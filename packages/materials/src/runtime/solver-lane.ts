@@ -13,6 +13,7 @@ import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { planContextMaintenance } from "@proofblade/molecules";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import type { RuntimeResourceSnapshot } from "../domain/types.js";
 
 export class PiSolverLane implements AgentLanePort {
   private busy = false;
@@ -25,6 +26,7 @@ export class PiSolverLane implements AgentLanePort {
     private readonly checkpointService: CheckpointService,
     private readonly profile: Awaited<ReturnType<typeof resolveModelProfile>>,
     private readonly skills: ProofBladeSkillRegistry,
+    private readonly resourceSnapshot: RuntimeResourceSnapshot,
   ) {}
 
   public static async create(options: {
@@ -46,6 +48,7 @@ export class PiSolverLane implements AgentLanePort {
       : await repo.create({ id: sessionId, cwd: options.runDir, metadata: { runId: options.runId, lane: "executor", purpose: "solve" } });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
+    const resourceSnapshot = options.runtime.resourceSnapshot(skills.contextSnapshot());
     const { models, model } = createConfiguredModels(profile);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
@@ -68,7 +71,7 @@ export class PiSolverLane implements AgentLanePort {
           task: snapshot.task,
           snapshot,
           contextWindow: profile.contextWindow,
-          resources: skills.contextSnapshot(),
+          resources: resourceSnapshot,
         });
         return [
           contextText(compiled),
@@ -85,7 +88,7 @@ export class PiSolverLane implements AgentLanePort {
     });
     harness.on("context", async ({ messages }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: skills.contextSnapshot() });
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
       const usedTokens = compiled.estimatedTokens + Math.ceil(JSON.stringify(messages).length / 4);
       const plan = planContextMaintenance(usedTokens, compiled.manifest.budget.availableInput);
@@ -97,7 +100,7 @@ export class PiSolverLane implements AgentLanePort {
     });
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: skills.contextSnapshot() });
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
       const checkpoint = await checkpointService.create(options.runId, "pi-compaction", compiled.manifest);
       return {
         compaction: {
@@ -109,7 +112,7 @@ export class PiSolverLane implements AgentLanePort {
         },
       };
     });
-    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills);
+    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot);
     laneRef.lane = lane;
     return lane;
   }
@@ -183,7 +186,7 @@ export class PiSolverLane implements AgentLanePort {
       snapshot,
       contextWindow: this.profile.contextWindow,
       outputBudget: this.profile.maxTokens,
-      resources: this.skills.contextSnapshot(),
+      resources: this.resourceSnapshot,
     });
     const observedInput = typeof response.usage?.input === "number" ? response.usage.input : 0;
     const plan = planContextMaintenance(Math.max(observedInput, compiled.estimatedTokens), compiled.manifest.budget.availableInput);

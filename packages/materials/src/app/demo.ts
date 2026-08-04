@@ -9,6 +9,7 @@ import { LocalFixtureSandbox } from "../sandbox/fixture.js";
 import type { ProofBladeConfig } from "../config.js";
 
 export interface AppServices {
+  projectRoot: string;
   control: ControlStore;
   artifacts: ArtifactStore;
   journal: EffectJournal;
@@ -22,7 +23,7 @@ export function createServices(root: string, config: ProofBladeConfig, effectFau
   const artifacts = new ArtifactStore(runsRoot, control);
   const sandbox = new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
   const journal = new EffectJournal(control, artifacts, sandbox, effectFault);
-  return { control, artifacts, journal, sandbox, runsRoot };
+  return { projectRoot: root, control, artifacts, journal, sandbox, runsRoot };
 }
 
 export function demoTask(runId: string, root: string, config: ProofBladeConfig): TaskContract {

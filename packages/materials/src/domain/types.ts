@@ -347,6 +347,8 @@ export interface RuntimeResourceSnapshot {
   version: 1;
   skillCatalogHash: string;
   skills: Array<{ name: string; description: string; contentHash: string }>;
+  mcpCatalogHash: string;
+  mcpServers: Array<{ name: string; description: string; configHash: string }>;
 }
 
 export interface ContextBuildInput {

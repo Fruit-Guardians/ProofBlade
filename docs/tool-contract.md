@@ -39,6 +39,8 @@ The Pi solver lane exposes fourteen sequential tools. The capability and Skill p
 
 Capability manifests are sorted before hashing; adding a manifest changes the catalog hash but never changes the core tool schema. Bundled capabilities are read-only target and artifact readers in this milestone. Every invocation creates the normal effect and artifact records, and target operations additionally create deterministic Observation/Evidence records.
 
+Each enabled project MCP server is represented as one `mcp.<name>` capability with fixed `describe` and `call` operations. Listing capabilities only reads `.mcp.json`; describe/call starts stdio lazily. MCP effects use conservative manual replay by default, persist sensitive arguments as hashes, redact known secret values before artifact registration, and create Observation/Evidence for successful calls.
+
 Jobs persist capability id, operation, arguments, generation, replay policy, effect/artifact references and terminal status. Pure, idempotent and resumable jobs restart from their durable record after a process restart; forbidden-replay jobs become `UNKNOWN`. Cancellation aborts the active controller, leaves the effect journal intact and prevents a late result from changing a `CANCELLED` job. Run teardown stops active jobs so no unexpected child process remains.
 
 ## Planner handoff contract

@@ -16,6 +16,15 @@ export class EffectJournal {
   ) {}
 
   public async execute(runId: string, input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy }, signal: AbortSignal = new AbortController().signal): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+    return await this.executeWith(runId, input, (request, innerSignal) => this.sandbox.execute(request, innerSignal), signal);
+  }
+
+  public async executeWith(
+    runId: string,
+    input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy },
+    executor: (request: EffectRequest, signal: AbortSignal) => Promise<RawEffectResult>,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
     const snapshot = await this.controlStore.snapshot(runId);
     const { effectId, idempotencyKey } = createEffectInput(runId, input.operation, input.args, input.replayPolicy ?? "pure", snapshot.generation);
     const existing = Object.values(snapshot.effects).find((effect) => effect.idempotencyKey === idempotencyKey);
@@ -47,7 +56,7 @@ export class EffectJournal {
     await this.injectFault?.("after_started", effectId);
     let result: RawEffectResult;
     try {
-      result = await this.sandbox.execute({ ...input, id: effectId, idempotencyKey }, signal);
+      result = await executor({ ...input, id: effectId, idempotencyKey }, signal);
     } catch (error) {
       result = { stdout: "", stderr: String(error), exitCode: null, durationMs: 0 };
     }
@@ -68,6 +77,11 @@ export class EffectJournal {
         const stored = JSON.parse(await this.artifactStore.readText(runId, completedArtifact)) as RawEffectResult;
         const outcome = stored.exitCode === 0 ? "success" : stored.exitCode === null ? "timeout" : "error";
         await this.controlStore.dispatch(runId, { type: "effect_finished", effectId: effect.id, outcome, artifactId: completedArtifact.id, externalId: stored.externalId, lane: "executor" });
+        reconciled.push(effect.id);
+        continue;
+      }
+      if (effect.operation.startsWith("mcp:")) {
+        await this.controlStore.dispatch(runId, { type: "effect_reconciled", effectId: effect.id, outcome: "unknown", lane: "executor" });
         reconciled.push(effect.id);
         continue;
       }

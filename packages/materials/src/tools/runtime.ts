@@ -1,14 +1,16 @@
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { JobRecord, RawEffectResult } from "../domain/types.js";
+import type { JobRecord, RawEffectResult, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
 import { id, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
-import { ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
+import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
+import { listBundledCapabilities } from "../capabilities/catalog.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
+import { McpProjectRegistry } from "../mcp/registry.js";
 
 export interface InspectTargetResult {
   output: string;
@@ -22,6 +24,7 @@ export class ProofBladeToolRuntime {
   private readonly observer: DeterministicObserver;
   private readonly capabilityRouter: ProofBladeCapabilityRouter;
   private readonly jobs: BackgroundJobRunner;
+  private readonly mcp: McpProjectRegistry;
 
   public constructor(
     public readonly runId: string,
@@ -30,9 +33,12 @@ export class ProofBladeToolRuntime {
     private readonly controlStore: ControlStore,
     private readonly artifactStore: ArtifactStore,
     private readonly journal: EffectJournal,
+    projectRoot = dirname(runsRoot),
   ) {
     this.observer = new DeterministicObserver(controlStore);
-    this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal);
+    this.mcp = McpProjectRegistry.load(projectRoot);
+    const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
+    this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, this.mcp);
     this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
   }
 
@@ -40,9 +46,17 @@ export class ProofBladeToolRuntime {
     return this.capabilityRouter.listCapabilities();
   }
 
+  public resourceSnapshot(base: RuntimeResourceSnapshot): RuntimeResourceSnapshot {
+    return {
+      ...base,
+      mcpCatalogHash: this.mcp.catalogHash(),
+      mcpServers: this.mcp.summaries().filter((server) => !server.disabled).map(({ name, description, configHash }) => ({ name, description, configHash })),
+    };
+  }
+
   public async invokeCapability(input: { capabilityId: string; operation: string; input: Record<string, unknown> }, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
     const result = await this.capabilityRouter.invoke({ capabilityId: input.capabilityId, operation: input.operation, input: input.input }, signal);
-    if (input.capabilityId !== "proofblade.target") return result;
+    if (input.capabilityId !== "proofblade.target" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[result.artifactId];
     if (!artifact) return result;
@@ -91,6 +105,7 @@ export class ProofBladeToolRuntime {
 
   public async close(): Promise<void> {
     await this.jobs.close();
+    await this.mcp.close();
   }
 
   public async inspectTarget(path?: string): Promise<InspectTargetResult> {

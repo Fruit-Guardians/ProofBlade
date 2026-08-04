@@ -16,6 +16,8 @@ import {
   PlannerCoordinator,
   ProofBladeToolRuntime,
   ProofBladeSkillRegistry,
+  McpProjectRegistry,
+  listBundledCapabilities,
   projectionHash,
   runDemo,
   SingleAgentCtfLoop,
@@ -59,8 +61,33 @@ async function main(): Promise<void> {
       break;
     }
     case "capabilities": {
-      const registry = new CapabilityRegistry();
+      const mcp = McpProjectRegistry.load(root);
+      const registry = new CapabilityRegistry([...listBundledCapabilities(), ...mcp.capabilityManifests()]);
       print({ catalogHash: registry.catalogHash(), capabilities: registry.list() });
+      break;
+    }
+    case "mcp": {
+      const action = arg ?? "list";
+      const mcp = McpProjectRegistry.load(root);
+      if (action === "list") {
+        print({ catalogHash: mcp.catalogHash(), servers: mcp.summaries() });
+        break;
+      }
+      const runId = required(rest[0], "run id");
+      const serverName = required(rest[1], "MCP server name");
+      const summary = mcp.summaries().find((item) => item.name === serverName && !item.disabled);
+      if (!summary) throw new Error(`Unknown enabled MCP server: ${serverName}`);
+      const runtime = await toolRuntime(runId, services);
+      try {
+        if (action === "describe") print(await runtime.invokeCapability({ capabilityId: summary.capabilityId, operation: "describe", input: {} }));
+        else if (action === "call") {
+          const tool = required(rest[2], "MCP tool name");
+          const toolArgs = rest[3] === undefined ? {} : parseObject(rest[3], "MCP tool arguments");
+          print(await runtime.invokeCapability({ capabilityId: summary.capabilityId, operation: "call", input: { tool, arguments: toolArgs } }));
+        } else throw new Error("mcp action must be list, describe, or call");
+      } finally {
+        await runtime.close();
+      }
       break;
     }
     case "skills": {
@@ -136,6 +163,7 @@ async function main(): Promise<void> {
         await lane.compact(rest.join(" ").trim() || "Manual ProofBlade compaction");
       } finally {
         await lane.close();
+        await runtime.close();
       }
       const snapshot = await services.control.snapshot(runId);
       print({ runId, checkpoints: Object.values(snapshot.checkpoints) });
@@ -287,6 +315,12 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
+function parseObject(value: string, label: string): Record<string, unknown> {
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${label} must be a JSON object`);
+  return parsed as Record<string, unknown>;
+}
+
 function helpText(): string {
   return [
     "ProofBlade / 证锋",
@@ -297,6 +331,7 @@ function helpText(): string {
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID]",
     "  capabilities",
+    "  mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",
     "  skill <run-id> <skill-name> [additional instructions]",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
@@ -323,7 +358,7 @@ function helpText(): string {
 async function toolRuntime(runId: string, services: ReturnType<typeof createServices>): Promise<ProofBladeToolRuntime> {
   const snapshot = await services.control.snapshot(runId);
   const fixture = await services.sandbox.build(snapshot.task);
-  return new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+  return new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal, services.projectRoot);
 }
 
 main().catch((error) => {

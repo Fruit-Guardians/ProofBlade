@@ -12,7 +12,7 @@
 | Capability 目录与路由 | 已实现 | `packages/materials/src/capabilities` |
 | Effect Journal、Artifact、Evidence | 已实现 | `packages/materials/src/effects`、`packages/materials/src/knowledge` |
 | 后台任务 | 已实现 | `packages/materials/src/jobs/background-runner.ts` |
-| 项目级 MCP | 接口已定，代码在下一阶段接入 | `.mcp.json`、固定代理工具 |
+| 项目级 MCP | 已实现 | `.mcp.json`、`mcp.<name>` Capability、官方 MCP 2.0 stdio Client |
 | 项目级 Skill | 已实现 | `skills/<name>/SKILL.md`、`load_skill`、Pi `harness.skill()` |
 
 状态表是行为事实来源。README 只提供入口，不用模糊措辞把预留接口写成已交付功能。
@@ -227,7 +227,7 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 
 ## 6. MCP 接入契约
 
-本节是下一代码阶段的实现契约。
+项目级 MCP 实现在 `packages/materials/src/mcp/registry.ts`。ProofBlade 参考 `tmp/pi-mcp-adapter` 的延迟发现和生命周期做法，嵌入层直接使用官方 MCP 2.0 Client/Core，不加载 Pi CLI ExtensionAPI。
 
 ### 6.1 配置位置
 
@@ -246,6 +246,8 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
       "description": "One-line server description",
       "requestTimeoutMs": 30000,
       "includeTools": ["read_item"],
+      "readOnly": true,
+      "replay": "manual",
       "disabled": false
     }
   }
@@ -266,6 +268,16 @@ MCP 不把全部服务器 Tool Schema 注入 L0 常驻上下文。固定交互�
 
 外层 Solver 工具保持固定，优先复用 `list_capabilities` 和 `invoke_capability`。每个 MCP Server 映射为 `mcp.<server-name>` Capability，避免服务器增减导致核心 Tool Schema 波动。
 
+当前 CLI 入口：
+
+```powershell
+proofblade mcp list
+proofblade mcp describe RUN-ID example
+proofblade mcp call RUN-ID example read_item '{"id":"ITEM"}'
+```
+
+`mcp list` 只解析配置。`describe` 和 `call` 必须关联一个已有 Run，因此连接、结果和失败都会进入该 Run 的 Effect/Artifact 记录。
+
 ### 6.3 效果与证据
 
 MCP 调用必须经过：
@@ -283,14 +295,14 @@ invoke_capability
 
 ### 6.4 MCP 验收
 
-- 缺少 `.mcp.json` 时启动行为与当前版本一致。
-- `list_capabilities` 不启动 Server。
-- 首次 describe/call 才启动对应 Server。
-- 未列入 `includeTools` 的 Tool 不可见且不可调用。
-- 环境变量值不出现在事件、日志、Artifact 和上下文中。
-- 超时、取消和进程退出都有确定的 Effect 终态。
-- 中断后的 MCP Effect 按重放策略进入恢复或 `UNKNOWN`。
-- 合成 stdio Server 的发现、调用、取消、重放和清理测试通过。
+- [x] 缺少 `.mcp.json` 时启动行为与当前版本一致。
+- [x] `list_capabilities` 不启动 Server。
+- [x] 首次 describe/call 才启动对应 Server。
+- [x] 未列入 `includeTools` 的 Tool 不可见且不可调用。
+- [x] 已知环境变量值和敏感参数值不出现在 Effect、Artifact 和上下文中。
+- [x] 调用失败和进程退出形成确定的 Effect 终态。
+- [x] 中断后的 MCP Effect 进入 `UNKNOWN`，默认不自动重放。
+- [x] 合成 stdio Server 的发现、调用、脱敏、证据和清理测试通过。
 
 ## 7. Skill 接入契约
 

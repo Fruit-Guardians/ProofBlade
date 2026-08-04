@@ -18,6 +18,8 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 50/60/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
+- Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
+- Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 
@@ -51,6 +53,7 @@ proofblade run demo
 proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
 proofblade capabilities
+proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
 proofblade skill <run-id> <skill-name> [additional instructions]
 proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
@@ -88,9 +91,9 @@ Imports only point downward in this diagram. Each package adds information inste
 - Add business-agnostic primitives to `packages/atoms`.
 - Add generic acquisition, processing or transport compositions to `packages/molecules`.
 - Add journaled ProofBlade tools and capability adapters to `packages/materials`.
-- Connect isolated local services through project-level `.mcp.json` configuration (next implementation phase).
+- Connect isolated local services through project-level `.mcp.json` configuration.
 - Put on-demand procedures and domain knowledge in `skills/<name>/SKILL.md`.
 
-Built-in tools, the Capability Router, the Effect Journal and the project Skill Registry are implemented. Skill metadata and hashes enter the ContextManifest while full instructions load through `load_skill` or Pi's native Skill invocation. MCP calls will follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
+Built-in tools, the Capability Router, the Effect Journal, the project Skill Registry and MCP stdio are implemented. Skill and MCP metadata enter the ContextManifest while full instructions and tool schemas load on demand. MCP calls follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
 
 See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.

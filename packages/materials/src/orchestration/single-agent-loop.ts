@@ -68,7 +68,7 @@ export class SingleAgentCtfLoop {
     snapshot = await this.services.control.snapshot(options.runId);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
-    const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal);
+    const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
     await runtime.recoverJobs();
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);

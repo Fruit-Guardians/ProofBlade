@@ -18,6 +18,8 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 带预算的六层上下文、常驻指令/任务记忆分离、50/60/80/90% 分级维护、制品首尾检索、工具调用配对修复、空闲压缩、机械检查点和上下文溢出恢复。
 - 配置模型可用时启用的 Pi JSONL Session 适配器。
 - 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
+- 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
+- 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
 
@@ -51,6 +53,7 @@ proofblade run demo
 proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
 proofblade capabilities
+proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
 proofblade skill <run-id> <skill-name> [additional instructions]
 proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
@@ -92,10 +95,10 @@ apps/cli                     用户意图与交付入口
 | 最小类型、哈希、序列化或存储原语 | 原子 | `packages/atoms` | 完全不知道 Agent 和 CTF 业务 |
 | 通用的信息获取、处理或传递流程 | 分子 | `packages/molecules` | 知道原子契约，不知道具体任务 |
 | 需要进入证据链的 ProofBlade 操作 | 内建 Tool / Capability | `packages/materials` | 读写 Run、制品、靶场或任务状态 |
-| 外部进程或独立服务提供的工具 | MCP Server | 项目根目录 `.mcp.json` | 希望延迟发现工具规范，并隔离服务生命周期（下一代码阶段） |
+| 外部进程或独立服务提供的工具 | MCP Server | 项目根目录 `.mcp.json` | 希望延迟发现工具规范，并隔离服务生命周期 |
 | 可按需注入的工作方法和领域知识 | Skill | `skills/<name>/SKILL.md` | 希望常驻元数据、使用时才加载正文 |
 
-当前已经实现内建 Tool、Capability Router、Effect Journal 和项目级 Skill Registry。Skill 目录元数据及哈希进入 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill 调用按需加载。MCP 接入将复用同一条审计路径。完整接口、目录示例、实现状态、检查清单和测试方法见 `docs/extensions.md`。
+当前已经实现内建 Tool、Capability Router、Effect Journal、项目级 Skill Registry 和 MCP stdio。Skill 与 MCP 只把目录元数据及哈希放入 ContextManifest；正文和完整 Tool Schema 按需加载。MCP 调用复用 `Capability Router -> Effect Journal -> Artifact/Evidence` 审计路径。完整接口、目录示例、实现状态、检查清单和测试方法见 `docs/extensions.md`。
 
 ## 设计文档
 

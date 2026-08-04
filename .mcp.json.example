@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "example": {
+      "command": "COMMAND",
+      "args": ["ARG"],
+      "cwd": ".",
+      "description": "One-line server description",
+      "env": {
+        "TOKEN": "${TOKEN}"
+      },
+      "requestTimeoutMs": 30000,
+      "includeTools": ["read_item"],
+      "readOnly": true,
+      "replay": "manual",
+      "disabled": false
+    }
+  }
+}

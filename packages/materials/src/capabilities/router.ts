@@ -5,6 +5,7 @@ import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ControlStore } from "../control/control-store.js";
 import { listBundledCapabilities } from "./catalog.js";
+import type { McpProjectRegistry } from "../mcp/registry.js";
 
 export interface CapabilityInvocation {
   capabilityId: string;
@@ -60,6 +61,7 @@ export class ProofBladeCapabilityRouter {
     private readonly _artifactStore: ArtifactStore,
     private readonly journal: EffectJournal,
     private readonly registry = new CapabilityRegistry(),
+    private readonly mcp?: McpProjectRegistry,
   ) {}
 
   public listCapabilities(): { catalogHash: string; capabilities: CapabilityManifest[] } {
@@ -74,6 +76,33 @@ export class ProofBladeCapabilityRouter {
     const { manifest, operation } = this.registry.find(request.capabilityId, request.operation);
     validateInput(operation, request.input);
     const snapshot = await this.controlStore.snapshot(this.runId);
+    if (this.mcp?.handles(request.capabilityId)) {
+      const executed = await this.journal.executeWith(
+        this.runId,
+        {
+          operation: `mcp:${request.capabilityId}:${request.operation}`,
+          args: { ...this.mcp.effectArgs(request.capabilityId, request.operation, request.input), generation: snapshot.generation },
+          replayPolicy: operation.replay,
+          cwd: this.runsRoot,
+        },
+        async (_effect, innerSignal) => await this.mcp!.execute(request.capabilityId, request.operation, request.input, innerSignal),
+        signal,
+      );
+      if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || `MCP capability failed: ${request.capabilityId}.${request.operation}`);
+      const output = formatOutput(executed.result.stdout, operation.outputPolicy);
+      return {
+        capabilityId: request.capabilityId,
+        operation: request.operation,
+        manifestHash: manifest.hash,
+        effectId: executed.effectId,
+        artifactId: executed.artifactId,
+        output: `<untrusted-observation capability="${request.capabilityId}" operation="${request.operation}" artifact="${executed.artifactId}">\n${output.text}\n</untrusted-observation>`,
+        stderr: executed.result.stderr,
+        outputTier: output.tier,
+        truncated: output.truncated,
+        originalChars: output.originalChars,
+      };
+    }
     const mapped = mapOperation(request.capabilityId, request.operation, request.input, this.fixture, this.runsRoot, this.runId, snapshot.artifacts);
     const executed = await this.journal.execute(this.runId, { operation: mapped.operation, args: { ...mapped.args, generation: snapshot.generation }, replayPolicy: operation.replay, cwd: mapped.cwd }, signal);
     if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || `Capability failed: ${request.capabilityId}.${request.operation}`);

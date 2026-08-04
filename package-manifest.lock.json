@@ -16,6 +16,35 @@
       "sourceCommit": "0524d6897f171d63a79e00946df8ce7f53c605fe",
       "integrity": "sha512-m3IZD4g3er0V8TC9+Vpgw/sjTKqcJlkcIBy/JvsgRubuuik3tAVzyugUg4rVrShIkkOT69mEd34NEqKUIsl6JQ==",
       "resourceFilter": ["openai-completions"]
+    },
+    {
+      "name": "@modelcontextprotocol/client",
+      "version": "2.0.0",
+      "source": "https://github.com/modelcontextprotocol/typescript-sdk",
+      "integrity": "sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==",
+      "resourceFilter": ["stdio-client", "tools-list", "tools-call"]
+    },
+    {
+      "name": "@modelcontextprotocol/core",
+      "version": "2.0.0",
+      "source": "https://github.com/modelcontextprotocol/typescript-sdk",
+      "integrity": "sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==",
+      "resourceFilter": ["protocol-types", "transport-contract"]
+    },
+    {
+      "name": "@modelcontextprotocol/server",
+      "version": "2.0.0",
+      "source": "https://github.com/modelcontextprotocol/typescript-sdk",
+      "integrity": "sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==",
+      "resourceFilter": ["test-stdio-server"]
+    },
+    {
+      "name": "pi-mcp-adapter",
+      "version": "2.19.0",
+      "source": "https://github.com/nicobailon/pi-mcp-adapter",
+      "sourceCommit": "f123a7e368ef7caab19a3b3070feef78590a3e2a",
+      "integrity": "sha512-2FwyuQKFWJP9kO8nl83fAEl+d10MxENqw7TvMcINlJn0yLVCHb5WevN06jpKo19GBi7BBkD6Ri7Sq2rJyiYZiQ==",
+      "resourceFilter": ["reference-only", "lazy-discovery", "stdio-lifecycle"]
     }
   ]
 }

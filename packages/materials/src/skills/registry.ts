@@ -85,6 +85,8 @@ export class ProofBladeSkillRegistry {
       version: 1,
       skillCatalogHash: this.catalogHash(),
       skills: this.list().map(({ name, description, contentHash }) => ({ name, description, contentHash })),
+      mcpCatalogHash: sha256(canonicalJson([])),
+      mcpServers: [],
     };
   }
 

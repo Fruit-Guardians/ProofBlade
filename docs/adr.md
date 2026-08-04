@@ -63,3 +63,7 @@ Keep the six-fixture evaluator provider-free. It reuses the production Control S
 ## ADR-016 Skills are project resources with two-level context loading
 
 Discover `skills/` through Pi 0.83.0's Skill parser and keep only validated, unique, project-contained entries. Put stable name, description, content hash and catalog hash in L0 and the ContextManifest; load the bounded body only through `load_skill` or an explicit Pi `harness.skill()` turn. Skill instructions do not create target evidence and Skill scripts must enter through a journaled capability rather than bypassing effect control.
+
+## ADR-017 Embedded MCP uses lazy capability adapters
+
+Read only the project `.mcp.json`; do not import ambient host MCP configuration. Map each enabled stdio server to a stable `mcp.<name>` capability while keeping the Solver tool schema unchanged. Listing is process-free, describe/call connect lazily, and every call goes through Effect Journal, Artifact, redaction and evidence handling. MCP code is trusted local process code rather than a sandbox boundary, and unfinished calls reconcile to unknown unless an explicit replay policy proves otherwise.
