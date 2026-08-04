@@ -3,9 +3,11 @@ import type { AgentHarnessTool } from "@earendil-works/pi-agent-core";
 import type { ProofBladeToolContract } from "../tools/contracts.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 
 export interface SolverToolContext {
   runtime: ProofBladeToolRuntime;
+  skills: ProofBladeSkillRegistry;
 }
 
 type SchemaTool = AgentHarnessTool<SolverToolContext, TSchema, unknown>;
@@ -18,6 +20,7 @@ export function createSolverTools(): SchemaTool[] {
     adapt(runBackgroundContract),
     adapt(readJobOutputContract),
     adapt(stopJobContract),
+    adapt(loadSkillContract),
     adapt(proposeIntentContract),
     adapt(proposeHypothesisContract),
     adapt(proposeFactContract),
@@ -156,6 +159,27 @@ const stopJobContract: ProofBladeToolContract<typeof stopJobSchema, Static<typeo
   executionMode: "sequential",
   async execute(input, context) {
     return await context.runtime.stopJob(input.jobId, input.reason);
+  },
+};
+
+const loadSkillSchema = Type.Object({
+  name: Type.String({ minLength: 1, description: "Skill name from the available-skills catalog." }),
+  maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+});
+
+const loadSkillContract: ProofBladeToolContract<typeof loadSkillSchema, Static<typeof loadSkillSchema>, unknown, SolverToolContext> = {
+  name: "load_skill",
+  version: "1.0.0",
+  description: "Load one trusted project Skill on demand. Only Skill metadata is resident in the standing context.",
+  parameters: loadSkillSchema,
+  readOnly: true,
+  sideEffect: "none",
+  replay: "pure",
+  outputPolicy: "inline",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return context.skills.loadForModel(input.name, input.maxChars);
   },
 };
 

@@ -59,3 +59,7 @@ Planner and executor do not share a chat transcript. The planner lane writes a b
 ## ADR-015 Evaluation is a deterministic pre-push gate
 
 Keep the six-fixture evaluator provider-free. It reuses the production Control Store, Observer, verifier and replay path with deterministic executor decisions, and reports success, evidence-backed success, replay parity and candidate-leak checks. A model-backed run remains a separate smoke test; it must not make the commit gate dependent on LM Studio availability.
+
+## ADR-016 Skills are project resources with two-level context loading
+
+Discover `skills/` through Pi 0.83.0's Skill parser and keep only validated, unique, project-contained entries. Put stable name, description, content hash and catalog hash in L0 and the ContextManifest; load the bounded body only through `load_skill` or an explicit Pi `harness.skill()` turn. Skill instructions do not create target evidence and Skill scripts must enter through a journaled capability rather than bypassing effect control.

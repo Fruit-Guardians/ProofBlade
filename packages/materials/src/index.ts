@@ -22,6 +22,7 @@ export * from "./runtime/solver-lane.js";
 export * from "./capabilities/catalog.js";
 export * from "./capabilities/router.js";
 export * from "./jobs/background-runner.js";
+export * from "./skills/registry.js";
 export * from "./evaluation/fixture-evaluator.js";
 export * from "./sandbox/fixture.js";
 export * from "./sandbox/fixture-catalog.js";

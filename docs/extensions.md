@@ -13,7 +13,7 @@
 | Effect Journal、Artifact、Evidence | 已实现 | `packages/materials/src/effects`、`packages/materials/src/knowledge` |
 | 后台任务 | 已实现 | `packages/materials/src/jobs/background-runner.ts` |
 | 项目级 MCP | 接口已定，代码在下一阶段接入 | `.mcp.json`、固定代理工具 |
-| 项目级 Skill | 接口已定，代码在下一阶段接入 | `skills/<name>/SKILL.md`、按需加载 |
+| 项目级 Skill | 已实现 | `skills/<name>/SKILL.md`、`load_skill`、Pi `harness.skill()` |
 
 状态表是行为事实来源。README 只提供入口，不用模糊措辞把预留接口写成已交付功能。
 
@@ -294,7 +294,7 @@ invoke_capability
 
 ## 7. Skill 接入契约
 
-本节是下一代码阶段的实现契约。ProofBlade 复用 Pi AgentHarness 的 Skill 解析和校验规则。
+ProofBlade 复用 Pi AgentHarness 的 Skill 解析和校验规则，并在 Windows 适配层统一路径表示。Registry 实现在 `packages/materials/src/skills/registry.ts`。
 
 ### 7.1 目录与格式
 
@@ -341,6 +341,16 @@ Skill 分两级进入上下文：
 ```
 
 加载正文时记录 Skill 名称、内容哈希和加载时间，但不把 Skill 当作目标证据。正文超过预算时先加载目录和摘要，再通过引用读取工具获取局部内容。Skill 更新后目录哈希变化，旧检查点仍保留原哈希以支持审计。
+
+当前入口：
+
+```powershell
+proofblade skills list
+proofblade skills show evidence-triage 4000
+proofblade skill RUN-ID evidence-triage "Focus on the current handoff"
+```
+
+Solver 的 L0 只包含可由模型选择的 Skill 元数据、内容哈希和目录哈希。`load_skill` 返回最多 12000 字符的有界正文；CLI `skill` 通过 Pi AgentHarness 原生 `skill()` 启动一个显式 Skill Turn。
 
 ### 7.3 Skill 与 Tool 的边界
 

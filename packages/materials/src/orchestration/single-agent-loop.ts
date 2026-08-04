@@ -13,6 +13,7 @@ import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 
 export interface SolverLaneCreateInput {
+  projectRoot: string;
   runId: string;
   runDir: string;
   runtime: ProofBladeToolRuntime;
@@ -77,7 +78,7 @@ export class SingleAgentCtfLoop {
       const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
-    const lane = await this.createLane({ runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+    const lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     try {
@@ -198,7 +199,7 @@ function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
 }
 
 async function defaultLaneFactory(input: SolverLaneCreateInput): Promise<AgentLanePort> {
-  return await PiSolverLane.create({ runId: input.runId, runDir: input.runDir, controlStore: input.services.control, artifactStore: input.services.artifacts, config: input.config, runtime: input.runtime });
+  return await PiSolverLane.create({ projectRoot: input.projectRoot, runId: input.runId, runDir: input.runDir, controlStore: input.services.control, artifactStore: input.services.artifacts, config: input.config, runtime: input.runtime });
 }
 
 function latestPending(snapshot: RunSnapshot) {

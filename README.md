@@ -51,6 +51,8 @@ proofblade run demo
 proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
 proofblade capabilities
+proofblade skills [list|show] [skill-name] [max-chars]
+proofblade skill <run-id> <skill-name> [additional instructions]
 proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>
 proofblade timeline <run-id>
@@ -91,9 +93,9 @@ apps/cli                     用户意图与交付入口
 | 通用的信息获取、处理或传递流程 | 分子 | `packages/molecules` | 知道原子契约，不知道具体任务 |
 | 需要进入证据链的 ProofBlade 操作 | 内建 Tool / Capability | `packages/materials` | 读写 Run、制品、靶场或任务状态 |
 | 外部进程或独立服务提供的工具 | MCP Server | 项目根目录 `.mcp.json` | 希望延迟发现工具规范，并隔离服务生命周期（下一代码阶段） |
-| 可按需注入的工作方法和领域知识 | Skill | `skills/<name>/SKILL.md` | 希望常驻元数据、使用时才加载正文（下一代码阶段） |
+| 可按需注入的工作方法和领域知识 | Skill | `skills/<name>/SKILL.md` | 希望常驻元数据、使用时才加载正文 |
 
-当前已经实现内建 Tool、Capability Router 和 Effect Journal。MCP 接入将复用同一条审计路径；Skill 只负责向当前推理提供指令和引用资源，不绕过工具效果控制。完整接口、目录示例、实现状态、检查清单和测试方法见 `docs/extensions.md`。
+当前已经实现内建 Tool、Capability Router、Effect Journal 和项目级 Skill Registry。Skill 目录元数据及哈希进入 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill 调用按需加载。MCP 接入将复用同一条审计路径。完整接口、目录示例、实现状态、检查清单和测试方法见 `docs/extensions.md`。
 
 ## 设计文档
 

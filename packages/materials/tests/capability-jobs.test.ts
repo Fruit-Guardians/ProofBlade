@@ -39,6 +39,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     "run_background",
     "read_job_output",
     "stop_job",
+    "load_skill",
     "propose_intent",
     "propose_hypothesis",
     "propose_fact",
@@ -47,7 +48,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     "search_history",
     "report_status",
   ]);
-  assert.equal(solverToolContractHash(), "690b104af4533cd917b1728aa5d35a3925a4c04bd910bf3e2f5cc71987d056f1");
+  assert.equal(solverToolContractHash(), "d865d6563d4c29201d7940c9dafe14424b2174081cc20937e242beb7b9d75ee0");
   assert.equal(bundledCapabilityCatalogHash(), "7b8e742875d5d4cba6b7a0e2107376c0f19cfd90cb4985cf8bd8db397fa81b62");
 });
 

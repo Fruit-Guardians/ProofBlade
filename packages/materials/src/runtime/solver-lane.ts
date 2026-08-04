@@ -12,6 +12,7 @@ import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { planContextMaintenance } from "@proofblade/molecules";
+import { ProofBladeSkillRegistry } from "../skills/registry.js";
 
 export class PiSolverLane implements AgentLanePort {
   private busy = false;
@@ -23,10 +24,12 @@ export class PiSolverLane implements AgentLanePort {
     private readonly harness: AgentHarness<SolverToolContext>,
     private readonly checkpointService: CheckpointService,
     private readonly profile: Awaited<ReturnType<typeof resolveModelProfile>>,
+    private readonly skills: ProofBladeSkillRegistry,
   ) {}
 
   public static async create(options: {
     runId: string;
+    projectRoot: string;
     runDir: string;
     controlStore: ControlStore;
     artifactStore: ArtifactStore;
@@ -42,6 +45,7 @@ export class PiSolverLane implements AgentLanePort {
       ? await repo.open(metadata)
       : await repo.create({ id: sessionId, cwd: options.runDir, metadata: { runId: options.runId, lane: "executor", purpose: "solve" } });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
+    const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
     const { models, model } = createConfiguredModels(profile);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
@@ -52,7 +56,8 @@ export class PiSolverLane implements AgentLanePort {
       model,
       tools,
       activeToolNames: tools.map((tool) => tool.name),
-      toolContext: { runtime: options.runtime },
+      toolContext: { runtime: options.runtime, skills },
+      resources: { skills: skills.piSkills() },
       thinkingLevel: "off",
       systemPrompt: async () => {
         const snapshot = await options.controlStore.snapshot(options.runId);
@@ -63,6 +68,7 @@ export class PiSolverLane implements AgentLanePort {
           task: snapshot.task,
           snapshot,
           contextWindow: profile.contextWindow,
+          resources: skills.contextSnapshot(),
         });
         return [
           contextText(compiled),
@@ -79,7 +85,7 @@ export class PiSolverLane implements AgentLanePort {
     });
     harness.on("context", async ({ messages }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens });
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: skills.contextSnapshot() });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
       const usedTokens = compiled.estimatedTokens + Math.ceil(JSON.stringify(messages).length / 4);
       const plan = planContextMaintenance(usedTokens, compiled.manifest.budget.availableInput);
@@ -91,7 +97,7 @@ export class PiSolverLane implements AgentLanePort {
     });
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens });
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: skills.contextSnapshot() });
       const checkpoint = await checkpointService.create(options.runId, "pi-compaction", compiled.manifest);
       return {
         compaction: {
@@ -103,7 +109,7 @@ export class PiSolverLane implements AgentLanePort {
         },
       };
     });
-    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile);
+    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills);
     laneRef.lane = lane;
     return lane;
   }
@@ -122,6 +128,24 @@ export class PiSolverLane implements AgentLanePort {
       await this.controlStore.append(this.runId, [
         { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason } },
         { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "model_usage", payload: { provider: response.provider, model: response.model, usage: response.usage } },
+      ]);
+      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage };
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  public async skill(name: string, additionalInstructions?: string): Promise<AgentOutcome> {
+    this.busy = true;
+    const correlationId = `${this.runId}:executor:skill:${name}`;
+    await this.controlStore.append(this.runId, [{ schemaVersion: 1, lane: "executor", correlationId, actor: "orchestrator", type: "turn_started", payload: { skill: name, skillCatalogHash: this.skills.catalogHash() } }]);
+    try {
+      const response = await this.harness.skill(name, additionalInstructions);
+      await this.maintainAfterTurn(response);
+      const output = response.content.filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text").map((item) => item.text).join("\n");
+      await this.controlStore.append(this.runId, [
+        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason, skill: name } },
+        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "model_usage", payload: { provider: response.provider, model: response.model, usage: response.usage, skill: name } },
       ]);
       return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage };
     } finally {
@@ -159,6 +183,7 @@ export class PiSolverLane implements AgentLanePort {
       snapshot,
       contextWindow: this.profile.contextWindow,
       outputBudget: this.profile.maxTokens,
+      resources: this.skills.contextSnapshot(),
     });
     const observedInput = typeof response.usage?.input === "number" ? response.usage.input : 0;
     const plan = planContextMaintenance(Math.max(observedInput, compiled.estimatedTokens), compiled.manifest.budget.availableInput);

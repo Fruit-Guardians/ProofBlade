@@ -316,6 +316,7 @@ export interface ContextManifest {
   jobIds: string[];
   handoffIds: string[];
   artifactIds: string[];
+  resources: RuntimeResourceSnapshot;
   memory: {
     standingInstructionHash: string;
     confirmedFactIds: string[];
@@ -342,6 +343,12 @@ export interface ContextManifest {
   hash: string;
 }
 
+export interface RuntimeResourceSnapshot {
+  version: 1;
+  skillCatalogHash: string;
+  skills: Array<{ name: string; description: string; contentHash: string }>;
+}
+
 export interface ContextBuildInput {
   runId: string;
   lane: Lane;
@@ -352,6 +359,7 @@ export interface ContextBuildInput {
   contextWindow?: number;
   outputBudget?: number;
   safetyMargin?: number;
+  resources?: RuntimeResourceSnapshot;
 }
 
 export interface ContextBuildOutput {

@@ -14,7 +14,7 @@ The effect record also stores the fixture generation and enough execution data t
 
 ## Solver tools
 
-The Pi solver lane exposes thirteen sequential tools. The capability tools have stable schemas; operation details are discovered only when requested.
+The Pi solver lane exposes fourteen sequential tools. The capability and Skill proxy tools have stable schemas; operation details or full Skill content are loaded only when requested.
 
 | Tool | Information role |
 | --- | --- |
@@ -24,6 +24,7 @@ The Pi solver lane exposes thirteen sequential tools. The capability tools have 
 | `run_background` | Queue a durable, cancellable capability job and return a JobRecord id. |
 | `read_job_output` | Poll a job and retrieve its bounded artifact output. |
 | `stop_job` | Cancel a queued or running job and persist the reason. |
+| `load_skill` | Load one model-visible project Skill by stable name with a bounded result; Skill metadata remains resident while its body is on demand. |
 | `propose_intent` | Propose and deduplicate an evidence-seeking action. |
 | `propose_hypothesis` | Process observations into a falsifiable statement linked to evidence ids. |
 | `propose_fact` | Propose a ledger fact; it remains unconfirmed until verifier action. |

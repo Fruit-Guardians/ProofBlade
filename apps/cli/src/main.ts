@@ -15,6 +15,7 @@ import {
   PiSolverLane,
   PlannerCoordinator,
   ProofBladeToolRuntime,
+  ProofBladeSkillRegistry,
   projectionHash,
   runDemo,
   SingleAgentCtfLoop,
@@ -60,6 +61,14 @@ async function main(): Promise<void> {
     case "capabilities": {
       const registry = new CapabilityRegistry();
       print({ catalogHash: registry.catalogHash(), capabilities: registry.list() });
+      break;
+    }
+    case "skills": {
+      const registry = await ProofBladeSkillRegistry.load(root);
+      const action = arg ?? "list";
+      if (action === "list") print({ catalogHash: registry.catalogHash(), skills: registry.list(), diagnostics: registry.diagnostics });
+      else if (action === "show") print(registry.loadForModel(required(rest[0], "skill name"), rest[1] === undefined ? undefined : Number(rest[1])));
+      else throw new Error("skills action must be list or show");
       break;
     }
     case "solve": {
@@ -122,7 +131,7 @@ async function main(): Promise<void> {
     case "compact": {
       const runId = required(arg, "run id");
       const runtime = await toolRuntime(runId, services);
-      const lane = await PiSolverLane.create({ runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, config, runtime });
+      const lane = await PiSolverLane.create({ projectRoot: root, runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, config, runtime });
       try {
         await lane.compact(rest.join(" ").trim() || "Manual ProofBlade compaction");
       } finally {
@@ -130,6 +139,21 @@ async function main(): Promise<void> {
       }
       const snapshot = await services.control.snapshot(runId);
       print({ runId, checkpoints: Object.values(snapshot.checkpoints) });
+      break;
+    }
+    case "skill": {
+      const runId = required(arg, "run id");
+      const skillName = required(rest[0], "skill name");
+      const runDir = join(services.runsRoot, runId);
+      await access(runDir);
+      const runtime = await toolRuntime(runId, services);
+      const lane = await PiSolverLane.create({ projectRoot: root, runId, runDir, controlStore: services.control, artifactStore: services.artifacts, config, runtime });
+      try {
+        print(await lane.skill(skillName, rest.slice(1).join(" ").trim() || undefined));
+      } finally {
+        await lane.close();
+        await runtime.close();
+      }
       break;
     }
     case "history": {
@@ -273,6 +297,8 @@ function helpText(): string {
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID]",
     "  capabilities",
+    "  skills [list|show] [skill-name] [max-chars]",
+    "  skill <run-id> <skill-name> [additional instructions]",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
     "  timeline <run-id>",
