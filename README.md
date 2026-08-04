@@ -17,6 +17,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Pi JSONL Session adapter that is activated when a configured model is available.
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
+- Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 
 Provider and model selection live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
 
@@ -35,6 +36,7 @@ npm run cli -- agent DEMO-001 "Summarize the verified facts"
 npm test
 npm run test:atoms
 npm run test:molecules
+npm run eval
 ```
 
 Runs and artifacts are written below `runs/`. Downloads and source snapshots belong in `tmp/`; the repository ignores that directory by default.
@@ -45,6 +47,7 @@ Runs and artifacts are written below `runs/`. Downloads and source snapshots bel
 proofblade init <task-id>
 proofblade run demo
 proofblade fixtures
+proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
 proofblade capabilities
 proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>

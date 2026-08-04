@@ -12,6 +12,8 @@ The capability/job suite checks that manifest and core solver-tool hashes are st
 
 The handoff suite checks planner/executor lane gates, knowledge-version invalidation, deterministic supersession, context handoff indexing and replay parity. The workflow suite also prepares an accepted handoff before each executor turn without adding a second model request.
 
+The evaluation runner uses the same deterministic lane across all six fixtures. A case passes only when it reaches verifier-gated `SUCCEEDED/report`, has the required reproduction evidence, matches the replayed projection hash, and keeps the expected candidate out of the event log. The JSON report includes per-case timing and a `reportHash` for CI or pre-push comparison.
+
 Useful commands:
 
 ```text
@@ -19,6 +21,7 @@ proofblade run demo
 proofblade replay DEMO-001
 proofblade ledger DEMO-001
 proofblade fixtures
+npm run eval
 proofblade solve web-source-1 --run-id WEB-001 --mode auto --max-turns 2
 proofblade checkpoint WEB-001 manual
 proofblade compact WEB-001 manual

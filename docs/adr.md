@@ -55,3 +55,7 @@ Keep one fixed `invoke_capability` contract in the provider-visible tool surface
 ## ADR-014 Planner handoffs are structured and version-checked
 
 Planner and executor do not share a chat transcript. The planner lane writes a bounded `HandoffRecord` with references, next actions, budget and a hash of the shared knowledge projection. The executor lane can accept only a current handoff; new knowledge supersedes old handoffs before the next turn. Handoff lifecycle events are reducer-owned and the active record is included in the context manifest. The initial planner is deterministic to keep local-model runs affordable; a configured planner model may be added behind the same contract.
+
+## ADR-015 Evaluation is a deterministic pre-push gate
+
+Keep the six-fixture evaluator provider-free. It reuses the production Control Store, Observer, verifier and replay path with deterministic executor decisions, and reports success, evidence-backed success, replay parity and candidate-leak checks. A model-backed run remains a separate smoke test; it must not make the commit gate dependent on LM Studio availability.

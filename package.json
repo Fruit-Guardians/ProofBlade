@@ -19,6 +19,7 @@
     "test:molecules": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run test --workspace=@proofblade/molecules",
     "test:materials": "npm run build && npm run test --workspace=@proofblade/materials",
     "cli": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts",
+    "eval": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts eval",
     "demo": "npm run cli -- run demo",
     "clean": "tsc -b --clean"
   },

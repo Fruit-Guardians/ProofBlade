@@ -19,6 +19,7 @@ import {
   runDemo,
   SingleAgentCtfLoop,
   snapshotContext,
+  FixtureEvaluationRunner,
 } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
@@ -46,6 +47,14 @@ async function main(): Promise<void> {
     }
     case "fixtures": {
       print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+      break;
+    }
+    case "eval": {
+      const evalPositionals = positional(rest, ["--attempts", "--max-turns", "--run-prefix", "--prefix"]);
+      const attempts = parsePositiveOption(rest, "--attempts") ?? parsePositiveValue(evalPositionals[0], "attempts");
+      const maxTurns = parsePositiveOption(rest, "--max-turns") ?? parsePositiveValue(evalPositionals[1], "max-turns");
+      const runPrefix = option(rest, "--run-prefix") ?? option(rest, "--prefix") ?? evalPositionals[2];
+      print(await new FixtureEvaluationRunner(root, config).run({ attempts, maxTurns, runPrefix }));
       break;
     }
     case "capabilities": {
@@ -235,6 +244,21 @@ function positional(args: string[], optionNames: string[]): string[] {
   return values;
 }
 
+function parsePositiveOption(args: string[], name: string): number | undefined {
+  const value = option(args, name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`);
+  return parsed;
+}
+
+function parsePositiveValue(value: string | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${label} must be a positive integer`);
+  return parsed;
+}
+
 function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
@@ -247,6 +271,7 @@ function helpText(): string {
     "  init <run-id>",
     "  run demo [--run-id ID]",
     "  fixtures",
+    "  eval [--attempts N] [--max-turns N] [--run-prefix ID]",
     "  capabilities",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
