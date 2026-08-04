@@ -11,14 +11,18 @@ import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
+import { planContextMaintenance } from "@proofblade/molecules";
 
 export class PiSolverLane implements AgentLanePort {
   private busy = false;
+  private compactRequested = false;
 
   private constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
     private readonly harness: AgentHarness<SolverToolContext>,
+    private readonly checkpointService: CheckpointService,
+    private readonly profile: Awaited<ReturnType<typeof resolveModelProfile>>,
   ) {}
 
   public static async create(options: {
@@ -41,6 +45,7 @@ export class PiSolverLane implements AgentLanePort {
     const { models, model } = createConfiguredModels(profile);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
+    const laneRef: { lane?: PiSolverLane } = {};
     const harness = new AgentHarness<SolverToolContext>({
       session,
       models,
@@ -74,12 +79,18 @@ export class PiSolverLane implements AgentLanePort {
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
-      const pruned = pruneAgentMessages(messages, transcriptBudget);
+      const usedTokens = compiled.estimatedTokens + Math.ceil(JSON.stringify(messages).length / 4);
+      const plan = planContextMaintenance(usedTokens, compiled.manifest.budget.availableInput);
+      if (!plan.shouldSnip) return { messages };
+      const pruned = pruneAgentMessages(messages, transcriptBudget, { mode: plan.shouldPrune ? "prune" : "snip" });
       if (pruned.dropped.length > 0) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
+      if (plan.shouldCompact) laneRef.lane?.requestCompactionAfterTurn();
       return { messages: pruned.messages };
     });
     harness.on("session_before_compact", async ({ preparation }) => {
-      const checkpoint = await checkpointService.create(options.runId, "pi-compaction");
+      const snapshot = await options.controlStore.snapshot(options.runId);
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens });
+      const checkpoint = await checkpointService.create(options.runId, "pi-compaction", compiled.manifest);
       return {
         compaction: {
           summary: checkpoint.content,
@@ -90,7 +101,9 @@ export class PiSolverLane implements AgentLanePort {
         },
       };
     });
-    return new PiSolverLane(options.runId, options.controlStore, harness);
+    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile);
+    laneRef.lane = lane;
+    return lane;
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -99,6 +112,7 @@ export class PiSolverLane implements AgentLanePort {
     await this.controlStore.append(this.runId, [{ schemaVersion: 1, lane: "executor", correlationId, actor: "orchestrator", type: "turn_started", payload: { promptLength: text.length } }]);
     try {
       const response = await this.harness.prompt(text);
+      await this.maintainAfterTurn(response);
       const output = response.content
         .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
         .map((item) => item.text)
@@ -127,5 +141,34 @@ export class PiSolverLane implements AgentLanePort {
 
   public async close(): Promise<void> {
     await this.harness.waitForIdle();
+  }
+
+  private requestCompactionAfterTurn(): void {
+    this.compactRequested = true;
+  }
+
+  private async maintainAfterTurn(response: AssistantMessage): Promise<void> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const compiled = new ContextCompiler().build({
+      runId: this.runId,
+      lane: "executor",
+      phase: snapshot.phase,
+      task: snapshot.task,
+      snapshot,
+      contextWindow: this.profile.contextWindow,
+      outputBudget: this.profile.maxTokens,
+    });
+    const observedInput = typeof response.usage?.input === "number" ? response.usage.input : 0;
+    const plan = planContextMaintenance(Math.max(observedInput, compiled.estimatedTokens), compiled.manifest.budget.availableInput);
+    if (!this.compactRequested && !plan.shouldCompact) return;
+    const force = this.compactRequested || plan.forceCompact;
+    this.compactRequested = false;
+    await this.checkpointService.create(this.runId, force ? "context-force-maintenance" : "context-idle-maintenance", compiled.manifest);
+    if (response.stopReason === "error" || response.stopReason === "aborted") return;
+    try {
+      await this.harness.compact(force ? "Preserve all confirmed facts, rejected hypotheses, artifacts, in-flight effects, leases, and the next action." : "Compact stale history while preserving the CTF checkpoint and latest complete tool exchange.");
+    } catch {
+      // The durable checkpoint remains the recovery source if Pi compaction fails.
+    }
   }
 }

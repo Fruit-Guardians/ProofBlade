@@ -2,6 +2,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { ContextManifest, RunSnapshot } from "../domain/types.js";
 import { id } from "../domain/utils.js";
+import { snipText } from "@proofblade/molecules";
 
 export interface CreatedCheckpoint {
   checkpointId: string;
@@ -21,7 +22,7 @@ export class CheckpointService {
       return { checkpointId: existing.id, artifactId: artifact.id, content: await this.artifactStore.readText(runId, artifact) };
     }
     const checkpointId = id("CP");
-    const content = checkpointText(snapshot, checkpointId, reason);
+    const content = checkpointText(snapshot, checkpointId, reason, manifest);
     const artifact = await this.artifactStore.putText(runId, content, { filename: `checkpoint-${checkpointId}.md`, mime: "text/markdown" });
     await this.controlStore.dispatch(runId, {
       type: "checkpoint",
@@ -32,11 +33,14 @@ export class CheckpointService {
   }
 }
 
-function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: string): string {
+function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: string, manifest?: ContextManifest): string {
   const confirmed = Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").sort(bySeq);
   const rejected = Object.values(snapshot.hypotheses).filter((item) => item.status === "REJECTED").sort(bySeq);
   const completed = Object.values(snapshot.effects).filter((item) => item.status === "FINISHED" || item.status === "RECONCILED").sort(bySeq);
   const next = Object.values(snapshot.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+  const observations = Object.values(snapshot.observations).sort(bySeq).slice(-24);
+  const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-24);
+  const activeEffects = Object.values(snapshot.effects).filter((item) => item.status === "PROPOSED" || item.status === "STARTED" || item.status === "UNKNOWN").sort(bySeq);
   return [
     "## Task",
     `- checkpoint_id: ${checkpointId}`,
@@ -44,26 +48,50 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
     `- task_id: ${snapshot.task.task_id}`,
     `- phase: ${snapshot.phase}`,
     `- objective: ${snapshot.task.objective}`,
+    `- standing_instruction_hash: ${manifest?.memory.standingInstructionHash ?? "not-compiled"}`,
+    "",
+    "## Memory layers",
+    "- standing instructions: L0 is immutable and remains in the stable prompt prefix",
+    `- confirmed facts: ${confirmed.length}`,
+    `- rejected hypotheses: ${rejected.length}`,
     "",
     "## Confirmed facts",
-    ...orNone(confirmed.map((item) => `- ${item.id}: ${item.statement} (evidence: ${item.evidenceIds.join(", ")})`)),
+    ...orNone(confirmed.map((item) => `- ${item.id}: ${safeValue(item.statement)} (evidence: ${item.evidenceIds.join(", ")})`)),
     "",
     "## Rejected hypotheses",
-    ...orNone(rejected.map((item) => `- ${item.id}: ${item.statement} (evidence: ${item.evidenceIds.join(", ")})`)),
+    ...orNone(rejected.map((item) => `- ${item.id}: ${safeValue(item.statement)} (evidence: ${item.evidenceIds.join(", ")})`)),
+    "",
+    "## Observation and evidence index",
+    ...orNone(observations.map((item) => `- observation ${item.id}: artifact=${item.source.artifactId}, operation=${item.source.operation}, ${safeValue(item.summary)}`)),
+    ...orNone(evidence.map((item) => `- evidence ${item.id}: artifact=${item.source.artifactId ?? "none"}, ${safeValue(item.summary)}`)),
     "",
     "## Artifacts",
-    ...orNone(Object.values(snapshot.artifacts).map((item) => `- ${item.id}: path=${item.path}, sha256=${item.sha256}`)),
+    ...orNone(Object.values(snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id)).map((item) => `- ${item.id}: path=${item.path}, sha256=${item.sha256}`)),
     "",
     "## Actions already completed",
     ...orNone(completed.map((item) => `- ${item.operation}: effect=${item.id}, outcome=${item.outcome ?? "unknown"}, artifact=${item.artifactId ?? "none"}`)),
     "",
+    "## In-flight effects and leases",
+    ...orNone(activeEffects.map((item) => `- effect ${item.id}: ${item.operation}, status=${item.status}, policy=${item.replayPolicy}`)),
+    ...orNone(Object.values(snapshot.leases).map((item) => `- lease ${item.resourceKey}: owner=${item.ownerLane}, generation=${item.generation}, expires=${item.expiresAt}`)),
+    "",
     "## Next actions",
     ...orNone(next.map((item, index) => `${index + 1}. ${item.id}: ${item.title}`)),
+    "",
+    "## Context maintenance",
+    `- manifest_hash: ${manifest?.hash ?? "not-compiled"}`,
+    `- stage: ${manifest?.maintenance.stage ?? "checkpoint"}`,
+    `- budget: ${manifest ? `${manifest.budget.estimatedInput}/${manifest.budget.availableInput} (${manifest.budget.ratio.toFixed(3)})` : "not-compiled"}`,
+    `- dropped_entries: ${manifest?.dropped.length ?? 0}`,
     "",
     "## Blockers / human input",
     ...(snapshot.status === "NEED_HUMAN" || snapshot.status === "PAUSED" ? [`- ${snapshot.terminalReason ?? snapshot.status}`] : ["- none"]),
     "",
   ].join("\n");
+}
+
+function safeValue(value: string): string {
+  return snipText(value.replace(/\r?\n/g, " "), 480).text.replace(/<\/(?:untrusted|task-memory)-/gi, "<\\/$1-");
 }
 
 function orNone(values: string[]): string[] {

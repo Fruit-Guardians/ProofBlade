@@ -244,6 +244,19 @@ export interface ContextManifest {
   evidenceIds: string[];
   completionIds: string[];
   artifactIds: string[];
+  memory: {
+    standingInstructionHash: string;
+    confirmedFactIds: string[];
+    rejectedHypothesisIds: string[];
+    recalledObservationIds: string[];
+    recalledEvidenceIds: string[];
+  };
+  maintenance: {
+    stage: "stable" | "notice" | "snip" | "prune" | "compact";
+    ratio: number;
+    shouldCompact: boolean;
+    forceCompact: boolean;
+  };
   dropped: Array<{ kind: string; id?: string; reason: string }>;
   budget: {
     contextWindow: number;

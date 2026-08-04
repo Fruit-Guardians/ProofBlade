@@ -79,6 +79,33 @@ test("agent transcript pruning keeps the latest tool call and result paired", ()
   assert.ok(pruned.estimatedTokens <= 300 || pruned.messages.length <= 4);
 });
 
+test("context pruning repairs interrupted tool calls, drops orphan results, and keeps references", () => {
+  const messages = [
+    {
+      role: "assistant",
+      content: [
+        { type: "toolCall", id: "call-a", name: "inspect_target", arguments: {} },
+        { type: "toolCall", id: "call-b", name: "read_artifact", arguments: {} },
+      ],
+      api: "openai-completions",
+      provider: "test",
+      model: "test",
+      usage: zeroUsage(),
+      stopReason: "toolUse",
+      timestamp: 1,
+    },
+    { role: "toolResult", toolCallId: "call-a", toolName: "inspect_target", content: [{ type: "text", text: "A-ARCHIVE-1 " + "x".repeat(2_000) }], details: { artifactId: "A-ARCHIVE-1" }, isError: false, timestamp: 2 },
+    { role: "toolResult", toolCallId: "orphan", toolName: "old", content: [{ type: "text", text: "orphan" }], isError: false, timestamp: 3 },
+  ] as AgentMessage[];
+  const pruned = pruneAgentMessages(messages, 10_000, { mode: "snip" });
+  const serialized = JSON.stringify(pruned.messages);
+  assert.match(serialized, /call-b/);
+  assert.match(serialized, /missing \(interrupted\)/);
+  assert.match(serialized, /A-ARCHIVE-1/);
+  assert.doesNotMatch(serialized, /"toolCallId":"orphan"/);
+  assert.ok(pruned.dropped.some((item) => item.kind === "tool_result_snip"));
+});
+
 test("mechanical checkpoint is durable and a second context overflow fails explicitly", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-overflow-"));
   try {
@@ -92,6 +119,8 @@ test("mechanical checkpoint is durable and a second context overflow fails expli
     const created = await new CheckpointService(services.control, services.artifacts).create(checkpointRun, "test");
     assert.match(created.content, /F-C: stable fact/);
     assert.match(created.content, /H-C: dead route/);
+    assert.match(created.content, /Observation and evidence index/);
+    assert.match(created.content, /Context maintenance/);
     const reopened = createServices(root, config);
     assert.equal((await reopened.control.snapshot(checkpointRun)).checkpoints[created.checkpointId]?.artifactId, created.artifactId);
 

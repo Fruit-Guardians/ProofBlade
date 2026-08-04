@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileContextLayers, EventProjector, snipText, type AgentTool } from "../src/index.js";
+import { compileContextLayers, EventProjector, planContextMaintenance, snipText, type AgentTool } from "../src/index.js";
 
 test("molecules extend atoms without application knowledge", async () => {
   const tool: AgentTool<object, { value: number }, number, undefined> = {
@@ -19,4 +19,14 @@ test("molecules extend atoms without application knowledge", async () => {
   assert.equal(snipped.truncated, true);
   assert.equal(snipped.text.length <= 80, true);
   assert.equal(snipped.originalChars, 200);
+});
+
+test("context maintenance escalates deterministically", () => {
+  assert.equal(planContextMaintenance(400, 1_000).stage, "stable");
+  assert.equal(planContextMaintenance(520, 1_000).stage, "notice");
+  assert.equal(planContextMaintenance(650, 1_000).stage, "snip");
+  assert.equal(planContextMaintenance(820, 1_000).stage, "prune");
+  const forced = planContextMaintenance(950, 1_000);
+  assert.equal(forced.stage, "compact");
+  assert.equal(forced.forceCompact, true);
 });

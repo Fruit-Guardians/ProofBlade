@@ -43,3 +43,7 @@ Prefer a zero-argument target inspection tool over an optional path that mixes t
 ## ADR-011 Context pruning is deterministic first
 
 Before asking an LLM to summarize, preserve stable task and ledger anchors, snip old tool results, remove complete old tool exchanges and write a mechanical checkpoint. Pi compaction receives that checkpoint through `session_before_compact`; one overflow recovery is allowed per Run and the next overflow becomes an explicit failure.
+
+## ADR-012 Context memory has separate authority and retrieval paths
+
+Standing instructions are a stable prompt-prefix contract. Confirmed facts and rejected hypotheses are task memory with explicit ids and evidence links; episode history and raw tool output remain retrieval-only artifacts. The context manifest records the hash and ids for each layer. Maintenance is staged at 50/60/80/90% pressure, preserves complete tool-call/result pairs, and leaves a checkpoint anchor before any Pi compaction. Target text is always wrapped as untrusted data and cannot alter the task contract, tool registry, budget or terminal state.

@@ -13,7 +13,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
 - Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
-- Budgeted six-layer context manifests, artifact head/tail retrieval, mechanical checkpoints and overflow recovery.
+- Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 50/60/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
 
 Provider and model selection live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.

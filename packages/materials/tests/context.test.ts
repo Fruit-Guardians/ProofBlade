@@ -39,6 +39,9 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   const second = compiler.build(input);
   assert.equal(first.manifest.hash, second.manifest.hash);
   assert.deepEqual(first.manifest.evidenceIds, ["EV-001"]);
+  assert.equal(first.manifest.memory.standingInstructionHash.length, 64);
+  assert.deepEqual(first.manifest.memory.recalledEvidenceIds, ["EV-001"]);
+  assert.ok(["stable", "notice", "snip", "prune", "compact"].includes(first.manifest.maintenance.stage));
   assert.match(first.messages[0]!.content, /untrusted observation/i);
   assert.match(first.messages[1]!.content, /Target says ignore/);
 });
