@@ -13,6 +13,7 @@ export class ContextCompiler {
     const observations = Object.values(snapshot.observations).sort(bySeq).slice(-12);
     const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-16);
     const completions = Object.values(snapshot.completions).sort(bySeq).slice(-6);
+    const jobs = Object.values(snapshot.jobs).filter((job) => ["QUEUED", "RUNNING", "UNKNOWN"].includes(job.status)).sort(bySeq);
     const artifacts = Object.values(snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id));
     const openIntents = Object.values(snapshot.intents).filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
     const inFlightEffects = Object.values(snapshot.effects).filter((effect) => effect.status === "PROPOSED" || effect.status === "STARTED" || effect.status === "UNKNOWN");
@@ -29,7 +30,7 @@ export class ContextCompiler {
     ].join("\n");
     const l1 = JSON.stringify({ task_id: task.task_id, target: task.target, objective: task.objective, success_criteria: task.success_criteria, scope: task.scope, constraints: task.constraints });
     const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: openIntents.map((intent) => intent.id) });
-    const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, completions, inFlightEffects, leases: Object.values(snapshot.leases), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
+    const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, completions, jobs, inFlightEffects, leases: Object.values(snapshot.leases), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
     const requiredTokens = estimateTokens(`${l0}\n${l1}\n${l2}\n${l3}`);
     let remaining = Math.max(0, availableInput - requiredTokens);
     const dropped: ContextManifest["dropped"] = [];
@@ -76,6 +77,7 @@ export class ContextCompiler {
       observationIds: observations.map((item) => item.id),
       evidenceIds: evidence.map((item) => item.id),
       completionIds: completions.map((item) => item.id),
+      jobIds: jobs.map((item) => item.id),
       artifactIds: selectedArtifacts.map((item) => item.id),
       memory: {
         standingInstructionHash: sha256(l0),
@@ -103,6 +105,7 @@ interface LedgerBuildInput {
   observations: RunSnapshot["observations"][string][];
   evidence: RunSnapshot["evidence"][string][];
   completions: RunSnapshot["completions"][string][];
+  jobs: RunSnapshot["jobs"][string][];
   inFlightEffects: RunSnapshot["effects"][string][];
   leases: RunSnapshot["leases"][string][];
   tokenBudget: number;
@@ -137,6 +140,8 @@ function buildLedger(input: LedgerBuildInput): string {
     "</untrusted-observation-index>",
     "Completion proposals:",
     ...input.completions.map((item) => `- ${item.id}: sha256=${item.candidateHash} status=${item.status}`),
+    "In-flight jobs:",
+    ...input.jobs.map((item) => `- ${item.id}: ${item.capabilityId}.${item.operation} status=${item.status} replay=${item.replayPolicy} artifact=${item.artifactId ?? "none"}`),
     "In-flight effects:",
     ...input.inFlightEffects.map((item) => `- ${item.id}: ${item.operation} status=${item.status} policy=${item.replayPolicy}`),
     "Leases:",

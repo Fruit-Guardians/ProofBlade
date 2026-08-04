@@ -41,6 +41,7 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
   const observations = Object.values(snapshot.observations).sort(bySeq).slice(-24);
   const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-24);
   const activeEffects = Object.values(snapshot.effects).filter((item) => item.status === "PROPOSED" || item.status === "STARTED" || item.status === "UNKNOWN").sort(bySeq);
+  const jobs = Object.values(snapshot.jobs).filter((item) => ["QUEUED", "RUNNING", "UNKNOWN"].includes(item.status)).sort(bySeq);
   return [
     "## Task",
     `- checkpoint_id: ${checkpointId}`,
@@ -73,6 +74,7 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
     "",
     "## In-flight effects and leases",
     ...orNone(activeEffects.map((item) => `- effect ${item.id}: ${item.operation}, status=${item.status}, policy=${item.replayPolicy}`)),
+    ...orNone(jobs.map((item) => `- job ${item.id}: ${item.capabilityId}.${item.operation}, status=${item.status}, replay=${item.replayPolicy}, artifact=${item.artifactId ?? "none"}`)),
     ...orNone(Object.values(snapshot.leases).map((item) => `- lease ${item.resourceKey}: owner=${item.ownerLane}, generation=${item.generation}, expires=${item.expiresAt}`)),
     "",
     "## Next actions",

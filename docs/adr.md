@@ -47,3 +47,7 @@ Before asking an LLM to summarize, preserve stable task and ledger anchors, snip
 ## ADR-012 Context memory has separate authority and retrieval paths
 
 Standing instructions are a stable prompt-prefix contract. Confirmed facts and rejected hypotheses are task memory with explicit ids and evidence links; episode history and raw tool output remain retrieval-only artifacts. The context manifest records the hash and ids for each layer. Maintenance is staged at 50/60/80/90% pressure, preserves complete tool-call/result pairs, and leaves a checkpoint anchor before any Pi compaction. Target text is always wrapped as untrusted data and cannot alter the task contract, tool registry, budget or terminal state.
+
+## ADR-013 Capability schemas are stable; operations are discovered and journaled
+
+Keep one fixed `invoke_capability` contract in the provider-visible tool surface. A canonical capability manifest and catalog hash describe available operations without changing the core schema. The router validates operation-specific arguments and maps them to the existing Effect Journal, artifact store and trust boundary. Background work is represented by durable JobRecords and lifecycle events; recovery is replay-policy driven, cancellation is explicit, and run teardown cleans up active controllers.

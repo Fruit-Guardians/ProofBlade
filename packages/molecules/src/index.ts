@@ -4,3 +4,4 @@ export * from "./file-artifact.js";
 export * from "./layered-context.js";
 export * from "./text-window.js";
 export * from "./context-maintenance.js";
+export * from "./capability.js";

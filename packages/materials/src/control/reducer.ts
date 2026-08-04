@@ -16,6 +16,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     intents: {},
     completions: {},
     checkpoints: {},
+    jobs: {},
     contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
@@ -176,6 +177,49 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.checkpoints[checkpoint.id] = checkpoint;
       break;
     }
+    case "job_queued": {
+      const job = p.job as RunSnapshot["jobs"][string];
+      if (!job?.id) throw new Error("job_queued requires job");
+      next.jobs[job.id] = job;
+      break;
+    }
+    case "job_started": {
+      const job = getJob(next, String(p.jobId));
+      if (job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
+      job.status = "RUNNING";
+      job.startedAt = typeof p.startedAt === "string" ? p.startedAt : job.startedAt;
+      break;
+    }
+    case "job_finished": {
+      const job = getJob(next, String(p.jobId));
+      if (job.status === "CANCELLED") break;
+      const status = p.status as typeof job.status;
+      if (!["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(status)) throw new Error(`Invalid job terminal status: ${String(status)}`);
+      job.status = status;
+      job.finishedAt = typeof p.finishedAt === "string" ? p.finishedAt : job.finishedAt;
+      job.effectId = typeof p.effectId === "string" ? p.effectId : job.effectId;
+      job.artifactId = typeof p.artifactId === "string" ? p.artifactId : job.artifactId;
+      job.externalId = typeof p.externalId === "string" ? p.externalId : job.externalId;
+      job.outcome = p.outcome as typeof job.outcome;
+      job.error = typeof p.error === "string" ? p.error : job.error;
+      job.outputTier = p.outputTier as typeof job.outputTier;
+      break;
+    }
+    case "job_cancelled": {
+      const job = getJob(next, String(p.jobId));
+      if (job.status === "SUCCEEDED" || job.status === "FAILED" || job.status === "TIMED_OUT") break;
+      job.status = "CANCELLED";
+      job.finishedAt = typeof p.finishedAt === "string" ? p.finishedAt : job.finishedAt;
+      job.error = typeof p.reason === "string" ? p.reason : job.error;
+      break;
+    }
+    case "job_reconciled": {
+      const job = getJob(next, String(p.jobId));
+      job.status = "UNKNOWN";
+      job.outcome = "unknown";
+      job.error = typeof p.reason === "string" ? p.reason : job.error;
+      break;
+    }
     case "context_overflow_recovered":
       next.contextOverflowRecoveries += 1;
       break;
@@ -198,6 +242,12 @@ function getEffect(snapshot: RunSnapshot, effectId: string) {
   const effect = snapshot.effects[effectId];
   if (!effect) throw new Error(`Unknown effect ${effectId}`);
   return effect;
+}
+
+function getJob(snapshot: RunSnapshot, jobId: string) {
+  const job = snapshot.jobs[jobId];
+  if (!job) throw new Error(`Unknown job ${jobId}`);
+  return job;
 }
 
 export function projectionHash(snapshot: RunSnapshot): string {

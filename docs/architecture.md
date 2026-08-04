@@ -58,6 +58,12 @@ Pi owns the provider turn and its JSONL Session. The solver tools can inspect th
 
 The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
 
+## Capabilities and background jobs
+
+The provider sees a fixed `invoke_capability` schema rather than a changing list of every plugin operation. `list_capabilities` returns the bundled manifest and canonical catalog hash; the router validates the capability id, operation, argument keys and replay policy before mapping it to a journaled sandbox operation. Target results are wrapped as untrusted observations and linked to deterministic Observation/Evidence records; artifact reads remain retrieval-only.
+
+`run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; forbidden replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
+
 ## Context and recovery
 
 The context compiler keeps six information layers explicit. L0/L1 hold stable instructions and the immutable task contract; L2 holds phase gates; L3 holds confirmed facts, proposed facts, rejected hypotheses, observations, evidence, completions, in-flight effects and leases; L4 holds recent messages; L5 holds artifact references. A `ContextManifest` records layer tokens, included ids, dropped ids, budget arithmetic, a standing-instruction hash, memory-layer ids and a deterministic hash. Confirmed facts and rejected hypotheses keep their ids even when older prose is reduced to an indexed retrieval hint, so compaction cannot silently turn task memory into a fresh search.

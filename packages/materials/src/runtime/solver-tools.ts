@@ -2,6 +2,7 @@ import { Type, type Static, type TSchema } from "typebox";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core";
 import type { ProofBladeToolContract } from "../tools/contracts.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
+import { canonicalJson, sha256 } from "../domain/utils.js";
 
 export interface SolverToolContext {
   runtime: ProofBladeToolRuntime;
@@ -12,6 +13,11 @@ type SchemaTool = AgentHarnessTool<SolverToolContext, TSchema, unknown>;
 export function createSolverTools(): SchemaTool[] {
   return [
     adapt(inspectTargetContract),
+    adapt(listCapabilitiesContract),
+    adapt(invokeCapabilityContract),
+    adapt(runBackgroundContract),
+    adapt(readJobOutputContract),
+    adapt(stopJobContract),
     adapt(proposeIntentContract),
     adapt(proposeHypothesisContract),
     adapt(proposeFactContract),
@@ -20,6 +26,14 @@ export function createSolverTools(): SchemaTool[] {
     adapt(searchHistoryContract),
     adapt(reportStatusContract),
   ];
+}
+
+export function solverToolContractSnapshot(): Array<Record<string, unknown>> {
+  return createSolverTools().map((tool) => ({ name: tool.name, label: tool.label, description: tool.description, parameters: tool.parameters, executionMode: tool.executionMode }));
+}
+
+export function solverToolContractHash(): string {
+  return sha256(canonicalJson(solverToolContractSnapshot()));
 }
 
 const inspectSchema = Type.Object({});
@@ -37,6 +51,111 @@ const inspectTargetContract: ProofBladeToolContract<typeof inspectSchema, Static
   executionMode: "sequential",
   async execute(_input, context) {
     return await context.runtime.inspectTarget();
+  },
+};
+
+const listCapabilitiesSchema = Type.Object({});
+
+const listCapabilitiesContract: ProofBladeToolContract<typeof listCapabilitiesSchema, Static<typeof listCapabilitiesSchema>, unknown, SolverToolContext> = {
+  name: "list_capabilities",
+  version: "1.0.0",
+  description: "List the stable capability catalog. Full operation schemas are loaded only when this tool is requested.",
+  parameters: listCapabilitiesSchema,
+  readOnly: true,
+  sideEffect: "none",
+  replay: "pure",
+  outputPolicy: "summary",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(_input, context) {
+    return context.runtime.listCapabilities();
+  },
+};
+
+const invokeCapabilitySchema = Type.Object({
+  capabilityId: Type.String({ minLength: 1 }),
+  operation: Type.String({ minLength: 1 }),
+  input: Type.Record(Type.String(), Type.Unknown()),
+});
+
+const invokeCapabilityContract: ProofBladeToolContract<typeof invokeCapabilitySchema, Static<typeof invokeCapabilitySchema>, unknown, SolverToolContext> = {
+  name: "invoke_capability",
+  version: "1.0.0",
+  description: "Invoke one operation from the stable capability catalog. The router validates scope, arguments and replay policy before journaling the effect.",
+  parameters: invokeCapabilitySchema,
+  readOnly: false,
+  sideEffect: "workspace",
+  replay: "idempotent",
+  outputPolicy: "summary",
+  evidenceKinds: ["observation"],
+  executionMode: "sequential",
+  async execute(input, context, signal) {
+    return await context.runtime.invokeCapability(input, signal);
+  },
+};
+
+const runBackgroundSchema = Type.Object({
+  capabilityId: Type.String({ minLength: 1 }),
+  operation: Type.String({ minLength: 1 }),
+  input: Type.Record(Type.String(), Type.Unknown()),
+  timeoutMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000 })),
+});
+
+const runBackgroundContract: ProofBladeToolContract<typeof runBackgroundSchema, Static<typeof runBackgroundSchema>, unknown, SolverToolContext> = {
+  name: "run_background",
+  version: "1.0.0",
+  description: "Start a durable, cancellable capability job and return its job id without blocking the current model turn.",
+  parameters: runBackgroundSchema,
+  readOnly: false,
+  sideEffect: "process",
+  replay: "idempotent",
+  outputPolicy: "summary",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return await context.runtime.runBackground(input);
+  },
+};
+
+const readJobOutputSchema = Type.Object({
+  jobId: Type.String({ minLength: 1 }),
+  maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+});
+
+const readJobOutputContract: ProofBladeToolContract<typeof readJobOutputSchema, Static<typeof readJobOutputSchema>, unknown, SolverToolContext> = {
+  name: "read_job_output",
+  version: "1.0.0",
+  description: "Poll a durable job and read its bounded artifact output when available.",
+  parameters: readJobOutputSchema,
+  readOnly: true,
+  sideEffect: "none",
+  replay: "pure",
+  outputPolicy: "summary",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return await context.runtime.readJobOutput(input.jobId, input.maxChars);
+  },
+};
+
+const stopJobSchema = Type.Object({
+  jobId: Type.String({ minLength: 1 }),
+  reason: Type.Optional(Type.String({ minLength: 1 })),
+});
+
+const stopJobContract: ProofBladeToolContract<typeof stopJobSchema, Static<typeof stopJobSchema>, unknown, SolverToolContext> = {
+  name: "stop_job",
+  version: "1.0.0",
+  description: "Cancel a queued or running durable capability job and persist the cancellation reason.",
+  parameters: stopJobSchema,
+  readOnly: false,
+  sideEffect: "process",
+  replay: "idempotent",
+  outputPolicy: "summary",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return await context.runtime.stopJob(input.jobId, input.reason);
   },
 };
 

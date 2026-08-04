@@ -3,10 +3,12 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { RawEffectResult } from "../domain/types.js";
+import type { JobRecord, RawEffectResult } from "../domain/types.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
 import { id, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
+import { ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
+import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
 
 export interface InspectTargetResult {
   output: string;
@@ -18,6 +20,8 @@ export interface InspectTargetResult {
 
 export class ProofBladeToolRuntime {
   private readonly observer: DeterministicObserver;
+  private readonly capabilityRouter: ProofBladeCapabilityRouter;
+  private readonly jobs: BackgroundJobRunner;
 
   public constructor(
     public readonly runId: string,
@@ -28,6 +32,65 @@ export class ProofBladeToolRuntime {
     private readonly journal: EffectJournal,
   ) {
     this.observer = new DeterministicObserver(controlStore);
+    this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal);
+    this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
+  }
+
+  public listCapabilities(): ReturnType<ProofBladeCapabilityRouter["listCapabilities"]> {
+    return this.capabilityRouter.listCapabilities();
+  }
+
+  public async invokeCapability(input: { capabilityId: string; operation: string; input: Record<string, unknown> }, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
+    const result = await this.capabilityRouter.invoke({ capabilityId: input.capabilityId, operation: input.operation, input: input.input }, signal);
+    if (input.capabilityId !== "proofblade.target") return result;
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const artifact = snapshot.artifacts[result.artifactId];
+    if (!artifact) return result;
+    const stored = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as RawEffectResult;
+    const observed = await this.observer.observe(this.runId, {
+      operation: `capability:${input.capabilityId}.${input.operation}`,
+      effectId: result.effectId,
+      artifactId: result.artifactId,
+      generation: snapshot.generation,
+      result: stored,
+    });
+    return { ...result, observationId: observed.observationId, evidenceId: observed.evidenceId };
+  }
+
+  public async runBackground(input: BackgroundJobStartInput): Promise<Record<string, unknown>> {
+    const job = await this.jobs.start(input);
+    return { jobId: job.id, status: job.status, capabilityId: job.capabilityId, operation: job.operation, replayPolicy: job.replayPolicy, generation: job.generation };
+  }
+
+  public async readJobOutput(jobId: string, maxChars = 4_000): Promise<JobOutput> {
+    return await this.jobs.readOutput(jobId, maxChars);
+  }
+
+  public async stopJob(jobId: string, reason?: string): Promise<Record<string, unknown>> {
+    const job = await this.jobs.cancel(jobId, reason);
+    return { jobId: job.id, status: job.status, reason: job.error };
+  }
+
+  public async jobStatus(jobId: string): Promise<JobRecord> {
+    return await this.jobs.poll(jobId);
+  }
+
+  public async waitJob(jobId: string, timeoutMs?: number): Promise<JobRecord> {
+    return await this.jobs.wait(jobId, timeoutMs);
+  }
+
+  public async listJobs(): Promise<JobRecord[]> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return Object.values(snapshot.jobs).sort((a, b) => a.createdSeq - b.createdSeq);
+  }
+
+  public async recoverJobs(): Promise<JobOutput[]> {
+    const jobs = await this.jobs.recover();
+    return await Promise.all(jobs.map(async (job) => this.jobs.readOutput(job.id).catch(() => ({ jobId: job.id, status: job.status, output: "", truncated: false, originalChars: 0 }))));
+  }
+
+  public async close(): Promise<void> {
+    await this.jobs.close();
   }
 
   public async inspectTarget(path?: string): Promise<InspectTargetResult> {
@@ -143,6 +206,7 @@ export class ProofBladeToolRuntime {
       evidence: Object.keys(snapshot.evidence),
       hypotheses: Object.keys(snapshot.hypotheses),
       completions: Object.values(snapshot.completions).map((item) => ({ id: item.id, candidateHash: item.candidateHash, status: item.status })),
+      jobs: Object.values(snapshot.jobs).map((item) => ({ id: item.id, capabilityId: item.capabilityId, operation: item.operation, status: item.status, artifactId: item.artifactId })),
       remainingToolCalls: snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length,
     };
   }
@@ -178,6 +242,7 @@ export class ProofBladeToolRuntime {
       ...Object.values(snapshot.observations).map((item) => ({ kind: "observation", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.checkpoints).map((item) => ({ kind: "checkpoint", id: item.id, text: item.reason, artifactId: item.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.jobs).map((item) => ({ kind: "job", id: item.id, text: `${item.capabilityId}.${item.operation} ${item.status}`, artifactId: item.artifactId, createdSeq: item.createdSeq })),
     ];
     return rows
       .filter((item) => JSON.stringify(item).toLowerCase().includes(normalized))

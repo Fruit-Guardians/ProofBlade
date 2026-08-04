@@ -12,6 +12,7 @@ import type {
   Observation,
   CompletionProposal,
   CheckpointRef,
+  JobRecord,
 } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
@@ -44,6 +45,11 @@ export type DomainCommand =
   | { type: "lease_heartbeat"; resourceKey: string; ownerLane: Lane; generation: number; heartbeatAt: string; expiresAt: string; lane?: Lane }
   | { type: "lease_released"; resourceKey: string; lane?: Lane }
   | { type: "checkpoint"; checkpoint: Omit<CheckpointRef, "createdSeq">; lane?: Lane }
+  | { type: "job_queued"; job: Omit<JobRecord, "createdSeq">; lane?: Lane }
+  | { type: "job_started"; jobId: string; startedAt?: string; lane?: Lane }
+  | { type: "job_finished"; jobId: string; status: "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "UNKNOWN"; outcome: "success" | "error" | "timeout" | "unknown"; effectId?: string; artifactId?: string; externalId?: string; error?: string; outputTier?: "small" | "medium" | "large"; finishedAt?: string; lane?: Lane }
+  | { type: "job_cancelled"; jobId: string; reason: string; finishedAt?: string; lane?: Lane }
+  | { type: "job_reconciled"; jobId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
 export class ControlStore {
@@ -138,6 +144,11 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "lease_heartbeat": return "lease_heartbeat";
     case "lease_released": return "lease_released";
     case "checkpoint": return "checkpoint_created";
+    case "job_queued": return "job_queued";
+    case "job_started": return "job_started";
+    case "job_finished": return "job_finished";
+    case "job_cancelled": return "job_cancelled";
+    case "job_reconciled": return "job_reconciled";
     case "context_recovery": return "context_overflow_recovered";
   }
 }
@@ -172,11 +183,27 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "lease_heartbeat": return { resourceKey: command.resourceKey, ownerLane: command.ownerLane, generation: command.generation, heartbeatAt: command.heartbeatAt, expiresAt: command.expiresAt };
     case "lease_released": return { resourceKey: command.resourceKey };
     case "checkpoint": return { checkpoint: { ...command.checkpoint, createdSeq: seq } };
+    case "job_queued": return { job: { ...command.job, createdSeq: seq } };
+    case "job_started": return { jobId: command.jobId, startedAt: command.startedAt ?? new Date().toISOString() };
+    case "job_finished": return { jobId: command.jobId, status: command.status, outcome: command.outcome, effectId: command.effectId, artifactId: command.artifactId, externalId: command.externalId, error: command.error, outputTier: command.outputTier, finishedAt: command.finishedAt ?? new Date().toISOString() };
+    case "job_cancelled": return { jobId: command.jobId, reason: command.reason, finishedAt: command.finishedAt ?? new Date().toISOString() };
+    case "job_reconciled": return { jobId: command.jobId, reason: command.reason };
     case "context_recovery": return { checkpointId: command.checkpointId };
   }
 }
 
 function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
+  if (command.type === "job_queued" && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
+    throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
+  }
+  if (command.type === "job_started" || command.type === "job_finished" || command.type === "job_cancelled" || command.type === "job_reconciled") {
+    const jobId = command.jobId;
+    const job = snapshot.jobs[jobId];
+    if (!job) throw new Error(`Unknown job ${jobId}`);
+    if (command.type === "job_started" && job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
+    if (command.type === "job_finished" && job.status === "CANCELLED") return;
+    if (command.type === "job_cancelled" && ["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) throw new Error(`Cannot cancel job in ${job.status}`);
+  }
   if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
   if (command.type === "completion_verified" && command.lane !== "verifier") {
     throw new Error("Completion verification is restricted to the verifier lane");

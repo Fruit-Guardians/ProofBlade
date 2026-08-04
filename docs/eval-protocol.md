@@ -8,6 +8,8 @@ The workflow suite runs all six local profiles through the same Tool Runtime, Ob
 
 The context suite forces a 20%-of-normal window and checks that confirmed facts and rejected hypotheses remain in the manifest, old tool exchanges are pruned as pairs, and artifact retrieval is bounded. It also reopens a mechanical checkpoint, verifies prompt-injection text stays inside an untrusted observation tag, and injects two context overflows to assert one recovery followed by explicit `context_overflow` failure.
 
+The capability/job suite checks that manifest and core solver-tool hashes are stable, unknown operations and escaping paths fail closed, target capability results produce artifact/evidence anchors, and output tiers are bounded. It runs background list/delay jobs through success, timeout, cancellation and durable recovery, then compares the replayed job projection with the persisted snapshot.
+
 Useful commands:
 
 ```text
@@ -19,6 +21,8 @@ proofblade solve web-source-1 --run-id WEB-001 --mode auto --max-turns 2
 proofblade checkpoint WEB-001 manual
 proofblade compact WEB-001 manual
 proofblade history WEB-001 CP
+proofblade capabilities
+proofblade jobs WEB-001 list
 npm run test:atoms
 npm run test:molecules
 npm test

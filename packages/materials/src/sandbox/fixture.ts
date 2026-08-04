@@ -70,7 +70,7 @@ export class LocalFixtureSandbox implements SandboxPort {
   }
 
   public async execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult> {
-    const native = await this.executeNative(effect);
+    const native = await this.executeNative(effect, signal);
     if (native) return native;
     if (!effect.command) return { stdout: JSON.stringify(effect.args), stderr: "", exitCode: 0, durationMs: 0 };
     const started = Date.now();
@@ -105,7 +105,7 @@ export class LocalFixtureSandbox implements SandboxPort {
     // Local fixtures are retained for replay and inspection.
   }
 
-  private async executeNative(effect: EffectRequest): Promise<RawEffectResult | undefined> {
+  private async executeNative(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult | undefined> {
     const started = Date.now();
     if (effect.operation === "fixture_list") {
       const files = await visibleFiles(effect.cwd ?? this.root);
@@ -136,6 +136,13 @@ export class LocalFixtureSandbox implements SandboxPort {
         exitCode: 0,
         durationMs: Date.now() - started,
       };
+    }
+    if (effect.operation === "fixture_delay") {
+      const milliseconds = Number(effect.args.milliseconds ?? 0);
+      await waitForDelay(milliseconds, signal);
+      return signal.aborted
+        ? { stdout: "", stderr: "aborted", exitCode: null, durationMs: Date.now() - started }
+        : { stdout: JSON.stringify({ milliseconds }), stderr: "", exitCode: 0, durationMs: Date.now() - started };
     }
     return undefined;
   }
@@ -185,4 +192,15 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function waitForDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted || milliseconds <= 0) return;
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, milliseconds);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
 }

@@ -15,7 +15,7 @@ export class EffectJournal {
     private readonly injectFault?: EffectFaultInjector,
   ) {}
 
-  public async execute(runId: string, input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy }): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+  public async execute(runId: string, input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy }, signal: AbortSignal = new AbortController().signal): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
     const snapshot = await this.controlStore.snapshot(runId);
     const { effectId, idempotencyKey } = createEffectInput(runId, input.operation, input.args, input.replayPolicy ?? "pure", snapshot.generation);
     const existing = Object.values(snapshot.effects).find((effect) => effect.idempotencyKey === idempotencyKey);
@@ -47,7 +47,7 @@ export class EffectJournal {
     await this.injectFault?.("after_started", effectId);
     let result: RawEffectResult;
     try {
-      result = await this.sandbox.execute({ ...input, id: effectId, idempotencyKey }, new AbortController().signal);
+      result = await this.sandbox.execute({ ...input, id: effectId, idempotencyKey }, signal);
     } catch (error) {
       result = { stdout: "", stderr: String(error), exitCode: null, durationMs: 0 };
     }

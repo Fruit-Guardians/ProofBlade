@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileContextLayers, EventProjector, planContextMaintenance, snipText, type AgentTool } from "../src/index.js";
+import { capabilityCatalogHash, compileContextLayers, EventProjector, planContextMaintenance, snipText, type AgentTool, withCapabilityHash } from "../src/index.js";
 
 test("molecules extend atoms without application knowledge", async () => {
   const tool: AgentTool<object, { value: number }, number, undefined> = {
@@ -29,4 +29,20 @@ test("context maintenance escalates deterministically", () => {
   const forced = planContextMaintenance(950, 1_000);
   assert.equal(forced.stage, "compact");
   assert.equal(forced.forceCompact, true);
+});
+
+test("capability manifest hashes are independent of operation insertion order", () => {
+  const first = withCapabilityHash({
+    id: "sample",
+    version: "1.0.0",
+    description: "sample",
+    trust: "bundled",
+    operations: [
+      { name: "b", description: "b", parameters: {}, readOnly: true, sideEffect: "none", replay: "pure", outputPolicy: "inline", executionMode: "sequential" },
+      { name: "a", description: "a", parameters: {}, readOnly: true, sideEffect: "none", replay: "pure", outputPolicy: "inline", executionMode: "sequential" },
+    ],
+  });
+  const second = withCapabilityHash({ ...first, operations: [...first.operations].reverse() });
+  assert.equal(first.hash, second.hash);
+  assert.equal(capabilityCatalogHash([first]), capabilityCatalogHash([second]));
 });

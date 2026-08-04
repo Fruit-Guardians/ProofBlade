@@ -119,6 +119,29 @@ export interface CheckpointRef {
   createdSeq: number;
 }
 
+export type JobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "CANCELLED" | "UNKNOWN";
+
+export interface JobRecord {
+  id: string;
+  capabilityId: string;
+  operation: string;
+  args: Record<string, unknown>;
+  replayPolicy: ReplayPolicy;
+  status: JobStatus;
+  lane: Lane;
+  generation: number;
+  timeoutMs?: number;
+  createdSeq: number;
+  startedAt?: string;
+  finishedAt?: string;
+  effectId?: string;
+  artifactId?: string;
+  externalId?: string;
+  outcome?: "success" | "error" | "timeout" | "unknown";
+  error?: string;
+  outputTier?: "small" | "medium" | "large";
+}
+
 export type ReplayPolicy = ReplayPolicyAtom;
 
 export interface ArtifactRef extends ArtifactAtom {
@@ -165,6 +188,7 @@ export interface RunSnapshot {
   intents: Record<string, Intent>;
   completions: Record<string, CompletionProposal>;
   checkpoints: Record<string, CheckpointRef>;
+  jobs: Record<string, JobRecord>;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
@@ -195,6 +219,11 @@ export type EventType =
   | "lease_heartbeat"
   | "lease_released"
   | "checkpoint_created"
+  | "job_queued"
+  | "job_started"
+  | "job_finished"
+  | "job_cancelled"
+  | "job_reconciled"
   | "context_overflow_recovered"
   | "completion_proposed"
   | "completion_verified"
@@ -243,6 +272,7 @@ export interface ContextManifest {
   observationIds: string[];
   evidenceIds: string[];
   completionIds: string[];
+  jobIds: string[];
   artifactIds: string[];
   memory: {
     standingInstructionHash: string;

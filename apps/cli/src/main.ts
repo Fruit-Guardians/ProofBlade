@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   contextText,
+  CapabilityRegistry,
   CheckpointService,
   createServices,
   demoTask,
@@ -44,6 +45,11 @@ async function main(): Promise<void> {
     }
     case "fixtures": {
       print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+      break;
+    }
+    case "capabilities": {
+      const registry = new CapabilityRegistry();
+      print({ catalogHash: registry.catalogHash(), capabilities: registry.list() });
       break;
     }
     case "solve": {
@@ -121,6 +127,21 @@ async function main(): Promise<void> {
       const query = required(rest.join(" ").trim(), "history query");
       const runtime = await toolRuntime(runId, services);
       print(await runtime.searchHistory(query));
+      break;
+    }
+    case "jobs": {
+      const runId = required(arg, "run id");
+      const runtime = await toolRuntime(runId, services);
+      try {
+        const action = rest[0] ?? "list";
+        if (action === "list") print(await runtime.listJobs());
+        else if (action === "recover") print(await runtime.recoverJobs());
+        else if (action === "read") print(await runtime.readJobOutput(required(rest[1], "job id"), rest[2] === undefined ? undefined : Number(rest[2])));
+        else if (action === "stop") print(await runtime.stopJob(required(rest[1], "job id"), rest.slice(2).join(" ") || undefined));
+        else throw new Error("jobs action must be list, recover, read, or stop");
+      } finally {
+        await runtime.close();
+      }
       break;
     }
     case "artifact": {
@@ -217,6 +238,7 @@ function helpText(): string {
     "  init <run-id>",
     "  run demo [--run-id ID]",
     "  fixtures",
+    "  capabilities",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
     "  timeline <run-id>",
@@ -227,6 +249,7 @@ function helpText(): string {
     "  checkpoint <run-id> [reason]",
     "  compact <run-id> [reason]",
     "  history <run-id> <query>",
+    "  jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]",
     "  artifact <run-id> <artifact-id> [max-chars]",
     "  fixture-build <run-id>",
     "  fixture-reset <run-id>",
