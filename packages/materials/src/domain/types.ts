@@ -24,6 +24,42 @@ export type RunStatus =
   | "CANCELLED"
   | "NEED_HUMAN";
 
+export type PrimaryFailureCategory =
+  | "model_no_tool_call"
+  | "bad_tool_args"
+  | "tool_timeout"
+  | "tool_schema_mismatch"
+  | "context_overflow"
+  | "context_amnesia"
+  | "wrong_hypothesis"
+  | "verification_missing"
+  | "permission_or_environment"
+  | "budget_exhausted"
+  | "effect_outcome_unknown"
+  | "environment_drift"
+  | "prompt_injection_followed"
+  | "duplicate_submission"
+  | "verifier_disagreement";
+
+export interface RunVersionSnapshot {
+  schemaVersion: 1;
+  runtimeVersion: string;
+  piVersion: string;
+  nodeVersion: string;
+  thinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  promptVersion: string;
+  promptHash: string;
+  contextCompilerVersion: string;
+  toolContractVersion: string;
+  toolContractHash: string;
+  routerPolicyVersion: string;
+  skillCatalogHash: string;
+  skills: Array<{ name: string; contentHash: string }>;
+  mcpCatalogHash: string;
+  mcpServers: Array<{ name: string; configHash: string; disabled: boolean }>;
+  hash: string;
+}
+
 export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "misc" | "mixed";
 
 export interface TaskContract {
@@ -196,6 +232,10 @@ export interface Effect extends EffectAtom<ReplayPolicy> {
   outcome?: "success" | "error" | "timeout" | "unknown";
   artifactId?: string;
   externalId?: string;
+  durationMs?: number;
+  outputBytes?: number;
+  exitCode?: number | null;
+  errorSignature?: string;
   createdSeq: number;
 }
 
@@ -232,6 +272,8 @@ export interface RunSnapshot {
   leases: Record<string, Lease>;
   activeLanes: Lane[];
   terminalReason?: string;
+  failureCategory?: PrimaryFailureCategory;
+  versionSnapshot?: RunVersionSnapshot;
   projectionHash?: string;
 }
 
@@ -268,6 +310,11 @@ export type EventType =
   | "context_overflow_recovered"
   | "completion_proposed"
   | "completion_verified"
+  | "provider_request_started"
+  | "provider_response_received"
+  | "tool_call_recorded"
+  | "tool_result_recorded"
+  | "compaction_recorded"
   | "model_usage"
   | "run_paused"
   | "run_resumed"

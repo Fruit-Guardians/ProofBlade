@@ -71,3 +71,7 @@ Read only the project `.mcp.json`; do not import ambient host MCP configuration.
 ## ADR-018 Tool policy metadata and failures are contract data
 
 Hash the full Tool Contract, including version, execution policy, timeout, resource-key templates, sensitivity and evidence kinds, rather than hashing only Pi-visible fields. Keep the minimal Tool shape in atoms, generic execution in molecules and ProofBlade policy in materials. Normalize thrown execution failures into deterministic structured errors, preserve partial artifact references and set Pi `isError`; never encode a failed operation as successful tool text.
+
+## ADR-019 Observability is a durable read model
+
+Append Provider, Tool, Effect and compaction measurements to the existing per-run event log; derive cost and diagnostic reports without creating a second state owner. Persist argument and payload hashes rather than raw sensitive content. Snapshot Prompt, Tool, Skill, MCP, router, runtime and dependency versions at Run start. Terminal non-success states carry one primary failure category, while the telemetry reader infers a category only for older logs that predate this field.

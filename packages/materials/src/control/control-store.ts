@@ -14,6 +14,8 @@ import type {
   CheckpointRef,
   JobRecord,
   HandoffRecord,
+  PrimaryFailureCategory,
+  RunVersionSnapshot,
 } from "../domain/types.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
@@ -28,8 +30,8 @@ export type DomainCommand =
   | { type: "fixture_reset"; generation: number; lane?: Lane }
   | { type: "pause"; reason: string; lane?: Lane }
   | { type: "resume"; lane?: Lane }
-  | { type: "finish"; verified: boolean; evidenceIds: string[]; reason: string; lane?: Lane }
-  | { type: "fail"; reason: string; lane?: Lane }
+  | { type: "finish"; verified: boolean; evidenceIds: string[]; reason: string; failureCategory?: PrimaryFailureCategory; lane?: Lane }
+  | { type: "fail"; reason: string; category: PrimaryFailureCategory; lane?: Lane }
   | { type: "exhaust"; reason: string; lane?: Lane }
   | { type: "fact"; fact: Omit<Fact, "createdSeq">; lane?: Lane }
   | { type: "observation"; observation: Omit<Observation, "createdSeq">; lane?: Lane }
@@ -41,7 +43,7 @@ export type DomainCommand =
   | { type: "artifact"; artifact: RunSnapshot["artifacts"][string]; lane?: Lane }
   | { type: "effect_proposed"; effect: Omit<RunSnapshot["effects"][string], "createdSeq">; lane?: Lane }
   | { type: "effect_started"; effectId: string; lane?: Lane }
-  | { type: "effect_finished"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; artifactId?: string; externalId?: string; lane?: Lane }
+  | { type: "effect_finished"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; artifactId?: string; externalId?: string; durationMs?: number; outputBytes?: number; exitCode?: number | null; errorSignature?: string; lane?: Lane }
   | { type: "effect_reconciled"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; lane?: Lane }
   | { type: "lease_acquired"; lease: RunSnapshot["leases"][string]; lane?: Lane }
   | { type: "lease_heartbeat"; resourceKey: string; ownerLane: Lane; generation: number; heartbeatAt: string; expiresAt: string; lane?: Lane }
@@ -61,12 +63,15 @@ export type DomainCommand =
 export class ControlStore {
   private readonly operations = new KeyedOperationQueue();
 
-  public constructor(private readonly eventStore: JsonlControlStore) {}
+  public constructor(
+    private readonly eventStore: JsonlControlStore,
+    private readonly versionProvider?: () => Promise<RunVersionSnapshot>,
+  ) {}
 
   public async createRun(runId: string, task: TaskContract): Promise<RunSnapshot> {
     return await this.operations.run(runId, async () => {
       await this.eventStore.persistTask(runId, task);
-      const snapshot = await this.eventStore.create(runId, task);
+      const snapshot = await this.eventStore.create(runId, task, await this.versionProvider?.());
       await this.eventStore.saveProjection(snapshot);
       return snapshot;
     });
@@ -174,9 +179,9 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "fixture_reset": return { generation: command.generation };
     case "pause": return { reason: command.reason };
     case "resume": return {};
-    case "finish": return { status: command.verified ? "SUCCEEDED" : "FAILED", verified: command.verified, evidenceIds: command.evidenceIds, reason: command.reason };
-    case "fail": return { reason: command.reason };
-    case "exhaust": return { status: "EXHAUSTED", verified: false, evidenceIds: [], reason: command.reason };
+    case "finish": return { status: command.verified ? "SUCCEEDED" : "FAILED", verified: command.verified, evidenceIds: command.evidenceIds, reason: command.reason, failureCategory: command.verified ? undefined : command.failureCategory ?? "verification_missing" };
+    case "fail": return { reason: command.reason, failureCategory: command.category };
+    case "exhaust": return { status: "EXHAUSTED", verified: false, evidenceIds: [], reason: command.reason, failureCategory: "budget_exhausted" };
     case "fact": return { fact: { ...command.fact, createdSeq: seq } };
     case "observation": return { observation: { ...command.observation, createdSeq: seq } };
     case "evidence": return { evidence: { ...command.evidence, createdSeq: seq } };
@@ -187,7 +192,7 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "artifact": return { artifact: command.artifact };
     case "effect_proposed": return { effect: { ...command.effect, createdSeq: seq } };
     case "effect_started": return { effectId: command.effectId };
-    case "effect_finished": return { effectId: command.effectId, outcome: command.outcome, artifactId: command.artifactId, externalId: command.externalId };
+    case "effect_finished": return { effectId: command.effectId, outcome: command.outcome, artifactId: command.artifactId, externalId: command.externalId, durationMs: command.durationMs, outputBytes: command.outputBytes, exitCode: command.exitCode, errorSignature: command.errorSignature };
     case "effect_reconciled": return { effectId: command.effectId, outcome: command.outcome };
     case "lease_acquired": return { lease: command.lease };
     case "lease_heartbeat": return { resourceKey: command.resourceKey, ownerLane: command.ownerLane, generation: command.generation, heartbeatAt: command.heartbeatAt, expiresAt: command.expiresAt };

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
+import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
 export interface ModelProfileConfig {
   provider: string;
@@ -13,6 +14,10 @@ export interface ModelProfileConfig {
   requestTimeoutMs: number;
   maxRetries: number;
   input: Array<"text" | "image">;
+  thinkingLevel?: ThinkingLevel;
+  reasoning?: boolean;
+  supportsReasoningEffort?: boolean;
+  maxTokensField?: "max_tokens" | "max_completion_tokens";
 }
 
 export interface ProofBladeConfig {
@@ -38,4 +43,6 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (!profile.provider || !profile.baseUrl || !profile.model) throw new Error(`Config ${path} has an incomplete executor profile`);
   if (!Number.isFinite(profile.contextWindow) || profile.contextWindow < 1024) throw new Error(`Invalid contextWindow in ${path}`);
   if (!Number.isFinite(profile.maxTokens) || profile.maxTokens < 1) throw new Error(`Invalid maxTokens in ${path}`);
+  if (profile.thinkingLevel !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(profile.thinkingLevel)) throw new Error(`Invalid thinkingLevel in ${path}`);
+  if (profile.maxTokensField !== undefined && profile.maxTokensField !== "max_tokens" && profile.maxTokensField !== "max_completion_tokens") throw new Error(`Invalid maxTokensField in ${path}`);
 }

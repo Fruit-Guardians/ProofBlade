@@ -14,11 +14,14 @@ The handoff suite checks planner/executor lane gates, knowledge-version invalida
 
 The evaluation runner uses the same deterministic lane across all six fixtures. A case passes only when it reaches verifier-gated `SUCCEEDED/report`, has the required reproduction evidence, matches the replayed projection hash, and keeps the expected candidate out of the event log. The JSON report includes per-case timing and a `reportHash` for CI or pre-push comparison.
 
+Each run also carries a hashed Prompt/Tool/Skill/MCP/Runtime version snapshot. Provider-backed runs append per-request usage and latency events, while Tool and Effect events retain timing, byte counts, error signatures and evidence contribution without raw arguments. `proofblade cost RUN` produces a deterministic telemetry report with cost/cache totals, p95 Provider latency, effective action ratio, time to first evidence and one primary terminal failure category.
+
 Useful commands:
 
 ```text
 proofblade run demo
 proofblade replay DEMO-001
+proofblade cost DEMO-001
 proofblade ledger DEMO-001
 proofblade fixtures
 npm run eval

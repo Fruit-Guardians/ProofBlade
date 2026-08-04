@@ -23,6 +23,7 @@ import {
   SingleAgentCtfLoop,
   snapshotContext,
   FixtureEvaluationRunner,
+  RunTelemetry,
 } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
@@ -113,7 +114,7 @@ async function main(): Promise<void> {
     }
     case "show": {
       const snapshot = await services.control.snapshot(required(arg, "run id"));
-      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, jobs: Object.keys(snapshot.jobs).length, handoffs: Object.keys(snapshot.handoffs).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, projectionHash: snapshot.projectionHash });
+      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, jobs: Object.keys(snapshot.jobs).length, handoffs: Object.keys(snapshot.handoffs).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, failureCategory: snapshot.failureCategory, versionSnapshotHash: snapshot.versionSnapshot?.hash, projectionHash: snapshot.projectionHash });
       break;
     }
     case "timeline": {
@@ -147,6 +148,10 @@ async function main(): Promise<void> {
     case "reconcile": {
       const runId = required(arg, "run id");
       print({ runId, reconciled: await services.journal.reconcile(runId) });
+      break;
+    }
+    case "cost": {
+      print(await new RunTelemetry(services.control).report(required(arg, "run id")));
       break;
     }
     case "checkpoint": {
@@ -341,6 +346,7 @@ function helpText(): string {
     "  context <run-id>",
     "  replay <run-id>",
     "  reconcile <run-id>",
+    "  cost <run-id>",
     "  checkpoint <run-id> [reason]",
     "  compact <run-id> [reason]",
     "  history <run-id> <query>",

@@ -41,6 +41,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.status = "READY";
       next.startedAt = event.ts;
       next.generation = Number(p.generation ?? 0);
+      next.versionSnapshot = p.versionSnapshot as RunSnapshot["versionSnapshot"];
       break;
     case "phase_started":
       next.phase = p.phase as RunSnapshot["phase"];
@@ -72,12 +73,14 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.status = status;
       next.finishedAt = event.ts;
       next.terminalReason = typeof p.reason === "string" ? p.reason : undefined;
+      next.failureCategory = status === "SUCCEEDED" ? undefined : p.failureCategory as RunSnapshot["failureCategory"];
       break;
     }
     case "run_failed":
       ensureNotTerminal(next.status);
       next.status = "FAILED";
       next.terminalReason = typeof p.reason === "string" ? p.reason : "run_failed";
+      next.failureCategory = p.failureCategory as RunSnapshot["failureCategory"];
       break;
     case "fact_added": {
       const fact = p.fact as RunSnapshot["facts"][string];
@@ -132,6 +135,10 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       effect.outcome = p.outcome as typeof effect.outcome;
       effect.artifactId = typeof p.artifactId === "string" ? p.artifactId : effect.artifactId;
       effect.externalId = typeof p.externalId === "string" ? p.externalId : effect.externalId;
+      effect.durationMs = typeof p.durationMs === "number" ? p.durationMs : effect.durationMs;
+      effect.outputBytes = typeof p.outputBytes === "number" ? p.outputBytes : effect.outputBytes;
+      effect.exitCode = typeof p.exitCode === "number" || p.exitCode === null ? p.exitCode : effect.exitCode;
+      effect.errorSignature = typeof p.errorSignature === "string" ? p.errorSignature : effect.errorSignature;
       break;
     }
     case "effect_reconciled": {
@@ -254,6 +261,11 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     case "turn_started":
     case "assistant_message":
+    case "provider_request_started":
+    case "provider_response_received":
+    case "tool_call_recorded":
+    case "tool_result_recorded":
+    case "compaction_recorded":
     case "model_usage":
       break;
     default:

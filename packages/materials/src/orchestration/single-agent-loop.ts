@@ -91,7 +91,7 @@ export class SingleAgentCtfLoop {
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
-            await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run." });
+            await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });
             break;
           }
           const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");

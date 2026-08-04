@@ -72,6 +72,16 @@ The planner lane currently uses a deterministic coordinator rather than an addit
 
 `FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane. It reports per-case status, evidence-backed completion, replay projection parity and candidate plaintext leakage, then hashes the complete report. `proofblade eval` and `npm run eval` are provider-free pre-push checks; LM Studio is reserved for a separate live smoke run.
 
+## Durable observability
+
+Pi lifecycle subscriptions append low-sensitivity Provider and Tool telemetry to the same durable run log. Provider payloads and raw Tool arguments are not persisted: requests record the selected provider/model, phase, estimated context, retry limit and timing; Tool calls record an argument hash, execution policy, wait time and sensitivity. Results record byte counts, structured error signatures, artifact hashes and whether evidence was added. Effect completion separately records duration, output bytes, exit code and error signature so direct runtime calls remain observable even without a Pi turn.
+
+`RunTelemetry` is a read-only projection over events and the run snapshot. `proofblade cost RUN` reports input/output/reasoning/cache tokens, Provider cost and latency, cache/context efficiency, Tool and Effect outcomes, time to first evidence, compaction/checkpoint counts and the primary failure category. A zero-cost LM Studio response remains a valid measured request rather than being treated as missing data.
+
+Every new Run stores one hashed version snapshot in `run_started`: ProofBlade, Pi and Node versions; prompt and context compiler versions/hashes; the full Tool Contract hash; router policy; project Skill content hashes; and MCP configuration hashes. Provider URLs, keys, prompt payloads, Tool arguments and target content stay outside this snapshot.
+
+Provider-specific reasoning behavior is configuration data. `thinkingLevel` selects Pi's level, while `reasoning`, `supportsReasoningEffort` and `maxTokensField` describe the OpenAI-compatible endpoint. API credentials are resolved only through the environment variable named by `apiKeyEnv`; neither the version snapshot nor telemetry records the variable value.
+
 ## Context and recovery
 
 The context compiler keeps six information layers explicit. L0/L1 hold stable instructions and the immutable task contract; L2 holds phase gates; L3 holds confirmed facts, proposed facts, rejected hypotheses, observations, evidence, completions, in-flight effects and leases; L4 holds recent messages; L5 holds artifact references. A `ContextManifest` records layer tokens, included ids, dropped ids, budget arithmetic, a standing-instruction hash, memory-layer ids and a deterministic hash. Confirmed facts and rejected hypotheses keep their ids even when older prose is reduced to an indexed retrieval hint, so compaction cannot silently turn task memory into a fresh search.

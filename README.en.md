@@ -21,10 +21,11 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
 - Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
+- Durable run telemetry for Provider/Tool/Effect metrics, cost and cache tokens, primary failure classification, and Prompt/Tool/Skill/MCP/Runtime version snapshots.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 
-Provider and model selection live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
+Provider, model, thinking level and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort` and `maxTokensField`. API keys are read only from the environment variable named by `apiKeyEnv`, and source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
 
 ## Quick start
 
@@ -36,6 +37,7 @@ npm run cli -- fixtures
 npm run cli -- solve web-source-1 WEB-001 auto 2
 npm run cli -- show DEMO-001
 npm run cli -- timeline DEMO-001
+npm run cli -- cost DEMO-001
 npm run cli -- replay DEMO-001
 npm run cli -- agent DEMO-001 "Summarize the verified facts"
 npm test
@@ -64,6 +66,7 @@ proofblade ledger <run-id>
 proofblade context <run-id>
 proofblade replay <run-id>
 proofblade reconcile <run-id>
+proofblade cost <run-id>
 proofblade checkpoint <run-id> [reason]
 proofblade compact <run-id> [reason]
 proofblade history <run-id> <query>

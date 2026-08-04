@@ -21,10 +21,11 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
+- Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
 
-Provider 和模型选择由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型，源码中不包含具体模型 ID。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
+Provider、模型、思考级别和 OpenAI 兼容参数由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`，源码中不包含具体模型 ID。API key 只通过 `apiKeyEnv` 指向的环境变量读取。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
 ## 快速开始
 
@@ -36,6 +37,7 @@ npm run cli -- fixtures
 npm run cli -- solve web-source-1 WEB-001 auto 2
 npm run cli -- show DEMO-001
 npm run cli -- timeline DEMO-001
+npm run cli -- cost DEMO-001
 npm run cli -- replay DEMO-001
 npm run cli -- agent DEMO-001 "Summarize the verified facts"
 npm test
@@ -64,6 +66,7 @@ proofblade ledger <run-id>
 proofblade context <run-id>
 proofblade replay <run-id>
 proofblade reconcile <run-id>
+proofblade cost <run-id>
 proofblade checkpoint <run-id> [reason]
 proofblade compact <run-id> [reason]
 proofblade history <run-id> <query>

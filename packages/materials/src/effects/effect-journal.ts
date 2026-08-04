@@ -3,6 +3,7 @@ import { id } from "../domain/utils.js";
 import { ControlStore, createEffectInput } from "../control/control-store.js";
 import { ArtifactStore } from "./artifact-store.js";
 import type { SandboxPort } from "../sandbox/fixture.js";
+import { toToolFailure } from "../tools/errors.js";
 
 export type EffectFaultPoint = "after_proposed" | "after_started" | "after_execute" | "after_artifact";
 export type EffectFaultInjector = (point: EffectFaultPoint, effectId: string) => void | Promise<void>;
@@ -76,7 +77,7 @@ export class EffectJournal {
       if (completedArtifact) {
         const stored = JSON.parse(await this.artifactStore.readText(runId, completedArtifact)) as RawEffectResult;
         const outcome = stored.exitCode === 0 ? "success" : stored.exitCode === null ? "timeout" : "error";
-        await this.controlStore.dispatch(runId, { type: "effect_finished", effectId: effect.id, outcome, artifactId: completedArtifact.id, externalId: stored.externalId, lane: "executor" });
+        await this.controlStore.dispatch(runId, { ...effectFinishedCommand(effect.id, outcome, stored), artifactId: completedArtifact.id, externalId: stored.externalId, lane: "executor" });
         reconciled.push(effect.id);
         continue;
       }
@@ -115,7 +116,19 @@ export class EffectJournal {
     });
     await this.injectFault?.("after_artifact", effectId);
     const outcome = result.exitCode === 0 ? "success" : result.exitCode === null ? "timeout" : "error";
-    await this.controlStore.dispatch(runId, { type: "effect_finished", effectId, outcome, artifactId: artifact.id, externalId: result.externalId, lane: "executor" });
+    await this.controlStore.dispatch(runId, { ...effectFinishedCommand(effectId, outcome, result), artifactId: artifact.id, externalId: result.externalId, lane: "executor" });
     return { effectId, result, artifactId: artifact.id };
   }
+}
+
+function effectFinishedCommand(effectId: string, outcome: "success" | "error" | "timeout" | "unknown", result: RawEffectResult) {
+  return {
+    type: "effect_finished" as const,
+    effectId,
+    outcome,
+    durationMs: result.durationMs,
+    outputBytes: Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr),
+    exitCode: result.exitCode,
+    ...(outcome === "success" ? {} : { errorSignature: toToolFailure(new Error(result.stderr || outcome)).error.signature }),
+  };
 }

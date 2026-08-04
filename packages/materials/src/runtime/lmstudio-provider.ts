@@ -27,16 +27,16 @@ export function createConfiguredModels(config: ResolvedModelProfile): { models: 
     api: "openai-completions",
     provider: config.provider,
     baseUrl: config.baseUrl,
-    reasoning: false,
+    reasoning: config.reasoning ?? false,
     input: config.input,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: config.contextWindow,
     maxTokens: config.maxTokens,
     compat: {
       supportsDeveloperRole: false,
-      supportsReasoningEffort: false,
+      supportsReasoningEffort: config.supportsReasoningEffort ?? false,
       supportsUsageInStreaming: true,
-      maxTokensField: "max_tokens",
+      maxTokensField: config.maxTokensField ?? "max_tokens",
     },
   };
   const provider = createProvider<"openai-completions">({

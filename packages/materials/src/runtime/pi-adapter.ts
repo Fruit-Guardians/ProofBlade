@@ -12,6 +12,7 @@ import type { Lane } from "../domain/types.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { attachPiObservability } from "../observability/pi-events.js";
 
 export interface AgentOutcome {
   text: string;
@@ -73,9 +74,18 @@ export class PiAgentLane implements AgentLanePort {
       tools: [readTool],
       activeToolNames: ["read"],
       toolContext: { env },
-      thinkingLevel: "off",
+      thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: contextText(compiled),
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
+    });
+    attachPiObservability(harness, {
+      runId: options.runId,
+      lane,
+      controlStore: options.controlStore,
+      estimateContextTokens: async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        return new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow }).estimatedTokens;
+      },
     });
     return new PiAgentLane(options.runId, lane, options.controlStore, harness);
   }
@@ -104,14 +114,6 @@ export class PiAgentLane implements AgentLanePort {
           actor: "model",
           type: "assistant_message",
           payload: { text: output, stopReason: response.stopReason },
-        },
-        {
-          schemaVersion: 1,
-          lane: this.lane,
-          correlationId: `${this.runId}:${this.lane}:turn`,
-          actor: "model",
-          type: "model_usage",
-          payload: { provider: response.provider, model: response.model, usage: response.usage },
         },
       ]);
       return { text: output, stopReason: response.stopReason, usage: response.usage, errorMessage: response.errorMessage };

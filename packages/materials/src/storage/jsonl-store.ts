@@ -1,6 +1,6 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { HarnessEvent, RunSnapshot } from "../domain/types.js";
+import type { HarnessEvent, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createInitialSnapshot, projectionHash, reduce } from "../control/reducer.js";
 import { atomicWriteFile, durableAppendFile, KeyedOperationQueue } from "@proofblade/atoms";
@@ -18,13 +18,13 @@ export class JsonlControlStore {
     return join(this.runsRoot, runId, "events.jsonl");
   }
 
-  public async create(runId: string, task: RunSnapshot["task"]): Promise<RunSnapshot> {
+  public async create(runId: string, task: RunSnapshot["task"], versionSnapshot?: RunVersionSnapshot): Promise<RunSnapshot> {
     const path = this.runPath(runId);
     await mkdir(dirname(path), { recursive: true });
     const initial = createInitialSnapshot(runId, task);
     await this.persistTask(runId, task);
     await atomicWriteFile(path, "");
-    await this.appendEvent(makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0 }));
+    await this.appendEvent(makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0, versionSnapshot }));
     return (await this.snapshot(runId)) ?? initial;
   }
 
