@@ -16,6 +16,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 50/60/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
+- Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 
 Provider and model selection live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
 
@@ -55,6 +56,7 @@ proofblade reconcile <run-id>
 proofblade checkpoint <run-id> [reason]
 proofblade compact <run-id> [reason]
 proofblade history <run-id> <query>
+proofblade handoff <run-id> [show|prepare]
 proofblade jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]
 proofblade artifact <run-id> <artifact-id> [max-chars]
 proofblade fixture-build <run-id>

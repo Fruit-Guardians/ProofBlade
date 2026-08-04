@@ -64,6 +64,10 @@ The provider sees a fixed `invoke_capability` schema rather than a changing list
 
 `run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; forbidden replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
 
+## Planner and executor handoff
+
+The planner lane currently uses a deterministic coordinator rather than an additional model call. It emits an immutable `HandoffRecord` containing a knowledge-version hash, bounded fact/hypothesis references, ranked next actions, prohibited repeats and remaining budget. The executor accepts the handoff through the Control Store before its Pi turn. An observation, fact, hypothesis, intent, completion, artifact or job change alters the knowledge hash; the next turn supersedes the stale handoff and creates a fresh one. Handoff events are serialized by the same per-run writer, and the context compiler injects only a bounded `<planner-handoff>` index. A configured planner model can later replace the draft builder without changing the handoff or reducer contract.
+
 ## Context and recovery
 
 The context compiler keeps six information layers explicit. L0/L1 hold stable instructions and the immutable task contract; L2 holds phase gates; L3 holds confirmed facts, proposed facts, rejected hypotheses, observations, evidence, completions, in-flight effects and leases; L4 holds recent messages; L5 holds artifact references. A `ContextManifest` records layer tokens, included ids, dropped ids, budget arithmetic, a standing-instruction hash, memory-layer ids and a deterministic hash. Confirmed facts and rejected hypotheses keep their ids even when older prose is reduced to an indexed retrieval hint, so compaction cannot silently turn task memory into a fresh search.

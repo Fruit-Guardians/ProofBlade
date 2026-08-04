@@ -13,8 +13,10 @@ import type {
   CompletionProposal,
   CheckpointRef,
   JobRecord,
+  HandoffRecord,
 } from "../domain/types.js";
-import { canonicalJson, id, sha256 } from "../domain/utils.js";
+import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
+import { handoffKnowledgeVersion } from "../domain/handoff.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
 import { reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
@@ -50,6 +52,10 @@ export type DomainCommand =
   | { type: "job_finished"; jobId: string; status: "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "UNKNOWN"; outcome: "success" | "error" | "timeout" | "unknown"; effectId?: string; artifactId?: string; externalId?: string; error?: string; outputTier?: "small" | "medium" | "large"; finishedAt?: string; lane?: Lane }
   | { type: "job_cancelled"; jobId: string; reason: string; finishedAt?: string; lane?: Lane }
   | { type: "job_reconciled"; jobId: string; reason: string; lane?: Lane }
+  | { type: "handoff_proposed"; handoff: Omit<HandoffRecord, "createdSeq">; lane?: Lane }
+  | { type: "handoff_accepted"; handoffId: string; lane?: Lane }
+  | { type: "handoff_superseded"; handoffId: string; reason: string; lane?: Lane }
+  | { type: "handoff_rejected"; handoffId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
 export class ControlStore {
@@ -149,6 +155,10 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "job_finished": return "job_finished";
     case "job_cancelled": return "job_cancelled";
     case "job_reconciled": return "job_reconciled";
+    case "handoff_proposed": return "handoff_proposed";
+    case "handoff_accepted": return "handoff_accepted";
+    case "handoff_superseded": return "handoff_superseded";
+    case "handoff_rejected": return "handoff_rejected";
     case "context_recovery": return "context_overflow_recovered";
   }
 }
@@ -188,6 +198,10 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "job_finished": return { jobId: command.jobId, status: command.status, outcome: command.outcome, effectId: command.effectId, artifactId: command.artifactId, externalId: command.externalId, error: command.error, outputTier: command.outputTier, finishedAt: command.finishedAt ?? new Date().toISOString() };
     case "job_cancelled": return { jobId: command.jobId, reason: command.reason, finishedAt: command.finishedAt ?? new Date().toISOString() };
     case "job_reconciled": return { jobId: command.jobId, reason: command.reason };
+    case "handoff_proposed": return { handoff: { ...command.handoff, createdSeq: seq } };
+    case "handoff_accepted": return { handoffId: command.handoffId };
+    case "handoff_superseded": return { handoffId: command.handoffId, reason: command.reason };
+    case "handoff_rejected": return { handoffId: command.handoffId, reason: command.reason };
     case "context_recovery": return { checkpointId: command.checkpointId };
   }
 }
@@ -203,6 +217,24 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
     if (command.type === "job_started" && job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
     if (command.type === "job_finished" && job.status === "CANCELLED") return;
     if (command.type === "job_cancelled" && ["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) throw new Error(`Cannot cancel job in ${job.status}`);
+  }
+  if (command.type === "handoff_proposed") {
+    if (isTerminal(snapshot.status)) throw new Error(`Cannot propose a handoff for terminal run ${snapshot.status}`);
+    if (command.lane !== "planner") throw new Error("Handoff proposals are restricted to the planner lane");
+    if (command.handoff.sourceLane !== "planner" || command.handoff.targetLane !== "executor") throw new Error("Handoff lanes are fixed to planner -> executor");
+    if (command.handoff.runId !== snapshot.runId || command.handoff.taskId !== snapshot.task.task_id) throw new Error("Handoff task identity mismatch");
+    if (snapshot.handoffs[command.handoff.id]) throw new Error(`Handoff already exists: ${command.handoff.id}`);
+  }
+  if (command.type === "handoff_accepted" || command.type === "handoff_superseded" || command.type === "handoff_rejected") {
+    const handoff = snapshot.handoffs[command.handoffId];
+    if (!handoff) throw new Error(`Unknown handoff ${command.handoffId}`);
+    if (command.type === "handoff_accepted") {
+      if (isTerminal(snapshot.status)) throw new Error(`Cannot accept a handoff for terminal run ${snapshot.status}`);
+      if (command.lane !== "executor") throw new Error("Handoff acceptance is restricted to the executor lane");
+      if (handoff.status !== "PROPOSED" && handoff.status !== "ACCEPTED") throw new Error(`Cannot accept handoff in ${handoff.status}`);
+      if (handoff.knowledgeVersion !== handoffKnowledgeVersion(snapshot)) throw new Error(`Handoff is stale: ${handoff.id}`);
+    }
+    if (command.type === "handoff_superseded" && handoff.status === "REJECTED") throw new Error("A rejected handoff cannot be superseded");
   }
   if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
   if (command.type === "completion_verified" && command.lane !== "verifier") {

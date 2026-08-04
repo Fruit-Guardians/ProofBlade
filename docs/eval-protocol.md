@@ -10,6 +10,8 @@ The context suite forces a 20%-of-normal window and checks that confirmed facts 
 
 The capability/job suite checks that manifest and core solver-tool hashes are stable, unknown operations and escaping paths fail closed, target capability results produce artifact/evidence anchors, and output tiers are bounded. It runs background list/delay jobs through success, timeout, cancellation and durable recovery, then compares the replayed job projection with the persisted snapshot.
 
+The handoff suite checks planner/executor lane gates, knowledge-version invalidation, deterministic supersession, context handoff indexing and replay parity. The workflow suite also prepares an accepted handoff before each executor turn without adding a second model request.
+
 Useful commands:
 
 ```text
@@ -22,6 +24,7 @@ proofblade checkpoint WEB-001 manual
 proofblade compact WEB-001 manual
 proofblade history WEB-001 CP
 proofblade capabilities
+proofblade handoff WEB-001 show
 proofblade jobs WEB-001 list
 npm run test:atoms
 npm run test:molecules

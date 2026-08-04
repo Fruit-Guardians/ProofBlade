@@ -14,6 +14,7 @@ export class ContextCompiler {
     const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-16);
     const completions = Object.values(snapshot.completions).sort(bySeq).slice(-6);
     const jobs = Object.values(snapshot.jobs).filter((job) => ["QUEUED", "RUNNING", "UNKNOWN"].includes(job.status)).sort(bySeq);
+    const handoffs = Object.values(snapshot.handoffs).filter((handoff) => handoff.status === "PROPOSED" || handoff.status === "ACCEPTED").sort(bySeq).slice(-2);
     const artifacts = Object.values(snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id));
     const openIntents = Object.values(snapshot.intents).filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
     const inFlightEffects = Object.values(snapshot.effects).filter((effect) => effect.status === "PROPOSED" || effect.status === "STARTED" || effect.status === "UNKNOWN");
@@ -29,8 +30,8 @@ export class ContextCompiler {
       "Record evidence before making a deterministic claim. Use the available tool contract and keep actions reproducible.",
     ].join("\n");
     const l1 = JSON.stringify({ task_id: task.task_id, target: task.target, objective: task.objective, success_criteria: task.success_criteria, scope: task.scope, constraints: task.constraints });
-    const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: openIntents.map((intent) => intent.id) });
-    const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, completions, jobs, inFlightEffects, leases: Object.values(snapshot.leases), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
+    const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: openIntents.map((intent) => intent.id), active_handoffs: handoffs.map((handoff) => ({ id: handoff.id, status: handoff.status, knowledgeVersion: handoff.knowledgeVersion })) });
+    const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, completions, jobs, handoffs, inFlightEffects, leases: Object.values(snapshot.leases), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
     const requiredTokens = estimateTokens(`${l0}\n${l1}\n${l2}\n${l3}`);
     let remaining = Math.max(0, availableInput - requiredTokens);
     const dropped: ContextManifest["dropped"] = [];
@@ -78,6 +79,7 @@ export class ContextCompiler {
       evidenceIds: evidence.map((item) => item.id),
       completionIds: completions.map((item) => item.id),
       jobIds: jobs.map((item) => item.id),
+      handoffIds: handoffs.map((item) => item.id),
       artifactIds: selectedArtifacts.map((item) => item.id),
       memory: {
         standingInstructionHash: sha256(l0),
@@ -106,6 +108,7 @@ interface LedgerBuildInput {
   evidence: RunSnapshot["evidence"][string][];
   completions: RunSnapshot["completions"][string][];
   jobs: RunSnapshot["jobs"][string][];
+  handoffs: RunSnapshot["handoffs"][string][];
   inFlightEffects: RunSnapshot["effects"][string][];
   leases: RunSnapshot["leases"][string][];
   tokenBudget: number;
@@ -140,6 +143,14 @@ function buildLedger(input: LedgerBuildInput): string {
     "</untrusted-observation-index>",
     "Completion proposals:",
     ...input.completions.map((item) => `- ${item.id}: sha256=${item.candidateHash} status=${item.status}`),
+    "Planner handoffs:",
+    ...input.handoffs.map((item) => [
+      `<planner-handoff id="${safeAttribute(item.id)}" status="${item.status}" hash="${safeAttribute(item.hash)}">`,
+      `- phase=${item.phase} knowledge=${item.knowledgeVersion}`,
+      ...item.nextActions.map((action) => `- action ${action.id}: ${safeLedgerText(action.title)}; expected=${action.expectedEvidence.join(",")}`),
+      ...item.prohibitedRepeats.map((repeat) => `- prohibited_repeat: ${safeLedgerText(repeat)}`),
+      "</planner-handoff>",
+    ].join("\n")),
     "In-flight jobs:",
     ...input.jobs.map((item) => `- ${item.id}: ${item.capabilityId}.${item.operation} status=${item.status} replay=${item.replayPolicy} artifact=${item.artifactId ?? "none"}`),
     "In-flight effects:",

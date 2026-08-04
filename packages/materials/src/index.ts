@@ -12,6 +12,8 @@ export * from "./effects/effect-journal.js";
 export * from "./knowledge/observer.js";
 export * from "./verification/verifier.js";
 export * from "./orchestration/single-agent-loop.js";
+export * from "./orchestration/planner.js";
+export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
 export * from "./tools/runtime.js";
 export * from "./runtime/pi-adapter.js";

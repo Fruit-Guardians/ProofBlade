@@ -207,6 +207,7 @@ export class ProofBladeToolRuntime {
       hypotheses: Object.keys(snapshot.hypotheses),
       completions: Object.values(snapshot.completions).map((item) => ({ id: item.id, candidateHash: item.candidateHash, status: item.status })),
       jobs: Object.values(snapshot.jobs).map((item) => ({ id: item.id, capabilityId: item.capabilityId, operation: item.operation, status: item.status, artifactId: item.artifactId })),
+      handoffs: Object.values(snapshot.handoffs).map((item) => ({ id: item.id, status: item.status, phase: item.phase, knowledgeVersion: item.knowledgeVersion, actionIds: item.nextActions.map((action) => action.id) })),
       remainingToolCalls: snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length,
     };
   }
@@ -243,6 +244,7 @@ export class ProofBladeToolRuntime {
       ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.checkpoints).map((item) => ({ kind: "checkpoint", id: item.id, text: item.reason, artifactId: item.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.jobs).map((item) => ({ kind: "job", id: item.id, text: `${item.capabilityId}.${item.operation} ${item.status}`, artifactId: item.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.handoffs).map((item) => ({ kind: "handoff", id: item.id, text: `${item.phase} ${item.status} ${item.knowledgeVersion}`, artifactId: undefined, createdSeq: item.createdSeq })),
     ];
     return rows
       .filter((item) => JSON.stringify(item).toLowerCase().includes(normalized))

@@ -10,6 +10,7 @@ import { pathToPhase } from "../control/phase-machine.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
 import { CheckpointService } from "../context/checkpoint.js";
+import { PlannerCoordinator } from "./planner.js";
 
 export interface SolverLaneCreateInput {
   runId: string;
@@ -70,6 +71,7 @@ export class SingleAgentCtfLoop {
     await runtime.recoverJobs();
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
+    const planner = new PlannerCoordinator(this.services.control);
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
       const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
@@ -82,6 +84,7 @@ export class SingleAgentCtfLoop {
       while (turns < maxTurns) {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status)) break;
+        await planner.prepare(options.runId);
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns));
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {

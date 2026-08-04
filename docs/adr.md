@@ -51,3 +51,7 @@ Standing instructions are a stable prompt-prefix contract. Confirmed facts and r
 ## ADR-013 Capability schemas are stable; operations are discovered and journaled
 
 Keep one fixed `invoke_capability` contract in the provider-visible tool surface. A canonical capability manifest and catalog hash describe available operations without changing the core schema. The router validates operation-specific arguments and maps them to the existing Effect Journal, artifact store and trust boundary. Background work is represented by durable JobRecords and lifecycle events; recovery is replay-policy driven, cancellation is explicit, and run teardown cleans up active controllers.
+
+## ADR-014 Planner handoffs are structured and version-checked
+
+Planner and executor do not share a chat transcript. The planner lane writes a bounded `HandoffRecord` with references, next actions, budget and a hash of the shared knowledge projection. The executor lane can accept only a current handoff; new knowledge supersedes old handoffs before the next turn. Handoff lifecycle events are reducer-owned and the active record is included in the context manifest. The initial planner is deterministic to keep local-model runs affordable; a configured planner model may be added behind the same contract.

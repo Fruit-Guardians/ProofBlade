@@ -13,6 +13,7 @@ import {
   listFixtureProfiles,
   PiAgentLane,
   PiSolverLane,
+  PlannerCoordinator,
   ProofBladeToolRuntime,
   projectionHash,
   runDemo,
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
     }
     case "show": {
       const snapshot = await services.control.snapshot(required(arg, "run id"));
-      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, projectionHash: snapshot.projectionHash });
+      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, jobs: Object.keys(snapshot.jobs).length, handoffs: Object.keys(snapshot.handoffs).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, projectionHash: snapshot.projectionHash });
       break;
     }
     case "timeline": {
@@ -142,6 +143,14 @@ async function main(): Promise<void> {
       } finally {
         await runtime.close();
       }
+      break;
+    }
+    case "handoff": {
+      const runId = required(arg, "run id");
+      const action = rest[0] ?? "show";
+      if (action === "show") print(Object.values((await services.control.snapshot(runId)).handoffs));
+      else if (action === "prepare") print(await new PlannerCoordinator(services.control).prepare(runId));
+      else throw new Error("handoff action must be show or prepare");
       break;
     }
     case "artifact": {
@@ -249,6 +258,7 @@ function helpText(): string {
     "  checkpoint <run-id> [reason]",
     "  compact <run-id> [reason]",
     "  history <run-id> <query>",
+    "  handoff <run-id> [show|prepare]",
     "  jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]",
     "  artifact <run-id> <artifact-id> [max-chars]",
     "  fixture-build <run-id>",

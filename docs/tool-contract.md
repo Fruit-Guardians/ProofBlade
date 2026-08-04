@@ -39,3 +39,7 @@ The Pi solver lane exposes thirteen sequential tools. The capability tools have 
 Capability manifests are sorted before hashing; adding a manifest changes the catalog hash but never changes the core tool schema. Bundled capabilities are read-only target and artifact readers in this milestone. Every invocation creates the normal effect and artifact records, and target operations additionally create deterministic Observation/Evidence records.
 
 Jobs persist capability id, operation, arguments, generation, replay policy, effect/artifact references and terminal status. Pure, idempotent and resumable jobs restart from their durable record after a process restart; forbidden-replay jobs become `UNKNOWN`. Cancellation aborts the active controller, leaves the effect journal intact and prevents a late result from changing a `CANCELLED` job. Run teardown stops active jobs so no unexpected child process remains.
+
+## Planner handoff contract
+
+The planner lane emits a versioned `HandoffRecord`; the executor receives ids and bounded summaries instead of planner chat history. The record carries `knowledgeVersion`, confirmed/rejected references, ranked `nextActions`, `prohibitedRepeats`, required artifact ids and remaining tool/time budget. `handoff_proposed` is planner-only, `handoff_accepted` is executor-only, and acceptance fails when the shared knowledge hash is stale. `handoff_superseded` preserves the old record for audit while the next turn receives a fresh handoff through the context compiler.

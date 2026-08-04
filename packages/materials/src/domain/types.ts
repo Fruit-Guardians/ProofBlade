@@ -142,6 +142,42 @@ export interface JobRecord {
   outputTier?: "small" | "medium" | "large";
 }
 
+export type HandoffStatus = "PROPOSED" | "ACCEPTED" | "SUPERSEDED" | "REJECTED";
+
+export interface HandoffAction {
+  id: string;
+  title: string;
+  description: string;
+  expectedEvidence: string[];
+  resourceKeys: string[];
+  estimatedToolCalls: number;
+}
+
+export interface HandoffRecord {
+  id: string;
+  schemaVersion: 1;
+  runId: string;
+  taskId: string;
+  sourceLane: "planner";
+  targetLane: "executor";
+  knowledgeVersion: string;
+  phase: Phase;
+  objective: string;
+  confirmedFacts: Array<{ id: string; summary: string; evidenceIds: string[] }>;
+  hypotheses: Array<{ id: string; statement: string; evidenceIds: string[] }>;
+  rejectedHypotheses: Array<{ id: string; statement: string; evidenceIds: string[] }>;
+  nextActions: HandoffAction[];
+  budget: { remainingMs: number; remainingToolCalls: number };
+  requiredArtifacts: string[];
+  prohibitedRepeats: string[];
+  expectedOutputSchema: string;
+  status: HandoffStatus;
+  createdSeq: number;
+  acceptedSeq?: number;
+  reason?: string;
+  hash: string;
+}
+
 export type ReplayPolicy = ReplayPolicyAtom;
 
 export interface ArtifactRef extends ArtifactAtom {
@@ -189,6 +225,7 @@ export interface RunSnapshot {
   completions: Record<string, CompletionProposal>;
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;
+  handoffs: Record<string, HandoffRecord>;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
@@ -224,6 +261,10 @@ export type EventType =
   | "job_finished"
   | "job_cancelled"
   | "job_reconciled"
+  | "handoff_proposed"
+  | "handoff_accepted"
+  | "handoff_superseded"
+  | "handoff_rejected"
   | "context_overflow_recovered"
   | "completion_proposed"
   | "completion_verified"
@@ -273,6 +314,7 @@ export interface ContextManifest {
   evidenceIds: string[];
   completionIds: string[];
   jobIds: string[];
+  handoffIds: string[];
   artifactIds: string[];
   memory: {
     standingInstructionHash: string;

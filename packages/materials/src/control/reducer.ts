@@ -17,6 +17,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     completions: {},
     checkpoints: {},
     jobs: {},
+    handoffs: {},
     contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
@@ -220,6 +221,34 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       job.error = typeof p.reason === "string" ? p.reason : job.error;
       break;
     }
+    case "handoff_proposed": {
+      const handoff = p.handoff as RunSnapshot["handoffs"][string];
+      if (!handoff?.id) throw new Error("handoff_proposed requires handoff");
+      if (handoff.status !== "PROPOSED") throw new Error("handoff_proposed requires PROPOSED status");
+      next.handoffs[handoff.id] = handoff;
+      break;
+    }
+    case "handoff_accepted": {
+      const handoff = getHandoff(next, String(p.handoffId));
+      if (handoff.status !== "PROPOSED" && handoff.status !== "ACCEPTED") throw new Error(`Cannot accept handoff in ${handoff.status}`);
+      handoff.status = "ACCEPTED";
+      handoff.acceptedSeq = event.seq;
+      break;
+    }
+    case "handoff_superseded": {
+      const handoff = getHandoff(next, String(p.handoffId));
+      if (handoff.status === "SUPERSEDED" || handoff.status === "REJECTED") break;
+      handoff.status = "SUPERSEDED";
+      handoff.reason = typeof p.reason === "string" ? p.reason : handoff.reason;
+      break;
+    }
+    case "handoff_rejected": {
+      const handoff = getHandoff(next, String(p.handoffId));
+      if (handoff.status === "SUPERSEDED" || handoff.status === "REJECTED") break;
+      handoff.status = "REJECTED";
+      handoff.reason = typeof p.reason === "string" ? p.reason : handoff.reason;
+      break;
+    }
     case "context_overflow_recovered":
       next.contextOverflowRecoveries += 1;
       break;
@@ -248,6 +277,12 @@ function getJob(snapshot: RunSnapshot, jobId: string) {
   const job = snapshot.jobs[jobId];
   if (!job) throw new Error(`Unknown job ${jobId}`);
   return job;
+}
+
+function getHandoff(snapshot: RunSnapshot, handoffId: string) {
+  const handoff = snapshot.handoffs[handoffId];
+  if (!handoff) throw new Error(`Unknown handoff ${handoffId}`);
+  return handoff;
 }
 
 export function projectionHash(snapshot: RunSnapshot): string {
