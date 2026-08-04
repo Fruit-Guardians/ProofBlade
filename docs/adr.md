@@ -31,3 +31,11 @@ Serialize control-store operations by run id. Validate a transition before appen
 ## ADR-008 Effect recovery preserves identity
 
 Persist the operation, arguments, execution location, timeout, generation and replay policy before execution. Recovery keeps the original effect id and either adopts its existing artifact, reruns replayable work, or records an unknown outcome.
+
+## ADR-009 Model output is a proposal
+
+Pi tools expose proposal commands, not terminal state mutation. Model facts remain `PROPOSED`, candidates must occur verbatim in a successful current-generation observation artifact, and only the verifier lane can confirm facts, accept completions or commit a successful run.
+
+## ADR-010 Small-model tools stay atomic
+
+Prefer a zero-argument target inspection tool over an optional path that mixes target, run and artifact namespaces. Keep target acquisition, knowledge proposals and result transmission as separate tools with sequential execution.

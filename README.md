@@ -10,7 +10,9 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Single-writer event sequencing, durable atomic projections and crash-recoverable effect journaling.
 - Run/phase state machine, facts, evidence, hypotheses, intents, leases, fixture generations and immutable artifacts.
 - Six-layer context compiler with deterministic manifests and untrusted-observation boundaries.
-- Local fixture sandbox and a self-contained demo run.
+- Model-driven single-agent Drive Loop with Auto and Assist execution modes.
+- Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
+- Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
 - Pi JSONL Session adapter that is activated when a configured model is available.
 
 Provider and model selection live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
@@ -21,6 +23,8 @@ Provider and model selection live in `proofblade.config.json`. The checked-in pr
 npm install
 npm run build
 npm run cli -- run demo DEMO-001
+npm run cli -- fixtures
+npm run cli -- solve web-source-1 WEB-001 auto 2
 npm run cli -- show DEMO-001
 npm run cli -- timeline DEMO-001
 npm run cli -- replay DEMO-001
@@ -37,6 +41,8 @@ Runs and artifacts are written below `runs/`. Downloads and source snapshots bel
 ```text
 proofblade init <task-id>
 proofblade run demo
+proofblade fixtures
+proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>
 proofblade timeline <run-id>
 proofblade ledger <run-id>

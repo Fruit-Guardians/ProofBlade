@@ -1,0 +1,154 @@
+import { isAbsolute, join } from "node:path";
+import type { ArtifactStore } from "../effects/artifact-store.js";
+import type { ControlStore } from "../control/control-store.js";
+import type { EffectJournal } from "../effects/effect-journal.js";
+import type { FixtureRef } from "../sandbox/fixture.js";
+import type { RawEffectResult } from "../domain/types.js";
+import { DeterministicObserver } from "../knowledge/observer.js";
+import { id, sha256 } from "../domain/utils.js";
+
+export interface InspectTargetResult {
+  output: string;
+  observationId: string;
+  evidenceId: string;
+  artifactId: string;
+}
+
+export class ProofBladeToolRuntime {
+  private readonly observer: DeterministicObserver;
+
+  public constructor(
+    public readonly runId: string,
+    public readonly fixture: FixtureRef,
+    private readonly runsRoot: string,
+    private readonly controlStore: ControlStore,
+    private readonly artifactStore: ArtifactStore,
+    private readonly journal: EffectJournal,
+  ) {
+    this.observer = new DeterministicObserver(controlStore);
+  }
+
+  public async inspectTarget(path?: string): Promise<InspectTargetResult> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const operation = path ? "fixture_read" : "fixture_inspect";
+    const executed = await this.journal.execute(this.runId, {
+      operation,
+      args: { path: path ?? "", generation: snapshot.generation },
+      replayPolicy: "pure",
+      cwd: this.fixture.path,
+    });
+    const observed = await this.observer.observe(this.runId, {
+      operation,
+      effectId: executed.effectId,
+      artifactId: executed.artifactId,
+      generation: snapshot.generation,
+      result: executed.result,
+    });
+    return { output: executed.result.stdout, observationId: observed.observationId, evidenceId: observed.evidenceId, artifactId: executed.artifactId };
+  }
+
+  public async proposeIntent(input: { title: string; description: string; priority?: number }): Promise<{ intentId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const duplicate = Object.values(snapshot.intents).find((item) => item.title.toLowerCase() === input.title.toLowerCase() && item.status !== "REJECTED");
+    if (duplicate) return { intentId: duplicate.id };
+    const intentId = id("I");
+    await this.controlStore.dispatch(this.runId, {
+      type: "intent",
+      intent: { id: intentId, title: input.title, description: input.description, phase: snapshot.phase, status: "OPEN", priority: input.priority ?? 5, ownerLane: "executor" },
+      lane: "executor",
+    });
+    return { intentId };
+  }
+
+  public async proposeHypothesis(input: { statement: string; evidenceIds?: string[] }): Promise<{ hypothesisId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const evidenceIds = input.evidenceIds ?? [];
+    assertEvidence(snapshot.evidence, evidenceIds);
+    const hypothesisId = id("H");
+    await this.controlStore.dispatch(this.runId, {
+      type: "hypothesis",
+      hypothesis: { id: hypothesisId, statement: scrubCandidate(input.statement), status: "OPEN", evidenceIds },
+      lane: "executor",
+    });
+    return { hypothesisId };
+  }
+
+  public async proposeFact(input: { statement: string; evidenceIds: string[] }): Promise<{ factId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    if (input.evidenceIds.length === 0) throw new Error("propose_fact requires evidence ids");
+    assertEvidence(snapshot.evidence, input.evidenceIds);
+    const factId = id("F");
+    await this.controlStore.dispatch(this.runId, {
+      type: "fact",
+      fact: { id: factId, statement: scrubCandidate(input.statement), status: "PROPOSED", evidenceIds: input.evidenceIds },
+      lane: "executor",
+    });
+    return { factId };
+  }
+
+  public async submitCandidate(candidate: string): Promise<{ completionId: string; candidateHash: string }> {
+    const normalized = candidate.trim();
+    if (!/^PB\{[^}\r\n]+\}$/.test(normalized)) throw new Error("Candidate must be one complete PB{...} value");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const supportingObservations = Object.values(snapshot.observations).filter((item) =>
+      item.source.generation === snapshot.generation && item.candidateKinds.includes("flag-shaped-value"),
+    );
+    if (supportingObservations.length === 0) throw new Error("Inspect the target and collect flag-shaped evidence before proposing completion");
+    let observed = false;
+    for (const observation of supportingObservations) {
+      const artifact = snapshot.artifacts[observation.source.artifactId];
+      if (!artifact) continue;
+      const stored = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as RawEffectResult;
+      if (stored.stdout.includes(normalized) || stored.stderr.includes(normalized)) {
+        observed = true;
+        break;
+      }
+    }
+    if (!observed) throw new Error("Candidate does not occur in a successful target observation");
+    if (Object.keys(snapshot.completions).length >= snapshot.task.constraints.max_submissions) throw new Error("Submission budget exhausted");
+    const candidateHash = sha256(normalized);
+    const existing = Object.values(snapshot.completions).find((item) => item.candidateHash === candidateHash);
+    if (existing) return { completionId: existing.id, candidateHash };
+    const artifact = await this.artifactStore.putText(this.runId, normalized, {
+      filename: `candidate-${candidateHash.slice(0, 12)}.txt`,
+      mime: "text/plain",
+      sensitivity: "flag_candidate",
+    });
+    const completionId = id("C");
+    await this.controlStore.dispatch(this.runId, {
+      type: "completion_proposed",
+      completion: { id: completionId, candidateHash, artifactId: artifact.id },
+      lane: "executor",
+    });
+    return { completionId, candidateHash };
+  }
+
+  public async status(): Promise<Record<string, unknown>> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return {
+      runId: snapshot.runId,
+      status: snapshot.status,
+      phase: snapshot.phase,
+      generation: snapshot.generation,
+      observations: Object.keys(snapshot.observations),
+      evidence: Object.keys(snapshot.evidence),
+      hypotheses: Object.keys(snapshot.hypotheses),
+      completions: Object.values(snapshot.completions).map((item) => ({ id: item.id, candidateHash: item.candidateHash, status: item.status })),
+      remainingToolCalls: snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length,
+    };
+  }
+
+  public candidateArtifactPath(path: string): string {
+    if (isAbsolute(path)) throw new Error("Stored artifact paths must be relative");
+    return join(this.runsRoot, this.runId, path);
+  }
+}
+
+function assertEvidence(evidence: Record<string, unknown>, evidenceIds: string[]): void {
+  const missing = evidenceIds.filter((id) => !Object.hasOwn(evidence, id));
+  if (missing.length > 0) throw new Error(`Unknown evidence ids: ${missing.join(", ")}`);
+}
+
+function scrubCandidate(statement: string): string {
+  return statement.replace(/PB\{[^}\r\n]+\}/g, (candidate) => `[candidate sha256=${sha256(candidate)}]`);
+}

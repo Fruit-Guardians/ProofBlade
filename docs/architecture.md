@@ -42,6 +42,23 @@ The first implementation uses one JSONL file per run. A keyed operation queue gi
 
 Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pure or idempotent work under the original effect id, adopts a result artifact that was already persisted, and marks work with an unsafe replay policy as `UNKNOWN`. Fixture generations and leases are durable control-store facts, so stale work can be rejected after reset or ownership change.
 
+## Single-agent loop
+
+The single-agent path keeps active control outside the model:
+
+```text
+Drive Loop -> Pi solver lane -> ProofBlade tools -> Effect Journal -> Sandbox
+     |                                  |               |
+     |                                  -> Observer -> Observation/Evidence
+     -> Phase machine -> Completion proposal -> Independent verifier
+                                              -> Report -> verifier-gated finish
+```
+
+Pi owns the provider turn and its JSONL Session. The solver tools can inspect the target, propose intents/hypotheses/facts and propose one candidate. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
+
+The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
+
+
 ## Pi 0.83.0 package note
 
 The GitHub snapshot at commit `0524d6897f171d63a79e00946df8ce7f53c605fe` and the npm package carrying version `0.83.0` expose slightly different names. ProofBlade targets the installed npm surface (`JsonlSessionRepo`) and protects session reopen behavior with an adapter contract test. Source commit and tarball integrity are recorded in `package-manifest.lock.json`.

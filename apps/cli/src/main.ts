@@ -5,11 +5,14 @@ import {
   contextText,
   createServices,
   demoTask,
+  fixtureTask,
   JsonlControlStore,
   loadConfig,
+  listFixtureProfiles,
   PiAgentLane,
   projectionHash,
   runDemo,
+  SingleAgentCtfLoop,
   snapshotContext,
 } from "@proofblade/materials";
 
@@ -36,9 +39,26 @@ async function main(): Promise<void> {
       print(outcome);
       break;
     }
+    case "fixtures": {
+      print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+      break;
+    }
+    case "solve": {
+      const profileId = required(arg, "fixture profile id");
+      const positionals = positional(rest, ["--run-id", "--mode", "--max-turns"]);
+      const runId = option(rest, "--run-id") ?? positionals[0] ?? `PB-${profileId}-${Date.now()}`;
+      const modeValue = option(rest, "--mode") ?? positionals[1] ?? "assist";
+      if (modeValue !== "auto" && modeValue !== "assist") throw new Error("--mode must be auto or assist");
+      const maxTurnsValue = option(rest, "--max-turns") ?? positionals[2];
+      const maxTurns = maxTurnsValue === undefined ? undefined : Number(maxTurnsValue);
+      if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("--max-turns must be a positive integer");
+      const loop = new SingleAgentCtfLoop(root, config, services);
+      print(await loop.run({ runId, task: fixtureTask(runId, profileId, root, config), mode: modeValue, maxTurns }));
+      break;
+    }
     case "show": {
       const snapshot = await services.control.snapshot(required(arg, "run id"));
-      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, evidence: Object.keys(snapshot.evidence).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, projectionHash: snapshot.projectionHash });
+      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, projectionHash: snapshot.projectionHash });
       break;
     }
     case "timeline": {
@@ -136,6 +156,18 @@ function withoutOption(args: string[], name: string): string[] {
   return index < 0 ? args : [...args.slice(0, index), ...args.slice(index + 2)];
 }
 
+function positional(args: string[], optionNames: string[]): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (optionNames.includes(args[index]!)) {
+      index += 1;
+      continue;
+    }
+    if (!args[index]!.startsWith("--")) values.push(args[index]!);
+  }
+  return values;
+}
+
 function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
@@ -147,6 +179,8 @@ function helpText(): string {
     "Commands:",
     "  init <run-id>",
     "  run demo [--run-id ID]",
+    "  fixtures",
+    "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
     "  timeline <run-id>",
     "  ledger <run-id>",

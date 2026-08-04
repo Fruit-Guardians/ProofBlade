@@ -37,10 +37,13 @@ test("control store replay is deterministic and verifier gated", async () => {
     const control = new ControlStore(events);
     const runId = "TEST-001";
     await control.createRun(runId, demoTask(runId, root, config));
+    await control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
+    await control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
+    await control.dispatch(runId, { type: "start_phase", phase: "experiment" });
     await control.dispatch(runId, { type: "start_phase", phase: "verification" });
     await assert.rejects(
       control.dispatch(runId, { type: "finish", verified: true, evidenceIds: [], reason: "missing evidence" }),
-      /requires verifier approval and evidence/,
+      /verifier lane/,
     );
     const before = await control.snapshot(runId);
     assert.equal(before.status, "VERIFYING");
@@ -49,10 +52,22 @@ test("control store replay is deterministic and verifier gated", async () => {
       evidence: { id: "EV-001", kind: "reproduction", summary: "verified", source: { generation: 1 }, confidence: 1, supports: ["F-001"], refutes: [] },
     });
     await control.dispatch(runId, {
-      type: "fact",
-      fact: { id: "F-001", statement: "candidate verified", status: "CONFIRMED", evidenceIds: ["EV-001"] },
+      type: "evidence",
+      evidence: { id: "EV-002", kind: "reproduction", summary: "verified again", source: { generation: 1 }, confidence: 1, supports: ["F-001"], refutes: [] },
+      lane: "verifier",
     });
-    await control.dispatch(runId, { type: "finish", verified: true, evidenceIds: ["EV-001"], reason: "verified" });
+    await control.dispatch(runId, {
+      type: "fact",
+      fact: { id: "F-001", statement: "candidate verified", status: "CONFIRMED", evidenceIds: ["EV-001", "EV-002"] },
+      lane: "verifier",
+    });
+    await control.dispatch(runId, {
+      type: "artifact",
+      artifact: { id: "A-001", path: "artifacts/candidate.txt", sha256: "candidate-hash", bytes: 4, mime: "text/plain", sensitivity: "flag_candidate" },
+    });
+    await control.dispatch(runId, { type: "completion_proposed", completion: { id: "C-001", candidateHash: "candidate-hash", artifactId: "A-001" }, lane: "executor" });
+    await control.dispatch(runId, { type: "completion_verified", completionId: "C-001", accepted: true, evidenceIds: ["EV-001", "EV-002"], lane: "verifier" });
+    await control.dispatch(runId, { type: "finish", verified: true, evidenceIds: ["EV-001", "EV-002"], reason: "verified", lane: "verifier" });
     const replayed = await control.replay(runId);
     const persisted = await events.loadProjection(runId);
     assert.equal(replayed.status, "SUCCEEDED");

@@ -9,11 +9,14 @@ import type {
   ReplayPolicy,
   RunSnapshot,
   TaskContract,
+  Observation,
+  CompletionProposal,
 } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
 import { reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
+import { assertPhaseTransition } from "./phase-machine.js";
 
 export type DomainCommand =
   | { type: "start_phase"; phase: Phase; lane?: Lane }
@@ -23,10 +26,14 @@ export type DomainCommand =
   | { type: "resume"; lane?: Lane }
   | { type: "finish"; verified: boolean; evidenceIds: string[]; reason: string; lane?: Lane }
   | { type: "fail"; reason: string; lane?: Lane }
+  | { type: "exhaust"; reason: string; lane?: Lane }
   | { type: "fact"; fact: Omit<Fact, "createdSeq">; lane?: Lane }
+  | { type: "observation"; observation: Omit<Observation, "createdSeq">; lane?: Lane }
   | { type: "evidence"; evidence: Omit<Evidence, "createdSeq">; lane?: Lane }
   | { type: "hypothesis"; hypothesis: Omit<Hypothesis, "createdSeq">; lane?: Lane }
   | { type: "intent"; intent: Omit<Intent, "createdSeq">; lane?: Lane }
+  | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds">; lane?: Lane }
+  | { type: "completion_verified"; completionId: string; accepted: boolean; evidenceIds: string[]; lane?: Lane }
   | { type: "artifact"; artifact: RunSnapshot["artifacts"][string]; lane?: Lane }
   | { type: "effect_proposed"; effect: Omit<RunSnapshot["effects"][string], "createdSeq">; lane?: Lane }
   | { type: "effect_started"; effectId: string; lane?: Lane }
@@ -66,6 +73,7 @@ export class ControlStore {
   public async dispatch(runId: string, command: DomainCommand): Promise<HarnessEvent[]> {
     return await this.operations.run(runId, async () => {
       const before = await this.snapshot(runId);
+      validateCommand(before, command);
       const lane = command.lane ?? "main";
       const seq = before.lastSeq + 1;
       const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq));
@@ -111,10 +119,14 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "resume": return "run_resumed";
     case "finish": return "run_finished";
     case "fail": return "run_failed";
+    case "exhaust": return "run_finished";
     case "fact": return "fact_added";
+    case "observation": return "observation_added";
     case "evidence": return "evidence_added";
     case "hypothesis": return "hypothesis_added";
     case "intent": return "intent_changed";
+    case "completion_proposed": return "completion_proposed";
+    case "completion_verified": return "completion_verified";
     case "artifact": return "artifact_registered";
     case "effect_proposed": return "effect_proposed";
     case "effect_started": return "effect_started";
@@ -140,10 +152,14 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "resume": return {};
     case "finish": return { status: command.verified ? "SUCCEEDED" : "FAILED", verified: command.verified, evidenceIds: command.evidenceIds, reason: command.reason };
     case "fail": return { reason: command.reason };
+    case "exhaust": return { status: "EXHAUSTED", verified: false, evidenceIds: [], reason: command.reason };
     case "fact": return { fact: { ...command.fact, createdSeq: seq } };
+    case "observation": return { observation: { ...command.observation, createdSeq: seq } };
     case "evidence": return { evidence: { ...command.evidence, createdSeq: seq } };
     case "hypothesis": return { hypothesis: { ...command.hypothesis, createdSeq: seq } };
     case "intent": return { intent: { ...command.intent, createdSeq: seq } };
+    case "completion_proposed": return { completion: { ...command.completion, status: "PROPOSED", evidenceIds: [], createdSeq: seq } };
+    case "completion_verified": return { completionId: command.completionId, accepted: command.accepted, evidenceIds: command.evidenceIds };
     case "artifact": return { artifact: command.artifact };
     case "effect_proposed": return { effect: { ...command.effect, createdSeq: seq } };
     case "effect_started": return { effectId: command.effectId };
@@ -153,6 +169,29 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "lease_heartbeat": return { resourceKey: command.resourceKey, ownerLane: command.ownerLane, generation: command.generation, heartbeatAt: command.heartbeatAt, expiresAt: command.expiresAt };
     case "lease_released": return { resourceKey: command.resourceKey };
     case "checkpoint": return { checkpointId: command.checkpointId };
+  }
+}
+
+function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
+  if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
+  if (command.type === "completion_verified" && command.lane !== "verifier") {
+    throw new Error("Completion verification is restricted to the verifier lane");
+  }
+  if (command.type === "fact" && command.fact.status === "CONFIRMED" && command.lane !== "verifier") {
+    throw new Error("Confirmed facts are restricted to the verifier lane");
+  }
+  if (command.type !== "finish" || !command.verified) return;
+  if (command.lane !== "verifier") throw new Error("A successful run can only be committed by the verifier lane");
+  const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
+  if (!completion) throw new Error("A successful run requires an accepted completion proposal");
+  const evidence = command.evidenceIds.map((id) => snapshot.evidence[id]);
+  if (evidence.some((item) => !item)) throw new Error("A successful run references unknown evidence");
+  if (!evidence.some((item) => item?.kind === "reproduction")) throw new Error("A successful run requires reproduction evidence");
+  if (command.evidenceIds.length < snapshot.task.verification.required_reproductions) {
+    throw new Error(`A successful run requires ${snapshot.task.verification.required_reproductions} evidence records`);
+  }
+  if (!command.evidenceIds.every((id) => completion.evidenceIds.includes(id))) {
+    throw new Error("Completion verification does not cover every final evidence id");
   }
 }
 

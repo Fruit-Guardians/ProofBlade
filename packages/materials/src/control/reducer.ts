@@ -10,9 +10,11 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     generation: 0,
     lastSeq: 0,
     facts: {},
+    observations: {},
     evidence: {},
     hypotheses: {},
     intents: {},
+    completions: {},
     artifacts: {},
     effects: {},
     leases: {},
@@ -77,6 +79,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const fact = p.fact as RunSnapshot["facts"][string];
       if (!fact?.id) throw new Error("fact_added requires fact");
       next.facts[fact.id] = fact;
+      break;
+    }
+    case "observation_added": {
+      const observation = p.observation as RunSnapshot["observations"][string];
+      if (!observation?.id) throw new Error("observation_added requires observation");
+      next.observations[observation.id] = observation;
       break;
     }
     case "evidence_added": {
@@ -147,6 +155,19 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "lease_released":
       delete next.leases[String(p.resourceKey)];
       break;
+    case "completion_proposed": {
+      const completion = p.completion as RunSnapshot["completions"][string];
+      if (!completion?.id) throw new Error("completion_proposed requires completion");
+      next.completions[completion.id] = completion;
+      break;
+    }
+    case "completion_verified": {
+      const completion = next.completions[String(p.completionId)];
+      if (!completion) throw new Error(`Unknown completion ${String(p.completionId)}`);
+      completion.status = p.accepted === true ? "ACCEPTED" : "REJECTED";
+      completion.evidenceIds = Array.isArray(p.evidenceIds) ? p.evidenceIds.map(String) : [];
+      break;
+    }
     case "turn_started":
     case "assistant_message":
     case "checkpoint_created":

@@ -28,7 +28,7 @@ export function createConfiguredModels(config: ResolvedModelProfile): { models: 
     provider: config.provider,
     baseUrl: config.baseUrl,
     reasoning: false,
-    input: ["text", "image"],
+    input: config.input,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: config.contextWindow,
     maxTokens: config.maxTokens,

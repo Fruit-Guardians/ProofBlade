@@ -1,4 +1,8 @@
+import type { ArtifactAtom, EffectAtom, MessageAtom, ReplayPolicyAtom, SequencedEventAtom } from "@proofblade/atoms";
+
 export type Lane = "main" | "planner" | "executor" | "verifier";
+
+export type ExecutionMode = "auto" | "assist";
 
 export type Phase =
   | "intake"
@@ -62,10 +66,18 @@ export interface Evidence {
   createdSeq: number;
 }
 
+export interface Observation {
+  id: string;
+  summary: string;
+  source: { operation: string; effectId: string; artifactId: string; generation: number };
+  candidateKinds: string[];
+  createdSeq: number;
+}
+
 export interface Fact {
   id: string;
   statement: string;
-  status: "CONFIRMED" | "REJECTED";
+  status: "PROPOSED" | "CONFIRMED" | "REJECTED";
   evidenceIds: string[];
   createdSeq: number;
 }
@@ -86,6 +98,15 @@ export interface Intent {
   status: "OPEN" | "CLAIMED" | "DONE" | "REJECTED";
   priority: number;
   ownerLane?: Lane;
+  createdSeq: number;
+}
+
+export interface CompletionProposal {
+  id: string;
+  candidateHash: string;
+  artifactId: string;
+  status: "PROPOSED" | "ACCEPTED" | "REJECTED";
+  evidenceIds: string[];
   createdSeq: number;
 }
 
@@ -129,9 +150,11 @@ export interface RunSnapshot {
   startedAt?: string;
   finishedAt?: string;
   facts: Record<string, Fact>;
+  observations: Record<string, Observation>;
   evidence: Record<string, Evidence>;
   hypotheses: Record<string, Hypothesis>;
   intents: Record<string, Intent>;
+  completions: Record<string, CompletionProposal>;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
   leases: Record<string, Lease>;
@@ -147,6 +170,7 @@ export type EventType =
   | "fixture_reset"
   | "turn_started"
   | "assistant_message"
+  | "observation_added"
   | "effect_proposed"
   | "effect_started"
   | "effect_finished"
@@ -160,6 +184,8 @@ export type EventType =
   | "lease_heartbeat"
   | "lease_released"
   | "checkpoint_created"
+  | "completion_proposed"
+  | "completion_verified"
   | "model_usage"
   | "run_paused"
   | "run_resumed"
@@ -201,7 +227,9 @@ export interface ContextManifest {
   compilerVersion: string;
   layerTokens: Record<"L0" | "L1" | "L2" | "L3" | "L4" | "L5", number>;
   factIds: string[];
+  observationIds: string[];
   evidenceIds: string[];
+  completionIds: string[];
   artifactIds: string[];
   dropped: Array<{ kind: string; id?: string; reason: string }>;
   hash: string;
@@ -222,4 +250,3 @@ export interface ContextBuildOutput {
   manifest: ContextManifest;
   estimatedTokens: number;
 }
-import type { ArtifactAtom, EffectAtom, MessageAtom, ReplayPolicyAtom, SequencedEventAtom } from "@proofblade/atoms";

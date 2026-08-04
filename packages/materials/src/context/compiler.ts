@@ -8,7 +8,9 @@ export class ContextCompiler {
   public build(input: ContextBuildInput): ContextBuildOutput {
     const { task, snapshot } = input;
     const facts = Object.values(snapshot.facts).filter((fact) => fact.status === "CONFIRMED").sort(bySeq);
+    const observations = Object.values(snapshot.observations).sort(bySeq).slice(-12);
     const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-12);
+    const completions = Object.values(snapshot.completions).sort(bySeq).slice(-6);
     const artifacts = Object.values(snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id)).slice(-12);
     const openIntents = Object.values(snapshot.intents).filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
 
@@ -22,12 +24,16 @@ export class ContextCompiler {
     const l3 = [
       "Confirmed facts:",
       ...facts.map((fact) => `- ${fact.id}: ${fact.statement} (evidence: ${fact.evidenceIds.join(", ") || "none"})`),
+      "Recent observations:",
+      ...observations.map((item) => `- ${item.id}: ${item.summary} (artifact: ${item.source.artifactId})`),
       "Recent evidence:",
       ...evidence.map((item) => [
         `<untrusted-observation source="${item.source.tool ?? "unknown"}" artifact="${item.source.artifactId ?? "none"}">`,
         `- ${item.id}: ${item.summary}`,
         "</untrusted-observation>",
       ].join("\n")),
+      "Completion proposals:",
+      ...completions.map((item) => `- ${item.id}: sha256=${item.candidateHash} status=${item.status}`),
     ].join("\n");
     const recent = input.recentMessages ?? [];
     const l4 = recent.slice(-8);
@@ -56,7 +62,7 @@ export class ContextCompiler {
       layerTokens.L4 = estimateTokens(messages.slice(2).map((m) => m.content).join("\n"));
       estimatedTokens = Object.values(layerTokens).reduce((sum, value) => sum + value, 0);
     }
-    const manifestBase = { version: 1 as const, runId: input.runId, lane: input.lane, phase: input.phase, compilerVersion: COMPILER_VERSION, layerTokens, factIds: facts.map((item) => item.id), evidenceIds: evidence.map((item) => item.id), artifactIds: artifacts.map((item) => item.id), dropped };
+    const manifestBase = { version: 1 as const, runId: input.runId, lane: input.lane, phase: input.phase, compilerVersion: COMPILER_VERSION, layerTokens, factIds: facts.map((item) => item.id), observationIds: observations.map((item) => item.id), evidenceIds: evidence.map((item) => item.id), completionIds: completions.map((item) => item.id), artifactIds: artifacts.map((item) => item.id), dropped };
     const manifest: ContextManifest = { ...manifestBase, hash: sha256(canonicalJson(manifestBase)) };
     return { messages, manifest, estimatedTokens };
   }

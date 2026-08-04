@@ -21,7 +21,13 @@ export class EffectJournal {
     const existing = Object.values(snapshot.effects).find((effect) => effect.idempotencyKey === idempotencyKey);
     if (existing?.status === "FINISHED" && existing.artifactId) {
       const artifact = snapshot.artifacts[existing.artifactId];
-      if (artifact) return { effectId: existing.id, result: { stdout: "", stderr: "replayed from artifact", exitCode: 0, durationMs: 0 }, artifactId: artifact.id };
+      if (artifact) {
+        const stored = JSON.parse(await this.artifactStore.readText(runId, artifact)) as RawEffectResult;
+        return { effectId: existing.id, result: stored, artifactId: artifact.id };
+      }
+    }
+    if (Object.keys(snapshot.effects).length >= snapshot.task.constraints.max_tool_calls) {
+      throw new Error(`Tool budget exhausted: ${snapshot.task.constraints.max_tool_calls}`);
     }
     const effect = {
       id: effectId,

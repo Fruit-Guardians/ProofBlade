@@ -69,11 +69,19 @@ export async function runDemo(root: string, runId: string, config: ProofBladeCon
     evidence: { id: evidenceOne, kind: "observation", summary: "The fixture contains a ProofBlade flag candidate.", source: { tool: "fixture_read", effectId: first.effectId, artifactId: first.artifactId, generation }, confidence: 0.95, supports: ["H-001"], refutes: [] },
     lane: "executor",
   });
+  await services.control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
   await services.control.dispatch(runId, {
     type: "hypothesis",
     hypothesis: { id: "H-001", statement: "The candidate in challenge.txt is the fixture solution.", status: "OPEN", evidenceIds: [evidenceOne] },
     lane: "executor",
   });
+  const candidateArtifact = await services.artifacts.putText(runId, flag, { filename: "candidate.txt", sensitivity: "flag_candidate" });
+  await services.control.dispatch(runId, {
+    type: "completion_proposed",
+    completion: { id: "C-001", candidateHash: sha256(flag), artifactId: candidateArtifact.id },
+    lane: "executor",
+  });
+  await services.control.dispatch(runId, { type: "start_phase", phase: "experiment" });
   await services.control.dispatch(runId, { type: "start_phase", phase: "verification", lane: "verifier" });
   const verifyCommand = process.platform === "win32" ? "findstr /C:\"PB{\" challenge.txt" : "grep -F 'PB{' challenge.txt";
   const second = await services.journal.execute(runId, { operation: "fixture_verify", args: { path: "challenge.txt", generation, attempt: 2 }, replayPolicy: "pure", command: verifyCommand, cwd: fixture.path });
@@ -83,6 +91,7 @@ export async function runDemo(root: string, runId: string, config: ProofBladeCon
     evidence: { id: evidenceTwo, kind: "reproduction", summary: "An independent match reproduced the same candidate.", source: { tool: "fixture_verify", effectId: second.effectId, artifactId: second.artifactId, generation }, confidence: 1, supports: ["H-001", "F-001"], refutes: [] },
     lane: "verifier",
   });
+  await services.control.dispatch(runId, { type: "completion_verified", completionId: "C-001", accepted: true, evidenceIds: [evidenceOne, evidenceTwo], lane: "verifier" });
   await services.control.dispatch(runId, {
     type: "hypothesis",
     hypothesis: { id: "H-001", statement: "The candidate in challenge.txt is the fixture solution.", status: "CONFIRMED", evidenceIds: [evidenceOne, evidenceTwo] },
