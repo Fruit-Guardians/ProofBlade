@@ -9,10 +9,10 @@ The package boundary follows how much information a component is allowed to know
 | 1 | `@proofblade/atoms` | represent and persist information | Generic contracts, hashes, ids, atomic file operations and keyed serialization. It knows nothing about CTF, Pi or the CLI. |
 | 2 | `@proofblade/molecules` | acquire and process information | Generic tool composition, event projection, layered context and file artifacts. It knows atoms, but no ProofBlade business rules. |
 | 3 | `@proofblade/materials` | turn information into ProofBlade behavior | CTF state, reducers, effects, leases, fixtures, provider resolution and Pi integration. It knows atoms and molecules. |
-| 4 | `@proofblade/cli` | transmit user intent and results | Commands, argument parsing and display. It consumes only the public materials API. |
+| 4 | `@proofblade/cli`, `@proofblade/gui` | transmit user intent, debug state and results | Commands, HTTP orchestration, browser state and display. Both consume the public materials API; neither is imported below the application layer. |
 
 ```text
-CLI (delivery)
+CLI / GUI (delivery and debugging)
   -> materials (business processing)
       -> molecules (generic processing)
           -> atoms (data and deterministic primitives)
@@ -32,10 +32,10 @@ ProofBlade has two durable domains:
 The control store is the authority for completion. Models and tools emit events or commands; the reducer is the only component that derives a run snapshot. Large tool output is stored as an immutable artifact and referenced by hash from the event log.
 
 ```text
-CLI -> Control Store -> Reducer -> Run Snapshot
-       |              -> Knowledge ledger
-       |              -> Effect journal -> Sandbox
-       -> Context Compiler -> Pi AgentHarness adapter
+CLI / GUI -> Control Store -> Reducer -> Run Snapshot
+           |              -> Knowledge ledger
+           |              -> Effect journal -> Sandbox
+           -> Context Compiler -> Pi AgentHarness adapter
 ```
 
 The first implementation uses one JSONL file per run. A keyed operation queue gives each run a single writer. Each event is reduced before append, the append is flushed to stable storage, and the derived projection is replaced atomically. `replay` rebuilds the snapshot from events and compares its canonical hash with the persisted projection hash. This gives a storage-independent contract before a SQLite adapter is introduced.
@@ -81,6 +81,14 @@ Pi lifecycle subscriptions append low-sensitivity Provider and Tool telemetry to
 Every new Run stores one hashed version snapshot in `run_started`: ProofBlade, Pi and Node versions; prompt and context compiler versions/hashes; the full Tool Contract hash; router policy; project Skill content hashes; and MCP configuration hashes. Provider URLs, keys, prompt payloads, Tool arguments and target content stay outside this snapshot.
 
 Provider-specific reasoning behavior is configuration data. `thinkingLevel` selects Pi's level, while `reasoning`, `supportsReasoningEffort` and `maxTokensField` describe the OpenAI-compatible endpoint. API credentials are resolved only through the environment variable named by `apiKeyEnv`; neither the version snapshot nor telemetry records the variable value.
+
+## Debugging application
+
+`@proofblade/gui` is an application adapter above materials. Its Node server reads snapshots, events, telemetry, Artifacts and Pi JSONL sessions through the existing public repositories. It does not add a third durable state model. A Tool debug projection correlates an assistant `toolCall`, the following Pi `toolResult`, Control Store `tool_call_recorded`/`tool_result_recorded` events with the same `toolCallId`, and referenced Artifact/Evidence/Effect records.
+
+The browser owns only selection, presentation and temporary transformations. Script Lab creates a dedicated Web Worker for one invocation, passes the selected Tool projection as structured-clone data, enforces a 1500 ms termination timer and destroys the Worker after a result or error. User script source is never evaluated by the Node server and is not added to the Run, Pi Session, event log or project configuration.
+
+Run list polling first checks `events.jsonl` modification time and reuses unchanged summaries. The selected Run is reloaded every two seconds so active phases, Tool calls, Effects and evidence appear without a page reload. Mutating GUI actions call the same `SingleAgentCtfLoop`, `RunRecoveryService` and `CheckpointService` used by the CLI.
 
 ## Context and recovery
 

@@ -22,6 +22,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
+- 动态调试 GUI：按 Run、Pi Session、assistant 轮次和单次 Tool 调用逐级检查 Arguments、Result、Pi Entry、Control telemetry 及完整关联 JSON，并在浏览器 Worker 中运行自定义处理脚本。
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
@@ -41,6 +42,7 @@ npm run cli -- timeline DEMO-001
 npm run cli -- cost DEMO-001
 npm run cli -- replay DEMO-001
 npm run cli -- agent DEMO-001 "Summarize the verified facts"
+npm run gui -- --port 4173
 npm test
 npm run test:atoms
 npm run test:molecules
@@ -48,6 +50,23 @@ npm run eval
 ```
 
 运行数据和制品写入 `runs/`。下载内容和外部源码快照统一放在 `tmp/`，该目录默认被 Git 忽略。
+
+## 动态调试 GUI
+
+```powershell
+npm run gui -- --port 4173
+npm run gui -- --config proofblade.config.json --port 4173
+```
+
+打开 `http://127.0.0.1:4173` 后可直接选择已有 Run。GUI 每 2 秒按事件文件更新时间增量刷新，并提供：
+
+- `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；
+- `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
+- 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
+- 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
+- 新建 Run、恢复核对、机械 Checkpoint、事件时间线、证据账本和 Artifact 内容查看。
+
+Script Lab 的 `input` 始终是当前选中的完整 Tool 调试对象。脚本使用普通 JavaScript `return` 返回结果，执行上限为 1500 ms；代码只进入临时浏览器 Worker，不发送给服务端。完整对象结构和 API 见 `docs/gui.md`。
 
 ## CLI
 
@@ -83,7 +102,7 @@ proofblade agent <run-id> [prompt]
 ## 分层结构
 
 ```text
-apps/cli                     用户意图与交付入口
+apps/cli + apps/gui          用户意图、调试与交付入口
    -> packages/materials     ProofBlade、CTF、Pi 和 Provider 知识
       -> packages/molecules  通用的信息获取与处理组合
          -> packages/atoms   最小类型、值对象和存储原语
@@ -113,4 +132,5 @@ apps/cli                     用户意图与交付入口
 - `docs/eval-protocol.md`：确定性评测指标和回归门槛。
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。
 - `docs/recovery.md`：六个故障注入窗口、恢复顺序和收敛不变量。
+- `docs/gui.md`：动态调试 GUI、Tool 调试对象、Script Lab 和本地 API。
 - `pi-ctf-agent-harness-design.md`：ProofBlade 的完整设计依据。

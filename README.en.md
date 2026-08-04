@@ -22,6 +22,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
 - Durable run telemetry for Provider/Tool/Effect metrics, cost and cache tokens, primary failure classification, and Prompt/Tool/Skill/MCP/Runtime version snapshots.
+- A live debugging GUI that drills through Runs, Pi Sessions, assistant turns and individual Tool calls, correlates raw Pi entries with Control telemetry, and processes the selected JSON inside a browser Worker.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
@@ -41,6 +42,7 @@ npm run cli -- timeline DEMO-001
 npm run cli -- cost DEMO-001
 npm run cli -- replay DEMO-001
 npm run cli -- agent DEMO-001 "Summarize the verified facts"
+npm run gui -- --port 4173
 npm test
 npm run test:atoms
 npm run test:molecules
@@ -48,6 +50,23 @@ npm run eval
 ```
 
 Runs and artifacts are written below `runs/`. Downloads and source snapshots belong in `tmp/`; the repository ignores that directory by default.
+
+## Live debugging GUI
+
+```powershell
+npm run gui -- --port 4173
+npm run gui -- --config proofblade.config.json --port 4173
+```
+
+Open `http://127.0.0.1:4173` and select an existing Run. The GUI refreshes changed run logs every two seconds and provides:
+
+- `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
+- tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
+- correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;
+- a browser Web Worker Script Lab with JSON, table, and text result views;
+- Run creation, recovery reconciliation, mechanical checkpoints, event timeline, evidence ledger, and Artifact content inspection.
+
+Script Lab receives the selected complete Tool debug object as `input`. Scripts return a value with normal JavaScript `return`, run for at most 1500 ms, and remain inside a temporary browser Worker. See `docs/gui.md` for the object shape and local API.
 
 ## CLI
 
@@ -83,7 +102,7 @@ proofblade agent <run-id> [prompt]
 ## Package funnel
 
 ```text
-apps/cli                     user intent and delivery
+apps/cli + apps/gui          user intent, debugging and delivery
    -> packages/materials     ProofBlade, CTF, Pi and provider knowledge
       -> packages/molecules  generic acquisition/processing composition
          -> packages/atoms   minimal types, values and storage primitives
@@ -101,4 +120,4 @@ Imports only point downward in this diagram. Each package adds information inste
 
 Built-in tools, the Capability Router, the Effect Journal, the project Skill Registry and MCP stdio are implemented. Skill and MCP metadata enter the ContextManifest while full instructions and tool schemas load on demand. MCP calls follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
 
-See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.
+See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.
