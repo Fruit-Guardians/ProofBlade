@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assistantTurnsFromEntries, assertRunId, correlateToolCalls } from "../src/debug-data.js";
+import { assistantTurnsFromEntries, assertRunId, conversationMessagesFromEntries, correlateToolCalls } from "../src/debug-data.js";
 import type { HarnessEvent, RunSnapshot } from "@proofblade/materials";
 
 const entries = [
@@ -36,6 +36,15 @@ test("correlates a Pi tool call with result, telemetry, artifact, and evidence",
 test("marks a tool call without a result as pending", () => {
   const calls = correlateToolCalls(entries.slice(0, 2), [], snapshot);
   assert.equal(calls[0]?.status, "pending");
+});
+
+test("projects user and assistant Pi entries into a conversation without tool-result bubbles", () => {
+  const messages = conversationMessagesFromEntries(entries);
+  assert.equal(messages.length, 2);
+  assert.equal(messages[0]?.role, "user");
+  assert.equal(messages[0]?.text, "inspect");
+  assert.equal(messages[1]?.role, "assistant");
+  assert.deepEqual(messages[1]?.toolCallIds, ["call-1"]);
 });
 
 test("rejects path-like run identifiers", () => {

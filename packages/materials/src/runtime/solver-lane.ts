@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -41,6 +41,7 @@ export class PiSolverLane implements AgentLanePort {
     config: ProofBladeConfig;
     runtime: ProofBladeToolRuntime;
     compactionFault?: CompactionFaultInjector;
+    onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
   }): Promise<PiSolverLane> {
     const env = new NodeExecutionEnv({ cwd: options.runDir });
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(options.runDir, "pi-sessions") });
@@ -113,6 +114,7 @@ export class PiSolverLane implements AgentLanePort {
         return new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot }).estimatedTokens;
       },
     });
+    if (options.onEvent) harness.subscribe(options.onEvent);
     const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot);
     laneRef.lane = lane;
     return lane;

@@ -1,4 +1,4 @@
-import type { ArtifactContent, BootstrapData, RunDetail, RunListItem } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, RunDetail, RunListItem } from "./shared.js";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -18,6 +18,37 @@ export async function getArtifact(runId: string, artifactId: string): Promise<Ar
 
 export async function startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns: number }): Promise<unknown> {
   return await request("/api/solve", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function createConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<{ runId: string }> {
+  return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function streamChat(runId: string, prompt: string, onEvent: (event: ChatStreamEvent) => void): Promise<void> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!response.ok || !response.body) {
+    const body = await response.json().catch(() => ({})) as { error?: unknown };
+    throw new Error(body.error ? String(body.error) : response.statusText);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      const data = frame.split(/\r?\n/).filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim()).join("\n");
+      if (data) onEvent(JSON.parse(data) as ChatStreamEvent);
+    }
+    if (done) break;
+  }
 }
 
 export async function createCheckpoint(runId: string, reason: string): Promise<unknown> {

@@ -84,7 +84,7 @@ Provider-specific reasoning behavior is configuration data. `thinkingLevel` sele
 
 ## Debugging application
 
-`@proofblade/gui` is an application adapter above materials. Its Node server reads snapshots, events, telemetry, Artifacts and Pi JSONL sessions through the existing public repositories. It does not add a third durable state model. A Tool debug projection correlates an assistant `toolCall`, the following Pi `toolResult`, Control Store `tool_call_recorded`/`tool_result_recorded` events with the same `toolCallId`, and referenced Artifact/Evidence/Effect records.
+`@proofblade/gui` is an application adapter above materials. Its Node server reads snapshots, events, telemetry, Artifacts and Pi JSONL sessions through the existing public repositories. It does not add a third durable state model. A conversation POST reopens the Run's `PiSolverLane`, streams normalized AgentHarness events as SSE, and lets the normal Pi Session and Control Store persist the completed turn. A Tool debug projection correlates an assistant `toolCall`, the following Pi `toolResult`, Control Store `tool_call_recorded`/`tool_result_recorded` events with the same `toolCallId`, and referenced Artifact/Evidence/Effect records.
 
 The browser owns only selection, presentation and temporary transformations. Script Lab creates a dedicated Web Worker for one invocation, passes the selected Tool projection as structured-clone data, enforces a 1500 ms termination timer and destroys the Worker after a result or error. User script source is never evaluated by the Node server and is not added to the Run, Pi Session, event log or project configuration.
 

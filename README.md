@@ -22,7 +22,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
-- 动态调试 GUI：按 Run、Pi Session、assistant 轮次和单次 Tool 调用逐级检查 Arguments、Result、Pi Entry、Control telemetry 及完整关联 JSON，并在浏览器 Worker 中运行自定义处理脚本。
+- 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
@@ -58,8 +58,9 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-打开 `http://127.0.0.1:4173` 后可直接选择已有 Run。GUI 每 2 秒按事件文件更新时间增量刷新，并提供：
+打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。点击“新建对话”会创建一个 RUNNING Run，composer 通过 SSE 直接调用配置文件中的真实模型；模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。GUI 每 2 秒按事件文件更新时间增量刷新，并提供：
 
+- 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；

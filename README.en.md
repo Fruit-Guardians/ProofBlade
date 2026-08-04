@@ -22,7 +22,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
 - Durable run telemetry for Provider/Tool/Effect metrics, cost and cache tokens, primary failure classification, and Prompt/Tool/Skill/MCP/Runtime version snapshots.
-- A live debugging GUI that drills through Runs, Pi Sessions, assistant turns and individual Tool calls, correlates raw Pi entries with Control telemetry, and processes the selected JSON inside a browser Worker.
+- A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
@@ -58,8 +58,9 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-Open `http://127.0.0.1:4173` and select an existing Run. The GUI refreshes changed run logs every two seconds and provides:
+Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates a RUNNING Run, and the composer drives the real model selected by the configuration through SSE. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream. The GUI refreshes changed run logs every two seconds and provides:
 
+- real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
 - tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
 - correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;

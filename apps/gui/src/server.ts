@@ -39,6 +39,15 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (method === "GET" && url.pathname === "/api/bootstrap") return sendJson(response, 200, data.bootstrap());
   if (method === "GET" && url.pathname === "/api/runs") return sendJson(response, 200, await data.listRuns());
+  if (method === "POST" && url.pathname === "/api/conversations") {
+    const body = await readBody(request);
+    const snapshot = await data.createConversation({
+      runId: string(body.runId, "runId"),
+      fixtureId: string(body.fixtureId, "fixtureId"),
+      objective: string(body.objective, "objective"),
+    });
+    return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
+  }
   if (method === "POST" && url.pathname === "/api/solve") {
     const body = await readBody(request);
     const mode = body.mode === "auto" ? "auto" : "assist";
@@ -50,6 +59,26 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
     if (method === "GET" && parts[3] === "artifacts" && parts[4]) return sendJson(response, 200, await data.artifact(runId, parts[4]));
+    if (method === "POST" && parts[3] === "chat") {
+      const body = await readBody(request);
+      response.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
+      });
+      const emit = (event: import("./shared.js").ChatStreamEvent): void => {
+        if (!response.writableEnded) response.write(`data: ${JSON.stringify(event)}\n\n`);
+      };
+      try {
+        await data.chat(runId, string(body.prompt, "prompt"), emit);
+      } catch (error) {
+        emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
+      } finally {
+        response.end();
+      }
+      return;
+    }
     if (method === "POST" && parts[3] === "checkpoint") {
       const body = await readBody(request);
       return sendJson(response, 201, await data.checkpoint(runId, typeof body.reason === "string" ? body.reason : "GUI manual checkpoint"));

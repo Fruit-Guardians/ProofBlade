@@ -1,9 +1,11 @@
-import { readdir, stat } from "node:fs/promises";
+import { access, readdir, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { join } from "node:path";
-import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
+  PiSolverLane,
+  ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
   SingleAgentCtfLoop,
@@ -19,6 +21,8 @@ import type {
   ActiveRunInfo,
   AssistantTurnDebug,
   BootstrapData,
+  ChatMessageDebug,
+  ChatStreamEvent,
   PiSessionDebug,
   RunDetail,
   RunListItem,
@@ -38,6 +42,7 @@ interface MessageLike {
   provider?: string;
   model?: string;
   stopReason?: string;
+  usage?: unknown;
   toolCallId?: string;
   toolName?: string;
   details?: unknown;
@@ -49,6 +54,7 @@ interface ContentLike {
   id?: string;
   name?: string;
   text?: string;
+  thinking?: string;
   arguments?: unknown;
 }
 
@@ -178,6 +184,63 @@ export class DebugDataService {
     return info;
   }
 
+  public async createConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+    assertRunId(input.runId);
+    try {
+      await access(join(this.services.runsRoot, input.runId, "task.json"));
+      throw new Error(`Run already exists: ${input.runId}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    task.objective = input.objective.trim() || task.objective;
+    await this.services.control.createRun(input.runId, task);
+    const fixture = await this.services.sandbox.build(task);
+    const generation = await this.services.sandbox.reset(fixture);
+    await this.services.control.dispatch(input.runId, { type: "fixture_reset", generation });
+    await this.services.control.dispatch(input.runId, { type: "start_phase", phase: "reconnaissance" });
+    return await this.services.control.snapshot(input.runId);
+  }
+
+  public async chat(runId: string, prompt: string, emit: (event: ChatStreamEvent) => void): Promise<void> {
+    assertRunId(runId);
+    const text = prompt.trim();
+    if (!text) throw new Error("Prompt is required");
+    if (this.active.get(runId)?.state === "running") throw new Error(`Run is already active: ${runId}`);
+    const snapshot = await this.services.control.snapshot(runId);
+    if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
+      throw new Error(`Run is terminal (${snapshot.status}); start a new conversation`);
+    }
+    if (snapshot.status === "PAUSED") await this.services.control.dispatch(runId, { type: "resume" });
+    const info: ActiveRunInfo = { runId, startedAt: new Date().toISOString(), state: "running" };
+    this.active.set(runId, info);
+    emit({ type: "started", runId });
+    let runtime: ProofBladeToolRuntime | undefined;
+    let lane: PiSolverLane | undefined;
+    try {
+      const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
+      runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
+      lane = await PiSolverLane.create({
+        projectRoot: this.root,
+        runId,
+        runDir: join(this.services.runsRoot, runId),
+        controlStore: this.services.control,
+        artifactStore: this.services.artifacts,
+        config: this.config,
+        runtime,
+        onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
+      });
+      const outcome = await lane.prompt(text);
+      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: outcome.usage });
+    } catch (error) {
+      emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      await lane?.close().catch(() => undefined);
+      await runtime?.close().catch(() => undefined);
+      this.active.delete(runId);
+    }
+  }
+
   private async loadSessions(runId: string): Promise<PiSessionDebug[]> {
     const runDir = join(this.services.runsRoot, runId);
     const env = new NodeExecutionEnv({ cwd: runDir });
@@ -199,6 +262,7 @@ export class DebugDataService {
           entries,
           branchEntryIds: branch.map((entry) => entry.id),
           assistantTurns,
+          messages: conversationMessagesFromEntries(branch),
           toolCalls: correlateToolCalls(entries, events, snapshot, assistantTurns),
         };
       }));
@@ -229,6 +293,30 @@ export function assistantTurnsFromEntries(entries: readonly SessionEntryLike[]):
     });
   }
   return turns;
+}
+
+export function conversationMessagesFromEntries(entries: readonly SessionEntryLike[]): ChatMessageDebug[] {
+  const messages: ChatMessageDebug[] = [];
+  for (const entry of entries) {
+    const message = asMessage(entry.message);
+    if (entry.type !== "message" || (message?.role !== "user" && message?.role !== "assistant")) continue;
+    const content = asContent(message.content);
+    messages.push({
+      id: entry.id ?? `${messages.length + 1}`,
+      entryId: entry.id ?? `${messages.length + 1}`,
+      role: message.role,
+      timestamp: entry.timestamp ?? "",
+      text: content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n"),
+      thinking: content.filter((item) => item.type === "thinking").map((item) => item.thinking ?? "").join("\n"),
+      toolCallIds: content.filter((item) => item.type === "toolCall" && item.id).map((item) => item.id!),
+      provider: message.provider,
+      model: message.model,
+      stopReason: message.stopReason,
+      usage: message.usage,
+      raw: entry,
+    });
+  }
+  return messages;
 }
 
 export function correlateToolCalls(
@@ -307,6 +395,22 @@ function asMessage(value: unknown): MessageLike | undefined {
 
 function asContent(value: unknown): ContentLike[] {
   return Array.isArray(value) ? value.filter((item): item is ContentLike => Boolean(item && typeof item === "object")) : [];
+}
+
+function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {
+  if (event.type === "message_update") {
+    const update = event.assistantMessageEvent;
+    if (update.type === "text_delta") emit({ type: "text_delta", delta: update.delta });
+    if (update.type === "thinking_delta") emit({ type: "thinking_delta", delta: update.delta });
+    return;
+  }
+  if (event.type === "tool_execution_start") {
+    emit({ type: "tool_start", toolCallId: event.toolCallId, toolName: event.toolName, args: event.args });
+    return;
+  }
+  if (event.type === "tool_execution_end") {
+    emit({ type: "tool_end", toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError });
+  }
 }
 
 export function assertRunId(runId: string): void {

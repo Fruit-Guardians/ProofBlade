@@ -42,6 +42,21 @@ export interface AssistantTurnDebug {
   raw: unknown;
 }
 
+export interface ChatMessageDebug {
+  id: string;
+  entryId: string;
+  role: "user" | "assistant";
+  timestamp: string;
+  text: string;
+  thinking: string;
+  toolCallIds: string[];
+  provider?: string;
+  model?: string;
+  stopReason?: string;
+  usage?: unknown;
+  raw: unknown;
+}
+
 export interface ToolCallDebug {
   id: string;
   name: string;
@@ -72,8 +87,18 @@ export interface PiSessionDebug {
   entries: unknown[];
   branchEntryIds: string[];
   assistantTurns: AssistantTurnDebug[];
+  messages: ChatMessageDebug[];
   toolCalls: ToolCallDebug[];
 }
+
+export type ChatStreamEvent =
+  | { type: "started"; runId: string }
+  | { type: "text_delta"; delta: string }
+  | { type: "thinking_delta"; delta: string }
+  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
+  | { type: "tool_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
+  | { type: "done"; text: string; stopReason: string; usage: unknown }
+  | { type: "error"; error: string };
 
 export interface RunDetail {
   snapshot: RunSnapshot;

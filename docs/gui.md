@@ -1,4 +1,4 @@
-# ProofBlade 动态调试 GUI
+# ProofBlade 对话式 Agent 与动态调试 GUI
 
 ## 启动
 
@@ -20,6 +20,32 @@ npm run gui -- --config proofblade.config.json --port 4173
 | `--project-root` | 仓库根目录 | 运行数据与配置根目录 |
 
 对应环境变量为 `PORT`、`HOST`、`PROOFBLADE_CONFIG` 和 `PROOFBLADE_ROOT`。服务只把 Provider 名称、模型配置值、Base URL 和思考等级作为界面摘要；`apiKeyEnv` 对应的环境变量值不会进入 API 响应。
+
+## 真实模型对话
+
+“新建对话”创建一个处于 `RUNNING / reconnaissance` 的 Run，并初始化对应 Fixture 生命周期。对话 composer 调用：
+
+```text
+Browser -> POST /api/runs/:id/chat
+        -> PiSolverLane.prompt(user text)
+        -> configured Provider / real model
+        -> ProofBlade Tools
+        -> Pi Session + Control Store
+```
+
+响应使用 `text/event-stream`。服务端把 AgentHarness 事件规范化为：
+
+| 事件 | 内容 |
+| --- | --- |
+| `started` | Run 已进入当前对话 turn |
+| `text_delta` | assistant 文本增量 |
+| `thinking_delta` | 模型思考增量 |
+| `tool_start` | Tool ID、名称和原始参数 |
+| `tool_end` | Tool 结果与错误状态 |
+| `done` | 最终文本、stop reason 和 usage |
+| `error` | Provider、Harness 或 Tool 错误 |
+
+浏览器只把这些事件作为当前 turn 的临时画面。请求完成后重新读取 Pi Session，以 durable entries 替换临时消息。每个 assistant message 下方的 Tool 行可直接打开调用调试侧栏。终态 Run 保持只读，需要通过“新建对话”继续新的任务边界。
 
 ## 调试路径
 
@@ -108,6 +134,8 @@ return {
 | `GET` | `/api/runs` | Run 摘要列表 |
 | `GET` | `/api/runs/:id` | Snapshot、Events、Telemetry、Pi Sessions 与 Tool 投影 |
 | `GET` | `/api/runs/:id/artifacts/:artifactId` | 校验引用后读取 Artifact 文本 |
+| `POST` | `/api/conversations` | 创建可多轮对话的 RUNNING Run |
+| `POST` | `/api/runs/:id/chat` | 通过 SSE 执行一个真实模型 turn |
 | `POST` | `/api/solve` | 使用生产 `SingleAgentCtfLoop` 创建并执行 Run |
 | `POST` | `/api/runs/:id/reconcile` | 使用 `RunRecoveryService` 核对恢复 |
 | `POST` | `/api/runs/:id/checkpoint` | 使用 `CheckpointService` 创建机械检查点 |

@@ -1,21 +1,22 @@
 import {
-  Activity, Archive, Braces, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, Code2,
-  Database, FileCode2, FileJson2, FlaskConical, Gauge, History, Layers3, Menu, PanelRight,
-  Pause, Play, Plus, RefreshCw, RotateCcw, Search, ServerCog, ShieldCheck, TerminalSquare,
-  X, Zap,
+  Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
+  CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Gauge, History,
+  Layers3, Menu, MessageSquare, PanelRight, Pause, Play, Plus, RefreshCw, RotateCcw, Search,
+  Send, ServerCog, ShieldCheck, TerminalSquare, UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { createCheckpoint, getArtifact, getBootstrap, getRun, getRuns, reconcileRun, startSolve } from "./api.js";
+import { createCheckpoint, createConversation, getArtifact, getBootstrap, getRun, getRuns, reconcileRun, startSolve, streamChat } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import type { ArtifactContent, BootstrapData, PiSessionDebug, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, PiSessionDebug, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
 
-type MainTab = "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
+type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
 type OutputView = "json" | "table" | "text";
 
 const phases = ["intake", "reconnaissance", "hypothesis", "experiment", "verification", "report"] as const;
 const phaseLabels: Record<string, string> = { intake: "接入", reconnaissance: "侦察", hypothesis: "假设", experiment: "实验", verification: "验证", report: "报告" };
 const tabItems: Array<{ id: MainTab; label: string; icon: typeof Activity }> = [
+  { id: "chat", label: "Agent 对话", icon: MessageSquare },
   { id: "overview", label: "概览", icon: Gauge },
   { id: "debugger", label: "Tool 调试器", icon: Braces },
   { id: "timeline", label: "事件时间线", icon: History },
@@ -54,7 +55,7 @@ export function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [runId, setRunId] = useState<string>();
   const [detail, setDetail] = useState<RunDetail>();
-  const [tab, setTab] = useState<MainTab>("debugger");
+  const [tab, setTab] = useState<MainTab>("chat");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
@@ -137,7 +138,7 @@ export function App() {
     <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建 Run</button>
+      <button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索 Run" aria-label="搜索 Run" /></div>
       <div className="filter-row">
         {[["ALL", "全部"], ["RUNNING", "运行中"], ["SUCCEEDED", "成功"], ["FAILED", "异常"]].map(([value, label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}
@@ -175,6 +176,7 @@ export function App() {
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
         {!detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {detail && tab === "chat" && <Conversation detail={detail} onRefresh={() => refreshDetail(detail.snapshot.runId, true)} onError={setError} onNew={() => setNewRunOpen(true)} />}
         {detail && tab === "overview" && <Overview detail={detail} />}
         {detail && tab === "debugger" && <ToolDebugger detail={detail} />}
         {detail && tab === "timeline" && <Timeline detail={detail} />}
@@ -188,8 +190,135 @@ export function App() {
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
       {detail ? <Metrics detail={detail} bootstrap={bootstrap} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
-    {newRunOpen && bootstrap && <NewRunModal bootstrap={bootstrap} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunId(id); void refreshRuns(); }} />}
+    {newRunOpen && bootstrap && <NewRunModal bootstrap={bootstrap} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setTab("chat"); setRunId(id); void refreshRuns(); }} />}
   </div>;
+}
+
+interface LiveToolCall {
+  id: string;
+  name: string;
+  status: "running" | "success" | "error";
+  args?: unknown;
+  result?: unknown;
+}
+
+function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void }) {
+  const preferred = detail.sessions.find((item) => item.metadata?.purpose === "solve") ?? detail.sessions.at(-1);
+  const [sessionId, setSessionId] = useState(preferred?.id ?? "");
+  const session = detail.sessions.find((item) => item.id === sessionId) ?? preferred;
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [pendingUser, setPendingUser] = useState<string>();
+  const [liveText, setLiveText] = useState("");
+  const [liveThinking, setLiveThinking] = useState("");
+  const [liveTools, setLiveTools] = useState<LiveToolCall[]>([]);
+  const [selectedCallId, setSelectedCallId] = useState<string>();
+  const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
+  const latestAssistant = session?.messages.slice().reverse().find((item) => item.role === "assistant");
+  const thread = useRef<HTMLDivElement>(null);
+  const terminal = ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(detail.snapshot.status);
+
+  useEffect(() => {
+    if (!preferred) return;
+    if (!detail.sessions.some((item) => item.id === sessionId)) setSessionId(preferred.id);
+  }, [detail.sessions, preferred, sessionId]);
+  useEffect(() => {
+    const element = thread.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [session?.messages.length, liveText, liveTools.length, pendingUser]);
+
+  const submit = async () => {
+    const prompt = draft.trim();
+    if (!prompt || sending || terminal) return;
+    setDraft("");
+    setPendingUser(prompt);
+    setLiveText("");
+    setLiveThinking("");
+    setLiveTools([]);
+    setSending(true);
+    let streamError: string | undefined;
+    let receivedTextDelta = false;
+    try {
+      await streamChat(detail.snapshot.runId, prompt, (event) => {
+        if (event.type === "text_delta") {
+          receivedTextDelta = true;
+          setLiveText((current) => current + event.delta);
+        }
+        if (event.type === "thinking_delta") setLiveThinking((current) => current + event.delta);
+        if (event.type === "tool_start") setLiveTools((current) => [...current.filter((item) => item.id !== event.toolCallId), { id: event.toolCallId, name: event.toolName, status: "running", args: event.args }]);
+        if (event.type === "tool_end") setLiveTools((current) => current.map((item) => item.id === event.toolCallId ? { ...item, status: event.isError ? "error" : "success", result: event.result } : item));
+        if (event.type === "done" && !receivedTextDelta) setLiveText(event.text);
+        if (event.type === "error") streamError = event.error;
+      });
+      if (streamError) onError(streamError);
+      await onRefresh();
+    } catch (error) {
+      onError(message(error));
+    } finally {
+      setSending(false);
+      setPendingUser(undefined);
+      setLiveText("");
+      setLiveThinking("");
+      setLiveTools([]);
+    }
+  };
+
+  return <div className={`conversation-page ${selectedCall ? "inspector-open" : ""}`}>
+    <div className="conversation-main">
+      <div className="conversation-toolbar">
+        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{detail.active?.state === "running" || sending ? "生成中" : "在线"}</span></div>
+        {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
+        <span className="conversation-model">{latestAssistant?.model ?? detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness"}</span>
+      </div>
+      <div className="message-thread" ref={thread}>
+        {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong><span>{detail.snapshot.task.target}</span></div>}
+        {session?.messages.map((chat) => {
+          const calls = session.toolCalls.filter((call) => call.assistantEntryId === chat.entryId);
+          return <article className={`chat-message role-${chat.role}`} key={chat.id}>
+            <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
+            <div className="message-content">
+              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}</div>
+              {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
+              {chat.text && <MessageText text={chat.text} />}
+              {calls.length > 0 && <div className="message-tools">{calls.map((call) => <button key={call.id} className={`message-tool tool-${call.status} ${selectedCallId === call.id ? "selected" : ""}`} onClick={() => setSelectedCallId(call.id)}><span>{call.status === "success" ? <Check size={13} /> : call.status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : call.status}</em><ChevronRight size={13} /></button>)}</div>}
+            </div>
+          </article>;
+        })}
+        {pendingUser && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送中</span></div><MessageText text={pendingUser} /></div></article>}
+        {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <div key={call.id} className={`message-tool tool-${call.status}`}><span>{call.status === "running" ? <RefreshCw className="spin" size={13} /> : call.status === "success" ? <Check size={13} /> : <CircleAlert size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.status}</em></div>)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
+      </div>
+      <div className="composer-wrap">
+        {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
+        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.snapshot.phase} · {session?.stats.totalTokens ?? 0} tokens</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
+      </div>
+    </div>
+    {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
+  </div>;
+}
+
+function ConversationToolInspector({ call, onClose }: { call: ToolCallDebug; onClose(): void }) {
+  const [source, setSource] = useState<InspectorSource>("full");
+  const [view, setView] = useState<"tree" | "raw">("tree");
+  const inspected = inspectorValue(call, source);
+  return <aside className="conversation-inspector">
+    <div className="conversation-inspector-head"><div><Wrench size={15} /><span><strong>{call.name}</strong><code>{call.id}</code></span></div><button className="icon-button" title="关闭调试面板" onClick={onClose}><X size={15} /></button></div>
+    <div className="source-tabs">{([ ["arguments", "Arguments"], ["result", "Result"], ["pi-entry", "Pi Entry"], ["telemetry", "Telemetry"], ["full", "完整对象"] ] as Array<[InspectorSource, string]>).map(([id, label]) => <button key={id} className={source === id ? "active" : ""} onClick={() => setSource(id)}>{label}</button>)}</div>
+    <div className="conversation-inspector-tools"><StatusMini status={call.status} /><span>轮次 #{call.assistantOrdinal}</span><div className="view-switch"><button className={view === "tree" ? "active" : ""} onClick={() => setView("tree")}><Layers3 size={12} />树</button><button className={view === "raw" ? "active" : ""} onClick={() => setView("raw")}><FileJson2 size={12} />原文</button></div></div>
+    <div className="conversation-json">{view === "tree" ? <JsonTree key={`${call.id}:${source}`} value={inspected} /> : <RawJson value={inspected} />}</div>
+    <ScriptLab input={call} compact />
+  </aside>;
+}
+
+function MessageText({ text }: { text: string }) {
+  const parts = text.split("```");
+  return <div className="message-text">{parts.map((part, index) => {
+    if (index % 2 === 1) {
+      const [language, ...lines] = part.split("\n");
+      const hasLanguage = /^[a-zA-Z0-9_+#.-]{1,20}$/.test(language.trim());
+      return <pre key={index} data-language={hasLanguage ? language.trim() : undefined}><code>{hasLanguage ? lines.join("\n") : part}</code></pre>;
+    }
+    return part && <p key={index}>{part}</p>;
+  })}</div>;
 }
 
 function ToolDebugger({ detail }: { detail: RunDetail }) {
@@ -237,7 +366,7 @@ function ToolDebugger({ detail }: { detail: RunDetail }) {
   </div>;
 }
 
-function ScriptLab({ input }: { input?: ToolCallDebug }) {
+function ScriptLab({ input, compact = false }: { input?: ToolCallDebug; compact?: boolean }) {
   const [preset, setPreset] = useState<keyof typeof scriptPresets>("summary");
   const [code, setCode] = useState(scriptPresets.summary);
   const [result, setResult] = useState<unknown>();
@@ -261,7 +390,7 @@ function ScriptLab({ input }: { input?: ToolCallDebug }) {
     worker.postMessage({ id, code, input });
   };
 
-  return <section className="script-lab">
+  return <section className={`script-lab ${compact ? "compact" : ""}`}>
     <div className="section-head"><div><Code2 size={15} /><strong>Script Lab</strong><span>Web Worker</span></div><div className="script-actions"><select value={preset} aria-label="脚本预设" onChange={(event) => { const next = event.target.value as keyof typeof scriptPresets; setPreset(next); setCode(scriptPresets[next]); }}><option value="summary">调用摘要</option><option value="evidence">Artifact / Evidence</option><option value="telemetry">Effect 摘要</option></select><button className="run-script" disabled={!input || running} onClick={execute}>{running ? <RefreshCw className="spin" size={14} /> : <Play size={14} />}运行</button></div></div>
     <div className="script-grid"><div className="script-editor"><div className="editor-bar"><span>transform.js</span><span>input = 完整 Tool 调试对象</span></div><textarea spellCheck={false} value={code} onChange={(event) => setCode(event.target.value)} /></div>
       <div className="script-output"><div className="editor-bar"><span>输出</span><div className="view-switch"><button className={outputView === "json" ? "active" : ""} onClick={() => setOutputView("json")}>JSON</button><button className={outputView === "table" ? "active" : ""} onClick={() => setOutputView("table")}>表格</button><button className={outputView === "text" ? "active" : ""} onClick={() => setOutputView("text")}>文本</button></div></div><div className="output-body">{error ? <div className="script-error">{error}</div> : result === undefined ? <div className="output-placeholder">等待执行</div> : outputView === "json" ? <JsonTree value={result} /> : outputView === "table" ? <FlatTable value={result} /> : <pre className="plain-output">{pretty(result)}</pre>}</div></div>
@@ -321,16 +450,22 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
 
 function NewRunModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
   const [fixtureId, setFixtureId] = useState(bootstrap.fixtures[0]?.id ?? "");
+  const [launch, setLaunch] = useState<"chat" | "solve">("chat");
   const [mode, setMode] = useState<"auto" | "assist">("assist");
   const [maxTurns, setMaxTurns] = useState(3);
-  const [runId, setRunId] = useState(`GUI-${Date.now()}`);
+  const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
+  const [objective, setObjective] = useState("分析目标，并根据我的后续消息持续协作。");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
-    try { await startSolve({ runId, fixtureId, mode, maxTurns }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
+    try {
+      if (launch === "chat") await createConversation({ runId, fixtureId, objective });
+      else await startSolve({ runId, fixtureId, mode, maxTurns });
+      onCreated(runId);
+    } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Plus size={17} /><strong>新建 Run</strong></div><button type="button" className="icon-button" onClick={onClose}><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>Run ID</span><input required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>Fixture</span><select value={fixtureId} onChange={(event) => setFixtureId(event.target.value)}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label><div className="modal-row"><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}开始运行</button></footer></form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Plus size={17} /><strong>新建会话</strong></div><button type="button" className="icon-button" onClick={onClose}><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="launch-switch segmented"><button type="button" className={launch === "chat" ? "active" : ""} onClick={() => setLaunch("chat")}><MessageSquare size={13} />Agent 对话</button><button type="button" className={launch === "solve" ? "active" : ""} onClick={() => setLaunch("solve")}><Play size={13} />自动执行</button></div><label><span>Run ID</span><input required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>Fixture</span><select value={fixtureId} onChange={(event) => setFixtureId(event.target.value)}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label>{launch === "chat" ? <label><span>目标</span><textarea required rows={3} value={objective} onChange={(event) => setObjective(event.target.value)} /></label> : <div className="modal-row"><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : launch === "chat" ? <MessageSquare size={14} /> : <Play size={14} />}{launch === "chat" ? "创建对话" : "开始运行"}</button></footer></form></div>;
 }
 
 function PhaseStrip({ current }: { current: string }) { const currentIndex = phases.indexOf(current as typeof phases[number]); return <div className="phase-strip">{phases.map((phase, index) => <div key={phase} className={`${index < currentIndex ? "done" : ""} ${phase === current ? "current" : ""}`}><span>{index < currentIndex ? <Check size={12} /> : index + 1}</span><strong>{phaseLabels[phase]}</strong><i /></div>)}</div>; }
