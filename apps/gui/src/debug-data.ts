@@ -57,6 +57,7 @@ const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 export class DebugDataService {
   private readonly services: AppServices;
   private readonly active = new Map<string, ActiveRunInfo>();
+  private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
 
   public constructor(
     private readonly root: string,
@@ -95,12 +96,14 @@ export class DebugDataService {
       .filter((entry) => entry.isDirectory() && runIdPattern.test(entry.name))
       .map(async (entry): Promise<RunListItem | undefined> => {
         try {
-          const [snapshot, eventsStat] = await Promise.all([
+          const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
+          const cached = this.runListCache.get(entry.name);
+          if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
+          const [snapshot, events] = await Promise.all([
             this.services.control.snapshot(entry.name),
-            stat(join(this.services.runsRoot, entry.name, "events.jsonl")),
+            this.services.control.events(entry.name),
           ]);
-          const events = await this.services.control.events(entry.name);
-          return {
+          const item: RunListItem = {
             runId: snapshot.runId,
             objective: snapshot.task.objective,
             targetKind: snapshot.task.target_kind,
@@ -117,6 +120,8 @@ export class DebugDataService {
             },
             active: this.active.get(snapshot.runId),
           };
+          this.runListCache.set(entry.name, { mtimeMs: eventsStat.mtimeMs, item });
+          return item;
         } catch {
           return undefined;
         }
