@@ -1,0 +1,20 @@
+{
+  "name": "@proofblade/materials",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.83.0",
+    "@earendil-works/pi-ai": "0.83.0",
+    "@proofblade/atoms": "0.1.0",
+    "@proofblade/molecules": "0.1.0"
+  },
+  "engines": { "node": ">=22.19.0" }
+}

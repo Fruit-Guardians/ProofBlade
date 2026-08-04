@@ -5,8 +5,10 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 ## Current scope
 
 - Pi `@earendil-works/pi-agent-core` and `@earendil-works/pi-ai` locked to `0.83.0`.
+- Four-level dependency funnel: reusable atoms, generic molecules, ProofBlade materials and the delivery CLI.
 - JSONL Control Store with deterministic replay and projection hashing.
-- Run/phase state machine, facts, evidence, hypotheses, intents, effects, leases and immutable artifacts.
+- Single-writer event sequencing, durable atomic projections and crash-recoverable effect journaling.
+- Run/phase state machine, facts, evidence, hypotheses, intents, leases, fixture generations and immutable artifacts.
 - Six-layer context compiler with deterministic manifests and untrusted-observation boundaries.
 - Local fixture sandbox and a self-contained demo run.
 - Pi JSONL Session adapter that is activated when a configured model is available.
@@ -24,6 +26,8 @@ npm run cli -- timeline DEMO-001
 npm run cli -- replay DEMO-001
 npm run cli -- agent DEMO-001 "Summarize the verified facts"
 npm test
+npm run test:atoms
+npm run test:molecules
 ```
 
 Runs and artifacts are written below `runs/`. Downloads and source snapshots belong in `tmp/`; the repository ignores that directory by default.
@@ -39,7 +43,21 @@ proofblade ledger <run-id>
 proofblade context <run-id>
 proofblade replay <run-id>
 proofblade reconcile <run-id>
+proofblade fixture-build <run-id>
+proofblade fixture-reset <run-id>
+proofblade fixture-score <run-id> <candidate>
 proofblade agent <run-id> [prompt]
 ```
 
-See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, and `docs/eval-protocol.md` for the contracts implemented by this first milestone.
+## Package funnel
+
+```text
+apps/cli                     user intent and delivery
+   -> packages/materials     ProofBlade, CTF, Pi and provider knowledge
+      -> packages/molecules  generic acquisition/processing composition
+         -> packages/atoms   minimal types, values and storage primitives
+```
+
+Imports only point downward in this diagram. Each package adds information instead of changing lower-level contracts. `atoms` and `molecules` have independent build and test commands, so deleting every layer above either package does not prevent that package from working.
+
+See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, and `docs/eval-protocol.md` for the implemented contracts.

@@ -1,17 +1,9 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "rootDir": ".",
-    "outDir": "dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "sourceMap": true
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "files": [],
+  "references": [
+    { "path": "./packages/atoms" },
+    { "path": "./packages/molecules" },
+    { "path": "./packages/materials" },
+    { "path": "./apps/cli" }
+  ]
 }

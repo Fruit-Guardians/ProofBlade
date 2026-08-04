@@ -19,3 +19,15 @@ Model text can propose an action; only a validated event reduced by the control 
 ## ADR-005 External effects are journaled
 
 All sandbox and capability calls have an effect id, replay policy, idempotency key and persisted result artifact.
+
+## ADR-006 Layers follow information scope
+
+Use a four-level dependency funnel instead of treating three layers as a fixed count. Atoms represent information without external knowledge. Molecules acquire and process generic information. Materials add ProofBlade, CTF, Pi and provider semantics. The CLI transmits user intent and results. Higher levels extend lower contracts, and imports never point toward a higher-information level.
+
+## ADR-007 One durable writer per run
+
+Serialize control-store operations by run id. Validate a transition before append, flush the JSONL record before publishing an atomically replaced projection, and recover projections through deterministic replay.
+
+## ADR-008 Effect recovery preserves identity
+
+Persist the operation, arguments, execution location, timeout, generation and replay policy before execution. Recovery keeps the original effect id and either adopts its existing artifact, reruns replayable work, or records an unknown outcome.

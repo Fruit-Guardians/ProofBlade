@@ -1,5 +1,29 @@
 # ProofBlade architecture
 
+## Dependency funnel
+
+The package boundary follows how much information a component is allowed to know, rather than forcing every feature into exactly three layers.
+
+| Level | Package | Information position | Knowledge boundary |
+| --- | --- | --- | --- |
+| 1 | `@proofblade/atoms` | represent and persist information | Generic contracts, hashes, ids, atomic file operations and keyed serialization. It knows nothing about CTF, Pi or the CLI. |
+| 2 | `@proofblade/molecules` | acquire and process information | Generic tool composition, event projection, layered context and file artifacts. It knows atoms, but no ProofBlade business rules. |
+| 3 | `@proofblade/materials` | turn information into ProofBlade behavior | CTF state, reducers, effects, leases, fixtures, provider resolution and Pi integration. It knows atoms and molecules. |
+| 4 | `@proofblade/cli` | transmit user intent and results | Commands, argument parsing and display. It consumes only the public materials API. |
+
+```text
+CLI (delivery)
+  -> materials (business processing)
+      -> molecules (generic processing)
+          -> atoms (data and deterministic primitives)
+```
+
+Dependency arrows always point toward a lower-information package. Lower packages never import a higher package. The boundary is enforced by `dependency-funnel.test.ts`, package dependency assertions and TypeScript project references.
+
+The type hierarchy grows in the same direction: `ToolAtom` becomes `AgentTool` and then `ToolDefinition`; `ArtifactAtom`, `EffectAtom`, `MessageAtom` and `SequencedEventAtom` are extended by domain types without adding business knowledge to atoms. `npm run test:atoms` and `npm run test:molecules` prove the bottom two levels work when their upper levels are absent.
+
+## Durable domains
+
 ProofBlade has two durable domains:
 
 1. Pi Session stores provider-visible messages, model changes and compaction entries.
@@ -14,7 +38,9 @@ CLI -> Control Store -> Reducer -> Run Snapshot
        -> Context Compiler -> Pi AgentHarness adapter
 ```
 
-The first implementation uses one JSONL file per run. `replay` rebuilds the snapshot from events and compares its canonical hash with the persisted projection hash. This gives a storage-independent contract before a SQLite adapter is introduced.
+The first implementation uses one JSONL file per run. A keyed operation queue gives each run a single writer. Each event is reduced before append, the append is flushed to stable storage, and the derived projection is replaced atomically. `replay` rebuilds the snapshot from events and compares its canonical hash with the persisted projection hash. This gives a storage-independent contract before a SQLite adapter is introduced.
+
+Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pure or idempotent work under the original effect id, adopts a result artifact that was already persisted, and marks work with an unsafe replay policy as `UNKNOWN`. Fixture generations and leases are durable control-store facts, so stale work can be rejected after reset or ownership change.
 
 ## Pi 0.83.0 package note
 

@@ -4,20 +4,23 @@
   "description": "ProofBlade (证锋), a Pi-based evidence-driven CTF agent harness.",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "engines": {
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test tests/**/*.test.ts",
-    "cli": "tsx src/cli/main.ts",
-    "demo": "tsx src/cli/main.ts run demo",
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
-  },
-  "dependencies": {
-    "@earendil-works/pi-agent-core": "0.83.0",
-    "@earendil-works/pi-ai": "0.83.0"
+    "build": "tsc -b",
+    "typecheck": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run build --workspace=@proofblade/materials && npm run typecheck --workspace=@proofblade/cli",
+    "test": "npm run build && node --import tsx --test packages/*/tests/**/*.test.ts",
+    "test:atoms": "npm run build --workspace=@proofblade/atoms && npm run test --workspace=@proofblade/atoms",
+    "test:molecules": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run test --workspace=@proofblade/molecules",
+    "test:materials": "npm run build && npm run test --workspace=@proofblade/materials",
+    "cli": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts",
+    "demo": "npm run cli -- run demo",
+    "clean": "tsc -b --clean"
   },
   "devDependencies": {
     "@types/node": "22.19.19",
