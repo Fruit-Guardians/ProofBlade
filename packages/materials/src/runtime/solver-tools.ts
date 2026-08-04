@@ -16,6 +16,8 @@ export function createSolverTools(): SchemaTool[] {
     adapt(proposeHypothesisContract),
     adapt(proposeFactContract),
     adapt(submitCandidateContract),
+    adapt(readArtifactContract),
+    adapt(searchHistoryContract),
     adapt(reportStatusContract),
   ];
 }
@@ -123,6 +125,47 @@ const submitCandidateContract: ProofBladeToolContract<typeof candidateSchema, St
 };
 
 const statusSchema = Type.Object({});
+
+const readArtifactSchema = Type.Object({
+  artifactId: Type.String({ description: "Artifact id from evidence, observations, status, or search_history." }),
+  maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+});
+
+const readArtifactContract: ProofBladeToolContract<typeof readArtifactSchema, Static<typeof readArtifactSchema>, unknown, SolverToolContext> = {
+  name: "read_artifact",
+  version: "1.0.0",
+  description: "Read a verified artifact by id with deterministic head/tail truncation and hash metadata.",
+  parameters: readArtifactSchema,
+  readOnly: true,
+  sideEffect: "none",
+  replay: "pure",
+  outputPolicy: "inline",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return await context.runtime.readArtifact(input.artifactId, input.maxChars);
+  },
+};
+
+const searchHistorySchema = Type.Object({
+  query: Type.String({ minLength: 2, description: "Case-insensitive text or stable id to find in the durable ledger." }),
+});
+
+const searchHistoryContract: ProofBladeToolContract<typeof searchHistorySchema, Static<typeof searchHistorySchema>, unknown, SolverToolContext> = {
+  name: "search_history",
+  version: "1.0.0",
+  description: "Search facts, hypotheses, observations, evidence, and checkpoints without loading raw history.",
+  parameters: searchHistorySchema,
+  readOnly: true,
+  sideEffect: "none",
+  replay: "pure",
+  outputPolicy: "summary",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return await context.runtime.searchHistory(input.query);
+  },
+};
 
 const reportStatusContract: ProofBladeToolContract<typeof statusSchema, Static<typeof statusSchema>, unknown, SolverToolContext> = {
   name: "report_status",

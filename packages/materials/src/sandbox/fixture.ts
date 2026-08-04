@@ -111,7 +111,7 @@ export class LocalFixtureSandbox implements SandboxPort {
       const files = await visibleFiles(effect.cwd ?? this.root);
       return { stdout: files.join("\n"), stderr: "", exitCode: 0, durationMs: Date.now() - started };
     }
-    if (effect.operation === "fixture_read") {
+    if (effect.operation === "fixture_read" || effect.operation === "artifact_read") {
       const path = resolveInside(effect.cwd ?? this.root, String(effect.args.path ?? ""));
       return { stdout: await readFile(path, "utf8"), stderr: "", exitCode: 0, durationMs: Date.now() - started };
     }

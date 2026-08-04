@@ -39,3 +39,7 @@ Pi tools expose proposal commands, not terminal state mutation. Model facts rema
 ## ADR-010 Small-model tools stay atomic
 
 Prefer a zero-argument target inspection tool over an optional path that mixes target, run and artifact namespaces. Keep target acquisition, knowledge proposals and result transmission as separate tools with sequential execution.
+
+## ADR-011 Context pruning is deterministic first
+
+Before asking an LLM to summarize, preserve stable task and ledger anchors, snip old tool results, remove complete old tool exchanges and write a mechanical checkpoint. Pi compaction receives that checkpoint through `session_before_compact`; one overflow recovery is allowed per Run and the next overflow becomes an explicit failure.

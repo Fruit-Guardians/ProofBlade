@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   contextText,
+  CheckpointService,
   createServices,
   demoTask,
   fixtureTask,
@@ -10,6 +11,8 @@ import {
   loadConfig,
   listFixtureProfiles,
   PiAgentLane,
+  PiSolverLane,
+  ProofBladeToolRuntime,
   projectionHash,
   runDemo,
   SingleAgentCtfLoop,
@@ -58,7 +61,7 @@ async function main(): Promise<void> {
     }
     case "show": {
       const snapshot = await services.control.snapshot(required(arg, "run id"));
-      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, projectionHash: snapshot.projectionHash });
+      print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, projectionHash: snapshot.projectionHash });
       break;
     }
     case "timeline": {
@@ -92,6 +95,40 @@ async function main(): Promise<void> {
     case "reconcile": {
       const runId = required(arg, "run id");
       print({ runId, reconciled: await services.journal.reconcile(runId) });
+      break;
+    }
+    case "checkpoint": {
+      const runId = required(arg, "run id");
+      const reason = rest.join(" ").trim() || "manual";
+      print(await new CheckpointService(services.control, services.artifacts).create(runId, reason));
+      break;
+    }
+    case "compact": {
+      const runId = required(arg, "run id");
+      const runtime = await toolRuntime(runId, services);
+      const lane = await PiSolverLane.create({ runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, config, runtime });
+      try {
+        await lane.compact(rest.join(" ").trim() || "Manual ProofBlade compaction");
+      } finally {
+        await lane.close();
+      }
+      const snapshot = await services.control.snapshot(runId);
+      print({ runId, checkpoints: Object.values(snapshot.checkpoints) });
+      break;
+    }
+    case "history": {
+      const runId = required(arg, "run id");
+      const query = required(rest.join(" ").trim(), "history query");
+      const runtime = await toolRuntime(runId, services);
+      print(await runtime.searchHistory(query));
+      break;
+    }
+    case "artifact": {
+      const runId = required(arg, "run id");
+      const artifactId = required(rest[0], "artifact id");
+      const maxChars = rest[1] === undefined ? undefined : Number(rest[1]);
+      const runtime = await toolRuntime(runId, services);
+      print(await runtime.readArtifact(artifactId, maxChars));
       break;
     }
     case "fixture-build": {
@@ -187,12 +224,22 @@ function helpText(): string {
     "  context <run-id>",
     "  replay <run-id>",
     "  reconcile <run-id>",
+    "  checkpoint <run-id> [reason]",
+    "  compact <run-id> [reason]",
+    "  history <run-id> <query>",
+    "  artifact <run-id> <artifact-id> [max-chars]",
     "  fixture-build <run-id>",
     "  fixture-reset <run-id>",
     "  fixture-score <run-id> <candidate>",
     "  agent <run-id> [prompt]  Run a Pi AgentHarness turn through LM Studio",
     "  --config <path>           Select a project configuration file",
   ].join("\n");
+}
+
+async function toolRuntime(runId: string, services: ReturnType<typeof createServices>): Promise<ProofBladeToolRuntime> {
+  const snapshot = await services.control.snapshot(runId);
+  const fixture = await services.sandbox.build(snapshot.task);
+  return new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 }
 
 main().catch((error) => {

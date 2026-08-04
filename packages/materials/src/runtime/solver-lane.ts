@@ -4,6 +4,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
+import { pruneAgentMessages } from "../context/agent-pruner.js";
+import { CheckpointService } from "../context/checkpoint.js";
+import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
@@ -22,6 +25,7 @@ export class PiSolverLane implements AgentLanePort {
     runId: string;
     runDir: string;
     controlStore: ControlStore;
+    artifactStore: ArtifactStore;
     config: ProofBladeConfig;
     runtime: ProofBladeToolRuntime;
   }): Promise<PiSolverLane> {
@@ -36,6 +40,7 @@ export class PiSolverLane implements AgentLanePort {
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const { models, model } = createConfiguredModels(profile);
     const tools = createSolverTools();
+    const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
     const harness = new AgentHarness<SolverToolContext>({
       session,
       models,
@@ -65,6 +70,26 @@ export class PiSolverLane implements AgentLanePort {
       },
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
     });
+    harness.on("context", async ({ messages }) => {
+      const snapshot = await options.controlStore.snapshot(options.runId);
+      const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens });
+      const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
+      const pruned = pruneAgentMessages(messages, transcriptBudget);
+      if (pruned.dropped.length > 0) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
+      return { messages: pruned.messages };
+    });
+    harness.on("session_before_compact", async ({ preparation }) => {
+      const checkpoint = await checkpointService.create(options.runId, "pi-compaction");
+      return {
+        compaction: {
+          summary: checkpoint.content,
+          firstKeptEntryId: preparation.firstKeptEntryId,
+          tokensBefore: preparation.tokensBefore,
+          retainedTail: preparation.retainedTail,
+          details: { checkpointId: checkpoint.checkpointId, artifactId: checkpoint.artifactId, kind: "mechanical" },
+        },
+      };
+    });
     return new PiSolverLane(options.runId, options.controlStore, harness);
   }
 
@@ -82,7 +107,7 @@ export class PiSolverLane implements AgentLanePort {
         { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason } },
         { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "model_usage", payload: { provider: response.provider, model: response.model, usage: response.usage } },
       ]);
-      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"] };
+      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage };
     } finally {
       this.busy = false;
     }
@@ -90,6 +115,10 @@ export class PiSolverLane implements AgentLanePort {
 
   public async abort(_reason: string): Promise<void> {
     await this.harness.abort();
+  }
+
+  public async compact(reason: string): Promise<void> {
+    await this.harness.compact(reason);
   }
 
   public async isIdle(): Promise<boolean> {

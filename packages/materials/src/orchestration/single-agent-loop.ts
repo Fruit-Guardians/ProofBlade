@@ -9,6 +9,7 @@ import { id, isTerminal } from "../domain/utils.js";
 import { pathToPhase } from "../control/phase-machine.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
+import { CheckpointService } from "../context/checkpoint.js";
 
 export interface SolverLaneCreateInput {
   runId: string;
@@ -67,6 +68,7 @@ export class SingleAgentCtfLoop {
     await this.ensureIntent(options.runId);
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
+    const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
       const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
@@ -80,7 +82,22 @@ export class SingleAgentCtfLoop {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status)) break;
         turns += 1;
-        await lane.prompt(turnPrompt(before, turns));
+        const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
+          const failed = await this.services.control.snapshot(options.runId);
+          if (failed.contextOverflowRecoveries >= 1) {
+            await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run." });
+            break;
+          }
+          const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");
+          await this.services.control.dispatch(options.runId, { type: "context_recovery", checkpointId: checkpoint.checkpointId });
+          try {
+            await lane.compact("Use the ProofBlade mechanical checkpoint and retain the latest complete tool exchange.");
+          } catch {
+            // The durable checkpoint remains the recovery source when Pi compaction cannot run.
+          }
+          continue;
+        }
         const after = await this.services.control.snapshot(options.runId);
         const pending = latestPending(after);
         if (pending) {
@@ -96,6 +113,14 @@ export class SingleAgentCtfLoop {
         if (mode === "assist") {
           await this.services.control.dispatch(options.runId, { type: "pause", reason: "Assist turn completed without a completion proposal." });
           break;
+        }
+        if (agentOutcome.usage.input >= Math.floor(this.config.modelProfiles.executor.contextWindow * 0.78)) {
+          await checkpoints.create(options.runId, "context-budget-threshold");
+          try {
+            await lane.compact("Preserve the task, ledger ids, rejected hypotheses, open effects, leases, and latest complete tool exchange.");
+          } catch {
+            // The checkpoint is sufficient for deterministic recovery.
+          }
         }
         if (Date.now() - Date.parse(before.startedAt ?? new Date().toISOString()) >= before.task.constraints.deadline_ms) {
           await this.services.control.dispatch(options.runId, { type: "exhaust", reason: "Run deadline exhausted." });
@@ -163,8 +188,12 @@ export class SingleAgentCtfLoop {
   }
 }
 
+function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
+  return stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? "");
+}
+
 async function defaultLaneFactory(input: SolverLaneCreateInput): Promise<AgentLanePort> {
-  return await PiSolverLane.create({ runId: input.runId, runDir: input.runDir, controlStore: input.services.control, config: input.config, runtime: input.runtime });
+  return await PiSolverLane.create({ runId: input.runId, runDir: input.runDir, controlStore: input.services.control, artifactStore: input.services.artifacts, config: input.config, runtime: input.runtime });
 }
 
 function latestPending(snapshot: RunSnapshot) {

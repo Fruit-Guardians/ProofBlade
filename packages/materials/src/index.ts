@@ -5,6 +5,8 @@ export * from "./control/lease-manager.js";
 export * from "./control/phase-machine.js";
 export * from "./control/reducer.js";
 export * from "./context/compiler.js";
+export * from "./context/agent-pruner.js";
+export * from "./context/checkpoint.js";
 export * from "./effects/artifact-store.js";
 export * from "./effects/effect-journal.js";
 export * from "./knowledge/observer.js";

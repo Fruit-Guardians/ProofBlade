@@ -14,7 +14,7 @@ The effect record also stores the fixture generation and enough execution data t
 
 ## Solver tools
 
-The Pi solver lane exposes six sequential tools:
+The Pi solver lane exposes eight sequential tools:
 
 | Tool | Information role |
 | --- | --- |
@@ -23,6 +23,8 @@ The Pi solver lane exposes six sequential tools:
 | `propose_hypothesis` | Process observations into a falsifiable statement linked to evidence ids. |
 | `propose_fact` | Propose a ledger fact; it remains unconfirmed until verifier action. |
 | `submit_candidate` | Transmit one observed `PB{...}` value as a completion proposal. |
+| `read_artifact` | Retrieve a bounded head/tail window from a referenced immutable artifact. |
+| `search_history` | Query durable facts, hypotheses, observations, evidence and checkpoints by id or text. |
 | `report_status` | Read authoritative phase, ids, proposals and remaining budget. |
 
 `submit_candidate` checks the exact candidate against successful current-generation observation artifacts before writing a proposal. It returns a hash and completion id to the model and requests early turn termination. Hidden scoring is not model-visible and executes as separate `fixture_score` effects.

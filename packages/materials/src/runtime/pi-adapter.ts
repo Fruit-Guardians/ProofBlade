@@ -17,10 +17,12 @@ export interface AgentOutcome {
   text: string;
   stopReason: string;
   usage: AssistantMessage["usage"];
+  errorMessage?: string;
 }
 
 export interface AgentLanePort {
   prompt(text: string): Promise<AgentOutcome>;
+  compact(reason: string): Promise<void>;
   abort(reason: string): Promise<void>;
   isIdle(): Promise<boolean>;
   close(): Promise<void>;
@@ -112,7 +114,7 @@ export class PiAgentLane implements AgentLanePort {
           payload: { provider: response.provider, model: response.model, usage: response.usage },
         },
       ]);
-      return { text: output, stopReason: response.stopReason, usage: response.usage };
+      return { text: output, stopReason: response.stopReason, usage: response.usage, errorMessage: response.errorMessage };
     } finally {
       this.busy = false;
     }
@@ -120,6 +122,10 @@ export class PiAgentLane implements AgentLanePort {
 
   public async abort(_reason: string): Promise<void> {
     await this.harness.abort();
+  }
+
+  public async compact(reason: string): Promise<void> {
+    await this.harness.compact(reason);
   }
 
   public async isIdle(): Promise<boolean> {

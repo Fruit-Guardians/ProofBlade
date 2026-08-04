@@ -6,12 +6,14 @@ import type { FixtureRef } from "../sandbox/fixture.js";
 import type { RawEffectResult } from "../domain/types.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
 import { id, sha256 } from "../domain/utils.js";
+import { snipText } from "@proofblade/molecules";
 
 export interface InspectTargetResult {
   output: string;
   observationId: string;
   evidenceId: string;
   artifactId: string;
+  truncated: boolean;
 }
 
 export class ProofBladeToolRuntime {
@@ -44,7 +46,14 @@ export class ProofBladeToolRuntime {
       generation: snapshot.generation,
       result: executed.result,
     });
-    return { output: executed.result.stdout, observationId: observed.observationId, evidenceId: observed.evidenceId, artifactId: executed.artifactId };
+    const visible = snipText(executed.result.stdout, 6_000);
+    return {
+      output: `<untrusted-observation source="${operation}" artifact="${executed.artifactId}">\n${visible.text}\n</untrusted-observation>`,
+      observationId: observed.observationId,
+      evidenceId: observed.evidenceId,
+      artifactId: executed.artifactId,
+      truncated: visible.truncated,
+    };
   }
 
   public async proposeIntent(input: { title: string; description: string; priority?: number }): Promise<{ intentId: string }> {
@@ -136,6 +145,45 @@ export class ProofBladeToolRuntime {
       completions: Object.values(snapshot.completions).map((item) => ({ id: item.id, candidateHash: item.candidateHash, status: item.status })),
       remainingToolCalls: snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length,
     };
+  }
+
+  public async readArtifact(artifactId: string, maxChars = 4_000): Promise<Record<string, unknown>> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const artifact = snapshot.artifacts[artifactId];
+    if (!artifact) throw new Error(`Unknown artifact: ${artifactId}`);
+    const executed = await this.journal.execute(this.runId, {
+      operation: "artifact_read",
+      args: { artifactId, path: artifact.path, sha256: artifact.sha256, maxChars, generation: snapshot.generation },
+      replayPolicy: "pure",
+      cwd: join(this.runsRoot, this.runId),
+    });
+    const snipped = snipText(executed.result.stdout, maxChars);
+    return {
+      artifactId,
+      sha256: artifact.sha256,
+      output: snipped.text,
+      truncated: snipped.truncated,
+      originalChars: snipped.originalChars,
+      resultArtifactId: executed.artifactId,
+    };
+  }
+
+  public async searchHistory(query: string): Promise<Array<Record<string, unknown>>> {
+    const normalized = query.trim().toLowerCase();
+    if (normalized.length < 2) throw new Error("History query must contain at least two characters");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const rows = [
+      ...Object.values(snapshot.facts).map((item) => ({ kind: "fact", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.hypotheses).map((item) => ({ kind: "hypothesis", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.observations).map((item) => ({ kind: "observation", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.checkpoints).map((item) => ({ kind: "checkpoint", id: item.id, text: item.reason, artifactId: item.artifactId, createdSeq: item.createdSeq })),
+    ];
+    return rows
+      .filter((item) => JSON.stringify(item).toLowerCase().includes(normalized))
+      .sort((a, b) => b.createdSeq - a.createdSeq)
+      .slice(0, 20)
+      .map(({ createdSeq: _createdSeq, ...item }) => item);
   }
 
   public candidateArtifactPath(path: string): string {

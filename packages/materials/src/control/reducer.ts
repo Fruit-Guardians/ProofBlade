@@ -15,6 +15,8 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     hypotheses: {},
     intents: {},
     completions: {},
+    checkpoints: {},
+    contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
     leases: {},
@@ -168,9 +170,17 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       completion.evidenceIds = Array.isArray(p.evidenceIds) ? p.evidenceIds.map(String) : [];
       break;
     }
+    case "checkpoint_created": {
+      const checkpoint = p.checkpoint as RunSnapshot["checkpoints"][string];
+      if (!checkpoint?.id) throw new Error("checkpoint_created requires checkpoint");
+      next.checkpoints[checkpoint.id] = checkpoint;
+      break;
+    }
+    case "context_overflow_recovered":
+      next.contextOverflowRecoveries += 1;
+      break;
     case "turn_started":
     case "assistant_message":
-    case "checkpoint_created":
     case "model_usage":
       break;
     default:

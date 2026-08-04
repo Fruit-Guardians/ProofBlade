@@ -110,6 +110,15 @@ export interface CompletionProposal {
   createdSeq: number;
 }
 
+export interface CheckpointRef {
+  id: string;
+  artifactId: string;
+  snapshotSeq: number;
+  reason: string;
+  contextManifestHash?: string;
+  createdSeq: number;
+}
+
 export type ReplayPolicy = ReplayPolicyAtom;
 
 export interface ArtifactRef extends ArtifactAtom {
@@ -155,6 +164,8 @@ export interface RunSnapshot {
   hypotheses: Record<string, Hypothesis>;
   intents: Record<string, Intent>;
   completions: Record<string, CompletionProposal>;
+  checkpoints: Record<string, CheckpointRef>;
+  contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
   leases: Record<string, Lease>;
@@ -184,6 +195,7 @@ export type EventType =
   | "lease_heartbeat"
   | "lease_released"
   | "checkpoint_created"
+  | "context_overflow_recovered"
   | "completion_proposed"
   | "completion_verified"
   | "model_usage"
@@ -227,11 +239,21 @@ export interface ContextManifest {
   compilerVersion: string;
   layerTokens: Record<"L0" | "L1" | "L2" | "L3" | "L4" | "L5", number>;
   factIds: string[];
+  hypothesisIds: string[];
   observationIds: string[];
   evidenceIds: string[];
   completionIds: string[];
   artifactIds: string[];
   dropped: Array<{ kind: string; id?: string; reason: string }>;
+  budget: {
+    contextWindow: number;
+    outputBudget: number;
+    safetyMargin: number;
+    availableInput: number;
+    estimatedInput: number;
+    ratio: number;
+    overBudget: boolean;
+  };
   hash: string;
 }
 
@@ -243,6 +265,8 @@ export interface ContextBuildInput {
   snapshot: RunSnapshot;
   recentMessages?: ContextMessage[];
   contextWindow?: number;
+  outputBudget?: number;
+  safetyMargin?: number;
 }
 
 export interface ContextBuildOutput {

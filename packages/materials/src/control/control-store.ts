@@ -11,6 +11,7 @@ import type {
   TaskContract,
   Observation,
   CompletionProposal,
+  CheckpointRef,
 } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
@@ -42,7 +43,8 @@ export type DomainCommand =
   | { type: "lease_acquired"; lease: RunSnapshot["leases"][string]; lane?: Lane }
   | { type: "lease_heartbeat"; resourceKey: string; ownerLane: Lane; generation: number; heartbeatAt: string; expiresAt: string; lane?: Lane }
   | { type: "lease_released"; resourceKey: string; lane?: Lane }
-  | { type: "checkpoint"; checkpointId: string; lane?: Lane };
+  | { type: "checkpoint"; checkpoint: Omit<CheckpointRef, "createdSeq">; lane?: Lane }
+  | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
 export class ControlStore {
   private readonly operations = new KeyedOperationQueue();
@@ -136,6 +138,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "lease_heartbeat": return "lease_heartbeat";
     case "lease_released": return "lease_released";
     case "checkpoint": return "checkpoint_created";
+    case "context_recovery": return "context_overflow_recovered";
   }
 }
 
@@ -168,7 +171,8 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "lease_acquired": return { lease: command.lease };
     case "lease_heartbeat": return { resourceKey: command.resourceKey, ownerLane: command.ownerLane, generation: command.generation, heartbeatAt: command.heartbeatAt, expiresAt: command.expiresAt };
     case "lease_released": return { resourceKey: command.resourceKey };
-    case "checkpoint": return { checkpointId: command.checkpointId };
+    case "checkpoint": return { checkpoint: { ...command.checkpoint, createdSeq: seq } };
+    case "context_recovery": return { checkpointId: command.checkpointId };
   }
 }
 

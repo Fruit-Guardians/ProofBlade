@@ -58,6 +58,14 @@ Pi owns the provider turn and its JSONL Session. The solver tools can inspect th
 
 The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
 
+## Context and recovery
+
+The context compiler keeps six information layers explicit. L0/L1 hold stable instructions and the immutable task contract; L2 holds phase gates; L3 holds confirmed facts, proposed facts, rejected hypotheses, observations, evidence, completions, in-flight effects and leases; L4 holds recent messages; L5 holds artifact references. A `ContextManifest` records layer tokens, included ids, dropped ids, budget arithmetic and a deterministic hash.
+
+Before a Pi provider request, the context hook snips old tool results and removes complete old tool exchanges while keeping the latest call/result pair. Full output remains in the immutable artifact store. `read_artifact` performs bounded head/tail retrieval by id and `search_history` queries the durable ledger without loading raw history. When pruning or compaction occurs, a fixed-format checkpoint records task, confirmed facts, rejected hypotheses, artifacts, completed actions, next intents and blockers.
+
+The first context overflow creates one mechanical checkpoint and invokes Pi compaction. A second overflow in the same Run is classified as `context_overflow` and fails explicitly; it never loops on compression indefinitely. Checkpoint and overflow counters are replayed from the Control Store, while the Pi Session remains the provider-facing transcript.
+
 
 ## Pi 0.83.0 package note
 
