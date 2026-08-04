@@ -67,3 +67,7 @@ Discover `skills/` through Pi 0.83.0's Skill parser and keep only validated, uni
 ## ADR-017 Embedded MCP uses lazy capability adapters
 
 Read only the project `.mcp.json`; do not import ambient host MCP configuration. Map each enabled stdio server to a stable `mcp.<name>` capability while keeping the Solver tool schema unchanged. Listing is process-free, describe/call connect lazily, and every call goes through Effect Journal, Artifact, redaction and evidence handling. MCP code is trusted local process code rather than a sandbox boundary, and unfinished calls reconcile to unknown unless an explicit replay policy proves otherwise.
+
+## ADR-018 Tool policy metadata and failures are contract data
+
+Hash the full Tool Contract, including version, execution policy, timeout, resource-key templates, sensitivity and evidence kinds, rather than hashing only Pi-visible fields. Keep the minimal Tool shape in atoms, generic execution in molecules and ProofBlade policy in materials. Normalize thrown execution failures into deterministic structured errors, preserve partial artifact references and set Pi `isError`; never encode a failed operation as successful tool text.

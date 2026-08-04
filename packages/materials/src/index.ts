@@ -15,6 +15,7 @@ export * from "./orchestration/single-agent-loop.js";
 export * from "./orchestration/planner.js";
 export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
+export * from "./tools/errors.js";
 export * from "./tools/runtime.js";
 export * from "./runtime/pi-adapter.js";
 export * from "./runtime/solver-tools.js";

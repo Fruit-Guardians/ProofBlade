@@ -16,6 +16,8 @@ The effect record also stores the fixture generation and enough execution data t
 
 The Pi solver lane exposes fourteen sequential tools. The capability and Skill proxy tools have stable schemas; operation details or full Skill content are loaded only when requested.
 
+Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `outputPolicy`, `replay`, `executionMode`, `resourceKeys`, `sensitivity`, and `evidenceKinds` in addition to its Provider-visible name, description, and TypeBox schema. Resource keys may contain argument templates such as `artifact:{artifactId}` or `job:{jobId}`; the runtime resolves them before lease acquisition. The canonical contract snapshot includes this complete metadata in fixed tool order. A policy-only change therefore changes `solverToolContractHash()` even when the Provider-visible schema is unchanged.
+
 | Tool | Information role |
 | --- | --- |
 | `inspect_target` | Acquire every visible synthetic target file through one zero-argument, journaled effect. |
@@ -34,6 +36,27 @@ The Pi solver lane exposes fourteen sequential tools. The capability and Skill p
 | `report_status` | Read authoritative phase, ids, proposals and remaining budget. |
 
 `submit_candidate` checks the exact candidate against successful current-generation observation artifacts before writing a proposal. It returns a hash and completion id to the model and requests early turn termination. Hidden scoring is not model-visible and executes as separate `fixture_score` effects.
+
+## Structured failures
+
+An execution failure is returned to Pi as `isError: true` with this stable payload instead of being disguised as successful text:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "TOOL_TIMEOUT",
+    "message": "operation timed out",
+    "retryable": true,
+    "signature": "sha256...",
+    "phase": "execute",
+    "partial_artifact_ref": { "id": "artifact-partial", "sha256": "..." },
+    "next_hint": "Read the partial artifact before retrying."
+  }
+}
+```
+
+The failure phase is one of `validate`, `lease`, `preflight`, `execute`, `normalize`, `redact`, `artifact`, `evidence`, or `finish`. Known abort, timeout, missing-resource, bad-argument, and permission errors receive deterministic codes and retry guidance. Candidate-shaped values and configured secrets are removed before an error message and signature reach the model or event stream. A tool that produced useful partial output must register it first and throw `ProofBladeToolError` with `partialArtifactRef`.
 
 ## Capability and job invariants
 

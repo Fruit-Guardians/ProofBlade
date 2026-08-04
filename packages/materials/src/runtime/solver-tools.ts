@@ -4,6 +4,7 @@ import type { ProofBladeToolContract } from "../tools/contracts.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { toToolFailure } from "../tools/errors.js";
 
 export interface SolverToolContext {
   runtime: ProofBladeToolRuntime;
@@ -13,26 +14,25 @@ export interface SolverToolContext {
 type SchemaTool = AgentHarnessTool<SolverToolContext, TSchema, unknown>;
 
 export function createSolverTools(): SchemaTool[] {
-  return [
-    adapt(inspectTargetContract),
-    adapt(listCapabilitiesContract),
-    adapt(invokeCapabilityContract),
-    adapt(runBackgroundContract),
-    adapt(readJobOutputContract),
-    adapt(stopJobContract),
-    adapt(loadSkillContract),
-    adapt(proposeIntentContract),
-    adapt(proposeHypothesisContract),
-    adapt(proposeFactContract),
-    adapt(submitCandidateContract),
-    adapt(readArtifactContract),
-    adapt(searchHistoryContract),
-    adapt(reportStatusContract),
-  ];
+  return solverToolContracts.map((contract) => adapt(contract));
 }
 
 export function solverToolContractSnapshot(): Array<Record<string, unknown>> {
-  return createSolverTools().map((tool) => ({ name: tool.name, label: tool.label, description: tool.description, parameters: tool.parameters, executionMode: tool.executionMode }));
+  return solverToolContracts.map((contract) => ({
+    name: contract.name,
+    version: contract.version,
+    description: contract.description,
+    parameters: contract.parameters,
+    readOnly: contract.readOnly,
+    sideEffect: contract.sideEffect,
+    timeoutMs: contract.timeoutMs,
+    outputPolicy: contract.outputPolicy,
+    replay: contract.replay,
+    executionMode: contract.executionMode,
+    resourceKeys: [...contract.resourceKeys],
+    sensitivity: contract.sensitivity,
+    evidenceKinds: [...contract.evidenceKinds],
+  }));
 }
 
 export function solverToolContractHash(): string {
@@ -48,8 +48,11 @@ const inspectTargetContract: ProofBladeToolContract<typeof inspectSchema, Static
   parameters: inspectSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 30_000,
   replay: "pure",
   outputPolicy: "inline",
+  resourceKeys: ["target:current"],
+  sensitivity: "target",
   evidenceKinds: ["observation"],
   executionMode: "sequential",
   async execute(_input, context) {
@@ -66,8 +69,11 @@ const listCapabilitiesContract: ProofBladeToolContract<typeof listCapabilitiesSc
   parameters: listCapabilitiesSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 5_000,
   replay: "pure",
   outputPolicy: "summary",
+  resourceKeys: [],
+  sensitivity: "public",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(_input, context) {
@@ -88,8 +94,11 @@ const invokeCapabilityContract: ProofBladeToolContract<typeof invokeCapabilitySc
   parameters: invokeCapabilitySchema,
   readOnly: false,
   sideEffect: "workspace",
+  timeoutMs: 120_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["capability:{capabilityId}", "target:current"],
+  sensitivity: "target",
   evidenceKinds: ["observation"],
   executionMode: "sequential",
   async execute(input, context, signal) {
@@ -111,8 +120,11 @@ const runBackgroundContract: ProofBladeToolContract<typeof runBackgroundSchema, 
   parameters: runBackgroundSchema,
   readOnly: false,
   sideEffect: "process",
+  timeoutMs: 10_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["capability:{capabilityId}", "target:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -132,8 +144,11 @@ const readJobOutputContract: ProofBladeToolContract<typeof readJobOutputSchema, 
   parameters: readJobOutputSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 10_000,
   replay: "pure",
   outputPolicy: "summary",
+  resourceKeys: ["job:{jobId}"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -153,8 +168,11 @@ const stopJobContract: ProofBladeToolContract<typeof stopJobSchema, Static<typeo
   parameters: stopJobSchema,
   readOnly: false,
   sideEffect: "process",
+  timeoutMs: 10_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["job:{jobId}"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -174,8 +192,11 @@ const loadSkillContract: ProofBladeToolContract<typeof loadSkillSchema, Static<t
   parameters: loadSkillSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 5_000,
   replay: "pure",
   outputPolicy: "inline",
+  resourceKeys: ["skill:{name}"],
+  sensitivity: "public",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -196,8 +217,11 @@ const proposeIntentContract: ProofBladeToolContract<typeof intentSchema, Static<
   parameters: intentSchema,
   readOnly: false,
   sideEffect: "workspace",
+  timeoutMs: 5_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["intent-board:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -217,8 +241,11 @@ const proposeHypothesisContract: ProofBladeToolContract<typeof hypothesisSchema,
   parameters: hypothesisSchema,
   readOnly: false,
   sideEffect: "workspace",
+  timeoutMs: 5_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["knowledge:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -238,8 +265,11 @@ const proposeFactContract: ProofBladeToolContract<typeof factSchema, Static<type
   parameters: factSchema,
   readOnly: false,
   sideEffect: "workspace",
+  timeoutMs: 5_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["knowledge:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -258,8 +288,11 @@ const submitCandidateContract: ProofBladeToolContract<typeof candidateSchema, St
   parameters: candidateSchema,
   readOnly: false,
   sideEffect: "workspace",
+  timeoutMs: 10_000,
   replay: "idempotent",
   outputPolicy: "summary",
+  resourceKeys: ["submission:current"],
+  sensitivity: "secret",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -281,8 +314,11 @@ const readArtifactContract: ProofBladeToolContract<typeof readArtifactSchema, St
   parameters: readArtifactSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 10_000,
   replay: "pure",
   outputPolicy: "inline",
+  resourceKeys: ["artifact:{artifactId}"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -301,8 +337,11 @@ const searchHistoryContract: ProofBladeToolContract<typeof searchHistorySchema, 
   parameters: searchHistorySchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 10_000,
   replay: "pure",
   outputPolicy: "summary",
+  resourceKeys: ["history:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(input, context) {
@@ -317,8 +356,11 @@ const reportStatusContract: ProofBladeToolContract<typeof statusSchema, Static<t
   parameters: statusSchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 5_000,
   replay: "pure",
   outputPolicy: "inline",
+  resourceKeys: ["run:current"],
+  sensitivity: "target",
   evidenceKinds: [],
   executionMode: "sequential",
   async execute(_input, context) {
@@ -326,9 +368,26 @@ const reportStatusContract: ProofBladeToolContract<typeof statusSchema, Static<t
   },
 };
 
+const solverToolContracts: ReadonlyArray<ProofBladeToolContract<any, any, any, SolverToolContext>> = [
+  inspectTargetContract,
+  listCapabilitiesContract,
+  invokeCapabilityContract,
+  runBackgroundContract,
+  readJobOutputContract,
+  stopJobContract,
+  loadSkillContract,
+  proposeIntentContract,
+  proposeHypothesisContract,
+  proposeFactContract,
+  submitCandidateContract,
+  readArtifactContract,
+  searchHistoryContract,
+  reportStatusContract,
+];
+
 function adapt<TParameters extends TSchema, TInput, TResult>(
   contract: ProofBladeToolContract<TParameters, TInput, TResult, SolverToolContext>,
-): AgentHarnessTool<SolverToolContext, TParameters, TResult> {
+): AgentHarnessTool<SolverToolContext, TParameters, unknown> {
   return {
     name: contract.name,
     label: contract.name,
@@ -336,8 +395,13 @@ function adapt<TParameters extends TSchema, TInput, TResult>(
     parameters: contract.parameters,
     executionMode: contract.executionMode,
     async execute(_toolCallId, params, signal, _onUpdate, context) {
-      const details = await contract.execute(params as TInput, context, signal);
-      return { content: [{ type: "text", text: JSON.stringify(details) }], details, terminate: contract.name === "submit_candidate" };
+      try {
+        const details = await contract.execute(params as TInput, context, signal);
+        return { content: [{ type: "text", text: JSON.stringify(details) }], details, isError: false, terminate: contract.name === "submit_candidate" };
+      } catch (error) {
+        const details = toToolFailure(error);
+        return { content: [{ type: "text", text: JSON.stringify(details) }], details, isError: true, terminate: false };
+      }
     },
   };
 }

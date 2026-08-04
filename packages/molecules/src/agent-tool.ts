@@ -1,4 +1,4 @@
-import type { ToolAtom } from "@proofblade/atoms";
+import type { ToolAtom, ToolExecutionModeAtom } from "@proofblade/atoms";
 
 export interface AgentTool<TParameters = unknown, TInput = unknown, TResult = unknown, TContext = unknown>
   extends ToolAtom<TParameters> {
@@ -7,5 +7,5 @@ export interface AgentTool<TParameters = unknown, TInput = unknown, TResult = un
 
 export interface ToolDefinition<TParameters = unknown, TInput = unknown, TResult = unknown, TContext = unknown>
   extends AgentTool<TParameters, TInput, TResult, TContext> {
-  executionMode: "parallel" | "sequential";
+  executionMode: ToolExecutionModeAtom;
 }

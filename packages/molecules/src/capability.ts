@@ -1,7 +1,7 @@
-import { canonicalJson, sha256 } from "@proofblade/atoms";
+import { canonicalJson, sha256, type ToolExecutionModeAtom, type ToolOutputPolicyAtom, type ToolSideEffectAtom } from "@proofblade/atoms";
 
-export type CapabilitySideEffect = "none" | "workspace" | "process" | "network" | "platform";
-export type CapabilityOutputPolicy = "inline" | "summary" | "artifact";
+export type CapabilitySideEffect = ToolSideEffectAtom;
+export type CapabilityOutputPolicy = ToolOutputPolicyAtom;
 export type CapabilityReplayPolicy = "pure" | "idempotent" | "resumable" | "reconcile" | "manual" | "forbidden-replay";
 
 export interface CapabilityOperationAtom {
@@ -12,7 +12,7 @@ export interface CapabilityOperationAtom {
   sideEffect: CapabilitySideEffect;
   replay: CapabilityReplayPolicy;
   outputPolicy: CapabilityOutputPolicy;
-  executionMode: "sequential" | "parallel";
+  executionMode: ToolExecutionModeAtom;
 }
 
 export interface CapabilityManifestAtom {

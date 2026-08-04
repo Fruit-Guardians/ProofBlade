@@ -20,6 +20,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
 - Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
+- Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 

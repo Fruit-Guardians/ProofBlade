@@ -4,6 +4,27 @@ export interface ToolAtom<TParameters = unknown> {
   parameters: TParameters;
 }
 
+export type ToolSideEffectAtom = "none" | "workspace" | "process" | "network" | "platform";
+export type ToolOutputPolicyAtom = "inline" | "summary" | "artifact";
+export type ToolExecutionModeAtom = "parallel" | "sequential";
+export type ToolSensitivityAtom = "public" | "target" | "secret";
+export type ToolErrorPhaseAtom = "validate" | "lease" | "preflight" | "execute" | "normalize" | "redact" | "artifact" | "evidence" | "finish";
+
+export interface ToolErrorAtom<TArtifactRef = ArtifactAtom & { id?: string }> {
+  code: string;
+  message: string;
+  retryable: boolean;
+  signature: string;
+  phase: ToolErrorPhaseAtom;
+  partial_artifact_ref?: TArtifactRef;
+  next_hint?: string;
+}
+
+export interface ToolFailureAtom<TArtifactRef = ArtifactAtom & { id?: string }> {
+  ok: false;
+  error: ToolErrorAtom<TArtifactRef>;
+}
+
 export interface MessageAtom<TRole extends string = string, TContent = string> {
   role: TRole;
   content: TContent;
