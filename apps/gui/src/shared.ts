@@ -1,5 +1,7 @@
 import type { HarnessEvent, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
+export type RunKind = "chat" | "fixture";
+
 export interface BootstrapData {
   projectName: string;
   configPath: string;
@@ -18,6 +20,7 @@ export interface ActiveRunInfo {
 
 export interface RunListItem {
   runId: string;
+  kind: RunKind;
   objective: string;
   targetKind: string;
   status: RunSnapshot["status"];
@@ -101,6 +104,7 @@ export type ChatStreamEvent =
   | { type: "error"; error: string };
 
 export interface RunDetail {
+  kind: RunKind;
   snapshot: RunSnapshot;
   events: HarnessEvent[];
   telemetry: RunTelemetryReport;

@@ -58,14 +58,14 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。点击“新建对话”会创建一个 RUNNING Run，composer 通过 SSE 直接调用配置文件中的真实模型；模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。GUI 每 2 秒按事件文件更新时间增量刷新，并提供：
+打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”创建不绑定 Fixture 的普通 Coding Agent 会话，通过 SSE 调用配置文件中的真实模型，并按需使用工作区 `read`、`bash`、`edit` 和 `write` 工具。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
 - 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
-- 新建 Run、恢复核对、机械 Checkpoint、事件时间线、证据账本和 Artifact 内容查看。
+- 普通 Coding Agent 与 Fixture 测试分离；Fixture 模式提供恢复核对、机械 Checkpoint、证据账本和 Artifact 内容查看。
 
 Script Lab 的 `input` 始终是当前选中的完整 Tool 调试对象。脚本使用普通 JavaScript `return` 返回结果，执行上限为 1500 ms；代码只进入临时浏览器 Worker，不发送给服务端。完整对象结构和 API 见 `docs/gui.md`。
 

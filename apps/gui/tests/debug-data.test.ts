@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assistantTurnsFromEntries, assertRunId, conversationMessagesFromEntries, correlateToolCalls } from "../src/debug-data.js";
+import { assistantTurnsFromEntries, assertRunId, codingConversationTask, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import type { HarnessEvent, RunSnapshot } from "@proofblade/materials";
 
 const entries = [
@@ -50,4 +50,14 @@ test("projects user and assistant Pi entries into a conversation without tool-re
 test("rejects path-like run identifiers", () => {
   assert.doesNotThrow(() => assertRunId("RUN-001.safe"));
   assert.throws(() => assertRunId("../runs/other"));
+});
+
+test("creates ordinary coding conversations without fixture semantics", () => {
+  const task = codingConversationTask("CHAT-001", "普通对话", "D:/workspace");
+  assert.equal(runKind(task), "chat");
+  assert.equal(task.mode, "coding_assistant");
+  assert.equal(task.target, "D:/workspace");
+  assert.deepEqual(task.success_criteria, []);
+  assert.equal(task.verification.required_reproductions, 0);
+  assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
 });

@@ -20,8 +20,12 @@ export async function startSolve(input: { runId: string; fixtureId: string; mode
   return await request("/api/solve", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<{ runId: string }> {
+export async function createConversation(input: { runId: string; title: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<{ runId: string }> {
+  return await request("/api/fixture-conversations", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function streamChat(runId: string, prompt: string, onEvent: (event: ChatStreamEvent) => void): Promise<void> {

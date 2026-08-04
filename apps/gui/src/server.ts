@@ -12,7 +12,7 @@ const port = Number(option("--port") ?? process.env.PORT ?? 4173);
 const host = option("--host") ?? process.env.HOST ?? "127.0.0.1";
 const config = await loadConfig(projectRoot, configPath);
 const data = new DebugDataService(projectRoot, config, configPath);
-const vite = await createViteServer({ root: guiRoot, server: { middlewareMode: true }, appType: "spa" });
+let vite: Awaited<ReturnType<typeof createViteServer>>;
 
 const server = createServer(async (request, response) => {
   try {
@@ -28,6 +28,11 @@ const server = createServer(async (request, response) => {
     sendError(response, error);
   }
 });
+vite = await createViteServer({
+  root: guiRoot,
+  server: { middlewareMode: true, hmr: { server, host, port, clientPort: port } },
+  appType: "spa",
+});
 
 server.listen(port, host, () => {
   console.log(`ProofBlade GUI listening on http://${host}:${port}`);
@@ -42,6 +47,14 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
     const snapshot = await data.createConversation({
+      runId: string(body.runId, "runId"),
+      title: typeof body.title === "string" ? body.title : "新对话",
+    });
+    return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
+  }
+  if (method === "POST" && url.pathname === "/api/fixture-conversations") {
+    const body = await readBody(request);
+    const snapshot = await data.createFixtureConversation({
       runId: string(body.runId, "runId"),
       fixtureId: string(body.fixtureId, "fixtureId"),
       objective: string(body.objective, "objective"),

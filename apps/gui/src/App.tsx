@@ -5,7 +5,7 @@ import {
   Send, ServerCog, ShieldCheck, TerminalSquare, UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { createCheckpoint, createConversation, getArtifact, getBootstrap, getRun, getRuns, reconcileRun, startSolve, streamChat } from "./api.js";
+import { createCheckpoint, createConversation, createFixtureConversation, getArtifact, getBootstrap, getRun, getRuns, reconcileRun, startSolve, streamChat } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, PiSessionDebug, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
 
@@ -57,12 +57,14 @@ export function App() {
   const [detail, setDetail] = useState<RunDetail>();
   const [tab, setTab] = useState<MainTab>("chat");
   const [search, setSearch] = useState("");
+  const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
+  const [fixtureOpen, setFixtureOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -71,7 +73,7 @@ export function App() {
     setRuns(next);
     if (selectPreferred) {
       const stored = localStorage.getItem("proofblade.runId");
-      const chosen = next.find((item) => item.runId === stored) ?? next.find((item) => item.counts.tools > 0) ?? next[0];
+      const chosen = next.find((item) => item.runId === stored && item.kind === "chat") ?? next.find((item) => item.kind === "chat") ?? next[0];
       if (chosen) setRunId(chosen.runId);
     }
   }, []);
@@ -96,6 +98,7 @@ export function App() {
   useEffect(() => {
     if (!runId) return;
     localStorage.setItem("proofblade.runId", runId);
+    setTab("chat");
     setDetail(undefined);
     void refreshDetail(runId);
     setLeftOpen(false);
@@ -115,8 +118,11 @@ export function App() {
 
   const filteredRuns = useMemo(() => runs.filter((run) => {
     const matchesSearch = `${run.runId} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === "ALL" || run.status === statusFilter);
-  }), [runs, search, statusFilter]);
+    return run.kind === runKindFilter && matchesSearch && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
+  }), [runKindFilter, runs, search, statusFilter]);
+  const visibleTabs = detail?.kind === "chat"
+    ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline")
+    : tabItems;
 
   const refreshAll = async () => {
     if (!runId) return;
@@ -138,39 +144,40 @@ export function App() {
     <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button>
-      <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索 Run" aria-label="搜索 Run" /></div>
-      <div className="filter-row">
+      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button></div>
+      <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
+      <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
+      {runKindFilter === "fixture" && <div className="filter-row">
         {[["ALL", "全部"], ["RUNNING", "运行中"], ["SUCCEEDED", "成功"], ["FAILED", "异常"]].map(([value, label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}
-      </div>
+      </div>}
       <div className="run-list">
         {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
-          <span className={`status-dot status-${run.status.toLowerCase()}`} />
-          <span className="run-item-body"><strong>{run.runId}</strong><small>{run.objective}</small><em>{phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
+          <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
+          <span className="run-item-body"><strong>{run.runId}</strong><small>{run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
           <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>
         </button>)}
-        {!filteredRuns.length && !loading && <div className="empty-list">没有匹配的 Run</div>}
+        {!filteredRuns.length && !loading && <div className="empty-list">{runKindFilter === "chat" ? "还没有对话" : "没有匹配的 Fixture Run"}</div>}
       </div>
       <div className="sidebar-footer"><Database size={13} /><span>{runs.length} runs</span><span>{bootstrap?.storage.runsDir ?? "runs"}</span></div>
     </aside>
 
-    <main className="workspace">
+    <main className={`workspace ${detail?.kind !== "fixture" ? "without-phase" : ""}`}>
       <header className="workspace-header">
         <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
-          <div><h1>{detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run")}</h1>{detail && <StatusBadge status={detail.snapshot.status} />}</div>
+          <div><h1>{detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run")}</h1>{detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
           <p>{detail?.snapshot.task.objective ?? ""}</p>
         </div>
         <div className="header-actions">
-          <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={!detail || refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>
-          <button className="command-button" title="创建机械 Checkpoint" disabled={!detail || refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>
+          {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
+          {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
           <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll()}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
           <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
         </div>
       </header>
 
-      {detail && <PhaseStrip current={detail.snapshot.phase} />}
-      <nav className="main-tabs">{tabItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>
+      {detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
+      <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
@@ -190,7 +197,8 @@ export function App() {
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
       {detail ? <Metrics detail={detail} bootstrap={bootstrap} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
-    {newRunOpen && bootstrap && <NewRunModal bootstrap={bootstrap} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setTab("chat"); setRunId(id); void refreshRuns(); }} />}
+    {newRunOpen && <NewConversationModal onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setRunId(id); void refreshRuns(); }} />}
+    {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
   </div>;
 }
 
@@ -203,7 +211,7 @@ interface LiveToolCall {
 }
 
 function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void }) {
-  const preferred = detail.sessions.find((item) => item.metadata?.purpose === "solve") ?? detail.sessions.at(-1);
+  const preferred = detail.sessions.find((item) => item.metadata?.purpose === (detail.kind === "chat" ? "chat" : "solve")) ?? detail.sessions.at(-1);
   const [sessionId, setSessionId] = useState(preferred?.id ?? "");
   const session = detail.sessions.find((item) => item.id === sessionId) ?? preferred;
   const [draft, setDraft] = useState("");
@@ -271,7 +279,7 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
         <span className="conversation-model">{latestAssistant?.model ?? detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness"}</span>
       </div>
       <div className="message-thread" ref={thread}>
-        {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong><span>{detail.snapshot.task.target}</span></div>}
+        {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
         {session?.messages.map((chat) => {
           const calls = session.toolCalls.filter((call) => call.assistantEntryId === chat.entryId);
           return <article className={`chat-message role-${chat.role}`} key={chat.id}>
@@ -289,7 +297,7 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
       </div>
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
-        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.snapshot.phase} · {session?.stats.totalTokens ?? 0} tokens</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
+        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · {session?.stats.totalTokens ?? 0} tokens</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
@@ -442,34 +450,47 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
     <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>tokens</span></div><div><span>模型用量</span><strong>{telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
     <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入" value={formatNumber(telemetry.provider.tokens.input)} /><MetricLine label="输出" value={formatNumber(telemetry.provider.tokens.output)} /><MetricLine label="推理" value={formatNumber(telemetry.provider.tokens.reasoning)} /><MetricLine label="缓存读取" value={formatNumber(telemetry.provider.tokens.cacheRead)} /></section>
     <section><div className="metrics-title"><Clock3 size={14} />延迟与成本</div><MetricLine label="平均延迟" value={`${Math.round(telemetry.provider.latencyMs.average)} ms`} /><MetricLine label="P95" value={`${Math.round(telemetry.provider.latencyMs.p95)} ms`} /><MetricLine label="执行时长" value={formatDuration(telemetry.durationMs)} /><MetricLine label="成本" value={`$${telemetry.provider.cost.totalUsd.toFixed(4)}`} /></section>
-    <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>
-    <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>
+    {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
+    {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
     <section><div className="metrics-title"><FlaskConical size={14} />配置</div><MetricLine label="Provider" value={bootstrap?.model.provider ?? "--"} /><MetricLine label="Model" value={bootstrap?.model.model ?? "--"} /><MetricLine label="Thinking" value={bootstrap?.model.thinkingLevel ?? "off"} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
   </div>;
 }
 
-function NewRunModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
+function NewConversationModal({ onClose, onCreated }: { onClose(): void; onCreated(id: string): void }) {
+  const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
+  const [title, setTitle] = useState("新对话");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try { await createConversation({ runId, title }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer></form></div>;
+}
+
+function FixtureTestModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
   const [fixtureId, setFixtureId] = useState(bootstrap.fixtures[0]?.id ?? "");
   const [launch, setLaunch] = useState<"chat" | "solve">("chat");
   const [mode, setMode] = useState<"auto" | "assist">("assist");
   const [maxTurns, setMaxTurns] = useState(3);
-  const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
-  const [objective, setObjective] = useState("分析目标，并根据我的后续消息持续协作。");
+  const [runId, setRunId] = useState(`FIXTURE-${Date.now()}`);
+  const [objective, setObjective] = useState(bootstrap.fixtures[0]?.description ?? "分析 Fixture");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      if (launch === "chat") await createConversation({ runId, fixtureId, objective });
+      if (launch === "chat") await createFixtureConversation({ runId, fixtureId, objective });
       else await startSolve({ runId, fixtureId, mode, maxTurns });
       onCreated(runId);
     } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Plus size={17} /><strong>新建会话</strong></div><button type="button" className="icon-button" onClick={onClose}><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="launch-switch segmented"><button type="button" className={launch === "chat" ? "active" : ""} onClick={() => setLaunch("chat")}><MessageSquare size={13} />Agent 对话</button><button type="button" className={launch === "solve" ? "active" : ""} onClick={() => setLaunch("solve")}><Play size={13} />自动执行</button></div><label><span>Run ID</span><input required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>Fixture</span><select value={fixtureId} onChange={(event) => setFixtureId(event.target.value)}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label>{launch === "chat" ? <label><span>目标</span><textarea required rows={3} value={objective} onChange={(event) => setObjective(event.target.value)} /></label> : <div className="modal-row"><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : launch === "chat" ? <MessageSquare size={14} /> : <Play size={14} />}{launch === "chat" ? "创建对话" : "开始运行"}</button></footer></form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><FlaskConical size={17} /><strong>Fixture 测试</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="launch-switch segmented"><button type="button" className={launch === "chat" ? "active" : ""} onClick={() => setLaunch("chat")}><MessageSquare size={13} />交互调试</button><button type="button" className={launch === "solve" ? "active" : ""} onClick={() => setLaunch("solve")}><Play size={13} />自动执行</button></div><label><span>Run ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>Fixture</span><select value={fixtureId} onChange={(event) => { setFixtureId(event.target.value); const fixture = bootstrap.fixtures.find((item) => item.id === event.target.value); if (fixture) setObjective(fixture.description); }}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label>{launch === "chat" ? <label><span>目标</span><textarea required rows={3} value={objective} onChange={(event) => setObjective(event.target.value)} /></label> : <div className="modal-row"><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : launch === "chat" ? <MessageSquare size={14} /> : <Play size={14} />}{launch === "chat" ? "开始调试" : "开始运行"}</button></footer></form></div>;
 }
 
 function PhaseStrip({ current }: { current: string }) { const currentIndex = phases.indexOf(current as typeof phases[number]); return <div className="phase-strip">{phases.map((phase, index) => <div key={phase} className={`${index < currentIndex ? "done" : ""} ${phase === current ? "current" : ""}`}><span>{index < currentIndex ? <Check size={12} /> : index + 1}</span><strong>{phaseLabels[phase]}</strong><i /></div>)}</div>; }
 function StatusBadge({ status }: { status: string }) { return <span className={`status-badge status-${status.toLowerCase()}`}>{status === "RUNNING" ? <RefreshCw size={11} className="spin" /> : status === "SUCCEEDED" ? <CheckCircle2 size={11} /> : status === "PAUSED" ? <Pause size={11} /> : <Activity size={11} />}{status}</span>; }
+function ConversationBadge() { return <span className="status-badge status-chat"><MessageSquare size={11} />对话</span>; }
 function StatusMini({ status }: { status: string }) { return <span className={`status-mini mini-${status.toLowerCase()}`}>{status}</span>; }
 function MetricLine({ label, value }: { label: string; value: string }) { return <div className="metric-line"><span>{label}</span><strong title={value}>{value}</strong></div>; }
 function HealthLine({ ok, label }: { ok: boolean; label: string }) { return <div className={`health-line ${ok ? "ok" : "warn"}`}>{ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}<span>{label}</span></div>; }

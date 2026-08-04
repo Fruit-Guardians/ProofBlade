@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
+  PiCodingLane,
   PiSolverLane,
   ProofBladeToolRuntime,
   RunRecoveryService,
@@ -16,6 +17,7 @@ import {
   type HarnessEvent,
   type ProofBladeConfig,
   type RunSnapshot,
+  type TaskContract,
 } from "@proofblade/materials";
 import type {
   ActiveRunInfo,
@@ -25,6 +27,7 @@ import type {
   ChatStreamEvent,
   PiSessionDebug,
   RunDetail,
+  RunKind,
   RunListItem,
   ToolCallDebug,
 } from "./shared.js";
@@ -111,6 +114,7 @@ export class DebugDataService {
           ]);
           const item: RunListItem = {
             runId: snapshot.runId,
+            kind: runKind(snapshot.task),
             objective: snapshot.task.objective,
             targetKind: snapshot.task.target_kind,
             status: snapshot.status,
@@ -144,7 +148,7 @@ export class DebugDataService {
       this.loadSessions(runId),
       stat(join(this.services.runsRoot, runId, "events.jsonl")),
     ]);
-    return { snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() };
+    return { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() };
   }
 
   public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
@@ -184,14 +188,15 @@ export class DebugDataService {
     return info;
   }
 
-  public async createConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+  public async createConversation(input: { runId: string; title: string }): Promise<RunSnapshot> {
     assertRunId(input.runId);
-    try {
-      await access(join(this.services.runsRoot, input.runId, "task.json"));
-      throw new Error(`Run already exists: ${input.runId}`);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
+    await this.assertRunDoesNotExist(input.runId);
+    return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, this.root));
+  }
+
+  public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+    assertRunId(input.runId);
+    await this.assertRunDoesNotExist(input.runId);
     const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
     task.objective = input.objective.trim() || task.objective;
     await this.services.control.createRun(input.runId, task);
@@ -200,6 +205,15 @@ export class DebugDataService {
     await this.services.control.dispatch(input.runId, { type: "fixture_reset", generation });
     await this.services.control.dispatch(input.runId, { type: "start_phase", phase: "reconnaissance" });
     return await this.services.control.snapshot(input.runId);
+  }
+
+  private async assertRunDoesNotExist(runId: string): Promise<void> {
+    try {
+      await access(join(this.services.runsRoot, runId, "task.json"));
+      throw new Error(`Run already exists: ${runId}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
 
   public async chat(runId: string, prompt: string, emit: (event: ChatStreamEvent) => void): Promise<void> {
@@ -216,20 +230,31 @@ export class DebugDataService {
     this.active.set(runId, info);
     emit({ type: "started", runId });
     let runtime: ProofBladeToolRuntime | undefined;
-    let lane: PiSolverLane | undefined;
+    let lane: PiCodingLane | PiSolverLane | undefined;
     try {
-      const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
-      runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-      lane = await PiSolverLane.create({
-        projectRoot: this.root,
-        runId,
-        runDir: join(this.services.runsRoot, runId),
-        controlStore: this.services.control,
-        artifactStore: this.services.artifacts,
-        config: this.config,
-        runtime,
-        onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-      });
+      if (runKind(snapshot.task) === "chat") {
+        lane = await PiCodingLane.create({
+          projectRoot: this.root,
+          runId,
+          runDir: join(this.services.runsRoot, runId),
+          controlStore: this.services.control,
+          config: this.config,
+          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
+        });
+      } else {
+        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
+        runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
+        lane = await PiSolverLane.create({
+          projectRoot: this.root,
+          runId,
+          runDir: join(this.services.runsRoot, runId),
+          controlStore: this.services.control,
+          artifactStore: this.services.artifacts,
+          config: this.config,
+          runtime,
+          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
+        });
+      }
       const outcome = await lane.prompt(text);
       emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: outcome.usage });
     } catch (error) {
@@ -246,7 +271,7 @@ export class DebugDataService {
     const env = new NodeExecutionEnv({ cwd: runDir });
     try {
       const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
-      const metadata = await repo.list({ cwd: runDir });
+      const metadata = await repo.list();
       const events = await this.services.control.events(runId);
       const snapshot = await this.services.control.snapshot(runId);
       return await Promise.all(metadata.map(async (item): Promise<PiSessionDebug> => {
@@ -270,6 +295,37 @@ export class DebugDataService {
       await env.cleanup();
     }
   }
+}
+
+export function runKind(task: Pick<TaskContract, "mode">): RunKind {
+  return task.mode === "coding_assistant" ? "chat" : "fixture";
+}
+
+export function codingConversationTask(runId: string, title: string, root: string): TaskContract {
+  return {
+    schema_version: 1,
+    task_id: runId,
+    mode: "coding_assistant",
+    target_kind: "unknown",
+    target: root,
+    objective: title.trim() || "新对话",
+    inputs: [],
+    success_criteria: [],
+    verification: { kind: "reproduction", required_reproductions: 0 },
+    scope: {
+      allowed_hosts: ["*"],
+      allowed_ports: [],
+      external_network: true,
+      allowed_workspace: root,
+    },
+    pause_policy: [],
+    constraints: {
+      deadline_ms: 86_400_000,
+      max_cost_usd: 100,
+      max_tool_calls: 1_000,
+      max_submissions: 0,
+    },
+  };
 }
 
 export function assistantTurnsFromEntries(entries: readonly SessionEntryLike[]): AssistantTurnDebug[] {

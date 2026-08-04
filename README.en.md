@@ -58,14 +58,14 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates a RUNNING Run, and the composer drives the real model selected by the configuration through SSE. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream. The GUI refreshes changed run logs every two seconds and provides:
+Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates an ordinary coding-agent session with no Fixture and drives the configured real model through SSE, with workspace `read`, `bash`, `edit`, and `write` tools available on demand. "Fixture test" is a separate entry point for interactive debugging or automatic execution; only that path loads the target sandbox, evidence gates, and recovery workflow. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
 - tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
 - correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;
 - a browser Web Worker Script Lab with JSON, table, and text result views;
-- Run creation, recovery reconciliation, mechanical checkpoints, event timeline, evidence ledger, and Artifact content inspection.
+- separate ordinary coding-agent and Fixture-test paths, with recovery, checkpoints, evidence, and Artifact inspection scoped to Fixture runs.
 
 Script Lab receives the selected complete Tool debug object as `input`. Scripts return a value with normal JavaScript `return`, run for at most 1500 ms, and remain inside a temporary browser Worker. See `docs/gui.md` for the object shape and local API.
 

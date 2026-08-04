@@ -19,6 +19,7 @@ export * from "./tools/contracts.js";
 export * from "./tools/errors.js";
 export * from "./tools/runtime.js";
 export * from "./runtime/pi-adapter.js";
+export * from "./runtime/coding-lane.js";
 export * from "./runtime/solver-tools.js";
 export * from "./runtime/solver-lane.js";
 export * from "./runtime/version.js";

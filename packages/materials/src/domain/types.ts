@@ -65,7 +65,7 @@ export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "mis
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
-  mode: "ctf_solve" | "vulnerability_discovery";
+  mode: "ctf_solve" | "vulnerability_discovery" | "coding_assistant";
   target_kind: TargetKind;
   target: string;
   objective: string;
