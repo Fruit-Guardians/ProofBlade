@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type { Effect, EffectRequest, RawEffectResult, ReplayPolicy, TaskContract } from "../domain/types.js";
@@ -20,12 +20,30 @@ export interface FixtureRef {
   privatePath: string;
 }
 
+export type FixtureHealthStatus = "healthy" | "missing" | "unhealthy" | "generation-drift";
+
+export interface FixtureHealth {
+  status: FixtureHealthStatus;
+  expectedGeneration: number;
+  actualGeneration: number;
+  reason?: string;
+}
+
+export interface FixtureReconcileResult {
+  fixture: FixtureRef;
+  health: FixtureHealth;
+  action: "none" | "reset";
+  generation: number;
+}
+
 export interface SandboxPort {
   build(task: TaskContract): Promise<FixtureRef>;
   reset(fixture: FixtureRef): Promise<number>;
   score(fixture: FixtureRef, candidate: string): Promise<{ accepted: boolean; candidateHash: string }>;
   execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>;
   reconcile(effect: Effect): Promise<ReconcileResult>;
+  health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>;
+  reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult>;
   destroy(fixture: FixtureRef): Promise<void>;
 }
 
@@ -99,6 +117,40 @@ export class LocalFixtureSandbox implements SandboxPort {
   public async reconcile(effect: Effect): Promise<ReconcileResult> {
     if (effect.replayPolicy === "pure" || effect.replayPolicy === "idempotent") return { action: "rerun", outcome: "unknown" };
     return { action: "unknown", outcome: "unknown" };
+  }
+
+  public async health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth> {
+    try {
+      await access(fixture.path);
+    } catch {
+      return { status: "missing", expectedGeneration, actualGeneration: 0, reason: "fixture directory is missing" };
+    }
+    const actualGeneration = await readGeneration(fixture.path);
+    const files = await visibleFiles(fixture.path).catch(() => []);
+    const scorerPresent = await exists(join(fixture.privatePath, "scorer.json"));
+    if (files.length === 0 || !scorerPresent || actualGeneration < 1) {
+      return { status: "unhealthy", expectedGeneration, actualGeneration, reason: "fixture files, scorer, or generation marker are incomplete" };
+    }
+    if (actualGeneration !== expectedGeneration) {
+      return { status: "generation-drift", expectedGeneration, actualGeneration, reason: "fixture generation differs from the control projection" };
+    }
+    return { status: "healthy", expectedGeneration, actualGeneration };
+  }
+
+  public async reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult> {
+    const profile = fixtureProfileFromTarget(task.target);
+    const fixture: FixtureRef = {
+      fixtureId: task.task_id,
+      profileId: profile?.id,
+      generation: expectedGeneration,
+      path: join(this.root, task.task_id),
+      privatePath: join(this.root, task.task_id, ".proofblade"),
+    };
+    const health = await this.health(fixture, expectedGeneration);
+    if (health.status === "healthy") return { fixture, health, action: "none", generation: expectedGeneration };
+    const rebuilt = await this.build(task);
+    const generation = await this.reset({ ...rebuilt, generation: Math.max(expectedGeneration, health.actualGeneration) });
+    return { fixture: { ...rebuilt, generation }, health, action: "reset", generation };
   }
 
   public async destroy(_fixture: FixtureRef): Promise<void> {

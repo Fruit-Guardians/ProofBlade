@@ -113,8 +113,11 @@ atoms.ToolAtom
 | `version` | 行为或 Schema 变化时递增的版本 |
 | `readOnly` | 是否只读 |
 | `sideEffect` | `none/workspace/process/network/platform` |
+| `timeoutMs` | 单次执行的确定超时上限 |
 | `replay` | `pure/idempotent/resumable/reconcile/manual/forbidden-replay` |
 | `outputPolicy` | `inline/summary/artifact` |
+| `resourceKeys` | 资源租约键或参数化键模板 |
+| `sensitivity` | `public/target/secret` 输出与遥测敏感级别 |
 | `evidenceKinds` | 可能产生的证据种类 |
 | `executionMode` | Pi 调度方式：`sequential/parallel` |
 
@@ -139,8 +142,11 @@ const queryContract: ProofBladeToolContract<
   parameters: querySchema,
   readOnly: true,
   sideEffect: "none",
+  timeoutMs: 30_000,
   replay: "pure",
   outputPolicy: "summary",
+  resourceKeys: ["example:{query}"],
+  sensitivity: "target",
   evidenceKinds: ["observation"],
   executionMode: "sequential",
   async execute(input, context, signal) {
@@ -414,6 +420,7 @@ MCP 的完整 Tool Schema、Skill 正文、长 Tool 输出都不是 L0 常驻内
 - 下层包可独立构建和测试。
 - `npm test` 和 `npm run eval` 通过。
 - README、对应契约文档和 CLI 帮助同步更新。
+- 新增恢复行为时同步 `docs/recovery.md` 的故障窗口和收敛不变量。
 
 完整回归命令：
 

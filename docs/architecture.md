@@ -90,6 +90,8 @@ Before a Pi provider request, a deterministic maintenance plan uses soft, snip, 
 
 When a completed turn reaches the compact band, the lane performs idle-time Pi compaction after the provider is idle; the compaction hook supplies the durable checkpoint as the summary anchor. A provider overflow creates one mechanical checkpoint and invokes Pi compaction. A second overflow in the same Run is classified as `context_overflow` and fails explicitly; it never loops on compression indefinitely. Checkpoint and overflow counters are replayed from the Control Store, while the Pi Session remains the provider-facing transcript.
 
+Recovery is coordinated by `RunRecoveryService`: expired leases are fenced and reaped, Fixture health is compared with the projected generation, stale jobs are reconciled, and unfinished Effects are handled only after the environment decision. `DurableCompactionCoordinator` persists the mechanical checkpoint before Pi Session append and reuses it after an interruption. Tool-pair validation runs for every Provider context, including low-pressure contexts. The six executable interruption scenarios and convergence rules are documented in `docs/recovery.en.md` (with the Chinese primary guide in `docs/recovery.md`).
+
 
 ## Pi 0.83.0 package note
 

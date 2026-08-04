@@ -70,6 +70,12 @@ export class EffectJournal {
     const reconciled: string[] = [];
     for (const effect of Object.values(snapshot.effects)) {
       if (effect.status !== "STARTED" && effect.status !== "PROPOSED") continue;
+      const effectGeneration = typeof effect.args.generation === "number" ? effect.args.generation : undefined;
+      if (effectGeneration !== undefined && effectGeneration !== snapshot.generation) {
+        await this.controlStore.dispatch(runId, { type: "effect_reconciled", effectId: effect.id, outcome: "unknown", lane: "executor" });
+        reconciled.push(effect.id);
+        continue;
+      }
       if (effect.status === "PROPOSED") {
         await this.controlStore.dispatch(runId, { type: "effect_started", effectId: effect.id, lane: "executor" });
       }

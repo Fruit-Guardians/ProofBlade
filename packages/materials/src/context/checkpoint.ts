@@ -15,7 +15,10 @@ export class CheckpointService {
 
   public async create(runId: string, reason: string, manifest?: ContextManifest): Promise<CreatedCheckpoint> {
     const snapshot = await this.controlStore.snapshot(runId);
-    const existing = Object.values(snapshot.checkpoints).find((item) => item.snapshotSeq === snapshot.lastSeq && item.reason === reason && item.contextManifestHash === manifest?.hash);
+    const existing = Object.values(snapshot.checkpoints).find((item) =>
+      item.reason === reason
+      && ((item.snapshotSeq === snapshot.lastSeq && item.contextManifestHash === manifest?.hash) || item.createdSeq === snapshot.lastSeq),
+    );
     if (existing) {
       const artifact = snapshot.artifacts[existing.artifactId];
       if (!artifact) throw new Error(`Checkpoint artifact missing: ${existing.artifactId}`);

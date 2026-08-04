@@ -16,7 +16,7 @@ The effect record also stores the fixture generation and enough execution data t
 
 The Pi solver lane exposes fourteen sequential tools. The capability and Skill proxy tools have stable schemas; operation details or full Skill content are loaded only when requested.
 
-Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `outputPolicy`, `replay`, `executionMode`, `resourceKeys`, `sensitivity`, and `evidenceKinds` in addition to its Provider-visible name, description, and TypeBox schema. Resource keys may contain argument templates such as `artifact:{artifactId}` or `job:{jobId}`; the runtime resolves them before lease acquisition. The canonical contract snapshot includes this complete metadata in fixed tool order. A policy-only change therefore changes `solverToolContractHash()` even when the Provider-visible schema is unchanged.
+Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `outputPolicy`, `replay`, `executionMode`, `resourceKeys`, `sensitivity`, and `evidenceKinds` in addition to its Provider-visible name, description, and TypeBox schema. Resource keys may contain argument templates such as `artifact:{artifactId}` or `job:{jobId}`; they are stable policy metadata for preflight and future multi-worker lease routing. The current single solver lane executes every core Tool sequentially, while Run recovery fences actual Fixture and target leases. The canonical contract snapshot includes this complete metadata in fixed tool order. A policy-only change therefore changes `solverToolContractHash()` even when the Provider-visible schema is unchanged.
 
 | Tool | Information role |
 | --- | --- |
@@ -65,6 +65,8 @@ Capability manifests are sorted before hashing; adding a manifest changes the ca
 Each enabled project MCP server is represented as one `mcp.<name>` capability with fixed `describe` and `call` operations. Listing capabilities only reads `.mcp.json`; describe/call starts stdio lazily. MCP effects use conservative manual replay by default, persist sensitive arguments as hashes, redact known secret values before artifact registration, and create Observation/Evidence for successful calls.
 
 Jobs persist capability id, operation, arguments, generation, replay policy, effect/artifact references and terminal status. Pure, idempotent and resumable jobs restart from their durable record after a process restart; forbidden-replay jobs become `UNKNOWN`. Cancellation aborts the active controller, leaves the effect journal intact and prevents a late result from changing a `CANCELLED` job. Run teardown stops active jobs so no unexpected child process remains.
+
+`RunRecoveryService` runs before a solver resumes. It reaps expired leases with owner/generation fencing, reconciles Fixture health, advances the generation after a rebuild, marks stale queued/running jobs `UNKNOWN`, and only then reconciles Effects. An Effect whose recorded argument generation differs from the current Fixture becomes `UNKNOWN`, even when its replay policy is `pure`. See `docs/recovery.en.md` and `docs/recovery.md` for the six fault windows.
 
 ## Planner handoff contract
 

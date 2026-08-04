@@ -47,7 +47,7 @@ export type DomainCommand =
   | { type: "effect_reconciled"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; lane?: Lane }
   | { type: "lease_acquired"; lease: RunSnapshot["leases"][string]; lane?: Lane }
   | { type: "lease_heartbeat"; resourceKey: string; ownerLane: Lane; generation: number; heartbeatAt: string; expiresAt: string; lane?: Lane }
-  | { type: "lease_released"; resourceKey: string; lane?: Lane }
+  | { type: "lease_released"; resourceKey: string; ownerLane?: Lane; generation?: number; lane?: Lane }
   | { type: "checkpoint"; checkpoint: Omit<CheckpointRef, "createdSeq">; lane?: Lane }
   | { type: "job_queued"; job: Omit<JobRecord, "createdSeq">; lane?: Lane }
   | { type: "job_started"; jobId: string; startedAt?: string; lane?: Lane }
@@ -212,6 +212,13 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
 }
 
 function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
+  if (command.type === "lease_released" && (command.ownerLane !== undefined || command.generation !== undefined)) {
+    const lease = snapshot.leases[command.resourceKey];
+    if (!lease) return;
+    if (command.ownerLane !== lease.ownerLane || command.generation !== lease.generation) {
+      throw new Error(`Lease ownership mismatch: ${command.resourceKey}`);
+    }
+  }
   if (command.type === "job_queued" && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
     throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
   }

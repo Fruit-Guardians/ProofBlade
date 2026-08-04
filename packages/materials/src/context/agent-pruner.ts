@@ -14,12 +14,68 @@ export interface AgentContextPruneOptions {
   mode?: AgentContextPruneMode;
 }
 
+export interface ToolPairViolation {
+  kind: "missing-result" | "orphan-result" | "duplicate-result" | "misordered-result";
+  toolCallId: string;
+  messageIndex: number;
+}
+
+export function repairAgentMessages(messages: AgentMessage[]): AgentContextPruneResult {
+  const output = structuredClone(messages);
+  const dropped: AgentContextPruneResult["dropped"] = [];
+  repairToolPairs(output, dropped);
+  removeInvalidToolResults(output, dropped);
+  repairToolPairs(output, dropped);
+  return { messages: output, estimatedTokens: messageTokens(output), dropped };
+}
+
+export function toolPairViolations(messages: AgentMessage[]): ToolPairViolation[] {
+  const violations: ToolPairViolation[] = [];
+  const validResults = new Set<number>();
+  for (let index = 0; index < messages.length; index += 1) {
+    const calls = assistantCallIds(messages[index]);
+    if (calls.length === 0) continue;
+    const expected = new Set(calls);
+    const seen = new Set<string>();
+    let batchIndex = 0;
+    let cursor = index + 1;
+    while (cursor < messages.length && messages[cursor]?.role === "toolResult") {
+      const result = messages[cursor];
+      if (result?.role === "toolResult" && expected.has(result.toolCallId) && !seen.has(result.toolCallId)) {
+        seen.add(result.toolCallId);
+        validResults.add(cursor);
+        if (calls[batchIndex] !== result.toolCallId) {
+          violations.push({ kind: "misordered-result", toolCallId: result.toolCallId, messageIndex: cursor });
+        }
+      } else if (result?.role === "toolResult") {
+        violations.push({
+          kind: seen.has(result.toolCallId) ? "duplicate-result" : "orphan-result",
+          toolCallId: result.toolCallId,
+          messageIndex: cursor,
+        });
+      }
+      batchIndex += 1;
+      cursor += 1;
+    }
+    for (const toolCallId of calls) {
+      if (!seen.has(toolCallId)) violations.push({ kind: "missing-result", toolCallId, messageIndex: index });
+    }
+  }
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message?.role === "toolResult" && !validResults.has(index) && !violations.some((item) => item.messageIndex === index)) {
+      violations.push({ kind: "orphan-result", toolCallId: message.toolCallId, messageIndex: index });
+    }
+  }
+  return violations;
+}
+
 export function pruneAgentMessages(messages: AgentMessage[], maxTokens: number, options: AgentContextPruneOptions = {}): AgentContextPruneResult {
   const output = structuredClone(messages);
   const dropped: AgentContextPruneResult["dropped"] = [];
   repairToolPairs(output, dropped);
   const toolResultIndexes = output.flatMap((message, index) => message.role === "toolResult" ? [index] : []);
-  for (const index of toolResultIndexes.slice(0, -2)) {
+  for (const index of toolResultIndexes.slice(0, -1)) {
     const message = output[index];
     if (!message || message.role !== "toolResult") continue;
     const text = message.content.map((item) => item.type === "text" ? item.text : `[${item.mimeType} image]`).join("\n");
@@ -41,61 +97,61 @@ export function pruneAgentMessages(messages: AgentMessage[], maxTokens: number, 
     trimOldMessages(output, maxTokens, dropped);
   }
   repairToolPairs(output, dropped);
-  removeOrphanToolResults(output, dropped);
+  removeInvalidToolResults(output, dropped);
   return { messages: output, estimatedTokens: messageTokens(output), dropped };
 }
 
 function repairToolPairs(messages: AgentMessage[], dropped: AgentContextPruneResult["dropped"]): void {
   for (let index = 0; index < messages.length; index += 1) {
     const assistant = messages[index];
-    const callIds = assistantCallIds(assistant);
-    if (callIds.length === 0) continue;
-    const resultIds = new Set<string>();
+    const calls = assistantCalls(assistant);
+    if (calls.length === 0) continue;
+    const results = new Map<string, Extract<AgentMessage, { role: "toolResult" }>>();
     let cursor = index + 1;
     while (cursor < messages.length) {
       const result = messages[cursor];
       if (result?.role !== "toolResult") break;
-      resultIds.add(result.toolCallId);
+      if (calls.some((call) => call.id === result.toolCallId) && !results.has(result.toolCallId)) results.set(result.toolCallId, result);
+      else dropped.push({ kind: "message", id: `orphan-or-duplicate-tool-result:${result.toolCallId}` });
       cursor += 1;
     }
-    const missing = callIds.filter((callId) => !resultIds.has(callId));
-    if (missing.length === 0) continue;
     const timestamp = typeof (assistant as { timestamp?: unknown }).timestamp === "number"
       ? (assistant as { timestamp: number }).timestamp
       : 0;
-    const placeholders = missing.map((toolCallId) => ({
-      role: "toolResult" as const,
-      toolCallId,
-      toolName: "unknown",
-      content: [{ type: "text" as const, text: '{"error":"Tool result missing (interrupted)"}' }],
-      isError: true,
-      timestamp,
-    }));
-    messages.splice(cursor, 0, ...placeholders);
-    dropped.push(...missing.map((toolCallId) => ({ kind: "message" as const, id: `missing-tool-result:${toolCallId}` })));
-    index = cursor + placeholders.length - 1;
+    const ordered = calls.map((call) => {
+      const result = results.get(call.id);
+      if (result) return result;
+      dropped.push({ kind: "message", id: `missing-tool-result:${call.id}` });
+      return {
+        role: "toolResult" as const,
+        toolCallId: call.id,
+        toolName: call.name,
+        content: [{ type: "text" as const, text: '{"error":"Tool result missing (interrupted)"}' }],
+        isError: true,
+        timestamp,
+      };
+    });
+    messages.splice(index + 1, cursor - index - 1, ...ordered);
+    index += ordered.length;
   }
 }
 
-function removeOrphanToolResults(messages: AgentMessage[], dropped: AgentContextPruneResult["dropped"]): void {
-  const knownCalls = new Set<string>();
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index];
-    if (message?.role === "assistant") {
-      for (const callId of assistantCallIds(message)) knownCalls.add(callId);
-      continue;
-    }
-    if (message?.role === "toolResult" && !knownCalls.has(message.toolCallId)) {
-      messages.splice(index, 1);
-      dropped.push({ kind: "message", id: `orphan-tool-result:${message.toolCallId}` });
-      index -= 1;
-    }
+function removeInvalidToolResults(messages: AgentMessage[], dropped: AgentContextPruneResult["dropped"]): void {
+  for (const violation of toolPairViolations(messages).filter((item) => item.kind !== "missing-result" && item.kind !== "misordered-result").sort((a, b) => b.messageIndex - a.messageIndex)) {
+    const message = messages[violation.messageIndex];
+    if (message?.role !== "toolResult") continue;
+    messages.splice(violation.messageIndex, 1);
+    dropped.push({ kind: "message", id: `${violation.kind}:${violation.toolCallId}` });
   }
 }
 
 function assistantCallIds(message: AgentMessage | undefined): string[] {
+  return assistantCalls(message).map((call) => call.id);
+}
+
+function assistantCalls(message: AgentMessage | undefined): Array<{ id: string; name: string }> {
   if (!message || message.role !== "assistant" || !Array.isArray(message.content)) return [];
-  return message.content.flatMap((item) => item.type === "toolCall" ? [item.id] : []);
+  return message.content.flatMap((item) => item.type === "toolCall" ? [{ id: item.id, name: item.name }] : []);
 }
 
 function outputTier(chars: number): "small" | "medium" | "large" {

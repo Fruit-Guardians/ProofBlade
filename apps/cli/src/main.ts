@@ -24,6 +24,7 @@ import {
   snapshotContext,
   FixtureEvaluationRunner,
   RunTelemetry,
+  RunRecoveryService,
 } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
@@ -147,7 +148,15 @@ async function main(): Promise<void> {
     }
     case "reconcile": {
       const runId = required(arg, "run id");
-      print({ runId, reconciled: await services.journal.reconcile(runId) });
+      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox).recover(runId);
+      print({
+        runId,
+        fixtureHealth: recovery.fixtureHealth,
+        fixtureAction: recovery.fixtureAction,
+        expiredLeases: recovery.expiredLeases.map((lease) => lease.resourceKey),
+        reconciledEffects: recovery.reconciledEffects,
+        reconciledJobs: recovery.reconciledJobs,
+      });
       break;
     }
     case "cost": {

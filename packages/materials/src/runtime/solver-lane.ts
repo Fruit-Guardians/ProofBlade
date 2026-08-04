@@ -4,8 +4,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
-import { pruneAgentMessages } from "../context/agent-pruner.js";
+import { pruneAgentMessages, repairAgentMessages } from "../context/agent-pruner.js";
 import { CheckpointService } from "../context/checkpoint.js";
+import { DurableCompactionCoordinator, type CompactionFaultInjector } from "../context/durable-compaction.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
@@ -39,6 +40,7 @@ export class PiSolverLane implements AgentLanePort {
     artifactStore: ArtifactStore;
     config: ProofBladeConfig;
     runtime: ProofBladeToolRuntime;
+    compactionFault?: CompactionFaultInjector;
   }): Promise<PiSolverLane> {
     const env = new NodeExecutionEnv({ cwd: options.runDir });
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(options.runDir, "pi-sessions") });
@@ -54,6 +56,7 @@ export class PiSolverLane implements AgentLanePort {
     const { models, model } = createConfiguredModels(profile);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
+    const compactionCoordinator = new DurableCompactionCoordinator(checkpointService, options.compactionFault);
     const laneRef: { lane?: PiSolverLane } = {};
     const harness = new AgentHarness<SolverToolContext>({
       session,
@@ -84,13 +87,14 @@ export class PiSolverLane implements AgentLanePort {
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
     });
     harness.on("context", async ({ messages }) => {
+      const repaired = repairAgentMessages(messages);
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
-      const usedTokens = compiled.estimatedTokens + Math.ceil(JSON.stringify(messages).length / 4);
+      const usedTokens = compiled.estimatedTokens + repaired.estimatedTokens;
       const plan = planContextMaintenance(usedTokens, compiled.manifest.budget.availableInput);
-      if (!plan.shouldSnip) return { messages };
-      const pruned = pruneAgentMessages(messages, transcriptBudget, { mode: plan.shouldPrune ? "prune" : "snip" });
+      if (!plan.shouldSnip) return { messages: repaired.messages };
+      const pruned = pruneAgentMessages(repaired.messages, transcriptBudget, { mode: plan.shouldPrune ? "prune" : "snip" });
       if (pruned.dropped.length > 0) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
       if (plan.shouldCompact) laneRef.lane?.requestCompactionAfterTurn();
       return { messages: pruned.messages };
@@ -98,16 +102,7 @@ export class PiSolverLane implements AgentLanePort {
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
-      const checkpoint = await checkpointService.create(options.runId, "pi-compaction", compiled.manifest);
-      return {
-        compaction: {
-          summary: checkpoint.content,
-          firstKeptEntryId: preparation.firstKeptEntryId,
-          tokensBefore: preparation.tokensBefore,
-          retainedTail: preparation.retainedTail,
-          details: { checkpointId: checkpoint.checkpointId, artifactId: checkpoint.artifactId, kind: "mechanical" },
-        },
-      };
+      return { compaction: await compactionCoordinator.provide(options.runId, preparation, compiled.manifest) };
     });
     attachPiObservability(harness, {
       runId: options.runId,

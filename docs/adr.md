@@ -75,3 +75,7 @@ Hash the full Tool Contract, including version, execution policy, timeout, resou
 ## ADR-019 Observability is a durable read model
 
 Append Provider, Tool, Effect and compaction measurements to the existing per-run event log; derive cost and diagnostic reports without creating a second state owner. Persist argument and payload hashes rather than raw sensitive content. Snapshot Prompt, Tool, Skill, MCP, router, runtime and dependency versions at Run start. Terminal non-success states carry one primary failure category, while the telemetry reader infers a category only for older logs that predate this field.
+
+## ADR-020 Recovery converges before model execution
+
+Run expired-lease reaping, Fixture health reconciliation, stale job handling and Effect reconciliation through one Orchestrator service before opening a solver turn. Fence lease release by owner and generation, and never replay an old-generation Effect against a rebuilt Fixture. Persist mechanical compaction checkpoints before Pi Session append; repair Tool pairs for every Provider context, regardless of context pressure. Keep all six interruption windows as executable regression tests and require a second recovery pass to be a no-op.

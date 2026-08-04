@@ -22,6 +22,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
+- 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
 
@@ -111,4 +112,5 @@ apps/cli                     用户意图与交付入口
 - `docs/tool-contract.md`：工具契约、效果、重放和制品规则。
 - `docs/eval-protocol.md`：确定性评测指标和回归门槛。
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。
+- `docs/recovery.md`：六个故障注入窗口、恢复顺序和收敛不变量。
 - `pi-ctf-agent-harness-design.md`：ProofBlade 的完整设计依据。

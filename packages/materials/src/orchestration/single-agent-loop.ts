@@ -11,6 +11,7 @@ import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
+import { RunRecoveryService } from "../recovery/run-recovery.js";
 
 export interface SolverLaneCreateInput {
   projectRoot: string;
@@ -60,11 +61,9 @@ export class SingleAgentCtfLoop {
       await this.services.control.dispatch(options.runId, { type: "resume" });
       snapshot = await this.services.control.snapshot(options.runId);
     }
-    const fixture = await this.services.sandbox.build(snapshot.task);
-    if (snapshot.generation === 0) {
-      const generation = await this.services.sandbox.reset(fixture);
-      await this.services.control.dispatch(options.runId, { type: "fixture_reset", generation });
-    }
+    const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox)
+      .recover(options.runId, snapshot.task);
+    const fixture = recovery.fixture;
     snapshot = await this.services.control.snapshot(options.runId);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
