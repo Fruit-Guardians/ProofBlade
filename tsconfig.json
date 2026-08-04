@@ -4,6 +4,7 @@
     { "path": "./packages/atoms" },
     { "path": "./packages/molecules" },
     { "path": "./packages/materials" },
-    { "path": "./apps/cli" }
+    { "path": "./apps/cli" },
+    { "path": "./apps/gui" }
   ]
 }

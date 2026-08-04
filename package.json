@@ -12,15 +12,16 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "tsc -b",
-    "typecheck": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run build --workspace=@proofblade/materials && npm run typecheck --workspace=@proofblade/cli",
-    "test": "npm run build && node --import tsx --test packages/*/tests/**/*.test.ts",
+    "build": "tsc -b && npm run build:web --workspace=@proofblade/gui",
+    "typecheck": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run build --workspace=@proofblade/materials && npm run typecheck --workspace=@proofblade/cli && npm run typecheck --workspace=@proofblade/gui",
+    "test": "npm run build && node --import tsx --test packages/*/tests/**/*.test.ts apps/*/tests/**/*.test.ts",
     "test:atoms": "npm run build --workspace=@proofblade/atoms && npm run test --workspace=@proofblade/atoms",
     "test:molecules": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run test --workspace=@proofblade/molecules",
     "test:materials": "npm run build && npm run test --workspace=@proofblade/materials",
     "cli": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts",
     "eval": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts eval",
     "demo": "npm run cli -- run demo",
+    "gui": "npm run dev --workspace=@proofblade/gui --",
     "clean": "tsc -b --clean"
   },
   "devDependencies": {
