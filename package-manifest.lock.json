@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "@earendil-works/pi-agent-core",
+      "version": "0.83.0",
+      "source": "https://github.com/earendil-works/pi",
+      "sourceCommit": "0524d6897f171d63a79e00946df8ce7f53c605fe",
+      "integrity": "sha512-RorGp9OH5l3ElpuC5a5ZQ2eWcchZGXflXRzVGkV99y3y6tT+LLNyxoYIdVKvTKWEObwhExeQbTH0fI2tE4iX4g==",
+      "resourceFilter": ["agent-core", "jsonl-session", "read-tool"]
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "0.83.0",
+      "source": "https://github.com/earendil-works/pi",
+      "sourceCommit": "0524d6897f171d63a79e00946df8ce7f53c605fe",
+      "integrity": "sha512-m3IZD4g3er0V8TC9+Vpgw/sjTKqcJlkcIBy/JvsgRubuuik3tAVzyugUg4rVrShIkkOT69mEd34NEqKUIsl6JQ==",
+      "resourceFilter": ["openai-completions"]
+    }
+  ]
+}
