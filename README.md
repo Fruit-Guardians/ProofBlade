@@ -14,6 +14,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 六层上下文编译器、确定性清单和不可信观察边界。
 - 稳定前缀缓存指纹：区分可复用的 L0/L1 与动态 L2-L5，并把前缀/动态哈希写入 ContextManifest。
 - Reasonix 风格的追加式上下文：Solver 将每轮状态作为当前用户轮的持久尾部，避免把变化的状态放到历史前面反复打断缓存；Provider 的 `cacheRetention` 可在配置中选择。
+- 配置驱动的 Coding `bash` 输出改写：`builtin | rtk` 保持同一 Tool Schema，记录改写版本、命令哈希、原始/可见字节、压缩率和 Artifact 引用。
 - 支持 Auto 与 Assist 模式的模型驱动单 Agent 执行循环。
 - 确定性 Observer、带事实依据的完成提案和独立隐藏评分验证器。
 - 六个本地工作流测试靶场：三个合成 Web 任务和三个合成逆向任务。
@@ -73,6 +74,26 @@ npm run gui -- --config proofblade.config.json --port 4173
 右侧“缓存前缀”诊断直接从最终 Provider payload 计算 System/Developer 指令和 Tool Schema 的规范哈希，不保存提示正文。稳定率用于发现系统提示、工具名称、顺序或 Schema 在相邻请求间漂移；它只说明客户端前缀是否稳定。真实缓存命中仍以模型响应中的 `cacheRead / (input + cacheRead + cacheWrite)` 为准，两项指标应一起判断：前缀稳定但 `cacheRead` 不增长通常表示中转站或模型没有复用缓存，而前缀变化会直接指出 `system`、`tools` 或 `rewrite` 原因。
 
 缓存保留策略可在 GUI 的“中转站与模型”里按 Provider 配置：`short`（默认行为）、`long`（请求稳定的会话缓存键与更长 TTL）或 `none`。无 GUI 时也可在 `modelProfiles.executor.cacheRetention` 中设置；不同中转站是否返回缓存字段仍以 Provider 实际响应为准。对话旁会显示每轮的提示词总量、缓存读取和命中率，右侧指标显示累计值。
+
+### RTK 工具输出改写
+
+仓库配置默认请求 [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk)，RTK 未安装或命令未命中时按 `fallback: "builtin"` 保留 Pi 原有行为。RTK 应安装在 Coding `bash` 使用的同一个 Shell 中；Windows 上若 Pi 选择 WSL，可用 `wsl rtk --version` 核对，或把 `rtkCommand` 配成该 Shell 可执行的路径。官方预编译包和安装方法见 RTK release 页面。
+
+```json
+{
+  "tools": {
+    "outputRewrite": {
+      "provider": "rtk",
+      "rtkCommand": "rtk",
+      "fallback": "builtin",
+      "rewriteTimeoutMs": 5000,
+      "maxRawBytes": 1048576
+    }
+  }
+}
+```
+
+RTK 只包装普通 Coding Agent 的 `bash`；`read/edit/write` 和 Solver 的 Effect/Capability 链保持原样。同一 Run 只走这一条输出改写链，后续上下文维护不会再次对刚产生的结果套 RTK。RTK 提供 tee 原文时，ProofBlade 先把它注册为 Artifact 再返回压缩内容；某些 RTK handler 不生成 tee，此时保存 Pi 可见的有界输出，并以 `rawCapture: "visible-output"` 明确标记。调试 Tool Result 的 `details.outputRewrite` 包含 provider/version/hash、字节数、实测压缩率和 Artifact id。RTK 主要减少后续请求中的动态 Tool 结果，不会直接增加 Provider 的 `cacheRead`。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；

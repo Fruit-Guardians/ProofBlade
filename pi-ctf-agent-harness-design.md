@@ -1634,9 +1634,9 @@ Drive Loop 是唯一主动推进 Run 的组件。事件订阅者、模型、工�
 
 ### Milestone 3：上下文与恢复
 
-交付：六层 Context Compiler、ContextManifest、token budget、artifact snip/prune、Pi compaction hook、机械 checkpoint、历史检索、prompt-injection 标记和已否决假设保留。
+交付：六层 Context Compiler、ContextManifest、token budget、artifact snip/prune、Pi compaction hook、机械 checkpoint、历史检索、prompt-injection 标记、已否决假设保留，以及保持 Tool Schema 稳定的可配置 OutputRewritePort/RTK Coding `bash` adapter。
 
-验收：人为把 context window 压小到正常值的 20%-30%，压缩后继续完成；关键 Fact 保留率 100%；重启后不重复已确认动作；第二次 overflow 进入明确失败分类。
+验收：人为把 context window 压小到正常值的 20%-30%，压缩后继续完成；关键 Fact 保留率 100%；重启后不重复已确认动作；第二次 overflow 进入明确失败分类；RTK A/B 记录原始/可见字节、Artifact 和关键行保留，未命中时 Tool Contract hash 与 builtin 基线一致。
 
 ### Milestone 4：能力插件与后台任务
 

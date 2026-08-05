@@ -10,6 +10,11 @@ import {
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
+import type { OutputRewritePort } from "@proofblade/molecules";
+import { createServices, demoTask } from "../src/app/demo.js";
+import type { ProofBladeConfig } from "../src/config.js";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -69,6 +74,72 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   context.enabledSkills.add("triage");
   const loaded = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
   assert.deepEqual(loaded.details, { name: "triage", maxChars: 2_000, content: "loaded" });
+});
+
+test("coding bash archives raw output before returning RTK-compressed content", async () => {
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-rtk-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "RTK-CODING-TEST";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const commands: string[] = [];
+  const env = {
+    cwd: dir,
+    async exec(command: string, options?: { env?: Record<string, string>; onStdout?: (chunk: string) => void }) {
+      commands.push(command);
+      assert.equal(options?.env?.RTK_TEE_DIR, "tee-dir");
+      options?.onStdout?.("6 tests passed\n");
+      return { ok: true as const, value: { stdout: "6 tests passed\n", stderr: "", exitCode: 0 } };
+    },
+  };
+  const raw = "PASS verbose diagnostic\n".repeat(200);
+  const port: OutputRewritePort = {
+    async prepare(input) {
+      return {
+        requestedProvider: "rtk",
+        provider: "rtk",
+        providerVersion: "0.42.4",
+        applied: true,
+        command: "rtk test npm test",
+        originalCommandHash: `original-${input.command.length}`,
+        rewrittenCommandHash: "rewritten",
+        executionEnv: { RTK_TEE_DIR: "tee-dir" },
+      };
+    },
+    async finalize(ticket, visibleOutput) {
+      return { ticket, rawOutput: raw, rawCapture: "rtk-tee", rawBytes: Buffer.byteLength(raw), visibleBytes: Buffer.byteLength(visibleOutput), rawTruncated: false };
+    },
+  };
+  const context = {
+    env,
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    outputRewrite: { port, artifactStore: services.artifacts, runId },
+  } as unknown as CodingResourceContext;
+  try {
+    const result = await executeTool("bash", { command: "npm test" }, context);
+    assert.deepEqual(commands, ["rtk test npm test"]);
+    const rewrite = (result.details as { outputRewrite: Record<string, unknown> }).outputRewrite;
+    assert.equal(rewrite.provider, "rtk");
+    assert.equal(rewrite.rawCapture, "rtk-tee");
+    assert.ok(Number(rewrite.savedBytes) > 4_000);
+    assert.ok(Number(rewrite.savingsRate) > 0.9);
+    const artifactId = String(rewrite.artifactId);
+    const snapshot = await services.control.snapshot(runId);
+    assert.ok(snapshot.artifacts[artifactId]);
+    assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ details: unknown; isError: boolean }> {

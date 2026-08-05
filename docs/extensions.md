@@ -14,6 +14,7 @@
 | 后台任务 | 已实现 | `packages/materials/src/jobs/background-runner.ts` |
 | 项目级 MCP | 已实现 | `.mcp.json`、`mcp.<name>` Capability、官方 MCP 2.0 stdio Client |
 | 项目级 Skill | 已实现 | `skills/<name>/SKILL.md`、`load_skill`、Pi `harness.skill()` |
+| Tool 输出改写 | 已实现 | `OutputRewritePort`、`tools.outputRewrite`、Coding `bash` RTK adapter |
 
 状态表是行为事实来源。README 只提供入口，不用模糊措辞把预留接口写成已交付功能。
 
@@ -91,6 +92,12 @@ Pi CLI 的 Package 自动发现和 ExtensionAPI 不会自动出现在嵌入式 A
 - 确实需要宿主进程扩展时，在材料层建立显式适配器并锁定版本。
 
 Package 和 Extension 属于宿主进程可信代码，接入前要审查来源、安装脚本、依赖树、网络行为和升级差异。
+
+### 3.8 Output Rewrite Adapter
+
+适合压缩已有 Tool 的动态输出，但不增加新的 Provider Tool。通用 prepare/finalize 契约放在 Molecules，具体 Provider、版本门槛、Shell、Artifact 和失败策略放在 Materials。当前 RTK adapter 只包装 Coding `bash`，保持名称、描述和 Schema 哈希不变。
+
+新增改写器时必须满足：原始命令与改写命令只记录哈希；真实执行与探测使用同一 Shell；Tool 返回前先注册可恢复 Artifact；trace 区分完整原文与有界可见输出；同一 Run 只启用一条改写链；用 A/B Fixture 检查字节/Token 降幅、关键行、退出码、Artifact 校验和回放一致性。
 
 ## 4. 编写内建 Tool
 

@@ -4,9 +4,9 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T23:18:36+08:00"
+  "updatedAt": "2026-08-06T00:19:34+08:00"
 }
 ```
 
@@ -27,6 +27,7 @@
 - 新增导出时检查依赖漏斗，避免导出 GUI/CLI 类型。
 - 配置字段必须有默认值、解析测试和密钥边界说明。
 - Coding Agent 的 Skill/MCP 通过固定代理契约进入 Provider；会话启用集合必须在执行时再次校验。
+- Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 
 ## 验证
 

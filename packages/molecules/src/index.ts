@@ -8,3 +8,4 @@ export * from "./prompt-cache.js";
 export * from "./cache-metrics.js";
 export * from "./provider-prefix.js";
 export * from "./capability.js";
+export * from "./output-rewrite.js";

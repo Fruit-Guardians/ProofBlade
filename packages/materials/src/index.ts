@@ -19,6 +19,7 @@ export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
 export * from "./tools/errors.js";
 export * from "./tools/runtime.js";
+export * from "./tools/output-rewrite.js";
 export * from "./runtime/pi-adapter.js";
 export * from "./runtime/provider-transport.js";
 export * from "./runtime/coding-resources.js";

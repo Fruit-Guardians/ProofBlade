@@ -6,7 +6,9 @@ import {
   type AgentHarnessTool,
   type ExecutionToolContext,
 } from "@earendil-works/pi-agent-core/node";
+import type { OutputRewritePort, OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
+import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 
@@ -18,6 +20,11 @@ export interface CodingResourceContext extends ExecutionToolContext {
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
+  outputRewrite?: {
+    port: OutputRewritePort;
+    artifactStore: ArtifactStore;
+    runId: string;
+  };
 }
 
 export interface CodingToolCatalogEntry {
@@ -60,10 +67,78 @@ export function codingProviderToolContractSnapshot(): Array<{ name: string; desc
 function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     createReadTool<CodingResourceContext>(),
-    createBashTool<CodingResourceContext>(),
+    createCodingBashTool(),
     createEditTool<CodingResourceContext>(),
     createWriteTool<CodingResourceContext>(),
   ];
+}
+
+function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createBashTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const pipeline = context.outputRewrite;
+      if (!pipeline) return await contract.execute(toolCallId, params as { command: string; timeout?: number }, signal, onUpdate, context);
+      const input = params as { command: string; timeout?: number };
+      const ticket = await pipeline.port.prepare({ toolCallId, command: input.command, cwd: context.env.cwd }, signal);
+      const executor = createBashTool<CodingResourceContext>({
+        async prepare(execution) {
+          Object.assign(execution.env, ticket.executionEnv);
+        },
+      });
+      let result: Awaited<ReturnType<typeof executor.execute>>;
+      try {
+        result = await executor.execute(toolCallId, { ...input, command: ticket.command }, signal, onUpdate, context);
+      } catch (error) {
+        const visible = error instanceof Error ? error.message : String(error);
+        const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId);
+        throw new Error(`${visible}\n\n[ProofBlade output artifact ${outputRewrite.artifactId}; rewrite=${outputRewrite.provider}]`, { cause: error });
+      }
+      const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId);
+      return {
+        ...result,
+        details: {
+          ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
+          outputRewrite,
+        },
+      };
+    },
+  };
+}
+
+async function finalizeAndArchive(
+  pipeline: NonNullable<CodingResourceContext["outputRewrite"]>,
+  ticket: OutputRewriteTicket,
+  visibleOutput: string,
+  toolCallId: string,
+): Promise<Record<string, unknown>> {
+  const finalized = await pipeline.port.finalize(ticket, visibleOutput);
+  const artifact = await pipeline.artifactStore.putText(pipeline.runId, finalized.rawOutput, {
+    filename: `bash-${toolCallId}-raw.txt`,
+    mime: "text/plain",
+    sensitivity: "public",
+    truncated: finalized.rawTruncated,
+  });
+  const savedBytes = Math.max(0, finalized.rawBytes - finalized.visibleBytes);
+  return {
+    requestedProvider: ticket.requestedProvider,
+    provider: ticket.provider,
+    providerVersion: ticket.providerVersion,
+    applied: ticket.applied,
+    fallbackReason: ticket.fallbackReason,
+    originalCommandHash: ticket.originalCommandHash,
+    rewrittenCommandHash: ticket.rewrittenCommandHash,
+    rawCapture: finalized.rawCapture,
+    rawBytes: finalized.rawBytes,
+    visibleBytes: finalized.visibleBytes,
+    savedBytes,
+    savingsRate: finalized.rawBytes > 0 ? Number((savedBytes / finalized.rawBytes).toFixed(4)) : 0,
+    rawTruncated: finalized.rawTruncated,
+    artifactId: artifact.id,
+    artifactHash: artifact.sha256,
+  };
 }
 
 const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
@@ -126,6 +201,10 @@ function enabledMcpSummaries(context: CodingResourceContext): ReturnType<McpProj
 function assertAbsent(input: Record<string, unknown>, keys: string[], operation: string): void {
   const unexpected = keys.filter((key) => input[key] !== undefined);
   if (unexpected.length > 0) throw new Error(`${operation} does not accept: ${unexpected.join(", ")}`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function toolResult(details: unknown, isError = false): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {

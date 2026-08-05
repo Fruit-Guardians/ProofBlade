@@ -14,6 +14,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Six-layer context compiler with deterministic manifests and untrusted-observation boundaries.
 - Provider-neutral stable-prefix cache fingerprints split reusable L0/L1 from dynamic L2-L5 in every ContextManifest.
 - Reasonix-style append-only context keeps each Solver turn's changing state as a persisted suffix instead of rewriting the history prefix; `cacheRetention` remains configurable per model profile.
+- Config-driven Coding `bash` output rewriting (`builtin | rtk`) preserves one Tool schema and records adapter version, command hashes, raw/visible bytes, measured reduction, and an Artifact reference.
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
 - Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
@@ -73,6 +74,26 @@ The context panel separates provider-reported input, output, reasoning, cache-re
 Choose cache retention per Provider in the GUI: `short` (the default), `long` (request a stable session cache key and longer TTL), or `none`. Headless runs can set `modelProfiles.executor.cacheRetention` directly. Cache reporting remains provider-specific; each assistant turn shows prompt total, cache reads, and hit rate, while the metrics panel shows cumulative values.
 
 The metrics panel also fingerprints the System/Developer instructions and Tool Schema from the final Provider payload without retaining prompt text. Prefix stability detects changes in instructions, tool names, ordering, schemas, or rewrite version; it does not claim an upstream cache hit. Actual hit rate remains `cacheRead / (input + cacheRead + cacheWrite)` from Provider usage. Read both together: a stable prefix with flat `cacheRead` points to relay/model cache behavior, while an unstable prefix reports `system`, `tools`, or `rewrite` as the change reason.
+
+### RTK tool-output rewriting
+
+The checked-in config requests [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk). With `fallback: "builtin"`, a missing binary or unmatched command retains Pi's existing behavior. Install RTK in the same shell used by Coding `bash`; when Pi selects WSL on Windows, verify it with `wsl rtk --version`, or set `rtkCommand` to a path executable from that shell.
+
+```json
+{
+  "tools": {
+    "outputRewrite": {
+      "provider": "rtk",
+      "rtkCommand": "rtk",
+      "fallback": "builtin",
+      "rewriteTimeoutMs": 5000,
+      "maxRawBytes": 1048576
+    }
+  }
+}
+```
+
+RTK wraps only ordinary Coding-Agent `bash`; `read/edit/write` and Solver Effect/Capability execution retain their existing paths. A Run uses one rewrite chain. When an RTK handler emits a tee capture, ProofBlade registers it as an Artifact before returning compact output. Handlers without a tee capture archive Pi's bounded visible output and record `rawCapture: "visible-output"`. Tool debug data exposes provider/version/hash, byte counts, measured reduction, and Artifact id under `details.outputRewrite`. This lowers dynamic Tool-result input on later turns; it does not directly raise Provider `cacheRead`.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;

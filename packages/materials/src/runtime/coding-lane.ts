@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   AgentHarness,
   JsonlSessionRepo,
@@ -6,12 +6,14 @@ import {
   type AgentHarnessEvent,
 } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { ProofBladeConfig } from "../config.js";
+import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
 import { attachPiObservability } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { ArtifactStore } from "../effects/artifact-store.js";
+import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { codingActiveToolNames, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
@@ -63,7 +65,16 @@ export class PiCodingLane implements AgentLanePort {
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     const tools = createCodingTools();
     const activeToolNames = codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers] });
-    const toolContext: CodingResourceContext = { env, skills, mcp, enabledSkills, enabledMcpServers };
+    const artifactStore = new ArtifactStore(dirname(options.runDir), options.controlStore);
+    const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
+    const toolContext: CodingResourceContext = {
+      env,
+      skills,
+      mcp,
+      enabledSkills,
+      enabledMcpServers,
+      outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
+    };
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,

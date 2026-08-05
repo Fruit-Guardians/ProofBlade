@@ -7,6 +7,15 @@
     "runsDir": "runs",
     "fixturesDir": "fixtures/runtime"
   },
+  "tools": {
+    "outputRewrite": {
+      "provider": "rtk",
+      "rtkCommand": "rtk",
+      "fallback": "builtin",
+      "rewriteTimeoutMs": 5000,
+      "maxRawBytes": 1048576
+    }
+  },
   "modelProfiles": {
     "executor": {
       "provider": "lmstudio",
