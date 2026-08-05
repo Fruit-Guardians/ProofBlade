@@ -11,10 +11,12 @@ import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["load_skill", "mcp_call"] as const;
 
 export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
   mcp: McpProjectRegistry;
+  enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
 }
 
@@ -36,18 +38,23 @@ export function createCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     loadSkillTool,
-    listMcpServersTool,
-    describeMcpServerTool,
-    callMcpTool,
+    mcpCallTool,
   ];
 }
 
 export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[] }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
-  if (input.skills.length > 0) active.push("load_skill");
-  if (input.mcpServers.length > 0) active.push("list_mcp_servers", "describe_mcp_server", "call_mcp_tool");
+  active.push(...CODING_PROXY_TOOL_NAMES);
   return active;
+}
+
+export function codingProviderToolContractSnapshot(): Array<{ name: string; description: string; parameters: unknown }> {
+  return createCodingTools().map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: structuredClone(tool.parameters),
+  }));
 }
 
 function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
@@ -70,47 +77,36 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
+    if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);
     return toolResult(context.skills.loadForModel(input.name, input.maxChars));
   },
 };
 
-const listMcpServersTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "list_mcp_servers",
-  label: "list_mcp_servers",
-  description: "List MCP servers enabled for this conversation without connecting to them.",
-  parameters: Type.Object({}),
-  executionMode: "sequential",
-  async execute(_toolCallId, _params, _signal, _onUpdate, context) {
-    return toolResult(context.mcp.summaries().filter((server) => context.enabledMcpServers.has(server.name) && !server.disabled));
-  },
-};
-
-const describeMcpServerTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "describe_mcp_server",
-  label: "describe_mcp_server",
-  description: "Connect lazily to one enabled MCP server and list its allowed tool schemas.",
-  parameters: Type.Object({ server: Type.String({ minLength: 1 }) }),
-  executionMode: "sequential",
-  async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const input = params as { server: string };
-    assertMcpEnabled(context, input.server);
-    return toolResult(await context.mcp.describe(input.server, signal));
-  },
-};
-
-const callMcpTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "call_mcp_tool",
-  label: "call_mcp_tool",
-  description: "Call one allowed tool on an enabled MCP server after inspecting its schema.",
+const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "mcp_call",
+  label: "mcp_call",
+  description: "List, inspect, or call enabled MCP capabilities through one cache-stable proxy. Use describe before call.",
   parameters: Type.Object({
-    server: Type.String({ minLength: 1 }),
-    tool: Type.String({ minLength: 1 }),
-    arguments: Type.Record(Type.String(), Type.Unknown()),
-  }),
+    operation: Type.Union([Type.Literal("list"), Type.Literal("describe"), Type.Literal("call")]),
+    server: Type.Optional(Type.String({ minLength: 1, description: "Enabled MCP server name for describe or call." })),
+    tool: Type.Optional(Type.String({ minLength: 1, description: "Allowed MCP tool name for call." })),
+    arguments: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "MCP tool arguments for call." })),
+  }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const input = params as { server: string; tool: string; arguments: Record<string, unknown> };
+    const input = params as { operation: "list" | "describe" | "call"; server?: string; tool?: string; arguments?: Record<string, unknown> };
+    if (!(["list", "describe", "call"] as const).includes(input.operation)) throw new Error(`Unsupported MCP operation: ${String(input.operation)}`);
+    if (input.operation === "list") {
+      assertAbsent(input, ["server", "tool", "arguments"], "MCP list");
+      return toolResult({ servers: enabledMcpSummaries(context) });
+    }
+    if (!input.server) throw new Error(`MCP ${input.operation} requires server`);
     assertMcpEnabled(context, input.server);
+    if (input.operation === "describe") {
+      assertAbsent(input, ["tool", "arguments"], "MCP describe");
+      return toolResult({ server: input.server, tools: await context.mcp.describe(input.server, signal) });
+    }
+    if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) throw new Error("MCP call requires tool and object arguments");
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
     if (!capabilityId) throw new Error(`Unknown MCP server: ${input.server}`);
     const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
@@ -120,6 +116,16 @@ const callMcpTool: AgentHarnessTool<CodingResourceContext> = {
 
 function assertMcpEnabled(context: CodingResourceContext, server: string): void {
   if (!context.enabledMcpServers.has(server)) throw new Error(`MCP server is not enabled for this conversation: ${server}`);
+  if (!enabledMcpSummaries(context).some((item) => item.name === server)) throw new Error(`Unknown or disabled MCP server: ${server}`);
+}
+
+function enabledMcpSummaries(context: CodingResourceContext): ReturnType<McpProjectRegistry["summaries"]> {
+  return context.mcp.summaries().filter((server) => context.enabledMcpServers.has(server.name) && !server.disabled);
+}
+
+function assertAbsent(input: Record<string, unknown>, keys: string[], operation: string): void {
+  const unexpected = keys.filter((key) => input[key] !== undefined);
+  if (unexpected.length > 0) throw new Error(`${operation} does not accept: ${unexpected.join(", ")}`);
 }
 
 function toolResult(details: unknown, isError = false): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {

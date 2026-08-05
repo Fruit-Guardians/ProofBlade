@@ -41,7 +41,7 @@ Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`
 %USERPROFILE%\.proofblade\gui-workspace.json
 ```
 
-“Tool、Skill、MCP”弹窗展示项目当前发现到的全部能力。内建 Coding Tool 可以逐项启停；启用 Skill 后才装配 `load_skill`；启用 MCP Server 后才装配 MCP 查询和调用工具，并在调用时再次校验 Server 是否属于当前对话的启用集合。这些选择按 Run ID 持久化，不影响其他对话。
+“Tool、Skill、MCP”弹窗展示项目当前发现到的全部能力。内建 Coding Tool 可以逐项启停；`load_skill` 和 `mcp_call` 作为固定代理始终进入 Coding Provider Tool 列表，启用集合只决定代理执行时可访问哪些 Skill 或 MCP Server。`mcp_call(operation=list)` 只列出已启用 Server 且不连接进程，`describe` 才延迟发现完整 Tool Schema，`call` 再按 allowlist 执行。这些选择按 Run ID 持久化，不影响其他对话。
 
 ## 上下文与 Token
 

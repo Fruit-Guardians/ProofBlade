@@ -274,6 +274,8 @@ MCP 不把全部服务器 Tool Schema 注入 L0 常驻上下文。固定交互�
 
 外层 Solver 工具保持固定，优先复用 `list_capabilities` 和 `invoke_capability`。每个 MCP Server 映射为 `mcp.<server-name>` Capability，避免服务器增减导致核心 Tool Schema 波动。
 
+普通 Coding Agent 使用单一固定 `mcp_call`：`operation=list` 读取已启用 Server 的一行目录，`operation=describe` 延迟加载所选 Server 的完整 Tool Schema，`operation=call` 调用已发现且允许的 Tool。`load_skill` 与 `mcp_call` 即使当前启用集合为空也保持相同名称、顺序和 Schema；执行时再次检查会话 allowlist。Coding 对话没有 CTF Fixture，因此结果进入 Pi Session 与 Tool telemetry，不创建虚假的 Observation/Evidence；Solver 路径继续经过 Effect Journal 和 Artifact/Evidence。
+
 当前 CLI 入口：
 
 ```powershell
@@ -402,7 +404,7 @@ Solver 的 L0 只包含可由模型选择的 Skill 元数据、内容哈希和�
 | L4 | 最近观察和工具结果 | 有界窗口，不可信内容需包裹 |
 | L5 | Artifact 和历史索引 | 默认只放引用、哈希和摘要 |
 
-MCP 的完整 Tool Schema、Skill 正文、长 Tool 输出都不是 L0 常驻内容。达到 50/60/80/90% 预算阈值时，它们与其他上下文采用相同的分级维护、Artifact 外置和检查点规则。
+MCP 的完整 Tool Schema、Skill 正文、长 Tool 输出都不是 L0 常驻内容。达到 55/60/75/80/90% 预算阈值时，它们与其他上下文采用相同的 notice、snip、prune、compact、force-compact 分级维护、Artifact 外置和检查点规则。
 
 ## 9. 扩展完成定义
 

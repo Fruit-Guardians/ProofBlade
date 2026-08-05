@@ -21,7 +21,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 配置模型可用时启用的 Pi JSONL Session 适配器。
 - 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
-- 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、Capability 映射、效果日志、脱敏和进程回收。
+- 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、固定 `mcp_call` 代理、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
 - 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
@@ -66,7 +66,7 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表和默认思考等级；模型发现和真实对话共用该代理。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
 
-对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停；Coding Agent 只把已启用能力装配到本轮。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
+对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
 

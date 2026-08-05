@@ -63,7 +63,7 @@ export class PiCodingLane implements AgentLanePort {
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     const tools = createCodingTools();
     const activeToolNames = codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers] });
-    const toolContext: CodingResourceContext = { env, skills, mcp, enabledMcpServers };
+    const toolContext: CodingResourceContext = { env, skills, mcp, enabledSkills, enabledMcpServers };
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
@@ -158,7 +158,7 @@ export class PiCodingLane implements AgentLanePort {
 function codingSystemPrompt(skills: Array<{ name: string; description: string }>, mcpServers: Array<{ name: string; description: string }>): string {
   const resources = [
     skills.length > 0 ? `\nEnabled Skills:\n${skills.map((skill) => `- ${skill.name}: ${skill.description}`).join("\n")}\nUse load_skill to load a Skill only when it is relevant.` : "",
-    mcpServers.length > 0 ? `\nEnabled MCP servers:\n${mcpServers.map((server) => `- ${server.name}: ${server.description}`).join("\n")}\nUse describe_mcp_server before call_mcp_tool.` : "",
+    mcpServers.length > 0 ? `\nEnabled MCP servers:\n${mcpServers.map((server) => `- ${server.name}: ${server.description}`).join("\n")}\nUse mcp_call with operation=describe before operation=call.` : "",
   ].join("");
   return `${CODING_SYSTEM_PROMPT}${resources}`;
 }

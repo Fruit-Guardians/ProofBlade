@@ -21,7 +21,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Pi JSONL Session adapter that is activated when a configured model is available.
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
-- Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
+- Project MCP stdio with `.mcp.json`, lazy discovery, one stable `mcp_call` proxy, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
 - Durable run telemetry for Provider/Tool/Effect metrics, cost and cache tokens, primary failure classification, and Prompt/Tool/Skill/MCP/Runtime version snapshots.
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
@@ -66,7 +66,7 @@ Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New c
 
 The gear button opens the relay and model manager. It can create multiple OpenAI-compatible profiles, each with its own name, Base URL, API key, optional proxy URL, discovered model list, and default thinking level. Model discovery and real conversations share the profile proxy. On Windows, the local file defaults to `%USERPROFILE%\.proofblade\gui-provider.json`. API responses expose only `hasApiKey`, never the key value. The controls below the composer switch provider, model, and thinking level per conversation.
 
-Conversations can be grouped into custom folders and filtered from the sidebar. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. Folder and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
+Conversations can be grouped into custom folders and filtered from the sidebar. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. The `load_skill` and `mcp_call` schemas remain present and stable; the enabled sets enforce which resources they may access at execution time. Folder and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
 
 The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
 
