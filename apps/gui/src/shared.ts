@@ -4,6 +4,7 @@ export type RunKind = "chat" | "fixture";
 
 export interface BootstrapData {
   projectName: string;
+  projectRoot: string;
   configPath: string;
   storage: { runsDir: string; fixturesDir: string };
   model: { provider: string; model: string; baseUrl: string; thinkingLevel: string };
@@ -67,12 +68,28 @@ export interface ConversationFolder {
 
 export interface ConversationPreferences {
   folderId?: string;
+  workspacePath: string;
   profileId: string;
   model: string;
   thinkingLevel: ProviderThinkingLevel;
   enabledTools: string[];
   enabledSkills: string[];
   enabledMcpServers: string[];
+}
+
+export interface DirectoryListing {
+  path: string;
+  parent?: string;
+  roots: string[];
+  directories: Array<{ name: string; path: string }>;
+}
+
+export interface ToolPresentation {
+  summary: string;
+  inputLabel: string;
+  input: string;
+  outputLabel: string;
+  output: string;
 }
 
 export interface CodingToolSummary {
@@ -176,6 +193,8 @@ export interface ToolCallDebug {
   arguments: unknown;
   call: unknown;
   result?: unknown;
+  completedAt?: string;
+  presentation: ToolPresentation;
   assistantEntry: unknown;
   resultEntry?: unknown;
   telemetry: { call?: HarnessEvent; result?: HarnessEvent };

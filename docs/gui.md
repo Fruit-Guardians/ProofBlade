@@ -35,7 +35,7 @@ Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`
 
 ## 对话工作区与能力
 
-侧栏支持“全部对话”“未分类”和自定义文件夹筛选。新建对话时可以选择文件夹，也可在输入框下方随时移动当前对话。文件夹与会话级偏好写入：
+侧栏支持“全部对话”“未分类”和自定义文件夹筛选。新建对话时可以选择文件夹，并通过绝对路径输入或服务端目录浏览器选择工作目录；既有对话也可从输入框下方切换目录。服务端校验路径为已存在的目录，再将其作为下一轮 `PiCodingLane.projectRoot`。工作目录、文件夹与会话级偏好写入：
 
 ```text
 %USERPROFILE%\.proofblade\gui-workspace.json
@@ -68,6 +68,8 @@ Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`）
 
 ```text
 Browser -> POST /api/runs/:id/chat
+        -> validate conversation workspacePath
+        -> PiCodingLane.create(projectRoot = workspacePath)
         -> PiCodingLane.prompt(user text)
         -> configured Provider / real model
         -> read / bash / edit / write (按需)
@@ -88,7 +90,13 @@ Browser -> POST /api/runs/:id/chat
 | `done` | 最终文本、stop reason 和 usage |
 | `error` | Provider、Harness 或 Tool 错误 |
 
-浏览器只把这些事件作为当前 turn 的临时画面。请求完成后重新读取 Pi Session，以 durable entries 替换临时消息。每个 assistant message 下方的 Tool 行可直接打开调用调试侧栏。普通会话可持续多轮；Fixture 终态 Run 保持只读。
+浏览器只把这些事件作为当前 turn 的临时画面。请求完成后重新读取 Pi Session，以 durable entries 替换临时消息。每个 assistant message 下方的 Tool 卡片直接显示实际指令/参数、Tool Result 文本、状态、耗时和关联引用；“完整数据”再打开原始调试侧栏。普通会话可持续多轮；Fixture 终态 Run 保持只读。
+
+普通对话还提供三种 durable 投影：
+
+- “执行轨迹”按时间合并用户消息、AI 思考/回答、Tool 调用/返回和 Control Event，原始对象保留在每条记录内。
+- “证据与结果”汇总所有 Tool 输入/返回、Run 的结构化 Evidence 和 Artifact 索引。
+- “产物”读取 Snapshot 已登记的 Artifact 内容；没有产物时显示明确空状态。
 
 ## 调试路径
 
@@ -130,6 +138,14 @@ interface ToolCallDebug {
   arguments: unknown;
   call: unknown;
   result?: unknown;
+  completedAt?: string;
+  presentation: {
+    summary: string;
+    inputLabel: string;
+    input: string;
+    outputLabel: string;
+    output: string;
+  };
   assistantEntry: unknown;
   resultEntry?: unknown;
   telemetry: {
@@ -180,15 +196,16 @@ return {
 | `PUT` | `/api/provider/active` | 切换默认 Provider Profile |
 | `DELETE` | `/api/provider/:id` | 删除指定 Provider Profile |
 | `GET` | `/api/workspace` | 文件夹、会话偏好与 Tool/Skill/MCP 目录 |
+| `GET` | `/api/directories?path=...` | 校验绝对路径并列出父目录、磁盘根与子目录 |
 | `POST` | `/api/folders` | 创建对话文件夹 |
 | `PUT` | `/api/folders/:id` | 修改对话文件夹名称 |
 | `DELETE` | `/api/folders/:id` | 删除文件夹并把其中对话移到未分类 |
-| `GET` | `/api/conversations/:id/preferences` | 读取会话级 Profile、模型、文件夹与能力选择 |
-| `PUT` | `/api/conversations/:id/preferences` | 更新会话级 Profile、模型、文件夹与能力选择 |
+| `GET` | `/api/conversations/:id/preferences` | 读取会话级工作目录、Profile、模型、文件夹与能力选择 |
+| `PUT` | `/api/conversations/:id/preferences` | 校验并更新会话级工作目录、Profile、模型、文件夹与能力选择 |
 | `GET` | `/api/runs` | Run 摘要列表 |
 | `GET` | `/api/runs/:id` | Snapshot、Events、Telemetry、Pi Sessions 与 Tool 投影 |
 | `GET` | `/api/runs/:id/artifacts/:artifactId` | 校验引用后读取 Artifact 文本 |
-| `POST` | `/api/conversations` | 创建不绑定 Fixture 的普通 Coding Agent 会话 |
+| `POST` | `/api/conversations` | 校验工作目录并创建不绑定 Fixture 的普通 Coding Agent 会话 |
 | `POST` | `/api/fixture-conversations` | 创建绑定 Fixture 的交互调试会话 |
 | `POST` | `/api/runs/:id/chat` | 通过 SSE 执行一个真实模型 turn |
 | `POST` | `/api/solve` | 使用生产 `SingleAgentCtfLoop` 创建并执行 Run |
@@ -206,4 +223,4 @@ npm run build:web --workspace=@proofblade/gui
 npm test
 ```
 
-GUI 单元测试覆盖 Tool/Result/Telemetry/Artifact/Evidence 关联、pending 调用、Run ID 边界、Provider 本地持久化、Key 响应脱敏和带 Bearer 凭据的模型发现。浏览器回归应至少覆盖 1440px 桌面与 390px 移动视口、Provider 设置、真实对话、Script Lab 执行、抽屉交互、控制台错误和页面溢出。
+GUI 单元测试覆盖目录存在性/类型校验、会话工作目录持久化、Tool 指令与结果可读投影、Tool/Result/Telemetry/Artifact/Evidence 关联、pending 调用、Run ID 边界、Provider 本地持久化、Key 响应脱敏和带 Bearer 凭据的模型发现。浏览器回归应至少覆盖 1440px 桌面与 390px 移动视口、目录选择、Tool 卡片、执行轨迹、证据与结果、Provider 设置、真实对话、Script Lab、抽屉交互、控制台错误和页面溢出。

@@ -6,6 +6,7 @@ import type { ConversationPreferences, WorkspaceSettings } from "../src/shared.j
 import { WorkspaceSettingsStore } from "../src/workspace-settings.js";
 
 const defaults: ConversationPreferences = {
+  workspacePath: "D:/workspace",
   profileId: "default",
   model: "model-a",
   thinkingLevel: "low",
@@ -36,6 +37,7 @@ test("persists folders and per-conversation provider and capability choices", as
 
     const saved = await store.saveConversation("CHAT-1", {
       folderId: folder.id,
+      workspacePath: "D:/cases/research",
       profileId: "relay-b",
       model: "model-b",
       thinkingLevel: "medium",
@@ -50,6 +52,7 @@ test("persists folders and per-conversation provider and capability choices", as
     assert.equal(publicSettings.localPath, path);
     assert.equal(publicSettings.conversations["CHAT-1"]?.profileId, "relay-b");
     assert.equal(publicSettings.conversations["CHAT-1"]?.model, "model-b");
+    assert.equal(publicSettings.conversations["CHAT-1"]?.workspacePath, "D:/cases/research");
     assert.deepEqual(publicSettings.conversations["CHAT-1"]?.enabledMcpServers, ["local"]);
 
     assert.equal((await reloaded.renameFolder(folder.id, "Cases")).name, "Cases");

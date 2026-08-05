@@ -63,11 +63,11 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates an ordinary coding-agent session with no Fixture and drives the configured real model through SSE, with workspace `read`, `bash`, `edit`, and `write` tools available on demand. "Fixture test" is a separate entry point for interactive debugging or automatic execution; only that path loads the target sandbox, evidence gates, and recovery workflow. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream.
+Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" accepts or browses to an absolute working directory and creates an ordinary coding-agent session with no Fixture. Every turn starts its Coding Lane in that directory, with `read`, `bash`, `edit`, and `write` available on demand. "Fixture test" remains a separate entry point for interactive debugging or automatic execution. Text, thinking, and Tool lifecycle events render while the turn is running, then the durable Pi Session replaces the temporary stream.
 
 The gear button opens the relay and model manager. It can create multiple OpenAI-compatible profiles, each with its own name, Base URL, API key, optional proxy URL, discovered model list, and default thinking level. Model discovery and real conversations share the profile proxy. On Windows, the local file defaults to `%USERPROFILE%\.proofblade\gui-provider.json`. API responses expose only `hasApiKey`, never the key value. The controls below the composer switch provider, model, and thinking level per conversation.
 
-Conversations can be grouped into custom folders and filtered from the sidebar. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. The `load_skill` and `mcp_call` schemas remain present and stable; the enabled sets enforce which resources they may access at execution time. Folder and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
+Conversations can be grouped into custom folders, filtered from the sidebar, and switched to another working directory below the composer. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. The `load_skill` and `mcp_call` schemas remain present and stable; the enabled sets enforce which resources they may access at execution time. Working directory, folder, and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
 
 The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
 
@@ -96,11 +96,13 @@ The checked-in config requests [RTK (Rust Token Killer)](https://github.com/rtk-
 RTK wraps only ordinary Coding-Agent `bash`; `read/edit/write` and Solver Effect/Capability execution retain their existing paths. A Run uses one rewrite chain. When an RTK handler emits a tee capture, ProofBlade registers it as an Artifact before returning compact output. Handlers without a tee capture archive Pi's bounded visible output and record `rawCapture: "visible-output"`. Tool debug data exposes provider/version/hash, byte counts, measured reduction, and Artifact id under `details.outputRewrite`. This lowers dynamic Tool-result input on later turns; it does not directly raise Provider `cacheRead`.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
+- readable Tool cards with the actual instruction/arguments, returned result, duration, and Artifact/Evidence/Effect references, with complete JSON one action away;
+- a merged user/AI/Tool/Control execution trace plus dedicated Tool-result, structured-evidence, and artifact views for ordinary conversations;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
 - tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
 - correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;
 - a browser Web Worker Script Lab with JSON, table, and text result views;
-- separate ordinary coding-agent and Fixture-test paths, with recovery, checkpoints, evidence, and Artifact inspection scoped to Fixture runs;
+- separate ordinary coding-agent and Fixture-test paths; both expose artifacts, while Fixture runs add recovery, checkpoints, and verification gates;
 - multiple relay profiles, per-conversation model selection, conversation folders, and Tool/Skill/MCP switches;
 - separate provider-token, visible-context, and cache-field accounting.
 

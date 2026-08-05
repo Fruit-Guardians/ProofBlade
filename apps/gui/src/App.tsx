@@ -6,9 +6,10 @@ import {
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getProviderSettings, getRun, getRuns, getWorkspaceSettings, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
+import { toolPresentation } from "./tool-presentation.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -136,7 +137,7 @@ export function App() {
     return run.kind === runKindFilter && matchesSearch && matchesFolder && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
   }), [folderFilter, runKindFilter, runs, search, statusFilter, workspaceSettings]);
   const visibleTabs = detail?.kind === "chat"
-    ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline")
+    ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline" || item.id === "evidence" || item.id === "artifacts")
     : tabItems;
 
   const refreshAll = async () => {
@@ -200,7 +201,7 @@ export function App() {
       </header>
 
       {detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
-      <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>
+      <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
@@ -220,7 +221,7 @@ export function App() {
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
       {detail ? <Metrics detail={detail} bootstrap={bootstrap} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
-    {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshRuns(); void refreshWorkspace(); }} />}
+    {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshRuns(); void refreshWorkspace(); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
@@ -250,6 +251,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const [turnError, setTurnError] = useState<string>();
   const [contextSnapshot, setContextSnapshot] = useState<Extract<ChatStreamEvent, { type: "context_snapshot" }>>();
   const [contextOpen, setContextOpen] = useState(false);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
   const [preferences, setPreferences] = useState<ConversationPreferences>();
   const [selectedCallId, setSelectedCallId] = useState<string>();
   const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
@@ -349,13 +351,13 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
               {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
-              {calls.length > 0 && <div className="message-tools">{calls.map((call) => <button key={call.id} className={`message-tool tool-${call.status} ${selectedCallId === call.id ? "selected" : ""}`} onClick={() => setSelectedCallId(call.id)}><span>{call.status === "success" ? <Check size={13} /> : call.status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : call.status}</em><ChevronRight size={13} /></button>)}</div>}
+              {calls.length > 0 && <div className="message-tools">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} selected={selectedCallId === call.id} onInspect={() => setSelectedCallId(call.id)} />)}</div>}
             </div>
           </article>;
         })}
         {pendingUser && !session?.messages.slice().reverse().find((item) => item.role === "user" && item.text === pendingUser) && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span className="sending-label"><i />发送中</span></div><MessageText text={pendingUser} /></div></article>}
         {failedUser && !pendingUser && <article className="chat-message role-user failed-message"><div className="message-avatar"><CircleAlert size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送失败，内容已放回输入框</span></div><MessageText text={failedUser} /></div></article>}
-        {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <div key={call.id} className={`message-tool tool-${call.status}`}><span>{call.status === "running" ? <RefreshCw className="spin" size={13} /> : call.status === "success" ? <Check size={13} /> : <CircleAlert size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.status}</em></div>)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
+        {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <ToolExecutionCard key={call.id} call={call} />)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
       </div>
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
@@ -366,6 +368,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
           <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
           <button type="button" className="context-button" title="当前 Pi Session 的累计 Provider token" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(sessionTokenTotal(session))} 累计</span></button>
+          <button type="button" className="workspace-button" title={preferences.workspacePath} onClick={() => setDirectoryOpen(true)}><FolderOpen size={13} />目录 <span>{shortPath(preferences.workspacePath)}</span></button>
           <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
         </div>}
         {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
@@ -373,7 +376,22 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
       </div>
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
+    {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
   </div>;
+}
+
+type ToolCardValue = ToolCallDebug | LiveToolCall;
+
+function ToolExecutionCard({ call, selected = false, onInspect }: { call: ToolCardValue; selected?: boolean; onInspect?: () => void }) {
+  const presentation = "presentation" in call ? call.presentation : toolPresentation(call.name, call.args ?? {}, call.result);
+  const status = call.status === "running" ? "pending" : call.status;
+  const duration = "telemetry" in call && call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : statusLabel(status);
+  const links = "links" in call ? call.links : undefined;
+  return <section className={`tool-execution-card tool-${status} ${selected ? "selected" : ""}`}>
+    <header><span className="tool-status-icon">{status === "success" ? <Check size={13} /> : status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{presentation.summary}</code><em>{duration}</em>{onInspect && <button type="button" title="查看完整调用数据" onClick={onInspect}><Braces size={13} />完整数据</button>}</header>
+    <div className="tool-io-grid"><div><label>{presentation.inputLabel}</label><pre>{presentation.input}</pre></div><div><label>{presentation.outputLabel}</label><pre>{presentation.output}</pre></div></div>
+    {links && (links.artifacts.length > 0 || links.evidence.length > 0 || links.effects.length > 0) && <footer>{links.artifacts.map((item) => <span key={item.id}><Archive size={11} />{item.id}</span>)}{links.evidence.map((item) => <span key={item.id}><ShieldCheck size={11} />{item.id}</span>)}{links.effects.map((item) => <span key={item.id}><Zap size={11} />{item.id}</span>)}</footer>}
+  </section>;
 }
 
 function ConversationToolInspector({ call, onClose }: { call: ToolCallDebug; onClose(): void }) {
@@ -535,13 +553,60 @@ function Overview({ detail }: { detail: RunDetail }) {
 
 function Timeline({ detail }: { detail: RunDetail }) {
   const [query, setQuery] = useState("");
+  if (detail.kind === "chat") return <ChatExecutionTimeline detail={detail} />;
   const events = detail.events.filter((event) => `${event.type} ${event.actor} ${event.lane} ${JSON.stringify(event.payload)}`.toLowerCase().includes(query.toLowerCase())).reverse();
   return <section className="timeline-page"><div className="section-toolbar"><div className="run-search"><Search size={14} /><input placeholder="筛选事件" value={query} onChange={(event) => setQuery(event.target.value)} /></div><span>{events.length} events</span></div><div className="event-table">{events.map((event) => <details key={event.id}><summary><code>{String(event.seq).padStart(4, "0")}</code><time>{clock(event.ts)}</time><span className={`event-mark actor-${event.actor}`} /><strong>{event.type}</strong><em>{event.lane}</em><small>{event.actor}</small><ChevronRight size={14} /></summary><RawJson value={event} /></details>)}</div></section>;
 }
 
+interface TraceItem {
+  id: string;
+  timestamp: string;
+  order: number;
+  source: "用户" | "AI" | "Tool" | "Control";
+  title: string;
+  summary: string;
+  detail: string;
+  status?: string;
+  raw?: unknown;
+}
+
+function ChatExecutionTimeline({ detail }: { detail: RunDetail }) {
+  const [query, setQuery] = useState("");
+  const trace = useMemo(() => {
+    const items: TraceItem[] = [];
+    for (const session of detail.sessions) {
+      for (const entry of session.messages) {
+        const role = entry.role === "user" ? "用户" : "AI";
+        const body = [entry.thinking ? `思考\n${entry.thinking}` : "", entry.text].filter(Boolean).join("\n\n");
+        items.push({ id: `${session.id}:message:${entry.id}`, timestamp: entry.timestamp, order: entry.role === "user" ? 10 : 20, source: role, title: entry.role === "user" ? "发送任务" : "模型响应", summary: firstLine(body) || entry.stopReason || "空响应", detail: body, status: entry.stopReason, raw: entry.raw });
+      }
+      for (const call of session.toolCalls) {
+        items.push({ id: `${session.id}:call:${call.id}`, timestamp: call.timestamp, order: 30 + call.callIndex, source: "Tool", title: `${call.name} · ${call.presentation.inputLabel}`, summary: call.presentation.summary, detail: call.presentation.input, status: "调用", raw: call.call });
+        if (call.completedAt) items.push({ id: `${session.id}:result:${call.id}`, timestamp: call.completedAt, order: 40 + call.callIndex, source: "Tool", title: `${call.name} · ${call.presentation.outputLabel}`, summary: firstLine(call.presentation.output), detail: call.presentation.output, status: call.status, raw: call.resultEntry });
+      }
+    }
+    for (const event of detail.events) items.push({ id: `control:${event.id}`, timestamp: event.ts, order: 50, source: "Control", title: event.type, summary: `${event.lane} · ${event.actor}`, detail: pretty(event.payload), raw: event });
+    return items.sort((a, b) => a.timestamp.localeCompare(b.timestamp) || a.order - b.order);
+  }, [detail.events, detail.sessions]);
+  const visible = trace.filter((item) => `${item.source} ${item.title} ${item.summary} ${item.detail}`.toLowerCase().includes(query.toLowerCase()));
+  return <section className="timeline-page execution-trace"><div className="section-toolbar"><div className="run-search"><Search size={14} /><input placeholder="筛选执行轨迹" value={query} onChange={(event) => setQuery(event.target.value)} /></div><span>{visible.length} records</span></div><div className="trace-list">{visible.map((item) => <details key={item.id}><summary><span className={`trace-source source-${item.source.toLowerCase()}`}>{item.source}</span><time>{item.timestamp ? clock(item.timestamp) : "--"}</time><span><strong>{item.title}</strong><small>{item.summary}</small></span>{item.status && <StatusMini status={item.status} />}<ChevronRight size={14} /></summary><div className="trace-detail">{item.detail && <pre>{item.detail}</pre>}{item.raw !== undefined && <RawJson value={item.raw} />}</div></details>)}</div></section>;
+}
+
 function EvidenceLedger({ detail }: { detail: RunDetail }) {
+  if (detail.kind === "chat") return <ChatEvidenceResults detail={detail} />;
   const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
   return <section className="evidence-page"><div className="section-toolbar"><div><strong>证据账本</strong><span>{evidence.length} 条不可变引用</span></div><StatusBadge status={detail.snapshot.status} /></div><div className="evidence-list">{evidence.map((item) => <details key={item.id}><summary><span className="evidence-confidence">{Math.round(item.confidence * 100)}%</span><code>{item.id}</code><strong>{item.summary}</strong><StatusMini status={item.kind} /><ChevronRight size={14} /></summary><div className="evidence-detail"><dl className="key-values"><dt>Artifact</dt><dd>{item.source.artifactId ?? "--"}</dd><dt>Effect</dt><dd>{item.source.effectId ?? "--"}</dd><dt>Tool</dt><dd>{item.source.tool ?? "--"}</dd><dt>Generation</dt><dd>{item.source.generation ?? "--"}</dd></dl><RawJson value={item} /></div></details>)}</div></section>;
+}
+
+function ChatEvidenceResults({ detail }: { detail: RunDetail }) {
+  const calls = detail.sessions.flatMap((session) => session.toolCalls).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
+  const artifacts = Object.values(detail.snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id));
+  return <div className="chat-results-page">
+    <section><div className="section-head"><div><TerminalSquare size={14} /><strong>Tool 结果</strong><span>{calls.length}</span></div></div><div className="chat-result-list">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} />)}{calls.length === 0 && <div className="empty-list">当前对话还没有 Tool 结果</div>}</div></section>
+    <section><div className="section-head"><div><ShieldCheck size={14} /><strong>证据记录</strong><span>{evidence.length}</span></div></div><div className="evidence-list">{evidence.map((item) => <details key={item.id}><summary><span className="evidence-confidence">{Math.round(item.confidence * 100)}%</span><code>{item.id}</code><strong>{item.summary}</strong><StatusMini status={item.kind} /><ChevronRight size={14} /></summary><div className="evidence-detail"><dl className="key-values"><dt>Artifact</dt><dd>{item.source.artifactId ?? "--"}</dd><dt>Effect</dt><dd>{item.source.effectId ?? "--"}</dd><dt>Tool</dt><dd>{item.source.tool ?? "--"}</dd><dt>Generation</dt><dd>{item.source.generation ?? "--"}</dd></dl><RawJson value={item} /></div></details>)}{evidence.length === 0 && <div className="empty-list">当前对话还没有结构化证据</div>}</div></section>
+    <section><div className="section-head"><div><Archive size={14} /><strong>产物索引</strong><span>{artifacts.length}</span></div></div><div className="result-artifact-list">{artifacts.map((item) => <div key={item.id}><FileCode2 size={14} /><code>{item.id}</code><span>{item.path}</span><em>{formatBytes(item.bytes)}</em></div>)}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</div></section>
+  </div>;
 }
 
 function Artifacts({ detail }: { detail: RunDetail }) {
@@ -554,7 +619,7 @@ function Artifacts({ detail }: { detail: RunDetail }) {
     setContent(undefined); setError(undefined);
     void getArtifact(detail.snapshot.runId, selectedId).then(setContent).catch((caught) => setError(message(caught)));
   }, [detail.snapshot.runId, selectedId]);
-  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{item.id}</strong><small>{item.path}</small></span><em>{formatBytes(item.bytes)}</em></button>)}</section><section className="artifact-view"><div className="section-head"><div><strong>{content?.artifact.id ?? selectedId}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">正在读取</div>}</section></div>;
+  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{item.id}</strong><small>{item.path}</small></span><em>{formatBytes(item.bytes)}</em></button>)}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content?.artifact.id ?? (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
 }
 
 function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: BootstrapData }) {
@@ -792,17 +857,32 @@ function CapabilitySection({ title, icon, items, onToggle }: { title: string; ic
   return <section className="capability-section"><div className="section-head"><div>{icon}<strong>{title}</strong><span>{items.filter((item) => item.enabled).length}/{items.length}</span></div></div>{items.map((item) => <label className={`capability-row ${item.disabled ? "disabled" : ""}`} key={item.id}><input type="checkbox" checked={item.enabled} disabled={item.disabled} onChange={() => onToggle(item.id)} /><span><strong>{item.name}</strong><small>{item.description}</small><em>{item.meta}</em></span></label>)}{!items.length && <div className="empty-list">当前项目没有可用项</div>}</section>;
 }
 
-function NewConversationModal({ folders, onClose, onCreated }: { folders: ConversationFolder[]; onClose(): void; onCreated(id: string): void }) {
+function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }: { folders: ConversationFolder[]; defaultWorkspace: string; onClose(): void; onCreated(id: string): void }) {
   const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
   const [title, setTitle] = useState("新对话");
   const [folderId, setFolderId] = useState("");
+  const [workspacePath, setWorkspacePath] = useState(defaultWorkspace);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
-    try { await createConversation({ runId, title }); if (folderId) await updateConversationPreferences(runId, { folderId }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
+    try { await createConversation({ runId, title, folderId: folderId || undefined, workspacePath }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer></form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
+}
+
+function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath: string; onClose(): void; onSelect(path: string): void | Promise<void> }) {
+  const [path, setPath] = useState(initialPath);
+  const [listing, setListing] = useState<DirectoryListing>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const open = useCallback(async (next?: string) => {
+    setLoading(true); setError(undefined);
+    try { const value = await getDirectories(next); setListing(value); setPath(value.path); } catch (caught) { setError(message(caught)); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void open(initialPath || undefined); }, [initialPath, open]);
+  return <div className="modal-backdrop directory-backdrop" role="presentation" onMouseDown={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) onClose(); }}><div className="modal directory-modal"><header><div><FolderOpen size={17} /><strong>选择工作目录</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="directory-location"><input value={path} onChange={(event) => setPath(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void open(path); } }} aria-label="工作目录绝对路径" /><button type="button" className="command-button" disabled={loading} onClick={() => void open(path)}><ChevronRight size={14} />打开</button></div><div className="directory-roots">{listing?.roots.map((root) => <button type="button" key={root} onClick={() => void open(root)}><Database size={13} />{root}</button>)}</div><div className="directory-list">{loading ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取目录</div> : <>{listing?.parent && <button type="button" className="directory-parent" onClick={() => void open(listing.parent)}><FolderOpen size={15} /><span>上一级</span><code>{listing.parent}</code><ChevronRight size={14} /></button>}{listing?.directories.map((item) => <button type="button" key={item.path} onDoubleClick={() => void open(item.path)} onClick={() => { setPath(item.path); }}><Folder size={15} /><span>{item.name}</span><code>{item.path}</code><ChevronRight size={14} /></button>)}{listing?.directories.length === 0 && <div className="empty-list">没有子目录</div>}</>}</div><footer><code className="selected-directory" title={path}>{path}</code><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={loading || !path.trim()} onClick={() => void onSelect(path)}><Check size={14} />使用此目录</button></footer></div></div>;
 }
 
 function FixtureTestModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
@@ -843,6 +923,10 @@ function inspectorValue(call: ToolCallDebug, source: InspectorSource): unknown {
   if (source === "telemetry") return call.telemetry;
   return call;
 }
+function chatTabLabel(id: MainTab, fallback: string): string { return id === "debugger" ? "工具记录" : id === "timeline" ? "执行轨迹" : id === "evidence" ? "证据与结果" : id === "artifacts" ? "产物" : fallback; }
+function statusLabel(status: string): string { return status === "success" ? "成功" : status === "error" ? "失败" : status === "pending" ? "执行中" : status; }
+function firstLine(value: string): string { return value.split(/\r?\n/, 1)[0]?.trim() ?? ""; }
+function shortPath(value: string): string { const normalized = value.replace(/[\\/]+$/, ""); const parts = normalized.split(/[\\/]/); return parts.at(-1) || value; }
 function message(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 function shortId(value: string): string { return value.length > 20 ? `${value.slice(0, 9)}...${value.slice(-6)}` : value; }
 function formatNumber(value: number): string { return new Intl.NumberFormat("zh-CN", { notation: value > 9999 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value); }

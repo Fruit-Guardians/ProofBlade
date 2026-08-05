@@ -6,6 +6,7 @@ import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadCon
 import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
+import { listDirectories, requireDirectory } from "./directory-browser.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,6 +81,9 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const capabilities = await capabilityCatalog();
     return sendJson(response, 200, workspaceSettings.publicSettings(capabilities, defaultPreferences(capabilities)));
   }
+  if (method === "GET" && url.pathname === "/api/directories") {
+    return sendJson(response, 200, await listDirectories(projectRoot, url.searchParams.get("path") ?? undefined));
+  }
   if (method === "POST" && url.pathname === "/api/folders") {
     const body = await readBody(request);
     return sendJson(response, 201, await workspaceSettings.createFolder(string(body.name, "name")));
@@ -97,10 +101,18 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (method === "GET" && url.pathname === "/api/runs") return sendJson(response, 200, await data.listRuns());
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
+    const capabilities = await capabilityCatalog();
+    const defaults = defaultPreferences(capabilities);
+    const workspacePath = await requireDirectory(optionalString(body.workspacePath) || projectRoot);
     const snapshot = await data.createConversation({
       runId: string(body.runId, "runId"),
       title: typeof body.title === "string" ? body.title : "新对话",
+      workspacePath,
     });
+    await workspaceSettings.saveConversation(snapshot.runId, {
+      workspacePath,
+      ...(typeof body.folderId === "string" && body.folderId ? { folderId: body.folderId } : {}),
+    }, defaults);
     return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
   }
   if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts[3] === "preferences") {
@@ -109,7 +121,9 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     if (method === "GET") return sendJson(response, 200, normalizedPreferences(workspaceSettings.preferences(parts[2], defaults), capabilities));
     if (method === "PUT") {
       const body = await readBody(request);
-      const next = normalizedPreferences({ ...workspaceSettings.preferences(parts[2], defaults), ...conversationPreferencesInput(body, workspaceSettings.preferences(parts[2], defaults)) }, capabilities);
+      const patch = conversationPreferencesInput(body, workspaceSettings.preferences(parts[2], defaults));
+      if (patch.workspacePath !== undefined) patch.workspacePath = await requireDirectory(patch.workspacePath);
+      const next = normalizedPreferences({ ...workspaceSettings.preferences(parts[2], defaults), ...patch }, capabilities);
       return sendJson(response, 200, await workspaceSettings.saveConversation(parts[2], next, defaults));
     }
   }
@@ -147,6 +161,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       try {
         const capabilities = await capabilityCatalog();
         const preferences = normalizedPreferences(workspaceSettings.preferences(runId, defaultPreferences(capabilities)), capabilities);
+        const workspacePath = await requireDirectory(preferences.workspacePath);
         await data.chat(
           runId,
           string(body.prompt, "prompt"),
@@ -157,6 +172,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
             enabledSkills: preferences.enabledSkills,
             enabledMcpServers: preferences.enabledMcpServers,
           },
+          workspacePath,
         );
       } catch (error) {
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
@@ -245,6 +261,7 @@ function defaultPreferences(capabilities: WorkspaceSettings["capabilities"]): Co
   const providers = providerSettings.publicSettings();
   const profile = providers.profiles.find((item) => item.id === providers.activeProfileId) ?? providers.profiles[0]!;
   return {
+    workspacePath: projectRoot,
     profileId: profile.id,
     model: profile.model,
     thinkingLevel: profile.thinkingLevel,
@@ -264,6 +281,7 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
   const allowedMcp = new Set(capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name));
   return {
     ...(input.folderId ? { folderId: input.folderId } : {}),
+    workspacePath: input.workspacePath || projectRoot,
     profileId: profile.id,
     model: input.profileId === profile.id && input.model ? input.model : profile.model,
     thinkingLevel: input.thinkingLevel,
@@ -277,6 +295,7 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
   return {
     ...current,
     ...(body.folderId === null ? { folderId: undefined } : typeof body.folderId === "string" ? { folderId: body.folderId } : {}),
+    ...(typeof body.workspacePath === "string" ? { workspacePath: body.workspacePath } : {}),
     ...(typeof body.profileId === "string" ? { profileId: body.profileId } : {}),
     ...(typeof body.model === "string" ? { model: body.model } : {}),
     ...(typeof body.thinkingLevel === "string" ? { thinkingLevel: body.thinkingLevel as ProviderThinkingLevel } : {}),

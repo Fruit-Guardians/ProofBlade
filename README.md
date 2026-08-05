@@ -63,11 +63,11 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”创建不绑定 Fixture 的普通 Coding Agent 会话，通过 SSE 调用配置文件中的真实模型，并按需使用工作区 `read`、`bash`、`edit` 和 `write` 工具。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
+打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”可输入或浏览选择绝对工作目录，创建不绑定 Fixture 的普通 Coding Agent 会话；每轮都以该目录启动 Coding Lane，并按需使用 `read`、`bash`、`edit` 和 `write`。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
 
 右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表和默认思考等级；模型发现和真实对话共用该代理。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
 
-对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
+对话可以放入自定义文件夹并在侧栏筛选，也可从输入框下方随时切换工作目录。能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。工作目录、文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
 
@@ -96,11 +96,13 @@ npm run gui -- --config proofblade.config.json --port 4173
 RTK 只包装普通 Coding Agent 的 `bash`；`read/edit/write` 和 Solver 的 Effect/Capability 链保持原样。同一 Run 只走这一条输出改写链，后续上下文维护不会再次对刚产生的结果套 RTK。RTK 提供 tee 原文时，ProofBlade 先把它注册为 Artifact 再返回压缩内容；某些 RTK handler 不生成 tee，此时保存 Pi 可见的有界输出，并以 `rawCapture: "visible-output"` 明确标记。调试 Tool Result 的 `details.outputRewrite` 包含 provider/version/hash、字节数、实测压缩率和 Artifact id。RTK 主要减少后续请求中的动态 Tool 结果，不会直接增加 Provider 的 `cacheRead`。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
+- Tool 卡片直接展示实际指令/参数、返回结果、耗时和 Artifact/Evidence/Effect 引用，完整 JSON 作为二级检查入口；
+- 普通对话提供用户、AI、Tool 和 Control 记录合并的执行轨迹，并独立汇总 Tool 结果、结构化证据和产物；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
 - 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
-- 普通 Coding Agent 与 Fixture 测试分离；Fixture 模式提供恢复核对、机械 Checkpoint、证据账本和 Artifact 内容查看；
+- 普通 Coding Agent 与 Fixture 测试分离；两者都可查看产物，Fixture 模式额外提供恢复核对、机械 Checkpoint 和验证账本；
 - 多中转站 Profile、会话级模型切换、对话文件夹，以及 Tool/Skill/MCP 能力开关；
 - Provider Token、可见上下文和缓存字段的独立统计。
 

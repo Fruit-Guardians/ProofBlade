@@ -1,4 +1,4 @@
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -30,6 +30,10 @@ export async function removeProvider(profileId: string): Promise<ProviderSetting
 
 export async function getWorkspaceSettings(): Promise<WorkspaceSettings> {
   return await request("/api/workspace");
+}
+
+export async function getDirectories(path?: string): Promise<DirectoryListing> {
+  return await request(`/api/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`);
 }
 
 export async function getConversationPreferences(runId: string): Promise<ConversationPreferences> {
@@ -64,7 +68,7 @@ export async function startSolve(input: { runId: string; fixtureId: string; mode
   return await request("/api/solve", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createConversation(input: { runId: string; title: string }): Promise<{ runId: string }> {
+export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }
 

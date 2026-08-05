@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assistantTurnsFromEntries, assertRunId, codingConversationTask, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import type { HarnessEvent, RunSnapshot } from "@proofblade/materials";
 
 const entries = [
@@ -28,6 +28,8 @@ test("correlates a Pi tool call with result, telemetry, artifact, and evidence",
   assert.equal(calls.length, 1);
   assert.equal(calls[0]?.id, "call-1");
   assert.equal(calls[0]?.status, "success");
+  assert.match(calls[0]?.presentation.input ?? "", /input\.txt/);
+  assert.match(calls[0]?.presentation.output ?? "", /artifactId/);
   assert.equal(calls[0]?.telemetry.call?.type, "tool_call_recorded");
   assert.deepEqual(calls[0]?.links.artifacts.map((item) => item.id), ["A-1"]);
   assert.deepEqual(calls[0]?.links.evidence.map((item) => item.id), ["EV-1"]);
@@ -71,4 +73,6 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.deepEqual(task.success_criteria, []);
   assert.equal(task.verification.required_reproductions, 0);
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
+  assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
+  assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
 });

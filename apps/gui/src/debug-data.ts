@@ -33,6 +33,7 @@ import type {
   ToolCallDebug,
   TokenUsage,
 } from "./shared.js";
+import { toolPresentation } from "./tool-presentation.js";
 
 interface SessionEntryLike {
   type?: string;
@@ -87,6 +88,7 @@ export class DebugDataService {
     const profile = this.config.modelProfiles.executor;
     return {
       projectName: "ProofBlade / 证锋",
+      projectRoot: this.root,
       configPath: this.configPath,
       storage: this.config.storage,
       model: {
@@ -195,10 +197,10 @@ export class DebugDataService {
     return info;
   }
 
-  public async createConversation(input: { runId: string; title: string }): Promise<RunSnapshot> {
+  public async createConversation(input: { runId: string; title: string; workspacePath?: string }): Promise<RunSnapshot> {
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
-    return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, this.root));
+    return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root));
   }
 
   public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
@@ -229,6 +231,7 @@ export class DebugDataService {
     emit: (event: ChatStreamEvent) => void,
     profile?: ModelProfileConfig,
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
+    workspacePath?: string,
   ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
@@ -248,7 +251,7 @@ export class DebugDataService {
     try {
       if (runKind(snapshot.task) === "chat") {
         lane = await PiCodingLane.create({
-          projectRoot: this.root,
+          projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
           runId,
           runDir: join(this.services.runsRoot, runId),
           controlStore: this.services.control,
@@ -438,6 +441,8 @@ export function correlateToolCalls(
         arguments: call.arguments ?? {},
         call,
         result: matched?.message,
+        completedAt: matched?.entry.timestamp,
+        presentation: toolPresentation(call.name ?? matched?.message.toolName ?? "unknown", call.arguments ?? {}, matched?.message),
         assistantEntry,
         resultEntry: matched?.entry,
         telemetry: { call: callEvents.get(callId), result: resultEvents.get(callId) },
@@ -446,6 +451,11 @@ export function correlateToolCalls(
     });
   }
   return output;
+}
+
+export function codingWorkspace(task: Pick<TaskContract, "mode" | "target" | "scope">, preferred: string | undefined, fallback: string): string {
+  if (task.mode !== "coding_assistant") return fallback;
+  return preferred || task.scope.allowed_workspace || task.target || fallback;
 }
 
 function collectReferencedIds(values: unknown[], snapshot: RunSnapshot): Set<string> {

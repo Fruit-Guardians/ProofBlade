@@ -5,6 +5,7 @@ import type { ConversationFolder, ConversationPreferences, ProviderThinkingLevel
 
 interface StoredConversationPreferences {
   folderId?: string;
+  workspacePath?: string;
   profileId?: string;
   model?: string;
   thinkingLevel?: ProviderThinkingLevel;
@@ -49,6 +50,7 @@ export class WorkspaceSettingsStore {
     const next: ConversationPreferences = {
       ...current,
       ...input,
+      workspacePath: input.workspacePath?.trim() || current.workspacePath,
       enabledTools: normalizeList(input.enabledTools ?? current.enabledTools),
       enabledSkills: normalizeList(input.enabledSkills ?? current.enabledSkills),
       enabledMcpServers: normalizeList(input.enabledMcpServers ?? current.enabledMcpServers),
@@ -131,6 +133,7 @@ function validatePreferences(value: unknown): StoredConversationPreferences {
   const input = value as StoredConversationPreferences;
   return {
     ...(typeof input.folderId === "string" && input.folderId ? { folderId: input.folderId } : {}),
+    ...(typeof input.workspacePath === "string" && input.workspacePath.trim() ? { workspacePath: input.workspacePath.trim() } : {}),
     ...(typeof input.profileId === "string" && input.profileId ? { profileId: input.profileId } : {}),
     ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
     ...(typeof input.thinkingLevel === "string" ? { thinkingLevel: input.thinkingLevel } : {}),
