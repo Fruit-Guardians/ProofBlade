@@ -51,6 +51,17 @@ Provider 输入 Token 与可见估算不是同一指标。中转站或模型模�
 
 Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`），用于区分“请求了缓存”与“上游实际返回缓存 Token”。GUI 可以在每个 Provider Profile 中单独保存该值；无 GUI 时再由 `modelProfiles.executor.cacheRetention` 提供默认值，不会把具体模型或密钥写进源码。对话消息旁显示单轮缓存读取和命中率，指标面板显示累计提示词量与累计 token。
 
+右侧“缓存前缀”显示另一组独立诊断。运行时在 Pi 完成请求重写后的 `before_provider_payload` 捕获 System/Developer 指令和有序 Tool Schema，只持久化规范哈希、数量和 Token 估算，不记录正文。相同 Provider 和模型的相邻请求参与比较；稳定率低于 100% 时，事件数据会把原因归类为 `system`、`tools` 或 `rewrite`。
+
+这两个指标回答不同问题：
+
+| 指标 | 数据来源 | 回答的问题 |
+| --- | --- | --- |
+| 缓存前缀稳定率 | 客户端最终请求体的哈希比较 | ProofBlade 是否改变了可缓存的 System/Tool 前缀？ |
+| 缓存命中率 | Provider 响应中的 `cacheRead` | 中转站或模型实际复用了多少提示 Token？ |
+
+前缀稳定率为 100% 但缓存读取不增长时，应检查 Provider 的缓存粒度、TTL、模型支持和中转站透传；缓存前缀发生变化时，应先消除对应的 System、Tool Schema 或请求重写漂移。维护阈值依次为 55% notice、60% snip、75% prune、80% compact 和 90% force compact。每次 snip/prune 后会重新计量，仍达到 compact 阈值才调度摘要压缩。
+
 ## 真实模型对话
 
 “新建对话”创建普通 Coding Agent 会话，不选择或初始化 Fixture。对话 composer 调用：

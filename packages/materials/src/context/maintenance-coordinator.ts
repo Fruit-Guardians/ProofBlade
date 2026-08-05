@@ -17,6 +17,7 @@ export interface ContextMaintenancePreparation {
   repaired: boolean;
   dropped: ReturnType<typeof pruneAgentMessages>["dropped"];
   plan: ContextMaintenancePlan;
+  postPlan: ContextMaintenancePlan;
   nextAction: "none" | "compact";
   checkpointRecommended: boolean;
 }
@@ -39,6 +40,7 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
       repaired: repaired.dropped.length > 0,
       dropped: repaired.dropped,
       plan,
+      postPlan: plan,
       nextAction: "none",
       checkpointRecommended: repaired.dropped.length > 0,
     };
@@ -46,13 +48,15 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
   const mode: AgentContextPruneMode = plan.forceCompact ? "emergency" : plan.shouldPrune ? "prune" : "snip";
   const messageBudget = Math.max(256, Math.floor(input.messageBudget ?? Math.max(256, input.availableTokens - baseTokens)));
   const pruned = pruneAgentMessages(repaired.messages, messageBudget, { mode });
+  const postPlan = planContextMaintenance(baseTokens + pruned.estimatedTokens, input.availableTokens);
   return {
     messages: pruned.messages,
     estimatedTokens: pruned.estimatedTokens,
     repaired: repaired.dropped.length > 0,
     dropped: [...repaired.dropped, ...pruned.dropped],
     plan,
-    nextAction: plan.shouldCompact ? "compact" : "none",
+    postPlan,
+    nextAction: plan.forceCompact || postPlan.shouldCompact ? "compact" : "none",
     checkpointRecommended: repaired.dropped.length > 0 || pruned.dropped.length > 0,
   };
 }

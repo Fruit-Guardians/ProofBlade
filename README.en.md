@@ -17,7 +17,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
 - Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
-- Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 50/60/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
+- Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 55/60/75/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
@@ -71,6 +71,8 @@ Conversations can be grouped into custom folders and filtered from the sidebar. 
 The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
 
 Choose cache retention per Provider in the GUI: `short` (the default), `long` (request a stable session cache key and longer TTL), or `none`. Headless runs can set `modelProfiles.executor.cacheRetention` directly. Cache reporting remains provider-specific; each assistant turn shows prompt total, cache reads, and hit rate, while the metrics panel shows cumulative values.
+
+The metrics panel also fingerprints the System/Developer instructions and Tool Schema from the final Provider payload without retaining prompt text. Prefix stability detects changes in instructions, tool names, ordering, schemas, or rewrite version; it does not claim an upstream cache hit. Actual hit rate remains `cacheRead / (input + cacheRead + cacheWrite)` from Provider usage. Read both together: a stable prefix with flat `cacheRead` points to relay/model cache behavior, while an unstable prefix reports `system`, `tools`, or `rewrite` as the change reason.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;

@@ -1,4 +1,4 @@
-import { cacheHitRate as calculateCacheHitRate } from "@proofblade/molecules";
+import { cacheHitRate as calculateCacheHitRate, compareProviderPrefixShapes, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { HarnessEvent, PrimaryFailureCategory, RunSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -36,6 +36,15 @@ export interface RunTelemetryReport {
     cost: CostTotals;
     contextEfficiency: number;
     cacheHitRate: number;
+    cachePrefix: {
+      observedRequests: number;
+      comparableRequests: number;
+      stableRequests: number;
+      changedRequests: number;
+      stabilityRate: number;
+      changeReasons: Record<string, number>;
+      last: Pick<ProviderPrefixShape, "prefixHash" | "systemHash" | "toolsHash" | "systemTokens" | "toolSchemaTokens" | "toolCount"> | null;
+    };
     toolCallCount: number;
     finishReasons: Record<string, number>;
     byModel: Array<{ provider: string; model: string; requests: number; tokens: number; costUsd: number }>;
@@ -153,9 +162,72 @@ function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] 
     cost,
     contextEfficiency: tokens.input ? round(tokens.output / tokens.input) : 0,
     cacheHitRate: round(calculateCacheHitRate(cacheUsage)),
+    cachePrefix: providerPrefixReport(usages),
     toolCallCount,
     finishReasons: orderedRecord(finishReasons),
     byModel: [...models.values()].sort((a, b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model)),
+  };
+}
+
+function providerPrefixReport(usages: HarnessEvent[]): RunTelemetryReport["provider"]["cachePrefix"] {
+  const previousByModel = new Map<string, ProviderPrefixShape>();
+  const reasons: Record<string, number> = {};
+  let observedRequests = 0;
+  let comparableRequests = 0;
+  let stableRequests = 0;
+  let changedRequests = 0;
+  let last: RunTelemetryReport["provider"]["cachePrefix"]["last"] = null;
+  for (const event of usages) {
+    const payload = event.payload ?? {};
+    const shape = providerPrefixShape(payload.cachePrefix);
+    if (!shape) continue;
+    observedRequests += 1;
+    const key = `${String(payload.provider ?? "unknown")}\u0000${String(payload.model ?? "unknown")}`;
+    const previous = previousByModel.get(key);
+    if (previous) {
+      comparableRequests += 1;
+      const comparison = compareProviderPrefixShapes(previous, shape);
+      if (comparison.changed) {
+        changedRequests += 1;
+        for (const reason of comparison.reasons) reasons[reason] = (reasons[reason] ?? 0) + 1;
+      } else {
+        stableRequests += 1;
+      }
+    }
+    previousByModel.set(key, shape);
+    last = {
+      prefixHash: shape.prefixHash,
+      systemHash: shape.systemHash,
+      toolsHash: shape.toolsHash,
+      systemTokens: shape.systemTokens,
+      toolSchemaTokens: shape.toolSchemaTokens,
+      toolCount: shape.toolCount,
+    };
+  }
+  return {
+    observedRequests,
+    comparableRequests,
+    stableRequests,
+    changedRequests,
+    stabilityRate: comparableRequests > 0 ? round(stableRequests / comparableRequests) : 0,
+    changeReasons: orderedRecord(reasons),
+    last,
+  };
+}
+
+function providerPrefixShape(value: unknown): ProviderPrefixShape | undefined {
+  const shape = object(value);
+  if (shape.version !== 1 || typeof shape.prefixHash !== "string" || typeof shape.systemHash !== "string" || typeof shape.toolsHash !== "string") return undefined;
+  return {
+    version: 1,
+    rewriteVersion: number(shape.rewriteVersion, 1),
+    prefixHash: shape.prefixHash,
+    systemHash: shape.systemHash,
+    toolsHash: shape.toolsHash,
+    instructionMessageCount: number(shape.instructionMessageCount),
+    toolCount: number(shape.toolCount),
+    systemTokens: number(shape.systemTokens),
+    toolSchemaTokens: number(shape.toolSchemaTokens),
   };
 }
 

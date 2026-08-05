@@ -64,6 +64,22 @@ test("context maintenance coordinator repairs every view and defers compaction",
   assert.equal(prepared.messages.some((message) => message.role === "toolResult"), true);
 });
 
+test("context maintenance snips before pruning and remeasures before compaction", () => {
+  const messages = [
+    { role: "assistant", content: [{ type: "toolCall", id: "call-old", name: "inspect_target", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 1 },
+    { role: "toolResult", toolCallId: "call-old", toolName: "inspect_target", content: [{ type: "text", text: "old output " + "x".repeat(16_000) }], isError: false, timestamp: 2 },
+    { role: "assistant", content: [{ type: "toolCall", id: "call-latest", name: "report_status", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 3 },
+    { role: "toolResult", toolCallId: "call-latest", toolName: "report_status", content: [{ type: "text", text: "latest result" }], isError: false, timestamp: 4 },
+  ] as never[];
+  const prepared = prepareContextMaintenance({ messages, availableTokens: 6_000, messageBudget: 4_500 });
+  assert.equal(prepared.plan.stage, "snip");
+  assert.equal(prepared.plan.shouldPrune, false);
+  assert.equal(prepared.dropped.some((item) => item.kind === "tool_result_snip" && item.id === "call-old"), true);
+  assert.equal(prepared.dropped.some((item) => item.kind === "tool_exchange" || item.kind === "message"), false);
+  assert.equal(prepared.postPlan.shouldCompact, false);
+  assert.equal(prepared.nextAction, "none");
+});
+
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 }

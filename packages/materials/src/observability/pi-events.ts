@@ -1,5 +1,6 @@
 import type { AgentHarness, AgentHarnessEvent } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
+import { captureProviderPrefixShape, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { ContextManifest, Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
@@ -27,6 +28,7 @@ interface PendingProvider {
   contextEstimatedTokens?: number;
   contextManifestHash?: string;
   contextCache?: ContextManifest["cache"];
+  cachePrefix?: ProviderPrefixShape;
   responseStatus?: number;
 }
 
@@ -85,6 +87,11 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     });
     return undefined;
   });
+  const unsubscribePayload = harness.on("before_provider_payload", async (event) => {
+    const pending = providers.find((item) => item.responseStatus === undefined);
+    if (pending) pending.cachePrefix = captureProviderPrefixShape(event.payload);
+    return undefined;
+  });
   const unsubscribeEvents = harness.subscribe(async (event) => {
     if (event.type === "message_end" && isAssistantMessage(event.message)) {
       const pending = providers.shift();
@@ -101,6 +108,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         contextEstimatedTokens: pending?.contextEstimatedTokens,
         contextManifestHash: pending?.contextManifestHash,
         contextCache: pending?.contextCache,
+        cachePrefix: pending?.cachePrefix,
         usage: message.usage,
       });
       return;
@@ -155,6 +163,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   });
   return () => {
     unsubscribeEvents();
+    unsubscribePayload();
     unsubscribeAfter();
     unsubscribeBefore();
   };

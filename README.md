@@ -17,7 +17,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 支持 Auto 与 Assist 模式的模型驱动单 Agent 执行循环。
 - 确定性 Observer、带事实依据的完成提案和独立隐藏评分验证器。
 - 六个本地工作流测试靶场：三个合成 Web 任务和三个合成逆向任务。
-- 带预算的六层上下文、常驻指令/任务记忆分离、50/60/80/90% 分级维护、制品首尾检索、工具调用配对修复、空闲压缩、机械检查点和上下文溢出恢复。
+- 带预算的六层上下文、常驻指令/任务记忆分离、55/60/75/80/90% 分级维护、制品首尾检索、工具调用配对修复、空闲压缩、机械检查点和上下文溢出恢复。
 - 配置模型可用时启用的 Pi JSONL Session 适配器。
 - 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
@@ -69,6 +69,8 @@ npm run gui -- --config proofblade.config.json --port 4173
 对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停；Coding Agent 只把已启用能力装配到本轮。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
+
+右侧“缓存前缀”诊断直接从最终 Provider payload 计算 System/Developer 指令和 Tool Schema 的规范哈希，不保存提示正文。稳定率用于发现系统提示、工具名称、顺序或 Schema 在相邻请求间漂移；它只说明客户端前缀是否稳定。真实缓存命中仍以模型响应中的 `cacheRead / (input + cacheRead + cacheWrite)` 为准，两项指标应一起判断：前缀稳定但 `cacheRead` 不增长通常表示中转站或模型没有复用缓存，而前缀变化会直接指出 `system`、`tools` 或 `rewrite` 原因。
 
 缓存保留策略可在 GUI 的“中转站与模型”里按 Provider 配置：`short`（默认行为）、`long`（请求稳定的会话缓存键与更长 TTL）或 `none`。无 GUI 时也可在 `modelProfiles.executor.cacheRetention` 中设置；不同中转站是否返回缓存字段仍以 Provider 实际响应为准。对话旁会显示每轮的提示词总量、缓存读取和命中率，右侧指标显示累计值。
 

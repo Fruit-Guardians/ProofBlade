@@ -23,9 +23,12 @@ test("molecules extend atoms without application knowledge", async () => {
 
 test("context maintenance escalates deterministically", () => {
   assert.equal(planContextMaintenance(400, 1_000).stage, "stable");
-  assert.equal(planContextMaintenance(520, 1_000).stage, "notice");
-  assert.equal(planContextMaintenance(650, 1_000).stage, "snip");
-  assert.equal(planContextMaintenance(820, 1_000).stage, "prune");
+  assert.equal(planContextMaintenance(570, 1_000).stage, "notice");
+  const snip = planContextMaintenance(650, 1_000);
+  assert.equal(snip.stage, "snip");
+  assert.equal(snip.shouldPrune, false);
+  assert.equal(planContextMaintenance(760, 1_000).stage, "prune");
+  assert.equal(planContextMaintenance(820, 1_000).stage, "compact");
   const forced = planContextMaintenance(950, 1_000);
   assert.equal(forced.stage, "compact");
   assert.equal(forced.forceCompact, true);

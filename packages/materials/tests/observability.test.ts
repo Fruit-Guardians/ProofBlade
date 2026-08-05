@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { captureProviderPrefixShape } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
@@ -83,6 +84,28 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     const sparse = await telemetry.report(sparseRunId);
     assert.equal(sparse.provider.requestCount, 1);
     assert.equal(sparse.provider.responseCount, 1);
+
+    const prefixRunId = "OBSERVE-CACHE-PREFIX";
+    await services.control.createRun(prefixRunId, demoTask(prefixRunId, root, config));
+    const stablePrefix = captureProviderPrefixShape({ messages: [{ role: "system", content: "stable" }, { role: "user", content: "turn one" }], tools: [{ name: "read" }] });
+    const dynamicOnly = captureProviderPrefixShape({ messages: [{ role: "system", content: "stable" }, { role: "user", content: "turn two" }], tools: [{ name: "read" }] });
+    const changedTools = captureProviderPrefixShape({ messages: [{ role: "system", content: "stable" }, { role: "user", content: "turn three" }], tools: [{ name: "read" }, { name: "bash" }] });
+    await services.control.append(prefixRunId, [stablePrefix, dynamicOnly, changedTools].map((cachePrefix, index) => ({
+      schemaVersion: 1 as const,
+      lane: "executor" as const,
+      correlationId: `prefix-${index}`,
+      actor: "model" as const,
+      type: "model_usage" as const,
+      payload: { provider: "local", model: "fixture-model", cachePrefix, usage: { input: 1, output: 1, totalTokens: 2, cost: { total: 0 } } },
+    })));
+    const prefix = (await telemetry.report(prefixRunId)).provider.cachePrefix;
+    assert.equal(prefix.observedRequests, 3);
+    assert.equal(prefix.comparableRequests, 2);
+    assert.equal(prefix.stableRequests, 1);
+    assert.equal(prefix.changedRequests, 1);
+    assert.equal(prefix.stabilityRate, 0.5);
+    assert.deepEqual(prefix.changeReasons, { tools: 1 });
+    assert.equal(prefix.last?.toolCount, 2);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

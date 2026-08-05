@@ -6,4 +6,5 @@ export * from "./text-window.js";
 export * from "./context-maintenance.js";
 export * from "./prompt-cache.js";
 export * from "./cache-metrics.js";
+export * from "./provider-prefix.js";
 export * from "./capability.js";
