@@ -60,6 +60,15 @@ test("projects persisted provider failures into assistant conversation messages"
   assert.equal(messages[0]?.error, "Connection error.");
 });
 
+test("projects durable claim verification onto the matching assistant message", () => {
+  const projected = conversationMessagesFromEntries(entries, [{
+    type: "assistant_message",
+    payload: { text: "checking", claimVerification: { required: true, status: "unverified", reason: "missing reproduction" } },
+  }] as HarnessEvent[]);
+  assert.equal(projected[1]?.claimVerification?.status, "unverified");
+  assert.equal(projected[1]?.claimVerification?.reason, "missing reproduction");
+});
+
 test("rejects path-like run identifiers", () => {
   assert.doesNotThrow(() => assertRunId("RUN-001.safe"));
   assert.throws(() => assertRunId("../runs/other"));

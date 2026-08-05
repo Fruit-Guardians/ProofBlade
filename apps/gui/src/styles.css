@@ -159,6 +159,13 @@ code, pre, textarea { font-family: "Cascadia Code", "SFMono-Regular", Consolas, 
 .message-meta { display: flex; align-items: center; gap: 8px; min-height: 23px; }
 .message-meta strong { font-size: 10px; }
 .message-meta time, .message-meta > span { color: var(--faint); font: 8px/1 "Cascadia Code", monospace; }
+.message-meta .claim-status { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border: 1px solid; border-radius: 3px; font-weight: 700; }
+.message-meta .claim-status.verified { border-color: #2c694c; color: #70d6a4; background: #14251c; }
+.message-meta .claim-status.unverified { border-color: #785c32; color: #e3b665; background: #2a2216; }
+.claim-verification-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 8px 10px; border: 1px solid #785c32; border-radius: 4px; color: #e3b665; background: #241e14; font-size: 10px; line-height: 1.5; }
+.claim-verification-note svg { flex: none; margin-top: 1px; }
+.claim-verification-note span { display: grid; gap: 2px; }
+.claim-verification-note strong { color: #f0c97f; }
 .message-text { color: #cbd3ce; font-size: 11px; line-height: 19px; }
 .message-text p { margin: 5px 0 0; white-space: pre-wrap; word-break: break-word; }
 .message-text pre { position: relative; max-width: 100%; overflow: auto; margin: 9px 0 2px; padding: 10px 11px; border: 1px solid #29342e; border-radius: 5px; color: #bcd0c5; background: #0a0e0c; font-size: 10px; line-height: 17px; }

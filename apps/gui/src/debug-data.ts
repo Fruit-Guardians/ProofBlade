@@ -278,7 +278,7 @@ export class DebugDataService {
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
       }
-      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage() });
+      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
     } catch (error) {
       emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -306,11 +306,11 @@ export class DebugDataService {
           path: item.path,
           metadata: item.metadata,
           stats,
-          usage: usageFromMessages(conversationMessagesFromEntries(branch)),
+          usage: usageFromMessages(conversationMessagesFromEntries(branch, events)),
           entries,
           branchEntryIds: branch.map((entry) => entry.id),
           assistantTurns,
-          messages: conversationMessagesFromEntries(branch),
+          messages: conversationMessagesFromEntries(branch, events),
           toolCalls: correlateToolCalls(entries, events, snapshot, assistantTurns),
         };
       }));
@@ -374,7 +374,7 @@ export function assistantTurnsFromEntries(entries: readonly SessionEntryLike[]):
   return turns;
 }
 
-export function conversationMessagesFromEntries(entries: readonly SessionEntryLike[]): ChatMessageDebug[] {
+export function conversationMessagesFromEntries(entries: readonly SessionEntryLike[], events: readonly HarnessEvent[] = []): ChatMessageDebug[] {
   const messages: ChatMessageDebug[] = [];
   for (const entry of entries) {
     const message = asMessage(entry.message);
@@ -395,6 +395,12 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       usage: normalizeUsage(message.usage),
       raw: entry,
     });
+  }
+  const claimEvents = events.filter((event) => event.type === "assistant_message" && isRecord(event.payload?.claimVerification));
+  for (const event of [...claimEvents].reverse()) {
+    const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
+    const message = [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
+    if (message) message.claimVerification = event.payload?.claimVerification as ChatMessageDebug["claimVerification"];
   }
   return messages;
 }
@@ -478,6 +484,10 @@ function collectReferencedIds(values: unknown[], snapshot: RunSnapshot): Set<str
 
 function asMessage(value: unknown): MessageLike | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as MessageLike : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function asContent(value: unknown): ContentLike[] {

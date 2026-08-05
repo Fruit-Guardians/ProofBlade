@@ -11,15 +11,17 @@ import { Type } from "typebox";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
+import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["load_skill", "mcp_call"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "load_skill", "mcp_call"] as const;
 
 export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
+  claimVerifier: CodingClaimVerifier;
   outputRewrite?: {
     port: OutputRewritePort;
     artifactStore: ArtifactStore;
@@ -44,10 +46,44 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
 export function createCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
+    verifyClaimTool,
     loadSkillTool,
     mcpCallTool,
   ];
 }
+
+const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "verify_claim",
+  label: "verify_claim",
+  description: "Reproduce a final challenge answer with a deterministic workspace command. The command must derive and print the candidate without embedding the candidate literal. A match creates durable Artifact, Evidence, and accepted Completion records.",
+  parameters: Type.Object({
+    candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
+    command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
+    timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(toolCallId, params, signal, onUpdate, context) {
+    const input = params as { candidate: string; command: string; timeout?: number };
+    const candidate = input.candidate.trim();
+    const command = input.command.trim();
+    if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
+    if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
+    const executor = createBashTool<CodingResourceContext>();
+    const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, signal, onUpdate, context);
+    const output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+    if (!output.includes(candidate)) throw new Error("Reproduction output does not contain the exact candidate");
+    const reproduction = await context.claimVerifier.record({ candidate, command, cwd: context.env.cwd, output, toolCallId });
+    return toolResult({
+      verified: true,
+      candidateHash: reproduction.candidateHash,
+      commandHash: reproduction.commandHash,
+      artifactId: reproduction.artifactId,
+      evidenceId: reproduction.evidenceId,
+      completionId: reproduction.completionId,
+      output,
+    });
+  },
+};
 
 export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[] }): string[] {
   const selected = new Set(input.tools);

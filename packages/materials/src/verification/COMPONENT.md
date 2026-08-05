@@ -4,9 +4,9 @@
 {
   "id": "materials-verification",
   "name": "Independent Verifier",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-06T01:52:34+08:00"
 }
 ```
 
@@ -16,13 +16,16 @@
 
 ## 入口与边界
 
-- `verifier.ts` 执行配置次数的复现并产出报告。
+- `verifier.ts` 执行配置次数的隐藏 scorer 复现并产出报告。
+- `claim-verification.ts` 为普通 Coding 对话识别高风险确定性结论，并把成功命令复现记录成 Artifact、Evidence、Completion 与确认 Fact。
 - Solver/Planner 只能提出 candidate，不能确认成功。
 - 候选明文放在敏感 Artifact，事件只保留哈希和引用。
 
 ## 开发规则与验证
 
 验证失败保持显式、可重放且不泄漏 scorer 细节。修改接受条件时同步 Task Contract、评测协议和 Auto/Assist 测试。
+
+Coding 复现命令不得包含候选明文，命令输出必须包含与最终回答完全一致的候选；字符串扫描只能作为观察，不能单独形成 reproduction Evidence。
 
 ```powershell
 npm run eval

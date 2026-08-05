@@ -20,5 +20,12 @@ test("formats coding tool instructions and returned text for direct inspection",
   const mcp = toolPresentation("mcp_call", { operation: "call", server: "local", tool: "search", arguments: { query: "proof" } }, undefined);
   assert.equal(mcp.summary, "call · local · search");
   assert.equal(mcp.output, "等待返回");
+
+  const verification = toolPresentation("verify_claim", { candidate: "flag{derived}", command: "node solve.mjs" }, { details: { verified: true, evidenceId: "EV-1" } });
+  assert.equal(verification.summary, "复现最终结论");
+  assert.equal(verification.inputLabel, "复现指令");
+  assert.match(verification.input, /node solve\.mjs/);
+  assert.match(verification.input, /flag\{derived\}/);
+  assert.equal(verification.outputLabel, "验证记录");
   assert.equal(resultText({ result: { content: [{ type: "text", text: "nested" }] } }), "nested");
 });

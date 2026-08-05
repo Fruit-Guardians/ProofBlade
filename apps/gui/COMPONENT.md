@@ -4,9 +4,9 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T01:20:00+08:00"
+  "updatedAt": "2026-08-06T01:52:34+08:00"
 }
 ```
 
@@ -26,6 +26,7 @@
 - SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
+- 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
 
 ## 验证
 

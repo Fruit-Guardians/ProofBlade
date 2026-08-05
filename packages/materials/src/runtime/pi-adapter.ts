@@ -13,12 +13,14 @@ import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import { attachPiObservability } from "../observability/pi-events.js";
+import type { ClaimVerificationProjection } from "../verification/claim-verification.js";
 
 export interface AgentOutcome {
   text: string;
   stopReason: string;
   usage: AssistantMessage["usage"];
   errorMessage?: string;
+  claimVerification?: ClaimVerificationProjection;
 }
 
 export interface AgentLanePort {

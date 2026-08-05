@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
+import { NodeExecutionEnv, type AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
 import { canonicalJson, sha256 } from "@proofblade/atoms";
 import type { McpProjectRegistry, McpServerSummary } from "../src/mcp/registry.js";
 import {
@@ -13,19 +13,73 @@ import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "b55ba6a6040823808e013e23e8113171360b9b300343c3a89ed0602ae27293ca");
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "load_skill", "mcp_call"]);
+  assert.equal(sha256(canonicalJson(snapshot)), "a98846eb2565138efdf1dfb44ca04156e45c6ed9fffb1a6cc2a118e00e2e43b9");
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "load_skill", "mcp_call"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "load_skill", "mcp_call"]);
   assert.deepEqual(withResources, withoutResources);
+});
+
+test("coding claim verification rejects decoys and persists a matching reproduction", async () => {
+  assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
+  assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
+  assert.equal(requiresClaimVerification("修复 feature flag 的布尔判断"), false);
+  assert.equal(requiresClaimVerification("你好"), false);
+
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-claim-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "CODING-CLAIM-TEST";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const candidate = "flag{3d02c696a47d9e524d37241e33098bd0}";
+  await writeFile(join(dir, "decoy.txt"), "LCTF2026EV-ARM-GW-042\n", "utf8");
+  await writeFile(join(dir, "protected.bin"), Buffer.from(candidate, "utf8").map((byte) => byte ^ 0x5a));
+  await writeFile(join(dir, "solve.mjs"), "import { readFileSync } from 'node:fs';\nconst data = readFileSync('protected.bin');\nprocess.stdout.write(Buffer.from(data.map((byte) => byte ^ 0x5a)).toString('utf8'));\n", "utf8");
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts);
+  const context = {
+    env,
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    claimVerifier: verifier,
+  } as unknown as CodingResourceContext;
+  try {
+    await assert.rejects(
+      () => executeTool("verify_claim", { candidate, command: `echo ${candidate}` }, context),
+      /embeds the candidate literal/,
+    );
+    const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs" }, context);
+    const details = result.details as Record<string, unknown>;
+    assert.equal(details.verified, true);
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 1);
+    assert.equal(Object.values(snapshot.completions).filter((item) => item.status === "ACCEPTED").length, 1);
+    assert.equal(Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").length, 1);
+    assert.ok(snapshot.artifacts[String(details.artifactId)]);
+    assert.equal(verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`).status, "verified");
+    assert.equal(verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042").status, "unverified");
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("coding resource proxies enforce conversation enablement and route MCP lazily", async () => {

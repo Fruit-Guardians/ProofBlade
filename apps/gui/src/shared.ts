@@ -1,4 +1,4 @@
-import type { HarnessEvent, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { ClaimVerificationProjection, HarnessEvent, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -179,6 +179,7 @@ export interface ChatMessageDebug {
   stopReason?: string;
   error?: string;
   usage?: TokenUsage;
+  claimVerification?: ClaimVerificationProjection;
   raw: unknown;
 }
 
@@ -226,7 +227,7 @@ export type ChatStreamEvent =
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
   | { type: "tool_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "context_snapshot"; messages: number; tools: number; systemPromptChars: number; messageChars: number; toolSchemaChars: number; estimatedVisibleTokens: number }
-  | { type: "done"; text: string; stopReason: string; usage: TokenUsage }
+  | { type: "done"; text: string; stopReason: string; usage: TokenUsage; claimVerification?: ClaimVerificationProjection }
   | { type: "error"; error: string };
 
 export interface RunDetail {
