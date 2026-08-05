@@ -27,7 +27,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 
-Provider, model, thinking level and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort` and `maxTokensField`. API keys are read only from the environment variable named by `apiKeyEnv`, and source code contains no concrete model id. Pi 0.83.0 declares Node.js 22.19 or newer.
+Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI can discover and select models, and stores its override plus API key only in the user's `.proofblade/gui-provider.json`; neither the repository nor API responses receive the key. Pi 0.83.0 declares Node.js 22.19 or newer.
 
 ## Quick start
 
@@ -59,6 +59,8 @@ npm run gui -- --config proofblade.config.json --port 4173
 ```
 
 Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates an ordinary coding-agent session with no Fixture and drives the configured real model through SSE, with workspace `read`, `bash`, `edit`, and `write` tools available on demand. "Fixture test" is a separate entry point for interactive debugging or automatic execution; only that path loads the target sandbox, evidence gates, and recovery workflow. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream.
+
+The gear button opens Provider settings for an OpenAI-compatible Base URL and API key, `/models` discovery, model selection, and thinking level. On Windows, the local file defaults to `%USERPROFILE%\.proofblade\gui-provider.json`. API responses expose only `hasApiKey`, never the key value. Saved settings apply to the next turn without changing a checked-in file.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;

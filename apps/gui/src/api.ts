@@ -1,4 +1,4 @@
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, RunDetail, RunListItem } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem } from "./shared.js";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -6,6 +6,18 @@ export async function getBootstrap(): Promise<BootstrapData> {
 
 export async function getRuns(): Promise<RunListItem[]> {
   return await request("/api/runs");
+}
+
+export async function getProviderSettings(): Promise<ProviderSettings> {
+  return await request("/api/provider");
+}
+
+export async function discoverProviderModels(input: { baseUrl: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
+  return await request("/api/provider/models", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function updateProviderSettings(input: ProviderSettingsInput): Promise<ProviderSettings> {
+  return await request("/api/provider", { method: "PUT", body: JSON.stringify(input) });
 }
 
 export async function getRun(runId: string): Promise<RunDetail> {

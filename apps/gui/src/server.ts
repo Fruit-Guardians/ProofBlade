@@ -4,13 +4,17 @@ import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
 import { loadConfig } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
+import { ProviderSettingsStore } from "./provider-settings.js";
+import type { ProviderSettingsInput, ProviderThinkingLevel } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(option("--project-root") ?? process.env.PROOFBLADE_ROOT ?? resolve(guiRoot, "../.."));
 const configPath = option("--config") ?? process.env.PROOFBLADE_CONFIG ?? "proofblade.config.json";
-const port = Number(option("--port") ?? process.env.PORT ?? 4173);
+const port = Number(option("--port") ?? positionalPort() ?? process.env.PORT ?? 4173);
 const host = option("--host") ?? process.env.HOST ?? "127.0.0.1";
 const config = await loadConfig(projectRoot, configPath);
+const providerSettings = await ProviderSettingsStore.create(config);
+config.modelProfiles.executor = providerSettings.modelProfile();
 const data = new DebugDataService(projectRoot, config, configPath);
 let vite: Awaited<ReturnType<typeof createViteServer>>;
 
@@ -43,6 +47,20 @@ server.listen(port, host, () => {
 async function api(method: string, url: URL, request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse): Promise<void> {
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (method === "GET" && url.pathname === "/api/bootstrap") return sendJson(response, 200, data.bootstrap());
+  if (method === "GET" && url.pathname === "/api/provider") return sendJson(response, 200, providerSettings.publicSettings());
+  if (method === "POST" && url.pathname === "/api/provider/models") {
+    const body = await readBody(request);
+    return sendJson(response, 200, await providerSettings.discover({
+      baseUrl: optionalString(body.baseUrl),
+      apiKey: optionalString(body.apiKey),
+    }));
+  }
+  if (method === "PUT" && url.pathname === "/api/provider") {
+    const body = await readBody(request);
+    const saved = await providerSettings.save(providerInput(body));
+    data.updateModelProfile(providerSettings.modelProfile());
+    return sendJson(response, 200, saved);
+  }
   if (method === "GET" && url.pathname === "/api/runs") return sendJson(response, 200, await data.listRuns());
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
@@ -131,7 +149,26 @@ function string(value: unknown, label: string): string {
   return value.trim();
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
+  return {
+    provider: string(body.provider, "provider"),
+    baseUrl: string(body.baseUrl, "baseUrl"),
+    model: string(body.model, "model"),
+    thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
+    apiKey: optionalString(body.apiKey),
+    clearApiKey: body.clearApiKey === true,
+  };
+}
+
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function positionalPort(): string | undefined {
+  return process.argv.slice(2).find((value) => /^\d+$/.test(value));
 }

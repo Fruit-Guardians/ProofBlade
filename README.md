@@ -27,7 +27,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
 
-Provider、模型、思考级别和 OpenAI 兼容参数由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`，源码中不包含具体模型 ID。API key 只通过 `apiKeyEnv` 指向的环境变量读取。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
+Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 右上角的 Provider 设置可查询并选择模型，其覆盖配置和 Key 只写入用户目录 `.proofblade/gui-provider.json`，不会进入仓库或 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
 ## 快速开始
 
@@ -59,6 +59,8 @@ npm run gui -- --config proofblade.config.json --port 4173
 ```
 
 打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”创建不绑定 Fixture 的普通 Coding Agent 会话，通过 SSE 调用配置文件中的真实模型，并按需使用工作区 `read`、`bash`、`edit` 和 `write` 工具。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
+
+右上角齿轮打开 Provider 设置，可填写 OpenAI-compatible Base URL 和 API Key、读取 `/models`、选择模型与思考等级。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后下一轮对话立即使用新配置，无需改动仓库文件。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；

@@ -2,7 +2,7 @@
 
 ## 启动
 
-GUI 是 `apps/gui` 应用层，不保存独立业务状态。它默认读取项目根目录的 `proofblade.config.json`，模型和 Provider 仍完全由配置文件决定。
+GUI 是 `apps/gui` 应用层，不保存独立 Run 业务状态。它默认读取项目根目录的 `proofblade.config.json` 作为基础配置，并从用户目录 `.proofblade/gui-provider.json` 加载 GUI 专用的 Provider 覆盖。
 
 ```powershell
 npm install
@@ -19,7 +19,19 @@ npm run gui -- --config proofblade.config.json --port 4173
 | `--config` | `proofblade.config.json` | ProofBlade 配置文件 |
 | `--project-root` | 仓库根目录 | 运行数据与配置根目录 |
 
-对应环境变量为 `PORT`、`HOST`、`PROOFBLADE_CONFIG` 和 `PROOFBLADE_ROOT`。服务只把 Provider 名称、模型配置值、Base URL 和思考等级作为界面摘要；`apiKeyEnv` 对应的环境变量值不会进入 API 响应。
+对应环境变量为 `PORT`、`HOST`、`PROOFBLADE_CONFIG` 和 `PROOFBLADE_ROOT`。服务只把 Provider 名称、模型配置值、Base URL、思考等级和 `hasApiKey` 作为界面数据；环境变量或用户配置中的 Key 内容不会进入 API 响应。
+
+## Provider 设置
+
+工作区右上角齿轮打开 Provider 设置。它支持 OpenAI-compatible Provider 名称、Base URL、API Key、`/models` 模型发现、模型选择和 Pi 思考等级。保存时只覆盖模型 Profile，不改写 `proofblade.config.json`，后续新 turn 会立即读取覆盖值。
+
+Windows 默认路径为：
+
+```text
+%USERPROFILE%\.proofblade\gui-provider.json
+```
+
+Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`GET /api/provider` 只返回 `hasApiKey` 布尔值；设置弹窗的密码输入框不会回填已保存内容。清除 Key 使用独立复选框。
 
 ## 真实模型对话
 
@@ -133,6 +145,9 @@ return {
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
 | `GET` | `/api/bootstrap` | Fixture、模型摘要、刷新间隔 |
+| `GET` | `/api/provider` | 当前 GUI Provider 覆盖与 `hasApiKey` |
+| `POST` | `/api/provider/models` | 使用表单 Base URL 和本地 Key 读取模型列表 |
+| `PUT` | `/api/provider` | 保存用户目录 Provider 覆盖并热更新运行时 |
 | `GET` | `/api/runs` | Run 摘要列表 |
 | `GET` | `/api/runs/:id` | Snapshot、Events、Telemetry、Pi Sessions 与 Tool 投影 |
 | `GET` | `/api/runs/:id/artifacts/:artifactId` | 校验引用后读取 Artifact 文本 |
@@ -154,4 +169,4 @@ npm run build:web --workspace=@proofblade/gui
 npm test
 ```
 
-GUI 单元测试覆盖 Tool/Result/Telemetry/Artifact/Evidence 关联、pending 调用和 Run ID 边界。浏览器回归应至少覆盖 1440px 桌面与 390px 移动视口、Script Lab 执行、抽屉交互、控制台错误和页面溢出。
+GUI 单元测试覆盖 Tool/Result/Telemetry/Artifact/Evidence 关联、pending 调用、Run ID 边界、Provider 本地持久化、Key 响应脱敏和带 Bearer 凭据的模型发现。浏览器回归应至少覆盖 1440px 桌面与 390px 移动视口、Provider 设置、真实对话、Script Lab 执行、抽屉交互、控制台错误和页面溢出。

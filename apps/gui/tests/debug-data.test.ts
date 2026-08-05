@@ -47,6 +47,17 @@ test("projects user and assistant Pi entries into a conversation without tool-re
   assert.deepEqual(messages[1]?.toolCallIds, ["call-1"]);
 });
 
+test("projects persisted provider failures into assistant conversation messages", () => {
+  const messages = conversationMessagesFromEntries([{
+    type: "message",
+    id: "assistant-error",
+    timestamp: "2026-08-05T00:00:03.000Z",
+    message: { role: "assistant", content: [], stopReason: "error", errorMessage: "Connection error." },
+  }]);
+  assert.equal(messages[0]?.stopReason, "error");
+  assert.equal(messages[0]?.error, "Connection error.");
+});
+
 test("rejects path-like run identifiers", () => {
   assert.doesNotThrow(() => assertRunId("RUN-001.safe"));
   assert.throws(() => assertRunId("../runs/other"));

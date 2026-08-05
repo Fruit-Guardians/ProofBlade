@@ -15,6 +15,7 @@ import {
   listFixtureProfiles,
   type AppServices,
   type HarnessEvent,
+  type ModelProfileConfig,
   type ProofBladeConfig,
   type RunSnapshot,
   type TaskContract,
@@ -45,6 +46,7 @@ interface MessageLike {
   provider?: string;
   model?: string;
   stopReason?: string;
+  errorMessage?: string;
   usage?: unknown;
   toolCallId?: string;
   toolName?: string;
@@ -74,6 +76,10 @@ export class DebugDataService {
     private readonly configPath: string,
   ) {
     this.services = createServices(root, config);
+  }
+
+  public updateModelProfile(profile: ModelProfileConfig): void {
+    this.config.modelProfiles.executor = { ...profile, input: [...profile.input] };
   }
 
   public bootstrap(): BootstrapData {
@@ -256,6 +262,10 @@ export class DebugDataService {
         });
       }
       const outcome = await lane.prompt(text);
+      if (outcome.errorMessage || outcome.stopReason === "error") {
+        emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
+        return;
+      }
       emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: outcome.usage });
     } catch (error) {
       emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
@@ -368,6 +378,7 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       provider: message.provider,
       model: message.model,
       stopReason: message.stopReason,
+      error: message.errorMessage,
       usage: message.usage,
       raw: entry,
     });

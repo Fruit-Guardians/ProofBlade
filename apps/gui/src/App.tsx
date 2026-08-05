@@ -1,13 +1,13 @@
 import {
   Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
   CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Gauge, History,
-  Layers3, Menu, MessageSquare, PanelRight, Pause, Play, Plus, RefreshCw, RotateCcw, Search,
-  Send, ServerCog, ShieldCheck, TerminalSquare, UserRound, Wrench, X, Zap,
+  KeyRound, Layers3, Menu, MessageSquare, PanelRight, Pause, Play, Plus, RefreshCw, RotateCcw, Search,
+  Send, ServerCog, Settings, ShieldCheck, TerminalSquare, UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { createCheckpoint, createConversation, createFixtureConversation, getArtifact, getBootstrap, getRun, getRuns, reconcileRun, startSolve, streamChat } from "./api.js";
+import { createCheckpoint, createConversation, createFixtureConversation, discoverProviderModels, getArtifact, getBootstrap, getProviderSettings, getRun, getRuns, reconcileRun, startSolve, streamChat, updateProviderSettings } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, PiSessionDebug, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, PiSessionDebug, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -65,6 +65,7 @@ export function App() {
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
   const [fixtureOpen, setFixtureOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -83,7 +84,7 @@ export function App() {
     try {
       const next = await getRun(selected);
       setDetail(next);
-      setError(undefined);
+      if (!quiet) setError(undefined);
     } catch (caught) {
       setError(message(caught));
     } finally {
@@ -171,6 +172,7 @@ export function App() {
         <div className="header-actions">
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
           {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
+          <button className="icon-button" title="Provider 设置" aria-label="Provider 设置" onClick={() => setProviderOpen(true)}><Settings size={17} /></button>
           <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll()}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
           <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
         </div>
@@ -199,6 +201,7 @@ export function App() {
     </aside>
     {newRunOpen && <NewConversationModal onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setRunId(id); void refreshRuns(); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
+    {providerOpen && <ProviderSettingsModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
   </div>;
 }
 
@@ -220,6 +223,8 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
   const [liveText, setLiveText] = useState("");
   const [liveThinking, setLiveThinking] = useState("");
   const [liveTools, setLiveTools] = useState<LiveToolCall[]>([]);
+  const [failedUser, setFailedUser] = useState<string>();
+  const [turnError, setTurnError] = useState<string>();
   const [selectedCallId, setSelectedCallId] = useState<string>();
   const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
   const latestAssistant = session?.messages.slice().reverse().find((item) => item.role === "assistant");
@@ -234,6 +239,10 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
     const element = thread.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [session?.messages.length, liveText, liveTools.length, pendingUser]);
+  useEffect(() => {
+    if (!failedUser || !session?.messages.some((item) => item.role === "user" && item.text === failedUser)) return;
+    setFailedUser(undefined);
+  }, [failedUser, session?.messages]);
 
   const submit = async () => {
     const prompt = draft.trim();
@@ -243,6 +252,8 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
     setLiveText("");
     setLiveThinking("");
     setLiveTools([]);
+    setFailedUser(undefined);
+    setTurnError(undefined);
     setSending(true);
     let streamError: string | undefined;
     let receivedTextDelta = false;
@@ -258,10 +269,19 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
         if (event.type === "done" && !receivedTextDelta) setLiveText(event.text);
         if (event.type === "error") streamError = event.error;
       });
-      if (streamError) onError(streamError);
       await onRefresh();
+      if (streamError) {
+        setFailedUser(prompt);
+        setDraft(prompt);
+        setTurnError(streamError);
+        onError(streamError);
+      }
     } catch (error) {
-      onError(message(error));
+      const failure = message(error);
+      setFailedUser(prompt);
+      setDraft(prompt);
+      setTurnError(failure);
+      onError(failure);
     } finally {
       setSending(false);
       setPendingUser(undefined);
@@ -274,7 +294,7 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
   return <div className={`conversation-page ${selectedCall ? "inspector-open" : ""}`}>
     <div className="conversation-main">
       <div className="conversation-toolbar">
-        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{detail.active?.state === "running" || sending ? "生成中" : "在线"}</span></div>
+        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{detail.active?.state === "running" || sending ? "生成中" : "就绪"}</span></div>
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model">{latestAssistant?.model ?? detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness"}</span>
       </div>
@@ -288,15 +308,18 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
               <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}</div>
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
+              {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
               {calls.length > 0 && <div className="message-tools">{calls.map((call) => <button key={call.id} className={`message-tool tool-${call.status} ${selectedCallId === call.id ? "selected" : ""}`} onClick={() => setSelectedCallId(call.id)}><span>{call.status === "success" ? <Check size={13} /> : call.status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.telemetry.result?.payload?.durationMs ? `${call.telemetry.result.payload.durationMs} ms` : call.status}</em><ChevronRight size={13} /></button>)}</div>}
             </div>
           </article>;
         })}
         {pendingUser && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送中</span></div><MessageText text={pendingUser} /></div></article>}
+        {failedUser && !pendingUser && <article className="chat-message role-user failed-message"><div className="message-avatar"><CircleAlert size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送失败，内容已放回输入框</span></div><MessageText text={failedUser} /></div></article>}
         {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <div key={call.id} className={`message-tool tool-${call.status}`}><span>{call.status === "running" ? <RefreshCw className="spin" size={13} /> : call.status === "success" ? <Check size={13} /> : <CircleAlert size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.status}</em></div>)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
       </div>
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
+        {turnError && <div className="turn-error"><CircleAlert size={14} /><span>{turnError}</span><button title="关闭" aria-label="关闭发送错误" onClick={() => setTurnError(undefined)}><X size={13} /></button></div>}
         <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · {session?.stats.totalTokens ?? 0} tokens</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
@@ -453,6 +476,86 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
     <section><div className="metrics-title"><FlaskConical size={14} />配置</div><MetricLine label="Provider" value={bootstrap?.model.provider ?? "--"} /><MetricLine label="Model" value={bootstrap?.model.model ?? "--"} /><MetricLine label="Thinking" value={bootstrap?.model.thinkingLevel ?? "off"} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
+  </div>;
+}
+
+function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(): Promise<void> }) {
+  const [provider, setProvider] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("");
+  const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
+  const [models, setModels] = useState<string[]>([]);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [clearApiKey, setClearApiKey] = useState(false);
+  const [localPath, setLocalPath] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [discovering, setDiscovering] = useState(false);
+  const [online, setOnline] = useState<boolean>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    void getProviderSettings().then((settings) => {
+      if (!active) return;
+      setProvider(settings.provider);
+      setBaseUrl(settings.baseUrl);
+      setModel(settings.model);
+      setThinkingLevel(settings.thinkingLevel);
+      setHasApiKey(settings.hasApiKey);
+      setLocalPath(settings.localPath);
+    }).catch((caught) => active && setError(message(caught))).finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  const discover = async () => {
+    setDiscovering(true); setError(undefined); setOnline(undefined);
+    try {
+      const result = await discoverProviderModels({ baseUrl, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
+      setModels(result.models);
+      setBaseUrl(result.baseUrl);
+      setOnline(true);
+      if (model === "auto" || !result.models.includes(model)) setModel(result.models[0] ?? model);
+    } catch (caught) { setOnline(false); setError(message(caught)); } finally { setDiscovering(false); }
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try {
+      const saved = await updateProviderSettings({
+        provider,
+        baseUrl,
+        model,
+        thinkingLevel,
+        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        clearApiKey,
+      });
+      setHasApiKey(saved.hasApiKey);
+      setApiKey("");
+      await onSaved();
+      onClose();
+    } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+
+  const modelOptions = [...new Set([model, ...models].filter(Boolean))];
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <form className="modal provider-modal" onSubmit={(event) => void submit(event)}>
+      <header><div><Settings size={17} /><strong>Provider 设置</strong>{online !== undefined && <span className={`provider-state ${online ? "online" : "offline"}`}><i />{online ? "已连接" : "连接异常"}</span>}</div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>
+      {error && <div className="script-error">{error}</div>}
+      {loading ? <div className="provider-loading"><RefreshCw className="spin" size={19} />正在读取配置</div> : <>
+        <div className="provider-grid">
+          <label><span>Provider</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label>
+          <label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label>
+        </div>
+        <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setOnline(undefined); }} placeholder="http://127.0.0.1:1234/v1" /></label>
+        <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
+        {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
+        <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{modelOptions.map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}读取模型</button></div></label>
+        <div className="provider-local-path"><code>{localPath}</code></div>
+      </>}
+      <footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={loading || busy || !model}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存</button></footer>
+    </form>
   </div>;
 }
 

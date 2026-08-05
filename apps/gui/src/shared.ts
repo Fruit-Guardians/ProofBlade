@@ -11,6 +11,31 @@ export interface BootstrapData {
   refreshIntervalMs: number;
 }
 
+export type ProviderThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+export interface ProviderSettings {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  thinkingLevel: ProviderThinkingLevel;
+  hasApiKey: boolean;
+  localPath: string;
+}
+
+export interface ProviderSettingsInput {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  thinkingLevel: ProviderThinkingLevel;
+  apiKey?: string;
+  clearApiKey?: boolean;
+}
+
+export interface ModelDiscoveryResult {
+  models: string[];
+  baseUrl: string;
+}
+
 export interface ActiveRunInfo {
   runId: string;
   startedAt: string;
@@ -56,6 +81,7 @@ export interface ChatMessageDebug {
   provider?: string;
   model?: string;
   stopReason?: string;
+  error?: string;
   usage?: unknown;
   raw: unknown;
 }
