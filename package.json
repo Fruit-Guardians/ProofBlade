@@ -18,6 +18,7 @@
     "test:atoms": "npm run build --workspace=@proofblade/atoms && npm run test --workspace=@proofblade/atoms",
     "test:molecules": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run test --workspace=@proofblade/molecules",
     "test:materials": "npm run build && npm run test --workspace=@proofblade/materials",
+    "verify": "npm test && npm run eval && npm audit --omit=dev",
     "cli": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts",
     "eval": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts eval",
     "demo": "npm run cli -- run demo",

@@ -32,7 +32,7 @@ Base Provider, model, thinking-level, and OpenAI compatibility settings live in 
 ## Quick start
 
 ```powershell
-npm install
+npm ci
 npm run build
 npm run cli -- run demo DEMO-001
 npm run cli -- fixtures
@@ -48,6 +48,8 @@ npm run test:atoms
 npm run test:molecules
 npm run eval
 ```
+
+Start from a clean checkout with `npm ci`; it installs exactly what `package-lock.json` records. When dependencies change, commit both `package.json` and the lockfile, then run `npm run verify` before merging.
 
 Runs and artifacts are written below `runs/`. Downloads and source snapshots belong in `tmp/`; the repository ignores that directory by default.
 

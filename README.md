@@ -32,7 +32,7 @@ Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofbla
 ## 快速开始
 
 ```powershell
-npm install
+npm ci
 npm run build
 npm run cli -- run demo DEMO-001
 npm run cli -- fixtures
@@ -48,6 +48,8 @@ npm run test:atoms
 npm run test:molecules
 npm run eval
 ```
+
+团队成员从干净工作区开始使用 `npm ci`，它严格按 `package-lock.json` 安装依赖。修改依赖后提交 `package.json` 和锁文件，并在合并前运行 `npm run verify`。
 
 运行数据和制品写入 `runs/`。下载内容和外部源码快照统一放在 `tmp/`，该目录默认被 Git 忽略。
 

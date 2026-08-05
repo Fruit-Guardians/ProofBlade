@@ -1,0 +1,10 @@
+# Replace these paths with GitHub team handles when the project has dedicated teams.
+# The repository owner remains the default reviewer until then.
+* @mansujiaosheng
+
+/packages/atoms/ @mansujiaosheng
+/packages/molecules/ @mansujiaosheng
+/packages/materials/ @mansujiaosheng
+/apps/cli/ @mansujiaosheng
+/apps/gui/ @mansujiaosheng
+/docs/ @mansujiaosheng

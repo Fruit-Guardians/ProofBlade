@@ -5,7 +5,7 @@
 GUI 是 `apps/gui` 应用层，不保存独立 Run 业务状态。它默认读取项目根目录的 `proofblade.config.json` 作为基础配置，并从用户目录 `.proofblade/gui-provider.json` 加载多个 GUI Provider Profile，从 `.proofblade/gui-workspace.json` 加载文件夹和会话偏好。
 
 ```powershell
-npm install
+npm ci
 npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
