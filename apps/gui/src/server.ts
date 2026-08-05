@@ -278,7 +278,7 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
     ...(body.folderId === null ? { folderId: undefined } : typeof body.folderId === "string" ? { folderId: body.folderId } : {}),
     ...(typeof body.profileId === "string" ? { profileId: body.profileId } : {}),
     ...(typeof body.model === "string" ? { model: body.model } : {}),
-    ...(typeof body.thinkingLevel === "string" ? { thinkingLevel: body.thinkingLevel as ProviderThinkingLevel } : {}),
+    ...(body.thinkingLevel !== undefined ? { thinkingLevel: providerThinkingLevel(body.thinkingLevel, "thinkingLevel") } : {}),
     ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
     ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
     ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),
@@ -287,6 +287,12 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function providerThinkingLevel(value: unknown, label: string): ProviderThinkingLevel {
+  const level = string(value, label);
+  if (!["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(level)) throw new Error(`${label} is invalid`);
+  return level as ProviderThinkingLevel;
 }
 
 function option(name: string): string | undefined {

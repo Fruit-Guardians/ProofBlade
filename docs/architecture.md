@@ -60,9 +60,11 @@ The Drive Loop is the sole active phase coordinator. In Auto mode it sends a pro
 
 ## Capabilities and background jobs
 
-The provider sees a fixed `invoke_capability` schema rather than a changing list of every plugin operation. `list_capabilities` returns the bundled manifest and canonical catalog hash; the router validates the capability id, operation, argument keys and replay policy before mapping it to a journaled sandbox operation. Target results are wrapped as untrusted observations and linked to deterministic Observation/Evidence records; artifact reads remain retrieval-only.
+The provider sees a fixed `invoke_capability` schema rather than a changing list of every plugin operation. `list_capabilities` returns the bundled manifest and canonical catalog hash; the router validates the capability id, operation, argument keys and replay policy before mapping it to a journaled sandbox operation. Target and Web results are wrapped as untrusted observations and linked to deterministic Observation/Evidence records; artifact reads remain retrieval-only.
 
-`run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; forbidden replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
+`proofblade.web.request` forms a scoped network boundary inside the router. The model supplies only an origin-relative path plus bounded method/header/body options. The host selects the origin from the active Fixture or immutable task target, applies host/port/external-network policy, rejects credentials, does not follow redirects, and records only redacted request metadata in Control events. The full bounded result crosses the Artifact barrier. Network replay is manual, so an interrupted request without an Artifact becomes `UNKNOWN`.
+
+`run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Successful background capability results pass through the same deterministic Observer before job completion. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; unsafe replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
 
 ## Planner and executor handoff
 
@@ -70,7 +72,7 @@ The planner lane currently uses a deterministic coordinator rather than an addit
 
 ## Evaluation gate
 
-`FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane. It reports per-case status, evidence-backed completion, replay projection parity and candidate plaintext leakage, then hashes the complete report. `proofblade eval` and `npm run eval` are provider-free pre-push checks; LM Studio is reserved for a separate live smoke run.
+`FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane. Web profiles execute against recoverable loopback Node HTTP services and expose candidates only in live responses; Reverse profiles remain file-backed. The runner reports per-case status, evidence-backed completion, replay projection parity and candidate plaintext leakage, then hashes the complete report. `proofblade eval` and `npm run eval` are provider-free pre-push checks; LM Studio is reserved for a separate live smoke run.
 
 ## Durable observability
 

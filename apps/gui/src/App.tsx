@@ -537,7 +537,6 @@ function Artifacts({ detail }: { detail: RunDetail }) {
 
 function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: BootstrapData }) {
   const { telemetry, snapshot } = detail;
-  const contextWindow = snapshot.versionSnapshot ? 1 : 1;
   const sessionUsage = detail.sessions.reduce((total, session) => ({
     input: total.input + session.usage.input,
     output: total.output + session.usage.output,
@@ -553,6 +552,7 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
   const tokenReasoning = hasSessionUsage ? sessionUsage.reasoning : telemetry.provider.tokens.reasoning;
   const tokenCacheRead = hasSessionUsage ? sessionUsage.cacheRead : telemetry.provider.tokens.cacheRead;
   const tokenTotal = hasSessionUsage ? sessionUsage.total : telemetry.provider.tokens.total;
+  const contextWindow = bootstrap?.model.contextWindow ?? Math.max(tokenTotal, 1);
   const effects = Object.values(snapshot.effects);
   return <div className="metrics-content">
     <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>

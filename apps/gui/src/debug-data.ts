@@ -94,6 +94,7 @@ export class DebugDataService {
         model: profile.model,
         baseUrl: profile.baseUrl,
         thinkingLevel: profile.thinkingLevel ?? "off",
+        contextWindow: profile.contextWindow,
       },
       fixtures: listFixtureProfiles().map(({ id, targetKind, description }) => ({ id, targetKind, description })),
       refreshIntervalMs: 2_000,

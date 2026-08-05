@@ -63,7 +63,7 @@ export class PiCodingLane implements AgentLanePort {
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     const tools = createCodingTools();
     const activeToolNames = codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers] });
-    const toolContext: CodingResourceContext = { env, skills, mcp, enabledMcpServers };
+    const toolContext: CodingResourceContext = { env, skills, enabledSkills, mcp, enabledMcpServers };
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,

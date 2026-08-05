@@ -16,10 +16,10 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Reasonix-style append-only context keeps each Solver turn's changing state as a persisted suffix instead of rewriting the history prefix; `cacheRetention` remains configurable per model profile.
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
-- Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
+- Six local workflow fixtures: three synthetic Web tasks backed by recoverable Node HTTP services and three synthetic Reverse tasks.
 - Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 50/60/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
-- Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
+- Stable capability catalog with canonical hashes, journaled `invoke_capability`, task-scoped `proofblade.web`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
 - Project MCP stdio with `.mcp.json`, lazy discovery, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.

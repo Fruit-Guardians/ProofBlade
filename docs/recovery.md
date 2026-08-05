@@ -25,7 +25,9 @@ ProofBlade 将恢复看作 Orchestrator 的确定性工作，而不是让模型�
 
 lease 释放携带 `ownerLane` 和 `generation`。回收前再次读取当前 lease，避免旧 Worker 删除后来获得的新一代 lease；已经过期的 lease 也不能通过迟到 heartbeat 续期。
 
-Fixture 健康状态分为 `healthy`、`missing`、`unhealthy` 和 `generation-drift`。缺目录、缺可见目标、缺 scorer、缺 generation marker 或 Control Store 代次不一致都会触发重建。重建后的 generation 严格大于已记录代次，从而使旧证据和旧 Effect 可被识别。
+Fixture 健康状态分为 `healthy`、`missing`、`unhealthy` 和 `generation-drift`。缺目录、缺可见目标、缺 scorer、缺 generation marker、HTTP 服务缺失/过期或 Control Store 代次不一致都会触发重建。HTTP Fixture 在宿主进程中绑定临时 loopback 端口；进程状态丢失后会启动新服务、清空路由运行状态并递增 generation，`destroy` 关闭服务但保留文件供审计。重建后的 generation 严格大于已记录代次，从而使旧证据和旧 Effect 可被识别。
+
+`proofblade.web` Effect 使用 `manual` 重放。若请求已完成并跨过 artifact 提交屏障，恢复采用该结果；若只处于 `PROPOSED`/`STARTED` 且没有结果制品，恢复标记为 `UNKNOWN`，不会自动再次发送网络请求。
 
 ## Pi compaction 两阶段提交
 

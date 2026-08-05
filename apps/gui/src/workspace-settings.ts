@@ -19,6 +19,8 @@ interface LocalWorkspaceFile {
   conversations: Record<string, StoredConversationPreferences>;
 }
 
+const thinkingLevels = new Set<ProviderThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
 export class WorkspaceSettingsStore {
   private folders: ConversationFolder[] = [];
   private conversations: Record<string, StoredConversationPreferences> = {};
@@ -133,7 +135,7 @@ function validatePreferences(value: unknown): StoredConversationPreferences {
     ...(typeof input.folderId === "string" && input.folderId ? { folderId: input.folderId } : {}),
     ...(typeof input.profileId === "string" && input.profileId ? { profileId: input.profileId } : {}),
     ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
-    ...(typeof input.thinkingLevel === "string" ? { thinkingLevel: input.thinkingLevel } : {}),
+    ...(typeof input.thinkingLevel === "string" && thinkingLevels.has(input.thinkingLevel) ? { thinkingLevel: input.thinkingLevel } : {}),
     ...(Array.isArray(input.enabledTools) ? { enabledTools: normalizeList(input.enabledTools) } : {}),
     ...(Array.isArray(input.enabledSkills) ? { enabledSkills: normalizeList(input.enabledSkills) } : {}),
     ...(Array.isArray(input.enabledMcpServers) ? { enabledMcpServers: normalizeList(input.enabledMcpServers) } : {}),

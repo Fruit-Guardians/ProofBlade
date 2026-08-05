@@ -8,6 +8,7 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { LocalFixtureSandbox } from "../src/sandbox/fixture.js";
 import type { EffectFaultPoint } from "../src/effects/effect-journal.js";
+import { fixtureTask } from "../src/app/fixture-task.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -108,6 +109,37 @@ test("leases enforce ownership and fixture generation survives process state", a
     assert.equal(reopened.generation, firstGeneration);
     assert.equal(await secondSandbox.reset(reopened), firstGeneration + 1);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("HTTP fixtures are health-checked, rebuilt after process loss, and released on destroy", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-http-fixture-"));
+  const task = fixtureTask("HTTP-FIXTURE-001", "web-source-1", root, config);
+  const firstSandbox = new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
+  let firstFixture: Awaited<ReturnType<LocalFixtureSandbox["build"]>> | undefined;
+  const secondSandbox = new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
+  let recoveredFixture: Awaited<ReturnType<LocalFixtureSandbox["build"]>> | undefined;
+  try {
+    firstFixture = await firstSandbox.build(task);
+    const firstGeneration = await firstSandbox.reset(firstFixture);
+    assert.ok(firstFixture.endpoint);
+    assert.equal((await firstSandbox.health(firstFixture, firstGeneration)).status, "healthy");
+    await firstSandbox.destroy(firstFixture);
+
+    const recovered = await secondSandbox.reconcileFixture(task, firstGeneration);
+    recoveredFixture = recovered.fixture;
+    assert.equal(recovered.action, "reset");
+    assert.equal(recovered.health.status, "unhealthy");
+    assert.equal(recovered.generation, firstGeneration + 1);
+    assert.ok(recovered.fixture.endpoint);
+    assert.equal((await secondSandbox.health(recovered.fixture, recovered.generation)).status, "healthy");
+
+    await secondSandbox.destroy(recovered.fixture);
+    assert.equal((await secondSandbox.health(recovered.fixture, recovered.generation)).status, "unhealthy");
+  } finally {
+    if (firstFixture) await firstSandbox.destroy(firstFixture);
+    if (recoveredFixture) await secondSandbox.destroy(recoveredFixture);
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -10,6 +10,7 @@
 | ProofBlade Tool 契约 | 已实现 | `packages/materials/src/tools/contracts.ts` |
 | Pi Solver Tool 适配 | 已实现 | `packages/materials/src/runtime/solver-tools.ts` |
 | Capability 目录与路由 | 已实现 | `packages/materials/src/capabilities` |
+| 受 Task scope 约束的 Web/API Capability | 已实现 | `proofblade.web.request`、`packages/materials/src/capabilities/web.ts` |
 | Effect Journal、Artifact、Evidence | 已实现 | `packages/materials/src/effects`、`packages/materials/src/knowledge` |
 | 后台任务 | 已实现 | `packages/materials/src/jobs/background-runner.ts` |
 | 项目级 MCP | 已实现 | `.mcp.json`、`mcp.<name>` Capability、官方 MCP 2.0 stdio Client |
@@ -230,6 +231,12 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 | `forbidden-replay` | 重复执行可能造成不可接受的二次效果 |
 
 不确定时选择更严格的策略，并为恢复路径写测试。
+
+### 5.4 `proofblade.web` 边界
+
+首版 Web/API 能力只支持 `GET`、`HEAD` 和 `POST`。模型输入是同源相对路径，目标 origin 由活动 Fixture endpoint 或不可变 `TaskContract.target` 决定；不要新增可由模型覆盖的 host、proxy 或 redirect 参数。所有请求先检查 `allowed_hosts`、`allowed_ports` 和 `external_network`，再进入 `EffectJournal.executeWith()`。
+
+网络 Effect 默认使用 `manual` 重放。控制事件只保存请求结构、大小限制和规范哈希，不保存 query/header/body 原值；响应完整内容进入 Artifact，模型只接收 `<untrusted-observation>` 中的有界输出。新增方法、认证或重定向策略时，必须分别补作用域逃逸、敏感头、超时、截断和中断恢复测试。
 
 ## 6. MCP 接入契约
 

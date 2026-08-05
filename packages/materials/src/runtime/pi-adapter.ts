@@ -37,6 +37,8 @@ export class PiAgentLane implements AgentLanePort {
     private readonly lane: Lane,
     private readonly controlStore: ControlStore,
     private readonly harness: AgentHarness<ExecutionToolContext>,
+    private readonly env: NodeExecutionEnv,
+    private readonly closeTransport: () => Promise<void>,
   ) {}
 
   public static async create(options: {
@@ -56,7 +58,7 @@ export class PiAgentLane implements AgentLanePort {
       ? await repo.open(metadata)
       : await repo.create({ id: sessionId, cwd: options.runDir, metadata: { runId: options.runId, lane } });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
-    const { models, model } = createConfiguredModels(profile);
+    const { models, model, closeTransport } = createConfiguredModels(profile);
     const snapshot = await options.controlStore.snapshot(options.runId);
     const compiled = new ContextCompiler().build({
       runId: options.runId,
@@ -87,7 +89,7 @@ export class PiAgentLane implements AgentLanePort {
         return new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow }).estimatedTokens;
       },
     });
-    return new PiAgentLane(options.runId, lane, options.controlStore, harness);
+    return new PiAgentLane(options.runId, lane, options.controlStore, harness, env, closeTransport);
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -135,6 +137,14 @@ export class PiAgentLane implements AgentLanePort {
   }
 
   public async close(): Promise<void> {
-    await this.harness.waitForIdle();
+    try {
+      await this.harness.waitForIdle();
+    } finally {
+      try {
+        await this.env.cleanup();
+      } finally {
+        await this.closeTransport();
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@ import { ContextCompiler } from "../src/context/compiler.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { ProofBladeSkillRegistry } from "../src/skills/registry.js";
+import { createCodingTools } from "../src/runtime/coding-resources.js";
 
 test("skill registry uses Pi validation, excludes invalid and duplicate entries, and hashes deterministically", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-skills-"));
@@ -46,6 +47,26 @@ test("context keeps only skill metadata resident and records the catalog snapsho
     assert.doesNotMatch(rendered, /BODY-MUST-BE-ON-DEMAND/);
     assert.equal(compiled.manifest.resources.skillCatalogHash, registry.catalogHash());
     assert.deepEqual(compiled.manifest.resources.skills.map((item) => item.name), ["triage"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("coding skill loading enforces the conversation allowlist", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-coding-skills-"));
+  try {
+    await skill(root, "allowed", "Allowed workflow", "ALLOWED-BODY");
+    await skill(root, "blocked", "Blocked workflow", "BLOCKED-BODY");
+    const registry = await ProofBladeSkillRegistry.load(root);
+    const loadSkill = createCodingTools().find((tool) => tool.name === "load_skill");
+    assert.ok(loadSkill);
+    const context = { skills: registry, enabledSkills: new Set(["allowed"]) } as never;
+    const loaded = await loadSkill.execute("skill-1", { name: "allowed" }, undefined, undefined, context);
+    assert.match(JSON.stringify(loaded), /ALLOWED-BODY/);
+    await assert.rejects(
+      () => loadSkill.execute("skill-2", { name: "blocked" }, undefined, undefined, context),
+      /not enabled/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

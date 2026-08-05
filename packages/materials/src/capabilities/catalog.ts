@@ -13,6 +13,20 @@ const artifactParameters = {
   additionalProperties: false,
 } as const;
 
+const webRequestParameters = {
+  type: "object",
+  properties: {
+    method: { type: "string", enum: ["GET", "HEAD", "POST"], description: "HTTP method; defaults to GET." },
+    path: { type: "string", minLength: 1, description: "Origin-relative target path, including an optional query string." },
+    headers: { type: "object", additionalProperties: { type: "string" }, description: "Non-sensitive request headers." },
+    body: { type: "string", maxLength: 16_384, description: "Optional POST body." },
+    timeoutMs: { type: "integer", minimum: 100, maximum: 30_000 },
+    maxBytes: { type: "integer", minimum: 256, maximum: 1_048_576 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
 const manifests: CapabilityManifest[] = [
   withCapabilityHash({
     id: "proofblade.target",
@@ -75,6 +89,24 @@ const manifests: CapabilityManifest[] = [
         readOnly: true,
         sideEffect: "none",
         replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+    ],
+  }),
+  withCapabilityHash({
+    id: "proofblade.web",
+    version: "1.0.0",
+    description: "Send one bounded HTTP request to the active task target under its network scope.",
+    trust: "bundled",
+    operations: [
+      {
+        name: "request",
+        description: "Send a scoped GET, HEAD, or POST request without following redirects.",
+        parameters: webRequestParameters,
+        readOnly: false,
+        sideEffect: "network",
+        replay: "manual",
         outputPolicy: "summary",
         executionMode: "sequential",
       },

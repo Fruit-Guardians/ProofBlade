@@ -14,6 +14,7 @@ export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as co
 
 export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
+  enabledSkills: Set<string>;
   mcp: McpProjectRegistry;
   enabledMcpServers: Set<string>;
 }
@@ -70,6 +71,7 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
+    if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);
     return toolResult(context.skills.loadForModel(input.name, input.maxChars));
   },
 };

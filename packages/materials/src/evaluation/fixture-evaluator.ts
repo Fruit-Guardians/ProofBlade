@@ -5,7 +5,7 @@ import { createServices } from "../app/demo.js";
 import { fixtureTask } from "../app/fixture-task.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
-import { listFixtureProfiles } from "../sandbox/fixture-catalog.js";
+import { getFixtureProfile, listFixtureProfiles } from "../sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/single-agent-loop.js";
 import { sha256, canonicalJson } from "../domain/utils.js";
 
@@ -125,9 +125,12 @@ export class FixtureEvaluationRunner {
 
 const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
   async prompt() {
-    const inspected = await runtime.inspectTarget();
+    const inspected = runtime.fixture.endpoint
+      ? await runtime.invokeCapability({ capabilityId: "proofblade.web", operation: "request", input: { path: webFixturePath(runtime.fixture.profileId) } })
+      : await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
     if (!candidate) throw new Error("Fixture contains no candidate");
+    if (!inspected.evidenceId) throw new Error("Fixture inspection produced no evidence");
     await runtime.proposeHypothesis({ statement: "The observed candidate satisfies the fixture.", evidenceIds: [inspected.evidenceId] });
     await runtime.submitCandidate(candidate);
     return {
@@ -141,6 +144,12 @@ const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
   async isIdle() { return true; },
   async close() {},
 });
+
+function webFixturePath(profileId: string | undefined): string {
+  const path = profileId ? getFixtureProfile(profileId).http?.evaluationPath : undefined;
+  if (!path) throw new Error(`Fixture has no evaluation HTTP path: ${profileId ?? "unknown"}`);
+  return path;
+}
 
 function normalizePositive(value: number, label: string): number {
   if (!Number.isInteger(value) || value < 1) throw new Error(`${label} must be a positive integer`);

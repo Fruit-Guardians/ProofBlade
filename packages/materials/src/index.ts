@@ -30,6 +30,7 @@ export * from "./observability/pi-events.js";
 export * from "./observability/run-telemetry.js";
 export * from "./capabilities/catalog.js";
 export * from "./capabilities/router.js";
+export * from "./capabilities/web.js";
 export * from "./jobs/background-runner.js";
 export * from "./skills/registry.js";
 export * from "./mcp/registry.js";

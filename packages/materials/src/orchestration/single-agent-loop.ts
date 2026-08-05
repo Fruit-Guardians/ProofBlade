@@ -206,11 +206,20 @@ function latestPending(snapshot: RunSnapshot) {
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number): string {
+  const acquisition = snapshot.task.target_kind === "web"
+    ? [
+        "Call inspect_target with an empty object {} to inspect visible route hints, then call list_capabilities and invoke_capability for proofblade.web.request with an origin-relative path.",
+        "Copy one complete PB{...} value exactly from the Web capability's untrusted observation.",
+      ]
+    : [
+        "Call inspect_target with an empty object {} to inspect every visible synthetic target file.",
+        "Copy one complete PB{...} value exactly from inspect_target output.",
+      ];
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
-    "Call inspect_target with an empty object {} to inspect every visible synthetic target file.",
+    ...acquisition,
     "Preserve the returned evidence id in any hypothesis or fact proposal.",
-    "Copy one complete PB{...} value exactly from inspect_target output, then call submit_candidate with that exact value.",
+    "Call submit_candidate with that exact value.",
     "Do not stop at a prose answer; the completion proposal tool is required.",
   ].join("\n");
 }

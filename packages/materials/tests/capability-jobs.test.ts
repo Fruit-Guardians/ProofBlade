@@ -59,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
-  assert.equal(bundledCapabilityCatalogHash(), "7b8e742875d5d4cba6b7a0e2107376c0f19cfd90cb4985cf8bd8db397fa81b62");
+  assert.equal(bundledCapabilityCatalogHash(), "7b744c6f5788f992e3992a2e7e8d0ee24b7fd78e5ead48f47e0f352e5c4eb225");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -112,7 +112,7 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
-    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.target"]);
+    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.target", "proofblade.web"]);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);
@@ -159,6 +159,8 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const snapshot = await services.control.snapshot(runId);
     assert.equal(snapshot.jobs["J-RECOVER"]?.status, "SUCCEEDED");
     assert.equal((await services.control.replay(runId)).jobs["J-RECOVER"]?.status, "SUCCEEDED");
+    assert.ok(Object.values(snapshot.observations).some((item) => item.source.effectId === completed.effectId));
+    assert.ok(Object.values(snapshot.evidence).some((item) => item.source.effectId === completed.effectId));
 
     await services.control.dispatch(runId, {
       type: "job_queued",

@@ -6,7 +6,7 @@ export interface BootstrapData {
   projectName: string;
   configPath: string;
   storage: { runsDir: string; fixturesDir: string };
-  model: { provider: string; model: string; baseUrl: string; thinkingLevel: string };
+  model: { provider: string; model: string; baseUrl: string; thinkingLevel: string; contextWindow: number };
   fixtures: Array<{ id: string; targetKind: string; description: string }>;
   refreshIntervalMs: number;
 }

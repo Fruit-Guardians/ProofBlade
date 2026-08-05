@@ -19,7 +19,9 @@ Executable coverage lives in `packages/materials/tests/interruption-recovery.tes
 
 Effect results cross a durable artifact barrier before `effect_finished`. Reconciliation adopts an artifact with the matching `sourceEffectId`. An in-flight Effect whose argument generation differs from the current Run generation becomes `UNKNOWN`, including otherwise pure work.
 
-Lease release carries owner and generation fencing. Expired leases reject late heartbeats. Fixture health distinguishes `healthy`, `missing`, `unhealthy`, and `generation-drift`; rebuilding always advances beyond the recorded generation.
+Lease release carries owner and generation fencing. Expired leases reject late heartbeats. Fixture health distinguishes `healthy`, `missing`, `unhealthy`, and `generation-drift`; missing or stale HTTP services are unhealthy. A recovered HTTP Fixture starts a new loopback service, clears route runtime state, and advances beyond the recorded generation. Destroy closes the service while retaining Fixture files for audit.
+
+`proofblade.web` Effects use manual replay. Recovery adopts a result that crossed the artifact barrier, but an unfinished request without a result becomes `UNKNOWN` and is never sent again automatically.
 
 `DurableCompactionCoordinator` runs from Pi's `session_before_compact` hook. It persists a mechanical checkpoint first, then returns that exact content for Pi to append. A retry while the checkpoint is the latest domain event reuses its id and artifact.
 

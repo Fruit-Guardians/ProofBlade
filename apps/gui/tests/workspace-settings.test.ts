@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import type { ConversationPreferences, WorkspaceSettings } from "../src/shared.js";
@@ -55,6 +55,26 @@ test("persists folders and per-conversation provider and capability choices", as
     assert.equal((await reloaded.renameFolder(folder.id, "Cases")).name, "Cases");
     await reloaded.removeFolder(folder.id);
     assert.equal(reloaded.preferences("CHAT-1", defaults).folderId, undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ignores an invalid persisted thinking level", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const tempRoot = join(root, "tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const dir = await mkdtemp(join(tempRoot, "workspace-settings-invalid-"));
+  const path = join(dir, "gui-workspace.json");
+
+  try {
+    await writeFile(path, JSON.stringify({
+      schemaVersion: 1,
+      folders: [],
+      conversations: { "CHAT-1": { thinkingLevel: "unbounded" } },
+    }), "utf8");
+    const store = await WorkspaceSettingsStore.create(path);
+    assert.equal(store.preferences("CHAT-1", defaults).thinkingLevel, defaults.thinkingLevel);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

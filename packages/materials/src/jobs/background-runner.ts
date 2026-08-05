@@ -4,6 +4,8 @@ import { id } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeCapabilityRouter } from "../capabilities/router.js";
 import { snipText } from "@proofblade/molecules";
+import type { DeterministicObserver } from "../knowledge/observer.js";
+import type { RawEffectResult } from "../domain/types.js";
 
 export interface BackgroundJobStartInput {
   capabilityId: string;
@@ -30,6 +32,7 @@ export class BackgroundJobRunner {
     private readonly controlStore: ControlStore,
     private readonly artifactStore: ArtifactStore,
     private readonly router: ProofBladeCapabilityRouter,
+    private readonly observer: DeterministicObserver,
   ) {}
 
   public async start(input: BackgroundJobStartInput): Promise<JobRecord> {
@@ -141,6 +144,18 @@ export class BackgroundJobRunner {
       await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
       if (job.timeoutMs) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, job.timeoutMs);
       const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: job.args }, entry.controller.signal);
+      const snapshot = await this.controlStore.snapshot(this.runId);
+      const artifact = snapshot.artifacts[result.artifactId];
+      if (artifact) {
+        const stored = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as RawEffectResult;
+        await this.observer.observe(this.runId, {
+          operation: `capability:${job.capabilityId}.${job.operation}`,
+          effectId: result.effectId,
+          artifactId: result.artifactId,
+          generation: job.generation,
+          result: stored,
+        });
+      }
       const after = await this.poll(job.id);
       if (after.status === "CANCELLED") return;
       await this.controlStore.dispatch(this.runId, {
