@@ -49,7 +49,7 @@ Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`
 
 Provider 输入 Token 与可见估算不是同一指标。中转站或模型模板可能加入服务端固定上下文，因此很短的用户消息也可能由上游报告数千输入 Token。缓存统计只读取 Provider 返回字段；字段缺失时显示 `0`，不从输入量推测缓存命中。
 
-Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`），用于区分“请求了缓存”与“上游实际返回缓存 Token”。该值来自 `modelProfiles.executor.cacheRetention`，不会把具体模型或密钥写进源码。
+Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`），用于区分“请求了缓存”与“上游实际返回缓存 Token”。GUI 可以在每个 Provider Profile 中单独保存该值；无 GUI 时再由 `modelProfiles.executor.cacheRetention` 提供默认值，不会把具体模型或密钥写进源码。对话消息旁显示单轮缓存读取和命中率，指标面板显示累计提示词量与累计 token。
 
 ## 真实模型对话
 

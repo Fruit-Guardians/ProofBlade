@@ -6,7 +6,7 @@ import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadCon
 import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
-import type { ConversationPreferences, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
+import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(option("--project-root") ?? process.env.PROOFBLADE_ROOT ?? resolve(guiRoot, "../.."));
@@ -218,6 +218,7 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
     model: string(body.model, "model"),
     models: stringArray(body.models),
     thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
+    cacheRetention: typeof body.cacheRetention === "string" ? body.cacheRetention as ProviderCacheRetention : undefined,
     apiKey: optionalString(body.apiKey),
     clearApiKey: body.clearApiKey === true,
     setActive: body.setActive === true,

@@ -8,7 +8,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getProviderSettings, getRun, getRuns, getWorkspaceSettings, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, PiSessionDebug, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -345,7 +345,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           return <article className={`chat-message role-${chat.role}`} key={chat.id}>
             <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
             <div className="message-content">
-              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}</div>
+              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <span className="message-usage">缓存 {formatNumber(chat.usage.cacheRead)} / {formatNumber(promptTokens(chat.usage))} · {formatPercent(cacheRate(chat.usage))}</span>}</div>
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
               {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
@@ -365,7 +365,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           <label title="本对话使用的模型"><Bot size={13} /><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
           <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
           <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
-          <button type="button" className="context-button" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(session?.usage.totalTokens ?? session?.stats.totalTokens ?? 0)}</span></button>
+          <button type="button" className="context-button" title="当前 Pi Session 的累计 Provider token" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(sessionTokenTotal(session))} 累计</span></button>
           <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
         </div>}
         {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
@@ -396,19 +396,41 @@ function modelOptions(providers: ProviderSettings | undefined, preferences: Conv
 
 function ContextBreakdown({ session, snapshot }: { session?: PiSessionDebug; snapshot?: Extract<ChatStreamEvent, { type: "context_snapshot" }> }) {
   const usage = session && session.usage.requests > 0 ? session.usage : session ? { ...session.usage, input: session.stats.uncachedTokens, totalTokens: session.stats.totalTokens } : undefined;
+  const promptTokens = (usage?.input ?? 0) + (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0);
+  const cacheHitRate = promptTokens > 0 ? (usage?.cacheRead ?? 0) / promptTokens : 0;
   return <div className="context-breakdown">
     <div className="context-breakdown-head"><strong>本会话上下文</strong><span>Provider usage 为上游实际计数</span></div>
     <div className="context-breakdown-grid">
-      <MetricLine label="输入" value={`${formatNumber(usage?.input ?? 0)} tokens`} />
+      <MetricLine label="提示词总量" value={`${formatNumber(promptTokens)} tokens`} />
+      <MetricLine label="未命中输入" value={`${formatNumber(usage?.input ?? 0)} tokens`} />
       <MetricLine label="输出" value={`${formatNumber(usage?.output ?? 0)} tokens`} />
       <MetricLine label="缓存读取" value={`${formatNumber(usage?.cacheRead ?? 0)} tokens`} />
       <MetricLine label="缓存写入" value={`${formatNumber(usage?.cacheWrite ?? 0)} tokens`} />
+      <MetricLine label="缓存命中率" value={`${(cacheHitRate * 100).toFixed(1)}%`} />
       <MetricLine label="推理" value={`${formatNumber(usage?.reasoning ?? 0)} tokens`} />
       <MetricLine label="请求次数" value={String(usage?.requests ?? 0)} />
     </div>
     {snapshot && <div className="context-visible-detail"><span>当前请求可见消息 {snapshot.messages} 条</span><span>启用 Tool {snapshot.tools} 个</span><span>系统提示 {formatNumber(snapshot.systemPromptChars)} chars</span><span>消息 {formatNumber(snapshot.messageChars)} chars</span><span>Tool schema {formatNumber(snapshot.toolSchemaChars)} chars</span><span>可见估算 {formatNumber(snapshot.estimatedVisibleTokens)} tokens</span></div>}
     <div className="context-note">缓存由中转站返回的 usage 字段决定；当前 Provider 未返回缓存命中字段时，缓存读取与写入显示为 0，输入仍按上游原值统计。</div>
   </div>;
+}
+
+function sessionTokenTotal(session?: PiSessionDebug): number {
+  if (!session) return 0;
+  return session.usage.requests > 0 ? session.usage.totalTokens : session.stats.totalTokens;
+}
+
+function promptTokens(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
+  return usage.input + usage.cacheRead + usage.cacheWrite;
+}
+
+function cacheRate(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
+  const total = promptTokens(usage);
+  return total > 0 ? usage.cacheRead / total : 0;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function MessageText({ text }: { text: string }) {
@@ -553,10 +575,12 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
   const tokenReasoning = hasSessionUsage ? sessionUsage.reasoning : telemetry.provider.tokens.reasoning;
   const tokenCacheRead = hasSessionUsage ? sessionUsage.cacheRead : telemetry.provider.tokens.cacheRead;
   const tokenTotal = hasSessionUsage ? sessionUsage.total : telemetry.provider.tokens.total;
+  const promptTotal = (hasSessionUsage ? sessionUsage.input : telemetry.provider.tokens.input) + tokenCacheRead + (hasSessionUsage ? sessionUsage.cacheWrite : telemetry.provider.tokens.cacheWrite);
+  const cacheHitRate = promptTotal > 0 ? tokenCacheRead / promptTotal : 0;
   const effects = Object.values(snapshot.effects);
   return <div className="metrics-content">
-    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
-    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入" value={formatNumber(tokenInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="缓存读取" value={formatNumber(tokenCacheRead)} /><MetricLine label="缓存写入" value={formatNumber(hasSessionUsage ? sessionUsage.cacheWrite : 0)} /></section>
+    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>累计 tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
+    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="提示词总量" value={formatNumber(promptTotal)} /><MetricLine label="未命中输入" value={formatNumber(tokenInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="缓存读取" value={formatNumber(tokenCacheRead)} /><MetricLine label="缓存写入" value={formatNumber(hasSessionUsage ? sessionUsage.cacheWrite : 0)} /><MetricLine label="缓存命中率" value={`${(cacheHitRate * 100).toFixed(1)}%`} /></section>
     <section><div className="metrics-title"><Clock3 size={14} />延迟与成本</div><MetricLine label="平均延迟" value={`${Math.round(telemetry.provider.latencyMs.average)} ms`} /><MetricLine label="P95" value={`${Math.round(telemetry.provider.latencyMs.p95)} ms`} /><MetricLine label="执行时长" value={formatDuration(telemetry.durationMs)} /><MetricLine label="成本" value={`$${telemetry.provider.cost.totalUsd.toFixed(4)}`} /></section>
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
@@ -574,6 +598,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
+  const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -590,11 +615,11 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
 
   const loadProfile = (profile?: ProviderProfile) => {
     if (!profile) return;
-    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {
@@ -608,7 +633,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const save = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
+      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
       setSettings(saved); setSelectedId(saved.activeProfileId); loadProfile(saved.profiles.find((profile) => profile.id === saved.activeProfileId)); setHasApiKey(saved.profiles.find((profile) => profile.id === saved.activeProfileId)?.hasApiKey ?? false); await onSaved();
     } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
@@ -632,7 +657,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
           <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
           {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
           <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{[...new Set([model, ...models].filter(Boolean))].map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}刷新模型</button></div></label>
-          <label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label>
+          <div className="provider-grid"><label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label><label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long">长期（会话键）</option><option value="none">关闭</option></select></label></div>
           <div className="provider-form-note">Key 只保存在本机配置，API 仅返回已配置状态。保存后新对话默认使用当前配置，已有对话保留自己的选择。</div>
         </div>
       </div>
@@ -648,6 +673,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
+  const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -667,6 +693,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
       setProxyUrl(settings.proxyUrl);
       setModel(settings.model);
       setThinkingLevel(settings.thinkingLevel);
+      setCacheRetention(settings.cacheRetention);
       setHasApiKey(settings.hasApiKey);
       setLocalPath(settings.localPath);
     }).catch((caught) => active && setError(message(caught))).finally(() => active && setLoading(false));
@@ -693,6 +720,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
         proxyUrl: proxyUrl.trim(),
         model,
         thinkingLevel,
+        cacheRetention,
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         clearApiKey,
       });
@@ -712,6 +740,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
         <div className="provider-grid">
           <label><span>Provider</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label>
           <label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label>
+          <label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long">长期（会话键）</option><option value="none">关闭</option></select></label>
         </div>
         <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setOnline(undefined); }} placeholder="http://127.0.0.1:1234/v1" /></label>
         <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => { setProxyUrl(event.target.value); setOnline(undefined); }} placeholder="http://127.0.0.1:7897" /></label>

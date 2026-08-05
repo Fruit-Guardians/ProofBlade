@@ -70,7 +70,7 @@ Conversations can be grouped into custom folders and filtered from the sidebar. 
 
 The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
 
-Set `modelProfiles.executor.cacheRetention` to `short` (the default), `long` (request a longer provider cache TTL where supported), or `none`. When omitted, Pi's default is used; whether a relay reports cache fields remains provider-specific.
+Choose cache retention per Provider in the GUI: `short` (the default), `long` (request a stable session cache key and longer TTL), or `none`. Headless runs can set `modelProfiles.executor.cacheRetention` directly. Cache reporting remains provider-specific; each assistant turn shows prompt total, cache reads, and hit rate, while the metrics panel shows cumulative values.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;

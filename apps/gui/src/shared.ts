@@ -12,6 +12,7 @@ export interface BootstrapData {
 }
 
 export type ProviderThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type ProviderCacheRetention = "none" | "short" | "long";
 
 export interface ProviderProfile {
   id: string;
@@ -22,6 +23,7 @@ export interface ProviderProfile {
   model: string;
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
+  cacheRetention: ProviderCacheRetention;
   hasApiKey: boolean;
 }
 
@@ -34,6 +36,7 @@ export interface ProviderSettings {
   proxyUrl: string;
   model: string;
   thinkingLevel: ProviderThinkingLevel;
+  cacheRetention: ProviderCacheRetention;
   hasApiKey: boolean;
 }
 
@@ -46,6 +49,7 @@ export interface ProviderSettingsInput {
   model: string;
   models?: string[];
   thinkingLevel: ProviderThinkingLevel;
+  cacheRetention?: ProviderCacheRetention;
   apiKey?: string;
   clearApiKey?: boolean;
   setActive?: boolean;

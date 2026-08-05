@@ -42,6 +42,7 @@ test("persists provider overrides outside the repository response without exposi
       proxyUrl: "http://127.0.0.1:7897/",
       model: "small-model",
       thinkingLevel: "low",
+      cacheRetention: "long",
       apiKey: "test-secret",
     });
     assert.equal(settings.baseUrl, "https://example.test/v1");
@@ -55,6 +56,8 @@ test("persists provider overrides outside the repository response without exposi
     const reloaded = await ProviderSettingsStore.create(config, path);
     assert.equal(reloaded.publicSettings().hasApiKey, true);
     assert.equal(reloaded.modelProfile().thinkingLevel, "low");
+    assert.equal(reloaded.publicSettings().cacheRetention, "long");
+    assert.equal(reloaded.modelProfile().cacheRetention, "long");
     assert.equal(reloaded.modelProfile().proxyUrl, "http://127.0.0.1:7897");
     assert.equal(reloaded.modelProfile().reasoning, true);
     assert.equal(reloaded.modelProfile().supportsReasoningEffort, true);
@@ -102,6 +105,7 @@ test("keeps multiple provider profiles, keys, and activation independent", async
       model: "model-a",
       models: ["model-a", "model-a-fast"],
       thinkingLevel: "low",
+      cacheRetention: "short",
       apiKey: "secret-a",
     });
     const relayA = settings.profiles.find((profile) => profile.name === "Relay A");
@@ -114,11 +118,14 @@ test("keeps multiple provider profiles, keys, and activation independent", async
       model: "model-b",
       models: ["model-b"],
       thinkingLevel: "medium",
+      cacheRetention: "long",
       apiKey: "secret-b",
     });
     const relayB = settings.profiles.find((profile) => profile.name === "Relay B");
     assert.ok(relayB);
     assert.equal(settings.activeProfileId, relayB.id);
+    assert.equal(settings.profiles.find((profile) => profile.id === relayB.id)?.cacheRetention, "long");
+    assert.equal(store.modelProfile(relayA.id).cacheRetention, "short");
     assert.equal("apiKey" in relayA, false);
     assert.equal("apiKey" in relayB, false);
 

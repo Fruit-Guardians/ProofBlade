@@ -70,7 +70,7 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
 
-缓存保留策略由 `modelProfiles.executor.cacheRetention` 控制：`short`（默认行为）、`long`（向支持的 Provider 请求更长 TTL）或 `none`。省略该字段时沿用 Pi 默认值；不同中转站是否返回缓存字段仍以 Provider 实际响应为准。
+缓存保留策略可在 GUI 的“中转站与模型”里按 Provider 配置：`short`（默认行为）、`long`（请求稳定的会话缓存键与更长 TTL）或 `none`。无 GUI 时也可在 `modelProfiles.executor.cacheRetention` 中设置；不同中转站是否返回缓存字段仍以 Provider 实际响应为准。对话旁会显示每轮的提示词总量、缓存读取和命中率，右侧指标显示累计值。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；

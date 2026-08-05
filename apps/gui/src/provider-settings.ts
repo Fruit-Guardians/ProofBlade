@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createProviderTransport, type ModelProfileConfig, type ProofBladeConfig } from "@proofblade/materials";
-import type { ModelDiscoveryResult, ProviderProfile, ProviderSettings, ProviderSettingsInput, ProviderThinkingLevel } from "./shared.js";
+import type { ModelDiscoveryResult, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderSettingsInput, ProviderThinkingLevel } from "./shared.js";
 
 interface LocalProviderProfile {
   id: string;
@@ -13,6 +13,7 @@ interface LocalProviderProfile {
   model: string;
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
+  cacheRetention?: ProviderCacheRetention;
   apiKey?: string;
 }
 
@@ -29,10 +30,12 @@ interface LegacyProviderFile {
   proxyUrl?: string;
   model: string;
   thinkingLevel: ProviderThinkingLevel;
+  cacheRetention?: ProviderCacheRetention;
   apiKey?: string;
 }
 
 const thinkingLevels = new Set<ProviderThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const cacheRetentions = new Set<ProviderCacheRetention>(["none", "short", "long"]);
 
 export class ProviderSettingsStore {
   private readonly path: string;
@@ -68,6 +71,7 @@ export class ProviderSettingsStore {
       proxyUrl: profile.proxyUrl,
       model: model?.trim() || profile.model,
       thinkingLevel: level,
+      cacheRetention: profile.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       apiKeyEnv,
       reasoning: reasoningEnabled || (this.baseProfile.reasoning ?? false),
       supportsReasoningEffort: reasoningEnabled ? true : this.baseProfile.supportsReasoningEffort,
@@ -87,13 +91,17 @@ export class ProviderSettingsStore {
       proxyUrl: active.proxyUrl ?? "",
       model: active.model,
       thinkingLevel: active.thinkingLevel,
+      cacheRetention: active.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       hasApiKey: Boolean(active.apiKey),
     };
   }
 
   public async save(input: ProviderSettingsInput): Promise<ProviderSettings> {
-    const validated = validateInput(input);
     const existing = input.id ? this.profiles.find((profile) => profile.id === input.id) : undefined;
+    const validated = validateInput({
+      ...input,
+      cacheRetention: input.cacheRetention ?? existing?.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
+    });
     const id = existing?.id ?? uniqueId(validated.name, new Set(this.profiles.map((profile) => profile.id)));
     const apiKey = input.clearApiKey ? undefined : input.apiKey?.trim() || existing?.apiKey;
     const next: LocalProviderProfile = { id, ...validated, ...(apiKey ? { apiKey } : {}) };
@@ -168,6 +176,7 @@ export class ProviderSettingsStore {
           model: legacy.model,
           models: legacy.model && legacy.model !== "auto" ? [legacy.model] : [],
           thinkingLevel: legacy.thinkingLevel,
+          cacheRetention: legacy.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
         });
         this.profiles = [{ id: "default", ...validated, ...(legacy.apiKey?.trim() ? { apiKey: legacy.apiKey.trim() } : {}) }];
         this.activeProfileId = "default";
@@ -189,6 +198,7 @@ export class ProviderSettingsStore {
         model: this.baseProfile.model,
         models: this.baseProfile.model === "auto" ? [] : [this.baseProfile.model],
         thinkingLevel: this.baseProfile.thinkingLevel ?? "off",
+        cacheRetention: this.baseProfile.cacheRetention ?? "short",
         ...(apiKey ? { apiKey } : {}),
       }];
       this.activeProfileId = "default";
@@ -218,6 +228,7 @@ function publicProfile(profile: LocalProviderProfile): ProviderProfile {
     model: profile.model,
     models: [...profile.models],
     thinkingLevel: profile.thinkingLevel,
+    cacheRetention: profile.cacheRetention ?? "short",
     hasApiKey: Boolean(profile.apiKey),
   };
 }
@@ -235,6 +246,7 @@ function validateStoredProfile(value: unknown): LocalProviderProfile {
     model: input.model ?? "",
     models: input.models,
     thinkingLevel: input.thinkingLevel ?? "off",
+    cacheRetention: input.cacheRetention,
   });
   const apiKey = typeof input.apiKey === "string" && input.apiKey.trim() ? input.apiKey.trim() : undefined;
   return { id, ...validated, ...(apiKey ? { apiKey } : {}) };
@@ -247,9 +259,11 @@ function validateInput(input: ProviderSettingsInput): Omit<LocalProviderProfile,
   const proxyUrl = normalizeOptionalUrl(input.proxyUrl, "代理 URL");
   const model = required(input.model, "模型");
   if (!thinkingLevels.has(input.thinkingLevel)) throw new Error(`不支持的思考等级：${String(input.thinkingLevel)}`);
+  const cacheRetention = input.cacheRetention ?? "short";
+  if (!cacheRetentions.has(cacheRetention)) throw new Error(`不支持的缓存保留策略：${String(cacheRetention)}`);
   const models = [...new Set((input.models ?? []).filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
   if (model !== "auto" && !models.includes(model)) models.unshift(model);
-  return { name, provider, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel };
+  return { name, provider, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel, cacheRetention };
 }
 
 function required(value: unknown, label: string): string {
