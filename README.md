@@ -13,6 +13,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - Run/Phase 状态机，以及事实、证据、假设、意图、租约、靶场代次和不可变制品。
 - 六层上下文编译器、确定性清单和不可信观察边界。
 - 稳定前缀缓存指纹：区分可复用的 L0/L1 与动态 L2-L5，并把前缀/动态哈希写入 ContextManifest。
+- Reasonix 风格的追加式上下文：Solver 将每轮状态作为当前用户轮的持久尾部，避免把变化的状态放到历史前面反复打断缓存；Provider 的 `cacheRetention` 可在配置中选择。
 - 支持 Auto 与 Assist 模式的模型驱动单 Agent 执行循环。
 - 确定性 Observer、带事实依据的完成提案和独立隐藏评分验证器。
 - 六个本地工作流测试靶场：三个合成 Web 任务和三个合成逆向任务。
@@ -68,6 +69,8 @@ npm run gui -- --config proofblade.config.json --port 4173
 对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停；Coding Agent 只把已启用能力装配到本轮。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
+
+缓存保留策略由 `modelProfiles.executor.cacheRetention` 控制：`short`（默认行为）、`long`（向支持的 Provider 请求更长 TTL）或 `none`。省略该字段时沿用 Pi 默认值；不同中转站是否返回缓存字段仍以 Provider 实际响应为准。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；

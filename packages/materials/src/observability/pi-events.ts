@@ -69,6 +69,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       contextManifestHash: pending.contextManifestHash,
       contextCache: pending.contextCache,
       retryLimit: event.streamOptions.maxRetries ?? 0,
+      cacheRetention: event.streamOptions.cacheRetention ?? "short",
     });
     return undefined;
   });

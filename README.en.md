@@ -13,6 +13,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Run/phase state machine, facts, evidence, hypotheses, intents, leases, fixture generations and immutable artifacts.
 - Six-layer context compiler with deterministic manifests and untrusted-observation boundaries.
 - Provider-neutral stable-prefix cache fingerprints split reusable L0/L1 from dynamic L2-L5 in every ContextManifest.
+- Reasonix-style append-only context keeps each Solver turn's changing state as a persisted suffix instead of rewriting the history prefix; `cacheRetention` remains configurable per model profile.
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
 - Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
@@ -68,6 +69,8 @@ The gear button opens the relay and model manager. It can create multiple OpenAI
 Conversations can be grouped into custom folders and filtered from the sidebar. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. Folder and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
 
 The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
+
+Set `modelProfiles.executor.cacheRetention` to `short` (the default), `long` (request a longer provider cache TTL where supported), or `none`. When omitted, Pi's default is used; whether a relay reports cache fields remains provider-specific.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;

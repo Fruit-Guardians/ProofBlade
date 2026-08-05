@@ -87,7 +87,30 @@ export class PiSolverLane implements AgentLanePort {
           ...SOLVER_PROTOCOL_INSTRUCTIONS,
         ].join("\n\n");
       },
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, cacheRetention: profile.cacheRetention },
+    });
+    // Reasonix keeps turn-specific state as a persisted suffix of the current
+    // turn. That lets the next provider request reuse the complete previous
+    // request prefix. Injecting this state in front of session history would
+    // make every phase/ledger change a cache reset.
+    harness.on("before_agent_start", async () => {
+      const snapshot = await options.controlStore.snapshot(options.runId);
+      const compiled = new ContextCompiler().build({
+        runId: options.runId,
+        lane: "executor",
+        phase: snapshot.phase,
+        task: snapshot.task,
+        snapshot,
+        contextWindow: profile.contextWindow,
+        outputBudget: profile.maxTokens,
+        resources: resourceSnapshot,
+      });
+      const timestamp = Date.now();
+      return {
+        messages: compiled.messages
+          .filter((message) => message.role !== "system")
+          .map((message) => ({ role: "user" as const, content: message.content, timestamp })) as AgentMessage[],
+      };
     });
     harness.on("context", async ({ messages }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
@@ -96,8 +119,9 @@ export class PiSolverLane implements AgentLanePort {
       const prepared = prepareContextMaintenance({ messages, availableTokens: compiled.manifest.budget.availableInput, baseTokens: compiled.estimatedTokens, messageBudget: transcriptBudget });
       if (prepared.checkpointRecommended) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
       if (prepared.nextAction === "compact") laneRef.lane?.requestCompactionAfterTurn();
-      const dynamicContext = compiled.messages.filter((message) => message.role !== "system");
-      return { messages: [...dynamicContext, ...prepared.messages] as AgentMessage[] };
+      // Keep maintenance on the existing append-only transcript. Turn state is
+      // added by before_agent_start, where the harness persists it as a suffix.
+      return { messages: prepared.messages as AgentMessage[] };
     });
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);

@@ -74,7 +74,7 @@ export class PiCodingLane implements AgentLanePort {
       toolContext,
       thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: () => codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled)),
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, cacheRetention: profile.cacheRetention },
     });
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - 2_048);
     harness.on("context", ({ messages }) => {
