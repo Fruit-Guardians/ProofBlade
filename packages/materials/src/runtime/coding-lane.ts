@@ -3,12 +3,7 @@ import {
   AgentHarness,
   JsonlSessionRepo,
   NodeExecutionEnv,
-  createBashTool,
-  createEditTool,
-  createReadTool,
-  createWriteTool,
   type AgentHarnessEvent,
-  type ExecutionToolContext,
 } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { planContextMaintenance } from "@proofblade/molecules";
@@ -16,6 +11,9 @@ import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { pruneAgentMessages, repairAgentMessages } from "../context/agent-pruner.js";
 import { attachPiObservability } from "../observability/pi-events.js";
+import { McpProjectRegistry } from "../mcp/registry.js";
+import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { codingActiveToolNames, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 
@@ -29,8 +27,10 @@ export class PiCodingLane implements AgentLanePort {
   private constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
-    private readonly harness: AgentHarness<ExecutionToolContext>,
+    private readonly harness: AgentHarness<CodingResourceContext>,
     private readonly env: NodeExecutionEnv,
+    private readonly closeTransport: () => Promise<void>,
+    private readonly mcp: McpProjectRegistry,
   ) {}
 
   public static async create(options: {
@@ -39,6 +39,7 @@ export class PiCodingLane implements AgentLanePort {
     runDir: string;
     controlStore: ControlStore;
     config: ProofBladeConfig;
+    capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] };
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
   }): Promise<PiCodingLane> {
     const env = new NodeExecutionEnv({ cwd: options.projectRoot });
@@ -54,22 +55,26 @@ export class PiCodingLane implements AgentLanePort {
         metadata: { runId: options.runId, lane: "main", purpose: "chat" },
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
-    const { models, model } = createConfiguredModels(profile);
-    const tools = [
-      createReadTool<ExecutionToolContext>(),
-      createBashTool<ExecutionToolContext>(),
-      createEditTool<ExecutionToolContext>(),
-      createWriteTool<ExecutionToolContext>(),
-    ];
-    const harness = new AgentHarness<ExecutionToolContext>({
+    const { models, model, closeTransport } = createConfiguredModels(profile);
+    const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
+    const mcp = McpProjectRegistry.load(options.projectRoot);
+    const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
+    const enabledSkills = new Set(options.capabilities?.enabledSkills ?? skills.list().map((skill) => skill.name));
+    const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
+    const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
+    const tools = createCodingTools();
+    const activeToolNames = codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers] });
+    const toolContext: CodingResourceContext = { env, skills, mcp, enabledMcpServers };
+    const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
       model,
       tools,
-      activeToolNames: tools.map((tool) => tool.name),
-      toolContext: { env },
+      activeToolNames,
+      resources: { skills: resources },
+      toolContext,
       thinkingLevel: profile.thinkingLevel ?? "off",
-      systemPrompt: CODING_SYSTEM_PROMPT,
+      systemPrompt: () => codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled)),
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
     });
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - 2_048);
@@ -86,7 +91,7 @@ export class PiCodingLane implements AgentLanePort {
       controlStore: options.controlStore,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    return new PiCodingLane(options.runId, options.controlStore, harness, env);
+    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp);
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -138,7 +143,26 @@ export class PiCodingLane implements AgentLanePort {
   }
 
   public async close(): Promise<void> {
-    await this.harness.waitForIdle();
-    await this.env.cleanup();
+    try {
+      await this.harness.waitForIdle();
+    } finally {
+      try {
+        await this.env.cleanup();
+      } finally {
+        try {
+          await this.closeTransport();
+        } finally {
+          await this.mcp.close();
+        }
+      }
+    }
   }
+}
+
+function codingSystemPrompt(skills: Array<{ name: string; description: string }>, mcpServers: Array<{ name: string; description: string }>): string {
+  const resources = [
+    skills.length > 0 ? `\nEnabled Skills:\n${skills.map((skill) => `- ${skill.name}: ${skill.description}`).join("\n")}\nUse load_skill to load a Skill only when it is relevant.` : "",
+    mcpServers.length > 0 ? `\nEnabled MCP servers:\n${mcpServers.map((server) => `- ${server.name}: ${server.description}`).join("\n")}\nUse describe_mcp_server before call_mcp_tool.` : "",
+  ].join("");
+  return `${CODING_SYSTEM_PROMPT}${resources}`;
 }

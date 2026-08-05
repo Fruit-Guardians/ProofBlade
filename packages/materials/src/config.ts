@@ -9,6 +9,7 @@ export interface ModelProfileConfig {
   model: string;
   modelDiscoveryPath: string;
   apiKeyEnv: string;
+  proxyUrl?: string;
   contextWindow: number;
   maxTokens: number;
   requestTimeoutMs: number;
@@ -41,8 +42,15 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (!profile) throw new Error(`Config ${path} is missing modelProfiles.executor`);
   if (profile.api !== "openai-completions") throw new Error(`Unsupported provider API: ${String(profile.api)}`);
   if (!profile.provider || !profile.baseUrl || !profile.model) throw new Error(`Config ${path} has an incomplete executor profile`);
+  if (profile.proxyUrl !== undefined) validateHttpUrl(profile.proxyUrl, `proxyUrl in ${path}`);
   if (!Number.isFinite(profile.contextWindow) || profile.contextWindow < 1024) throw new Error(`Invalid contextWindow in ${path}`);
   if (!Number.isFinite(profile.maxTokens) || profile.maxTokens < 1) throw new Error(`Invalid maxTokens in ${path}`);
   if (profile.thinkingLevel !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(profile.thinkingLevel)) throw new Error(`Invalid thinkingLevel in ${path}`);
   if (profile.maxTokensField !== undefined && profile.maxTokensField !== "max_tokens" && profile.maxTokensField !== "max_completion_tokens") throw new Error(`Invalid maxTokensField in ${path}`);
+}
+
+function validateHttpUrl(value: string, label: string): void {
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { throw new Error(`Invalid ${label}`); }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`Invalid ${label}`);
 }

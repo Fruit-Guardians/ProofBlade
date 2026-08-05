@@ -31,6 +31,7 @@ import type {
   RunKind,
   RunListItem,
   ToolCallDebug,
+  TokenUsage,
 } from "./shared.js";
 
 interface SessionEntryLike {
@@ -222,7 +223,13 @@ export class DebugDataService {
     }
   }
 
-  public async chat(runId: string, prompt: string, emit: (event: ChatStreamEvent) => void): Promise<void> {
+  public async chat(
+    runId: string,
+    prompt: string,
+    emit: (event: ChatStreamEvent) => void,
+    profile?: ModelProfileConfig,
+    capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
+  ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
     if (!text) throw new Error("Prompt is required");
@@ -237,6 +244,7 @@ export class DebugDataService {
     emit({ type: "started", runId });
     let runtime: ProofBladeToolRuntime | undefined;
     let lane: PiCodingLane | PiSolverLane | undefined;
+    const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
       if (runKind(snapshot.task) === "chat") {
         lane = await PiCodingLane.create({
@@ -244,7 +252,8 @@ export class DebugDataService {
           runId,
           runDir: join(this.services.runsRoot, runId),
           controlStore: this.services.control,
-          config: this.config,
+          config: runConfig,
+          capabilities,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       } else {
@@ -256,7 +265,7 @@ export class DebugDataService {
           runDir: join(this.services.runsRoot, runId),
           controlStore: this.services.control,
           artifactStore: this.services.artifacts,
-          config: this.config,
+          config: runConfig,
           runtime,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
@@ -266,7 +275,7 @@ export class DebugDataService {
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
       }
-      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: outcome.usage });
+      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage() });
     } catch (error) {
       emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -294,6 +303,7 @@ export class DebugDataService {
           path: item.path,
           metadata: item.metadata,
           stats,
+          usage: usageFromMessages(conversationMessagesFromEntries(branch)),
           entries,
           branchEntryIds: branch.map((entry) => entry.id),
           assistantTurns,
@@ -379,7 +389,7 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       model: message.model,
       stopReason: message.stopReason,
       error: message.errorMessage,
-      usage: message.usage,
+      usage: normalizeUsage(message.usage),
       raw: entry,
     });
   }
@@ -465,6 +475,16 @@ function asContent(value: unknown): ContentLike[] {
 }
 
 function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {
+  if (event.type === "before_provider_payload") {
+    const payload = event.payload && typeof event.payload === "object" ? event.payload as Record<string, unknown> : {};
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+    const tools = Array.isArray(payload.tools) ? payload.tools : [];
+    const messageChars = JSON.stringify(messages).length;
+    const toolSchemaChars = JSON.stringify(tools).length;
+    const systemPromptChars = messages.filter((item) => item && typeof item === "object" && (item as Record<string, unknown>).role === "system").map((item) => JSON.stringify(item)).join("").length;
+    emit({ type: "context_snapshot", messages: messages.length, tools: tools.length, systemPromptChars, messageChars, toolSchemaChars, estimatedVisibleTokens: Math.ceil((messageChars + toolSchemaChars) / 4) });
+    return;
+  }
   if (event.type === "message_update") {
     const update = event.assistantMessageEvent;
     if (update.type === "text_delta") emit({ type: "text_delta", delta: update.delta });
@@ -478,6 +498,39 @@ function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent)
   if (event.type === "tool_execution_end") {
     emit({ type: "tool_end", toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError });
   }
+}
+
+function normalizeUsage(value: unknown): TokenUsage | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const usage = value as Record<string, unknown>;
+  const number = (key: string): number => typeof usage[key] === "number" && Number.isFinite(usage[key]) ? usage[key] as number : 0;
+  return {
+    input: number("input"),
+    output: number("output"),
+    cacheRead: number("cacheRead"),
+    cacheWrite: number("cacheWrite"),
+    reasoning: number("reasoning"),
+    totalTokens: number("totalTokens") || number("input") + number("output") + number("cacheRead") + number("cacheWrite"),
+  };
+}
+
+function emptyUsage(): TokenUsage {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0 };
+}
+
+function usageFromMessages(messages: ChatMessageDebug[]): TokenUsage & { requests: number } {
+  const total: TokenUsage & { requests: number } = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, requests: 0 };
+  for (const message of messages) {
+    if (!message.usage) continue;
+    total.requests += 1;
+    total.input += message.usage.input;
+    total.output += message.usage.output;
+    total.cacheRead += message.usage.cacheRead;
+    total.cacheWrite += message.usage.cacheWrite;
+    total.reasoning += message.usage.reasoning;
+    total.totalTokens += message.usage.totalTokens;
+  }
+  return total;
 }
 
 export function assertRunId(runId: string): void {

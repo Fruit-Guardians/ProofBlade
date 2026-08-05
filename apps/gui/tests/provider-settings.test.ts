@@ -39,11 +39,13 @@ test("persists provider overrides outside the repository response without exposi
     const settings = await store.save({
       provider: "gateway",
       baseUrl: "https://example.test/v1/",
+      proxyUrl: "http://127.0.0.1:7897/",
       model: "small-model",
       thinkingLevel: "low",
       apiKey: "test-secret",
     });
     assert.equal(settings.baseUrl, "https://example.test/v1");
+    assert.equal(settings.proxyUrl, "http://127.0.0.1:7897");
     assert.equal(settings.model, "small-model");
     assert.equal(settings.hasApiKey, true);
     assert.equal("apiKey" in settings, false);
@@ -53,6 +55,7 @@ test("persists provider overrides outside the repository response without exposi
     const reloaded = await ProviderSettingsStore.create(config, path);
     assert.equal(reloaded.publicSettings().hasApiKey, true);
     assert.equal(reloaded.modelProfile().thinkingLevel, "low");
+    assert.equal(reloaded.modelProfile().proxyUrl, "http://127.0.0.1:7897");
     assert.equal(reloaded.modelProfile().reasoning, true);
     assert.equal(reloaded.modelProfile().supportsReasoningEffort, true);
     assert.equal(reloaded.modelProfile().maxTokensField, "max_completion_tokens");
@@ -81,5 +84,57 @@ test("discovers OpenAI-compatible models with the configured bearer key", async 
     assert.deepEqual(result.models, ["chat-a", "chat-b"]);
   } finally {
     await new Promise<void>((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise()));
+  }
+});
+
+test("keeps multiple provider profiles, keys, and activation independent", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const path = join(root, "tmp", `provider-profiles-${Date.now()}.json`);
+  delete process.env.PROOFBLADE_GUI_RELAY_A_API_KEY;
+  delete process.env.PROOFBLADE_GUI_RELAY_B_API_KEY;
+
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    let settings = await store.save({
+      name: "Relay A",
+      provider: "relay-a",
+      baseUrl: "https://relay-a.example/v1",
+      model: "model-a",
+      models: ["model-a", "model-a-fast"],
+      thinkingLevel: "low",
+      apiKey: "secret-a",
+    });
+    const relayA = settings.profiles.find((profile) => profile.name === "Relay A");
+    assert.ok(relayA);
+
+    settings = await store.save({
+      name: "Relay B",
+      provider: "relay-b",
+      baseUrl: "https://relay-b.example/v1",
+      model: "model-b",
+      models: ["model-b"],
+      thinkingLevel: "medium",
+      apiKey: "secret-b",
+    });
+    const relayB = settings.profiles.find((profile) => profile.name === "Relay B");
+    assert.ok(relayB);
+    assert.equal(settings.activeProfileId, relayB.id);
+    assert.equal("apiKey" in relayA, false);
+    assert.equal("apiKey" in relayB, false);
+
+    assert.equal(store.modelProfile(relayA.id).apiKeyEnv, "PROOFBLADE_GUI_RELAY_A_API_KEY");
+    assert.equal(process.env.PROOFBLADE_GUI_RELAY_A_API_KEY, "secret-a");
+    assert.equal(store.modelProfile(relayB.id).apiKeyEnv, "PROOFBLADE_GUI_RELAY_B_API_KEY");
+    assert.equal(process.env.PROOFBLADE_GUI_RELAY_B_API_KEY, "secret-b");
+
+    settings = await store.activate(relayA.id);
+    assert.equal(settings.activeProfileId, relayA.id);
+    settings = await store.remove(relayB.id);
+    assert.equal(settings.profiles.some((profile) => profile.id === relayB.id), false);
+    assert.equal(settings.activeProfileId, relayA.id);
+  } finally {
+    delete process.env.PROOFBLADE_GUI_RELAY_A_API_KEY;
+    delete process.env.PROOFBLADE_GUI_RELAY_B_API_KEY;
+    await rm(path, { force: true });
   }
 });

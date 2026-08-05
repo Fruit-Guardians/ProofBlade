@@ -27,7 +27,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
 - Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
 
-Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI can discover and select models, and stores its override plus API key only in the user's `.proofblade/gui-provider.json`; neither the repository nor API responses receive the key. Pi 0.83.0 declares Node.js 22.19 or newer.
+Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI manages multiple relay or local-model profiles and lets each conversation select its provider, model, and thinking level. Profiles and keys stay in the user's `.proofblade/gui-provider.json`; folders and conversation preferences stay in `.proofblade/gui-workspace.json`. Neither file enters the repository, and API responses never expose key values. Pi 0.83.0 declares Node.js 22.19 or newer.
 
 ## Quick start
 
@@ -60,14 +60,20 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 Open `http://127.0.0.1:4173`; the default view is the Agent conversation. "New conversation" creates an ordinary coding-agent session with no Fixture and drives the configured real model through SSE, with workspace `read`, `bash`, `edit`, and `write` tools available on demand. "Fixture test" is a separate entry point for interactive debugging or automatic execution; only that path loads the target sandbox, evidence gates, and recovery workflow. Text, thinking, and Tool start/end events render while the turn is running, then the durable Pi Session replaces the temporary stream.
 
-The gear button opens Provider settings for an OpenAI-compatible Base URL and API key, `/models` discovery, model selection, and thinking level. On Windows, the local file defaults to `%USERPROFILE%\.proofblade\gui-provider.json`. API responses expose only `hasApiKey`, never the key value. Saved settings apply to the next turn without changing a checked-in file.
+The gear button opens the relay and model manager. It can create multiple OpenAI-compatible profiles, each with its own name, Base URL, API key, optional proxy URL, discovered model list, and default thinking level. Model discovery and real conversations share the profile proxy. On Windows, the local file defaults to `%USERPROFILE%\.proofblade\gui-provider.json`. API responses expose only `hasApiKey`, never the key value. The controls below the composer switch provider, model, and thinking level per conversation.
+
+Conversations can be grouped into custom folders and filtered from the sidebar. The capability dialog lists built-in Tools, Skills, and MCP servers and persists a separate enabled set for each conversation. Folder and conversation settings live in `%USERPROFILE%\.proofblade\gui-workspace.json`.
+
+The context panel separates provider-reported input, output, reasoning, cache-read, and cache-write tokens from the visible request estimate. Some relays report several thousand input tokens even for a tiny prompt because of gateway or model-template overhead. When the upstream response omits cache fields, the UI shows zero instead of estimating a cache hit.
 
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
 - tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
 - correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;
 - a browser Web Worker Script Lab with JSON, table, and text result views;
-- separate ordinary coding-agent and Fixture-test paths, with recovery, checkpoints, evidence, and Artifact inspection scoped to Fixture runs.
+- separate ordinary coding-agent and Fixture-test paths, with recovery, checkpoints, evidence, and Artifact inspection scoped to Fixture runs;
+- multiple relay profiles, per-conversation model selection, conversation folders, and Tool/Skill/MCP switches;
+- separate provider-token, visible-context, and cache-field accounting.
 
 Script Lab receives the selected complete Tool debug object as `input`. Scripts return a value with normal JavaScript `return`, run for at most 1500 ms, and remain inside a temporary browser Worker. See `docs/gui.md` for the object shape and local API.
 

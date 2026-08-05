@@ -1,13 +1,14 @@
 import {
   Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
-  CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Gauge, History,
-  KeyRound, Layers3, Menu, MessageSquare, PanelRight, Pause, Play, Plus, RefreshCw, RotateCcw, Search,
-  Send, ServerCog, Settings, ShieldCheck, TerminalSquare, UserRound, Wrench, X, Zap,
+  CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Folder, FolderOpen,
+  FolderPlus, Gauge, History, KeyRound, Layers3, ListChecks, Menu, MessageSquare, PanelRight, Pause,
+  Play, Plus, RefreshCw, RotateCcw, Search, Send, ServerCog, Settings, ShieldCheck, TerminalSquare,
+  UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { createCheckpoint, createConversation, createFixtureConversation, discoverProviderModels, getArtifact, getBootstrap, getProviderSettings, getRun, getRuns, reconcileRun, startSolve, streamChat, updateProviderSettings } from "./api.js";
+import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getProviderSettings, getRun, getRuns, getWorkspaceSettings, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, PiSessionDebug, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, PiSessionDebug, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, WorkspaceSettings } from "./shared.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -52,6 +53,8 @@ const scriptPresets = {
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapData>();
+  const [providers, setProviders] = useState<ProviderSettings>();
+  const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>();
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [runId, setRunId] = useState<string>();
   const [detail, setDetail] = useState<RunDetail>();
@@ -59,6 +62,7 @@ export function App() {
   const [search, setSearch] = useState("");
   const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [folderFilter, setFolderFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>();
@@ -66,6 +70,8 @@ export function App() {
   const [newRunOpen, setNewRunOpen] = useState(false);
   const [fixtureOpen, setFixtureOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
+  const [capabilityOpen, setCapabilityOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -77,6 +83,10 @@ export function App() {
       const chosen = next.find((item) => item.runId === stored && item.kind === "chat") ?? next.find((item) => item.kind === "chat") ?? next[0];
       if (chosen) setRunId(chosen.runId);
     }
+  }, []);
+
+  const refreshWorkspace = useCallback(async () => {
+    setWorkspaceSettings(await getWorkspaceSettings());
   }, []);
 
   const refreshDetail = useCallback(async (selected: string, quiet = false) => {
@@ -93,7 +103,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void Promise.all([getBootstrap(), refreshRuns(true)]).then(([data]) => setBootstrap(data)).catch((caught) => setError(message(caught))).finally(() => setLoading(false));
+    void Promise.all([getBootstrap(), getProviderSettings(), getWorkspaceSettings(), refreshRuns(true)]).then(([data, provider, workspace]) => {
+      setBootstrap(data); setProviders(provider); setWorkspaceSettings(workspace);
+    }).catch((caught) => setError(message(caught))).finally(() => setLoading(false));
   }, [refreshRuns]);
 
   useEffect(() => {
@@ -119,8 +131,10 @@ export function App() {
 
   const filteredRuns = useMemo(() => runs.filter((run) => {
     const matchesSearch = `${run.runId} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
-    return run.kind === runKindFilter && matchesSearch && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
-  }), [runKindFilter, runs, search, statusFilter]);
+    const conversationFolder = workspaceSettings?.conversations[run.runId]?.folderId;
+    const matchesFolder = folderFilter === "ALL" || (folderFilter === "UNCATEGORIZED" ? !conversationFolder : conversationFolder === folderFilter);
+    return run.kind === runKindFilter && matchesSearch && matchesFolder && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
+  }), [folderFilter, runKindFilter, runs, search, statusFilter, workspaceSettings]);
   const visibleTabs = detail?.kind === "chat"
     ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline")
     : tabItems;
@@ -151,6 +165,12 @@ export function App() {
       {runKindFilter === "fixture" && <div className="filter-row">
         {[["ALL", "全部"], ["RUNNING", "运行中"], ["SUCCEEDED", "成功"], ["FAILED", "异常"]].map(([value, label]) => <button key={value} className={statusFilter === value ? "active" : ""} onClick={() => setStatusFilter(value)}>{label}</button>)}
       </div>}
+      {runKindFilter === "chat" && <div className="folder-filter">
+        <button className={folderFilter === "ALL" ? "active" : ""} onClick={() => setFolderFilter("ALL")}><FolderOpen size={13} />全部对话<span>{runs.filter((run) => run.kind === "chat").length}</span></button>
+        <button className={folderFilter === "UNCATEGORIZED" ? "active" : ""} onClick={() => setFolderFilter("UNCATEGORIZED")}><Folder size={13} />未分类<span>{runs.filter((run) => run.kind === "chat" && !workspaceSettings?.conversations[run.runId]?.folderId).length}</span></button>
+        {workspaceSettings?.folders.map((folder) => <button key={folder.id} className={folderFilter === folder.id ? "active" : ""} onClick={() => setFolderFilter(folder.id)}><Folder size={13} />{folder.name}<span>{runs.filter((run) => run.kind === "chat" && workspaceSettings.conversations[run.runId]?.folderId === folder.id).length}</span></button>)}
+        <button className="folder-add" title="管理文件夹" aria-label="管理文件夹" onClick={() => setFolderOpen(true)}><FolderPlus size={14} /></button>
+      </div>}
       <div className="run-list">
         {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
           <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
@@ -173,6 +193,7 @@ export function App() {
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
           {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
           <button className="icon-button" title="Provider 设置" aria-label="Provider 设置" onClick={() => setProviderOpen(true)}><Settings size={17} /></button>
+          {detail?.kind === "chat" && <button className="icon-button" title="Tool、Skill、MCP" aria-label="Tool、Skill、MCP" onClick={() => setCapabilityOpen(true)}><ListChecks size={17} /></button>}
           <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll()}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
           <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
         </div>
@@ -185,7 +206,7 @@ export function App() {
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
         {!detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
-        {detail && tab === "chat" && <Conversation detail={detail} onRefresh={() => refreshDetail(detail.snapshot.runId, true)} onError={setError} onNew={() => setNewRunOpen(true)} />}
+        {detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={() => refreshDetail(detail.snapshot.runId, true)} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
         {detail && tab === "overview" && <Overview detail={detail} />}
         {detail && tab === "debugger" && <ToolDebugger detail={detail} />}
         {detail && tab === "timeline" && <Timeline detail={detail} />}
@@ -199,9 +220,11 @@ export function App() {
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
       {detail ? <Metrics detail={detail} bootstrap={bootstrap} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
-    {newRunOpen && <NewConversationModal onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setRunId(id); void refreshRuns(); }} />}
+    {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshRuns(); void refreshWorkspace(); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
-    {providerOpen && <ProviderSettingsModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
+    {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
+    {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
+    {capabilityOpen && detail?.kind === "chat" && workspaceSettings && <CapabilityModal runId={detail.snapshot.runId} workspace={workspaceSettings} onClose={() => setCapabilityOpen(false)} onSaved={async () => { setWorkspaceSettings(await getWorkspaceSettings()); setNotice("本对话能力配置已保存"); }} />}
   </div>;
 }
 
@@ -213,7 +236,7 @@ interface LiveToolCall {
   result?: unknown;
 }
 
-function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void }) {
+function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefresh, onError, onNew, onCapabilities }: { detail: RunDetail; providers?: ProviderSettings; workspace?: WorkspaceSettings; onWorkspaceChange(value: WorkspaceSettings): void; onRefresh(): Promise<void>; onError(error: string): void; onNew(): void; onCapabilities(): void }) {
   const preferred = detail.sessions.find((item) => item.metadata?.purpose === (detail.kind === "chat" ? "chat" : "solve")) ?? detail.sessions.at(-1);
   const [sessionId, setSessionId] = useState(preferred?.id ?? "");
   const session = detail.sessions.find((item) => item.id === sessionId) ?? preferred;
@@ -225,6 +248,9 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
   const [liveTools, setLiveTools] = useState<LiveToolCall[]>([]);
   const [failedUser, setFailedUser] = useState<string>();
   const [turnError, setTurnError] = useState<string>();
+  const [contextSnapshot, setContextSnapshot] = useState<Extract<ChatStreamEvent, { type: "context_snapshot" }>>();
+  const [contextOpen, setContextOpen] = useState(false);
+  const [preferences, setPreferences] = useState<ConversationPreferences>();
   const [selectedCallId, setSelectedCallId] = useState<string>();
   const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
   const latestAssistant = session?.messages.slice().reverse().find((item) => item.role === "assistant");
@@ -243,6 +269,18 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
     if (!failedUser || !session?.messages.some((item) => item.role === "user" && item.text === failedUser)) return;
     setFailedUser(undefined);
   }, [failedUser, session?.messages]);
+  useEffect(() => {
+    let active = true;
+    setPreferences(workspace?.conversations[detail.snapshot.runId]);
+    void getConversationPreferences(detail.snapshot.runId).then((next) => active && setPreferences(next)).catch(() => undefined);
+    return () => { active = false; };
+  }, [detail.snapshot.runId, workspace]);
+
+  const savePreferences = async (patch: Partial<ConversationPreferences>) => {
+    const next = await updateConversationPreferences(detail.snapshot.runId, { ...(preferences ?? {}), ...patch });
+    setPreferences(next);
+    if (workspace) onWorkspaceChange({ ...workspace, conversations: { ...workspace.conversations, [detail.snapshot.runId]: next } });
+  };
 
   const submit = async () => {
     const prompt = draft.trim();
@@ -266,6 +304,7 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
         if (event.type === "thinking_delta") setLiveThinking((current) => current + event.delta);
         if (event.type === "tool_start") setLiveTools((current) => [...current.filter((item) => item.id !== event.toolCallId), { id: event.toolCallId, name: event.toolName, status: "running", args: event.args }]);
         if (event.type === "tool_end") setLiveTools((current) => current.map((item) => item.id === event.toolCallId ? { ...item, status: event.isError ? "error" : "success", result: event.result } : item));
+        if (event.type === "context_snapshot") setContextSnapshot(event);
         if (event.type === "done" && !receivedTextDelta) setLiveText(event.text);
         if (event.type === "error") streamError = event.error;
       });
@@ -301,11 +340,12 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
       <div className="message-thread" ref={thread}>
         {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
         {session?.messages.map((chat) => {
+          const isPendingMessage = Boolean(pendingUser && chat.role === "user" && chat.text === pendingUser && chat.id === session.messages.slice().reverse().find((item) => item.role === "user")?.id);
           const calls = session.toolCalls.filter((call) => call.assistantEntryId === chat.entryId);
           return <article className={`chat-message role-${chat.role}`} key={chat.id}>
             <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
             <div className="message-content">
-              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}</div>
+              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}</div>
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
               {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
@@ -313,14 +353,23 @@ function Conversation({ detail, onRefresh, onError, onNew }: { detail: RunDetail
             </div>
           </article>;
         })}
-        {pendingUser && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送中</span></div><MessageText text={pendingUser} /></div></article>}
+        {pendingUser && !session?.messages.slice().reverse().find((item) => item.role === "user" && item.text === pendingUser) && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span className="sending-label"><i />发送中</span></div><MessageText text={pendingUser} /></div></article>}
         {failedUser && !pendingUser && <article className="chat-message role-user failed-message"><div className="message-avatar"><CircleAlert size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送失败，内容已放回输入框</span></div><MessageText text={failedUser} /></div></article>}
         {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <div key={call.id} className={`message-tool tool-${call.status}`}><span>{call.status === "running" ? <RefreshCw className="spin" size={13} /> : call.status === "success" ? <Check size={13} /> : <CircleAlert size={13} />}</span><strong>{call.name}</strong><code>{shortId(call.id)}</code><em>{call.status}</em></div>)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
       </div>
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
         {turnError && <div className="turn-error"><CircleAlert size={14} /><span>{turnError}</span><button title="关闭" aria-label="关闭发送错误" onClick={() => setTurnError(undefined)}><X size={13} /></button></div>}
-        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · {session?.stats.totalTokens ?? 0} tokens</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
+        {preferences && <div className="composer-context">
+          <label title="本对话使用的中转站"><ServerCog size={13} /><select aria-label="本对话 Provider" value={preferences.profileId} onChange={(event) => { const next = providers?.profiles.find((item) => item.id === event.target.value); void savePreferences({ profileId: event.target.value, model: next?.model ?? preferences.model }); }} >{providers?.profiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name} · {profile.provider}</option>)}</select></label>
+          <label title="本对话使用的模型"><Bot size={13} /><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
+          <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
+          <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
+          <button type="button" className="context-button" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(session?.usage.totalTokens ?? session?.stats.totalTokens ?? 0)}</span></button>
+          <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
+        </div>}
+        {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
+        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · 输入 {formatNumber(session?.usage.input ?? 0)} · 输出 {formatNumber(session?.usage.output ?? 0)} · 缓存 {formatNumber((session?.usage.cacheRead ?? 0) + (session?.usage.cacheWrite ?? 0))}</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
@@ -338,6 +387,28 @@ function ConversationToolInspector({ call, onClose }: { call: ToolCallDebug; onC
     <div className="conversation-json">{view === "tree" ? <JsonTree key={`${call.id}:${source}`} value={inspected} /> : <RawJson value={inspected} />}</div>
     <ScriptLab input={call} compact />
   </aside>;
+}
+
+function modelOptions(providers: ProviderSettings | undefined, preferences: ConversationPreferences): string[] {
+  const profile = providers?.profiles.find((item) => item.id === preferences.profileId);
+  return [...new Set([preferences.model, ...(profile?.models ?? [])].filter(Boolean))];
+}
+
+function ContextBreakdown({ session, snapshot }: { session?: PiSessionDebug; snapshot?: Extract<ChatStreamEvent, { type: "context_snapshot" }> }) {
+  const usage = session && session.usage.requests > 0 ? session.usage : session ? { ...session.usage, input: session.stats.uncachedTokens, totalTokens: session.stats.totalTokens } : undefined;
+  return <div className="context-breakdown">
+    <div className="context-breakdown-head"><strong>本会话上下文</strong><span>Provider usage 为上游实际计数</span></div>
+    <div className="context-breakdown-grid">
+      <MetricLine label="输入" value={`${formatNumber(usage?.input ?? 0)} tokens`} />
+      <MetricLine label="输出" value={`${formatNumber(usage?.output ?? 0)} tokens`} />
+      <MetricLine label="缓存读取" value={`${formatNumber(usage?.cacheRead ?? 0)} tokens`} />
+      <MetricLine label="缓存写入" value={`${formatNumber(usage?.cacheWrite ?? 0)} tokens`} />
+      <MetricLine label="推理" value={`${formatNumber(usage?.reasoning ?? 0)} tokens`} />
+      <MetricLine label="请求次数" value={String(usage?.requests ?? 0)} />
+    </div>
+    {snapshot && <div className="context-visible-detail"><span>当前请求可见消息 {snapshot.messages} 条</span><span>启用 Tool {snapshot.tools} 个</span><span>系统提示 {formatNumber(snapshot.systemPromptChars)} chars</span><span>消息 {formatNumber(snapshot.messageChars)} chars</span><span>Tool schema {formatNumber(snapshot.toolSchemaChars)} chars</span><span>可见估算 {formatNumber(snapshot.estimatedVisibleTokens)} tokens</span></div>}
+    <div className="context-note">缓存由中转站返回的 usage 字段决定；当前 Provider 未返回缓存命中字段时，缓存读取与写入显示为 0，输入仍按上游原值统计。</div>
+  </div>;
 }
 
 function MessageText({ text }: { text: string }) {
@@ -467,11 +538,25 @@ function Artifacts({ detail }: { detail: RunDetail }) {
 function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: BootstrapData }) {
   const { telemetry, snapshot } = detail;
   const contextWindow = snapshot.versionSnapshot ? 1 : 1;
-  const tokenTotal = telemetry.provider.tokens.total;
+  const sessionUsage = detail.sessions.reduce((total, session) => ({
+    input: total.input + session.usage.input,
+    output: total.output + session.usage.output,
+    reasoning: total.reasoning + session.usage.reasoning,
+    cacheRead: total.cacheRead + session.usage.cacheRead,
+    cacheWrite: total.cacheWrite + session.usage.cacheWrite,
+    total: total.total + session.usage.totalTokens,
+    requests: total.requests + session.usage.requests,
+  }), { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0, requests: 0 });
+  const hasSessionUsage = sessionUsage.requests > 0;
+  const tokenInput = hasSessionUsage ? sessionUsage.input : telemetry.provider.tokens.input;
+  const tokenOutput = hasSessionUsage ? sessionUsage.output : telemetry.provider.tokens.output;
+  const tokenReasoning = hasSessionUsage ? sessionUsage.reasoning : telemetry.provider.tokens.reasoning;
+  const tokenCacheRead = hasSessionUsage ? sessionUsage.cacheRead : telemetry.provider.tokens.cacheRead;
+  const tokenTotal = hasSessionUsage ? sessionUsage.total : telemetry.provider.tokens.total;
   const effects = Object.values(snapshot.effects);
   return <div className="metrics-content">
-    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>tokens</span></div><div><span>模型用量</span><strong>{telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
-    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入" value={formatNumber(telemetry.provider.tokens.input)} /><MetricLine label="输出" value={formatNumber(telemetry.provider.tokens.output)} /><MetricLine label="推理" value={formatNumber(telemetry.provider.tokens.reasoning)} /><MetricLine label="缓存读取" value={formatNumber(telemetry.provider.tokens.cacheRead)} /></section>
+    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
+    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入" value={formatNumber(tokenInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="缓存读取" value={formatNumber(tokenCacheRead)} /><MetricLine label="缓存写入" value={formatNumber(hasSessionUsage ? sessionUsage.cacheWrite : 0)} /></section>
     <section><div className="metrics-title"><Clock3 size={14} />延迟与成本</div><MetricLine label="平均延迟" value={`${Math.round(telemetry.provider.latencyMs.average)} ms`} /><MetricLine label="P95" value={`${Math.round(telemetry.provider.latencyMs.p95)} ms`} /><MetricLine label="执行时长" value={formatDuration(telemetry.durationMs)} /><MetricLine label="成本" value={`$${telemetry.provider.cost.totalUsd.toFixed(4)}`} /></section>
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
@@ -479,9 +564,87 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
   </div>;
 }
 
+function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(): Promise<void> }) {
+  const [settings, setSettings] = useState<ProviderSettings>();
+  const [selectedId, setSelectedId] = useState("");
+  const [name, setName] = useState("");
+  const [provider, setProvider] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("");
+  const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
+  const [models, setModels] = useState<string[]>([]);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [clearApiKey, setClearApiKey] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const current = settings?.profiles.find((profile) => profile.id === selectedId);
+
+  useEffect(() => {
+    void getProviderSettings().then((next) => {
+      setSettings(next); setSelectedId(next.activeProfileId); loadProfile(next.profiles.find((profile) => profile.id === next.activeProfileId));
+    }).catch((caught) => setError(message(caught)));
+  }, []);
+
+  const loadProfile = (profile?: ProviderProfile) => {
+    if (!profile) return;
+    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
+  };
+
+  const createNew = () => {
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+  };
+
+  const discover = async () => {
+    setDiscovering(true); setError(undefined);
+    try {
+      const result = await discoverProviderModels({ profileId: selectedId || undefined, baseUrl, proxyUrl: proxyUrl.trim(), ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
+      setModels(result.models); setBaseUrl(result.baseUrl); if (!result.models.includes(model)) setModel(result.models[0] ?? model);
+    } catch (caught) { setError(message(caught)); } finally { setDiscovering(false); }
+  };
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try {
+      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
+      setSettings(saved); setSelectedId(saved.activeProfileId); loadProfile(saved.profiles.find((profile) => profile.id === saved.activeProfileId)); setHasApiKey(saved.profiles.find((profile) => profile.id === saved.activeProfileId)?.hasApiKey ?? false); await onSaved();
+    } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    if (!selectedId || !window.confirm("删除当前 Provider 配置？")) return;
+    setBusy(true); setError(undefined);
+    try { const next = await removeProvider(selectedId); setSettings(next); loadProfile(next.profiles.find((profile) => profile.id === next.activeProfileId)); await onSaved(); } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
+  };
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <form className="modal provider-modal provider-profiles-modal" onSubmit={(event) => void save(event)}>
+      <header><div><Settings size={17} /><strong>中转站与模型</strong><span className="modal-subtitle">{settings?.localPath ?? "本地配置"}</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>
+      {error && <div className="script-error">{error}</div>}
+      <div className="provider-layout">
+        <aside className="provider-list"><div className="section-head"><strong>Provider</strong><button type="button" className="icon-button" title="新建 Provider" aria-label="新建 Provider" onClick={createNew}><Plus size={15} /></button></div>{settings?.profiles.map((profile) => <button type="button" key={profile.id} className={`provider-list-item ${selectedId === profile.id ? "selected" : ""}`} onClick={() => loadProfile(profile)}><span className="provider-list-dot" /><span><strong>{profile.name}</strong><small>{profile.provider} · {profile.model}</small></span>{settings.activeProfileId === profile.id && <em>当前</em>}</button>)}</aside>
+        <div className="provider-form">
+          <div className="provider-grid"><label><span>配置名称</span><input required value={name} onChange={(event) => setName(event.target.value)} /></label><label><span>Provider ID</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label></div>
+          <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://aihub.top/v1" /></label>
+          <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7897" /></label>
+          <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
+          {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
+          <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{[...new Set([model, ...models].filter(Boolean))].map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}刷新模型</button></div></label>
+          <label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label>
+          <div className="provider-form-note">Key 只保存在本机配置，API 仅返回已配置状态。保存后新对话默认使用当前配置，已有对话保留自己的选择。</div>
+        </div>
+      </div>
+      <footer><button type="button" className="command-button danger-button" disabled={!selectedId || busy || settings?.profiles.length === 1} onClick={() => void remove()}><X size={14} />删除配置</button><span className="status-spacer" /><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !model}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存并使用</button></footer>
+    </form>
+  </div>;
+}
+
 function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(): Promise<void> }) {
   const [provider, setProvider] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
@@ -501,6 +664,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
       if (!active) return;
       setProvider(settings.provider);
       setBaseUrl(settings.baseUrl);
+      setProxyUrl(settings.proxyUrl);
       setModel(settings.model);
       setThinkingLevel(settings.thinkingLevel);
       setHasApiKey(settings.hasApiKey);
@@ -512,7 +676,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const discover = async () => {
     setDiscovering(true); setError(undefined); setOnline(undefined);
     try {
-      const result = await discoverProviderModels({ baseUrl, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
+      const result = await discoverProviderModels({ baseUrl, proxyUrl: proxyUrl.trim(), ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
       setModels(result.models);
       setBaseUrl(result.baseUrl);
       setOnline(true);
@@ -526,6 +690,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
       const saved = await updateProviderSettings({
         provider,
         baseUrl,
+        proxyUrl: proxyUrl.trim(),
         model,
         thinkingLevel,
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
@@ -549,6 +714,7 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
           <label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label>
         </div>
         <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setOnline(undefined); }} placeholder="http://127.0.0.1:1234/v1" /></label>
+        <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => { setProxyUrl(event.target.value); setOnline(undefined); }} placeholder="http://127.0.0.1:7897" /></label>
         <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
         {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
         <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{modelOptions.map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}读取模型</button></div></label>
@@ -559,16 +725,53 @@ function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(
   </div>;
 }
 
-function NewConversationModal({ onClose, onCreated }: { onClose(): void; onCreated(id: string): void }) {
+function FolderManagerModal({ folders, onClose, onChanged }: { folders: ConversationFolder[]; onClose(): void; onChanged(): Promise<void> }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const add = async (event: FormEvent) => {
+    event.preventDefault(); if (!name.trim()) return; setBusy(true); setError(undefined);
+    try { await createFolder(name); setName(""); await onChanged(); } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
+  };
+  const rename = async (folder: ConversationFolder) => {
+    const next = window.prompt("文件夹名称", folder.name)?.trim(); if (!next || next === folder.name) return;
+    try { await renameFolder(folder.id, next); await onChanged(); } catch (caught) { setError(message(caught)); }
+  };
+  const remove = async (folder: ConversationFolder) => {
+    if (!window.confirm(`删除文件夹“${folder.name}”？对话会保留并回到未分类。`)) return;
+    try { await removeFolder(folder.id); await onChanged(); } catch (caught) { setError(message(caught)); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal folder-modal"><header><div><Folder size={17} /><strong>对话文件夹</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<form className="folder-create" onSubmit={(event) => void add(event)}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="新文件夹名称" /><button className="primary-button" disabled={busy || !name.trim()}><FolderPlus size={14} />添加</button></form><div className="folder-manager-list">{folders.map((folder) => <div className="folder-manager-row" key={folder.id}><Folder size={15} /><strong>{folder.name}</strong><span className="status-spacer" /><button type="button" className="icon-button" title="重命名" aria-label={`重命名 ${folder.name}`} onClick={() => void rename(folder)}><Code2 size={14} /></button><button type="button" className="icon-button" title="删除" aria-label={`删除 ${folder.name}`} onClick={() => void remove(folder)}><X size={14} /></button></div>)}{!folders.length && <div className="empty-list">还没有文件夹</div>}</div><footer><button type="button" className="primary-button" onClick={onClose}>完成</button></footer></div></div>;
+}
+
+function CapabilityModal({ runId, workspace, onClose, onSaved }: { runId: string; workspace: WorkspaceSettings; onClose(): void; onSaved(): Promise<void> }) {
+  const [preferences, setPreferences] = useState<ConversationPreferences>();
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void getConversationPreferences(runId).then(setPreferences).catch((caught) => setError(message(caught))); }, [runId]);
+  const toggle = (key: "enabledTools" | "enabledSkills" | "enabledMcpServers", value: string) => setPreferences((current) => current ? { ...current, [key]: current[key].includes(value) ? current[key].filter((item) => item !== value) : [...current[key], value] } : current);
+  const save = async () => {
+    if (!preferences) return; setBusy(true); setError(undefined);
+    try { await updateConversationPreferences(runId, preferences); await onSaved(); onClose(); } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal capability-modal"><header><div><ListChecks size={17} /><strong>本对话能力</strong><span className="modal-subtitle">只影响当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}{!preferences ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取能力</div> : <div className="capability-sections"><CapabilitySection title="Coding Tools" icon={<Wrench size={14} />} items={workspace.capabilities.tools.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: `${item.schemaChars} chars`, enabled: preferences.enabledTools.includes(item.name) }))} onToggle={(id) => toggle("enabledTools", id)} /><CapabilitySection title="Skills" icon={<Zap size={14} />} items={workspace.capabilities.skills.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.path, enabled: !item.disabled && preferences.enabledSkills.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledSkills", id)} /><CapabilitySection title="MCP Servers" icon={<ServerCog size={14} />} items={workspace.capabilities.mcpServers.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.status, enabled: !item.disabled && preferences.enabledMcpServers.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledMcpServers", id)} /></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={busy || !preferences} onClick={() => void save()}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存能力</button></footer></div></div>;
+}
+
+function CapabilitySection({ title, icon, items, onToggle }: { title: string; icon: ReactNode; items: Array<{ id: string; name: string; description: string; meta: string; enabled: boolean; disabled?: boolean }>; onToggle(id: string): void }) {
+  return <section className="capability-section"><div className="section-head"><div>{icon}<strong>{title}</strong><span>{items.filter((item) => item.enabled).length}/{items.length}</span></div></div>{items.map((item) => <label className={`capability-row ${item.disabled ? "disabled" : ""}`} key={item.id}><input type="checkbox" checked={item.enabled} disabled={item.disabled} onChange={() => onToggle(item.id)} /><span><strong>{item.name}</strong><small>{item.description}</small><em>{item.meta}</em></span></label>)}{!items.length && <div className="empty-list">当前项目没有可用项</div>}</section>;
+}
+
+function NewConversationModal({ folders, onClose, onCreated }: { folders: ConversationFolder[]; onClose(): void; onCreated(id: string): void }) {
   const [runId, setRunId] = useState(`CHAT-${Date.now()}`);
   const [title, setTitle] = useState("新对话");
+  const [folderId, setFolderId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
-    try { await createConversation({ runId, title }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
+    try { await createConversation({ runId, title }); if (folderId) await updateConversationPreferences(runId, { folderId }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer></form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer></form></div>;
 }
 
 function FixtureTestModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {

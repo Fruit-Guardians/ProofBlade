@@ -27,7 +27,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
 
-Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 右上角的 Provider 设置可查询并选择模型，其覆盖配置和 Key 只写入用户目录 `.proofblade/gui-provider.json`，不会进入仓库或 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
+Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
 ## 快速开始
 
@@ -60,14 +60,20 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”创建不绑定 Fixture 的普通 Coding Agent 会话，通过 SSE 调用配置文件中的真实模型，并按需使用工作区 `read`、`bash`、`edit` 和 `write` 工具。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
 
-右上角齿轮打开 Provider 设置，可填写 OpenAI-compatible Base URL 和 API Key、读取 `/models`、选择模型与思考等级。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后下一轮对话立即使用新配置，无需改动仓库文件。
+右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表和默认思考等级；模型发现和真实对话共用该代理。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
+
+对话可以放入自定义文件夹并在侧栏筛选。输入框下方的能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停；Coding Agent 只把已启用能力装配到本轮。文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
+
+上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
 
 - 真实模型多轮对话、流式响应和消息内 Tool 调用；
 - `Run -> Pi Session -> assistant 轮次 -> Tool 调用` 的逐级选择；
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
 - 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
-- 普通 Coding Agent 与 Fixture 测试分离；Fixture 模式提供恢复核对、机械 Checkpoint、证据账本和 Artifact 内容查看。
+- 普通 Coding Agent 与 Fixture 测试分离；Fixture 模式提供恢复核对、机械 Checkpoint、证据账本和 Artifact 内容查看；
+- 多中转站 Profile、会话级模型切换、对话文件夹，以及 Tool/Skill/MCP 能力开关；
+- Provider Token、可见上下文和缓存字段的独立统计。
 
 Script Lab 的 `input` 始终是当前选中的完整 Tool 调试对象。脚本使用普通 JavaScript `return` 返回结果，执行上限为 1500 ms；代码只进入临时浏览器 Worker，不发送给服务端。完整对象结构和 API 见 `docs/gui.md`。
 

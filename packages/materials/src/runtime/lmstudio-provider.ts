@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ModelProfileConfig } from "../config.js";
+import { createProviderTransport } from "./provider-transport.js";
 
 export interface ResolvedModelProfile extends ModelProfileConfig {
   modelId: string;
@@ -14,13 +15,20 @@ export interface ResolvedModelProfile extends ModelProfileConfig {
 
 export async function resolveModelProfile(profile: ModelProfileConfig): Promise<ResolvedModelProfile> {
   const baseUrl = profile.baseUrl.replace(/\/$/, "");
-  const modelId = profile.model === "auto"
-    ? await discoverModel(baseUrl, profile.modelDiscoveryPath)
-    : profile.model;
+  if (profile.model !== "auto") {
+    return { ...profile, baseUrl, modelId: profile.model };
+  }
+  const transport = createProviderTransport(profile.proxyUrl);
+  let modelId: string;
+  try {
+    modelId = await discoverModel(baseUrl, profile.modelDiscoveryPath, transport?.fetch);
+  } finally {
+    await transport?.close();
+  }
   return { ...profile, baseUrl, modelId };
 }
 
-export function createConfiguredModels(config: ResolvedModelProfile): { models: MutableModels; model: Model<"openai-completions"> } {
+export function createConfiguredModels(config: ResolvedModelProfile): { models: MutableModels; model: Model<"openai-completions">; closeTransport(): Promise<void> } {
   const model: Model<"openai-completions"> = {
     id: config.modelId,
     name: config.modelId,
@@ -39,22 +47,30 @@ export function createConfiguredModels(config: ResolvedModelProfile): { models: 
       maxTokensField: config.maxTokensField ?? "max_tokens",
     },
   };
+  const transport = createProviderTransport(config.proxyUrl);
+  const baseApi = openAICompletionsApi();
+  const api = transport ? {
+    stream: (streamModel: typeof model, context: Parameters<typeof baseApi.stream>[1], options?: Parameters<typeof baseApi.stream>[2]) =>
+      baseApi.stream(streamModel, context, { ...options, fetch: transport.fetch }),
+    streamSimple: (streamModel: typeof model, context: Parameters<typeof baseApi.streamSimple>[1], options?: Parameters<typeof baseApi.streamSimple>[2]) =>
+      baseApi.streamSimple(streamModel, context, { ...options, fetch: transport.fetch }),
+  } : baseApi;
   const provider = createProvider<"openai-completions">({
     id: config.provider,
     name: config.provider,
     baseUrl: config.baseUrl,
     auth: { apiKey: envApiKeyAuth(`${config.provider} API key`, [config.apiKeyEnv]) },
     models: [model],
-    api: openAICompletionsApi(),
+    api,
   });
   process.env[config.apiKeyEnv] ??= "local-provider";
   const models = createModels();
   models.setProvider(provider);
-  return { models, model };
+  return { models, model, closeTransport: async () => { await transport?.close(); } };
 }
 
-async function discoverModel(baseUrl: string, discoveryPath: string): Promise<string> {
-  const response = await fetch(`${baseUrl}${discoveryPath}`, { signal: AbortSignal.timeout(10_000) });
+async function discoverModel(baseUrl: string, discoveryPath: string, providerFetch: typeof globalThis.fetch = fetch): Promise<string> {
+  const response = await providerFetch(`${baseUrl}${discoveryPath}`, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`LM Studio model discovery failed: HTTP ${response.status}`);
   const body = await response.json() as { data?: Array<{ id?: string }> };
   const model = body.data?.find((item) => item.id && !item.id.toLowerCase().includes("embed"));

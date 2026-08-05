@@ -80,7 +80,7 @@ Pi lifecycle subscriptions append low-sensitivity Provider and Tool telemetry to
 
 Every new Run stores one hashed version snapshot in `run_started`: ProofBlade, Pi and Node versions; prompt and context compiler versions/hashes; the full Tool Contract hash; router policy; project Skill content hashes; and MCP configuration hashes. Provider URLs, keys, prompt payloads, Tool arguments and target content stay outside this snapshot.
 
-Provider-specific reasoning behavior is configuration data. `thinkingLevel` selects Pi's level, while `reasoning`, `supportsReasoningEffort` and `maxTokensField` describe the OpenAI-compatible endpoint. API credentials are resolved only through the environment variable named by `apiKeyEnv`; neither the version snapshot nor telemetry records the variable value.
+Provider-specific reasoning and transport behavior is configuration data. `thinkingLevel` selects Pi's level, `reasoning`, `supportsReasoningEffort` and `maxTokensField` describe the OpenAI-compatible endpoint, and optional `proxyUrl` is shared by model discovery and provider requests. The CLI resolves credentials through the environment variable named by `apiKeyEnv`; the GUI may instead load its user-local `.proofblade` override. Neither the version snapshot nor telemetry records credential values.
 
 ## Debugging application
 

@@ -1,4 +1,4 @@
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -12,12 +12,44 @@ export async function getProviderSettings(): Promise<ProviderSettings> {
   return await request("/api/provider");
 }
 
-export async function discoverProviderModels(input: { baseUrl: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
+export async function discoverProviderModels(input: { profileId?: string; baseUrl: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
   return await request("/api/provider/models", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function updateProviderSettings(input: ProviderSettingsInput): Promise<ProviderSettings> {
   return await request("/api/provider", { method: "PUT", body: JSON.stringify(input) });
+}
+
+export async function activateProvider(profileId: string): Promise<ProviderSettings> {
+  return await request("/api/provider/active", { method: "PUT", body: JSON.stringify({ profileId }) });
+}
+
+export async function removeProvider(profileId: string): Promise<ProviderSettings> {
+  return await request(`/api/provider/${encodeURIComponent(profileId)}`, { method: "DELETE" });
+}
+
+export async function getWorkspaceSettings(): Promise<WorkspaceSettings> {
+  return await request("/api/workspace");
+}
+
+export async function getConversationPreferences(runId: string): Promise<ConversationPreferences> {
+  return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`);
+}
+
+export async function updateConversationPreferences(runId: string, input: Partial<ConversationPreferences>): Promise<ConversationPreferences> {
+  return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export async function createFolder(name: string): Promise<ConversationFolder> {
+  return await request("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export async function renameFolder(folderId: string, name: string): Promise<ConversationFolder> {
+  return await request(`/api/folders/${encodeURIComponent(folderId)}`, { method: "PUT", body: JSON.stringify({ name }) });
+}
+
+export async function removeFolder(folderId: string): Promise<void> {
+  await request(`/api/folders/${encodeURIComponent(folderId)}`, { method: "DELETE" });
 }
 
 export async function getRun(runId: string): Promise<RunDetail> {

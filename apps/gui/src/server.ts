@@ -2,10 +2,11 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
-import { loadConfig } from "@proofblade/materials";
+import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
-import type { ProviderSettingsInput, ProviderThinkingLevel } from "./shared.js";
+import { WorkspaceSettingsStore } from "./workspace-settings.js";
+import type { ConversationPreferences, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(option("--project-root") ?? process.env.PROOFBLADE_ROOT ?? resolve(guiRoot, "../.."));
@@ -15,6 +16,7 @@ const host = option("--host") ?? process.env.HOST ?? "127.0.0.1";
 const config = await loadConfig(projectRoot, configPath);
 const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
+const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
 let vite: Awaited<ReturnType<typeof createViteServer>>;
 
@@ -51,7 +53,9 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (method === "POST" && url.pathname === "/api/provider/models") {
     const body = await readBody(request);
     return sendJson(response, 200, await providerSettings.discover({
+      profileId: optionalString(body.profileId),
       baseUrl: optionalString(body.baseUrl),
+      proxyUrl: optionalString(body.proxyUrl),
       apiKey: optionalString(body.apiKey),
     }));
   }
@@ -61,6 +65,35 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     data.updateModelProfile(providerSettings.modelProfile());
     return sendJson(response, 200, saved);
   }
+  if (method === "PUT" && url.pathname === "/api/provider/active") {
+    const body = await readBody(request);
+    const saved = await providerSettings.activate(string(body.profileId, "profileId"));
+    data.updateModelProfile(providerSettings.modelProfile());
+    return sendJson(response, 200, saved);
+  }
+  if (method === "DELETE" && parts[0] === "api" && parts[1] === "provider" && parts[2]) {
+    const saved = await providerSettings.remove(parts[2]);
+    data.updateModelProfile(providerSettings.modelProfile());
+    return sendJson(response, 200, saved);
+  }
+  if (method === "GET" && url.pathname === "/api/workspace") {
+    const capabilities = await capabilityCatalog();
+    return sendJson(response, 200, workspaceSettings.publicSettings(capabilities, defaultPreferences(capabilities)));
+  }
+  if (method === "POST" && url.pathname === "/api/folders") {
+    const body = await readBody(request);
+    return sendJson(response, 201, await workspaceSettings.createFolder(string(body.name, "name")));
+  }
+  if (parts[0] === "api" && parts[1] === "folders" && parts[2]) {
+    if (method === "PUT") {
+      const body = await readBody(request);
+      return sendJson(response, 200, await workspaceSettings.renameFolder(parts[2], string(body.name, "name")));
+    }
+    if (method === "DELETE") {
+      await workspaceSettings.removeFolder(parts[2]);
+      return sendJson(response, 200, { ok: true });
+    }
+  }
   if (method === "GET" && url.pathname === "/api/runs") return sendJson(response, 200, await data.listRuns());
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
@@ -69,6 +102,16 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       title: typeof body.title === "string" ? body.title : "新对话",
     });
     return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
+  }
+  if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts[3] === "preferences") {
+    const capabilities = await capabilityCatalog();
+    const defaults = defaultPreferences(capabilities);
+    if (method === "GET") return sendJson(response, 200, normalizedPreferences(workspaceSettings.preferences(parts[2], defaults), capabilities));
+    if (method === "PUT") {
+      const body = await readBody(request);
+      const next = normalizedPreferences({ ...workspaceSettings.preferences(parts[2], defaults), ...conversationPreferencesInput(body, workspaceSettings.preferences(parts[2], defaults)) }, capabilities);
+      return sendJson(response, 200, await workspaceSettings.saveConversation(parts[2], next, defaults));
+    }
   }
   if (method === "POST" && url.pathname === "/api/fixture-conversations") {
     const body = await readBody(request);
@@ -102,7 +145,19 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
         if (!response.writableEnded) response.write(`data: ${JSON.stringify(event)}\n\n`);
       };
       try {
-        await data.chat(runId, string(body.prompt, "prompt"), emit);
+        const capabilities = await capabilityCatalog();
+        const preferences = normalizedPreferences(workspaceSettings.preferences(runId, defaultPreferences(capabilities)), capabilities);
+        await data.chat(
+          runId,
+          string(body.prompt, "prompt"),
+          emit,
+          providerSettings.modelProfile(preferences.profileId, preferences.model, preferences.thinkingLevel),
+          {
+            enabledTools: preferences.enabledTools,
+            enabledSkills: preferences.enabledSkills,
+            enabledMcpServers: preferences.enabledMcpServers,
+          },
+        );
       } catch (error) {
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
       } finally {
@@ -155,13 +210,83 @@ function optionalString(value: unknown): string | undefined {
 
 function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
   return {
+    id: optionalString(body.id),
+    name: string(body.name, "name"),
     provider: string(body.provider, "provider"),
     baseUrl: string(body.baseUrl, "baseUrl"),
+    proxyUrl: optionalString(body.proxyUrl),
     model: string(body.model, "model"),
+    models: stringArray(body.models),
     thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
     apiKey: optionalString(body.apiKey),
     clearApiKey: body.clearApiKey === true,
+    setActive: body.setActive === true,
   };
+}
+
+async function capabilityCatalog(): Promise<WorkspaceSettings["capabilities"]> {
+  const [skills, mcp] = await Promise.all([
+    ProofBladeSkillRegistry.load(projectRoot),
+    Promise.resolve(McpProjectRegistry.load(projectRoot)),
+  ]);
+  try {
+    return {
+      tools: codingToolCatalog(),
+      skills: skills.list({ includeDisabled: true }).map((skill) => ({ name: skill.name, description: skill.description, path: skill.path, disabled: skill.disableModelInvocation })),
+      mcpServers: mcp.summaries().map((server) => ({ name: server.name, description: server.description, status: server.status, disabled: server.disabled })),
+    };
+  } finally {
+    await mcp.close();
+  }
+}
+
+function defaultPreferences(capabilities: WorkspaceSettings["capabilities"]): ConversationPreferences {
+  const providers = providerSettings.publicSettings();
+  const profile = providers.profiles.find((item) => item.id === providers.activeProfileId) ?? providers.profiles[0]!;
+  return {
+    profileId: profile.id,
+    model: profile.model,
+    thinkingLevel: profile.thinkingLevel,
+    enabledTools: capabilities.tools.map((tool) => tool.name),
+    enabledSkills: capabilities.skills.filter((skill) => !skill.disabled).map((skill) => skill.name),
+    enabledMcpServers: capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name),
+  };
+}
+
+function normalizedPreferences(input: ConversationPreferences, capabilities: WorkspaceSettings["capabilities"]): ConversationPreferences {
+  const providers = providerSettings.publicSettings();
+  const profile = providers.profiles.find((item) => item.id === input.profileId)
+    ?? providers.profiles.find((item) => item.id === providers.activeProfileId)
+    ?? providers.profiles[0]!;
+  const allowedTools = new Set(capabilities.tools.map((tool) => tool.name));
+  const allowedSkills = new Set(capabilities.skills.filter((skill) => !skill.disabled).map((skill) => skill.name));
+  const allowedMcp = new Set(capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name));
+  return {
+    ...(input.folderId ? { folderId: input.folderId } : {}),
+    profileId: profile.id,
+    model: input.profileId === profile.id && input.model ? input.model : profile.model,
+    thinkingLevel: input.thinkingLevel,
+    enabledTools: input.enabledTools.filter((name) => allowedTools.has(name)),
+    enabledSkills: input.enabledSkills.filter((name) => allowedSkills.has(name)),
+    enabledMcpServers: input.enabledMcpServers.filter((name) => allowedMcp.has(name)),
+  };
+}
+
+function conversationPreferencesInput(body: Record<string, unknown>, current: ConversationPreferences): Partial<ConversationPreferences> {
+  return {
+    ...current,
+    ...(body.folderId === null ? { folderId: undefined } : typeof body.folderId === "string" ? { folderId: body.folderId } : {}),
+    ...(typeof body.profileId === "string" ? { profileId: body.profileId } : {}),
+    ...(typeof body.model === "string" ? { model: body.model } : {}),
+    ...(typeof body.thinkingLevel === "string" ? { thinkingLevel: body.thinkingLevel as ProviderThinkingLevel } : {}),
+    ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
+    ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
+    ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),
+  };
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function option(name: string): string | undefined {

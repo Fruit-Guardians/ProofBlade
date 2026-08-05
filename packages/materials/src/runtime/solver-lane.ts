@@ -30,6 +30,7 @@ export class PiSolverLane implements AgentLanePort {
     private readonly profile: Awaited<ReturnType<typeof resolveModelProfile>>,
     private readonly skills: ProofBladeSkillRegistry,
     private readonly resourceSnapshot: RuntimeResourceSnapshot,
+    private readonly closeTransport: () => Promise<void>,
   ) {}
 
   public static async create(options: {
@@ -54,7 +55,7 @@ export class PiSolverLane implements AgentLanePort {
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
     const resourceSnapshot = options.runtime.resourceSnapshot(skills.contextSnapshot());
-    const { models, model } = createConfiguredModels(profile);
+    const { models, model, closeTransport } = createConfiguredModels(profile);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService, options.compactionFault);
@@ -115,7 +116,7 @@ export class PiSolverLane implements AgentLanePort {
       },
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot);
+    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot, closeTransport);
     laneRef.lane = lane;
     return lane;
   }
@@ -170,7 +171,11 @@ export class PiSolverLane implements AgentLanePort {
   }
 
   public async close(): Promise<void> {
-    await this.harness.waitForIdle();
+    try {
+      await this.harness.waitForIdle();
+    } finally {
+      await this.closeTransport();
+    }
   }
 
   private requestCompactionAfterTurn(): void {

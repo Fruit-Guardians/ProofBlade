@@ -2,7 +2,7 @@
 
 ## 启动
 
-GUI 是 `apps/gui` 应用层，不保存独立 Run 业务状态。它默认读取项目根目录的 `proofblade.config.json` 作为基础配置，并从用户目录 `.proofblade/gui-provider.json` 加载 GUI 专用的 Provider 覆盖。
+GUI 是 `apps/gui` 应用层，不保存独立 Run 业务状态。它默认读取项目根目录的 `proofblade.config.json` 作为基础配置，并从用户目录 `.proofblade/gui-provider.json` 加载多个 GUI Provider Profile，从 `.proofblade/gui-workspace.json` 加载文件夹和会话偏好。
 
 ```powershell
 npm install
@@ -23,7 +23,7 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 ## Provider 设置
 
-工作区右上角齿轮打开 Provider 设置。它支持 OpenAI-compatible Provider 名称、Base URL、API Key、`/models` 模型发现、模型选择和 Pi 思考等级。保存时只覆盖模型 Profile，不改写 `proofblade.config.json`，后续新 turn 会立即读取覆盖值。
+工作区右上角齿轮打开“中转站与模型”。它支持多个 OpenAI-compatible Profile，每个 Profile 独立配置名称、Provider 标识、Base URL、API Key、可选 HTTP(S) 代理 URL、`/models` 模型发现、模型选择和 Pi 思考等级。模型发现与 Pi Provider 请求使用同一代理；本地模型 Profile 留空代理即可直连。保存时不改写 `proofblade.config.json`，后续新 turn 会立即读取所选 Profile。
 
 Windows 默认路径为：
 
@@ -31,7 +31,23 @@ Windows 默认路径为：
 %USERPROFILE%\.proofblade\gui-provider.json
 ```
 
-Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`GET /api/provider` 只返回 `hasApiKey` 布尔值；设置弹窗的密码输入框不会回填已保存内容。清除 Key 使用独立复选框。
+Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`GET /api/provider` 只返回各 Profile 的 `hasApiKey` 布尔值；设置弹窗的密码输入框不会回填已保存内容。清除 Key 使用独立复选框。输入框下方可为当前对话选择 Profile、该 Profile 的模型和思考等级。
+
+## 对话工作区与能力
+
+侧栏支持“全部对话”“未分类”和自定义文件夹筛选。新建对话时可以选择文件夹，也可在输入框下方随时移动当前对话。文件夹与会话级偏好写入：
+
+```text
+%USERPROFILE%\.proofblade\gui-workspace.json
+```
+
+“Tool、Skill、MCP”弹窗展示项目当前发现到的全部能力。内建 Coding Tool 可以逐项启停；启用 Skill 后才装配 `load_skill`；启用 MCP Server 后才装配 MCP 查询和调用工具，并在调用时再次校验 Server 是否属于当前对话的启用集合。这些选择按 Run ID 持久化，不影响其他对话。
+
+## 上下文与 Token
+
+每个 Pi Session 汇总 Provider 响应中的输入、输出、推理、缓存读取和缓存写入 Token。输入框下方和右侧指标使用同一份 Provider usage；上下文面板另外显示发往 Provider 的可见消息数量、Tool 数量、系统提示字符、消息字符、Tool Schema 字符和粗略可见 Token 估算。
+
+Provider 输入 Token 与可见估算不是同一指标。中转站或模型模板可能加入服务端固定上下文，因此很短的用户消息也可能由上游报告数千输入 Token。缓存统计只读取 Provider 返回字段；字段缺失时显示 `0`，不从输入量推测缓存命中。
 
 ## 真实模型对话
 
@@ -147,7 +163,15 @@ return {
 | `GET` | `/api/bootstrap` | Fixture、模型摘要、刷新间隔 |
 | `GET` | `/api/provider` | 当前 GUI Provider 覆盖与 `hasApiKey` |
 | `POST` | `/api/provider/models` | 使用表单 Base URL 和本地 Key 读取模型列表 |
-| `PUT` | `/api/provider` | 保存用户目录 Provider 覆盖并热更新运行时 |
+| `PUT` | `/api/provider` | 新建或更新用户目录中的 Provider Profile |
+| `PUT` | `/api/provider/active` | 切换默认 Provider Profile |
+| `DELETE` | `/api/provider/:id` | 删除指定 Provider Profile |
+| `GET` | `/api/workspace` | 文件夹、会话偏好与 Tool/Skill/MCP 目录 |
+| `POST` | `/api/folders` | 创建对话文件夹 |
+| `PUT` | `/api/folders/:id` | 修改对话文件夹名称 |
+| `DELETE` | `/api/folders/:id` | 删除文件夹并把其中对话移到未分类 |
+| `GET` | `/api/conversations/:id/preferences` | 读取会话级 Profile、模型、文件夹与能力选择 |
+| `PUT` | `/api/conversations/:id/preferences` | 更新会话级 Profile、模型、文件夹与能力选择 |
 | `GET` | `/api/runs` | Run 摘要列表 |
 | `GET` | `/api/runs/:id` | Snapshot、Events、Telemetry、Pi Sessions 与 Tool 投影 |
 | `GET` | `/api/runs/:id/artifacts/:artifactId` | 校验引用后读取 Artifact 文本 |
