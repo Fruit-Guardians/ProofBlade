@@ -6,10 +6,9 @@ import {
   type AgentHarnessEvent,
 } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { planContextMaintenance } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
-import { pruneAgentMessages, repairAgentMessages } from "../context/agent-pruner.js";
+import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
 import { attachPiObservability } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -79,11 +78,8 @@ export class PiCodingLane implements AgentLanePort {
     });
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - 2_048);
     harness.on("context", ({ messages }) => {
-      const repaired = repairAgentMessages(messages);
-      const plan = planContextMaintenance(repaired.estimatedTokens, contextBudget);
-      if (!plan.shouldSnip) return { messages: repaired.messages };
-      const mode = plan.forceCompact ? "emergency" : plan.shouldPrune ? "prune" : "snip";
-      return { messages: pruneAgentMessages(repaired.messages, contextBudget, { mode }).messages };
+      const prepared = prepareContextMaintenance({ messages, availableTokens: contextBudget, messageBudget: contextBudget });
+      return { messages: prepared.messages };
     });
     attachPiObservability(harness, {
       runId: options.runId,

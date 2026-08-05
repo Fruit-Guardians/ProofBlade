@@ -12,6 +12,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Single-writer event sequencing, durable atomic projections and crash-recoverable effect journaling.
 - Run/phase state machine, facts, evidence, hypotheses, intents, leases, fixture generations and immutable artifacts.
 - Six-layer context compiler with deterministic manifests and untrusted-observation boundaries.
+- Provider-neutral stable-prefix cache fingerprints split reusable L0/L1 from dynamic L2-L5 in every ContextManifest.
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
 - Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.

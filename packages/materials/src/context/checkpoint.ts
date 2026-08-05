@@ -54,6 +54,8 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
     `- phase: ${snapshot.phase}`,
     `- objective: ${snapshot.task.objective}`,
     `- standing_instruction_hash: ${manifest?.memory.standingInstructionHash ?? "not-compiled"}`,
+    `- cache_prefix_hash: ${manifest?.cache?.prefixHash ?? "not-compiled"}`,
+    `- cache_prefix_tokens: ${manifest?.cache?.prefixTokens ?? 0}`,
     "",
     "## Memory layers",
     "- standing instructions: L0 is immutable and remains in the stable prompt prefix",

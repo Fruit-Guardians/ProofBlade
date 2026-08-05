@@ -1,7 +1,7 @@
 import type { AgentHarness, AgentHarnessEvent } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
-import type { Lane } from "../domain/types.js";
+import type { ContextManifest, Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
@@ -11,6 +11,11 @@ export interface PiObservabilityOptions {
   lane: Lane;
   controlStore: ControlStore;
   estimateContextTokens?: () => Promise<number>;
+  getContextSnapshot?: () => Promise<{
+    estimatedTokens?: number;
+    manifestHash?: string;
+    cache?: ContextManifest["cache"];
+  } | undefined>;
 }
 
 interface PendingProvider {
@@ -20,6 +25,8 @@ interface PendingProvider {
   provider: string;
   model: string;
   contextEstimatedTokens?: number;
+  contextManifestHash?: string;
+  contextCache?: ContextManifest["cache"];
   responseStatus?: number;
 }
 
@@ -36,13 +43,20 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   const tools = new Map<string, PendingTool>();
   const unsubscribeBefore = harness.on("before_provider_request", async (event) => {
     const snapshot = await options.controlStore.snapshot(options.runId);
+    const context = await options.getContextSnapshot?.();
     const pending: PendingProvider = {
       requestId: id("PR"),
       startedAt: Date.now(),
       phase: snapshot.phase,
       provider: event.model.provider,
       model: event.model.id,
-      ...(options.estimateContextTokens ? { contextEstimatedTokens: await options.estimateContextTokens() } : {}),
+      ...(context?.estimatedTokens !== undefined
+        ? { contextEstimatedTokens: context.estimatedTokens }
+        : options.estimateContextTokens
+          ? { contextEstimatedTokens: await options.estimateContextTokens() }
+          : {}),
+      ...(context?.manifestHash ? { contextManifestHash: context.manifestHash } : {}),
+      ...(context?.cache ? { contextCache: context.cache } : {}),
     };
     providers.push(pending);
     await append(options, "provider_request_started", "model", {
@@ -52,6 +66,8 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       api: event.model.api,
       phase: pending.phase,
       contextEstimatedTokens: pending.contextEstimatedTokens,
+      contextManifestHash: pending.contextManifestHash,
+      contextCache: pending.contextCache,
       retryLimit: event.streamOptions.maxRetries ?? 0,
     });
     return undefined;
@@ -82,6 +98,8 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         finishReason: message.stopReason,
         toolCallCount: message.content.filter((item) => item.type === "toolCall").length,
         contextEstimatedTokens: pending?.contextEstimatedTokens,
+        contextManifestHash: pending?.contextManifestHash,
+        contextCache: pending?.contextCache,
         usage: message.usage,
       });
       return;

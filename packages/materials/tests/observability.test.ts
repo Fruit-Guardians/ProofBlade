@@ -59,6 +59,7 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     assert.equal(report.provider.requestCount, 1);
     assert.equal(report.provider.tokens.input, 100);
     assert.equal(report.provider.tokens.cacheRead, 25);
+    assert.equal(report.provider.cacheHitRate, 0.2);
     assert.equal(report.provider.latencyMs.p95, 120);
     assert.equal(report.provider.cost.totalUsd, 0);
     assert.equal(report.tools.agentCalls, 1);

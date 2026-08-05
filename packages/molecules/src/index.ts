@@ -4,4 +4,6 @@ export * from "./file-artifact.js";
 export * from "./layered-context.js";
 export * from "./text-window.js";
 export * from "./context-maintenance.js";
+export * from "./prompt-cache.js";
+export * from "./cache-metrics.js";
 export * from "./capability.js";

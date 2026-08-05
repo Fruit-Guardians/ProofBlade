@@ -371,6 +371,15 @@ export interface ContextManifest {
     recalledObservationIds: string[];
     recalledEvidenceIds: string[];
   };
+  cache: {
+    strategy: "stable-prefix";
+    prefixHash: string;
+    dynamicHash: string;
+    prefixLayerIds: string[];
+    dynamicLayerIds: string[];
+    prefixTokens: number;
+    dynamicTokens: number;
+  };
   maintenance: {
     stage: "stable" | "notice" | "snip" | "prune" | "compact";
     ratio: number;

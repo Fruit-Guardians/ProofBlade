@@ -1,3 +1,4 @@
+import { cacheHitRate as calculateCacheHitRate } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { HarnessEvent, PrimaryFailureCategory, RunSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -142,7 +143,7 @@ function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] 
     models.set(key, entry);
   }
   latencies.sort((a, b) => a - b);
-  const inputBasis = tokens.input + tokens.cacheRead;
+  const cacheUsage = { input: tokens.input, cacheRead: tokens.cacheRead, cacheWrite: tokens.cacheWrite };
   return {
     requestCount: Math.max(starts.length, usages.length),
     responseCount: Math.max(responses.length, usages.length),
@@ -151,7 +152,7 @@ function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] 
     tokens,
     cost,
     contextEfficiency: tokens.input ? round(tokens.output / tokens.input) : 0,
-    cacheHitRate: inputBasis ? round(tokens.cacheRead / inputBasis) : 0,
+    cacheHitRate: round(calculateCacheHitRate(cacheUsage)),
     toolCallCount,
     finishReasons: orderedRecord(finishReasons),
     byModel: [...models.values()].sort((a, b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model)),

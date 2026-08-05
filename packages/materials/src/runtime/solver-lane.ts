@@ -1,10 +1,11 @@
 import { join } from "node:path";
 import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
-import { ContextCompiler, contextText } from "../context/compiler.js";
-import { pruneAgentMessages, repairAgentMessages } from "../context/agent-pruner.js";
+import { ContextCompiler } from "../context/compiler.js";
+import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator, type CompactionFaultInjector } from "../context/durable-compaction.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
@@ -81,7 +82,7 @@ export class PiSolverLane implements AgentLanePort {
           resources: resourceSnapshot,
         });
         return [
-          contextText(compiled),
+          compiled.messages[0]?.content ?? "",
           "[tool-protocol]",
           ...SOLVER_PROTOCOL_INSTRUCTIONS,
         ].join("\n\n");
@@ -89,17 +90,14 @@ export class PiSolverLane implements AgentLanePort {
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries },
     });
     harness.on("context", async ({ messages }) => {
-      const repaired = repairAgentMessages(messages);
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
-      const usedTokens = compiled.estimatedTokens + repaired.estimatedTokens;
-      const plan = planContextMaintenance(usedTokens, compiled.manifest.budget.availableInput);
-      if (!plan.shouldSnip) return { messages: repaired.messages };
-      const pruned = pruneAgentMessages(repaired.messages, transcriptBudget, { mode: plan.shouldPrune ? "prune" : "snip" });
-      if (pruned.dropped.length > 0) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
-      if (plan.shouldCompact) laneRef.lane?.requestCompactionAfterTurn();
-      return { messages: pruned.messages };
+      const prepared = prepareContextMaintenance({ messages, availableTokens: compiled.manifest.budget.availableInput, baseTokens: compiled.estimatedTokens, messageBudget: transcriptBudget });
+      if (prepared.checkpointRecommended) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
+      if (prepared.nextAction === "compact") laneRef.lane?.requestCompactionAfterTurn();
+      const dynamicContext = compiled.messages.filter((message) => message.role !== "system");
+      return { messages: [...dynamicContext, ...prepared.messages] as AgentMessage[] };
     });
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
@@ -113,6 +111,11 @@ export class PiSolverLane implements AgentLanePort {
       estimateContextTokens: async () => {
         const current = await options.controlStore.snapshot(options.runId);
         return new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot }).estimatedTokens;
+      },
+      getContextSnapshot: async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
+        return { estimatedTokens: compiled.estimatedTokens, manifestHash: compiled.manifest.hash, cache: compiled.manifest.cache };
       },
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
