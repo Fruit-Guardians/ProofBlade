@@ -4,9 +4,9 @@
 {
   "id": "materials-verification",
   "name": "Independent Verifier",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T01:52:34+08:00"
+  "updatedAt": "2026-08-06T02:31:17+08:00"
 }
 ```
 
@@ -25,7 +25,7 @@
 
 验证失败保持显式、可重放且不泄漏 scorer 细节。修改接受条件时同步 Task Contract、评测协议和 Auto/Assist 测试。
 
-Coding 复现命令不得包含候选明文，命令输出必须包含与最终回答完全一致的候选；字符串扫描只能作为观察，不能单独形成 reproduction Evidence。
+Coding 复现命令不得包含候选明文，命令输出必须包含与最终回答完全一致的候选；字符串扫描只能作为观察，不能单独形成 reproduction Evidence。`verify_claim` 必须校验传入的支撑 Evidence ID，并将其挂到 reproduction Evidence、确认 Fact 和结果 Artifact 上。
 
 ```powershell
 npm run eval

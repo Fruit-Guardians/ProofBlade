@@ -4,15 +4,15 @@
 {
   "id": "materials-domain",
   "name": "Domain Contracts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-06T02:31:17+08:00"
 }
 ```
 
 ## 职责
 
-定义 ProofBlade 的 Task、Run、Event、Fact、Evidence、Effect、Job、Checkpoint、Telemetry 和 Planner handoff 等业务类型及规范化辅助函数。
+定义 ProofBlade 的 Task、Run、Event、Fact、Evidence、带语义元数据的 Artifact、Effect、Job、Checkpoint、Telemetry 和 Planner handoff 等业务类型及规范化辅助函数。
 
 ## 入口与边界
 

@@ -4,9 +4,9 @@
 {
   "id": "materials-control",
   "name": "Control Store and Reducer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-06T02:31:17+08:00"
 }
 ```
 
@@ -22,7 +22,7 @@
 
 ## 开发规则与验证
 
-事件必须可重放、序号连续、Schema 可迁移。状态变化只能通过事件进入 Reducer；新增事件要覆盖并发、重放哈希和旧数据读取。
+事件必须可重放、序号连续、Schema 可迁移。状态变化只能通过事件进入 Reducer；Artifact 语义更新使用 `artifact_annotated`，不得改写历史原文或在 Reducer 中修改事件对象。新增事件要覆盖并发、重放哈希和旧数据读取。
 
 ```powershell
 npm run test:materials

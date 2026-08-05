@@ -94,8 +94,11 @@ export interface TaskContract {
 export interface Evidence {
   id: string;
   kind: "observation" | "reproduction" | "source" | "negative";
+  name?: string;
   summary: string;
-  source: { tool?: string; effectId?: string; artifactId?: string; generation?: number };
+  tags?: string[];
+  dependsOn?: string[];
+  source: { tool?: string; effectId?: string; artifactId?: string; artifactIds?: string[]; generation?: number };
   confidence: number;
   supports: string[];
   refutes: string[];
@@ -216,11 +219,24 @@ export interface HandoffRecord {
 
 export type ReplayPolicy = ReplayPolicyAtom;
 
+export type ArtifactRole = "supporting" | "intermediate" | "debug" | "result";
+
+export interface ArtifactSemanticMetadata {
+  name: string;
+  summary: string;
+  tags: string[];
+  role: ArtifactRole;
+  relatedIds: string[];
+  annotatedBy: "harness" | "agent" | "user";
+  updatedSeq: number;
+}
+
 export interface ArtifactRef extends ArtifactAtom {
   id: string;
   sensitivity: "public" | "secret" | "flag_candidate";
   sourceEffectId?: string;
   truncated?: boolean;
+  semantic?: ArtifactSemanticMetadata;
 }
 
 export interface Effect extends EffectAtom<ReplayPolicy> {
@@ -294,6 +310,7 @@ export type EventType =
   | "hypothesis_added"
   | "evidence_added"
   | "artifact_registered"
+  | "artifact_annotated"
   | "lease_acquired"
   | "lease_heartbeat"
   | "lease_released"

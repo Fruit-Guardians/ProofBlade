@@ -16,6 +16,7 @@ import type {
   HandoffRecord,
   PrimaryFailureCategory,
   RunVersionSnapshot,
+  ArtifactSemanticMetadata,
 } from "../domain/types.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
@@ -41,6 +42,7 @@ export type DomainCommand =
   | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds">; lane?: Lane }
   | { type: "completion_verified"; completionId: string; accepted: boolean; evidenceIds: string[]; lane?: Lane }
   | { type: "artifact"; artifact: RunSnapshot["artifacts"][string]; lane?: Lane }
+  | { type: "artifact_annotation"; artifactId: string; semantic: Omit<ArtifactSemanticMetadata, "updatedSeq">; lane?: Lane }
   | { type: "effect_proposed"; effect: Omit<RunSnapshot["effects"][string], "createdSeq">; lane?: Lane }
   | { type: "effect_started"; effectId: string; lane?: Lane }
   | { type: "effect_finished"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; artifactId?: string; externalId?: string; durationMs?: number; outputBytes?: number; exitCode?: number | null; errorSignature?: string; lane?: Lane }
@@ -147,6 +149,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "completion_proposed": return "completion_proposed";
     case "completion_verified": return "completion_verified";
     case "artifact": return "artifact_registered";
+    case "artifact_annotation": return "artifact_annotated";
     case "effect_proposed": return "effect_proposed";
     case "effect_started": return "effect_started";
     case "effect_finished": return "effect_finished";
@@ -189,7 +192,12 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "intent": return { intent: { ...command.intent, createdSeq: seq } };
     case "completion_proposed": return { completion: { ...command.completion, status: "PROPOSED", evidenceIds: [], createdSeq: seq } };
     case "completion_verified": return { completionId: command.completionId, accepted: command.accepted, evidenceIds: command.evidenceIds };
-    case "artifact": return { artifact: command.artifact };
+    case "artifact": return {
+      artifact: command.artifact.semantic
+        ? { ...command.artifact, semantic: { ...command.artifact.semantic, updatedSeq: seq } }
+        : command.artifact,
+    };
+    case "artifact_annotation": return { artifactId: command.artifactId, semantic: { ...command.semantic, updatedSeq: seq } };
     case "effect_proposed": return { effect: { ...command.effect, createdSeq: seq } };
     case "effect_started": return { effectId: command.effectId };
     case "effect_finished": return { effectId: command.effectId, outcome: command.outcome, artifactId: command.artifactId, externalId: command.externalId, durationMs: command.durationMs, outputBytes: command.outputBytes, exitCode: command.exitCode, errorSignature: command.errorSignature };
@@ -219,6 +227,11 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
       throw new Error(`Lease ownership mismatch: ${command.resourceKey}`);
     }
   }
+  if (command.type === "artifact_annotation") {
+    if (!snapshot.artifacts[command.artifactId]) throw new Error(`Unknown artifact ${command.artifactId}`);
+    validateArtifactSemantic(snapshot, command.semantic);
+  }
+  if (command.type === "artifact" && command.artifact.semantic) validateArtifactSemantic(snapshot, command.artifact.semantic);
   if (command.type === "job_queued" && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
     throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
   }
@@ -268,6 +281,25 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
   if (!command.evidenceIds.every((id) => completion.evidenceIds.includes(id))) {
     throw new Error("Completion verification does not cover every final evidence id");
   }
+}
+
+function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<ArtifactSemanticMetadata, "updatedSeq"> | ArtifactSemanticMetadata): void {
+  if (!semantic.name.trim() || semantic.name.length > 160) throw new Error("Artifact name must contain 1-160 characters");
+  if (!semantic.summary.trim() || semantic.summary.length > 1_000) throw new Error("Artifact summary must contain 1-1000 characters");
+  if (semantic.tags.length > 16 || semantic.tags.some((tag) => !tag.trim() || tag.length > 40)) throw new Error("Artifact tags must contain at most 16 values of 1-40 characters");
+  if (!(["supporting", "intermediate", "debug", "result"] as string[]).includes(semantic.role)) throw new Error(`Unknown artifact role: ${String(semantic.role)}`);
+  if (!(["harness", "agent", "user"] as string[]).includes(semantic.annotatedBy)) throw new Error(`Unknown artifact annotator: ${String(semantic.annotatedBy)}`);
+  if (semantic.relatedIds.length > 32) throw new Error("Artifact related ids must contain at most 32 values");
+  const known = new Set([
+    ...Object.keys(snapshot.artifacts),
+    ...Object.keys(snapshot.evidence),
+    ...Object.keys(snapshot.facts),
+    ...Object.keys(snapshot.hypotheses),
+    ...Object.keys(snapshot.completions),
+    ...Object.keys(snapshot.observations),
+  ]);
+  const missing = semantic.relatedIds.filter((id) => !known.has(id));
+  if (missing.length > 0) throw new Error(`Unknown related ids: ${missing.join(", ")}`);
 }
 
 export function createEffectInput(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string } {

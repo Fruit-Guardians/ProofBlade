@@ -1,5 +1,5 @@
 import { basename, join } from "node:path";
-import type { ArtifactRef } from "../domain/types.js";
+import type { ArtifactRef, ArtifactSemanticMetadata } from "../domain/types.js";
 import { id, redactSecrets } from "../domain/utils.js";
 import type { ControlStore } from "../control/control-store.js";
 import { FileArtifactRepository } from "@proofblade/molecules";
@@ -10,6 +10,7 @@ export interface ArtifactMeta {
   sourceEffectId?: string;
   filename?: string;
   truncated?: boolean;
+  semantic?: Omit<ArtifactSemanticMetadata, "updatedSeq">;
 }
 
 export class ArtifactStore {
@@ -28,6 +29,7 @@ export class ArtifactStore {
       sensitivity: meta.sensitivity ?? "public",
       sourceEffectId: meta.sourceEffectId,
       truncated: meta.truncated,
+      semantic: meta.semantic ? { ...meta.semantic, updatedSeq: 0 } : undefined,
     };
     await this.controlStore.dispatch(runId, { type: "artifact", artifact, lane: "executor" });
     return artifact;

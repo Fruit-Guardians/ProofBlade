@@ -118,6 +118,14 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.artifacts[artifact.id] = artifact;
       break;
     }
+    case "artifact_annotated": {
+      const artifact = next.artifacts[String(p.artifactId)];
+      if (!artifact) throw new Error(`Unknown artifact ${String(p.artifactId)}`);
+      const semantic = p.semantic as RunSnapshot["artifacts"][string]["semantic"];
+      if (!semantic?.name) throw new Error("artifact_annotated requires semantic metadata");
+      artifact.semantic = semantic;
+      break;
+    }
     case "effect_proposed": {
       const effect = p.effect as RunSnapshot["effects"][string];
       if (!effect?.id) throw new Error("effect_proposed requires effect");

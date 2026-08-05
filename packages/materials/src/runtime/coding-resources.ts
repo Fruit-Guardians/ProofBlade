@@ -11,10 +11,11 @@ import { Type } from "typebox";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
+import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "load_skill", "mcp_call"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "mcp_call"] as const;
 
 export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
@@ -22,6 +23,7 @@ export interface CodingResourceContext extends ExecutionToolContext {
   enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
   claimVerifier: CodingClaimVerifier;
+  evidenceGraph: CodingEvidenceGraph;
   outputRewrite?: {
     port: OutputRewritePort;
     artifactStore: ArtifactStore;
@@ -47,6 +49,7 @@ export function createCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyClaimTool,
+    evidenceTool,
     loadSkillTool,
     mcpCallTool,
   ];
@@ -59,11 +62,12 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
   parameters: Type.Object({
     candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
     command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the reproduction." })),
     timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(toolCallId, params, signal, onUpdate, context) {
-    const input = params as { candidate: string; command: string; timeout?: number };
+    const input = params as { candidate: string; command: string; evidenceIds?: string[]; timeout?: number };
     const candidate = input.candidate.trim();
     const command = input.command.trim();
     if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
@@ -72,7 +76,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
     const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, signal, onUpdate, context);
     const output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
     if (!output.includes(candidate)) throw new Error("Reproduction output does not contain the exact candidate");
-    const reproduction = await context.claimVerifier.record({ candidate, command, cwd: context.env.cwd, output, toolCallId });
+    const reproduction = await context.claimVerifier.record({ candidate, command, cwd: context.env.cwd, output, toolCallId, supportingEvidenceIds: input.evidenceIds });
     return toolResult({
       verified: true,
       candidateHash: reproduction.candidateHash,
@@ -80,8 +84,80 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       artifactId: reproduction.artifactId,
       evidenceId: reproduction.evidenceId,
       completionId: reproduction.completionId,
+      supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
+  },
+};
+
+const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "evidence",
+  label: "evidence",
+  description: "Search, read, annotate, or record the durable evidence graph through one cache-stable proxy. Record promotes and labels its artifacts while creating Evidence and an optional Fact, so do not annotate first. Use annotate only for metadata that should not become Evidence. Record only material findings.",
+  parameters: Type.Union([
+    Type.Object({
+      operation: Type.Literal("search"),
+      query: Type.Optional(Type.String({ maxLength: 200 })),
+      tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+    }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("read"),
+      artifactId: Type.String({ minLength: 1 }),
+      maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+    }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("annotate"),
+      artifactId: Type.String({ minLength: 1 }),
+      name: Type.String({ minLength: 1, maxLength: 160 }),
+      summary: Type.String({ minLength: 1, maxLength: 1_000 }),
+      tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+      role: Type.Optional(Type.Union([Type.Literal("supporting"), Type.Literal("intermediate"), Type.Literal("debug"), Type.Literal("result")])),
+      relatedIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("record"),
+      artifactIds: Type.Array(Type.String({ minLength: 1, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 }),
+      name: Type.String({ minLength: 1, maxLength: 160 }),
+      summary: Type.String({ minLength: 1, maxLength: 1_000 }),
+      tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+      dependsOn: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16 })),
+      claim: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
+    }, { additionalProperties: false }),
+  ]),
+  executionMode: "sequential",
+  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+    const input = params as {
+      operation: "search" | "read" | "annotate" | "record";
+      query?: string;
+      artifactId?: string;
+      artifactIds?: string[];
+      name?: string;
+      summary?: string;
+      tags?: string[];
+      role?: "supporting" | "intermediate" | "debug" | "result";
+      relatedIds?: string[];
+      dependsOn?: string[];
+      claim?: string;
+      maxChars?: number;
+    };
+    if (!("operation" in input) || !["search", "read", "annotate", "record"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (input.operation === "search") {
+      assertAbsent(input, ["artifactId", "artifactIds", "name", "summary", "role", "relatedIds", "dependsOn", "claim", "maxChars"], "evidence search");
+      return toolResult({ results: await context.evidenceGraph.search(input.query, input.tags) });
+    }
+    if (input.operation === "read") {
+      assertAbsent(input, ["query", "artifactIds", "name", "summary", "tags", "role", "relatedIds", "dependsOn", "claim"], "evidence read");
+      if (!input.artifactId) throw new Error("evidence read requires artifactId");
+      return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, input.maxChars));
+    }
+    if (input.operation === "annotate") {
+      assertAbsent(input, ["query", "artifactIds", "dependsOn", "claim", "maxChars"], "evidence annotate");
+      if (!input.artifactId || !input.name || !input.summary) throw new Error("evidence annotate requires artifactId, name, and summary");
+      return toolResult(await context.evidenceGraph.annotateArtifact({ artifactId: input.artifactId, name: input.name, summary: input.summary, tags: input.tags, role: input.role, relatedIds: input.relatedIds }));
+    }
+    assertAbsent(input, ["query", "artifactId", "role", "relatedIds", "maxChars"], "evidence record");
+    if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
+    return toolResult(await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn }));
   },
 };
 
@@ -102,11 +178,43 @@ export function codingProviderToolContractSnapshot(): Array<{ name: string; desc
 
 function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
-    createReadTool<CodingResourceContext>(),
+    createCodingReadTool(),
     createCodingBashTool(),
     createEditTool<CodingResourceContext>(),
     createWriteTool<CodingResourceContext>(),
   ];
+}
+
+function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createReadTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const input = params as { path: string; offset?: number; limit?: number };
+      const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+      const pipeline = context.outputRewrite;
+      const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
+      if (!pipeline || !visible || result.content.some((item) => item.type === "image")) return result;
+      const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
+        filename: `read-${toolCallId}.txt`,
+        mime: "text/plain",
+        sensitivity: "public",
+        semantic: {
+          name: `文件读取 · ${pathTitle(input.path)}`,
+          summary: `读取 ${input.path}${readRange(input)} 的文本结果，${Buffer.byteLength(visible)} bytes。`,
+          tags: ["read", "file-content", pathTitle(input.path)],
+          role: "intermediate",
+          relatedIds: [],
+          annotatedBy: "harness",
+        },
+      });
+      return {
+        ...result,
+        content: [...result.content, artifactAnchor(artifact.id)],
+        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256 },
+      };
+    },
+  };
 }
 
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
@@ -128,13 +236,14 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         result = await executor.execute(toolCallId, { ...input, command: ticket.command }, signal, onUpdate, context);
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
-        const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId);
+        const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         throw new Error(`${visible}\n\n[ProofBlade output artifact ${outputRewrite.artifactId}; rewrite=${outputRewrite.provider}]`, { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId);
+      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       return {
         ...result,
+        content: [...result.content, artifactAnchor(String(outputRewrite.artifactId))],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
@@ -149,6 +258,8 @@ async function finalizeAndArchive(
   ticket: OutputRewriteTicket,
   visibleOutput: string,
   toolCallId: string,
+  command: string,
+  role: "intermediate" | "debug",
 ): Promise<Record<string, unknown>> {
   const finalized = await pipeline.port.finalize(ticket, visibleOutput);
   const artifact = await pipeline.artifactStore.putText(pipeline.runId, finalized.rawOutput, {
@@ -156,6 +267,14 @@ async function finalizeAndArchive(
     mime: "text/plain",
     sensitivity: "public",
     truncated: finalized.rawTruncated,
+    semantic: {
+      name: `命令输出 · ${commandTitle(command)}`,
+      summary: `${role === "debug" ? "失败命令" : "命令"}的原始输出，${finalized.rawBytes} bytes${finalized.rawTruncated ? "，已截断" : ""}。`,
+      tags: ["bash", "command-output", ticket.provider],
+      role,
+      relatedIds: [],
+      annotatedBy: "harness",
+    },
   });
   const savedBytes = Math.max(0, finalized.rawBytes - finalized.visibleBytes);
   return {
@@ -175,6 +294,26 @@ async function finalizeAndArchive(
     artifactId: artifact.id,
     artifactHash: artifact.sha256,
   };
+}
+
+function commandTitle(command: string): string {
+  const first = command.split(/\r?\n/, 1)[0]?.trim().replace(/\s+/g, " ") ?? "bash";
+  return first.length > 100 ? `${first.slice(0, 97)}...` : first;
+}
+
+function pathTitle(path: string): string {
+  const normalized = path.trim().replace(/\\/g, "/");
+  const title = normalized.split("/").filter(Boolean).at(-1) ?? normalized;
+  return title.length > 100 ? `${title.slice(0, 97)}...` : title;
+}
+
+function readRange(input: { offset?: number; limit?: number }): string {
+  const parts = [input.offset !== undefined ? `offset=${input.offset}` : "", input.limit !== undefined ? `limit=${input.limit}` : ""].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+}
+
+function artifactAnchor(artifactId: string): { type: "text"; text: string } {
+  return { type: "text", text: `[ProofBlade artifact ${artifactId}; use this id with the evidence tool]` };
 }
 
 const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {

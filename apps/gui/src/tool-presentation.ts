@@ -37,6 +37,10 @@ export function toolPresentation(name: string, argumentsValue: unknown, result: 
     inputLabel = "复现指令";
     input = [command, labeled("最终候选", text(args.candidate))].filter(Boolean).join("\n\n");
     summary = "复现最终结论";
+  } else if (name === "evidence") {
+    inputLabel = evidenceInputLabel(operation);
+    summary = evidenceSummary(operation, args);
+    input = display(argumentsValue);
   } else if (name === "mcp_call") {
     inputLabel = "MCP 调用";
     summary = [operation, server, tool].filter(Boolean).join(" · ") || "MCP";
@@ -49,9 +53,25 @@ export function toolPresentation(name: string, argumentsValue: unknown, result: 
     summary: clip(summary, 220),
     inputLabel,
     input: bounded(input || "无参数"),
-    outputLabel: name === "verify_claim" ? "验证记录" : "返回结果",
+    outputLabel: name === "verify_claim" ? "验证记录" : name === "evidence" ? "证据图更新" : "返回结果",
     output: result === undefined ? "等待返回" : bounded(resultText(result) || "已完成（没有文本返回）"),
   };
+}
+
+function evidenceInputLabel(operation: string): string {
+  if (operation === "search") return "搜索证据图";
+  if (operation === "read") return "读取产物";
+  if (operation === "annotate") return "标注产物";
+  if (operation === "record") return "记录证据";
+  return "证据操作";
+}
+
+function evidenceSummary(operation: string, args: UnknownRecord): string {
+  if (operation === "search") return `搜索证据 · ${text(args.query) || "全部"}`;
+  if (operation === "read") return `读取产物 · ${text(args.artifactId) || "未指定"}`;
+  if (operation === "annotate") return `标注产物 · ${text(args.name) || text(args.artifactId) || "未命名"}`;
+  if (operation === "record") return `记录证据 · ${text(args.name) || "未命名"}`;
+  return "证据操作";
 }
 
 export function resultText(value: unknown): string {

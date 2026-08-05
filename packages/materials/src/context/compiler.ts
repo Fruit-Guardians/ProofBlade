@@ -171,7 +171,7 @@ function buildLedger(input: LedgerBuildInput): string {
     "Recent evidence:",
     ...input.evidence.map((item) => [
       `<untrusted-observation source="${safeAttribute(item.source.tool ?? "unknown")}" artifact="${safeAttribute(item.source.artifactId ?? "none")}">`,
-      `- ${item.id}: ${safeLedgerText(item.summary)}`,
+      `- ${item.id}: ${safeLedgerText(item.name ?? item.summary)}; ${safeLedgerText(item.summary)}; tags=${(item.tags ?? []).join(",") || "none"}; depends_on=${(item.dependsOn ?? []).join(",") || "none"}`,
       "</untrusted-observation>",
     ].join("\n")),
     "</untrusted-observation-index>",

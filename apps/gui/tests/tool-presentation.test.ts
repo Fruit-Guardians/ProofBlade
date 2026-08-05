@@ -27,5 +27,16 @@ test("formats coding tool instructions and returned text for direct inspection",
   assert.match(verification.input, /node solve\.mjs/);
   assert.match(verification.input, /flag\{derived\}/);
   assert.equal(verification.outputLabel, "验证记录");
+
+  const evidence = toolPresentation("evidence", {
+    operation: "record",
+    name: "EF01 受保护记录",
+    artifactIds: ["A-1"],
+  }, { details: { evidenceId: "EV-1", factId: "F-1" } });
+  assert.equal(evidence.inputLabel, "记录证据");
+  assert.equal(evidence.summary, "记录证据 · EF01 受保护记录");
+  assert.equal(evidence.outputLabel, "证据图更新");
+  assert.match(evidence.output, /F-1/);
+
   assert.equal(resultText({ result: { content: [{ type: "text", text: "nested" }] } }), "nested");
 });

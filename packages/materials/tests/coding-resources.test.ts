@@ -14,18 +14,19 @@ import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
+import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "a98846eb2565138efdf1dfb44ca04156e45c6ed9fffb1a6cc2a118e00e2e43b9");
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "mcp_call"]);
+  assert.equal(sha256(canonicalJson(snapshot)), "329986246c5163aa730555f3774a1ffef6ddfd2bf6cad26c76189c18ab60ff24");
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "load_skill", "mcp_call"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "mcp_call"]);
   assert.deepEqual(withResources, withoutResources);
 });
 
@@ -53,6 +54,7 @@ test("coding claim verification rejects decoys and persists a matching reproduct
   await writeFile(join(dir, "solve.mjs"), "import { readFileSync } from 'node:fs';\nconst data = readFileSync('protected.bin');\nprocess.stdout.write(Buffer.from(data.map((byte) => byte ^ 0x5a)).toString('utf8'));\n", "utf8");
   const env = new NodeExecutionEnv({ cwd: dir });
   const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts);
+  const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
   const context = {
     env,
     skills: {},
@@ -60,20 +62,46 @@ test("coding claim verification rejects decoys and persists a matching reproduct
     enabledSkills: new Set<string>(),
     enabledMcpServers: new Set<string>(),
     claimVerifier: verifier,
+    evidenceGraph,
   } as unknown as CodingResourceContext;
   try {
+    const analysisArtifact = await services.artifacts.putText(runId, "EF01 offset=0xD4 length=0x26 nonce=fc99899b203e3fb7e7a36312", {
+      filename: "ncal-ef01-analysis.txt",
+      semantic: { name: "NCAL EF01 初步解析", summary: "从校准文件解析出的受保护 DID 记录。", tags: ["ncal", "ef01"], role: "intermediate", relatedIds: [], annotatedBy: "harness" },
+    });
+    const recorded = await executeTool("evidence", {
+      operation: "record",
+      name: "EF01 受保护记录",
+      summary: "NCAL 中 EF01 位于 0xD4，长度为 0x26，并带 12 字节 nonce。",
+      artifactIds: [analysisArtifact.id],
+      tags: ["ncal", "ef01", "protected-record"],
+      claim: "目标数据来自受保护的 EF01 记录，而不是 F190 VIN 字符串。",
+    }, context);
+    const evidenceId = String((recorded.details as Record<string, unknown>).evidenceId);
+    const searched = await executeTool("evidence", { operation: "search", query: "EF01" }, context);
+    assert.ok(((searched.details as { results: unknown[] }).results).length >= 2);
+    const read = await executeTool("evidence", { operation: "read", artifactId: analysisArtifact.id }, context);
+    assert.match(String((read.details as Record<string, unknown>).output), /offset=0xD4/);
+    await assert.rejects(
+      () => executeTool("evidence", { operation: "annotate", artifactId: analysisArtifact.id, name: "bad", summary: "bad", relatedIds: ["EV-MISSING"] }, context),
+      /Unknown related ids/,
+    );
     await assert.rejects(
       () => executeTool("verify_claim", { candidate, command: `echo ${candidate}` }, context),
       /embeds the candidate literal/,
     );
-    const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs" }, context);
+    const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const details = result.details as Record<string, unknown>;
     assert.equal(details.verified, true);
     const snapshot = await services.control.snapshot(runId);
-    assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 1);
+    assert.equal(Object.keys(snapshot.evidence).length, 2);
+    assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction" && item.dependsOn?.includes(evidenceId)).length, 1);
     assert.equal(Object.values(snapshot.completions).filter((item) => item.status === "ACCEPTED").length, 1);
     assert.equal(Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").length, 1);
     assert.ok(snapshot.artifacts[String(details.artifactId)]);
+    assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.name, "EF01 受保护记录");
+    assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.role, "supporting");
+    assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
     assert.equal(verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`).status, "verified");
     assert.equal(verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042").status, "unverified");
   } finally {
@@ -188,6 +216,7 @@ test("coding bash archives raw output before returning RTK-compressed content", 
     assert.ok(Number(rewrite.savedBytes) > 4_000);
     assert.ok(Number(rewrite.savingsRate) > 0.9);
     const artifactId = String(rewrite.artifactId);
+    assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`ProofBlade artifact ${artifactId}`));
     const snapshot = await services.control.snapshot(runId);
     assert.ok(snapshot.artifacts[artifactId]);
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
@@ -196,9 +225,50 @@ test("coding bash archives raw output before returning RTK-compressed content", 
   }
 });
 
-async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ details: unknown; isError: boolean }> {
+test("coding read creates a searchable source artifact for the evidence graph", async () => {
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-read-evidence-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "READ-EVIDENCE-TEST";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  await writeFile(join(dir, "source.txt"), "did=0xEF01\noffset=0xD4\nlength=0x26\n", "utf8");
+  const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
+  const context = {
+    env: new NodeExecutionEnv({ cwd: dir }),
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    evidenceGraph,
+    outputRewrite: { port: {} as OutputRewritePort, artifactStore: services.artifacts, runId },
+  } as unknown as CodingResourceContext;
+  try {
+    const read = await executeTool("read", { path: "source.txt" }, context);
+    const artifactId = String((read.details as Record<string, unknown>).artifactId);
+    assert.match(read.content.map((item) => item.text ?? "").join("\n"), new RegExp(`ProofBlade artifact ${artifactId}`));
+    const searched = await executeTool("evidence", { operation: "search", query: "source.txt DID protected" }, context);
+    const results = (searched.details as { results: Array<{ id: string }> }).results;
+    assert.ok(results.some((item) => item.id === artifactId));
+    const recorded = await executeTool("evidence", { operation: "record", artifactIds: [artifactId], name: "EF01 DID 记录", summary: "source.txt 定义 EF01 的偏移和长度。", claim: "EF01 是受保护记录。" }, context);
+    assert.match(String((recorded.details as Record<string, unknown>).evidenceId), /^EV-/);
+    const artifact = (await services.control.snapshot(runId)).artifacts[artifactId]!;
+    assert.equal(artifact.semantic?.name, "EF01 DID 记录");
+    assert.equal(artifact.semantic?.role, "supporting");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {
   const tool = createCodingTools().find((candidate) => candidate.name === name);
   assert.ok(tool, `Missing coding tool: ${name}`);
   const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("test-call", params, new AbortController().signal, () => undefined, context);
-  return result as { details: unknown; isError: boolean };
+  return result as { content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean };
 }

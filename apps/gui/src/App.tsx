@@ -1,7 +1,7 @@
 import {
   Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
   CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Folder, FolderOpen,
-  FolderPlus, Gauge, History, KeyRound, Layers3, ListChecks, Menu, MessageSquare, PanelRight, Pause,
+  FolderPlus, Gauge, GitBranch, History, KeyRound, Layers3, Link2, ListChecks, Menu, MessageSquare, PanelRight, Pause,
   Play, Plus, RefreshCw, RotateCcw, Search, Send, ServerCog, Settings, ShieldCheck, TerminalSquare,
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
@@ -391,7 +391,7 @@ function ToolExecutionCard({ call, selected = false, onInspect }: { call: ToolCa
   return <section className={`tool-execution-card tool-${status} ${selected ? "selected" : ""}`}>
     <header><span className="tool-status-icon">{status === "success" ? <Check size={13} /> : status === "error" ? <CircleAlert size={13} /> : <RefreshCw className="spin" size={13} />}</span><strong>{call.name}</strong><code>{presentation.summary}</code><em>{duration}</em>{onInspect && <button type="button" title="查看完整调用数据" onClick={onInspect}><Braces size={13} />完整数据</button>}</header>
     <div className="tool-io-grid"><div><label>{presentation.inputLabel}</label><pre>{presentation.input}</pre></div><div><label>{presentation.outputLabel}</label><pre>{presentation.output}</pre></div></div>
-    {links && (links.artifacts.length > 0 || links.evidence.length > 0 || links.effects.length > 0) && <footer>{links.artifacts.map((item) => <span key={item.id}><Archive size={11} />{item.id}</span>)}{links.evidence.map((item) => <span key={item.id}><ShieldCheck size={11} />{item.id}</span>)}{links.effects.map((item) => <span key={item.id}><Zap size={11} />{item.id}</span>)}</footer>}
+    {links && (links.artifacts.length > 0 || links.evidence.length > 0 || links.effects.length > 0) && <footer>{links.artifacts.map((item) => <span key={item.id} title={item.id}><Archive size={11} />{item.semantic?.name ?? shortId(item.id)}</span>)}{links.evidence.map((item) => <span key={item.id} title={item.id}><ShieldCheck size={11} />{item.name ?? shortId(item.id)}</span>)}{links.effects.map((item) => <span key={item.id} title={item.id}><Zap size={11} />{shortId(item.id)}</span>)}</footer>}
   </section>;
 }
 
@@ -596,18 +596,68 @@ function ChatExecutionTimeline({ detail }: { detail: RunDetail }) {
 function EvidenceLedger({ detail }: { detail: RunDetail }) {
   if (detail.kind === "chat") return <ChatEvidenceResults detail={detail} />;
   const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
-  return <section className="evidence-page"><div className="section-toolbar"><div><strong>证据账本</strong><span>{evidence.length} 条不可变引用</span></div><StatusBadge status={detail.snapshot.status} /></div><div className="evidence-list">{evidence.map((item) => <details key={item.id}><summary><span className="evidence-confidence">{Math.round(item.confidence * 100)}%</span><code>{item.id}</code><strong>{item.summary}</strong><StatusMini status={item.kind} /><ChevronRight size={14} /></summary><div className="evidence-detail"><dl className="key-values"><dt>Artifact</dt><dd>{item.source.artifactId ?? "--"}</dd><dt>Effect</dt><dd>{item.source.effectId ?? "--"}</dd><dt>Tool</dt><dd>{item.source.tool ?? "--"}</dd><dt>Generation</dt><dd>{item.source.generation ?? "--"}</dd></dl><RawJson value={item} /></div></details>)}</div></section>;
+  return <section className="evidence-page"><div className="section-toolbar"><div><strong>证据账本</strong><span>{evidence.length} 条不可变引用</span></div><StatusBadge status={detail.snapshot.status} /></div><div className="evidence-list">{evidence.map((item) => <details key={item.id}><summary><span className="evidence-confidence">{Math.round(item.confidence * 100)}%</span><code>{item.id}</code><strong>{item.name ?? item.summary}</strong><StatusMini status={item.kind} /><ChevronRight size={14} /></summary><div className="evidence-detail"><dl className="key-values"><dt>摘要</dt><dd>{item.summary}</dd><dt>Artifact</dt><dd>{evidenceArtifactIds(item).join(", ") || "--"}</dd><dt>依赖证据</dt><dd>{item.dependsOn?.join(", ") || "--"}</dd><dt>Tool</dt><dd>{item.source.tool ?? "--"}</dd></dl><RawJson value={item} /></div></details>)}</div></section>;
 }
 
 function ChatEvidenceResults({ detail }: { detail: RunDetail }) {
   const calls = detail.sessions.flatMap((session) => session.toolCalls).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
-  const artifacts = Object.values(detail.snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id));
   return <div className="chat-results-page">
-    <section><div className="section-head"><div><TerminalSquare size={14} /><strong>Tool 结果</strong><span>{calls.length}</span></div></div><div className="chat-result-list">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} />)}{calls.length === 0 && <div className="empty-list">当前对话还没有 Tool 结果</div>}</div></section>
-    <section><div className="section-head"><div><ShieldCheck size={14} /><strong>证据记录</strong><span>{evidence.length}</span></div></div><div className="evidence-list">{evidence.map((item) => <details key={item.id}><summary><span className="evidence-confidence">{Math.round(item.confidence * 100)}%</span><code>{item.id}</code><strong>{item.summary}</strong><StatusMini status={item.kind} /><ChevronRight size={14} /></summary><div className="evidence-detail"><dl className="key-values"><dt>Artifact</dt><dd>{item.source.artifactId ?? "--"}</dd><dt>Effect</dt><dd>{item.source.effectId ?? "--"}</dd><dt>Tool</dt><dd>{item.source.tool ?? "--"}</dd><dt>Generation</dt><dd>{item.source.generation ?? "--"}</dd></dl><RawJson value={item} /></div></details>)}{evidence.length === 0 && <div className="empty-list">当前对话还没有结构化证据</div>}</div></section>
-    <section><div className="section-head"><div><Archive size={14} /><strong>产物索引</strong><span>{artifacts.length}</span></div></div><div className="result-artifact-list">{artifacts.map((item) => <div key={item.id}><FileCode2 size={14} /><code>{item.id}</code><span>{item.path}</span><em>{formatBytes(item.bytes)}</em></div>)}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</div></section>
+    <EvidenceChain detail={detail} />
+    <ArtifactIndex detail={detail} />
+    <details className="raw-tool-results"><summary><TerminalSquare size={14} /><span><strong>原始 Tool 记录</strong><small>用于调试，不等同于证据</small></span><em>{calls.length}</em><ChevronRight size={14} /></summary><div className="chat-result-list">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} />)}{calls.length === 0 && <div className="empty-list">当前对话还没有 Tool 结果</div>}</div></details>
   </div>;
+}
+
+function EvidenceChain({ detail }: { detail: RunDetail }) {
+  const facts = Object.values(detail.snapshot.facts).sort((a, b) => b.createdSeq - a.createdSeq);
+  const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
+  const referenced = new Set(facts.flatMap((fact) => fact.evidenceIds));
+  const orphaned = evidence.filter((item) => !referenced.has(item.id));
+  return <section className="evidence-chain-section"><div className="section-head"><div><GitBranch size={14} /><strong>证据链</strong><span>{facts.length} 个主张 · {evidence.length} 条证据</span></div></div><div className="evidence-chain">
+    {facts.map((fact) => <article className="claim-node" key={fact.id}><header><StatusMini status={fact.status} /><span><strong>{fact.statement}</strong><code>{fact.id}</code></span></header><div className="claim-evidence">{fact.evidenceIds.map((id) => detail.snapshot.evidence[id]).filter(Boolean).map((item) => <EvidenceBranch key={item.id} detail={detail} evidence={item} />)}{fact.evidenceIds.length === 0 && <div className="chain-empty">该主张没有关联 Evidence</div>}</div></article>)}
+    {orphaned.map((item) => <article className="claim-node orphan" key={item.id}><header><StatusMini status="unlinked" /><span><strong>未关联到 Fact 的证据</strong><code>{item.id}</code></span></header><div className="claim-evidence"><EvidenceBranch detail={detail} evidence={item} /></div></article>)}
+    {facts.length === 0 && evidence.length === 0 && <div className="empty-list chain-empty-state"><GitBranch size={18} /><strong>尚未形成证据链</strong><span>原始 Tool 输出仍在下方产物归档中；只有被 Agent 解释并关联到主张的内容才进入这里。</span></div>}
+  </div></section>;
+}
+
+function EvidenceBranch({ detail, evidence }: { detail: RunDetail; evidence: RunDetail["snapshot"]["evidence"][string] }) {
+  const artifacts = evidenceArtifactIds(evidence).map((id) => detail.snapshot.artifacts[id]).filter(Boolean);
+  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <ArtifactRow key={artifact.id} detail={detail} artifact={artifact} compact />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+}
+
+function ArtifactIndex({ detail }: { detail: RunDetail }) {
+  const artifacts = Object.values(detail.snapshot.artifacts).sort((a, b) => (b.semantic?.updatedSeq ?? 0) - (a.semantic?.updatedSeq ?? 0) || a.id.localeCompare(b.id));
+  const groups = {
+    important: artifacts.filter((item) => ["supporting", "result"].includes(artifactInfo(detail, item).role)),
+    intermediate: artifacts.filter((item) => artifactInfo(detail, item).role === "intermediate"),
+    debug: artifacts.filter((item) => artifactInfo(detail, item).role === "debug"),
+  };
+  return <section className="artifact-index-section"><div className="section-head"><div><Archive size={14} /><strong>产物索引</strong><span>{artifacts.length}</span></div></div><div className="artifact-groups">
+    <div className="artifact-group important"><header><strong>关键产物</strong><span>{groups.important.length}</span></header>{groups.important.map((item) => <ArtifactRow key={item.id} detail={detail} artifact={item} />)}{groups.important.length === 0 && <div className="empty-list">当前还没有被证据引用或标为结果的产物</div>}</div>
+    <details><summary><span><strong>分析中间物</strong><small>命令输出、解析过程和临时结果</small></span><em>{groups.intermediate.length}</em><ChevronRight size={14} /></summary><div>{groups.intermediate.map((item) => <ArtifactRow key={item.id} detail={detail} artifact={item} />)}</div></details>
+    <details><summary><span><strong>调试归档</strong><small>失败命令和诊断输出</small></span><em>{groups.debug.length}</em><ChevronRight size={14} /></summary><div>{groups.debug.map((item) => <ArtifactRow key={item.id} detail={detail} artifact={item} />)}</div></details>
+  </div></section>;
+}
+
+function ArtifactRow({ detail, artifact, compact = false }: { detail: RunDetail; artifact: RunDetail["snapshot"]["artifacts"][string]; compact?: boolean }) {
+  const info = artifactInfo(detail, artifact);
+  return <div className={`semantic-artifact-row role-${info.role} ${compact ? "compact" : ""}`}><FileCode2 size={14} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{artifact.id}</code></span><div className="artifact-tags">{info.tags.slice(0, 4).map((tag) => <em key={tag}>#{tag}</em>)}</div><StatusMini status={info.role} /><b>{formatBytes(artifact.bytes)}</b></div>;
+}
+
+function artifactInfo(detail: RunDetail, artifact: RunDetail["snapshot"]["artifacts"][string]): { name: string; summary: string; tags: string[]; role: "supporting" | "intermediate" | "debug" | "result" } {
+  if (artifact.semantic) return artifact.semantic;
+  const call = detail.sessions.flatMap((session) => session.toolCalls).find((item) => item.links.artifacts.some((linked) => linked.id === artifact.id));
+  const filename = artifact.path.split(/[\\/]/).at(-1) ?? artifact.id;
+  return {
+    name: call ? `${call.name} · ${call.presentation.summary}` : filename.replace(/^A-[^-]+(?:-[^-]+){4}-/, ""),
+    summary: call ? `${call.presentation.outputLabel}的原始归档，尚未由 Agent 标注。` : `${artifact.mime} · 尚未标注`,
+    tags: call ? [call.name, "unannotated"] : ["unannotated"],
+    role: call?.status === "error" ? "debug" : "intermediate",
+  };
+}
+
+function evidenceArtifactIds(evidence: RunDetail["snapshot"]["evidence"][string]): string[] {
+  return [...new Set([...(evidence.source.artifactIds ?? []), ...(evidence.source.artifactId ? [evidence.source.artifactId] : [])])];
 }
 
 function Artifacts({ detail }: { detail: RunDetail }) {
@@ -620,7 +670,7 @@ function Artifacts({ detail }: { detail: RunDetail }) {
     setContent(undefined); setError(undefined);
     void getArtifact(detail.snapshot.runId, selectedId).then(setContent).catch((caught) => setError(message(caught)));
   }, [detail.snapshot.runId, selectedId]);
-  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{item.id}</strong><small>{item.path}</small></span><em>{formatBytes(item.bytes)}</em></button>)}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content?.artifact.id ?? (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
 }
 
 function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: BootstrapData }) {

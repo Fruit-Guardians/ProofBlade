@@ -10,6 +10,7 @@ export interface ClaimReproduction {
   evidenceId: string;
   completionId: string;
   toolCallId: string;
+  supportingEvidenceIds: string[];
 }
 
 export interface ClaimVerificationProjection {
@@ -39,12 +40,17 @@ export class CodingClaimVerifier {
     cwd: string;
     output: string;
     toolCallId: string;
+    supportingEvidenceIds?: string[];
   }): Promise<ClaimReproduction> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const candidateHash = sha256(input.candidate);
     const commandHash = sha256(input.command);
+    const supportingEvidenceIds = [...new Set(input.supportingEvidenceIds ?? [])];
+    const missingEvidence = supportingEvidenceIds.filter((id) => !snapshot.evidence[id]);
+    if (missingEvidence.length > 0) throw new Error(`Unknown supporting evidence ids: ${missingEvidence.join(", ")}`);
     const completionId = id("C");
     const evidenceId = id("EV");
+    const factId = id("F");
     const artifact = await this.artifactStore.putText(this.runId, canonicalJson({
       schemaVersion: 1,
       kind: "claim_reproduction",
@@ -59,6 +65,14 @@ export class CodingClaimVerifier {
       filename: `claim-reproduction-${input.toolCallId}.json`,
       mime: "application/json",
       sensitivity: "flag_candidate",
+      semantic: {
+        name: "最终候选复现",
+        summary: `候选 ${candidateHash.slice(0, 12)}... 由命令 ${commandHash.slice(0, 12)}... 成功复现。`,
+        tags: ["verification", "candidate", "reproduction"],
+        role: "result",
+        relatedIds: supportingEvidenceIds,
+        annotatedBy: "harness",
+      },
     });
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
@@ -70,10 +84,13 @@ export class CodingClaimVerifier {
       evidence: {
         id: evidenceId,
         kind: "reproduction",
+        name: "最终候选复现通过",
         summary: `Candidate sha256=${candidateHash} reproduced by command sha256=${commandHash}.`,
-        source: { tool: "verify_claim", artifactId: artifact.id, generation: snapshot.generation },
+        tags: ["verification", "candidate", "reproduction"],
+        dependsOn: supportingEvidenceIds,
+        source: { tool: "verify_claim", artifactId: artifact.id, artifactIds: [artifact.id], generation: snapshot.generation },
         confidence: 1,
-        supports: [completionId],
+        supports: [completionId, factId],
         refutes: [],
       },
       lane: "verifier",
@@ -88,10 +105,23 @@ export class CodingClaimVerifier {
     await this.controlStore.dispatch(this.runId, {
       type: "fact",
       fact: {
-        id: id("F"),
+        id: factId,
         statement: `Reproduced claim sha256=${candidateHash}`,
         status: "CONFIRMED",
-        evidenceIds: [evidenceId],
+        evidenceIds: [...supportingEvidenceIds, evidenceId],
+      },
+      lane: "verifier",
+    });
+    await this.controlStore.dispatch(this.runId, {
+      type: "artifact_annotation",
+      artifactId: artifact.id,
+      semantic: {
+        name: "最终候选复现",
+        summary: `候选 ${candidateHash.slice(0, 12)}... 由命令 ${commandHash.slice(0, 12)}... 成功复现。`,
+        tags: ["verification", "candidate", "reproduction"],
+        role: "result",
+        relatedIds: [...supportingEvidenceIds, evidenceId, completionId, factId],
+        annotatedBy: "harness",
       },
       lane: "verifier",
     });
@@ -103,6 +133,7 @@ export class CodingClaimVerifier {
       evidenceId,
       completionId,
       toolCallId: input.toolCallId,
+      supportingEvidenceIds,
     };
     this.reproductions.push(reproduction);
     return reproduction;
