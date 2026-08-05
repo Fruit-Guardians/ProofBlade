@@ -143,6 +143,7 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 
 ## 设计文档
 
+- `docs/components.md`：25 个组件的开发入口、文档版本与强制更新规则。
 - `docs/architecture.md`：依赖方向、运行时组件和上下文层级。
 - `docs/task-contract.md`：任务、事实、证据和完成条件。
 - `docs/tool-contract.md`：工具契约、效果、重放和制品规则。

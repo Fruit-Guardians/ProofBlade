@@ -1,0 +1,29 @@
+# Control Store and Reducer
+
+```json component-metadata
+{
+  "id": "materials-control",
+  "name": "Control Store and Reducer",
+  "version": "0.1.0",
+  "createdAt": "2026-08-05T22:49:12+08:00",
+  "updatedAt": "2026-08-05T22:49:12+08:00"
+}
+```
+
+## 职责
+
+维护 Run 的只追加事件、单写者序列、投影、阶段机和租约。Reducer 是 RunSnapshot 的唯一派生入口，也是业务完成状态的权威控制平面。
+
+## 入口与边界
+
+- `control-store.ts` 负责 append、snapshot 与 replay。
+- `reducer.ts` 应用事件；`phase-machine.ts` 校验阶段转换；`lease-manager.ts` 处理所有权。
+- 不直接执行外部 Effect，不保存 Provider 消息正文。
+
+## 开发规则与验证
+
+事件必须可重放、序号连续、Schema 可迁移。状态变化只能通过事件进入 Reducer；新增事件要覆盖并发、重放哈希和旧数据读取。
+
+```powershell
+npm run test:materials
+```

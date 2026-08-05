@@ -137,4 +137,6 @@ Imports only point downward in this diagram. Each package adds information inste
 
 Built-in tools, the Capability Router, the Effect Journal, the project Skill Registry and MCP stdio are implemented. Skill and MCP metadata enter the ContextManifest while full instructions and tool schemas load on demand. MCP calls follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
 
+Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the 25-component index and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
+
 See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.

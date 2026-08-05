@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    { "id": "atoms", "paths": ["packages/atoms/"], "document": "packages/atoms/COMPONENT.md" },
+    { "id": "molecules", "paths": ["packages/molecules/"], "document": "packages/molecules/COMPONENT.md" },
+    { "id": "materials", "paths": ["packages/materials/"], "document": "packages/materials/COMPONENT.md" },
+    { "id": "materials-app", "paths": ["packages/materials/src/app/"], "document": "packages/materials/src/app/COMPONENT.md" },
+    { "id": "materials-capabilities", "paths": ["packages/materials/src/capabilities/"], "document": "packages/materials/src/capabilities/COMPONENT.md" },
+    { "id": "materials-cli", "paths": ["packages/materials/src/cli/"], "document": "packages/materials/src/cli/COMPONENT.md" },
+    { "id": "materials-context", "paths": ["packages/materials/src/context/"], "document": "packages/materials/src/context/COMPONENT.md" },
+    { "id": "materials-control", "paths": ["packages/materials/src/control/"], "document": "packages/materials/src/control/COMPONENT.md" },
+    { "id": "materials-domain", "paths": ["packages/materials/src/domain/"], "document": "packages/materials/src/domain/COMPONENT.md" },
+    { "id": "materials-effects", "paths": ["packages/materials/src/effects/"], "document": "packages/materials/src/effects/COMPONENT.md" },
+    { "id": "materials-evaluation", "paths": ["packages/materials/src/evaluation/"], "document": "packages/materials/src/evaluation/COMPONENT.md" },
+    { "id": "materials-jobs", "paths": ["packages/materials/src/jobs/"], "document": "packages/materials/src/jobs/COMPONENT.md" },
+    { "id": "materials-knowledge", "paths": ["packages/materials/src/knowledge/"], "document": "packages/materials/src/knowledge/COMPONENT.md" },
+    { "id": "materials-mcp", "paths": ["packages/materials/src/mcp/"], "document": "packages/materials/src/mcp/COMPONENT.md" },
+    { "id": "materials-observability", "paths": ["packages/materials/src/observability/"], "document": "packages/materials/src/observability/COMPONENT.md" },
+    { "id": "materials-orchestration", "paths": ["packages/materials/src/orchestration/"], "document": "packages/materials/src/orchestration/COMPONENT.md" },
+    { "id": "materials-recovery", "paths": ["packages/materials/src/recovery/"], "document": "packages/materials/src/recovery/COMPONENT.md" },
+    { "id": "materials-runtime", "paths": ["packages/materials/src/runtime/"], "document": "packages/materials/src/runtime/COMPONENT.md" },
+    { "id": "materials-sandbox", "paths": ["packages/materials/src/sandbox/"], "document": "packages/materials/src/sandbox/COMPONENT.md" },
+    { "id": "materials-skills", "paths": ["packages/materials/src/skills/"], "document": "packages/materials/src/skills/COMPONENT.md" },
+    { "id": "materials-storage", "paths": ["packages/materials/src/storage/"], "document": "packages/materials/src/storage/COMPONENT.md" },
+    { "id": "materials-tools", "paths": ["packages/materials/src/tools/"], "document": "packages/materials/src/tools/COMPONENT.md" },
+    { "id": "materials-verification", "paths": ["packages/materials/src/verification/"], "document": "packages/materials/src/verification/COMPONENT.md" },
+    { "id": "cli", "paths": ["apps/cli/"], "document": "apps/cli/COMPONENT.md" },
+    { "id": "gui", "paths": ["apps/gui/"], "document": "apps/gui/COMPONENT.md" }
+  ]
+}

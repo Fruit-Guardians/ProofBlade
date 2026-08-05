@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -28,5 +30,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Enforce component documentation updates
+        env:
+          COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run check:components -- --base "$COMPONENT_BASE_SHA"
       - name: Run repository verification
         run: npm run verify

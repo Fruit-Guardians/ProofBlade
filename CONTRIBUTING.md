@@ -36,6 +36,18 @@ apps/cli + apps/gui -> packages/materials -> packages/molecules -> packages/atom
 
 新增接口优先通过扩展类型和适配器递进，而不是修改底层类型来满足单一业务。涉及 Control Store、Pi Session、Tool Contract、Skill 或 MCP 的行为变化，需要同时更新对应契约文档和回归测试。
 
+## 组件文档与版本
+
+每个可维护组件都有一份 `COMPONENT.md`，注册关系见 `component-docs.json`，总索引见 `docs/components.md`。文档开头的 `component-metadata` JSON 是机器可读契约，其中：
+
+- `version` 使用 `主版本.次版本.修订号`。不兼容契约变更升主版本，新增兼容能力升次版本，内部修复和说明修正升修订号。
+- `createdAt` 记录文档首次编写时间，后续保持不变。
+- `updatedAt` 记录该组件最近一次变更时间，使用带时区的 ISO 8601 时间。
+- 修改组件源码、测试、包配置或构建配置时，必须同时修改最具体路径对应的 `COMPONENT.md`，提高 `version` 并更新 `updatedAt`。
+- 只更新组件文档时可以升版；修改子组件时不要求父组件连带升版。路径重叠时以 `component-docs.json` 中最长的路径前缀为准。
+
+本地运行 `npm run check:components` 会比较 `HEAD` 与工作区；CI 使用 PR 基线或 push 前提交进行比较。遗漏文档、版本未提高、更新时间未前进或新增源码没有组件归属都会让检查失败。
+
 ## 验证门槛
 
 提交前运行：
