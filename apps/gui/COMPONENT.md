@@ -4,9 +4,9 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T01:52:34+08:00"
+  "updatedAt": "2026-08-06T02:08:30+08:00"
 }
 ```
 
@@ -27,6 +27,7 @@
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
 - 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
+- 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 
 ## 验证
 

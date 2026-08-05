@@ -13,6 +13,7 @@ import {
   createServices,
   fixtureTask,
   listFixtureProfiles,
+  requiresClaimVerification,
   type AppServices,
   type HarnessEvent,
   type ModelProfileConfig,
@@ -401,6 +402,21 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
     const message = [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
     if (message) message.claimVerification = event.payload?.claimVerification as ChatMessageDebug["claimVerification"];
+  }
+  let latestUserPrompt = "";
+  for (const message of messages) {
+    if (message.role === "user") {
+      latestUserPrompt = message.text;
+      continue;
+    }
+    if (message.claimVerification || message.stopReason === "toolUse" || !message.text) continue;
+    if (requiresClaimVerification(latestUserPrompt, message.text)) {
+      message.claimVerification = {
+        required: true,
+        status: "unverified",
+        reason: "历史消息没有候选复现记录。",
+      };
+    }
   }
   return messages;
 }
