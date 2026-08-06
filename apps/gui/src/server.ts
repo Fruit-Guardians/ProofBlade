@@ -147,6 +147,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
     if (method === "GET" && parts[3] === "artifacts" && parts[4]) return sendJson(response, 200, await data.artifact(runId, parts[4]));
+    if (method === "POST" && parts[3] === "pause") return sendJson(response, 202, await data.pause(runId));
     if (method === "POST" && parts[3] === "chat") {
       const body = await readBody(request);
       response.writeHead(200, {

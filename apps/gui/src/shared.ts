@@ -135,7 +135,7 @@ export interface TokenUsage {
 export interface ActiveRunInfo {
   runId: string;
   startedAt: string;
-  state: "running" | "failed";
+  state: "running" | "stopping" | "paused" | "failed";
   error?: string;
 }
 
@@ -222,6 +222,8 @@ export interface PiSessionDebug {
 
 export type ChatStreamEvent =
   | { type: "started"; runId: string }
+  | { type: "stopping"; runId: string }
+  | { type: "paused"; runId: string }
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }

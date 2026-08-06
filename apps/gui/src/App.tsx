@@ -6,7 +6,7 @@ import {
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
@@ -243,6 +243,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const session = detail.sessions.find((item) => item.id === sessionId) ?? preferred;
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [pendingUser, setPendingUser] = useState<string>();
   const [liveText, setLiveText] = useState("");
   const [liveThinking, setLiveThinking] = useState("");
@@ -296,6 +297,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     setTurnError(undefined);
     setSending(true);
     let streamError: string | undefined;
+    let paused = false;
     let receivedTextDelta = false;
     try {
       await streamChat(detail.snapshot.runId, prompt, (event) => {
@@ -309,9 +311,11 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         if (event.type === "context_snapshot") setContextSnapshot(event);
         if (event.type === "done" && !receivedTextDelta) setLiveText(event.text);
         if (event.type === "error") streamError = event.error;
+        if (event.type === "stopping") setStopping(true);
+        if (event.type === "paused") paused = true;
       });
       await onRefresh();
-      if (streamError) {
+      if (streamError && !paused) {
         setFailedUser(prompt);
         setDraft(prompt);
         setTurnError(streamError);
@@ -325,6 +329,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
       onError(failure);
     } finally {
       setSending(false);
+      setStopping(false);
       setPendingUser(undefined);
       setLiveText("");
       setLiveThinking("");
@@ -332,10 +337,23 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     }
   };
 
+  const stop = async () => {
+    if (!sending || stopping) return;
+    setStopping(true);
+    try {
+      await pauseRun(detail.snapshot.runId);
+    } catch (error) {
+      const failure = message(error);
+      setStopping(false);
+      setTurnError(failure);
+      onError(failure);
+    }
+  };
+
   return <div className={`conversation-page ${selectedCall ? "inspector-open" : ""}`}>
     <div className="conversation-main">
       <div className="conversation-toolbar">
-        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{detail.active?.state === "running" || sending ? "生成中" : "就绪"}</span></div>
+        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{stopping || detail.active?.state === "stopping" ? "正在暂停" : detail.active?.state === "running" || sending ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model">{latestAssistant?.model ?? detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness"}</span>
       </div>
@@ -358,7 +376,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         })}
         {pendingUser && !session?.messages.slice().reverse().find((item) => item.role === "user" && item.text === pendingUser) && <article className="chat-message role-user optimistic"><div className="message-avatar"><UserRound size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span className="sending-label"><i />发送中</span></div><MessageText text={pendingUser} /></div></article>}
         {failedUser && !pendingUser && <article className="chat-message role-user failed-message"><div className="message-avatar"><CircleAlert size={15} /></div><div className="message-content"><div className="message-meta"><strong>你</strong><span>发送失败，内容已放回输入框</span></div><MessageText text={failedUser} /></div></article>}
-        {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />实时生成</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <ToolExecutionCard key={call.id} call={call} />)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
+        {sending && <article className="chat-message role-assistant live-message"><div className="message-avatar"><Bot size={15} /></div><div className="message-content"><div className="message-meta"><strong>ProofBlade</strong><span className="streaming-label"><i />{stopping ? "正在暂停" : "实时生成"}</span></div>{liveThinking && <details className="thinking-block" open><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{liveThinking}</pre></details>}{liveText && <MessageText text={liveText} />}{liveTools.length > 0 && <div className="message-tools">{liveTools.map((call) => <ToolExecutionCard key={call.id} call={call} />)}</div>}{!liveText && !liveThinking && !liveTools.length && <div className="typing-indicator"><i /><i /><i /></div>}</div></article>}
       </div>
       <div className="composer-wrap">
         {terminal && <div className="terminal-chat-bar"><CircleAlert size={14} /><span>当前 Run 已结束</span><button onClick={onNew}><Plus size={13} />新建对话</button></div>}
@@ -373,7 +391,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
         </div>}
         {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
-        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · 输入 {formatNumber(session?.usage.input ?? 0)} · 输出 {formatNumber(session?.usage.output ?? 0)} · 缓存 {formatNumber((session?.usage.cacheRead ?? 0) + (session?.usage.cacheWrite ?? 0))}</span><button className="send-button" title="发送" aria-label="发送" disabled={!draft.trim() || sending || terminal} onClick={() => void submit()}>{sending ? <RefreshCw className="spin" size={16} /> : <Send size={16} />}</button></div></div>
+        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · 输入 {formatNumber(session?.usage.input ?? 0)} · 输出 {formatNumber(session?.usage.output ?? 0)} · 缓存 {formatNumber((session?.usage.cacheRead ?? 0) + (session?.usage.cacheWrite ?? 0))}</span><button type="button" className={`send-button ${sending ? "stop-button" : ""}`} title={sending ? "暂停运行" : "发送"} aria-label={sending ? "暂停运行" : "发送"} disabled={terminal || (sending ? stopping : !draft.trim())} onClick={() => sending ? void stop() : void submit()}>{sending ? <Pause size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}

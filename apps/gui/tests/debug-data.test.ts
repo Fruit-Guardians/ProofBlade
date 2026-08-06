@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import type { HarnessEvent, RunSnapshot } from "@proofblade/materials";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
+import type { ChatStreamEvent } from "../src/shared.js";
 
 const entries = [
   { type: "message", id: "user-1", timestamp: "2026-08-05T00:00:00.000Z", message: { role: "user", content: [{ type: "text", text: "inspect" }] } },
@@ -96,3 +100,65 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
 });
+
+test("pauses an active coding lane and persists a resumable run state", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-pause-"));
+  let releasePrompt: ((outcome: AgentOutcome) => void) | undefined;
+  let markPromptStarted: (() => void) | undefined;
+  const promptStarted = new Promise<void>((resolve) => { markPromptStarted = resolve; });
+  const promptResult = new Promise<AgentOutcome>((resolve) => { releasePrompt = resolve; });
+  let aborts = 0;
+  const lane: AgentLanePort = {
+    async prompt() { markPromptStarted?.(); return await promptResult; },
+    async abort() {
+      aborts += 1;
+      releasePrompt?.({ text: "partial", stopReason: "aborted", usage: zeroUsage() });
+    },
+    async compact() {},
+    async isIdle() { return false; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-PAUSE-001";
+    await data.createConversation({ runId, title: "pause test", workspacePath: root });
+    const events: ChatStreamEvent[] = [];
+    const chat = data.chat(runId, "inspect the workspace", (event) => events.push(event), undefined, undefined, root);
+    await promptStarted;
+    const paused = await data.pause(runId);
+    await chat;
+
+    assert.equal(aborts, 1);
+    assert.equal(paused.state, "paused");
+    assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
+    assert.deepEqual(events.filter((event) => event.type === "stopping" || event.type === "paused").map((event) => event.type), ["stopping", "paused"]);
+    assert.equal(events.some((event) => event.type === "done" || event.type === "error"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+const config: ProofBladeConfig = {
+  schemaVersion: 1,
+  runtime: { piVersion: "0.83.0" },
+  storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+  modelProfiles: {
+    executor: {
+      provider: "test",
+      api: "openai-completions",
+      baseUrl: "http://127.0.0.1:1/v1",
+      model: "test-model",
+      modelDiscoveryPath: "/models",
+      apiKeyEnv: "TEST_API_KEY",
+      contextWindow: 4096,
+      maxTokens: 512,
+      requestTimeoutMs: 1000,
+      maxRetries: 0,
+      input: ["text"],
+    },
+  },
+};
+
+function zeroUsage() {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}

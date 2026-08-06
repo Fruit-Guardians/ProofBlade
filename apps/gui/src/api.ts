@@ -1,4 +1,4 @@
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -76,11 +76,12 @@ export async function createFixtureConversation(input: { runId: string; fixtureI
   return await request("/api/fixture-conversations", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function streamChat(runId: string, prompt: string, onEvent: (event: ChatStreamEvent) => void): Promise<void> {
+export async function streamChat(runId: string, prompt: string, onEvent: (event: ChatStreamEvent) => void, signal?: AbortSignal): Promise<void> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ prompt }),
+    signal,
   });
   if (!response.ok || !response.body) {
     const body = await response.json().catch(() => ({})) as { error?: unknown };
@@ -101,6 +102,10 @@ export async function streamChat(runId: string, prompt: string, onEvent: (event:
     }
     if (done) break;
   }
+}
+
+export async function pauseRun(runId: string): Promise<ActiveRunInfo> {
+  return await request(`/api/runs/${encodeURIComponent(runId)}/pause`, { method: "POST", body: "{}" });
 }
 
 export async function createCheckpoint(runId: string, reason: string): Promise<unknown> {

@@ -219,6 +219,8 @@ button.message-tool:hover, button.message-tool.selected { border-color: #3e6f57;
 .composer-footer > span { color: var(--faint); font: 8px/1 "Cascadia Code", monospace; }
 .send-button { display: grid; width: 28px; height: 28px; margin-left: auto; place-items: center; border: 1px solid #3aaa78; border-radius: 5px; color: #07140d; background: var(--green); cursor: pointer; }
 .send-button:disabled { border-color: #334139; color: #617069; background: #202923; cursor: default; }
+.send-button.stop-button { border-color: #d56b6b; color: #fff; background: #b94343; }
+.send-button.stop-button:hover:not(:disabled) { background: #ca5050; }
 .terminal-chat-bar { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; color: #c5a76e; font-size: 9px; }
 .terminal-chat-bar span { flex: 1; }
 .terminal-chat-bar button { display: flex; align-items: center; gap: 4px; height: 25px; border: 1px solid #4d554e; border-radius: 4px; color: #bdc6c1; background: #1b221e; cursor: pointer; font-size: 9px; }

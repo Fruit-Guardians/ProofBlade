@@ -15,6 +15,7 @@ import {
   listFixtureProfiles,
   requiresClaimVerification,
   type AppServices,
+  type AgentLanePort,
   type HarnessEvent,
   type ModelProfileConfig,
   type ProofBladeConfig,
@@ -67,16 +68,21 @@ interface ContentLike {
 }
 
 const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
+type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
   private readonly services: AppServices;
   private readonly active = new Map<string, ActiveRunInfo>();
+  private readonly activeLanes = new Map<string, AgentLanePort>();
+  private readonly pauseRequests = new Set<string>();
+  private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
 
   public constructor(
     private readonly root: string,
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
+    private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
   ) {
     this.services = createServices(root, config);
   }
@@ -245,13 +251,14 @@ export class DebugDataService {
     if (snapshot.status === "PAUSED") await this.services.control.dispatch(runId, { type: "resume" });
     const info: ActiveRunInfo = { runId, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(runId, info);
+    this.streamEmitters.set(runId, emit);
     emit({ type: "started", runId });
     let runtime: ProofBladeToolRuntime | undefined;
-    let lane: PiCodingLane | PiSolverLane | undefined;
+    let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
       if (runKind(snapshot.task) === "chat") {
-        lane = await PiCodingLane.create({
+        lane = await this.createCodingLane({
           projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
           runId,
           runDir: join(this.services.runsRoot, runId),
@@ -274,19 +281,60 @@ export class DebugDataService {
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       }
+      this.activeLanes.set(runId, lane);
+      if (this.pauseRequests.has(runId)) {
+        await this.ensurePaused(runId, "Paused by user");
+        emit({ type: "paused", runId });
+        return;
+      }
       const outcome = await lane.prompt(text);
+      if (this.pauseRequests.has(runId)) {
+        await this.ensurePaused(runId, "Paused by user");
+        emit({ type: "paused", runId });
+        return;
+      }
       if (outcome.errorMessage || outcome.stopReason === "error") {
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
       }
       emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
     } catch (error) {
-      emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
+      if (this.pauseRequests.has(runId)) {
+        await this.ensurePaused(runId, "Paused by user");
+        emit({ type: "paused", runId });
+      } else {
+        emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
+      }
     } finally {
       await lane?.close().catch(() => undefined);
       await runtime?.close().catch(() => undefined);
+      this.activeLanes.delete(runId);
+      this.pauseRequests.delete(runId);
+      this.streamEmitters.delete(runId);
       this.active.delete(runId);
     }
+  }
+
+  public async pause(runId: string, reason = "Paused by user"): Promise<ActiveRunInfo> {
+    assertRunId(runId);
+    const current = this.active.get(runId);
+    if (!current || current.state === "failed") throw new Error(`Run is not active: ${runId}`);
+    if (current.state === "paused") return current;
+    const stopping: ActiveRunInfo = { ...current, state: "stopping" };
+    this.active.set(runId, stopping);
+    this.pauseRequests.add(runId);
+    this.streamEmitters.get(runId)?.({ type: "stopping", runId });
+    await this.ensurePaused(runId, reason);
+    const paused: ActiveRunInfo = { ...current, state: "paused" };
+    this.active.set(runId, paused);
+    await this.activeLanes.get(runId)?.abort(reason);
+    return paused;
+  }
+
+  private async ensurePaused(runId: string, reason: string): Promise<void> {
+    const snapshot = await this.services.control.snapshot(runId);
+    if (snapshot.status === "PAUSED" || ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) return;
+    await this.services.control.dispatch(runId, { type: "pause", reason, lane: "main" });
   }
 
   private async loadSessions(runId: string): Promise<PiSessionDebug[]> {
