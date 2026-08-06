@@ -35,7 +35,7 @@ export class BackgroundJobRunner {
   public async start(input: BackgroundJobStartInput): Promise<JobRecord> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) throw new Error(`Cannot start a background job for terminal run ${snapshot.status}`);
-    const operation = this.router.describe(input.capabilityId, input.operation);
+    const operation = this.router.resolveInvocationPolicy({ capabilityId: input.capabilityId, operation: input.operation, input: input.input });
     const timeoutMs = normalizeTimeout(input.timeoutMs);
     const job: Omit<JobRecord, "createdSeq"> = {
       id: id("J"),

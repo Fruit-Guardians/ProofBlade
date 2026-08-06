@@ -72,17 +72,26 @@ export class ProofBladeCapabilityRouter {
     return this.registry.find(capabilityId, operationName).operation;
   }
 
-  public async invoke(request: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
-    const { manifest, operation } = this.registry.find(request.capabilityId, request.operation);
+  public resolveInvocationPolicy(request: CapabilityInvocation): CapabilityOperationAtom {
+    const { operation } = this.registry.find(request.capabilityId, request.operation);
     validateInput(operation, request.input);
+    if (!this.mcp?.handles(request.capabilityId)) return operation;
+    const resolved = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
+    return { ...operation, readOnly: resolved.readOnly, sideEffect: resolved.sideEffect, replay: resolved.replay };
+  }
+
+  public async invoke(request: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
+    const { manifest } = this.registry.find(request.capabilityId, request.operation);
+    const operation = this.resolveInvocationPolicy(request);
     const snapshot = await this.controlStore.snapshot(this.runId);
     if (this.mcp?.handles(request.capabilityId)) {
+      const mcpPolicy = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
       const executed = await this.journal.executeWith(
         this.runId,
         {
           operation: `mcp:${request.capabilityId}:${request.operation}`,
-          args: { ...this.mcp.effectArgs(request.capabilityId, request.operation, request.input), generation: snapshot.generation },
-          replayPolicy: operation.replay,
+          args: { ...this.mcp.effectArgs(request.capabilityId, request.operation, request.input, mcpPolicy), generation: snapshot.generation },
+          replayPolicy: mcpPolicy.replay,
           cwd: this.runsRoot,
         },
         async (_effect, innerSignal) => await this.mcp!.execute(request.capabilityId, request.operation, request.input, innerSignal),

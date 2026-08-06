@@ -4,9 +4,9 @@
 {
   "id": "materials-mcp",
   "name": "MCP Registry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-06T19:33:48+08:00"
 }
 ```
 
@@ -23,6 +23,8 @@
 ## 开发规则与验证
 
 默认延迟连接；环境变量和凭据不得进入事件、版本快照或 GUI 响应。Server/Tool 顺序与配置哈希必须确定。
+
+分发型 MCP Tool 必须用 `nestedToolPolicy` 对内层工具执行默认拒绝校验。Effect 创建前解析内层身份并采用它的 replay/sideEffect/sensitivity/resourceKeys；配置标记的参数只持久化哈希，并从 MCP 输出中脱敏。
 
 ```powershell
 npm run test:materials
