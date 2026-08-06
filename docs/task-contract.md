@@ -2,8 +2,12 @@
 
 `TaskContract` is immutable for the life of a run. It records the target, objective, success criteria, verification mode, scope, pause policy and budgets. A model can propose clarification, but it cannot mutate the contract or mark a run successful.
 
+In the production unattended profile, pause policy never delegates a decision to a user. A task that cannot progress is retried, rerouted, deprioritized or marked blocked by the contest scheduler so other challenges continue. Assist-mode pauses remain a development-only behavior.
+
 The reducer accepts a successful `run_finished` only when the payload contains `verified: true`. The command boundary additionally requires the verifier lane, an accepted completion, known evidence ids, at least one reproduction record and the task contract's configured evidence count. The demo uses a local reproduction verifier; workflow fixtures use the hidden scorer adapter.
 
 The workflow fixtures use `verification.kind: "hidden_scorer"` and require two reproduction records. Their visible target files are separate from `.proofblade/scorer.json`. A completion proposal stores a candidate hash and sensitive artifact reference; the event stream does not contain the candidate text. A successful command is valid only when it comes from the verifier lane, references an accepted completion and includes the required evidence records.
 
 ProofBlade currently ships three synthetic Web profiles and three synthetic Reverse profiles. `proofblade fixtures` lists their public metadata without exposing scorer values.
+
+Platform challenge metadata is converted into a versioned Task Contract only after attachment hashes and challenge revision are known. Platform credentials, authenticated attachment URLs, submission endpoints and cookies are Host-owned data and are never copied into the Task Contract. See `docs/platform-contract.md`.

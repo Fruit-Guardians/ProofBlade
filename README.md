@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Agent 框架。它把 Pi 会话与 CTF 控制存储分离，用只追加事件记录每一次状态变化，并且只允许独立验证器作出任务完成判定。
+ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型无人值守 CTF Agent 框架。正式比赛目标是通过官方 API 自动获取题目、调度求解、验证候选并提交答案；模型可以自主选择分析路线，但只有 Host Control Plane 持有平台凭据和提交权。
 
 ## 当前能力
 
@@ -23,6 +23,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、固定 `mcp_call` 代理、Capability 映射、效果日志、脱敏和进程回收。
+- 无人值守 Competition Platform 边界和确定性平台模拟器：覆盖题目/附件同步、提交冷却、重复提交及提交后响应丢失的 reconciliation。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
 - 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
@@ -166,9 +167,10 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 
 ## 设计文档
 
-- `docs/components.md`：25 个组件的开发入口、文档版本与强制更新规则。
+- `docs/components.md`：26 个组件的开发入口、文档版本与强制更新规则。
 - `docs/architecture.md`：依赖方向、运行时组件和上下文层级。
 - `docs/task-contract.md`：任务、事实、证据和完成条件。
+- `docs/platform-contract.md`：比赛平台、无人值守策略和提交恢复契约。
 - `docs/tool-contract.md`：工具契约、效果、重放和制品规则。
 - `docs/eval-protocol.md`：确定性评测指标和回归门槛。
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。

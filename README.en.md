@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness runtime. It keeps Pi sessions and the CTF control store separate, records every state transition as an append-only event, and makes completion a verifier-gated decision.
+ProofBlade is an evidence-driven, unattended CTF agent harness built on the Pi AgentHarness runtime. Its production target is to retrieve challenges through the official competition API, schedule solving work, verify candidates, and submit answers automatically. Models retain freedom over analysis routes, while platform credentials and submission authority remain inside the Host control plane.
 
 ## Current scope
 
@@ -23,6 +23,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
 - Project MCP stdio with `.mcp.json`, lazy discovery, one stable `mcp_call` proxy, capability mapping, effect journaling, redaction and process cleanup.
+- An unattended competition-platform boundary and deterministic simulator covering challenge and attachment sync, cooldowns, duplicate submissions, and reconciliation after a committed submission loses its response.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
 - Durable run telemetry for Provider/Tool/Effect metrics, cost and cache tokens, primary failure classification, and Prompt/Tool/Skill/MCP/Runtime version snapshots.
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
@@ -160,6 +161,6 @@ Imports only point downward in this diagram. Each package adds information inste
 
 Built-in tools, the Capability Router, the Effect Journal, the project Skill Registry and MCP stdio are implemented. Skill and MCP metadata enter the ContextManifest while full instructions and tool schemas load on demand. MCP calls follow the same `Tool -> Capability Router -> Effect Journal -> Artifact/Evidence` audit path. See `docs/extensions.md` for implementation status, contracts, examples and the verification checklist.
 
-Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the 25-component index and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
+Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the 26-component index and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
 
-See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.
+See `docs/architecture.md`, `docs/task-contract.md`, `docs/platform-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.

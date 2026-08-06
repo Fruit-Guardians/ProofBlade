@@ -17,6 +17,7 @@
     { "id": "materials-mcp", "paths": ["packages/materials/src/mcp/"], "document": "packages/materials/src/mcp/COMPONENT.md" },
     { "id": "materials-observability", "paths": ["packages/materials/src/observability/"], "document": "packages/materials/src/observability/COMPONENT.md" },
     { "id": "materials-orchestration", "paths": ["packages/materials/src/orchestration/"], "document": "packages/materials/src/orchestration/COMPONENT.md" },
+    { "id": "materials-platform", "paths": ["packages/materials/src/platform/"], "document": "packages/materials/src/platform/COMPONENT.md" },
     { "id": "materials-recovery", "paths": ["packages/materials/src/recovery/"], "document": "packages/materials/src/recovery/COMPONENT.md" },
     { "id": "materials-runtime", "paths": ["packages/materials/src/runtime/"], "document": "packages/materials/src/runtime/COMPONENT.md" },
     { "id": "materials-sandbox", "paths": ["packages/materials/src/sandbox/"], "document": "packages/materials/src/sandbox/COMPONENT.md" },

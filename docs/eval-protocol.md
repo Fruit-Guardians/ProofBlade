@@ -2,6 +2,8 @@
 
 The baseline is deterministic and offline. A fixture is reset before each run, the event stream is replayed from zero, and the projection hash must match. Add live provider evaluations only after the adapter contract tests pass.
 
+The contest-level baseline uses `CompetitionPlatformSimulator`. It tests challenge and attachment discovery, wrong-answer cooldown, duplicate handling, accepted score updates, attempt-key collisions, and the crash window where the platform commits a submission before the response is lost. A retry is legal only after reconciliation proves the original attempt absent. Future Portfolio evaluations report score under deadline, accepted points per wall-clock minute, submission precision, blocked-task turnover and complete-contest recovery.
+
 The durability suite injects failure immediately after effect proposal, start, execution and artifact persistence. Every replayable case must converge to one finished effect with one registered result artifact. It also checks concurrent event sequence allocation, lease ownership and fixture generation persistence.
 
 The interruption suite covers the six design windows explicitly: start-before-launch, artifact-before-finish, assistant-before-preflight, a partially completed parallel Tool batch, checkpoint-before-Pi-append, and heartbeat/Fixture loss. It asserts fenced lease reaping, old-generation isolation, legal Tool pairs in original call order, one Pi compaction entry, retained Facts, no active stale jobs, and an unchanged projection hash after a second recovery pass. The complete matrix is in `docs/recovery.en.md` and `docs/recovery.md`.

@@ -42,6 +42,8 @@ export * from "./evaluation/fixture-evaluator.js";
 export * from "./sandbox/fixture.js";
 export * from "./sandbox/fixture-catalog.js";
 export * from "./recovery/run-recovery.js";
+export * from "./platform/contracts.js";
+export * from "./platform/simulator.js";
 export * from "./storage/jsonl-store.js";
 export * from "./app/demo.js";
 export * from "./app/fixture-task.js";

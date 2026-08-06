@@ -1,6 +1,6 @@
 # 面向西湖论剑的 Pi CTF Agent / Harness 设计基线
 
-> 研究时间：2026-08-04  |  研究对象：Pi Agent Harness、Pi Package 生态、Reasonix、OpenClacky、Firefox-Reverse、Tsec Hackathon 第二季前三名  |  文档状态：v0.3 实施基线
+> 研究时间：2026-08-04  |  无人值守目标校准：2026-08-06  |  研究对象：Pi Agent Harness、Pi Package 生态、Reasonix、OpenClacky、Firefox-Reverse、Tsec Hackathon 第二季前三名  |  文档状态：v0.4 实施基线
 
 ## 0. 先给结论
 
@@ -27,19 +27,27 @@
 | CTF 能力层 | 静态分析、动态执行、网络/浏览器、模糊测试、报告生成 | 自建工具 + MCP/插件 |
 | 隔离与评测层 | 容器/VM、目标重置、网络策略、隐藏评分器、回放和指标 | 自建 Fixture/Eval 基础设施 |
 
-最终目标不是“会聊天的逆向助手”，而是一个可以在本地隔离环境中完成下列闭环的系统：
+最终目标不是“会聊天的逆向助手”，也不是比赛期间等待人类决策的辅助工具，而是一个通过比赛官方 API 无人值守运行的系统。它在 Host 侧持有比赛凭据，自动同步题目、下载附件、调度 Run、验证候选、提交答案并恢复未知提交：
 
 ```text
-题目接入 → 目标建模 → 计划 → 侦察 → 假设 → 实验/利用 → 验证 → 证据归档 → 报告
-                         ↑                    ↓
-                         └────── 失败反馈 / 路线切换 ──────┘
+比赛同步 → 题目组合调度 → 目标建模 → 侦察/假设/实验 → 独立验证 → 提交 → 平台确认
+              ↑                         ↓                       ↓
+              └──── 换题/换路线/换能力 ─┴──── 提交恢复/冷却 ────┘
 ```
 
 ---
 
 ## 1. 任务边界与设计目标
 
-### 1.1 目标用户和比赛形态
+### 1.1 无人值守正式运行约束
+
+正式比赛 Profile 从启动到比赛结束不依赖人工输入。人只在赛前配置官方 API、Provider、模型、资源上限和比赛规则；运行期间任何单题失败都必须收敛为自动重试、换路线、换能力、降低优先级或 `BLOCKED`，不得让全局调度停在 `NEED_HUMAN`。
+
+比赛本身是一等对象，不是若干互不相关的单题 Run。系统同时维护 Contest、Challenge、Attachment、ChallengeRun、Submission、ScoreboardSnapshot、PlatformSession、RateLimit 和 ContestDeadline。每题内部由 Intent Scheduler 推进，全局由 Portfolio Scheduler 根据分值、剩余时间、历史成功率、预计耗时和资源竞争选择题目。
+
+模型可自主选择获准的分析技术和能力组合。阶段、Skill 和 Planner 只提供优先级与上下文，不把解题方法固化为硬白名单；硬限制只用于比赛授权范围、凭据隔离、资源上限、不可逆平台 Effect 和证据/提交门禁。Provider 内置但无法审计的工具结果只能作为 Hint，经过 ProofBlade Effect/Artifact 的结果才能成为 Evidence。
+
+### 1.2 目标用户和比赛形态
 
 你面对的是开发型 CTF：Agent 需要在给定题目、源码、二进制、容器、网页或服务的环境中，连续使用工具完成分析和验证。比赛评分通常同时看：
 
@@ -57,7 +65,7 @@
 4. **成本和延迟**：缓存命中、输入输出 Token、每题平均耗时。
 5. **可观察性**：能否解释“为什么走这条路线、为什么停、哪一步失败”。
 
-### 1.2 第一版的范围
+### 1.3 第一版的范围
 
 第一版建议集中在三类题型：
 
@@ -67,7 +75,7 @@
 
 Crypto、Misc、移动端和硬件分析可以通过同一套能力协议逐步加入，不需要在第一版把所有工具注册到模型上下文。
 
-### 1.3 明确的非目标
+### 1.4 明确的非目标
 
 以下内容放入后续阶段：
 
@@ -77,7 +85,7 @@ Crypto、Misc、移动端和硬件分析可以通过同一套能力协议逐步�
 - 为了“看起来智能”而加入没有评测依据的自动反思；
 - 直接改造 Pi 核心循环，导致上游升级和问题定位成本上升。
 
-### 1.4 学习顺序：按失败边界学，不按框架列表学
+### 1.5 学习顺序：按失败边界学，不按框架列表学
 
 你已经掌握基础工具调用，下一步不要继续横向收集框架 API。建议每一阶段都做一个可运行练习：
 
@@ -467,6 +475,31 @@ apps → control-plane → domain ports
 - `ADR-004`: 模型只能提议状态，Reducer 才能提交状态；
 - `ADR-005`: 外部副作用必须经过 Effect Journal。
 
+### 3.5 Competition Platform 与双层调度
+
+比赛平台是外部权威系统，不是模型工具，也不是第三个可以自由写入的事实域。Host adapter 独占认证信息，通过稳定端口向 Control Plane 提供比赛快照、题目、附件流、提交回执和提交 reconciliation：
+
+```ts
+interface CompetitionPlatformPort {
+  snapshot(signal?: AbortSignal): Promise<ContestSnapshot>;
+  listChallenges(signal?: AbortSignal): Promise<PlatformChallenge[]>;
+  openAttachment(challengeId: string, attachmentId: string, signal?: AbortSignal): Promise<PlatformAttachmentContent>;
+  submitCandidate(input: PlatformSubmissionInput, signal?: AbortSignal): Promise<PlatformSubmissionReceipt>;
+  reconcileSubmission(attemptKey: string, challengeId: string, signal?: AbortSignal): Promise<PlatformSubmissionReconciliation>;
+}
+```
+
+平台凭据、Cookie、认证 URL 和提交 endpoint 不进入 Pi Session、Task Contract、MCP、Skill、Tool Runner 或目标环境。附件进入题目工作区前必须落 Artifact、计算 hash，并绑定 challenge revision。
+
+调度分为两级：
+
+1. Portfolio Scheduler 在 Contest 范围选择 Challenge，考虑分值、剩余时间、题型历史成功率、预计耗时、冷却和 CPU/GPU/浏览器资源；
+2. Intent Scheduler 只负责单个 ChallengeRun 内的下一步实验。
+
+平台提交属于 Host 侧 `reconcile` Effect。本地 `attemptKey` 只用于关联事件，不能假设官方 API 支持服务端幂等。进程可能在 POST 已生效、响应返回前崩溃；恢复时必须先查询提交历史、题目 solved 状态和冷却，再决定采用回执、创建新 attempt 或保持 `UNKNOWN`。
+
+开发和 CI 使用 `CompetitionPlatformSimulator` 覆盖题目同步、附件下载、正确/错误/重复提交、冷却、限流、比赛结束，以及“提交已落地但响应丢失”的故障窗口。真实平台 adapter 必须通过同一组 contract tests。
+
 ---
 
 ## 4. Harness 核心设计
@@ -539,7 +572,7 @@ CLI 查询读 projection；`replay` 从零重放后计算 hash，并与 projecti
 | idempotent | 写入固定路径、创建已命名目录 | 检查 effect id 后补齐 |
 | resumable | 长时间 fuzz、调试会话 | 读取 checkpoint 后继续 |
 | reconcile | 启动进程、提交答案、创建容器 | 先查询外部状态，再决定补记或重试 |
-| manual | 需要人工选择的实验 | 恢复为待确认状态 |
+| manual | 仅开发 Profile 允许人工选择的实验 | 正式比赛 Profile 禁止调度；改走替代能力或阻塞当前题 |
 | forbidden-replay | 不可重复的外部动作 | 标记 outcome unknown，停止自动推进 |
 
 Provider 重试采用指数退避，最多次数由模型和阶段配置决定。上下文溢出单独计数：同一用户输入最多触发一次压缩恢复，防止“压缩—重试—再次溢出”的循环。
@@ -595,13 +628,13 @@ CREATED → READY → RUNNING ⇄ PAUSED
                     ↓         ↓
                  VERIFYING → SUCCEEDED
                     ↓
-          FAILED / EXHAUSTED / CANCELLED / NEED_HUMAN
+          FAILED / EXHAUSTED / CANCELLED / BLOCKED
 ```
 
 合法转移由表驱动，所有 terminal state 不可逆。`BLOCKED` 容易混淆“临时依赖”和“任务结束”，建议拆成：
 
-- `PAUSED`：可自动或人工恢复；
-- `NEED_HUMAN`：缺少只由用户提供的信息；
+- `PAUSED`：由 Portfolio Scheduler 按冷却、资源或重试时间自动恢复；
+- `BLOCKED`：当前题缺少可用能力或可靠路线，不阻塞其他题目；
 - `EXHAUSTED`：时间、Token、成本或实验预算耗尽；
 - `FAILED`：出现确定性、不可恢复错误；
 - `CANCELLED`：外部取消。
@@ -659,6 +692,7 @@ type ContextBuildOutput = {
 {
   "schema_version": 1,
   "task_id": "TASK",
+  "deployment_profile": "unattended|development",
   "mode": "ctf_solve|vulnerability_discovery",
   "target_kind": "unknown|web|reverse|pwn|crypto|misc|mixed",
   "target": "HOST_OR_LOCAL_FIXTURE",
@@ -682,9 +716,7 @@ type ContextBuildOutput = {
     "external_network": false,
     "allowed_workspace": "./runs/TASK"
   },
-  "pause_policy": [
-    "scope_change", "credential_required", "irreversible_external_effect"
-  ],
+  "pause_policy": [],
   "constraints": {
     "deadline_ms": 1800000,
     "max_cost_usd": 2.0,
@@ -694,7 +726,7 @@ type ContextBuildOutput = {
 }
 ```
 
-Task Contract 本身是 immutable value object。phase、next action、remaining budget 保持在 Run Snapshot 中。输入 hash、目标、scope、success criteria、pause policy 和总预算仅能由 Host 命令创建新版本；模型只能提交澄清或修改建议。每个 effect 记录实际使用的 `task_contract_version`。
+Task Contract 本身是 immutable value object。phase、next action、remaining budget 保持在 Run Snapshot 中。输入 hash、目标、scope、success criteria、pause policy 和总预算仅能由 Host 命令创建新版本；模型只能提交澄清或修改建议。每个 effect 记录实际使用的 `task_contract_version`。正式比赛的 `deployment_profile=unattended` 且 `pause_policy=[]`；scope、凭据或不可逆操作不满足时 fail closed，并让 Portfolio Scheduler 改做其他题，而不是等待人类。
 
 ### 5.3 压缩策略
 
@@ -744,7 +776,7 @@ Task Contract 本身是 immutable value object。phase、next action、remaining
 ## Next actions
 1. ...
 
-## Blockers / human input
+## Machine-resolvable blockers
 - none
 ```
 
@@ -829,7 +861,7 @@ REPRODUCE
   ↓
 REPORT
   ↓
-DONE / BLOCKED / NEED_HUMAN
+DONE / BLOCKED / EXHAUSTED
 ```
 
 每个阶段都定义：目标、输入、允许能力、输出 schema、完成条件和失败转移。
@@ -861,14 +893,14 @@ DONE / BLOCKED / NEED_HUMAN
 | Crypto | 原语、随机数、密钥/nonce 生命周期、样本关系 | 已知向量/统计/差分 | 独立脚本对隐藏样本成立 |
 | Misc | 数据格式、编码层、元数据、隐写/协议 | file/magic/metadata | 从原始附件一键生成结果 |
 
-### 6.3 全自动和辅助模式
+### 6.3 正式运行和开发调试模式
 
-参考 Firefox-Reverse，提供两种模式：
+提供两种明确隔离的部署 Profile：
 
-- **Auto**：目标清晰时，Harness 自动推进；只在登录态、验证码、题目歧义和预算决策处暂停；
-- **Assist**：每个阶段结束时提交阶段摘要、证据、风险和 2-3 个路线选项，由用户或 director 选择。
+- **Unattended**：正式比赛模式。平台登录、预算、题目歧义、能力缺失和冷却都由 Host 策略处理；单题可以阻塞或降级，但系统继续调度其他题目；
+- **Development/Assist**：开发阶段可暂停并查看阶段摘要、证据、风险和路线选项，用于调试，不可进入比赛部署配置。
 
-开发阶段优先使用 Assist。它能暴露阶段划分、工具契约和摘要质量问题；稳定后再把相同流程切到 Auto。
+开发阶段可以使用 Assist 暴露阶段划分、工具契约和摘要质量问题，但所有发布门禁必须在无输入的 Unattended Profile 下通过。不得把“稳定后再自动化”的未实现人工分支带进正式镜像。
 
 ### 6.4 无进展和绕圈护栏
 
@@ -1033,7 +1065,7 @@ if provider is degraded                       → same-role fallback model
 每增加一个角色都要通过同一套对照：至少 20 个固定 challenge、每题 3 次运行，报告成功率、95% 置信区间、p50/p95 时间、成本和重复调用率。只有满足下列之一才保留：
 
 - 成功率有稳定提升，成本增长在预设范围；
-- 成功率不变但 p95 延迟或人工介入明显下降；
+- 成功率不变但 p95 延迟下降，或无人值守阻塞恢复率明显提升；
 - 成本不变但证据完整率、恢复率或验证通过率明显上升。
 
 若只让报告看起来更“聪明”，却没有改变这些指标，就删除该角色。
@@ -1050,7 +1082,7 @@ if provider is degraded                       → same-role fallback model
 read_file        write_file        list_files        search_code
 run_command      run_background    read_job_output   stop_job
 inspect_target   run_experiment    collect_evidence  read_artifact
-propose_intent   propose_fact      report_status     ask_human
+propose_intent   propose_fact      report_status     defer_challenge
 ```
 
 题型能力通过 `invoke_capability` 或 Skill 进入：
@@ -1155,6 +1187,8 @@ Background job 不应只返回一个临时 PID。Job record 包含稳定 `job_id
 
 不要把 MCP 当作隔离边界。stdio MCP 是受信任的本地代码，HTTP MCP 是受信任的远程能力；两者仍需通过相同的 Tool Contract、timeout、redaction、resource lease 和 effect journal。服务自报的 `readOnlyHint` 只用于调度提示，Host 仍按本地策略决定权限和并发。
 
+还要防止嵌套工具绕过策略。`frx-director-mcp.agent_call_tool` 这类外层工具会在参数中再次选择浏览器内部工具；Host 不能只给 `agent_call_tool` 配一个统一的 readOnly/replay 标记，必须解析内层 `tool + arguments`，重新解析 sideEffect、scope、sensitivity、resource lease 和 replay policy。未出现在本地内层策略表中的工具默认拒绝。模型仍可通过目录动态发现获准能力，阶段只影响推荐顺序，不替代安全策略。
+
 ---
 
 ## 9. 证据账本与可复现性
@@ -1165,13 +1199,13 @@ Background job 不应只返回一个临时 PID。Job record 包含稳定 `job_id
 
 | 对象 | 含义 | 谁可创建 | 是否可直接进入报告 |
 |---|---|---|---|
-| Observation | 一次工具/人工观察到的原始现象 | Tool adapter / Human | 否 |
+| Observation | 一次工具或平台观察到的原始现象 | Tool adapter / Platform adapter | 否 |
 | Artifact | 文件、输出、trace、截图、脚本等不可变产物 | Harness | 作为引用 |
 | Evidence | Observation 与 Artifact 的可追溯证据包 | Reducer | 是 |
 | Hypothesis | 可证伪解释，带预期观察和实验 | Model 提议，Reducer 提交 | 否 |
 | Fact | 被 Evidence 支持的规范化主张 | Reducer / Verifier | 是 |
 | Intent | 下一条探索方向，消费 Fact/Hypothesis 并预期产生证据 | Planner 提议，Reducer 提交 | 否 |
-| Hint | 人或外部系统提供的判断，默认未验证 | Human / Platform | 否 |
+| Hint | Provider 内置工具或外部系统提供的判断，默认未验证 | Provider / Platform | 否 |
 
 核心关系：
 
@@ -1273,10 +1307,11 @@ CANDIDATE_FOUND → REPRODUCED → VERIFIED → SUBMITTED → ACCEPTED
                          ↘ REJECTED       ↘ DUPLICATE / COOLDOWN / WRONG
 ```
 
-- CTF flag：至少从原始 fixture 重新执行一次独立复现，候选值匹配 Task Contract 的格式，再提交；平台 `accepted` 才完成；
+- CTF flag：根据来源可信度、错误提交惩罚、题目是否一次性和剩余比赛时间选择验证强度；稳定 exploit 默认独立复现，可信静态提取可以一次证据提交，一次性 token 禁止机械重复；平台 `accepted` 才完成；
 - 漏洞挖掘：最小复现 + 根因定位 + 影响边界 + 修复后反例或第二种独立证据；
 - 无平台提交接口：隐藏 verifier 的 exit code 和签名结果作为 `VERIFIED`，不让 Agent 读取评分器源码；
 - 提交操作带 idempotency key、冷却状态和次数预算，不得因重试风暴耗尽比赛额度；
+- 本地 idempotency key 不代表平台支持恰好一次；POST 结果不明时先调用 Platform reconciliation，`UNKNOWN` 不得直接重试；
 - 报告生成只能读取 `VERIFIED/ACCEPTED` Fact；未验证内容进入“候选/限制”，不得写成确定结论。
 
 ---
@@ -1290,6 +1325,7 @@ CANDIDATE_FOUND → REPRODUCED → VERIFIED → SUBMITTED → ACCEPTED
 1. **Unit fixtures**：单工具、参数错误、超时、输出截断、恢复；
 2. **Workflow fixtures**：一个题型对应一条短流程，例如“定位入口→构造输入→验证”；
 3. **Challenge fixtures**：完整本地合成题，含隐藏评分器和可复现环境。
+4. **Contest scenarios**：通过 Platform Simulator 动态开放多题，模拟附件修订、认证过期、限流、冷却、平台故障和全局截止时间。
 
 每个 fixture 固定：初始文件、目标服务、环境变量、时间预算、成功判定、允许网络、期望产物。
 
@@ -1324,6 +1360,10 @@ Challenge fixture 还要满足：
 | Fact precision | 抽检 Fact 中被原始 Artifact 支持的比例 |
 | Compression retention | 压缩前关键状态在压缩后仍可检索的比例 |
 | Environment reset fidelity | 重置后目标 hash/行为恢复到基线的比例 |
+| Score under deadline | 截止时间前平台确认的总分 |
+| Accepted points per minute | 单位墙钟时间获得的有效分值 |
+| Portfolio turnover | 阻塞或低收益题让出资源后推进其他题目的比例 |
+| Platform recovery precision | 未知提交恢复后未重复消耗额度且状态正确的比例 |
 
 ### 10.3 回放模式
 
@@ -1644,9 +1684,9 @@ Drive Loop 是唯一主动推进 Run 的组件。事件订阅者、模型、工�
 
 ### Milestone 2：单 Agent CTF Loop
 
-交付：Task Contract、Phase 状态机、Observation/Artifact/Evidence/Hypothesis/Fact/Intent 模型、基础工具面、Auto/Assist 两种模式和确定性 Observer。
+交付：Task Contract、Phase 状态机、Observation/Artifact/Evidence/Hypothesis/Fact/Intent 模型、基础工具面、无人值守 Drive Loop、开发 Assist Profile 和确定性 Observer。
 
-验收：本地合成 Web/Reverse 题各 3 道，从 Intake 到 Report；最终 claim 都带 Evidence；模型无权直接将 Run 改为成功；平台/隐藏 scorer 判定与报告一致。
+验收：本地合成 Web/Reverse 题各 3 道，从 Intake 到 Report；正式 Profile 全程无人工输入；最终 claim 都带 Evidence；模型无权直接将 Run 改为成功；隐藏 scorer 判定与报告一致。
 
 ### Milestone 3：上下文与恢复
 
@@ -1654,29 +1694,35 @@ Drive Loop 是唯一主动推进 Run 的组件。事件订阅者、模型、工�
 
 验收：人为把 context window 压小到正常值的 20%-30%，压缩后继续完成；关键 Fact 保留率 100%；重启后不重复已确认动作；第二次 overflow 进入明确失败分类；RTK A/B 记录原始/可见字节、Artifact 和关键行保留，未命中时 Tool Contract hash 与 builtin 基线一致。
 
-### Milestone 4：能力插件与后台任务
+### Milestone 4：Competition Platform 与无人值守比赛闭环
 
-交付：稳定 `invoke_capability`、capability manifest、MCP stdio、`run_background`、job record、进程组清理、输出分档、canonical tool contract test；把 `pi-mcp-adapter` 和 `pi-agent-browser-native` 作为外部候选与自研 adapter 做配对评测。
+交付：`CompetitionPlatformPort`、平台模拟器、Contest/Challenge/Attachment/Submission 契约、Host 凭据隔离、附件哈希、提交 reconciliation、Portfolio Scheduler 骨架和比赛级事件/指标。
 
-验收：反汇编器/浏览器能力按需加载，核心 schema hash 不变；插件超时/崩溃只结束本 effect；Run 结束无非预期后台进程；晋级的 Package 通过权限、故障注入、context delta 和版本重建测试。
+验收：从模拟平台同步题目、下载附件、创建 Run、验证候选、提交并获得 accepted 全程无输入；错误/重复/冷却状态确定；“平台已提交但响应丢失”恢复后不重复提交；进程重启后 Contest、题目和提交投影一致。
 
-### Milestone 5：Planner + Executor
+### Milestone 5：能力插件与后台任务
+
+交付：稳定 `invoke_capability`、capability manifest、MCP stdio、`run_background`、job record、进程组清理、输出分档、canonical tool contract test；把 `pi-mcp-adapter`、`pi-agent-browser-native` 和 Firefox-Reverse 作为外部候选与自研 adapter 做配对评测。
+
+验收：反汇编器/浏览器能力按需加载，核心 schema hash 不变；嵌套工具按内层策略校验；插件超时/崩溃只结束本 effect；Run 结束无非预期后台进程；晋级的 Package 通过权限、故障注入、context delta 和版本重建测试。
+
+### Milestone 6：Planner + Executor
 
 交付：两个独立 `AgentHarness`/Pi Session、deterministic router、Handoff schema、Intent claim、模型 fallback、成本和重复率指标。Manager 是确定性控制器，Planner 只生成/排序 Intent，Executor 消费 Intent。
 
 验收：至少 20 个 challenge、每题 3 次，与单 Agent baseline 配对比较，并把 `pi-subagents` profile 作为外部对照组；成功率、成本或 p95 延迟至少一项稳定改善，其他项未突破预算；duplicate intent rate 和 parallel waste 在阈值内。
 
-### Milestone 6：Independent Verifier 与评测门禁
+### Milestone 7：Independent Verifier 与评测门禁
 
-交付：独立 Verifier Session、submission state、30-50 个 fixture、replay/shadow、失败分类、消融实验、回归报告和版本门禁。
+交付：独立 Verifier Session、自适应验证策略、30-50 个 fixture、Contest scenarios、replay/shadow、失败分类、消融实验、回归报告和版本门禁。
 
-验收：错误提交率下降；Verifier 不读取 Solver 推理仍能复现；每次 Prompt/Tool/Skill/Runtime 改动自动跑 protocol replay 和固定 live 子集。
+验收：错误提交率下降；Verifier 不读取 Solver 推理仍能复现；每次 Prompt/Tool/Skill/Runtime 改动自动跑 protocol replay、Contest Simulator 和固定 live 子集。
 
-### Milestone 7：题型 Skill 与多 Worker
+### Milestone 8：题型 Skill 与多 Worker
 
 交付：Web recon、ELF triage、Pwn crash-to-repro、JS reverse 等 Skill；每个 Skill 带 references/scripts/evals；按 Intent 弹性扩展多个通用 Worker，加入 claim/heartbeat/conclude。
 
-验收：Skill 在 holdout 题上减少工具调用或提升通过率/证据完整度；多 Worker 相比双模型 baseline 有稳定收益；Skill 候选未经评测不会进入默认集合。
+验收：Skill 在 holdout 题上减少工具调用或提升通过率/证据完整度；多 Worker相比双模型 baseline 有稳定收益；Portfolio Scheduler 的截止时间总分高于单 Worker 基线；Skill 候选未经评测不会进入默认集合。
 
 **升级纪律**：Milestone N 的退出条件未通过，不开始 N+1 的模型角色扩张。尤其不要用多 Agent 掩盖工具错误、环境不稳定和上下文丢失。
 
@@ -1882,9 +1928,28 @@ interface ArtifactStorePort {
   read(ref: ArtifactRef, range?: ByteRange): Promise<AsyncIterable<Uint8Array>>;
   verify(ref: ArtifactRef): Promise<boolean>;
 }
+
+interface CompetitionPlatformPort {
+  snapshot(signal?: AbortSignal): Promise<ContestSnapshot>;
+  listChallenges(signal?: AbortSignal): Promise<PlatformChallenge[]>;
+  openAttachment(
+    challengeId: string,
+    attachmentId: string,
+    signal?: AbortSignal,
+  ): Promise<PlatformAttachmentContent>;
+  submitCandidate(
+    input: PlatformSubmissionInput,
+    signal?: AbortSignal,
+  ): Promise<PlatformSubmissionReceipt>;
+  reconcileSubmission(
+    attemptKey: string,
+    challengeId: string,
+    signal?: AbortSignal,
+  ): Promise<PlatformSubmissionReconciliation>;
+}
 ```
 
-领域服务只依赖这些端口。Pi、Docker/Podman、SQLite、MCP 和具体 Provider 都在 adapter 层。
+领域服务只依赖这些端口。Pi、Docker/Podman、SQLite、MCP、具体模型 Provider 和官方比赛 API 都在 adapter 层；`CompetitionPlatformPort` 只注入 Host Control Plane，不注入模型、Skill、MCP 或目标工作区。
 
 ### 19.2 SQLite 最小表
 
@@ -1906,6 +1971,24 @@ SQLite 配置建议：WAL、foreign keys、busy timeout；单 writer task 串行
 ### 19.3 初始配置示例
 
 ```yaml
+deployment:
+  profile: unattended
+  runtime_human_input: false
+
+contest:
+  id: WESTLAKE-CTF-2026
+  sync_interval_ms: 5000
+  start_policy: wait_for_server_time
+  end_policy: stop_new_work_and_reconcile
+
+platform:
+  adapter: official-api
+  base_url_env: PROOFBLADE_PLATFORM_BASE_URL
+  credential_env: PROOFBLADE_PLATFORM_TOKEN
+  request_timeout_ms: 15000
+  max_in_flight_requests: 4
+  unknown_submission_policy: reconcile_before_retry
+
 runtime:
   pi_version: "0.83.0"
   max_active_runs: 1
@@ -1928,6 +2011,10 @@ context:
   summary_tool_tokens: 12000
 
 scheduler:
+  portfolio:
+    max_active_challenges: 3
+    rescore_interval_ms: 15000
+    blocked_retry_ms: 120000
   max_open_intents: 8
   claim_ttl_ms: 120000
   reason_on_new_fact: true
@@ -1952,6 +2039,11 @@ models:
 
 - [ ] Pi 版本和 Provider model id 精确锁定；
 - [ ] Pi adapter contract tests 全部通过；
+- [ ] 正式镜像以 `unattended` Profile 启动，比赛全程不请求运行时人工输入；
+- [ ] Platform Simulator 从 API 同步、附件落盘、求解、验证到 `ACCEPTED` 的闭环可一键运行；
+- [ ] 平台已提交但响应丢失时，重启后通过 reconciliation 恢复且不重复消耗提交额度；
+- [ ] Contest、Challenge、Submission 和 Scoreboard 投影在 replay/restart 后一致；
+- [ ] Portfolio Scheduler 能在单题阻塞、冷却或低收益时释放资源，并在截止时间前恢复推进和计分；
 - [ ] Run 从创建、暂停、恢复、验证到终态均有合法事件；
 - [ ] Effect 故障注入覆盖六个 crash point；
 - [ ] Fixture build/reset/score 可一键运行且 generation 正确；

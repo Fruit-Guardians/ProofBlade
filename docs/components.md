@@ -33,6 +33,7 @@ npm run verify
 | 物资 | MCP | [`packages/materials/src/mcp/COMPONENT.md`](../packages/materials/src/mcp/COMPONENT.md) |
 | 物资 | Observability | [`packages/materials/src/observability/COMPONENT.md`](../packages/materials/src/observability/COMPONENT.md) |
 | 物资 | Orchestration | [`packages/materials/src/orchestration/COMPONENT.md`](../packages/materials/src/orchestration/COMPONENT.md) |
+| 物资 | Competition platform | [`packages/materials/src/platform/COMPONENT.md`](../packages/materials/src/platform/COMPONENT.md) |
 | 物资 | Recovery | [`packages/materials/src/recovery/COMPONENT.md`](../packages/materials/src/recovery/COMPONENT.md) |
 | 物资 | Runtime | [`packages/materials/src/runtime/COMPONENT.md`](../packages/materials/src/runtime/COMPONENT.md) |
 | 物资 | Sandbox | [`packages/materials/src/sandbox/COMPONENT.md`](../packages/materials/src/sandbox/COMPONENT.md) |

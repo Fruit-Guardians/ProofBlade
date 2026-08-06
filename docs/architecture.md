@@ -31,6 +31,8 @@ ProofBlade has two durable domains:
 
 The control store is the authority for completion. Models and tools emit events or commands; the reducer is the only component that derives a run snapshot. Large tool output is stored as an immutable artifact and referenced by hash from the event log.
 
+The competition platform is an external authority rather than a third writable domain. A Host-owned `CompetitionPlatformPort` synchronizes contest/challenge state, streams attachments and submits verifier-approved candidates. Credentials and authenticated URLs never enter Pi Session, model tools, Skills, MCP processes or target workspaces. Platform receipts are imported through journaled commands and reconciled against challenge state after interruption.
+
 ```text
 CLI / GUI -> Control Store -> Reducer -> Run Snapshot
            |              -> Knowledge ledger
@@ -73,6 +75,8 @@ The planner lane currently uses a deterministic coordinator rather than an addit
 ## Evaluation gate
 
 `FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane. It reports per-case status, evidence-backed completion, replay projection parity and candidate plaintext leakage, then hashes the complete report. `proofblade eval` and `npm run eval` are provider-free pre-push checks; LM Studio is reserved for a separate live smoke run.
+
+`CompetitionPlatformSimulator` is the next outer evaluation boundary. It provides contest time, challenge revisions, hashed attachments, score, cooldown and submission history without exposing expected answers. It can commit a submission and then drop the response so recovery tests prove that an unknown POST is reconciled before any retry. The future Portfolio Scheduler will be evaluated by score under deadline, submission precision and recovery of the complete contest state rather than only per-run success.
 
 ## Durable observability
 
