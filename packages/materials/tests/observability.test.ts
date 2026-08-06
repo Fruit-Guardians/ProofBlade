@@ -40,7 +40,7 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     const { hash: _hash, ...versionBase } = snapshot.versionSnapshot;
     assert.equal(snapshot.versionSnapshot.hash, sha256(canonicalJson(versionBase)));
     assert.equal(snapshot.versionSnapshot.piVersion, "0.83.0");
-    assert.equal(snapshot.versionSnapshot.toolContractVersion, "tools@2");
+    assert.equal(snapshot.versionSnapshot.toolContractVersion, "tools@3");
 
     await services.control.append(runId, [
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_started", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", contextEstimatedTokens: 800, retryLimit: 0 } },

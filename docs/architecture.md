@@ -54,7 +54,9 @@ Drive Loop -> Pi solver lane -> ProofBlade tools -> Effect Journal -> Sandbox
                                               -> Report -> verifier-gated finish
 ```
 
-Pi owns the provider turn and its JSONL Session. The solver tools can inspect the target, propose intents/hypotheses/facts and propose one candidate. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
+Pi owns the provider turn and its JSONL Session. The solver chooses its own authorized analysis route from direct reasoning, project Skills, stable capabilities and MCP-backed operations; phase and handoff data prioritize work but do not prescribe a Tool sequence. The solver tools can inspect the target, propose intents/hypotheses/facts and propose one candidate. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. Candidate syntax is challenge-specific rather than fixed to one flag prefix. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
+
+The Drive Loop compares the durable knowledge version before and after each model turn. A turn with no new Fact, Hypothesis, Observation, Evidence, Intent, Completion, Job or Artifact is not treated as progress; the next turn receives a route-change signal without being told which technique or Tool to choose.
 
 The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
 

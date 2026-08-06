@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,6 +8,7 @@ import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SOLVER_PROTOCOL_INSTRUCTIONS } from "../src/runtime/version.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -106,6 +107,69 @@ test("completion proposals must be grounded in a successful current-generation o
     await runtime.inspectTarget();
     await assert.rejects(runtime.submitCandidate("PB{fabricated_value}"), /does not occur in a successful target observation/);
     assert.equal(Object.keys((await services.control.snapshot(runId)).completions).length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("candidate grounding accepts challenge-specific answer formats", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-generic-candidate-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "GENERIC-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await writeFile(join(fixture.path, "generic-answer.txt"), "answer-42\n", "utf8");
+    const { ProofBladeToolRuntime } = await import("../src/tools/runtime.js");
+    const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+    try {
+      await runtime.inspectTarget();
+      const proposed = await runtime.submitCandidate("answer-42");
+      assert.match(proposed.candidateHash, /^[a-f0-9]{64}$/);
+      assert.equal((await services.control.snapshot(runId)).completions[proposed.completionId]?.status, "PROPOSED");
+    } finally {
+      await runtime.close();
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("auto mode preserves route freedom and redirects a stalled turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-autonomy-"));
+  try {
+    const prompts: string[] = [];
+    const idleLane: SolverLaneFactory = async () => ({
+      async prompt(prompt) {
+        prompts.push(prompt);
+        return {
+          text: "No action taken.",
+          stopReason: "stop",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const services = createServices(root, config);
+    const runId = "AUTONOMY-web-source-1";
+    const loop = new SingleAgentCtfLoop(root, config, services, idleLane);
+    const result = await loop.run({ runId, task: fixtureTask(runId, "web-source-1", root, config), mode: "auto", maxTurns: 2 });
+
+    assert.equal(result.status, "EXHAUSTED");
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[0]!, /choose your own analysis method/i);
+    assert.match(prompts[1]!, /previous turn made no durable progress/i);
+    assert.match(prompts[1]!, /materially different route/i);
+    assert.doesNotMatch(prompts.join("\n"), /inspect_target|PB\{/);
+    const protocol = SOLVER_PROTOCOL_INSTRUCTIONS.join("\n");
+    assert.match(protocol, /no fixed tool sequence is required/i);
+    assert.doesNotMatch(protocol, /Call inspect_target|PB\{/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -4,9 +4,9 @@
 {
   "id": "materials-domain",
   "name": "Domain Contracts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T11:05:27+08:00"
+  "updatedAt": "2026-08-06T19:02:19+08:00"
 }
 ```
 
@@ -24,6 +24,8 @@
 新增字段先判断所属 durable domain。事件和持久结构变化要同步 Reducer、版本快照、GUI 投影、文档与兼容测试。
 
 Reasoning Tree 是共享 DAG 的可读投影，不是独立复制的数据结构。引用已有领域实体的节点复用其稳定 ID；只有中间推理节点使用独立 ID。
+
+Handoff 的 fallback action 必须描述信息目标和预期 Evidence，不得硬编码某个 Solver Tool 或题型样例的解题步骤。
 
 ```powershell
 npm run typecheck --workspace=@proofblade/materials

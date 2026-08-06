@@ -12,6 +12,7 @@ import { IndependentVerifier, type VerificationOutcome } from "../verification/v
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 import { RunRecoveryService } from "../recovery/run-recovery.js";
+import { handoffKnowledgeVersion } from "../domain/handoff.js";
 
 export interface SolverLaneCreateInput {
   projectRoot: string;
@@ -80,13 +81,15 @@ export class SingleAgentCtfLoop {
     const lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
     let turns = 0;
     let verification: VerificationOutcome | undefined;
+    let previousTurnAdvanced: boolean | undefined;
     try {
       while (turns < maxTurns) {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status)) break;
+        const beforeKnowledgeVersion = handoffKnowledgeVersion(before);
         await planner.prepare(options.runId);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        const agentOutcome = await lane.prompt(turnPrompt(before, turns, previousTurnAdvanced));
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
@@ -103,6 +106,7 @@ export class SingleAgentCtfLoop {
           continue;
         }
         const after = await this.services.control.snapshot(options.runId);
+        previousTurnAdvanced = handoffKnowledgeVersion(after) !== beforeKnowledgeVersion;
         const pending = latestPending(after);
         if (pending) {
           if (mode === "assist") {
@@ -148,7 +152,7 @@ export class SingleAgentCtfLoop {
     if (Object.keys(snapshot.intents).length > 0) return;
     await this.services.control.dispatch(runId, {
       type: "intent",
-      intent: { id: id("I"), title: "Inspect target and propose an evidenced candidate", description: "Use the stable target tools, preserve observations, then submit one candidate for independent verification.", phase: "reconnaissance", status: "CLAIMED", priority: 10, ownerLane: "executor" },
+      intent: { id: id("I"), title: "Solve the challenge through an evidenced route", description: "Choose the highest-value authorized analysis route, preserve durable observations, and propose a grounded candidate for independent verification.", phase: "reconnaissance", status: "CLAIMED", priority: 10, ownerLane: "executor" },
       lane: "executor",
     });
   }
@@ -205,13 +209,18 @@ function latestPending(snapshot: RunSnapshot) {
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
-function turnPrompt(snapshot: RunSnapshot, turn: number): string {
+function turnPrompt(snapshot: RunSnapshot, turn: number, previousTurnAdvanced?: boolean): string {
+  const progress = previousTurnAdvanced === false
+    ? "The previous turn made no durable progress. Choose a materially different route; do not repeat the same no-result action."
+    : previousTurnAdvanced === true
+      ? "The previous turn advanced durable state. Reassess the new evidence before choosing the next action."
+      : "Select the highest-value first action from the task, active handoff, and available resources.";
   return [
-    `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
-    "Call inspect_target with an empty object {} to inspect every visible synthetic target file.",
-    "Preserve the returned evidence id in any hypothesis or fact proposal.",
-    "Copy one complete PB{...} value exactly from inspect_target output, then call submit_candidate with that exact value.",
-    "Do not stop at a prose answer; the completion proposal tool is required.",
+    `Continue run ${snapshot.runId}; executor turn ${turn}; phase=${snapshot.phase}; target_kind=${snapshot.task.target_kind}.`,
+    `Objective: ${snapshot.task.objective}`,
+    progress,
+    "Choose your own analysis method and authorized tool sequence. Skills, capabilities, MCP-backed operations, and direct reasoning are optional resources, not a mandatory recipe.",
+    "Make concrete progress toward durable evidence or a grounded candidate. Do not stop with an unsupported prose answer.",
   ].join("\n");
 }
 

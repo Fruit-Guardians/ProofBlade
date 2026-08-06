@@ -58,7 +58,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.sensitivity), /^(public|target|secret)$/);
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
-  assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
+  assert.equal(solverToolContractHash(), "e10e211e146c1e6a0f92e4de897e29a8f0a990e25748f2d502014e0cb51b91aa");
   assert.equal(bundledCapabilityCatalogHash(), "7b8e742875d5d4cba6b7a0e2107376c0f19cfd90cb4985cf8bd8db397fa81b62");
 });
 

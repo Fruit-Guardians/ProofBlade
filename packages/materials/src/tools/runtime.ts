@@ -175,12 +175,17 @@ export class ProofBladeToolRuntime {
 
   public async submitCandidate(candidate: string): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = candidate.trim();
-    if (!/^PB\{[^}\r\n]+\}$/.test(normalized)) throw new Error("Candidate must be one complete PB{...} value");
+    if (!normalized || normalized.includes("\0") || Buffer.byteLength(normalized, "utf8") > 4096) {
+      throw new Error("Candidate must be non-empty, contain no NUL byte, and be at most 4096 UTF-8 bytes");
+    }
     const snapshot = await this.controlStore.snapshot(this.runId);
+    const successfulEffects = new Set(Object.values(snapshot.evidence)
+      .filter((item) => item.kind === "observation" && item.source.generation === snapshot.generation && item.source.effectId)
+      .map((item) => item.source.effectId!));
     const supportingObservations = Object.values(snapshot.observations).filter((item) =>
-      item.source.generation === snapshot.generation && item.candidateKinds.includes("flag-shaped-value"),
+      item.source.generation === snapshot.generation && successfulEffects.has(item.source.effectId),
     );
-    if (supportingObservations.length === 0) throw new Error("Inspect the target and collect flag-shaped evidence before proposing completion");
+    if (supportingObservations.length === 0) throw new Error("Collect a successful current-generation target observation before proposing completion");
     let observed = false;
     for (const observation of supportingObservations) {
       const artifact = snapshot.artifacts[observation.source.artifactId];

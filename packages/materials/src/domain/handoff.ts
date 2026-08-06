@@ -47,9 +47,11 @@ export function buildHandoffDraft(snapshot: RunSnapshot, handoffId: string): Han
   }));
   if (actions.length === 0) {
     actions.push({
-      id: "ACTION-INSPECT",
-      title: "Inspect the visible target",
-      description: observations.length === 0 ? "Acquire the first bounded target observation." : "Acquire a fresh bounded observation that distinguishes the remaining routes.",
+      id: "ACTION-ADVANCE",
+      title: "Advance the highest-value evidence route",
+      description: observations.length === 0
+        ? "Choose an authorized analysis route that can produce the first bounded observation."
+        : "Choose a materially different evidence-producing action that distinguishes the remaining routes.",
       expectedEvidence: ["observation", "artifact"],
       resourceKeys: ["target:" + snapshot.task.task_id],
       estimatedToolCalls: 1,

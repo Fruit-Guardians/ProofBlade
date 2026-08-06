@@ -278,7 +278,7 @@ const proposeFactContract: ProofBladeToolContract<typeof factSchema, Static<type
 };
 
 const candidateSchema = Type.Object({
-  candidate: Type.String({ description: "One complete PB{...} candidate from target evidence." }),
+  candidate: Type.String({ minLength: 1, maxLength: 4096, description: "The complete candidate exactly as it appears in successful target evidence." }),
 });
 
 const submitCandidateContract: ProofBladeToolContract<typeof candidateSchema, Static<typeof candidateSchema>, unknown, SolverToolContext> = {

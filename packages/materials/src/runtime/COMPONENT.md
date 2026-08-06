@@ -4,9 +4,9 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T16:55:00+08:00"
+  "updatedAt": "2026-08-06T19:02:19+08:00"
 }
 ```
 
@@ -35,6 +35,8 @@ Coding Lane 的 context hook 只构造单调 Provider 视图并记录 compaction
 CTF flag、挑战答案或恢复密钥等确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现候选不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
 
 输出改写不得改变 `bash` 的名称、描述、Schema 或 Tool 顺序。Solver Lane 的业务工具继续使用 Effect Journal/Capability Router，不叠加第二条 RTK 裁剪链。
+
+Solver System Prompt 约束目标、授权、Evidence 和提交门，不规定 `inspect_target`、Capability、Skill 或 MCP 的调用顺序。候选格式由题目决定，Provider 可自行选择已授权路线。
 
 ```powershell
 npm run test:materials
