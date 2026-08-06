@@ -78,7 +78,7 @@ export class PiAgentLane implements AgentLanePort {
       toolContext: { env },
       thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: contextText(compiled),
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, cacheRetention: profile.cacheRetention },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
     attachPiObservability(harness, {
       runId: options.runId,

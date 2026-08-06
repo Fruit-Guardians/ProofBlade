@@ -87,7 +87,7 @@ export class PiSolverLane implements AgentLanePort {
           ...SOLVER_PROTOCOL_INSTRUCTIONS,
         ].join("\n\n");
       },
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, cacheRetention: profile.cacheRetention },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
     // Reasonix keeps turn-specific state as a persisted suffix of the current
     // turn. That lets the next provider request reuse the complete previous

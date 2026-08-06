@@ -61,6 +61,69 @@ test("output rewrite configuration rejects invalid byte budgets", async () => {
   }
 });
 
+test("provider retry settings accept a bounded Retry-After budget", async () => {
+  const dir = await projectTemp("provider-retry-config-");
+  const path = join(dir, "proofblade.json");
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: {
+      executor: {
+        provider: "test",
+        api: "openai-completions",
+        baseUrl: "http://127.0.0.1:1/v1",
+        model: "test",
+        modelDiscoveryPath: "/models",
+        apiKeyEnv: "TEST_KEY",
+        contextWindow: 4_096,
+        maxTokens: 512,
+        requestTimeoutMs: 1_000,
+        maxRetries: 4,
+        maxRetryDelayMs: 15_000,
+        input: ["text"],
+      },
+    },
+  }), "utf8");
+  try {
+    const loaded = await loadConfig(dir, path);
+    assert.equal(loaded.modelProfiles.executor.maxRetries, 4);
+    assert.equal(loaded.modelProfiles.executor.maxRetryDelayMs, 15_000);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("provider retry settings reject an unbounded retry budget", async () => {
+  const dir = await projectTemp("provider-retry-invalid-");
+  const path = join(dir, "proofblade.json");
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: {
+      executor: {
+        provider: "test",
+        api: "openai-completions",
+        baseUrl: "http://127.0.0.1:1/v1",
+        model: "test",
+        modelDiscoveryPath: "/models",
+        apiKeyEnv: "TEST_KEY",
+        contextWindow: 4_096,
+        maxTokens: 512,
+        requestTimeoutMs: 1_000,
+        maxRetries: 9,
+        input: ["text"],
+      },
+    },
+  }), "utf8");
+  try {
+    await assert.rejects(() => loadConfig(dir, path), /maxRetries/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("RTK prepares a rewritten command and returns its tee capture for artifact storage", async () => {
   const dir = await projectTemp("rtk-rewrite-");
   const calls: string[][] = [];
