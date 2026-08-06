@@ -243,7 +243,7 @@ export class DebugDataService {
     assertRunId(runId);
     const text = prompt.trim();
     if (!text) throw new Error("Prompt is required");
-    if (this.active.get(runId)?.state === "running") throw new Error(`Run is already active: ${runId}`);
+    if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
     const snapshot = await this.services.control.snapshot(runId);
     if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
       throw new Error(`Run is terminal (${snapshot.status}); start a new conversation`);

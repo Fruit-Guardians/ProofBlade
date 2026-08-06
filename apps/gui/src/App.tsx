@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
@@ -139,6 +140,11 @@ export function App() {
   const visibleTabs = detail?.kind === "chat"
     ? tabItems.filter((item) => item.id === "chat" || item.id === "debugger" || item.id === "timeline" || item.id === "evidence" || item.id === "artifacts")
     : tabItems;
+  const currentPreferences = detail ? workspaceSettings?.conversations[detail.snapshot.runId] : undefined;
+  const currentProfile = providers?.profiles.find((profile) => profile.id === currentPreferences?.profileId);
+  const currentProviderName = currentProfile?.provider ?? bootstrap?.model.provider ?? "provider";
+  const currentModelName = currentPreferences?.model ?? bootstrap?.model.model ?? "model";
+  const currentThinkingLevel = currentPreferences?.thinkingLevel ?? bootstrap?.model.thinkingLevel ?? "off";
 
   const refreshAll = async () => {
     if (!runId) return;
@@ -214,12 +220,12 @@ export function App() {
         {detail && tab === "evidence" && <EvidenceLedger detail={detail} />}
         {detail && tab === "artifacts" && <Artifacts detail={detail} />}
       </div>
-      <footer className="status-bar"><span><span className="live-pulse" />{detail?.active?.state === "running" ? "实时执行" : "数据已同步"}</span><span>seq {detail?.snapshot.lastSeq ?? 0}</span><span>gen {detail?.snapshot.generation ?? 0}</span><span>{bootstrap?.model.provider ?? "provider"} / {bootstrap?.model.model ?? "model"}</span><span className="status-spacer" /><span>{detail ? formatDate(detail.updatedAt) : "--"}</span></footer>
+      <footer className="status-bar"><span><span className="live-pulse" />{detail?.active?.state === "running" ? "实时执行" : detail?.active?.state === "stopping" || detail?.active?.state === "paused" ? "正在暂停" : "数据已同步"}</span><span>seq {detail?.snapshot.lastSeq ?? 0}</span><span>gen {detail?.snapshot.generation ?? 0}</span><span>{currentProviderName} / {currentModelName}</span><span className="status-spacer" /><span>{detail ? formatDate(detail.updatedAt) : "--"}</span></footer>
     </main>
 
     <aside className={`metrics-sidebar ${rightOpen ? "drawer-open" : ""}`}>
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
-      {detail ? <Metrics detail={detail} bootstrap={bootstrap} /> : <div className="empty-list">选择 Run 后显示</div>}
+      {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshRuns(); void refreshWorkspace(); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
@@ -259,6 +265,9 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const latestAssistant = session?.messages.slice().reverse().find((item) => item.role === "assistant");
   const thread = useRef<HTMLDivElement>(null);
   const terminal = ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(detail.snapshot.status);
+  const runInFlight = isConversationInFlight(detail.active?.state, sending);
+  const pausePending = stopping || detail.active?.state === "stopping" || detail.active?.state === "paused";
+  const displayedModel = currentModelLabel(preferences?.model, latestAssistant?.model, detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness");
 
   useEffect(() => {
     if (!preferred) return;
@@ -287,7 +296,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
 
   const submit = async () => {
     const prompt = draft.trim();
-    if (!prompt || sending || terminal) return;
+    if (!prompt || runInFlight || terminal) return;
     setDraft("");
     setPendingUser(prompt);
     setLiveText("");
@@ -338,10 +347,11 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   };
 
   const stop = async () => {
-    if (!sending || stopping) return;
+    if (!runInFlight || pausePending) return;
     setStopping(true);
     try {
       await pauseRun(detail.snapshot.runId);
+      await onRefresh();
     } catch (error) {
       const failure = message(error);
       setStopping(false);
@@ -353,9 +363,9 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   return <div className={`conversation-page ${selectedCall ? "inspector-open" : ""}`}>
     <div className="conversation-main">
       <div className="conversation-toolbar">
-        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{stopping || detail.active?.state === "stopping" ? "正在暂停" : detail.active?.state === "running" || sending ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
+        <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{pausePending ? "正在暂停" : runInFlight ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
-        <span className="conversation-model">{latestAssistant?.model ?? detail.snapshot.versionSnapshot?.runtimeVersion ?? "Pi AgentHarness"}</span>
+        <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
       </div>
       <div className="message-thread" ref={thread}>
         {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
@@ -365,7 +375,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           return <article className={`chat-message role-${chat.role}`} key={chat.id}>
             <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
             <div className="message-content">
-              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.claimVerification?.status === "verified" && <span className="claim-status verified" title={`Evidence ${chat.claimVerification.evidenceId ?? ""}`}><ShieldCheck size={11} />已验证{chat.claimVerification.evidenceId ? ` · ${chat.claimVerification.evidenceId}` : ""}</span>}{chat.role === "assistant" && chat.claimVerification?.status === "unverified" && <span className="claim-status unverified" title={chat.claimVerification.reason}><CircleAlert size={11} />未验证</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <span className="message-usage">缓存 {formatNumber(chat.usage.cacheRead)} / {formatNumber(promptTokens(chat.usage))} · {formatPercent(cacheRate(chat.usage))}</span>}</div>
+              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.claimVerification?.status === "verified" && <span className="claim-status verified" title={`Evidence ${chat.claimVerification.evidenceId ?? ""}`}><ShieldCheck size={11} />已验证{chat.claimVerification.evidenceId ? ` · ${chat.claimVerification.evidenceId}` : ""}</span>}{chat.role === "assistant" && chat.claimVerification?.status === "unverified" && <span className="claim-status unverified" title={chat.claimVerification.reason}><CircleAlert size={11} />未验证</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <TurnCacheUsage usage={chat.usage} />}</div>
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
               {chat.claimVerification?.status === "unverified" && <div className="claim-verification-note"><CircleAlert size={14} /><span><strong>本轮结论没有通过复现门</strong>{chat.claimVerification.reason ?? "缺少与最终候选直接对应的成功复现记录。"}</span></div>}
@@ -386,12 +396,12 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           <label title="本对话使用的模型"><Bot size={13} /><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
           <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
           <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
-          <button type="button" className="context-button" title="当前 Pi Session 的累计 Provider token" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(sessionTokenTotal(session))} 累计</span></button>
+          <button type="button" className="context-button" title="当前 Pi Session 的累计 Provider token 与缓存命中率" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(sessionTokenTotal(session))} · {formatPercent(projectCacheUsage(session?.usage ?? emptySessionUsage()).hitRate)}</span></button>
           <button type="button" className="workspace-button" title={preferences.workspacePath} onClick={() => setDirectoryOpen(true)}><FolderOpen size={13} />目录 <span>{shortPath(preferences.workspacePath)}</span></button>
           <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
         </div>}
         {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
-        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={sending || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><span>{detail.kind === "chat" ? "普通对话" : phaseLabels[detail.snapshot.phase]} · 输入 {formatNumber(session?.usage.input ?? 0)} · 输出 {formatNumber(session?.usage.output ?? 0)} · 缓存 {formatNumber((session?.usage.cacheRead ?? 0) + (session?.usage.cacheWrite ?? 0))}</span><button type="button" className={`send-button ${sending ? "stop-button" : ""}`} title={sending ? "暂停运行" : "发送"} aria-label={sending ? "暂停运行" : "发送"} disabled={terminal || (sending ? stopping : !draft.trim())} onClick={() => sending ? void stop() : void submit()}>{sending ? <Pause size={16} /> : <Send size={16} />}</button></div></div>
+        <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={runInFlight || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><SessionUsageSummary session={session} kind={detail.kind} phase={detail.snapshot.phase} /><button type="button" className={`send-button ${runInFlight ? "stop-button" : ""}`} title={runInFlight ? "暂停运行" : "发送"} aria-label={runInFlight ? "暂停运行" : "发送"} disabled={terminal || (runInFlight ? pausePending : !draft.trim())} onClick={() => runInFlight ? void stop() : void submit()}>{runInFlight ? <Pause size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
@@ -433,37 +443,41 @@ function modelOptions(providers: ProviderSettings | undefined, preferences: Conv
 
 function ContextBreakdown({ session, snapshot }: { session?: PiSessionDebug; snapshot?: Extract<ChatStreamEvent, { type: "context_snapshot" }> }) {
   const usage = session && session.usage.requests > 0 ? session.usage : session ? { ...session.usage, input: session.stats.uncachedTokens, totalTokens: session.stats.totalTokens } : undefined;
-  const promptTokens = (usage?.input ?? 0) + (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0);
-  const cacheHitRate = promptTokens > 0 ? (usage?.cacheRead ?? 0) / promptTokens : 0;
+  const cache = projectCacheUsage(usage ?? emptySessionUsage());
   return <div className="context-breakdown">
     <div className="context-breakdown-head"><strong>本会话上下文</strong><span>Provider usage 为上游实际计数</span></div>
     <div className="context-breakdown-grid">
-      <MetricLine label="提示词总量" value={`${formatNumber(promptTokens)} tokens`} />
-      <MetricLine label="未命中输入" value={`${formatNumber(usage?.input ?? 0)} tokens`} />
+      <MetricLine label="输入侧总量" value={`${formatNumber(cache.inputBasis)} tokens`} />
+      <MetricLine label="累计未命中" value={`${formatNumber(cache.uncachedInput)} tokens`} />
       <MetricLine label="输出" value={`${formatNumber(usage?.output ?? 0)} tokens`} />
-      <MetricLine label="缓存读取" value={`${formatNumber(usage?.cacheRead ?? 0)} tokens`} />
-      <MetricLine label="缓存写入" value={`${formatNumber(usage?.cacheWrite ?? 0)} tokens`} />
-      <MetricLine label="缓存命中率" value={`${(cacheHitRate * 100).toFixed(1)}%`} />
+      <MetricLine label="累计缓存读取" value={`${formatNumber(cache.cacheRead)} tokens`} />
+      <MetricLine label="累计缓存写入" value={`${formatNumber(cache.cacheWrite)} tokens`} />
+      <MetricLine label="累计缓存命中率" value={formatPercent(cache.hitRate)} />
       <MetricLine label="推理" value={`${formatNumber(usage?.reasoning ?? 0)} tokens`} />
       <MetricLine label="请求次数" value={String(usage?.requests ?? 0)} />
     </div>
     {snapshot && <div className="context-visible-detail"><span>当前请求可见消息 {snapshot.messages} 条</span><span>启用 Tool {snapshot.tools} 个</span><span>系统提示 {formatNumber(snapshot.systemPromptChars)} chars</span><span>消息 {formatNumber(snapshot.messageChars)} chars</span><span>Tool schema {formatNumber(snapshot.toolSchemaChars)} chars</span><span>可见估算 {formatNumber(snapshot.estimatedVisibleTokens)} tokens</span></div>}
-    <div className="context-note">缓存由中转站返回的 usage 字段决定；当前 Provider 未返回缓存命中字段时，缓存读取与写入显示为 0，输入仍按上游原值统计。</div>
+    <div className="context-note">缓存由中转站返回的 usage 字段决定。缓存前缀通常按离散 token 块计量，相邻请求可能返回相同的“本次缓存读取”；累计读取、累计未命中、请求次数和命中率仍会随真实请求变化。Provider 不返回缓存字段时显示为 0。</div>
   </div>;
+}
+
+function TurnCacheUsage({ usage }: { usage: { input: number; cacheRead: number; cacheWrite: number } }) {
+  const cache = projectCacheUsage(usage);
+  return <span className="message-usage" title={`本次未命中 ${formatNumber(cache.uncachedInput)}；缓存写入 ${formatNumber(cache.cacheWrite)}`}>本次缓存读取 {formatNumber(cache.cacheRead)} / 输入侧 {formatNumber(cache.inputBasis)} · {formatPercent(cache.hitRate)}</span>;
+}
+
+function SessionUsageSummary({ session, kind, phase }: { session?: PiSessionDebug; kind: RunDetail["kind"]; phase: string }) {
+  const cache = projectCacheUsage(session?.usage ?? emptySessionUsage());
+  return <span>{kind === "chat" ? "普通对话" : phaseLabels[phase]} · 输出 {formatNumber(session?.usage.output ?? 0)} · 累计缓存命中 {formatPercent(cache.hitRate)}（读取 {formatNumber(cache.cacheRead)} / 输入侧 {formatNumber(cache.inputBasis)}）</span>;
+}
+
+function emptySessionUsage(): { input: number; cacheRead: number; cacheWrite: number } {
+  return { input: 0, cacheRead: 0, cacheWrite: 0 };
 }
 
 function sessionTokenTotal(session?: PiSessionDebug): number {
   if (!session) return 0;
   return session.usage.requests > 0 ? session.usage.totalTokens : session.stats.totalTokens;
-}
-
-function promptTokens(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
-  return usage.input + usage.cacheRead + usage.cacheWrite;
-}
-
-function cacheRate(usage: { input: number; cacheRead: number; cacheWrite: number }): number {
-  const total = promptTokens(usage);
-  return total > 0 ? usage.cacheRead / total : 0;
 }
 
 function formatPercent(value: number): string {
@@ -733,7 +747,7 @@ function Artifacts({ detail }: { detail: RunDetail }) {
   return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
 }
 
-function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: BootstrapData }) {
+function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail; provider: string; model: string; thinkingLevel: string }) {
   const { telemetry, snapshot } = detail;
   const contextWindow = snapshot.versionSnapshot ? 1 : 1;
   const sessionUsage = detail.sessions.reduce((total, session) => ({
@@ -751,18 +765,17 @@ function Metrics({ detail, bootstrap }: { detail: RunDetail; bootstrap?: Bootstr
   const tokenReasoning = hasSessionUsage ? sessionUsage.reasoning : telemetry.provider.tokens.reasoning;
   const tokenCacheRead = hasSessionUsage ? sessionUsage.cacheRead : telemetry.provider.tokens.cacheRead;
   const tokenTotal = hasSessionUsage ? sessionUsage.total : telemetry.provider.tokens.total;
-  const promptTotal = (hasSessionUsage ? sessionUsage.input : telemetry.provider.tokens.input) + tokenCacheRead + (hasSessionUsage ? sessionUsage.cacheWrite : telemetry.provider.tokens.cacheWrite);
-  const cacheHitRate = promptTotal > 0 ? tokenCacheRead / promptTotal : 0;
+  const cache = projectCacheUsage({ input: tokenInput, cacheRead: tokenCacheRead, cacheWrite: hasSessionUsage ? sessionUsage.cacheWrite : telemetry.provider.tokens.cacheWrite });
   const prefix = telemetry.provider.cachePrefix;
   const effects = Object.values(snapshot.effects);
   return <div className="metrics-content">
     <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>累计 tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
-    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="提示词总量" value={formatNumber(promptTotal)} /><MetricLine label="未命中输入" value={formatNumber(tokenInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="缓存读取" value={formatNumber(tokenCacheRead)} /><MetricLine label="缓存写入" value={formatNumber(hasSessionUsage ? sessionUsage.cacheWrite : 0)} /><MetricLine label="缓存命中率" value={`${(cacheHitRate * 100).toFixed(1)}%`} /></section>
+    <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入侧总量" value={formatNumber(cache.inputBasis)} /><MetricLine label="累计未命中" value={formatNumber(cache.uncachedInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="累计缓存读取" value={formatNumber(cache.cacheRead)} /><MetricLine label="累计缓存写入" value={formatNumber(cache.cacheWrite)} /><MetricLine label="累计缓存命中率" value={formatPercent(cache.hitRate)} /></section>
     <section><div className="metrics-title"><Database size={14} />缓存前缀</div><MetricLine label="稳定率" value={prefix.comparableRequests > 0 ? formatPercent(prefix.stabilityRate) : "等待下一轮"} /><MetricLine label="变化" value={`${prefix.changedRequests} / ${prefix.comparableRequests}`} /><MetricLine label="System" value={`${formatNumber(prefix.last?.systemTokens ?? 0)} tokens`} /><MetricLine label="Tool schema" value={`${formatNumber(prefix.last?.toolSchemaTokens ?? 0)} tokens`} /><MetricLine label="Tool 数量" value={String(prefix.last?.toolCount ?? 0)} /><MetricLine label="Prefix hash" value={prefix.last ? shortId(prefix.last.prefixHash) : "--"} /></section>
     <section><div className="metrics-title"><Clock3 size={14} />延迟与成本</div><MetricLine label="平均延迟" value={`${Math.round(telemetry.provider.latencyMs.average)} ms`} /><MetricLine label="P95" value={`${Math.round(telemetry.provider.latencyMs.p95)} ms`} /><MetricLine label="执行时长" value={formatDuration(telemetry.durationMs)} /><MetricLine label="成本" value={`$${telemetry.provider.cost.totalUsd.toFixed(4)}`} /></section>
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={Object.values(snapshot.completions).some((item) => item.status === "ACCEPTED")} label="完成提案已验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
-    <section><div className="metrics-title"><FlaskConical size={14} />配置</div><MetricLine label="Provider" value={bootstrap?.model.provider ?? "--"} /><MetricLine label="Model" value={bootstrap?.model.model ?? "--"} /><MetricLine label="Thinking" value={bootstrap?.model.thinkingLevel ?? "off"} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
+    <section><div className="metrics-title"><FlaskConical size={14} />当前对话配置</div><MetricLine label="Provider" value={provider} /><MetricLine label="Model" value={model} /><MetricLine label="Thinking" value={thinkingLevel} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
   </div>;
 }
 
