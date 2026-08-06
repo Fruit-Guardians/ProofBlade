@@ -2,8 +2,7 @@
  * CLI 命令: Intent 调度器相关命令
  */
 
-import type { IntentScheduler } from '@proofblade/materials';
-import type { ControlStore } from '@proofblade/materials';
+import type { IntentScheduler, ControlStore, Intent } from '@proofblade/materials';
 
 export async function handleIntentsCommand(
   args: string[],
@@ -44,7 +43,7 @@ async function listIntents(runId: string, controlStore: ControlStore): Promise<v
   console.log(`\n📋 Intent 列表 - ${runId}\n`);
 
   // TODO: 从 Control Store 加载 Intent
-  const intents = []; // await controlStore.getIntents(runId);
+  const intents: Intent[] = []; // await controlStore.getIntents(runId);
 
   if (intents.length === 0) {
     console.log('暂无 Intent');
@@ -64,9 +63,8 @@ async function listIntents(runId: string, controlStore: ControlStore): Promise<v
       STALE: '⏰',
     }[intent.status] || '❓';
 
-    console.log(
-      `${intent.id.padEnd(10)} | ${statusEmoji} ${intent.status.padEnd(8)} | ` +
-      `${intent.priority.padEnd(8)} | ${intent.objective.slice(0, 28).padEnd(28)} | ${intent.attempts}`
+    console.log(`${intent.id.padEnd(10)} | ${statusEmoji} ${intent.status.padEnd(8)} | ` +
+      `${String(intent.priority).padEnd(8)} | ${intent.objective.slice(0, 28).padEnd(28)} | ${intent.attempts}`
     );
   }
 
@@ -89,8 +87,8 @@ async function showIntentScores(
   console.log(`\n🎯 Intent 评分详情 - ${runId}\n`);
 
   // TODO: 加载 Intent 和上下文
-  const intents = []; // await controlStore.getIntents(runId);
-  const context = null; // await controlStore.getSchedulingContext(runId);
+  const intents: Intent[] = []; // await controlStore.getIntents(runId);
+  const context: any = null; // await controlStore.getSchedulingContext(runId);
 
   if (!context || intents.length === 0) {
     console.log('无可评分的 Intent');
@@ -134,7 +132,7 @@ async function exportIntentGraph(
   console.log(`\n📊 导出 Intent 图 - ${runId} (格式: ${format})\n`);
 
   // TODO: 加载 Intent 图
-  const intents = []; // await controlStore.getIntents(runId);
+  const intents: Intent[] = []; // await controlStore.getIntents(runId);
 
   if (intents.length === 0) {
     console.log('暂无 Intent');
@@ -153,6 +151,8 @@ async function exportIntentGraph(
         CLAIMED: ':::claimed',
         COMPLETED: ':::completed',
         FAILED: ':::failed',
+        CANCELLED: ':::cancelled',
+        STALE: ':::stale',
       }[intent.status] || '';
 
       console.log(`  ${nodeId}["${label}"]${style}`);
@@ -168,6 +168,8 @@ async function exportIntentGraph(
     console.log('  classDef claimed fill:#fff3e0');
     console.log('  classDef completed fill:#e8f5e9');
     console.log('  classDef failed fill:#ffebee');
+    console.log('  classDef cancelled fill:#eeeeee');
+    console.log('  classDef stale fill:#fce4ec');
     console.log('```');
   } else if (format === 'json') {
     console.log(JSON.stringify(intents, null, 2));
@@ -185,7 +187,7 @@ async function testClaim(
   console.log(`\n🔒 测试 Intent 认领 - ${runId}\n`);
 
   // TODO: 加载上下文
-  const context = null; // await controlStore.getSchedulingContext(runId);
+  const context: any = null; // await controlStore.getSchedulingContext(runId);
 
   if (!context) {
     console.log('无法加载调度上下文');

@@ -166,23 +166,30 @@ export class IntentScheduler {
       const intent = intents.find(i => i.id === score.intentId);
       if (!intent) continue;
 
-      // 尝试原子认领资源
-      const lease = await this.leaseManager.tryAcquire(
-        intent.resourceKeys,
-        'scheduler',  // TODO: 使用实际 Worker ID
-        {
-          generation: context.currentGeneration,
-          intentId: intent.id,
-          expiresIn: intent.estimatedDuration * 2, // 2倍预估时间作为超时
-        }
-      );
+      // 尝试原子认领第一个资源（简化实现）
+      if (intent.resourceKeys.length > 0) {
+        try {
+          const lease = await this.leaseManager.acquire(
+            context.runId,
+            intent.resourceKeys[0],
+            'executor' as any, // TODO: 使用实际 Lane
+            intent.estimatedDuration * 2 // 2倍预估时间作为超时
+          );
 
-      if (lease) {
-        // 认领成功，更新 Intent 状态
+          // 认领成功，更新 Intent 状态
+          intent.status = 'CLAIMED';
+          intent.claimedAt = new Date().toISOString();
+          intent.leaseId = lease.resourceKey; // 使用 resourceKey 作为标识
+
+          return intent;
+        } catch (error) {
+          // 资源被占用，尝试下一个 Intent
+          continue;
+        }
+      } else {
+        // 无需资源，直接认领
         intent.status = 'CLAIMED';
         intent.claimedAt = new Date().toISOString();
-        intent.leaseId = lease.id;
-
         return intent;
       }
     }

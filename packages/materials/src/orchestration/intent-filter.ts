@@ -97,11 +97,6 @@ export class IntentFilter {
       if (context.occupiedResources.includes(resourceKey)) {
         return false;
       }
-
-      // 检查 LeaseManager 中的实时状态
-      if (this.leaseManager.isOccupied(resourceKey)) {
-        return false;
-      }
     }
 
     return true;

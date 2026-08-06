@@ -207,7 +207,7 @@ export interface ReasoningForestIndex {
   hash: string;
 }
 
-export interface Intent {
+export interface IntentLegacy {
   id: string;
   title: string;
   description: string;
@@ -358,7 +358,7 @@ export interface RunSnapshot {
   reasoningEdges: Record<string, ReasoningEdge>;
   reasoningTrees: Record<string, ReasoningTree>;
   hypotheses: Record<string, Hypothesis>;
-  intents: Record<string, Intent>;
+  intents: Record<string, IntentLegacy>;
   completions: Record<string, CompletionProposal>;
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;

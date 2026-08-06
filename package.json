@@ -13,7 +13,7 @@
   },
   "scripts": {
     "check:components": "node scripts/check-component-docs.mjs",
-    "build": "tsc -b && npm run build:web --workspace=@proofblade/gui",
+    "build": "npx tsc -b && npm run build:web --workspace=@proofblade/gui",
     "typecheck": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run build --workspace=@proofblade/materials && npm run typecheck --workspace=@proofblade/cli && npm run typecheck --workspace=@proofblade/gui",
     "test": "npm run build && node --import tsx --test packages/*/tests/**/*.test.ts apps/*/tests/**/*.test.ts",
     "test:atoms": "npm run build --workspace=@proofblade/atoms && npm run test --workspace=@proofblade/atoms",
@@ -24,7 +24,7 @@
     "eval": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts eval",
     "demo": "npm run cli -- run demo",
     "gui": "npm run dev --workspace=@proofblade/gui --",
-    "clean": "tsc -b --clean"
+    "clean": "npx tsc -b --clean"
   },
   "devDependencies": {
     "@types/node": "26.1.2",

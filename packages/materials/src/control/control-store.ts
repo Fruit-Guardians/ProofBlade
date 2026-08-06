@@ -3,7 +3,7 @@ import type {
   Fact,
   HarnessEvent,
   Hypothesis,
-  Intent,
+  IntentLegacy,
   Lane,
   Phase,
   ReplayPolicy,
@@ -45,7 +45,7 @@ export type DomainCommand =
   | { type: "reasoning_edge"; edge: Omit<ReasoningEdge, "createdSeq">; lane?: Lane }
   | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "hypothesis"; hypothesis: Omit<Hypothesis, "createdSeq">; lane?: Lane }
-  | { type: "intent"; intent: Omit<Intent, "createdSeq">; lane?: Lane }
+  | { type: "intent"; intent: Omit<IntentLegacy, "createdSeq">; lane?: Lane }
   | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds">; lane?: Lane }
   | { type: "completion_verified"; completionId: string; accepted: boolean; evidenceIds: string[]; lane?: Lane }
   | { type: "artifact"; artifact: RunSnapshot["artifacts"][string]; lane?: Lane }
