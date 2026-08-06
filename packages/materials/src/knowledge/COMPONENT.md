@@ -4,9 +4,9 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T11:05:27+08:00"
+  "updatedAt": "2026-08-06T12:20:00+08:00"
 }
 ```
 
@@ -18,12 +18,15 @@
 
 - `observer.ts` 负责观察归一化与证据锚定。
 - `evidence-graph.ts` 为 Coding lane 提供 Artifact 标注、Evidence 归纳、带类型边的共享 DAG、Reasoning Tree 整理、Forest 摘要和局部树检查。
+- `evidence-curation-gate.ts` 追踪未审阅的 `read/bash` 产物；软检查点提示整理，硬检查点阻止继续侦察，直至 Agent 将产物提升为 Evidence 或明确标记为已审阅的普通/调试输出。
 - 模型只能提出知识命令；Reducer 决定知识状态。
 - 原始大输出留在 Artifact，Knowledge 只保存可检索索引与引用。
 
 ## 开发规则与验证
 
 所有目标内容保持不可信标签和来源。Routine Tool 输出默认只是 intermediate/debug Artifact；只有具备名称、摘要、标签和来源引用的发现才提升为 Evidence。Evidence Curator 通过固定代理命名、解释、连边和组织树；主 Agent 默认读取 Forest 摘要，需要溯源时才展开局部树。底层图允许节点被多树采用，GUI 的树形结构只是投影。
+
+证据整理门只统计 Harness 生成且仍未被 Agent 审阅的侦察产物。阈值变化必须覆盖软提示、硬阻断、`record` 清账和 `annotate` 清账测试，禁止通过自动批量提升来伪造高 Evidence 数量。
 
 ```powershell
 npm run test:materials

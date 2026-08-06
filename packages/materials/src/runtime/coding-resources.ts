@@ -12,6 +12,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
+import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
@@ -24,6 +25,7 @@ export interface CodingResourceContext extends ExecutionToolContext {
   enabledMcpServers: Set<string>;
   claimVerifier: CodingClaimVerifier;
   evidenceGraph: CodingEvidenceGraph;
+  evidenceCurationGate?: EvidenceCurationGate;
   outputRewrite?: {
     port: OutputRewritePort;
     artifactStore: ArtifactStore;
@@ -257,6 +259,7 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
     ...contract,
     async execute(toolCallId, params, signal, onUpdate, context) {
       const input = params as { path: string; offset?: number; limit?: number };
+      await context.evidenceCurationGate?.assertInvestigationAllowed();
       const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
       const pipeline = context.outputRewrite;
       const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
@@ -274,9 +277,10 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
           annotatedBy: "harness",
         },
       });
+      const notice = await context.evidenceCurationGate?.checkpointNotice();
       return {
         ...result,
-        content: [...result.content, artifactAnchor(artifact.id)],
+        content: [...result.content, artifactAnchor(artifact.id), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
         details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256 },
       };
     },
@@ -291,6 +295,7 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const pipeline = context.outputRewrite;
       if (!pipeline) return await contract.execute(toolCallId, params as { command: string; timeout?: number }, signal, onUpdate, context);
       const input = params as { command: string; timeout?: number };
+      await context.evidenceCurationGate?.assertInvestigationAllowed();
       const ticket = await pipeline.port.prepare({ toolCallId, command: input.command, cwd: context.env.cwd }, signal);
       const executor = createBashTool<CodingResourceContext>({
         async prepare(execution) {
@@ -303,13 +308,15 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
-        throw new Error(`${visible}\n\n[ProofBlade output artifact ${outputRewrite.artifactId}; rewrite=${outputRewrite.provider}]`, { cause: error });
+        const notice = await context.evidenceCurationGate?.checkpointNotice();
+        throw new Error(`${visible}\n\n[ProofBlade output artifact ${outputRewrite.artifactId}; rewrite=${outputRewrite.provider}]${notice ? `\n${notice}` : ""}`, { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
+      const notice = await context.evidenceCurationGate?.checkpointNotice();
       return {
         ...result,
-        content: [...result.content, artifactAnchor(String(outputRewrite.artifactId))],
+        content: [...result.content, artifactAnchor(String(outputRewrite.artifactId)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,

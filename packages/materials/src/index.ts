@@ -14,6 +14,7 @@ export * from "./effects/artifact-store.js";
 export * from "./effects/effect-journal.js";
 export * from "./knowledge/observer.js";
 export * from "./knowledge/evidence-graph.js";
+export * from "./knowledge/evidence-curation-gate.js";
 export * from "./verification/verifier.js";
 export * from "./verification/claim-verification.js";
 export * from "./orchestration/single-agent-loop.js";

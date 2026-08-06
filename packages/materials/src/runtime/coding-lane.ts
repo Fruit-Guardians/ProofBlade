@@ -16,6 +16,7 @@ import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/evidence-graph.js";
+import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
@@ -26,7 +27,7 @@ const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent workin
 
 Respond naturally to ordinary conversation. Use workspace tools only when the user's request benefits from inspecting, running, or editing project files. Explain completed work concisely and preserve the user's existing changes.
 
-Ordinary conversation has no implicit challenge fixture or scorer. Read and bash results include a ProofBlade artifact anchor. When workspace inspection produces a materially useful finding, use that stable A-* id with evidence record to give the artifact a human-readable name, concise summary, tags, Evidence, and an optional proposed claim. Record already labels and promotes its artifacts, so do not annotate them first. Use annotate only for metadata that should not become Evidence. Record only findings that advance or refute a hypothesis; routine listings and failed probes remain intermediate or debug artifacts. Use evidence inspect_forest for orientation, inspect_tree for local provenance, and search/read to recover related findings instead of guessing ids. Reuse shared graph nodes in multiple reasoning trees; label each tree with a concise name, summary, purpose, and explanation.
+Ordinary conversation has no implicit challenge fixture or scorer. Read and bash results include a ProofBlade artifact anchor. When workspace inspection produces a materially useful finding, use that stable A-* id with evidence record to give the artifact a human-readable name, concise summary, tags, Evidence, and an optional proposed claim. Record already labels and promotes its artifacts, so do not annotate them first. Use annotate only for reviewed routine/debug output that should not become Evidence. Record only findings that advance or refute a hypothesis. Evidence curation checkpoints report unreviewed artifacts; resolve a required checkpoint with record or annotate before continuing read/bash exploration. Use evidence inspect_forest for orientation, inspect_tree for local provenance, and search/read to recover related findings instead of guessing ids. Reuse shared graph nodes in multiple reasoning trees; label each tree with a concise name, summary, purpose, and explanation.
 
 When the user asks for a CTF flag, challenge answer, recovered secret, or another deterministic result from workspace evidence, inspect the real inputs and test decoy hypotheses against file structures and control flow. Before reporting a final candidate as confirmed, call verify_claim with the exact candidate and a deterministic command that derives and prints it without embedding the candidate literal. Link the supporting evidence ids used by the reproduction. Treat strings output alone as an observation, not verification. If reproduction is still missing, state that the conclusion is unverified and name the missing check.`;
 
@@ -77,6 +78,7 @@ export class PiCodingLane implements AgentLanePort {
     const artifactStore = new ArtifactStore(dirname(options.runDir), options.controlStore);
     const claimVerifier = new CodingClaimVerifier(options.runId, options.controlStore, artifactStore);
     const evidenceGraph = new CodingEvidenceGraph(options.runId, options.controlStore, artifactStore);
+    const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
     const forestContext = formatReasoningForestContext(await evidenceGraph.inspectForest());
     const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
     const toolContext: CodingResourceContext = {
@@ -87,6 +89,7 @@ export class PiCodingLane implements AgentLanePort {
       enabledMcpServers,
       claimVerifier,
       evidenceGraph,
+      evidenceCurationGate,
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
     };
     const harness = new AgentHarness<CodingResourceContext>({
