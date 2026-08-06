@@ -1960,7 +1960,7 @@ models:
 - [ ] ContextManifest 可解释每轮注入和裁剪；
 - [ ] prompt injection fixture 保持权限、目标和完成状态不变；
 - [ ] Run 结束无孤儿进程、容器和 lease；
-- [ ] 6 道初始题每题重复 3 次，baseline 报告可复现；
+- [x] 6 道初始题每题重复 3 次，baseline 报告可复现；
 - [ ] secret/flag redaction 测试覆盖 event、artifact、trace 和 UI；
 - [ ] README/ADR/tool/task/eval contract 与代码一致。
 

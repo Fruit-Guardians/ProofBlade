@@ -28,7 +28,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
-- 机器可读的六靶场评测器，检查成功率、证据绑定、重放一致性和候选答案泄漏。
+- 机器可读的 `baseline-v1` 六靶场评测器，默认每题重复三次，汇总耗时、Token、成本、有效动作、首个证据时间和事实证据覆盖率，并提供稳定报告哈希与可执行合并门禁。
 
 Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
@@ -114,7 +114,7 @@ Script Lab 的 `input` 始终是当前选中的完整 Tool 调试对象。脚本
 proofblade init <task-id>
 proofblade run demo
 proofblade fixtures
-proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
+proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]

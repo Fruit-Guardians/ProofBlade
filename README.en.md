@@ -28,7 +28,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
-- Machine-readable six-fixture evaluation runner with success, evidence-backed, replay-parity and candidate-leak gates.
+- Machine-readable `baseline-v1` runner that repeats all six fixtures three times by default, aggregates latency, tokens, cost, effective actions, first-evidence time and Fact evidence coverage, and emits a stable report hash plus an enforceable merge gate.
 
 Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI manages multiple relay or local-model profiles and lets each conversation select its provider, model, and thinking level. Profiles and keys stay in the user's `.proofblade/gui-provider.json`; folders and conversation preferences stay in `.proofblade/gui-workspace.json`. Neither file enters the repository, and API responses never expose key values. Pi 0.83.0 declares Node.js 22.19 or newer.
 
@@ -114,7 +114,7 @@ Script Lab receives the selected complete Tool debug object as `input`. Scripts 
 proofblade init <task-id>
 proofblade run demo
 proofblade fixtures
-proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID]
+proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]

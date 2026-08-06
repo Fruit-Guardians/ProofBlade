@@ -4,26 +4,28 @@
 {
   "id": "materials-evaluation",
   "name": "Fixture Evaluation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T00:22:45+08:00"
 }
 ```
 
 ## 职责
 
-通过生产单 Agent 循环执行六个确定性 Fixture，统计成功、证据绑定、重放一致性、候选泄漏和报告哈希。
+通过生产单 Agent 循环执行六个确定性 Fixture，默认每题重复三次，统计成功、证据绑定、重放一致性、候选泄漏、遥测聚合和稳定报告哈希。
 
 ## 入口与边界
 
 - `fixture-evaluator.ts` 是评测运行器。
 - 评测不使用另一套求解逻辑；Provider-free deterministic lane 只替代模型输出。
-- 评测报告是发布门槛，不是 Control Store 的业务权威。
+- `baseline-v1` 要求六题完整覆盖、至少三次尝试、全成功、全证据绑定、全重放一致、全事实证据覆盖且无候选泄漏。
+- 评测报告是发布门槛，不是 Control Store 的业务权威；运行 ID、墙钟耗时和原始错误不进入稳定哈希。
 
 ## 开发规则与验证
 
-新增能力必须优先增加能失败的 Fixture 或断言。保持结果机器可读、顺序稳定并记录 attempt/runId。
+新增能力必须优先增加能失败的 Fixture 或断言。保持结果机器可读、顺序稳定并记录 attempt/runId。开发时允许子集报告，合并前必须执行完整门禁。
 
 ```powershell
 npm run eval
+npm run eval -- --enforce-gate
 ```
