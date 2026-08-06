@@ -1187,6 +1187,22 @@ Hint --influences--> Intent/Hypothesis
 
 `Fact` 与 `Evidence` 分开很重要：同一个 Fact 可以被多个独立实验支持；一个 Evidence 包也可能同时支持或反驳多个 claim。
 
+#### 9.1.1 共享 DAG、推理树与森林投影
+
+证据链的权威结构不应实现成互不相交的线性链或树。一个 Artifact/Observation/Evidence 会被多个假设和结论采用，底层应保存一个带类型边、禁止环的共享 DAG：
+
+```text
+Artifact/Observation --derived_from--> Evidence
+Evidence              --supports-----> Fact/Claim
+Evidence              --refutes------> Hypothesis/Claim
+Evidence              --depends_on---> Evidence
+Reproduction Evidence --reproduces---> Completion/Result
+```
+
+面向人和主 Agent 时，再以某个 Claim、Hypothesis 或 Result 为根，把 DAG 的局部子图投影成一棵 Reasoning Tree。多棵树形成 Reasoning Forest；树本身只保存名称、摘要、用途、解释、根节点、成员节点和关联树，不复制节点正文。同一节点被多树采用时，GUI 显示复用次数和树列表。
+
+Evidence Curator 使用固定、缓存稳定的 `evidence` 能力代理负责归纳离散观察、命名、标签、去重、连边和组织树。主 Agent 的常驻上下文只注入 Forest 摘要索引，需要验证来源时调用 `inspect_tree` 展开局部图；原始 Tool 输出和完整 Artifact 继续留在调试/归档层。所有 node/edge/tree 更新进入 Control Store 事件流，并拒绝未知引用、重复边、环、断开的树和跨 fixture generation 关系。
+
 ```ts
 type Evidence = {
   id: string;

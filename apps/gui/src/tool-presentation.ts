@@ -59,18 +59,28 @@ export function toolPresentation(name: string, argumentsValue: unknown, result: 
 }
 
 function evidenceInputLabel(operation: string): string {
+  if (operation === "inspect_forest") return "查看推理森林";
+  if (operation === "inspect_tree") return "展开推理树";
   if (operation === "search") return "搜索证据图";
   if (operation === "read") return "读取产物";
   if (operation === "annotate") return "标注产物";
   if (operation === "record") return "记录证据";
+  if (operation === "link") return "连接推理节点";
+  if (operation === "create_tree") return "创建推理树";
+  if (operation === "update_tree") return "更新推理树";
   return "证据操作";
 }
 
 function evidenceSummary(operation: string, args: UnknownRecord): string {
+  if (operation === "inspect_forest") return "查看推理森林 · 摘要";
+  if (operation === "inspect_tree") return `展开推理树 · ${text(args.treeId) || "未指定"}`;
   if (operation === "search") return `搜索证据 · ${text(args.query) || "全部"}`;
   if (operation === "read") return `读取产物 · ${text(args.artifactId) || "未指定"}`;
   if (operation === "annotate") return `标注产物 · ${text(args.name) || text(args.artifactId) || "未命名"}`;
   if (operation === "record") return `记录证据 · ${text(args.name) || "未命名"}`;
+  if (operation === "link") return `连接节点 · ${text(args.from) || "?"} → ${text(args.to) || "?"}`;
+  if (operation === "create_tree") return `创建推理树 · ${text(args.name) || "未命名"}`;
+  if (operation === "update_tree") return `更新推理树 · ${text(args.treeId) || "未指定"}`;
   return "证据操作";
 }
 

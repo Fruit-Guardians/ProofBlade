@@ -38,5 +38,17 @@ test("formats coding tool instructions and returned text for direct inspection",
   assert.equal(evidence.outputLabel, "证据图更新");
   assert.match(evidence.output, /F-1/);
 
+  const forest = toolPresentation("evidence", { operation: "inspect_forest" }, { details: { trees: [] } });
+  assert.equal(forest.inputLabel, "查看推理森林");
+  assert.equal(forest.summary, "查看推理森林 · 摘要");
+
+  const tree = toolPresentation("evidence", { operation: "inspect_tree", treeId: "TREE-1" }, { details: { nodes: [] } });
+  assert.equal(tree.inputLabel, "展开推理树");
+  assert.match(tree.summary, /TREE-1/);
+
+  const link = toolPresentation("evidence", { operation: "link", from: "EV-1", to: "F-1", relation: "supports" }, { details: { edge: { id: "RE-1" } } });
+  assert.equal(link.inputLabel, "连接推理节点");
+  assert.match(link.summary, /EV-1 → F-1/);
+
   assert.equal(resultText({ result: { content: [{ type: "text", text: "nested" }] } }), "nested");
 });

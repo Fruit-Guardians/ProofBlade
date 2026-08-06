@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
   assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "329986246c5163aa730555f3774a1ffef6ddfd2bf6cad26c76189c18ab60ff24");
+  assert.equal(sha256(canonicalJson(snapshot)), "add79e77d8d8222dd065a743787e2a5d218989f75941ab4b73238237a62840e6");
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });

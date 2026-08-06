@@ -602,10 +602,52 @@ function EvidenceLedger({ detail }: { detail: RunDetail }) {
 function ChatEvidenceResults({ detail }: { detail: RunDetail }) {
   const calls = detail.sessions.flatMap((session) => session.toolCalls).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   return <div className="chat-results-page">
-    <EvidenceChain detail={detail} />
+    <ReasoningForest detail={detail} />
     <ArtifactIndex detail={detail} />
     <details className="raw-tool-results"><summary><TerminalSquare size={14} /><span><strong>原始 Tool 记录</strong><small>用于调试，不等同于证据</small></span><em>{calls.length}</em><ChevronRight size={14} /></summary><div className="chat-result-list">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} />)}{calls.length === 0 && <div className="empty-list">当前对话还没有 Tool 结果</div>}</div></details>
   </div>;
+}
+
+function ReasoningForest({ detail }: { detail: RunDetail }) {
+  const trees = Object.values(detail.snapshot.reasoningTrees).sort((a, b) => b.updatedSeq - a.updatedSeq);
+  const usage = new Map<string, string[]>();
+  for (const tree of trees) for (const nodeId of tree.nodeIds) usage.set(nodeId, [...(usage.get(nodeId) ?? []), tree.id]);
+  const organized = new Set(trees.flatMap((tree) => tree.nodeIds));
+  const orphaned = Object.values(detail.snapshot.reasoningNodes).filter((node) => !organized.has(node.id));
+  if (trees.length === 0) return <EvidenceChain detail={detail} />;
+  return <section className="reasoning-forest-section"><div className="section-head"><div><GitBranch size={14} /><strong>推理森林</strong><span>{trees.length} 棵树 · {usage.size} 个节点 · {[...usage.values()].filter((ids) => ids.length > 1).length} 个共享节点</span></div></div><div className="reasoning-forest">
+    {trees.map((tree) => <ReasoningTreeView key={tree.id} detail={detail} tree={tree} usage={usage} />)}
+    {orphaned.length > 0 && <details className="forest-orphans"><summary><Link2 size={13} /><span><strong>尚未整理的图节点</strong><small>可由 Evidence Curator 纳入一棵或多棵推理树</small></span><em>{orphaned.length}</em><ChevronRight size={14} /></summary><div className="reasoning-node-list">{orphaned.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={new Set(orphaned.map((item) => item.id))} />)}</div></details>}
+  </div></section>;
+}
+
+function ReasoningTreeView({ detail, tree, usage }: { detail: RunDetail; tree: RunDetail["snapshot"]["reasoningTrees"][string]; usage: Map<string, string[]> }) {
+  const nodeIds = new Set(tree.nodeIds);
+  const nodes = tree.nodeIds.map((id) => detail.snapshot.reasoningNodes[id]).filter(Boolean);
+  const edges = Object.values(detail.snapshot.reasoningEdges).filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to));
+  const shared = nodes.filter((node) => (usage.get(node.id)?.length ?? 0) > 1).length;
+  const relatedTreeIds = [...new Set([...tree.relatedTreeIds, ...Object.values(detail.snapshot.reasoningTrees).filter((item) => item.relatedTreeIds.includes(tree.id)).map((item) => item.id)])];
+  const ordered = [...nodes].sort((a, b) => Number(b.id === tree.rootNodeId) - Number(a.id === tree.rootNodeId) || b.updatedSeq - a.updatedSeq);
+  return <details className={`reasoning-tree-card status-${tree.status.toLowerCase()}`}><summary><span className="tree-mark"><GitBranch size={14} /></span><span className="tree-copy"><strong>{tree.name}</strong><small>{tree.summary}</small><span className="tree-tags">{tree.tags.slice(0, 5).map((tag) => <em key={tag}>#{tag}</em>)}</span></span><span className="tree-counts"><b>{nodes.length}</b><small>节点</small><b>{edges.length}</b><small>关系</small>{shared > 0 && <><b>{shared}</b><small>共享</small></>}</span><StatusMini status={tree.status} /><ChevronRight size={14} /></summary><div className="reasoning-tree-detail">
+    <dl className="tree-explanation"><dt>用途</dt><dd>{tree.purpose}</dd><dt>AI 解释</dt><dd>{tree.explanation}</dd><dt>根节点</dt><dd><code>{tree.rootNodeId}</code></dd>{relatedTreeIds.length > 0 && <><dt>关联树</dt><dd>{relatedTreeIds.map((id) => detail.snapshot.reasoningTrees[id]?.name ?? shortId(id)).join(" · ")}</dd></>}</dl>
+    <div className="reasoning-node-list">{ordered.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={nodeIds} root={node.id === tree.rootNodeId} />)}</div>
+  </div></details>;
+}
+
+function ReasoningNodeView({ detail, node, usage, treeNodeIds, root = false }: { detail: RunDetail; node: RunDetail["snapshot"]["reasoningNodes"][string]; usage: Map<string, string[]>; treeNodeIds: Set<string>; root?: boolean }) {
+  const incoming = Object.values(detail.snapshot.reasoningEdges).filter((edge) => edge.to === node.id && treeNodeIds.has(edge.from));
+  const outgoing = Object.values(detail.snapshot.reasoningEdges).filter((edge) => edge.from === node.id && treeNodeIds.has(edge.to));
+  const adoptedBy = usage.get(node.id) ?? [];
+  const artifact = node.reference?.kind === "artifact" ? detail.snapshot.artifacts[node.reference.id] : undefined;
+  return <details className={`reasoning-node-row node-${node.kind} ${root ? "root" : ""}`}><summary><span className="node-kind-icon">{node.kind === "artifact" ? <FileCode2 size={13} /> : node.kind === "claim" || node.kind === "result" ? <CheckCircle2 size={13} /> : <ShieldCheck size={13} />}</span><span><strong>{node.name}</strong><small>{node.summary}</small></span>{root && <em className="root-label">根节点</em>}{adoptedBy.length > 1 && <em className="shared-label">共享 {adoptedBy.length}</em>}<StatusMini status={node.status} /><ChevronRight size={13} /></summary><div className="reasoning-node-detail"><p>{node.explanation}</p><dl className="key-values"><dt>类型</dt><dd>{reasoningKindLabel(node.kind)}</dd><dt>ID</dt><dd><code>{node.id}</code></dd><dt>来源</dt><dd>{node.reference ? `${node.reference.kind} · ${node.reference.id}` : "AI 推理节点"}</dd>{artifact && <><dt>Artifact</dt><dd>{artifact.path} · {formatBytes(artifact.bytes)}</dd></>}<dt>被采用</dt><dd>{adoptedBy.map((id) => detail.snapshot.reasoningTrees[id]?.name ?? shortId(id)).join(" · ") || "尚未纳入推理树"}</dd></dl><div className="node-relations">{incoming.map((edge) => <div key={edge.id}><span>由</span><strong>{detail.snapshot.reasoningNodes[edge.from]?.name ?? shortId(edge.from)}</strong><em>{reasoningRelationLabel(edge.relation)}</em><small>{edge.explanation}</small></div>)}{outgoing.map((edge) => <div key={edge.id}><span>用于</span><strong>{detail.snapshot.reasoningNodes[edge.to]?.name ?? shortId(edge.to)}</strong><em>{reasoningRelationLabel(edge.relation)}</em><small>{edge.explanation}</small></div>)}{incoming.length === 0 && outgoing.length === 0 && <div className="chain-empty">当前树内没有直接关系</div>}</div></div></details>;
+}
+
+function reasoningKindLabel(kind: string): string {
+  return ({ artifact: "离散产物", observation: "观察点", evidence: "证据归纳", hypothesis: "假设", inference: "中间推理", claim: "主张", reproduction: "复现证据", result: "结果" } as Record<string, string>)[kind] ?? kind;
+}
+
+function reasoningRelationLabel(relation: string): string {
+  return ({ derived_from: "归纳自", supports: "支撑", refutes: "反驳", depends_on: "依赖", adopts: "采用", reproduces: "复现" } as Record<string, string>)[relation] ?? relation;
 }
 
 function EvidenceChain({ detail }: { detail: RunDetail }) {
@@ -613,7 +655,7 @@ function EvidenceChain({ detail }: { detail: RunDetail }) {
   const evidence = Object.values(detail.snapshot.evidence).sort((a, b) => b.createdSeq - a.createdSeq);
   const referenced = new Set(facts.flatMap((fact) => fact.evidenceIds));
   const orphaned = evidence.filter((item) => !referenced.has(item.id));
-  return <section className="evidence-chain-section"><div className="section-head"><div><GitBranch size={14} /><strong>证据链</strong><span>{facts.length} 个主张 · {evidence.length} 条证据</span></div></div><div className="evidence-chain">
+  return <section className="evidence-chain-section"><div className="section-head"><div><GitBranch size={14} /><strong>历史证据链</strong><span>{facts.length} 个主张 · {evidence.length} 条证据</span></div></div><div className="evidence-chain">
     {facts.map((fact) => <article className="claim-node" key={fact.id}><header><StatusMini status={fact.status} /><span><strong>{fact.statement}</strong><code>{fact.id}</code></span></header><div className="claim-evidence">{fact.evidenceIds.map((id) => detail.snapshot.evidence[id]).filter(Boolean).map((item) => <EvidenceBranch key={item.id} detail={detail} evidence={item} />)}{fact.evidenceIds.length === 0 && <div className="chain-empty">该主张没有关联 Evidence</div>}</div></article>)}
     {orphaned.map((item) => <article className="claim-node orphan" key={item.id}><header><StatusMini status="unlinked" /><span><strong>未关联到 Fact 的证据</strong><code>{item.id}</code></span></header><div className="claim-evidence"><EvidenceBranch detail={detail} evidence={item} /></div></article>)}
     {facts.length === 0 && evidence.length === 0 && <div className="empty-list chain-empty-state"><GitBranch size={18} /><strong>尚未形成证据链</strong><span>原始 Tool 输出仍在下方产物归档中；只有被 Agent 解释并关联到主张的内容才进入这里。</span></div>}

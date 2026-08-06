@@ -4,9 +4,9 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T02:47:13+08:00"
+  "updatedAt": "2026-08-06T11:05:27+08:00"
 }
 ```
 
@@ -16,7 +16,7 @@
 
 ## 入口与边界
 
-- `coding-lane.ts` 驱动普通对话；`solver-lane.ts` 驱动证据型任务。
+- `coding-lane.ts` 驱动普通对话并在动态尾部注入隐藏 Forest 摘要；`solver-lane.ts` 驱动证据型任务。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
 - Coding Provider 始终看到固定 `evidence`、`load_skill` 和 `mcp_call`；启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
@@ -27,7 +27,7 @@
 
 模型、URL、思考等级和缓存策略只能来自配置。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
 
-`evidence` 的 `search/read/annotate/record` 共用一个缓存稳定 Tool，并使用判别联合 Schema 隔离各操作字段；只允许把有实质价值的发现提升为 Evidence。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。MCP `list` 不连接 Server，`describe` 才允许懒连接，`call` 必须使用 describe 后可见的 allowlist Tool。
+`evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool，并使用判别联合 Schema 隔离各操作字段；`inspect_forest` 用于方向回顾，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 
 CTF flag、挑战答案或恢复密钥等确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现候选不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
 

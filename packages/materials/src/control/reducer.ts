@@ -1,5 +1,6 @@
 import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 
 export function createInitialSnapshot(runId: string, task: TaskContract): RunSnapshot {
   return {
@@ -12,6 +13,9 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     facts: {},
     observations: {},
     evidence: {},
+    reasoningNodes: {},
+    reasoningEdges: {},
+    reasoningTrees: {},
     hypotheses: {},
     intents: {},
     completions: {},
@@ -98,6 +102,37 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const evidence = p.evidence as RunSnapshot["evidence"][string];
       if (!evidence?.id) throw new Error("evidence_added requires evidence");
       next.evidence[evidence.id] = evidence;
+      break;
+    }
+    case "reasoning_node_upserted": {
+      const value = p.node as Omit<RunSnapshot["reasoningNodes"][string], "createdSeq" | "updatedSeq">;
+      if (!value?.id) throw new Error("reasoning_node_upserted requires node");
+      validateReasoningNode(next, value);
+      const previous = next.reasoningNodes[value.id];
+      next.reasoningNodes[value.id] = {
+        ...value,
+        createdSeq: previous?.createdSeq ?? event.seq,
+        updatedSeq: event.seq,
+      };
+      break;
+    }
+    case "reasoning_edge_added": {
+      const value = p.edge as Omit<RunSnapshot["reasoningEdges"][string], "createdSeq">;
+      if (!value?.id) throw new Error("reasoning_edge_added requires edge");
+      validateReasoningEdge(next, value);
+      next.reasoningEdges[value.id] = { ...value, createdSeq: event.seq };
+      break;
+    }
+    case "reasoning_tree_upserted": {
+      const value = p.tree as Omit<RunSnapshot["reasoningTrees"][string], "createdSeq" | "updatedSeq">;
+      if (!value?.id) throw new Error("reasoning_tree_upserted requires tree");
+      validateReasoningTree(next, value);
+      const previous = next.reasoningTrees[value.id];
+      next.reasoningTrees[value.id] = {
+        ...value,
+        createdSeq: previous?.createdSeq ?? event.seq,
+        updatedSeq: event.seq,
+      };
       break;
     }
     case "hypothesis_added": {

@@ -1,8 +1,18 @@
 import { basename } from "node:path";
 import { snipText } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
-import type { ArtifactRole, ArtifactSemanticMetadata, Evidence, RunSnapshot } from "../domain/types.js";
-import { id } from "../domain/utils.js";
+import type {
+  ArtifactRole,
+  ArtifactSemanticMetadata,
+  Evidence,
+  ReasoningEdge,
+  ReasoningEdgeRelation,
+  ReasoningForestIndex,
+  ReasoningNode,
+  ReasoningTree,
+  RunSnapshot,
+} from "../domain/types.js";
+import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 
 export interface RecordCodingEvidenceInput {
@@ -12,6 +22,24 @@ export interface RecordCodingEvidenceInput {
   tags?: string[];
   claim?: string;
   dependsOn?: string[];
+}
+
+export interface CreateReasoningTreeInput {
+  name: string;
+  summary: string;
+  purpose: string;
+  explanation: string;
+  rootNodeId: string;
+  nodeIds: string[];
+  tags?: string[];
+  relatedTreeIds?: string[];
+  status?: ReasoningTree["status"];
+}
+
+export interface UpdateReasoningTreeInput extends Partial<Omit<CreateReasoningTreeInput, "rootNodeId" | "nodeIds">> {
+  treeId: string;
+  rootNodeId?: string;
+  nodeIds?: string[];
 }
 
 export class CodingEvidenceGraph {
@@ -48,6 +76,7 @@ export class CodingEvidenceGraph {
   public async recordEvidence(input: RecordCodingEvidenceInput): Promise<{
     evidenceId: string;
     factId?: string;
+    treeId?: string;
     artifactIds: string[];
   }> {
     const snapshot = await this.controlStore.snapshot(this.runId);
@@ -99,7 +128,125 @@ export class CodingEvidenceGraph {
         lane: "main",
       });
     }
-    return { evidenceId, factId, artifactIds };
+    for (const artifactId of artifactIds) await this.ensureDomainNode(artifactId);
+    for (const dependencyId of dependsOn) await this.ensureDomainNode(dependencyId);
+    await this.ensureDomainNode(evidenceId);
+    for (const artifactId of artifactIds) await this.ensureEdge(artifactId, evidenceId, "derived_from", "该 Evidence 由此 Artifact 中的离散观察归纳生成。", 0.9);
+    for (const dependencyId of dependsOn) await this.ensureEdge(dependencyId, evidenceId, "depends_on", "该 Evidence 依赖已有 Evidence 的解释。", 0.8);
+    let treeId: string | undefined;
+    if (factId && claim) {
+      await this.ensureDomainNode(factId);
+      await this.ensureEdge(evidenceId, factId, "supports", "该 Evidence 支撑此主张。", 0.8);
+      const current = await this.controlStore.snapshot(this.runId);
+      const relatedTreeIds = Object.values(current.reasoningTrees).filter((tree) => dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
+      const created = await this.createTree({
+        name: claim,
+        summary,
+        purpose: `组织并复核主张：${claim}`,
+        explanation: `由 ${name} 及其来源产物组成的初始推理树；Evidence Curator 可继续补充、反驳或重命名。`,
+        rootNodeId: factId,
+        nodeIds: [...artifactIds, ...dependsOn, evidenceId, factId],
+        relatedTreeIds,
+        tags,
+        status: "ACTIVE",
+      });
+      treeId = created.tree.id;
+    }
+    return { evidenceId, factId, treeId, artifactIds };
+  }
+
+  public async linkNodes(input: {
+    from: string;
+    to: string;
+    relation: ReasoningEdgeRelation;
+    explanation?: string;
+    confidence?: number;
+  }): Promise<{ edge: ReasoningEdge }> {
+    await this.ensureDomainNode(input.from);
+    await this.ensureDomainNode(input.to);
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const edge: Omit<ReasoningEdge, "createdSeq"> = {
+      id: id("RE"),
+      from: input.from,
+      to: input.to,
+      relation: input.relation,
+      explanation: optionalText(input.explanation, "Reasoning edge explanation", 1_000) ?? "",
+      confidence: input.confidence ?? 0.8,
+      generation: snapshot.generation,
+    };
+    await this.controlStore.dispatch(this.runId, { type: "reasoning_edge", edge, lane: "main" });
+    const updated = await this.controlStore.snapshot(this.runId);
+    return { edge: updated.reasoningEdges[edge.id]! };
+  }
+
+  public async createTree(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree }> {
+    const requestedNodeIds = unique(input.nodeIds);
+    for (const nodeId of requestedNodeIds) await this.ensureDomainNode(nodeId);
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const nodeIds = upstreamClosure(snapshot, requestedNodeIds);
+    const tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq"> = {
+      id: id("TREE"),
+      name: requiredText(input.name, "Reasoning tree name", 160),
+      summary: requiredText(input.summary, "Reasoning tree summary", 1_000),
+      tags: normalizedTags(input.tags),
+      purpose: requiredText(input.purpose, "Reasoning tree purpose", 1_000),
+      explanation: requiredText(input.explanation, "Reasoning tree explanation", 2_000),
+      rootNodeId: input.rootNodeId,
+      nodeIds,
+      relatedTreeIds: unique(input.relatedTreeIds ?? []),
+      status: input.status ?? "ACTIVE",
+      generation: snapshot.generation,
+      explainedBy: "curator",
+    };
+    await this.controlStore.dispatch(this.runId, { type: "reasoning_tree", tree, lane: "main" });
+    const updated = await this.controlStore.snapshot(this.runId);
+    return { tree: updated.reasoningTrees[tree.id]! };
+  }
+
+  public async updateTree(input: UpdateReasoningTreeInput): Promise<{ tree: ReasoningTree }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const previous = snapshot.reasoningTrees[input.treeId];
+    if (!previous) throw new Error(`Unknown reasoning tree: ${input.treeId}`);
+    const requestedNodeIds = unique(input.nodeIds ?? previous.nodeIds);
+    for (const nodeId of requestedNodeIds) await this.ensureDomainNode(nodeId);
+    const current = await this.controlStore.snapshot(this.runId);
+    const nodeIds = upstreamClosure(current, requestedNodeIds);
+    const tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq"> = {
+      id: previous.id,
+      name: requiredText(input.name ?? previous.name, "Reasoning tree name", 160),
+      summary: requiredText(input.summary ?? previous.summary, "Reasoning tree summary", 1_000),
+      tags: normalizedTags(input.tags ?? previous.tags),
+      purpose: requiredText(input.purpose ?? previous.purpose, "Reasoning tree purpose", 1_000),
+      explanation: requiredText(input.explanation ?? previous.explanation, "Reasoning tree explanation", 2_000),
+      rootNodeId: input.rootNodeId ?? previous.rootNodeId,
+      nodeIds,
+      relatedTreeIds: unique(input.relatedTreeIds ?? previous.relatedTreeIds),
+      status: input.status ?? previous.status,
+      generation: previous.generation,
+      explainedBy: "curator",
+    };
+    await this.controlStore.dispatch(this.runId, { type: "reasoning_tree", tree, lane: "main" });
+    const updated = await this.controlStore.snapshot(this.runId);
+    return { tree: updated.reasoningTrees[tree.id]! };
+  }
+
+  public async inspectForest(): Promise<ReasoningForestIndex> {
+    return buildReasoningForest(await this.controlStore.snapshot(this.runId));
+  }
+
+  public async inspectTree(treeId: string): Promise<Record<string, unknown>> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const tree = snapshot.reasoningTrees[treeId];
+    if (!tree) throw new Error(`Unknown reasoning tree: ${treeId}`);
+    const nodeIds = new Set(tree.nodeIds);
+    const usage = nodeTreeUsage(snapshot);
+    return {
+      tree,
+      root: snapshot.reasoningNodes[tree.rootNodeId],
+      nodes: tree.nodeIds.map((nodeId) => ({ ...snapshot.reasoningNodes[nodeId], adoptedByTrees: usage.get(nodeId) ?? [] })),
+      edges: Object.values(snapshot.reasoningEdges).filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to)).sort((a, b) => a.createdSeq - b.createdSeq),
+      relatedTrees: relatedTreeIds(snapshot, tree.id).map((id) => snapshot.reasoningTrees[id]).filter(Boolean).map((item) => ({ id: item.id, name: item.name, summary: item.summary, status: item.status })),
+    };
   }
 
   public async search(query = "", tags: string[] = []): Promise<Array<Record<string, unknown>>> {
@@ -111,6 +258,7 @@ export class CodingEvidenceGraph {
       ...Object.values(snapshot.facts).map((item) => ({ kind: "fact", id: item.id, name: item.statement, summary: item.statement, status: item.status, evidenceIds: item.evidenceIds, tags: [], createdSeq: item.createdSeq, search: `${item.id} ${item.statement}`.toLowerCase() })),
       ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, name: item.name ?? item.summary, summary: item.summary, artifactIds: evidenceArtifactIds(item), dependsOn: item.dependsOn ?? [], supports: item.supports, refutes: item.refutes, tags: item.tags ?? [], createdSeq: item.createdSeq, search: `${item.id} ${item.name ?? ""} ${item.summary} ${(item.tags ?? []).join(" ")}`.toLowerCase() })),
       ...Object.values(snapshot.artifacts).map((item) => ({ kind: "artifact", id: item.id, name: item.semantic?.name ?? basename(item.path), summary: item.semantic?.summary ?? `${item.mime}, ${item.bytes} bytes`, role: item.semantic?.role ?? "intermediate", relatedIds: item.semantic?.relatedIds ?? [], tags: item.semantic?.tags ?? [], createdSeq: item.semantic?.updatedSeq ?? 0, search: `${item.id} ${item.path} ${item.semantic?.name ?? ""} ${item.semantic?.summary ?? ""} ${(item.semantic?.tags ?? []).join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.reasoningTrees).map((item) => ({ kind: "reasoning_tree", id: item.id, name: item.name, summary: item.summary, purpose: item.purpose, status: item.status, rootNodeId: item.rootNodeId, nodeIds: item.nodeIds, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.purpose} ${item.tags.join(" ")}`.toLowerCase() })),
     ];
     return rows
       .map((row) => ({ ...row, score: queryTerms.filter((term) => row.search.includes(term)).length }))
@@ -139,6 +287,148 @@ export class CodingEvidenceGraph {
       originalChars: visible.originalChars,
     };
   }
+
+  private async ensureDomainNode(nodeId: string): Promise<void> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    if (snapshot.reasoningNodes[nodeId]) return;
+    const node = domainReasoningNode(snapshot, nodeId);
+    if (!node) throw new Error(`Unknown graph node or domain reference: ${nodeId}`);
+    await this.controlStore.dispatch(this.runId, { type: "reasoning_node", node, lane: "main" });
+  }
+
+  private async ensureEdge(from: string, to: string, relation: ReasoningEdgeRelation, explanation: string, confidence: number): Promise<void> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    if (Object.values(snapshot.reasoningEdges).some((edge) => edge.from === from && edge.to === to && edge.relation === relation)) return;
+    await this.linkNodes({ from, to, relation, explanation, confidence });
+  }
+}
+
+export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestIndex {
+  const usage = nodeTreeUsage(snapshot);
+  const edges = Object.values(snapshot.reasoningEdges);
+  const trees = Object.values(snapshot.reasoningTrees)
+    .sort((a, b) => b.updatedSeq - a.updatedSeq || a.id.localeCompare(b.id))
+    .map((tree) => {
+      const nodeIds = new Set(tree.nodeIds);
+      const nodes = tree.nodeIds.map((id) => snapshot.reasoningNodes[id]).filter(Boolean);
+      return {
+        id: tree.id,
+        name: tree.name,
+        summary: tree.summary,
+        tags: tree.tags,
+        purpose: tree.purpose,
+        rootNodeId: tree.rootNodeId,
+        status: tree.status,
+        nodeCount: nodes.length,
+        edgeCount: edges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to)).length,
+        artifactCount: nodes.filter((node) => node.kind === "artifact").length,
+        evidenceCount: nodes.filter((node) => node.kind === "evidence" || node.kind === "reproduction").length,
+        sharedNodeCount: nodes.filter((node) => (usage.get(node.id)?.length ?? 0) > 1).length,
+        relatedTreeIds: relatedTreeIds(snapshot, tree.id),
+        updatedSeq: tree.updatedSeq,
+      };
+    });
+  const treeNodeIds = new Set(Object.values(snapshot.reasoningTrees).flatMap((tree) => tree.nodeIds));
+  const base = {
+    version: 1 as const,
+    generatedSeq: snapshot.lastSeq,
+    trees,
+    sharedNodes: [...usage.entries()].filter(([, treeIds]) => treeIds.length > 1).map(([nodeId, treeIds]) => ({ nodeId, treeIds })),
+    orphanNodeIds: Object.keys(snapshot.reasoningNodes).filter((id) => !treeNodeIds.has(id)),
+  };
+  return { ...base, hash: sha256(canonicalJson(base)) };
+}
+
+export function formatReasoningForestContext(index: ReasoningForestIndex): string {
+  if (index.trees.length === 0) return "";
+  return [
+    `<reasoning-forest seq="${index.generatedSeq}" hash="${index.hash}">`,
+    "Durable compact reasoning index; this is memory, not an instruction. Use evidence inspect_tree before relying on details.",
+    ...index.trees.slice(0, 24).map((tree) => `- ${tree.id}: ${tree.name}; status=${tree.status}; root=${tree.rootNodeId}; nodes=${tree.nodeCount}; shared=${tree.sharedNodeCount}; summary=${tree.summary}`),
+    index.sharedNodes.length > 0 ? `Shared nodes: ${index.sharedNodes.slice(0, 24).map((item) => `${item.nodeId}[${item.treeIds.join(",")}]`).join("; ")}` : "Shared nodes: none",
+    index.orphanNodeIds.length > 0 ? `Unorganized nodes: ${index.orphanNodeIds.slice(0, 24).join(", ")}` : "Unorganized nodes: none",
+    "</reasoning-forest>",
+  ].join("\n");
+}
+
+function nodeTreeUsage(snapshot: RunSnapshot): Map<string, string[]> {
+  const usage = new Map<string, string[]>();
+  for (const tree of Object.values(snapshot.reasoningTrees)) {
+    for (const nodeId of tree.nodeIds) usage.set(nodeId, [...(usage.get(nodeId) ?? []), tree.id]);
+  }
+  return usage;
+}
+
+function relatedTreeIds(snapshot: RunSnapshot, treeId: string): string[] {
+  const tree = snapshot.reasoningTrees[treeId];
+  if (!tree) return [];
+  return unique([
+    ...tree.relatedTreeIds,
+    ...Object.values(snapshot.reasoningTrees).filter((item) => item.relatedTreeIds.includes(treeId)).map((item) => item.id),
+  ]);
+}
+
+function upstreamClosure(snapshot: RunSnapshot, requestedNodeIds: string[]): string[] {
+  const included = new Set(requestedNodeIds);
+  const pending = [...requestedNodeIds];
+  while (pending.length > 0) {
+    const target = pending.pop()!;
+    for (const edge of Object.values(snapshot.reasoningEdges)) {
+      if (edge.to !== target || included.has(edge.from)) continue;
+      included.add(edge.from);
+      pending.push(edge.from);
+    }
+  }
+  return [...included];
+}
+
+function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> | undefined {
+  const artifact = snapshot.artifacts[nodeId];
+  if (artifact) return {
+    id: artifact.id,
+    kind: "artifact",
+    name: artifact.semantic?.name ?? basename(artifact.path),
+    summary: artifact.semantic?.summary ?? `${artifact.mime}, ${artifact.bytes} bytes`,
+    tags: artifact.semantic?.tags ?? [],
+    status: artifact.semantic?.role === "result" ? "CONFIRMED" : "OPEN",
+    explanation: artifact.semantic?.summary ?? "由 Tool 产生并归档的离散观察来源。",
+    reference: { kind: "artifact", id: artifact.id },
+    generation: snapshot.generation,
+    explainedBy: artifact.semantic?.annotatedBy === "agent" ? "agent" : "harness",
+  };
+  const evidence = snapshot.evidence[nodeId];
+  if (evidence) return {
+    id: evidence.id,
+    kind: evidence.kind === "reproduction" ? "reproduction" : "evidence",
+    name: evidence.name ?? evidence.summary,
+    summary: evidence.summary,
+    tags: evidence.tags ?? [],
+    status: evidence.refutes.length > 0 ? "CONTESTED" : "SUPPORTED",
+    explanation: "由一个或多个来源观察归纳并保留稳定引用。",
+    reference: { kind: "evidence", id: evidence.id },
+    generation: evidence.source.generation ?? snapshot.generation,
+    explainedBy: "curator",
+  };
+  const fact = snapshot.facts[nodeId];
+  if (fact) return {
+    id: fact.id,
+    kind: "claim",
+    name: fact.statement,
+    summary: fact.statement,
+    tags: [],
+    status: fact.status === "CONFIRMED" ? "CONFIRMED" : fact.status === "REJECTED" ? "REFUTED" : "OPEN",
+    explanation: "由关联 Evidence 支撑或反驳的可验证主张。",
+    reference: { kind: "fact", id: fact.id },
+    generation: snapshot.generation,
+    explainedBy: "curator",
+  };
+  const observation = snapshot.observations[nodeId];
+  if (observation) return { id: observation.id, kind: "observation", name: observation.summary, summary: observation.summary, tags: observation.candidateKinds, status: "OPEN", explanation: "由 Tool 输出直接提取的离散观察。", reference: { kind: "observation", id: observation.id }, generation: observation.source.generation, explainedBy: "harness" };
+  const hypothesis = snapshot.hypotheses[nodeId];
+  if (hypothesis) return { id: hypothesis.id, kind: "hypothesis", name: hypothesis.statement, summary: hypothesis.statement, tags: [], status: hypothesis.status === "CONFIRMED" ? "CONFIRMED" : hypothesis.status === "REJECTED" ? "REFUTED" : "OPEN", explanation: "等待证据检验的推理方向。", reference: { kind: "hypothesis", id: hypothesis.id }, generation: snapshot.generation, explainedBy: "curator" };
+  const completion = snapshot.completions[nodeId];
+  if (completion) return { id: completion.id, kind: "result", name: `结果 ${completion.id}`, summary: `候选哈希 ${completion.candidateHash}`, tags: ["result"], status: completion.status === "ACCEPTED" ? "CONFIRMED" : completion.status === "REJECTED" ? "REFUTED" : "OPEN", explanation: "由复现证据验证的最终结果候选。", reference: { kind: "completion", id: completion.id }, generation: snapshot.generation, explainedBy: "harness" };
+  return undefined;
 }
 
 function semanticInput(input: {

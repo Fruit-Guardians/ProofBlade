@@ -129,6 +129,84 @@ export interface Hypothesis {
   createdSeq: number;
 }
 
+export type ReasoningNodeKind = "artifact" | "observation" | "evidence" | "hypothesis" | "inference" | "claim" | "reproduction" | "result";
+
+export type ReasoningNodeStatus = "OPEN" | "SUPPORTED" | "CONTESTED" | "REFUTED" | "CONFIRMED";
+
+export interface ReasoningNode {
+  id: string;
+  kind: ReasoningNodeKind;
+  name: string;
+  summary: string;
+  tags: string[];
+  status: ReasoningNodeStatus;
+  explanation: string;
+  reference?: {
+    kind: "artifact" | "observation" | "evidence" | "fact" | "hypothesis" | "completion";
+    id: string;
+  };
+  generation: number;
+  explainedBy: "harness" | "agent" | "curator" | "user";
+  createdSeq: number;
+  updatedSeq: number;
+}
+
+export type ReasoningEdgeRelation = "derived_from" | "supports" | "refutes" | "depends_on" | "adopts" | "reproduces";
+
+export interface ReasoningEdge {
+  id: string;
+  from: string;
+  to: string;
+  relation: ReasoningEdgeRelation;
+  explanation: string;
+  confidence: number;
+  generation: number;
+  createdSeq: number;
+}
+
+export interface ReasoningTree {
+  id: string;
+  name: string;
+  summary: string;
+  tags: string[];
+  purpose: string;
+  explanation: string;
+  rootNodeId: string;
+  nodeIds: string[];
+  relatedTreeIds: string[];
+  status: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
+  generation: number;
+  explainedBy: "agent" | "curator" | "user";
+  createdSeq: number;
+  updatedSeq: number;
+}
+
+export interface ReasoningForestTreeSummary {
+  id: string;
+  name: string;
+  summary: string;
+  tags: string[];
+  purpose: string;
+  rootNodeId: string;
+  status: ReasoningTree["status"];
+  nodeCount: number;
+  edgeCount: number;
+  artifactCount: number;
+  evidenceCount: number;
+  sharedNodeCount: number;
+  relatedTreeIds: string[];
+  updatedSeq: number;
+}
+
+export interface ReasoningForestIndex {
+  version: 1;
+  generatedSeq: number;
+  trees: ReasoningForestTreeSummary[];
+  sharedNodes: Array<{ nodeId: string; treeIds: string[] }>;
+  orphanNodeIds: string[];
+  hash: string;
+}
+
 export interface Intent {
   id: string;
   title: string;
@@ -276,6 +354,9 @@ export interface RunSnapshot {
   facts: Record<string, Fact>;
   observations: Record<string, Observation>;
   evidence: Record<string, Evidence>;
+  reasoningNodes: Record<string, ReasoningNode>;
+  reasoningEdges: Record<string, ReasoningEdge>;
+  reasoningTrees: Record<string, ReasoningTree>;
   hypotheses: Record<string, Hypothesis>;
   intents: Record<string, Intent>;
   completions: Record<string, CompletionProposal>;
@@ -309,6 +390,9 @@ export type EventType =
   | "intent_changed"
   | "hypothesis_added"
   | "evidence_added"
+  | "reasoning_node_upserted"
+  | "reasoning_edge_added"
+  | "reasoning_tree_upserted"
   | "artifact_registered"
   | "artifact_annotated"
   | "lease_acquired"
@@ -376,6 +460,7 @@ export interface ContextManifest {
   hypothesisIds: string[];
   observationIds: string[];
   evidenceIds: string[];
+  reasoningTreeIds: string[];
   completionIds: string[];
   jobIds: string[];
   handoffIds: string[];

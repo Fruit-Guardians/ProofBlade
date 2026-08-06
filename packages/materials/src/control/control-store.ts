@@ -17,7 +17,11 @@ import type {
   PrimaryFailureCategory,
   RunVersionSnapshot,
   ArtifactSemanticMetadata,
+  ReasoningEdge,
+  ReasoningNode,
+  ReasoningTree,
 } from "../domain/types.js";
+import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
@@ -37,6 +41,9 @@ export type DomainCommand =
   | { type: "fact"; fact: Omit<Fact, "createdSeq">; lane?: Lane }
   | { type: "observation"; observation: Omit<Observation, "createdSeq">; lane?: Lane }
   | { type: "evidence"; evidence: Omit<Evidence, "createdSeq">; lane?: Lane }
+  | { type: "reasoning_node"; node: Omit<ReasoningNode, "createdSeq" | "updatedSeq">; lane?: Lane }
+  | { type: "reasoning_edge"; edge: Omit<ReasoningEdge, "createdSeq">; lane?: Lane }
+  | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "hypothesis"; hypothesis: Omit<Hypothesis, "createdSeq">; lane?: Lane }
   | { type: "intent"; intent: Omit<Intent, "createdSeq">; lane?: Lane }
   | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds">; lane?: Lane }
@@ -144,6 +151,9 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "fact": return "fact_added";
     case "observation": return "observation_added";
     case "evidence": return "evidence_added";
+    case "reasoning_node": return "reasoning_node_upserted";
+    case "reasoning_edge": return "reasoning_edge_added";
+    case "reasoning_tree": return "reasoning_tree_upserted";
     case "hypothesis": return "hypothesis_added";
     case "intent": return "intent_changed";
     case "completion_proposed": return "completion_proposed";
@@ -188,6 +198,9 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "fact": return { fact: { ...command.fact, createdSeq: seq } };
     case "observation": return { observation: { ...command.observation, createdSeq: seq } };
     case "evidence": return { evidence: { ...command.evidence, createdSeq: seq } };
+    case "reasoning_node": return { node: command.node };
+    case "reasoning_edge": return { edge: command.edge };
+    case "reasoning_tree": return { tree: command.tree };
     case "hypothesis": return { hypothesis: { ...command.hypothesis, createdSeq: seq } };
     case "intent": return { intent: { ...command.intent, createdSeq: seq } };
     case "completion_proposed": return { completion: { ...command.completion, status: "PROPOSED", evidenceIds: [], createdSeq: seq } };
@@ -232,6 +245,9 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
     validateArtifactSemantic(snapshot, command.semantic);
   }
   if (command.type === "artifact" && command.artifact.semantic) validateArtifactSemantic(snapshot, command.artifact.semantic);
+  if (command.type === "reasoning_node") validateReasoningNode(snapshot, command.node);
+  if (command.type === "reasoning_edge") validateReasoningEdge(snapshot, command.edge);
+  if (command.type === "reasoning_tree") validateReasoningTree(snapshot, command.tree);
   if (command.type === "job_queued" && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
     throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
   }
@@ -297,6 +313,8 @@ function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<Artifact
     ...Object.keys(snapshot.hypotheses),
     ...Object.keys(snapshot.completions),
     ...Object.keys(snapshot.observations),
+    ...Object.keys(snapshot.reasoningNodes),
+    ...Object.keys(snapshot.reasoningTrees),
   ]);
   const missing = semantic.relatedIds.filter((id) => !known.has(id));
   if (missing.length > 0) throw new Error(`Unknown related ids: ${missing.join(", ")}`);

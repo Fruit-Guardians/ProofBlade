@@ -4,9 +4,9 @@
 {
   "id": "materials-context",
   "name": "Context and Compaction",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T02:31:17+08:00"
+  "updatedAt": "2026-08-06T11:05:27+08:00"
 }
 ```
 
@@ -22,7 +22,7 @@
 
 ## 开发规则与验证
 
-保持稳定前缀与动态尾部分离。裁剪不得破坏 Tool pair、事实 ID、Evidence/Artifact 引用、语义名称、Evidence 依赖或最近错误。阈值和摘要格式变化必须有确定性回归测试。
+保持稳定前缀与动态尾部分离。已组织知识只注入 Reasoning Forest 的树摘要，不展开完整图；尚未组织的近期 Evidence 仍保留短索引。裁剪不得破坏 Tool pair、事实 ID、Evidence/Artifact 引用、树根、共享节点或最近错误。阈值和摘要格式变化必须有确定性回归测试。
 
 ```powershell
 npm run test:materials

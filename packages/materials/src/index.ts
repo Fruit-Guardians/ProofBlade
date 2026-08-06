@@ -1,5 +1,6 @@
 export * from "./config.js";
 export * from "./domain/types.js";
+export * from "./domain/reasoning.js";
 export * from "./control/control-store.js";
 export * from "./control/lease-manager.js";
 export * from "./control/phase-machine.js";
@@ -12,6 +13,7 @@ export * from "./context/durable-compaction.js";
 export * from "./effects/artifact-store.js";
 export * from "./effects/effect-journal.js";
 export * from "./knowledge/observer.js";
+export * from "./knowledge/evidence-graph.js";
 export * from "./verification/verifier.js";
 export * from "./verification/claim-verification.js";
 export * from "./orchestration/single-agent-loop.js";

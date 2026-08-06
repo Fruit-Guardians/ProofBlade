@@ -93,8 +93,13 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Search, read, annotate, or record the durable evidence graph through one cache-stable proxy. Record promotes and labels its artifacts while creating Evidence and an optional Fact, so do not annotate first. Use annotate only for metadata that should not become Evidence. Record only material findings.",
+  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use inspect_forest for orientation and inspect_tree for provenance. Record promotes artifacts into Evidence and an optional claim/tree. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Union([
+    Type.Object({ operation: Type.Literal("inspect_forest") }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("inspect_tree"),
+      treeId: Type.String({ minLength: 1 }),
+    }, { additionalProperties: false }),
     Type.Object({
       operation: Type.Literal("search"),
       query: Type.Optional(Type.String({ maxLength: 200 })),
@@ -123,11 +128,44 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       dependsOn: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16 })),
       claim: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
     }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("link"),
+      from: Type.String({ minLength: 1, description: "Upstream premise/source node id; information flows from this node." }),
+      to: Type.String({ minLength: 1, description: "Downstream derived, supported, refuted, or reproduced node id." }),
+      relation: Type.Union([Type.Literal("derived_from"), Type.Literal("supports"), Type.Literal("refutes"), Type.Literal("depends_on"), Type.Literal("adopts"), Type.Literal("reproduces")], { description: "Relation from upstream to downstream; depends_on means the downstream node depends on the upstream node." }),
+      explanation: Type.Optional(Type.String({ maxLength: 1_000 })),
+      confidence: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+    }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("create_tree"),
+      name: Type.String({ minLength: 1, maxLength: 160 }),
+      summary: Type.String({ minLength: 1, maxLength: 1_000 }),
+      purpose: Type.String({ minLength: 1, maxLength: 1_000 }),
+      explanation: Type.String({ minLength: 1, maxLength: 2_000 }),
+      rootNodeId: Type.String({ minLength: 1 }),
+      nodeIds: Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 128 }),
+      tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+      relatedTreeIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+      status: Type.Optional(Type.Union([Type.Literal("ACTIVE"), Type.Literal("SUPPORTED"), Type.Literal("CONTESTED"), Type.Literal("ARCHIVED")])),
+    }, { additionalProperties: false }),
+    Type.Object({
+      operation: Type.Literal("update_tree"),
+      treeId: Type.String({ minLength: 1 }),
+      name: Type.Optional(Type.String({ minLength: 1, maxLength: 160 })),
+      summary: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
+      purpose: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
+      explanation: Type.Optional(Type.String({ minLength: 1, maxLength: 2_000 })),
+      rootNodeId: Type.Optional(Type.String({ minLength: 1 })),
+      nodeIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 128 })),
+      tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+      relatedTreeIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+      status: Type.Optional(Type.Union([Type.Literal("ACTIVE"), Type.Literal("SUPPORTED"), Type.Literal("CONTESTED"), Type.Literal("ARCHIVED")])),
+    }, { additionalProperties: false }),
   ]),
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as {
-      operation: "search" | "read" | "annotate" | "record";
+      operation: "inspect_forest" | "inspect_tree" | "search" | "read" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
       query?: string;
       artifactId?: string;
       artifactIds?: string[];
@@ -139,8 +177,24 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       dependsOn?: string[];
       claim?: string;
       maxChars?: number;
+      treeId?: string;
+      from?: string;
+      to?: string;
+      relation?: "derived_from" | "supports" | "refutes" | "depends_on" | "adopts" | "reproduces";
+      explanation?: string;
+      confidence?: number;
+      purpose?: string;
+      rootNodeId?: string;
+      nodeIds?: string[];
+      relatedTreeIds?: string[];
+      status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["search", "read", "annotate", "record"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (!("operation" in input) || !["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (input.operation === "inspect_forest") return toolResult(await context.evidenceGraph.inspectForest());
+    if (input.operation === "inspect_tree") {
+      if (!input.treeId) throw new Error("evidence inspect_tree requires treeId");
+      return toolResult(await context.evidenceGraph.inspectTree(input.treeId));
+    }
     if (input.operation === "search") {
       assertAbsent(input, ["artifactId", "artifactIds", "name", "summary", "role", "relatedIds", "dependsOn", "claim", "maxChars"], "evidence search");
       return toolResult({ results: await context.evidenceGraph.search(input.query, input.tags) });
@@ -155,9 +209,21 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       if (!input.artifactId || !input.name || !input.summary) throw new Error("evidence annotate requires artifactId, name, and summary");
       return toolResult(await context.evidenceGraph.annotateArtifact({ artifactId: input.artifactId, name: input.name, summary: input.summary, tags: input.tags, role: input.role, relatedIds: input.relatedIds }));
     }
-    assertAbsent(input, ["query", "artifactId", "role", "relatedIds", "maxChars"], "evidence record");
-    if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
-    return toolResult(await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn }));
+    if (input.operation === "record") {
+      assertAbsent(input, ["query", "artifactId", "role", "relatedIds", "maxChars"], "evidence record");
+      if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
+      return toolResult(await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn }));
+    }
+    if (input.operation === "link") {
+      if (!input.from || !input.to || !input.relation) throw new Error("evidence link requires from, to, and relation");
+      return toolResult(await context.evidenceGraph.linkNodes({ from: input.from, to: input.to, relation: input.relation, explanation: input.explanation, confidence: input.confidence }));
+    }
+    if (input.operation === "create_tree") {
+      if (!input.name || !input.summary || !input.purpose || !input.explanation || !input.rootNodeId || !input.nodeIds) throw new Error("evidence create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds");
+      return toolResult(await context.evidenceGraph.createTree({ name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
+    }
+    if (!input.treeId) throw new Error("evidence update_tree requires treeId");
+    return toolResult(await context.evidenceGraph.updateTree({ treeId: input.treeId, name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
   },
 };
 

@@ -1,6 +1,7 @@
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
+import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 
 export interface ClaimReproduction {
   candidate: string;
@@ -124,6 +125,28 @@ export class CodingClaimVerifier {
         annotatedBy: "harness",
       },
       lane: "verifier",
+    });
+    const graph = new CodingEvidenceGraph(this.runId, this.controlStore, this.artifactStore);
+    await graph.linkNodes({ from: artifact.id, to: evidenceId, relation: "derived_from", explanation: "复现记录产物生成验证 Evidence。", confidence: 1 });
+    for (const supportingEvidenceId of supportingEvidenceIds) {
+      await graph.linkNodes({ from: supportingEvidenceId, to: evidenceId, relation: "depends_on", explanation: "最终复现采用此分析 Evidence。", confidence: 1 });
+    }
+    await graph.linkNodes({ from: evidenceId, to: factId, relation: "supports", explanation: "复现 Evidence 确认哈希化结果主张。", confidence: 1 });
+    await graph.linkNodes({ from: evidenceId, to: completionId, relation: "reproduces", explanation: "复现 Evidence 验证最终候选结果。", confidence: 1 });
+    const graphSnapshot = await this.controlStore.snapshot(this.runId);
+    const relatedTreeIds = Object.values(graphSnapshot.reasoningTrees)
+      .filter((tree) => supportingEvidenceIds.some((id) => tree.nodeIds.includes(id)))
+      .map((tree) => tree.id);
+    await graph.createTree({
+      name: "最终候选复现",
+      summary: `候选 ${candidateHash.slice(0, 12)}... 已由确定性命令从工作区输入复现。`,
+      purpose: "汇总最终结论、上游分析依据与可重复验证结果。",
+      explanation: "该树以 accepted Completion 为根，连接复现产物、reproduction Evidence、确认 Fact 和所有上游 Evidence。",
+      rootNodeId: completionId,
+      nodeIds: [artifact.id, ...supportingEvidenceIds, evidenceId, factId, completionId],
+      relatedTreeIds,
+      tags: ["verification", "candidate", "reproduction"],
+      status: "SUPPORTED",
     });
     const reproduction = {
       candidate: input.candidate,
