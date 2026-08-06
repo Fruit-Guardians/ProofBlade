@@ -45,9 +45,13 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
       checkpointRecommended: repaired.dropped.length > 0,
     };
   }
-  const mode: AgentContextPruneMode = plan.forceCompact ? "emergency" : plan.shouldPrune ? "prune" : "snip";
   const messageBudget = Math.max(256, Math.floor(input.messageBudget ?? Math.max(256, input.availableTokens - baseTokens)));
-  const pruned = pruneAgentMessages(repaired.messages, messageBudget, { mode });
+  const snipped = pruneAgentMessages(repaired.messages, messageBudget, { mode: "snip" });
+  const snipPlan = planContextMaintenance(baseTokens + snipped.estimatedTokens, input.availableTokens);
+  const mustEmergencyPrune = snipPlan.forceCompact || snipped.estimatedTokens > messageBudget;
+  const pruned = mustEmergencyPrune
+    ? pruneAgentMessages(snipped.messages, messageBudget, { mode: "emergency" satisfies AgentContextPruneMode })
+    : snipped;
   const postPlan = planContextMaintenance(baseTokens + pruned.estimatedTokens, input.availableTokens);
   return {
     messages: pruned.messages,
@@ -56,7 +60,7 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
     dropped: [...repaired.dropped, ...pruned.dropped],
     plan,
     postPlan,
-    nextAction: plan.forceCompact || postPlan.shouldCompact ? "compact" : "none",
-    checkpointRecommended: repaired.dropped.length > 0 || pruned.dropped.length > 0,
+    nextAction: plan.shouldCompact || postPlan.shouldCompact ? "compact" : "none",
+    checkpointRecommended: repaired.dropped.length > 0 || mustEmergencyPrune,
   };
 }

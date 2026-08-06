@@ -80,6 +80,36 @@ test("context maintenance snips before pruning and remeasures before compaction"
   assert.equal(prepared.nextAction, "none");
 });
 
+test("snipped tool results keep a monotonic provider prefix across tool turns", () => {
+  const firstRaw = [
+    { role: "user", content: "inspect", timestamp: 1 },
+    { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 2 },
+    { role: "toolResult", toolCallId: "call-1", toolName: "bash", content: [{ type: "text", text: "first output " + "a".repeat(16_000) }], isError: false, timestamp: 3 },
+  ] as never[];
+  const first = prepareContextMaintenance({ messages: firstRaw, availableTokens: 6_000, messageBudget: 6_000 });
+  assert.equal(first.plan.shouldSnip, true);
+  assert.match(JSON.stringify(first.messages), /archived large output/);
+
+  const secondRaw = [
+    ...firstRaw,
+    { role: "assistant", content: [{ type: "toolCall", id: "call-2", name: "bash", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 4 },
+    { role: "toolResult", toolCallId: "call-2", toolName: "bash", content: [{ type: "text", text: "second output " + "b".repeat(16_000) }], isError: false, timestamp: 5 },
+  ] as never[];
+  const second = prepareContextMaintenance({ messages: secondRaw, availableTokens: 6_000, messageBudget: 6_000 });
+  assert.deepEqual(second.messages.slice(0, first.messages.length), first.messages);
+  assert.match(JSON.stringify(second.messages.at(-1)), /archived large output/);
+});
+
+test("context maintenance preserves error outputs without later prefix rewrites", () => {
+  const messages = [
+    { role: "assistant", content: [{ type: "toolCall", id: "call-error", name: "bash", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 1 },
+    { role: "toolResult", toolCallId: "call-error", toolName: "bash", content: [{ type: "text", text: "diagnostic " + "x".repeat(4_000) }], isError: true, timestamp: 2 },
+  ] as never[];
+  const prepared = prepareContextMaintenance({ messages, availableTokens: 2_000, messageBudget: 2_000 });
+  assert.match(JSON.stringify(prepared.messages), /diagnostic x{100}/);
+  assert.doesNotMatch(JSON.stringify(prepared.messages), /archived large output/);
+});
+
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 }

@@ -42,6 +42,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly closeTransport: () => Promise<void>,
     private readonly mcp: McpProjectRegistry,
     private readonly claimVerifier: CodingClaimVerifier,
+    private readonly maintenance: { compactRequested: boolean },
   ) {}
 
   public static async create(options: {
@@ -104,9 +105,11 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled)),
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, cacheRetention: profile.cacheRetention },
     });
+    const maintenance = { compactRequested: false };
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - 2_048);
     harness.on("context", ({ messages }) => {
       const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext), availableTokens: contextBudget, messageBudget: contextBudget });
+      if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: prepared.messages };
     });
     attachPiObservability(harness, {
@@ -115,7 +118,7 @@ export class PiCodingLane implements AgentLanePort {
       controlStore: options.controlStore,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp, claimVerifier);
+    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp, claimVerifier, maintenance);
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -144,6 +147,7 @@ export class PiCodingLane implements AgentLanePort {
         type: "assistant_message",
         payload: { text: output, stopReason: response.stopReason, claimVerification },
       }]);
+      await this.maintainAfterTurn(response);
       return {
         text: output,
         stopReason: response.stopReason,
@@ -181,6 +185,17 @@ export class PiCodingLane implements AgentLanePort {
           await this.mcp.close();
         }
       }
+    }
+  }
+
+  private async maintainAfterTurn(response: AssistantMessage): Promise<void> {
+    if (!this.maintenance.compactRequested) return;
+    this.maintenance.compactRequested = false;
+    if (response.stopReason === "error" || response.stopReason === "aborted") return;
+    try {
+      await this.harness.compact("Compact stale exploration while preserving the latest complete tool exchange, Evidence and Artifact ids, reasoning forest roots, open hypotheses, rejected routes, and the next action.");
+    } catch {
+      // The append-only Pi transcript and Control Store remain the recovery source.
     }
   }
 }

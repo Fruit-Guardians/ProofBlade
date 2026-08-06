@@ -75,9 +75,12 @@ export function pruneAgentMessages(messages: AgentMessage[], maxTokens: number, 
   const dropped: AgentContextPruneResult["dropped"] = [];
   repairToolPairs(output, dropped);
   const toolResultIndexes = output.flatMap((message, index) => message.role === "toolResult" ? [index] : []);
-  for (const index of toolResultIndexes.slice(0, -1)) {
+  for (const index of toolResultIndexes) {
     const message = output[index];
     if (!message || message.role !== "toolResult") continue;
+    // Error output is diagnostic tail state. Keeping it verbatim from first
+    // appearance avoids a later raw-to-snip transition at an older prefix.
+    if (message.isError) continue;
     const text = message.content.map((item) => item.type === "text" ? item.text : `[${item.mimeType} image]`).join("\n");
     const tier = outputTier(text.length);
     if (tier === "small") continue;
