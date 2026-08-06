@@ -92,6 +92,7 @@ export class ProofBladeCapabilityRouter {
           operation: `mcp:${request.capabilityId}:${request.operation}`,
           args: { ...this.mcp.effectArgs(request.capabilityId, request.operation, request.input, mcpPolicy), generation: snapshot.generation },
           replayPolicy: mcpPolicy.replay,
+          artifactSensitivity: mcpPolicy.sensitivity === "secret" ? "secret" : undefined,
           cwd: this.runsRoot,
         },
         async (_effect, innerSignal) => await this.mcp!.execute(request.capabilityId, request.operation, request.input, innerSignal),

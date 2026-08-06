@@ -427,7 +427,7 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
     assertMcpEnabled(context, input.server);
     if (input.operation === "describe") {
       assertAbsent(input, ["tool", "arguments"], "MCP describe");
-      return toolResult({ server: input.server, tools: await context.mcp.describe(input.server, signal) });
+      return toolResult(await context.mcp.describeServer(input.server, signal));
     }
     if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) throw new Error("MCP call requires tool and object arguments");
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;

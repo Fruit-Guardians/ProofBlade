@@ -1,4 +1,4 @@
-import type { EffectRequest, RawEffectResult, ReplayPolicy, RunSnapshot } from "../domain/types.js";
+import type { ArtifactRef, EffectRequest, RawEffectResult, ReplayPolicy, RunSnapshot } from "../domain/types.js";
 import { id } from "../domain/utils.js";
 import { ControlStore, createEffectInput } from "../control/control-store.js";
 import { ArtifactStore } from "./artifact-store.js";
@@ -7,6 +7,7 @@ import { toToolFailure } from "../tools/errors.js";
 
 export type EffectFaultPoint = "after_proposed" | "after_started" | "after_execute" | "after_artifact";
 export type EffectFaultInjector = (point: EffectFaultPoint, effectId: string) => void | Promise<void>;
+type JournalInput = Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy; artifactSensitivity?: ArtifactRef["sensitivity"] };
 
 export class EffectJournal {
   public constructor(
@@ -16,13 +17,13 @@ export class EffectJournal {
     private readonly injectFault?: EffectFaultInjector,
   ) {}
 
-  public async execute(runId: string, input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy }, signal: AbortSignal = new AbortController().signal): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+  public async execute(runId: string, input: JournalInput, signal: AbortSignal = new AbortController().signal): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
     return await this.executeWith(runId, input, (request, innerSignal) => this.sandbox.execute(request, innerSignal), signal);
   }
 
   public async executeWith(
     runId: string,
-    input: Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy },
+    input: JournalInput,
     executor: (request: EffectRequest, signal: AbortSignal) => Promise<RawEffectResult>,
     signal: AbortSignal = new AbortController().signal,
   ): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
@@ -62,7 +63,7 @@ export class EffectJournal {
       result = { stdout: "", stderr: String(error), exitCode: null, durationMs: 0 };
     }
     await this.injectFault?.("after_execute", effectId);
-    return await this.finish(runId, effectId, input.operation, input.args, result);
+    return await this.finish(runId, effectId, input.operation, input.args, result, input.artifactSensitivity);
   }
 
   public async reconcile(runId: string): Promise<string[]> {
@@ -113,12 +114,12 @@ export class EffectJournal {
     return reconciled;
   }
 
-  private async finish(runId: string, effectId: string, operation: string, args: Record<string, unknown>, result: RawEffectResult): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+  private async finish(runId: string, effectId: string, operation: string, args: Record<string, unknown>, result: RawEffectResult, artifactSensitivity?: ArtifactRef["sensitivity"]): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
     const artifact = await this.artifactStore.putText(runId, JSON.stringify({ ...result, operation, args }, null, 2), {
       mime: "application/json",
       sourceEffectId: effectId,
       filename: `${operation}-${effectId}.json`,
-      sensitivity: /(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "flag_candidate" : "public",
+      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "flag_candidate" : "public"),
     });
     await this.injectFault?.("after_artifact", effectId);
     const outcome = result.exitCode === 0 ? "success" : result.exitCode === null ? "timeout" : "error";

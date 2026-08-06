@@ -118,9 +118,14 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   ];
   const mcp = {
     summaries: () => summaries,
-    describe: async (server: string) => {
+    describeServer: async (server: string) => {
       calls.push({ kind: "describe", value: server });
-      return [{ name: "echo_text", description: "Echo text", inputSchema: { type: "object" }, readOnlyHint: true }];
+      return {
+        server,
+        configHash: "echo-hash",
+        tools: [{ name: "agent_call_tool", description: "Dispatch", inputSchema: { type: "object" }, readOnlyHint: false }],
+        nestedTools: [{ name: "page_eval", readOnly: false, sideEffect: "network", replay: "forbidden-replay", sensitivity: "target" }],
+      };
     },
     execute: async (capabilityId: string, operation: string, input: Record<string, unknown>) => {
       calls.push({ kind: "execute", value: { capabilityId, operation, input } });
@@ -143,6 +148,7 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
 
   const described = await executeTool("mcp_call", { operation: "describe", server: "echo" }, context);
   assert.equal((described.details as { server: string }).server, "echo");
+  assert.equal((described.details as { nestedTools: Array<{ name: string }> }).nestedTools[0]?.name, "page_eval");
   assert.deepEqual(calls, [{ kind: "describe", value: "echo" }]);
   await assert.rejects(() => executeTool("mcp_call", { operation: "describe", server: "browser" }, context), /not enabled/);
   await assert.rejects(() => executeTool("mcp_call", { operation: "list", server: "echo" }, context), /does not accept/);

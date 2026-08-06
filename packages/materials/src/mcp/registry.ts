@@ -175,7 +175,16 @@ export class McpProjectRegistry {
     const entry = this.definitions.find((item) => item.capabilityId === capabilityId && !item.definition.disabled);
     if (!entry) throw new Error(`Unknown MCP capability: ${capabilityId}`);
     const base = serverInvocationPolicy(entry);
-    if (operation === "describe") return { ...base, readOnly: true, sensitivity: "public" };
+    if (operation === "describe") {
+      return {
+        readOnly: true,
+        sideEffect: "process",
+        replay: "manual",
+        sensitivity: "public",
+        resourceKeys: base.resourceKeys,
+        redactArguments: [],
+      };
+    }
     if (operation !== "call") throw new Error(`Unsupported MCP operation: ${operation}`);
     const outerTool = typeof input.tool === "string" ? input.tool : "";
     const args = input.arguments;
@@ -233,9 +242,8 @@ export class McpProjectRegistry {
     try {
       if (operation === "describe") {
         if (Object.keys(input).length > 0) throw new Error("MCP describe takes no input");
-        const tools = await this.describe(entry.name, signal);
-        const nestedTools = allowedNestedTools(entry.definition);
-        return { stdout: JSON.stringify({ server: entry.name, configHash: entry.configHash, tools, ...(nestedTools.length > 0 ? { nestedTools } : {}) }, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
+        const description = await this.describeServer(entry.name, signal);
+        return { stdout: JSON.stringify(description, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
       }
       if (operation !== "call") throw new Error(`Unsupported MCP operation: ${operation}`);
       const policy = this.resolveInvocation(capabilityId, operation, input);
@@ -262,6 +270,13 @@ export class McpProjectRegistry {
       connection.tools = allowedTools(result, entry.definition).sort((a, b) => a.name.localeCompare(b.name));
     }
     return connection.tools.map((tool) => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) }));
+  }
+
+  public async describeServer(name: string, signal?: AbortSignal): Promise<{ server: string; configHash: string; tools: McpToolSummary[]; nestedTools?: Array<McpNestedToolDefinition & { name: string }> }> {
+    const entry = this.entry(name);
+    const tools = await this.describe(name, signal);
+    const nestedTools = allowedNestedTools(entry.definition);
+    return { server: entry.name, configHash: entry.configHash, tools, ...(nestedTools.length > 0 ? { nestedTools } : {}) };
   }
 
   public async close(): Promise<void> {
@@ -412,10 +427,11 @@ function allowedNestedTools(definition: McpServerDefinition): Array<McpNestedToo
 function sensitiveArgumentValues(value: Record<string, unknown>, configured = new Set<string>()): string[] {
   const output: string[] = [];
   for (const [key, child] of Object.entries(value)) {
-    if (configured.has(key) || /(?:authorization|cookie|password|secret|token|api[-_]?key)/i.test(key)) output.push(...stringValues(child));
+    if (configured.has(key)) output.push(...stringValues(child).filter((item) => item.length > 0));
+    else if (/(?:authorization|cookie|password|secret|token|api[-_]?key)/i.test(key)) output.push(...stringValues(child).filter((item) => item.length >= 4));
     else if (child && typeof child === "object") output.push(...sensitiveArgumentValues(Array.isArray(child) ? Object.fromEntries(child.map((item, index) => [String(index), item])) : child as Record<string, unknown>, configured));
   }
-  return output.filter((item) => item.length >= 4);
+  return output;
 }
 
 function stringValues(value: unknown): string[] {

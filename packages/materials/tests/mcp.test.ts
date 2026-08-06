@@ -37,7 +37,10 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     await writeMcpConfig(root, marker);
     const direct = McpProjectRegistry.load(root);
     assert.equal(direct.summaries()[0]?.status, "configured");
-    assert.deepEqual(direct.capabilityManifests().map((item) => item.id), ["mcp.echo"]);
+    const directManifest = direct.capabilityManifests()[0]!;
+    assert.equal(directManifest.id, "mcp.echo");
+    assert.equal(directManifest.operations.find((operation) => operation.name === "describe")?.replay, "manual");
+    assert.equal(direct.resolveInvocation("mcp.echo", "describe", {}).replay, "manual");
     await assert.rejects(() => access(marker));
     await direct.close();
 
@@ -107,10 +110,10 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
       operation: "call",
       input: {
         tool: "agent_call_tool",
-        arguments: { name: "page_eval", args: { expression: "window.SECRET_EXPRESSION", token: "NESTED-TOKEN-789" } },
+        arguments: { name: "page_eval", args: { expression: "xyz", token: "NESTED-TOKEN-789" } },
       },
     });
-    assert.doesNotMatch(nested.output, /SECRET_EXPRESSION|NESTED-TOKEN-789/);
+    assert.doesNotMatch(nested.output, /xyz|NESTED-TOKEN-789/);
     assert.match(nested.output, /\[REDACTED\]/);
     const nestedSnapshot = await services.control.snapshot(runId);
     const nestedEffect = nestedSnapshot.effects[nested.effectId]!;
@@ -119,9 +122,10 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     assert.equal((nestedEffect.args.mcp as { innerTool: string }).innerTool, "page_eval");
     assert.equal(((nestedEffect.args.mcp as { policy: { sideEffect: string } }).policy.sideEffect), "network");
     const nestedSerialized = JSON.stringify({ effect: nestedEffect, artifact: nestedSnapshot.artifacts[nested.artifactId] });
-    assert.doesNotMatch(nestedSerialized, /SECRET_EXPRESSION|NESTED-TOKEN-789/);
+    assert.doesNotMatch(nestedSerialized, /xyz|NESTED-TOKEN-789/);
+    assert.equal(nestedSnapshot.artifacts[nested.artifactId]?.sensitivity, "secret");
     const nestedArtifactText = await services.artifacts.readText(runId, nestedSnapshot.artifacts[nested.artifactId]!);
-    assert.doesNotMatch(nestedArtifactText, /SECRET_EXPRESSION|NESTED-TOKEN-789/);
+    assert.doesNotMatch(nestedArtifactText, /xyz|NESTED-TOKEN-789/);
     assert.match(nestedArtifactText, /\[REDACTED\]/);
 
     const safeJob = await runtime.runBackground({
@@ -155,6 +159,7 @@ async function writeMcpConfig(root: string, marker: string): Promise<void> {
         includeTools: ["echo", "agent_tools", "agent_call_tool"],
         requestTimeoutMs: 10_000,
         readOnly: true,
+        replay: "pure",
         nestedToolPolicy: {
           dispatcherTool: "agent_call_tool",
           toolField: "name",
@@ -166,7 +171,7 @@ async function writeMcpConfig(root: string, marker: string): Promise<void> {
               readOnly: false,
               sideEffect: "network",
               replay: "forbidden-replay",
-              sensitivity: "target",
+              sensitivity: "secret",
               resourceKeys: ["browser:current-tab"],
               redactArguments: ["expression"],
             },

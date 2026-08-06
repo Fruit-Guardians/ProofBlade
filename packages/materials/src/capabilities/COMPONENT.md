@@ -4,9 +4,9 @@
 {
   "id": "materials-capabilities",
   "name": "Capability Catalog and Router",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T19:33:48+08:00"
+  "updatedAt": "2026-08-06T22:38:40+08:00"
 }
 ```
 
@@ -19,6 +19,7 @@
 - `catalog.ts` 生成规范化 manifest 与哈希。
 - `router.ts` 校验 capability、operation、参数键和 replay policy。
 - MCP 分发器调用按内层 Tool 动态解析策略，前台 Effect 与后台 Job 使用同一结果。
+- 内层敏感级别为 `secret` 时，Router 必须把分类传给 Effect Journal，确保结果 Artifact 不会降级为 `public`。
 - Provider 只看到固定代理 Schema；完整能力细节按需获取。
 
 ## 开发规则与验证
