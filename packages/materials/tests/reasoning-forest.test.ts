@@ -71,6 +71,14 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     const secondHash = (await services.control.replay(runId)).projectionHash;
     assert.equal(firstHash, secondHash);
 
+    const longClaimArtifact = await services.artifacts.putText(runId, "long claim source", { filename: "long-claim.txt", mime: "text/plain", sensitivity: "public" });
+    const longClaim = `完整权威主张：${"保持完整内容用于验证，展示标题应单独截断。".repeat(12)}`;
+    const longRecord = await graph.recordEvidence({ name: "长主张证据", summary: "验证权威 Claim 与图展示标签具有不同长度边界。", artifactIds: [longClaimArtifact.id], claim: longClaim });
+    const longSnapshot = await services.control.snapshot(runId);
+    assert.equal(longSnapshot.facts[longRecord.factId!]?.statement, longClaim);
+    assert.ok(longSnapshot.reasoningNodes[longRecord.factId!]!.name.length <= 160);
+    assert.ok(longSnapshot.reasoningTrees[longRecord.treeId!]!.name.length <= 160);
+
     await services.control.dispatch(runId, { type: "fixture_reset", generation: 1 });
     await assert.rejects(
       graph.linkNodes({ from: shared.evidenceId, to: branchB.factId!, relation: "adopts" }),

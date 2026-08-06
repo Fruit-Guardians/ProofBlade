@@ -140,9 +140,9 @@ export class CodingEvidenceGraph {
       const current = await this.controlStore.snapshot(this.runId);
       const relatedTreeIds = Object.values(current.reasoningTrees).filter((tree) => dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
       const created = await this.createTree({
-        name: claim,
+        name: displayText(claim, 160),
         summary,
-        purpose: `组织并复核主张：${claim}`,
+        purpose: displayText(`组织并复核主张：${claim}`, 1_000),
         explanation: `由 ${name} 及其来源产物组成的初始推理树；Evidence Curator 可继续补充、反驳或重命名。`,
         rootNodeId: factId,
         nodeIds: [...artifactIds, ...dependsOn, evidenceId, factId],
@@ -387,7 +387,7 @@ function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<Reason
   if (artifact) return {
     id: artifact.id,
     kind: "artifact",
-    name: artifact.semantic?.name ?? basename(artifact.path),
+    name: displayText(artifact.semantic?.name ?? basename(artifact.path), 160),
     summary: artifact.semantic?.summary ?? `${artifact.mime}, ${artifact.bytes} bytes`,
     tags: artifact.semantic?.tags ?? [],
     status: artifact.semantic?.role === "result" ? "CONFIRMED" : "OPEN",
@@ -400,7 +400,7 @@ function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<Reason
   if (evidence) return {
     id: evidence.id,
     kind: evidence.kind === "reproduction" ? "reproduction" : "evidence",
-    name: evidence.name ?? evidence.summary,
+    name: displayText(evidence.name ?? evidence.summary, 160),
     summary: evidence.summary,
     tags: evidence.tags ?? [],
     status: evidence.refutes.length > 0 ? "CONTESTED" : "SUPPORTED",
@@ -413,7 +413,7 @@ function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<Reason
   if (fact) return {
     id: fact.id,
     kind: "claim",
-    name: fact.statement,
+    name: displayText(fact.statement, 160),
     summary: fact.statement,
     tags: [],
     status: fact.status === "CONFIRMED" ? "CONFIRMED" : fact.status === "REJECTED" ? "REFUTED" : "OPEN",
@@ -423,9 +423,9 @@ function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<Reason
     explainedBy: "curator",
   };
   const observation = snapshot.observations[nodeId];
-  if (observation) return { id: observation.id, kind: "observation", name: observation.summary, summary: observation.summary, tags: observation.candidateKinds, status: "OPEN", explanation: "由 Tool 输出直接提取的离散观察。", reference: { kind: "observation", id: observation.id }, generation: observation.source.generation, explainedBy: "harness" };
+  if (observation) return { id: observation.id, kind: "observation", name: displayText(observation.summary, 160), summary: observation.summary, tags: observation.candidateKinds, status: "OPEN", explanation: "由 Tool 输出直接提取的离散观察。", reference: { kind: "observation", id: observation.id }, generation: observation.source.generation, explainedBy: "harness" };
   const hypothesis = snapshot.hypotheses[nodeId];
-  if (hypothesis) return { id: hypothesis.id, kind: "hypothesis", name: hypothesis.statement, summary: hypothesis.statement, tags: [], status: hypothesis.status === "CONFIRMED" ? "CONFIRMED" : hypothesis.status === "REJECTED" ? "REFUTED" : "OPEN", explanation: "等待证据检验的推理方向。", reference: { kind: "hypothesis", id: hypothesis.id }, generation: snapshot.generation, explainedBy: "curator" };
+  if (hypothesis) return { id: hypothesis.id, kind: "hypothesis", name: displayText(hypothesis.statement, 160), summary: hypothesis.statement, tags: [], status: hypothesis.status === "CONFIRMED" ? "CONFIRMED" : hypothesis.status === "REJECTED" ? "REFUTED" : "OPEN", explanation: "等待证据检验的推理方向。", reference: { kind: "hypothesis", id: hypothesis.id }, generation: snapshot.generation, explainedBy: "curator" };
   const completion = snapshot.completions[nodeId];
   if (completion) return { id: completion.id, kind: "result", name: `结果 ${completion.id}`, summary: `候选哈希 ${completion.candidateHash}`, tags: ["result"], status: completion.status === "ACCEPTED" ? "CONFIRMED" : completion.status === "REJECTED" ? "REFUTED" : "OPEN", explanation: "由复现证据验证的最终结果候选。", reference: { kind: "completion", id: completion.id }, generation: snapshot.generation, explainedBy: "harness" };
   return undefined;
@@ -447,6 +447,12 @@ function semanticInput(input: {
     relatedIds: unique(input.relatedIds ?? input.fallback?.relatedIds ?? []).slice(0, 32),
     annotatedBy: "agent",
   };
+}
+
+function displayText(value: string, maxLength: number): string {
+  const normalized = value.trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(1, maxLength - 3))}...`;
 }
 
 function evidenceArtifactIds(evidence: Evidence): string[] {
