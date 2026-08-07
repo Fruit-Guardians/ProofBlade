@@ -78,6 +78,35 @@ npm run test:molecules
 
 适合由独立进程维护、具备自身生命周期和工具目录的服务。ProofBlade 只常驻服务器名称与一句描述；完整 Tool Schema 在模型明确查询服务器时加载。调用结果仍要进入 Effect Journal 和 Artifact，目标输出仍被标记为不可信观察。
 
+当 MCP Tool 本身还是一个分发器（例如 `agent_call_tool({ name, args })`）时，必须配置 `nestedToolPolicy`。ProofBlade 会在创建 Effect 前解析内层工具名，未知工具默认拒绝，并把内层的副作用、重放、敏感级别和资源键写入审计参数。Solver 与 Coding 的 `describe` 都会给出获准内层工具的策略摘要；`redactArguments` 指定的内层字段即使只有一个字符也只保存哈希，返回结果中的原值也会被清除。内层 sensitivity 为 `secret` 时，结果 Artifact 同样标为 `secret`。`describe` 始终使用 `manual` 重放策略，不继承 Server 的调用策略。
+
+```json
+{
+  "nestedToolPolicy": {
+    "dispatcherTool": "agent_call_tool",
+    "toolField": "name",
+    "argumentsField": "args",
+    "tools": {
+      "page_info": {
+        "readOnly": true,
+        "sideEffect": "none",
+        "replay": "manual",
+        "sensitivity": "target"
+      },
+      "page_eval": {
+        "readOnly": false,
+        "sideEffect": "network",
+        "replay": "forbidden-replay",
+        "sensitivity": "target",
+        "redactArguments": ["expression"]
+      }
+    }
+  }
+}
+```
+
+这是执行边界，不是解题编排器：模型仍通过 `agent_tools` 动态发现工具，并可自由决定调用顺序、组合方式和分析路线。仓库根目录的 `.mcp.example.json` 给出了 `frx-director-mcp 0.3.4 -> Firefox-Reverse` 的可审查示例；复制为 `.mcp.json` 前需修改安装路径和 `PROOFBLADE_FRX_WORKSPACE_ROOT`。
+
 ### 3.6 Skill
 
 适合工作方法、领域规则、操作步骤和配套脚本。主上下文只常驻 `name` 与 `description`；模型或宿主明确选择 Skill 后，才加载完整 `SKILL.md`。Skill 不承担 Effect、权限或审计职责。

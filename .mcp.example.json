@@ -1,0 +1,85 @@
+{
+  "mcpServers": {
+    "browser_reverse": {
+      "command": "node",
+      "args": [
+        "../frx-director-mcp/dist/index.js"
+      ],
+      "cwd": ".",
+      "description": "Firefox-Reverse browser and SpiderMonkey analysis through frx-director-mcp 0.3.4.",
+      "env": {
+        "FRX_WORKSPACE_ROOT": "${PROOFBLADE_FRX_WORKSPACE_ROOT}"
+      },
+      "includeTools": [
+        "frx_status",
+        "agent_start",
+        "agent_poll",
+        "agent_read_brief",
+        "agent_read",
+        "agent_send",
+        "agent_stop",
+        "agent_tools",
+        "agent_call_tool"
+      ],
+      "requestTimeoutMs": 120000,
+      "readOnly": false,
+      "sideEffect": "network",
+      "replay": "manual",
+      "sensitivity": "target",
+      "resourceKeys": [
+        "browser:firefox-reverse"
+      ],
+      "nestedToolPolicy": {
+        "dispatcherTool": "agent_call_tool",
+        "toolField": "name",
+        "argumentsField": "args",
+        "tools": {
+          "page_info": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "page_elements": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "page_screenshot": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "page_eval": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"], "redactArguments": ["expression"] },
+          "page_navigate": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"] },
+          "page_click": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"] },
+          "page_type": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "secret", "resourceKeys": ["browser:current-tab"], "redactArguments": ["text"] },
+          "page_scroll": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"] },
+          "code_search": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "find_param_entry": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "net_capture": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"] },
+          "net_list": { "readOnly": true, "sideEffect": "network", "replay": "manual", "sensitivity": "target" },
+          "net_get": { "readOnly": true, "sideEffect": "network", "replay": "manual", "sensitivity": "secret" },
+          "scripts_list": { "readOnly": true, "sideEffect": "network", "replay": "manual", "sensitivity": "target" },
+          "scripts_save": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "scripts_capture_all": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "jsvmp_trace": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:trace"] },
+          "jsvmp_query": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "jsvmp_status": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "public" },
+          "webapi_trace": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:trace"] },
+          "webapi_query": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "signer_trace": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:trace"] },
+          "closure_read": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:trace"] },
+          "hook_inject": { "readOnly": false, "sideEffect": "network", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:current-tab"], "redactArguments": ["script"] },
+          "whitebox_diff": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "resourceKeys": ["browser:trace"] },
+          "jsvmp_split_dispatcher": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "jsvmp_disassemble": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "wasm_probe": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target" },
+          "wasm_disasm": { "readOnly": false, "sideEffect": "process", "replay": "idempotent", "sensitivity": "target" },
+          "js_trace": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target" },
+          "crypto_scan": { "readOnly": true, "sideEffect": "process", "replay": "manual", "sensitivity": "target" },
+          "fs_list": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "fs_read": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "fs_write": { "readOnly": false, "sideEffect": "workspace", "replay": "forbidden-replay", "sensitivity": "target", "redactArguments": ["content"] },
+          "fs_mkdir": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "public" },
+          "fs_copy": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "run_node": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "redactArguments": ["code"] },
+          "run_python": { "readOnly": false, "sideEffect": "process", "replay": "forbidden-replay", "sensitivity": "target", "redactArguments": ["code"] },
+          "skill_get": { "readOnly": true, "sideEffect": "none", "replay": "pure", "sensitivity": "public" },
+          "notes_add": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "notes_get": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "remember": { "readOnly": false, "sideEffect": "workspace", "replay": "idempotent", "sensitivity": "target" },
+          "recall": { "readOnly": true, "sideEffect": "none", "replay": "manual", "sensitivity": "target" },
+          "cookies": { "readOnly": false, "sideEffect": "platform", "replay": "forbidden-replay", "sensitivity": "secret", "resourceKeys": ["browser:cookies"] }
+        }
+      }
+    }
+  }
+}

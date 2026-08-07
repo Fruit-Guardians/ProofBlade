@@ -162,6 +162,16 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
 
     await services.control.dispatch(runId, {
       type: "job_queued",
+      job: { id: "J-REDACTED", capabilityId: "proofblade.target", operation: "list", args: {}, argsRedacted: true, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
+      lane: "executor",
+    });
+    await runtime.recoverJobs();
+    const redacted = await runtime.jobStatus("J-REDACTED");
+    assert.equal(redacted.status, "UNKNOWN");
+    assert.match(redacted.error ?? "", /arguments were redacted/);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
       job: { id: "J-TERMINAL", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });

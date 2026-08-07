@@ -22,5 +22,18 @@ server.registerTool(
   { description: "Tool excluded by the project allowlist.", inputSchema: z.object({}) },
   async () => ({ content: [{ type: "text", text: "hidden" }] }),
 );
+server.registerTool(
+  "agent_tools",
+  { description: "List synthetic nested tools.", inputSchema: z.object({}), annotations: { readOnlyHint: true } },
+  async () => ({ content: [{ type: "text", text: JSON.stringify(["page_info", "page_eval", "run_node"]) }] }),
+);
+server.registerTool(
+  "agent_call_tool",
+  {
+    description: "Dispatch one synthetic nested tool.",
+    inputSchema: z.object({ name: z.string(), args: z.record(z.unknown()).optional() }),
+  },
+  async ({ name, args = {} }) => ({ content: [{ type: "text", text: JSON.stringify({ name, args }) }] }),
+);
 
 await server.connect(new StdioServerTransport());

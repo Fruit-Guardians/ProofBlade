@@ -35,14 +35,16 @@ export class BackgroundJobRunner {
   public async start(input: BackgroundJobStartInput): Promise<JobRecord> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) throw new Error(`Cannot start a background job for terminal run ${snapshot.status}`);
-    const operation = this.router.describe(input.capabilityId, input.operation);
+    const invocation = { capabilityId: input.capabilityId, operation: input.operation, input: input.input };
+    const persistence = this.router.preparePersistence(invocation);
     const timeoutMs = normalizeTimeout(input.timeoutMs);
     const job: Omit<JobRecord, "createdSeq"> = {
       id: id("J"),
       capabilityId: input.capabilityId,
       operation: input.operation,
-      args: structuredClone(input.input),
-      replayPolicy: operation.replay,
+      args: persistence.input,
+      argsRedacted: persistence.argsRedacted || undefined,
+      replayPolicy: persistence.operation.replay,
       status: "QUEUED",
       lane: input.lane ?? "executor",
       generation: snapshot.generation,
@@ -51,7 +53,7 @@ export class BackgroundJobRunner {
     await this.controlStore.dispatch(this.runId, { type: "job_queued", job, lane: job.lane });
     const created = (await this.controlStore.snapshot(this.runId)).jobs[job.id];
     if (!created) throw new Error(`Job was not persisted: ${job.id}`);
-    this.schedule(created);
+    this.schedule(created, structuredClone(input.input));
     return created;
   }
 
@@ -78,6 +80,11 @@ export class BackgroundJobRunner {
       if (job.status !== "QUEUED" && job.status !== "RUNNING") continue;
       if (isTerminalRun(snapshot.status)) {
         await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: `Run is already terminal (${snapshot.status}); background work was not resumed.`, lane: "executor" });
+        recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
+        continue;
+      }
+      if (job.argsRedacted) {
+        await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: "Process restarted after background arguments were redacted; original arguments are unavailable for replay.", lane: "executor" });
         recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
         continue;
       }
@@ -122,11 +129,11 @@ export class BackgroundJobRunner {
     await Promise.all([...this.active.values()].map((entry) => entry.promise.catch(() => undefined)));
   }
 
-  private schedule(job: JobRecord): void {
+  private schedule(job: JobRecord, executionInput?: Record<string, unknown>): void {
     if (this.active.has(job.id)) return;
     const controller = new AbortController();
     const entry = { controller, timedOut: false, timeout: undefined as ReturnType<typeof setTimeout> | undefined, promise: Promise.resolve() };
-    entry.promise = this.run(job, entry);
+    entry.promise = this.run(job, executionInput ?? job.args, entry);
     this.active.set(job.id, entry);
     entry.promise.finally(() => {
       if (entry.timeout) clearTimeout(entry.timeout);
@@ -134,13 +141,13 @@ export class BackgroundJobRunner {
     }).catch(() => undefined);
   }
 
-  private async run(job: JobRecord, entry: { controller: AbortController; timeout?: ReturnType<typeof setTimeout>; timedOut: boolean }): Promise<void> {
+  private async run(job: JobRecord, executionInput: Record<string, unknown>, entry: { controller: AbortController; timeout?: ReturnType<typeof setTimeout>; timedOut: boolean }): Promise<void> {
     try {
       const current = await this.poll(job.id);
       if (current.status === "CANCELLED") return;
       await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
       if (job.timeoutMs) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, job.timeoutMs);
-      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: job.args }, entry.controller.signal);
+      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput }, entry.controller.signal);
       const after = await this.poll(job.id);
       if (after.status === "CANCELLED") return;
       await this.controlStore.dispatch(this.runId, {

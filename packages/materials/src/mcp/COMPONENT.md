@@ -4,9 +4,9 @@
 {
   "id": "materials-mcp",
   "name": "MCP Registry",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T12:00:00+08:00"
 }
 ```
 
@@ -23,6 +23,10 @@
 ## 开发规则与验证
 
 默认延迟连接；环境变量和凭据不得进入事件、版本快照或 GUI 响应。Server/Tool 顺序与配置哈希必须确定。
+
+分发型 MCP Tool 必须用 `nestedToolPolicy` 对内层工具执行默认拒绝校验。Effect 创建前解析内层身份并采用它的 replay/sideEffect/sensitivity/resourceKeys；显式配置的脱敏字段不受启发式最短长度限制。Solver 与 Coding MCP 代理共用 `describeServer()` 返回允许的内层工具与策略；`describe` 固定使用 `manual` 重放策略。
+
+前台 Effect 与后台 Job 必须复用同一套 MCP 参数脱敏逻辑。后台 Job 的原始参数只能保留在当前进程内，不能进入事件日志或运行投影。
 
 ```powershell
 npm run test:materials
