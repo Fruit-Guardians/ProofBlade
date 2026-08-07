@@ -4,15 +4,15 @@
 {
   "id": "materials-observability",
   "name": "Runtime Observability",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-07T19:40:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "ea7d0b8a8bc0e66a7191e52864e2441a87e48e706307bfb0b4d64aa1907af4bb",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-07T19:40:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T19:40:00+08:00",
+    "sourceHash": "6825adeb0be6c2aada1b8d20c2427193e6e0deebe6cf34a3e720377e8525ca89",
     "result": "passed"
   }
 }

@@ -47,6 +47,27 @@ server.listen(port, host, () => {
   console.log(`Config: ${configPath}`);
 });
 
+let shutdownPromise: Promise<void> | undefined;
+const shutdown = (signal: string): Promise<void> => {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    try {
+      await data.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+      await vite.close();
+    } catch (error) {
+      process.exitCode = 1;
+      console.error(`ProofBlade GUI shutdown failed after ${signal}:`, error);
+    }
+  })();
+  return shutdownPromise;
+};
+
+process.once("SIGINT", () => { void shutdown("SIGINT"); });
+process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
+
 async function api(method: string, url: URL, request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse): Promise<void> {
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (method === "GET" && url.pathname === "/api/bootstrap") return sendJson(response, 200, data.bootstrap());

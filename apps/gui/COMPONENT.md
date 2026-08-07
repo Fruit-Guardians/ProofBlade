@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.3",
+  "version": "0.7.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T18:07:00+08:00",
+  "updatedAt": "2026-08-07T19:30:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-07T18:07:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T18:07:00+08:00",
-    "sourceHash": "e34e38890219523237a7a051bdd216267baa94121f1655c7ea505a4d786ee6ec",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-07T19:30:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T19:30:00+08:00",
+    "sourceHash": "70193a5e0506a2c56eafc12c193cf03468e15bd576c774ade6040b25ab06ba72",
     "result": "passed"
   }
 }
@@ -43,6 +43,7 @@
 - “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
+- GUI Shutdown 先拒绝新 Chat/Solve/Conversation，跟踪并等待全部运行 Promise；完成后调用 Sandbox `close()`。Lane Abort、运行任务和 Sandbox 关闭错误统一以 `AggregateError` 返回。
 
 ## 验证
 

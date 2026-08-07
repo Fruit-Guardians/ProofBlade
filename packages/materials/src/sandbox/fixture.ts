@@ -45,6 +45,7 @@ export interface SandboxPort {
   health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>;
   reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult>;
   destroy(fixture: FixtureRef): Promise<void>;
+  close(): Promise<void>;
 }
 
 export class LocalFixtureSandbox implements SandboxPort {
@@ -155,6 +156,10 @@ export class LocalFixtureSandbox implements SandboxPort {
 
   public async destroy(_fixture: FixtureRef): Promise<void> {
     // Local fixtures are retained for replay and inspection.
+  }
+
+  public async close(): Promise<void> {
+    // Local fixtures have no process resources; HTTP-backed sandboxes override this lifecycle hook.
   }
 
   private async executeNative(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult | undefined> {
