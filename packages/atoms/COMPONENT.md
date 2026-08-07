@@ -4,15 +4,15 @@
 {
   "id": "atoms",
   "name": "Atoms 原子层",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T19:40:00+08:00",
+  "updatedAt": "2026-08-07T20:10:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T19:40:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T19:40:00+08:00",
-    "sourceHash": "684f9d462aff998e5e1354692be141ae64ed1b4a03e506510c4c02bb01a80490",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
+    "sourceHash": "0e9076d0f255428ccbd5cb0258fad5e96a5dec27341754e4f4908f9229798768",
     "result": "passed"
   }
 }

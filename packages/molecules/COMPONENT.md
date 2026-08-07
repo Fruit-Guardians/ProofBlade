@@ -4,15 +4,15 @@
 {
   "id": "molecules",
   "name": "Molecules 分子层",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T19:40:00+08:00",
+  "updatedAt": "2026-08-07T20:10:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T19:40:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T19:40:00+08:00",
-    "sourceHash": "2edb20e7486087e5a7af202f1cd8c79f0331986bbd7b6826106111d381ec2151",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
+    "sourceHash": "a4df8d8f8228c11f1fa0c333907c139539f5c4a96e6b7e1037d440e281c34597",
     "result": "passed"
   }
 }

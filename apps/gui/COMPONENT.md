@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T19:30:00+08:00",
+  "updatedAt": "2026-08-07T20:10:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 4,
-    "securityAuditCount": 4,
-    "lastBugAuditAt": "2026-08-07T19:30:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T19:30:00+08:00",
-    "sourceHash": "70193a5e0506a2c56eafc12c193cf03468e15bd576c774ade6040b25ab06ba72",
+    "bugAuditCount": 5,
+    "securityAuditCount": 5,
+    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
+    "sourceHash": "9938325e43f821784f1fd09fae7727bf1b529919e38f0cbf34f39c657cadef8d",
     "result": "passed"
   }
 }

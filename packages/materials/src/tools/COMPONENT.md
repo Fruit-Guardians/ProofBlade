@@ -4,15 +4,15 @@
 {
   "id": "materials-tools",
   "name": "Tool Contracts and Runtime",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T19:40:00+08:00",
+  "updatedAt": "2026-08-07T20:10:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T19:40:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T19:40:00+08:00",
-    "sourceHash": "84ba3fed115d693031f0c3882e2d52cd3926ffa1b913f267a102b297eeae0df8",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
+    "sourceHash": "b8e8b4667076b26d78d4110104ad029acc5b8c7976dfc63c1ba8e5506a2877aa",
     "result": "passed"
   }
 }

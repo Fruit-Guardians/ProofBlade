@@ -10,7 +10,9 @@ export function componentSourceHash(root, registry, component) {
     .sort((left, right) => left.localeCompare(right));
   const hash = createHash("sha256");
   for (const file of files) {
-    const contentHash = createHash("sha256").update(readFileSync(join(root, file))).digest("hex");
+    const content = readFileSync(join(root, file));
+    const canonical = content.includes(0) ? content : Buffer.from(content.toString("utf8").replaceAll("\r\n", "\n"));
+    const contentHash = createHash("sha256").update(canonical).digest("hex");
     hash.update(`${file}\0${contentHash}\n`);
   }
   return hash.digest("hex");

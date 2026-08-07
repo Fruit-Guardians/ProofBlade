@@ -4,15 +4,15 @@
 {
   "id": "materials-skills",
   "name": "Skill Registry",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T19:40:00+08:00",
+  "updatedAt": "2026-08-07T20:10:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T19:40:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T19:40:00+08:00",
-    "sourceHash": "6d3991cc20c519ade69efbd61058e20616b872aeaa3da174491acb97cbb7c15e",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
+    "sourceHash": "27123936e75cdc2d6b8b03d219af016f8f59c1fcce283343fcd7de7383444538",
     "result": "passed"
   }
 }
