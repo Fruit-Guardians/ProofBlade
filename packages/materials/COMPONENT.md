@@ -4,9 +4,9 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T13:17:18+08:00"
+  "updatedAt": "2026-08-07T13:42:58+08:00"
 }
 ```
 
