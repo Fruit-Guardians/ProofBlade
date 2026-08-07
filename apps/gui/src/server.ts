@@ -7,6 +7,7 @@ import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
+import { closeGuiResources } from "./shutdown.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -52,11 +53,13 @@ const shutdown = (signal: string): Promise<void> => {
   if (shutdownPromise) return shutdownPromise;
   shutdownPromise = (async () => {
     try {
-      await data.close();
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => error ? reject(error) : resolve());
+      await closeGuiResources({
+        closeData: () => data.close(),
+        closeHttp: () => new Promise<void>((resolve, reject) => {
+          server.close((error) => error ? reject(error) : resolve());
+        }),
+        closeVite: () => vite.close(),
       });
-      await vite.close();
     } catch (error) {
       process.exitCode = 1;
       console.error(`ProofBlade GUI shutdown failed after ${signal}:`, error);

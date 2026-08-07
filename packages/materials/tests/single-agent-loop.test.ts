@@ -119,6 +119,79 @@ test("auto mode preserves a pause raised during a turn instead of exhausting the
   }
 });
 
+test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after-run-failure] aborting in Planner prevents a new model request and permits Sandbox cleanup", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-abort-after-planner-"));
+  const services = createServices(root, config);
+  const controller = new AbortController();
+  let prompts = 0;
+  let aborts = 0;
+  const originalDispatch = services.control.dispatch.bind(services.control);
+  services.control.dispatch = async (runId, command) => {
+    const events = await originalDispatch(runId, command);
+    if (command.type === "handoff_accepted") controller.abort();
+    return events;
+  };
+  const lane: SolverLaneFactory = async () => ({
+    async prompt() { prompts += 1; return { text: "unexpected", stopReason: "stop", usage: zeroUsage() }; },
+    async compact() {},
+    async abort() { aborts += 1; },
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "ABORT-PLANNER-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    await assert.rejects(
+      new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
+      /aborted/i,
+    );
+    assert.equal(prompts, 0);
+    assert.equal(aborts, 1);
+    assert.notEqual((await services.control.snapshot(runId)).status, "EXHAUSTED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:abort-before-verification] aborting after Prompt leaves the candidate unverified", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-abort-before-verification-"));
+  const services = createServices(root, config);
+  const controller = new AbortController();
+  let prompts = 0;
+  const lane: SolverLaneFactory = async ({ runtime }) => ({
+    async prompt() {
+      prompts += 1;
+      const inspected = await runtime.inspectTarget();
+      const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
+      assert.ok(candidate);
+      await runtime.submitCandidate(candidate);
+      controller.abort();
+      return { text: "candidate proposed", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "ABORT-VERIFY-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    await assert.rejects(
+      new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
+      /aborted/i,
+    );
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(prompts, 1);
+    assert.equal(Object.values(snapshot.completions)[0]?.status, "PROPOSED");
+    assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 0);
+    assert.notEqual(snapshot.status, "EXHAUSTED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("completion proposals must be grounded in a successful current-generation observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-grounding-"));
   try {
@@ -141,4 +214,8 @@ test("completion proposals must be grounded in a successful current-generation o
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function zeroUsage() {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 }

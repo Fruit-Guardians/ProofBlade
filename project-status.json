@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T19:55:00+08:00",
+  "updatedAt": "2026-08-07T20:17:19+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -264,6 +264,28 @@
       "validation": [
         "npm run test:ci-gates",
         "npm run check:change-contracts",
+        "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-004",
+      "occurredAt": "2026-08-07T20:17:19+08:00",
+      "summary": "修复 GUI 关闭故障路径、Solver 单次中止和模型调用边界竞态。",
+      "branch": "codex/gui-shutdown-v2",
+      "commit": "self",
+      "planIds": [
+        "PLAN-130"
+      ],
+      "changes": [
+        "服务清理失败时仍关闭 HTTP Server 和 Vite，并统一汇总关闭错误",
+        "Planner 返回、模型返回和验证入口重新检查 AbortSignal",
+        "Chat Lane 直接中止，Solver Lane 统一只通过对应 AbortController 中止",
+        "恢复未受影响组件审计台账，只对真实受影响组件递增一次"
+      ],
+      "validation": [
+        "GUI shutdown failure and Solver abort contract tests",
+        "npm run check:components -- --base e2d2164",
+        "npm run check:change-contracts -- --base e2d2164",
         "npm run verify"
       ]
     }

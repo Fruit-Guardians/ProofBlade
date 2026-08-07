@@ -77,7 +77,8 @@ export class SingleAgentCtfLoop {
     const planner = new PlannerCoordinator(this.services.control);
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
-      const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
+      throwIfAborted(options.signal);
+      const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, options.signal);
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
@@ -108,8 +109,10 @@ export class SingleAgentCtfLoop {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
         await planner.prepare(options.runId);
+        throwIfAborted(options.signal);
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        throwIfAborted(options.signal);
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
@@ -133,7 +136,8 @@ export class SingleAgentCtfLoop {
             await this.services.control.dispatch(options.runId, { type: "pause", reason: `Completion ${pending.id} is waiting for verifier approval.` });
             break;
           }
-          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id);
+          throwIfAborted(options.signal);
+          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, options.signal);
           if (verification.accepted) break;
           await this.moveTo(options.runId, "experiment");
           continue;
@@ -182,7 +186,8 @@ export class SingleAgentCtfLoop {
     });
   }
 
-  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string): Promise<VerificationOutcome> {
+  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, signal?: AbortSignal): Promise<VerificationOutcome> {
+    throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     if (Object.keys(snapshot.hypotheses).length === 0) {
       const completion = snapshot.completions[completionId]!;
@@ -192,7 +197,9 @@ export class SingleAgentCtfLoop {
         lane: "executor",
       });
     }
+    throwIfAborted(signal);
     await this.moveTo(runId, "verification");
+    throwIfAborted(signal);
     const verified = await verifier.verify(runId, fixture, completionId);
     if (!verified.accepted) return verified;
     await this.moveTo(runId, "report");

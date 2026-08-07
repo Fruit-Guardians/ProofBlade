@@ -1,15 +1,36 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T19:55:00+08:00
+> 状态更新时间：2026-08-07T20:17:19+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-004 | 2026-08-07T20:17:19+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-004
+
+时间：2026-08-07T20:17:19+08:00
+
+摘要：修复 GUI 关闭故障路径、Solver 单次中止和模型调用边界竞态。
+
+### 变更
+
+- 服务清理失败时仍关闭 HTTP Server 和 Vite，并统一汇总关闭错误
+- Planner 返回、模型返回和验证入口重新检查 AbortSignal
+- Chat Lane 直接中止，Solver Lane 统一只通过对应 AbortController 中止
+- 恢复未受影响组件审计台账，只对真实受影响组件递增一次
+
+### 验证
+
+- [x] GUI shutdown failure and Solver abort contract tests
+- [x] npm run check:components -- --base e2d2164
+- [x] npm run check:change-contracts -- --base e2d2164
+- [x] npm run verify
 
 ## UPDATE-20260807-003
 

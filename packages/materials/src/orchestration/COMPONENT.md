@@ -4,15 +4,15 @@
 {
   "id": "materials-orchestration",
   "name": "Agent Orchestration",
-  "version": "0.1.6",
+  "version": "0.1.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T20:10:00+08:00",
+  "updatedAt": "2026-08-07T20:17:19.5056968+08:00",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
-    "lastBugAuditAt": "2026-08-07T20:10:00+08:00",
-    "lastSecurityAuditAt": "2026-08-07T20:10:00+08:00",
-    "sourceHash": "d3475a168d9bb0e4a9767dfcc7d452f475fa38c2e3defbce35b18297eccd688c",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-07T20:17:19.5056968+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:17:19.5056968+08:00",
+    "sourceHash": "5ac13592eb2865a7dbe44af1193eb2e40dc6c7ce21e4a137260c7e88f72c342b",
     "result": "passed"
   }
 }
@@ -33,7 +33,7 @@
 plan-only、等待确认和验证边界 fail-closed。引入新模型角色前先证明成功率、成本和延迟收益，并保持交接契约可测试。
 
 - `SingleAgentCtfLoop` 在 lane 建成后通过 `onLaneReady` 暴露运行控制句柄；每轮模型调用前后都必须检查 durable `PAUSED` 状态。
-- `SingleAgentRunOptions.signal` 在恢复、建 Lane、`onLaneReady` 和每轮执行前 fail-closed，并将 Abort 传递给当前 Solver Lane；Lane 和 Runtime 关闭失败以 `AggregateError` 返回。
+- `SingleAgentRunOptions.signal` 在 Planner 返回、模型返回和验证入口 fail-closed，并通过同一个 Controller 将 Abort 传递给当前 Solver Lane。
 - 暂停不是终态或预算耗尽；Auto 模式不得把暂停中的运行改写成 `EXHAUSTED`。
 
 ```powershell

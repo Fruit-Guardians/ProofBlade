@@ -106,7 +106,9 @@ export class DebugDataService {
 
   private async shutdown(): Promise<void> {
     const aborts: Promise<unknown>[] = [];
-    for (const lane of this.activeLanes.values()) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
+    for (const [runId, lane] of this.activeLanes) {
+      if (!this.solveTasks.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
+    }
     for (const task of this.solveTasks.values()) task.controller.abort("GUI shutting down");
     const abortResults = await Promise.allSettled(aborts);
     const taskResults = await Promise.allSettled([
@@ -416,7 +418,9 @@ export class DebugDataService {
     await this.ensurePaused(runId, reason);
     const paused: ActiveRunInfo = { ...current, state: "paused" };
     this.active.set(runId, paused);
-    await this.activeLanes.get(runId)?.abort(reason);
+    const solveTask = this.solveTasks.get(runId);
+    if (solveTask) solveTask.controller.abort(reason);
+    else await this.activeLanes.get(runId)?.abort(reason);
     return paused;
   }
 
