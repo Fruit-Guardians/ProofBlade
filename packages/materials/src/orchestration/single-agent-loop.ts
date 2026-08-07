@@ -78,7 +78,14 @@ export class SingleAgentCtfLoop {
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
       throwIfAborted(options.signal);
-      const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, options.signal);
+      let verified: VerificationOutcome;
+      try {
+        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, options.signal);
+      } catch (error) {
+        const paused = await this.services.control.snapshot(options.runId);
+        if (paused.status === "PAUSED") return outcome(paused, mode, 0);
+        throw error;
+      }
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
@@ -159,6 +166,13 @@ export class SingleAgentCtfLoop {
           break;
         }
       }
+    } catch (error) {
+      const paused = await this.services.control.snapshot(options.runId);
+      if (paused.status === "PAUSED") {
+        snapshot = paused;
+        return outcome(snapshot, mode, turns, verification);
+      }
+      throw error;
     } finally {
       removeAbortListener?.();
       const results: PromiseSettledResult<void>[] = [];
@@ -200,9 +214,12 @@ export class SingleAgentCtfLoop {
     throwIfAborted(signal);
     await this.moveTo(runId, "verification");
     throwIfAborted(signal);
-    const verified = await verifier.verify(runId, fixture, completionId);
+    const verified = await verifier.verify(runId, fixture, completionId, signal);
+    await this.ensureVerifierActive(runId, signal);
     if (!verified.accepted) return verified;
+    await this.ensureVerifierActive(runId, signal);
     await this.moveTo(runId, "report");
+    await this.ensureVerifierActive(runId, signal);
     const report = [
       "# ProofBlade verification report",
       "",
@@ -219,8 +236,14 @@ export class SingleAgentCtfLoop {
     for (const intent of Object.values(current.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED")) {
       await this.services.control.dispatch(runId, { type: "intent", intent: { ...intent, status: "DONE" }, lane: "executor" });
     }
+    await this.ensureVerifierActive(runId, signal);
     await this.services.control.dispatch(runId, { type: "finish", verified: true, evidenceIds: verified.evidenceIds, reason: "Hidden scorer reproduced the candidate.", lane: "verifier" });
     return verified;
+  }
+
+  private async ensureVerifierActive(runId: string, signal?: AbortSignal): Promise<void> {
+    throwIfAborted(signal);
+    if ((await this.services.control.snapshot(runId)).status === "PAUSED") throw new Error("Run paused during verification");
   }
 
   private async moveTo(runId: string, phase: RunSnapshot["phase"]): Promise<void> {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T20:17:19+08:00",
+  "updatedAt": "2026-08-07T22:17:05.6261580+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -287,6 +287,27 @@
         "npm run check:components -- --base e2d2164",
         "npm run check:change-contracts -- --base e2d2164",
         "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-005",
+      "occurredAt": "2026-08-07T22:17:05.6261580+08:00",
+      "summary": "修复 Verifier 执行期间暂停后仍完成成功的问题。",
+      "branch": "codex/gui-shutdown-v2",
+      "commit": "self",
+      "planIds": [
+        "PLAN-130"
+      ],
+      "changes": [
+        "Verifier 将 AbortSignal 传递到每次 fixture_score Effect，并在 Effect 和结果提交边界检查运行状态",
+        "验证返回、report 和 finish 前增加 fail-closed 检查，暂停运行保持 PAUSED",
+        "phase_started 事件不再隐式恢复 PAUSED，新增暂停阶段转换回归测试"
+      ],
+      "validation": [
+        "contract:pause-during-verifier",
+        "phase transitions do not implicitly resume a paused run",
+        "npm run typecheck --workspace=@proofblade/gui",
+        "npm run typecheck --workspace=@proofblade/materials"
       ]
     }
   ],

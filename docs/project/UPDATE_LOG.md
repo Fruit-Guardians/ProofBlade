@@ -1,16 +1,36 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T20:17:19+08:00
+> 状态更新时间：2026-08-07T22:17:05.6261580+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-004 | 2026-08-07T20:17:19+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-005
+
+时间：2026-08-07T22:17:05.6261580+08:00
+
+摘要：修复 Verifier 执行期间暂停后仍完成成功的问题。
+
+### 变更
+
+- Verifier 将 AbortSignal 传递到每次 fixture_score Effect，并在 Effect 和结果提交边界检查运行状态
+- 验证返回、report 和 finish 前增加 fail-closed 检查，暂停运行保持 PAUSED
+- phase_started 事件不再隐式恢复 PAUSED，新增暂停阶段转换回归测试
+
+### 验证
+
+- [x] contract:pause-during-verifier
+- [x] phase transitions do not implicitly resume a paused run
+- [x] npm run typecheck --workspace=@proofblade/gui
+- [x] npm run typecheck --workspace=@proofblade/materials
 
 ## UPDATE-20260807-004
 

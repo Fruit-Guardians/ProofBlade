@@ -192,6 +192,43 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
   }
 });
 
+test("[contract:pause-during-verifier] pause during verifier remains PAUSED instead of completing successfully", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-pause-during-verifier-"));
+  const services = createServices(root, config);
+  const originalExecute = services.journal.execute.bind(services.journal);
+  let pauseDuringScore = true;
+  services.journal.execute = async (runId, input, signal) => {
+    const result = await originalExecute(runId, input, signal);
+    if (pauseDuringScore && input.operation === "fixture_score") {
+      pauseDuringScore = false;
+      await services.control.dispatch(runId, { type: "pause", reason: "paused during verifier", lane: "verifier" });
+    }
+    return result;
+  };
+  const lane: SolverLaneFactory = async ({ runtime }) => ({
+    async prompt() {
+      const inspected = await runtime.inspectTarget();
+      const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
+      assert.ok(candidate);
+      await runtime.submitCandidate(candidate);
+      return { text: "candidate proposed", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "PAUSE-VERIFIER-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task: fixtureTask(runId, "web-source-1", root, config), mode: "auto", maxTurns: 1 });
+    assert.equal(result.status, "PAUSED");
+    assert.equal((await services.control.snapshot(runId)).status, "PAUSED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("completion proposals must be grounded in a successful current-generation observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-grounding-"));
   try {

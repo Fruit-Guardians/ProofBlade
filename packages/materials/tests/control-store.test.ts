@@ -95,3 +95,20 @@ test("control store replay is deterministic and verifier gated", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("phase transitions do not implicitly resume a paused run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-paused-phase-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "PAUSED-PHASE-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    await control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
+    await control.dispatch(runId, { type: "pause", reason: "test pause" });
+    await control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
+    assert.equal((await control.snapshot(runId)).status, "PAUSED");
+    await control.dispatch(runId, { type: "resume" });
+    assert.equal((await control.snapshot(runId)).status, "RUNNING");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

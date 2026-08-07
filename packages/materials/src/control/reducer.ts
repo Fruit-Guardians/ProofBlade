@@ -49,8 +49,10 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     case "phase_started":
       next.phase = p.phase as RunSnapshot["phase"];
-      if (next.phase === "verification") next.status = "VERIFYING";
-      else if (next.status === "READY" || next.status === "PAUSED" || next.status === "VERIFYING") next.status = "RUNNING";
+      if (next.status !== "PAUSED") {
+        if (next.phase === "verification") next.status = "VERIFYING";
+        else if (next.status === "READY" || next.status === "VERIFYING") next.status = "RUNNING";
+      }
       break;
     case "phase_finished":
       if (p.phase) next.phase = p.phase as RunSnapshot["phase"];
