@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T23:08:26.1335151+08:00
+> 状态更新时间：2026-08-08T02:47:55.5788475+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260808-001 | 2026-08-08T02:47:55.5788475+08:00 | PLAN-120 | codex/context-length-recovery | 本条记录所在提交 |
 | UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-006 | 2026-08-07T22:44:53.9883278+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
@@ -14,6 +15,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260808-001
+
+时间：2026-08-08T02:47:55.5788475+08:00
+
+摘要：修复长工具回合压缩无效和 length 空回复，建立有界上下文恢复。
+
+### 变更
+
+- 按模型窗口扣除输出、System/Tool 和 Provider 安全预算，不硬编码全局 16K 上限
+- prune 阶段将消息降到恢复目标，并对 Pi retainedTail 执行二次有界裁剪
+- Coding length 自动压缩续跑最多两次，Solver length 进入既有上下文恢复状态机
+- GUI 隐藏内部续跑提示，原始调试轨迹和恢复计数保持可审计
+
+### 验证
+
+- [x] 104/104 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component documentation check passed: 25 components, 5 affected
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260807-007
 

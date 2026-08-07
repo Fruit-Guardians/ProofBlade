@@ -48,7 +48,7 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
   const messageBudget = Math.max(256, Math.floor(input.messageBudget ?? Math.max(256, input.availableTokens - baseTokens)));
   const snipped = pruneAgentMessages(repaired.messages, messageBudget, { mode: "snip" });
   const snipPlan = planContextMaintenance(baseTokens + snipped.estimatedTokens, input.availableTokens);
-  const mustEmergencyPrune = snipPlan.forceCompact || snipped.estimatedTokens > messageBudget;
+  const mustEmergencyPrune = plan.shouldPrune && snipped.estimatedTokens > messageBudget;
   const pruned = mustEmergencyPrune
     ? pruneAgentMessages(snipped.messages, messageBudget, { mode: "emergency" satisfies AgentContextPruneMode })
     : snipped;

@@ -110,6 +110,31 @@ test("context maintenance preserves error outputs without later prefix rewrites"
   assert.doesNotMatch(JSON.stringify(prepared.messages), /archived large output/);
 });
 
+test("context maintenance prunes an oversized transcript to its recovery target", () => {
+  const messages = Array.from({ length: 8 }, (_, index) => [
+    { role: "assistant", content: [{ type: "toolCall", id: `call-${index}`, name: "bash", arguments: { command: `step-${index}` } }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 },
+    { role: "toolResult", toolCallId: `call-${index}`, toolName: "bash", content: [{ type: "text", text: `result-${index} ` + "x".repeat(1_200) }], isError: false, timestamp: index * 2 + 1 },
+  ]).flat() as never[];
+  const prepared = prepareContextMaintenance({ messages, availableTokens: 3_000, messageBudget: 1_500 });
+  assert.equal(prepared.plan.shouldPrune, true);
+  assert.ok(prepared.estimatedTokens <= 1_500);
+  assert.ok(prepared.dropped.some((item) => item.kind === "tool_exchange" || item.kind === "message"));
+  assert.match(JSON.stringify(prepared.messages), /call-7/);
+});
+
+test("context maintenance keeps pruning after snipping drops below the prune threshold", () => {
+  const messages = Array.from({ length: 8 }, (_, index) => [
+    { role: "assistant", content: [{ type: "toolCall", id: `call-${index}`, name: "bash", arguments: { command: `step-${index}` } }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 },
+    { role: "toolResult", toolCallId: `call-${index}`, toolName: "bash", content: [{ type: "text", text: `result-${index} ` + "x".repeat(900) }], isError: false, timestamp: index * 2 + 1 },
+  ]).flat() as never[];
+  const availableTokens = 2_600;
+  const messageBudget = 1_300;
+  const prepared = prepareContextMaintenance({ messages, availableTokens, messageBudget });
+  assert.equal(prepared.plan.shouldPrune, true);
+  assert.ok(prepared.estimatedTokens <= messageBudget);
+  assert.match(JSON.stringify(prepared.messages), /call-7/);
+});
+
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 }

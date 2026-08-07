@@ -28,6 +28,7 @@ export * from "./runtime/pi-adapter.js";
 export * from "./runtime/provider-transport.js";
 export * from "./runtime/coding-resources.js";
 export * from "./runtime/coding-lane.js";
+export * from "./runtime/context-length-recovery.js";
 export * from "./runtime/solver-tools.js";
 export * from "./runtime/solver-lane.js";
 export * from "./runtime/version.js";

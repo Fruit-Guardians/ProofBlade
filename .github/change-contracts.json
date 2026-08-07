@@ -64,6 +64,23 @@
         "contract:single-audit-increment",
         "contract:cross-platform-source-hash"
       ]
+    },
+    {
+      "id": "context-length-recovery",
+      "triggers": [
+        { "path": "packages/materials/src/runtime/context-length-recovery.ts" },
+        { "path": "packages/materials/src/runtime/coding-lane.ts", "patterns": ["promptWithContextLengthRecovery", "session_before_compact"] },
+        { "path": "packages/materials/src/context/durable-compaction.ts", "patterns": ["maxContextTokens", "retainedTail"] },
+        { "path": "packages/materials/src/orchestration/single-agent-loop.ts", "patterns": ["stopReason === \"length\""] },
+        { "path": "apps/gui/src/debug-data.ts", "patterns": ["AUTOMATIC_CONTEXT_RECOVERY_MARKER"] }
+      ],
+      "testPaths": ["packages/materials/tests/", "apps/gui/tests/"],
+      "scenarios": [
+        "contract:coding-length-auto-recovery",
+        "contract:bounded-compaction-tail",
+        "contract:solver-length-context-recovery",
+        "contract:hidden-context-recovery-turn"
+      ]
     }
   ]
 }
