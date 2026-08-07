@@ -14,6 +14,8 @@ import type { PrimaryFailureCategory } from "../domain/types.js";
 export const BASELINE_PROTOCOL_VERSION = "baseline-v1";
 export const BASELINE_REQUIRED_ATTEMPTS = 3;
 
+export type EvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
+
 export interface FixtureEvaluationOptions {
   attempts?: number;
   maxTurns?: number;
@@ -44,7 +46,7 @@ export interface FixtureEvaluationCase {
   confirmedFacts: number;
   evidenceLinkedFacts: number;
   factEvidenceCoverage: number;
-  failureCategory?: PrimaryFailureCategory;
+  failureCategory?: EvaluationFailureCategory;
   error?: string;
 }
 
@@ -53,6 +55,7 @@ export interface FixtureEvaluationSummary {
   protocolVersion: typeof BASELINE_PROTOCOL_VERSION;
   runPrefix: string;
   fixtureIds: string[];
+  budget: { maxTurns: number };
   attempts: number;
   total: number;
   successCount: number;
@@ -76,7 +79,7 @@ export interface FixtureEvaluationSummary {
     evidenceLinkedFacts: number;
     factEvidenceCoverage: number;
   };
-  failureCategories: Partial<Record<PrimaryFailureCategory, number>>;
+  failureCategories: Partial<Record<EvaluationFailureCategory, number>>;
   gate: {
     passed: boolean;
     checks: Array<{ id: string; passed: boolean; actual: number | string; expected: number | string }>;
@@ -86,14 +89,18 @@ export interface FixtureEvaluationSummary {
 }
 
 export class FixtureEvaluationRunner {
-  public constructor(private readonly root: string, private readonly config: ProofBladeConfig) {}
+  public constructor(
+    private readonly root: string,
+    private readonly config: ProofBladeConfig,
+    private readonly createLane: SolverLaneFactory = deterministicLane,
+  ) {}
 
   public async run(options: FixtureEvaluationOptions = {}): Promise<FixtureEvaluationSummary> {
     const attempts = normalizePositive(options.attempts ?? BASELINE_REQUIRED_ATTEMPTS, "attempts");
     const maxTurns = normalizePositive(options.maxTurns ?? 1, "maxTurns");
     const runPrefix = options.runPrefix ?? `EVAL-${Date.now()}`;
-    const requiredFixtureIds = listFixtureProfiles().map((profile) => profile.id);
-    const requested = [...new Set(options.fixtureIds ?? requiredFixtureIds)];
+    const requiredFixtureIds = listFixtureProfiles().map((profile) => profile.id).sort();
+    const requested = [...new Set(options.fixtureIds ?? requiredFixtureIds)].sort();
     const profiles = requested.map((fixtureId) => listFixtureProfiles().find((profile) => profile.id === fixtureId) ?? (() => { throw new Error(`Unknown fixture profile: ${fixtureId}`); })());
     const services = createServices(this.root, this.config);
     const cases: FixtureEvaluationCase[] = [];
@@ -123,6 +130,7 @@ export class FixtureEvaluationRunner {
       protocolVersion: BASELINE_PROTOCOL_VERSION,
       runPrefix,
       fixtureIds: requested,
+      budget: { maxTurns },
       attempts,
       total,
       successCount,
@@ -148,7 +156,7 @@ export class FixtureEvaluationRunner {
     let turns = 0;
     let error: string | undefined;
     try {
-      const outcome = await new SingleAgentCtfLoop(this.root, this.config, services, deterministicLane).run({ runId, task, mode: "auto", maxTurns });
+      const outcome = await new SingleAgentCtfLoop(this.root, this.config, services, this.createLane).run({ runId, task, mode: "auto", maxTurns });
       status = outcome.status;
       phase = outcome.phase;
       turns = outcome.turns;
@@ -170,7 +178,7 @@ export class FixtureEvaluationRunner {
     let confirmedFacts = 0;
     let evidenceLinkedFacts = 0;
     let factEvidenceCoverage = 0;
-    let failureCategory: PrimaryFailureCategory | undefined;
+    let failureCategory: EvaluationFailureCategory | undefined;
     try {
       const snapshot = await services.control.snapshot(runId);
       const replayed = await services.control.replay(runId);
@@ -201,7 +209,7 @@ export class FixtureEvaluationRunner {
       error = error ?? String(caught);
     }
     const success = status === "SUCCEEDED" && phase === "report" && evidenceBacked && replayParity && !candidateLeaked && !error;
-    if (!success && !failureCategory && error) failureCategory = "permission_or_environment";
+    if (!success && !failureCategory) failureCategory = "unclassified";
     return {
       fixtureId,
       runId,
@@ -302,6 +310,7 @@ function stableReportHash(summary: Omit<FixtureEvaluationSummary, "reportHash">)
     schemaVersion: summary.schemaVersion,
     protocolVersion: summary.protocolVersion,
     fixtureIds: summary.fixtureIds,
+    budget: summary.budget,
     attempts: summary.attempts,
     total: summary.total,
     successCount: summary.successCount,
@@ -325,10 +334,10 @@ function stableReportHash(summary: Omit<FixtureEvaluationSummary, "reportHash">)
   }));
 }
 
-function orderedCounts(values: PrimaryFailureCategory[]): Partial<Record<PrimaryFailureCategory, number>> {
-  const counts: Partial<Record<PrimaryFailureCategory, number>> = {};
+function orderedCounts(values: EvaluationFailureCategory[]): Partial<Record<EvaluationFailureCategory, number>> {
+  const counts: Partial<Record<EvaluationFailureCategory, number>> = {};
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
-  return Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))) as Partial<Record<PrimaryFailureCategory, number>>;
+  return Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))) as Partial<Record<EvaluationFailureCategory, number>>;
 }
 
 function sum(values: number[]): number {
