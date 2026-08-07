@@ -14,7 +14,13 @@ The capability/job suite checks that manifest and core solver-tool hashes are st
 
 The handoff suite checks planner/executor lane gates, knowledge-version invalidation, deterministic supersession, context handoff indexing and replay parity. The workflow suite also prepares an accepted handoff before each executor turn without adding a second model request.
 
-The evaluation runner uses the same deterministic lane across all six fixtures. A case passes only when it reaches verifier-gated `SUCCEEDED/report`, has the required reproduction evidence, matches the replayed projection hash, and keeps the expected candidate out of the event log. The JSON report includes per-case timing and a `reportHash` for CI or pre-push comparison.
+The evaluation runner uses the same deterministic lane across all six fixtures. Baseline protocol `baseline-v2` runs every fixture three times by default. A case passes only when it reaches verifier-gated `SUCCEEDED/report`, has the required reproduction evidence, matches the replayed projection hash, and keeps the expected candidate out of the event log.
+
+Schema version 3 includes aggregate duration (total/average/p95), Provider requests, tokens, cost per solve, Effect counts, evidence-producing action ratio, time to first evidence, confirmed-Fact evidence coverage and primary failure-category counts. It also records a canonical snapshot of the selected Fixture Catalog: target kind, description hash, expected-value hash and path-sorted input-file hashes. The Catalog snapshot exposes no expected plaintext. The deterministic lane does not emit Pi Tool calls, so its effective action ratio is derived from Effects referenced by Evidence. Provider-backed evaluation can retain the same report fields while supplying real token and cost values.
+
+The machine-readable gate requires at least three attempts, exact coverage of all six fixture profiles, 100% success, evidence-backed success, replay parity and confirmed-Fact evidence coverage, plus zero candidate leaks. Fixture ids are deduplicated and sorted before execution so equivalent sets produce the same case order. The report records the per-case turn budget and canonical Fixture Catalog hash and includes both in the stable hash. The hash excludes run ids, wall-clock timing and raw error text so equivalent runs can be compared across machines while different budgets or Fixture contents remain distinguishable. It retains behavioral counters, gate results and stable per-case outcomes. Failures that have no Control/Telemetry classification are reported as `unclassified`; they are not inferred to be permission or environment failures.
+
+`proofblade eval` prints a report even when the gate fails, which permits intentional fixture subsets during development. `proofblade eval --enforce-gate` also exits nonzero on a failed gate. The root `npm run verify` command uses enforcement and is the merge-time baseline check.
 
 Each run also carries a hashed Prompt/Tool/Skill/MCP/Runtime version snapshot. Provider-backed runs append per-request usage and latency events, while Tool and Effect events retain timing, byte counts, error signatures and evidence contribution without raw arguments. `proofblade cost RUN` produces a deterministic telemetry report with cost/cache totals, p95 Provider latency, effective action ratio, time to first evidence and one primary terminal failure category.
 
@@ -27,6 +33,7 @@ proofblade cost DEMO-001
 proofblade ledger DEMO-001
 proofblade fixtures
 npm run eval
+npm run eval -- --enforce-gate
 proofblade solve web-source-1 --run-id WEB-001 --mode auto --max-turns 2
 proofblade checkpoint WEB-001 manual
 proofblade compact WEB-001 manual
