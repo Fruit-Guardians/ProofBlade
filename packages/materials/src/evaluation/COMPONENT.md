@@ -4,9 +4,9 @@
 {
   "id": "materials-evaluation",
   "name": "Fixture Evaluation",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T15:00:00+08:00"
+  "updatedAt": "2026-08-07T15:30:00+08:00"
 }
 ```
 
@@ -21,6 +21,7 @@
 - `baseline-v3` 和报告 Schema 4 要求六题完整覆盖、至少三次尝试、全成功、全证据绑定、全重放一致、全事实证据覆盖且无候选泄漏。
 - 评测报告是发布门槛，不是 Control Store 的业务权威；Fixture 集合先规范排序，目标类型、描述、expected、输入文件和规范化 HTTP 路由形成不含明文答案的 Catalog 哈希。HTTP Header 值和响应 Body 只记录哈希。Catalog 和执行预算进入稳定哈希，运行 ID、墙钟耗时和原始错误不进入稳定哈希。
 - 未被 Control/Telemetry 识别的异常记录为 `unclassified`，不得推断成权限或环境错误。
+- 评测批次无论成功或异常都调用 Sandbox 全量关闭，不能跨批次保留 HTTP 监听端口。
 
 ## 开发规则与验证
 

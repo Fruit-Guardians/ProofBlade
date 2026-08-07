@@ -68,25 +68,27 @@ export class SingleAgentCtfLoop {
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-    await runtime.recoverJobs();
-    const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
-    const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
-    const planner = new PlannerCoordinator(this.services.control);
-    const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
-    if (pendingAtStart) {
-      const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
-      return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
-    }
-    const lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+    let lane: AgentLanePort | undefined;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     try {
+      await runtime.recoverJobs();
+      const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
+      const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
+      const planner = new PlannerCoordinator(this.services.control);
+      const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
+      if (pendingAtStart) {
+        const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
+        return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
+      }
+      const activeLane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+      lane = activeLane;
       while (turns < maxTurns) {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status)) break;
         await planner.prepare(options.runId);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        const agentOutcome = await activeLane.prompt(turnPrompt(before, turns));
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
@@ -96,7 +98,7 @@ export class SingleAgentCtfLoop {
           const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");
           await this.services.control.dispatch(options.runId, { type: "context_recovery", checkpointId: checkpoint.checkpointId });
           try {
-            await lane.compact("Use the ProofBlade mechanical checkpoint and retain the latest complete tool exchange.");
+            await activeLane.compact("Use the ProofBlade mechanical checkpoint and retain the latest complete tool exchange.");
           } catch {
             // The durable checkpoint remains the recovery source when Pi compaction cannot run.
           }
@@ -121,7 +123,7 @@ export class SingleAgentCtfLoop {
         if (agentOutcome.usage.input >= Math.floor(this.config.modelProfiles.executor.contextWindow * 0.78)) {
           await checkpoints.create(options.runId, "context-budget-threshold");
           try {
-            await lane.compact("Preserve the task, ledger ids, rejected hypotheses, open effects, leases, and latest complete tool exchange.");
+            await activeLane.compact("Preserve the task, ledger ids, rejected hypotheses, open effects, leases, and latest complete tool exchange.");
           } catch {
             // The checkpoint is sufficient for deterministic recovery.
           }
@@ -131,16 +133,21 @@ export class SingleAgentCtfLoop {
           break;
         }
       }
-    } finally {
-      await lane.close();
-      await runtime.close();
-    }
-    snapshot = await this.services.control.snapshot(options.runId);
-    if (mode === "auto" && !isTerminal(snapshot.status) && turns >= maxTurns) {
-      await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
       snapshot = await this.services.control.snapshot(options.runId);
+      if (mode === "auto" && !isTerminal(snapshot.status) && turns >= maxTurns) {
+        await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
+        snapshot = await this.services.control.snapshot(options.runId);
+      }
+      return outcome(snapshot, mode, turns, verification);
+    } finally {
+      const closed: PromiseSettledResult<void>[] = [];
+      if (lane) closed.push(...await Promise.allSettled([lane.close()]));
+      closed.push(...await Promise.allSettled([runtime.close()]));
+      const finalSnapshot = await this.services.control.snapshot(options.runId);
+      if (isTerminal(finalSnapshot.status)) await this.services.sandbox.destroy(fixture);
+      const failures = closed.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+      if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more run resources");
     }
-    return outcome(snapshot, mode, turns, verification);
   }
 
   private async ensureIntent(runId: string): Promise<void> {

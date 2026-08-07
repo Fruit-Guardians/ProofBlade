@@ -36,7 +36,8 @@ async function main(): Promise<void> {
   const [command = "help", arg, ...rest] = args;
   const config = await loadConfig(root, configPath);
   const services = createServices(root, config);
-  switch (command) {
+  try {
+    switch (command) {
     case "init": {
       const runId = required(arg, "task id");
       const snapshot = await services.control.createRun(runId, demoTask(runId, root, config));
@@ -281,8 +282,11 @@ async function main(): Promise<void> {
     case "-h":
       console.log(helpText());
       break;
-    default:
-      throw new Error(`Unknown command: ${command}\n\n${helpText()}`);
+      default:
+        throw new Error(`Unknown command: ${command}\n\n${helpText()}`);
+    }
+  } finally {
+    await services.sandbox.close();
   }
 }
 

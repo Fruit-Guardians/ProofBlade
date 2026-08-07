@@ -58,8 +58,10 @@ test("auto mode solves all three web and three reverse fixtures through the veri
     const services = createServices(root, config);
     for (const profile of listFixtureProfiles()) {
       const runId = `AUTO-${profile.id}`;
+      const task = fixtureTask(runId, profile.id, root, config);
+      const preparedFixture = profile.http ? await services.sandbox.build(task) : undefined;
       const loop = new SingleAgentCtfLoop(root, config, services, deterministicLane);
-      const result = await loop.run({ runId, task: fixtureTask(runId, profile.id, root, config), mode: "auto", maxTurns: 1 });
+      const result = await loop.run({ runId, task, mode: "auto", maxTurns: 1 });
       assert.equal(result.status, "SUCCEEDED", profile.id);
       assert.equal(result.phase, "report", profile.id);
       const snapshot = await services.control.snapshot(runId);
@@ -69,6 +71,7 @@ test("auto mode solves all three web and three reverse fixtures through the veri
       assert.ok(Object.values(snapshot.artifacts).some((item) => item.path.endsWith("report.md")), profile.id);
       const events = await readFile(join(root, "runs", runId, "events.jsonl"), "utf8");
       assert.doesNotMatch(events, new RegExp(escapeRegExp(profile.expected)), `${profile.id} leaked its candidate into the event log`);
+      if (preparedFixture?.endpoint) await assert.rejects(fetch(`${preparedFixture.endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) }), `${profile.id} retained its HTTP service after reaching a terminal state`);
     }
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -82,13 +85,17 @@ test("assist mode pauses before verification and resumes from the durable propos
     const runId = "ASSIST-web-source-1";
     const loop = new SingleAgentCtfLoop(root, config, services, deterministicLane);
     const task = fixtureTask(runId, "web-source-1", root, config);
+    const fixture = await services.sandbox.build(task);
+    assert.ok(fixture.endpoint);
     const first = await loop.run({ runId, task, mode: "assist", maxTurns: 1 });
     assert.equal(first.status, "PAUSED");
     assert.equal(Object.values((await services.control.snapshot(runId)).completions)[0]?.status, "PROPOSED");
+    assert.equal((await fetch(`${fixture.endpoint}/.proofblade/health`)).status, 200);
     const resumed = await loop.run({ runId, task, mode: "assist", maxTurns: 1 });
     assert.equal(resumed.status, "SUCCEEDED");
     assert.equal(resumed.turns, 0);
     assert.equal(Object.values((await services.control.snapshot(runId)).completions)[0]?.status, "ACCEPTED");
+    await assert.rejects(fetch(`${fixture.endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) }));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -126,50 +126,54 @@ export class FixtureEvaluationRunner {
     const profiles = requested.map((fixtureId) => listFixtureProfiles().find((profile) => profile.id === fixtureId) ?? (() => { throw new Error(`Unknown fixture profile: ${fixtureId}`); })());
     const fixtureCatalog = catalogSnapshot(profiles);
     const services = createServices(this.root, this.config);
-    const cases: FixtureEvaluationCase[] = [];
-    for (const profile of profiles) {
-      for (let attempt = 1; attempt <= attempts; attempt += 1) {
-        cases.push(await this.runCase(services, profile.id, attempt, `${runPrefix}-${profile.id}-a${attempt}`, maxTurns));
+    try {
+      const cases: FixtureEvaluationCase[] = [];
+      for (const profile of profiles) {
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+          cases.push(await this.runCase(services, profile.id, attempt, `${runPrefix}-${profile.id}-a${attempt}`, maxTurns));
+        }
       }
+      const total = cases.length;
+      const successCount = cases.filter((item) => item.success).length;
+      const evidenceBackedCount = cases.filter((item) => item.evidenceBacked).length;
+      const replayParityCount = cases.filter((item) => item.replayParity).length;
+      const candidateLeakCount = cases.filter((item) => item.candidateLeaked).length;
+      const metrics = aggregateMetrics(cases, successCount);
+      const failureCategories = orderedCounts(cases.flatMap((item) => item.failureCategory ? [item.failureCategory] : []));
+      const checks = [
+        check("minimum_attempts", attempts >= BASELINE_REQUIRED_ATTEMPTS, attempts, `>=${BASELINE_REQUIRED_ATTEMPTS}`),
+        check("fixture_coverage", sameValues(requested, requiredFixtureIds), requested.join(","), requiredFixtureIds.join(",")),
+        check("success_rate", successCount === total, rate(successCount, total), 1),
+        check("evidence_backed_rate", evidenceBackedCount === total, rate(evidenceBackedCount, total), 1),
+        check("replay_parity_rate", replayParityCount === total, rate(replayParityCount, total), 1),
+        check("candidate_leaks", candidateLeakCount === 0, candidateLeakCount, 0),
+        check("fact_evidence_coverage", metrics.factEvidenceCoverage === 1, metrics.factEvidenceCoverage, 1),
+      ];
+      const summaryBase: Omit<FixtureEvaluationSummary, "reportHash"> = {
+        schemaVersion: 4 as const,
+        protocolVersion: BASELINE_PROTOCOL_VERSION,
+        runPrefix,
+        fixtureIds: requested,
+        fixtureCatalog,
+        budget: { maxTurns },
+        attempts,
+        total,
+        successCount,
+        successRate: rate(successCount, total),
+        evidenceBackedCount,
+        evidenceBackedRate: rate(evidenceBackedCount, total),
+        replayParityCount,
+        replayParityRate: rate(replayParityCount, total),
+        candidateLeakCount,
+        metrics,
+        failureCategories,
+        gate: { passed: checks.every((item) => item.passed), checks },
+        cases,
+      };
+      return { ...summaryBase, reportHash: stableReportHash(summaryBase) };
+    } finally {
+      await services.sandbox.close();
     }
-    const total = cases.length;
-    const successCount = cases.filter((item) => item.success).length;
-    const evidenceBackedCount = cases.filter((item) => item.evidenceBacked).length;
-    const replayParityCount = cases.filter((item) => item.replayParity).length;
-    const candidateLeakCount = cases.filter((item) => item.candidateLeaked).length;
-    const metrics = aggregateMetrics(cases, successCount);
-    const failureCategories = orderedCounts(cases.flatMap((item) => item.failureCategory ? [item.failureCategory] : []));
-    const checks = [
-      check("minimum_attempts", attempts >= BASELINE_REQUIRED_ATTEMPTS, attempts, `>=${BASELINE_REQUIRED_ATTEMPTS}`),
-      check("fixture_coverage", sameValues(requested, requiredFixtureIds), requested.join(","), requiredFixtureIds.join(",")),
-      check("success_rate", successCount === total, rate(successCount, total), 1),
-      check("evidence_backed_rate", evidenceBackedCount === total, rate(evidenceBackedCount, total), 1),
-      check("replay_parity_rate", replayParityCount === total, rate(replayParityCount, total), 1),
-      check("candidate_leaks", candidateLeakCount === 0, candidateLeakCount, 0),
-      check("fact_evidence_coverage", metrics.factEvidenceCoverage === 1, metrics.factEvidenceCoverage, 1),
-    ];
-    const summaryBase: Omit<FixtureEvaluationSummary, "reportHash"> = {
-      schemaVersion: 4 as const,
-      protocolVersion: BASELINE_PROTOCOL_VERSION,
-      runPrefix,
-      fixtureIds: requested,
-      fixtureCatalog,
-      budget: { maxTurns },
-      attempts,
-      total,
-      successCount,
-      successRate: rate(successCount, total),
-      evidenceBackedCount,
-      evidenceBackedRate: rate(evidenceBackedCount, total),
-      replayParityCount,
-      replayParityRate: rate(replayParityCount, total),
-      candidateLeakCount,
-      metrics,
-      failureCategories,
-      gate: { passed: checks.every((item) => item.passed), checks },
-      cases,
-    };
-    return { ...summaryBase, reportHash: stableReportHash(summaryBase) };
   }
 
   private async runCase(services: ReturnType<typeof createServices>, fixtureId: string, attempt: number, runId: string, maxTurns: number): Promise<FixtureEvaluationCase> {

@@ -91,6 +91,11 @@ export class DebugDataService {
     this.config.modelProfiles.executor = { ...profile, input: [...profile.input] };
   }
 
+  public async close(): Promise<void> {
+    await Promise.allSettled([...this.activeLanes.values()].map(async (lane) => await lane.abort("GUI shutting down")));
+    await this.services.sandbox.close();
+  }
+
   public bootstrap(): BootstrapData {
     const profile = this.config.modelProfiles.executor;
     return {

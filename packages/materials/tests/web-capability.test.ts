@@ -176,3 +176,24 @@ test("live HTTP fixtures restart with a new generation after process state is lo
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("sandbox close releases every active HTTP fixture and is idempotent", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-web-close-"));
+  const services = createServices(root, config);
+  try {
+    const first = await services.sandbox.build(fixtureTask("WEB-CLOSE-001", "web-source-1", root, config));
+    const second = await services.sandbox.build(fixtureTask("WEB-CLOSE-002", "web-route-2", root, config));
+    assert.ok(first.endpoint);
+    assert.ok(second.endpoint);
+    assert.equal((await fetch(`${first.endpoint}/.proofblade/health`)).status, 200);
+    assert.equal((await fetch(`${second.endpoint}/.proofblade/health`)).status, 200);
+
+    await services.sandbox.close();
+    await assert.rejects(fetch(`${first.endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) }));
+    await assert.rejects(fetch(`${second.endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) }));
+    await services.sandbox.close();
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -47,6 +47,25 @@ server.listen(port, host, () => {
   console.log(`Config: ${configPath}`);
 });
 
+let shuttingDown = false;
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const results = await Promise.allSettled([
+    data.close(),
+    vite.close(),
+    new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose())),
+  ]);
+  const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+  if (failures.length > 0) {
+    console.error(new AggregateError(failures, "ProofBlade GUI shutdown failed"));
+    process.exitCode = 1;
+  }
+}
+
+process.once("SIGINT", () => { void shutdown(); });
+process.once("SIGTERM", () => { void shutdown(); });
+
 async function api(method: string, url: URL, request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse): Promise<void> {
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (method === "GET" && url.pathname === "/api/bootstrap") return sendJson(response, 200, data.bootstrap());

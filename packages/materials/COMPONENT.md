@@ -4,9 +4,9 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T15:00:00+08:00"
+  "updatedAt": "2026-08-07T15:30:00+08:00"
 }
 ```
 
@@ -31,6 +31,7 @@
 - 显式 MCP 脱敏字段不受短值阈值限制；`secret` 调用结果保持 secret Artifact 分类，Solver/Coding 共用嵌套能力描述。
 - 后台 Job 只持久化 Provider 安全参数副本；原始参数仅用于当前进程执行，脱敏参数不能跨进程自动重放。
 - `proofblade.web` 对 Task 选定的 Origin 执行有界同源 HTTP 请求；query、Header 和 Body 原值不得进入 Control Store，Live HTTP Fixture 定义必须进入评测 Catalog 哈希。
+- Live HTTP Fixture 在终态 Run 后释放、在 `PAUSED` Run 中保留，并由 CLI/GUI 退出路径执行全量关闭。
 - Coding Agent 的 `read`/`bash` 结果保存原始材料并返回稳定 Artifact 锚点；名称、摘要、标签、用途和关联关系进入可重放的语义投影，只有 Evidence/Fact 链上的内容才视为结论依据。
 - 推理知识以共享 DAG 持久化，并按主题投影成可折叠的 Reasoning Tree；多棵树组成 Forest，同一 Artifact/Evidence 节点可以被重复采用但不得复制权威数据。
 - 未审阅的侦察 Artifact 由 Evidence Curation Gate 限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。

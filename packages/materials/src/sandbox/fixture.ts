@@ -48,6 +48,7 @@ export interface SandboxPort {
   health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>;
   reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult>;
   destroy(fixture: FixtureRef): Promise<void>;
+  close(): Promise<void>;
 }
 
 export class LocalFixtureSandbox implements SandboxPort {
@@ -172,12 +173,22 @@ export class LocalFixtureSandbox implements SandboxPort {
   }
 
   public async destroy(fixture: FixtureRef): Promise<void> {
+    this.generations.delete(fixture.fixtureId);
     const active = this.httpServers.get(fixture.fixtureId);
     if (active) {
       this.httpServers.delete(fixture.fixtureId);
       await closeServer(active.server);
     }
     // Fixture files are retained for replay and inspection.
+  }
+
+  public async close(): Promise<void> {
+    const active = [...this.httpServers.values()];
+    this.httpServers.clear();
+    this.generations.clear();
+    const results = await Promise.allSettled(active.map(async (fixture) => await closeServer(fixture.server)));
+    const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more Fixture HTTP services");
   }
 
   private async ensureHttpFixture(fixtureId: string, profileId: string, profile: FixtureHttpProfile, generation: number): Promise<string> {
