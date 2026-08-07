@@ -128,6 +128,27 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     assert.doesNotMatch(nestedArtifactText, /xyz|NESTED-TOKEN-789/);
     assert.match(nestedArtifactText, /\[REDACTED\]/);
 
+    const secretJobStart = await runtime.runBackground({
+      capabilityId: "mcp.echo",
+      operation: "call",
+      input: {
+        tool: "agent_call_tool",
+        arguments: { name: "page_eval", args: { expression: "bgx", token: "BACKGROUND-TOKEN-012" } },
+      },
+    });
+    const queuedSecretJob = await runtime.jobStatus(String(secretJobStart.jobId));
+    assert.equal(queuedSecretJob.argsRedacted, true);
+    assert.doesNotMatch(JSON.stringify(queuedSecretJob.args), /bgx|BACKGROUND-TOKEN-012/);
+    const completedSecretJob = await runtime.waitJob(String(secretJobStart.jobId), 10_000);
+    assert.equal(completedSecretJob.status, "SUCCEEDED");
+    const backgroundSnapshot = await services.control.snapshot(runId);
+    const backgroundEffect = backgroundSnapshot.effects[completedSecretJob.effectId!]!;
+    const backgroundArtifact = backgroundSnapshot.artifacts[completedSecretJob.artifactId!]!;
+    assert.equal(backgroundArtifact.sensitivity, "secret");
+    assert.doesNotMatch(JSON.stringify({ job: completedSecretJob, effect: backgroundEffect, artifact: backgroundArtifact }), /bgx|BACKGROUND-TOKEN-012/);
+    assert.doesNotMatch(await services.artifacts.readText(runId, backgroundArtifact), /bgx|BACKGROUND-TOKEN-012/);
+    assert.doesNotMatch(await readFile(join(root, "runs", runId, "events.jsonl"), "utf8"), /bgx|BACKGROUND-TOKEN-012/);
+
     const safeJob = await runtime.runBackground({
       capabilityId: "mcp.echo",
       operation: "call",

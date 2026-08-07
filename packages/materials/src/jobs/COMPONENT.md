@@ -4,9 +4,9 @@
 {
   "id": "materials-jobs",
   "name": "Durable Background Jobs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T19:33:48+08:00"
+  "updatedAt": "2026-08-07T12:00:00+08:00"
 }
 ```
 
@@ -25,6 +25,8 @@
 恢复行为必须服从 replay policy；取消与超时不能绕过 Effect 终态记录。增加并发时保留稳定资源键。
 
 分发型 MCP Job 在排队前解析内层 Tool，并持久化内层 replay policy；禁止自动重放的浏览器或进程动作不得继承外层分发器默认值。
+
+Job 事件只持久化 Provider 提供的安全参数副本。原始参数只用于当前进程内执行；参数经过脱敏的 Job 必须标记 `argsRedacted`，进程重启后转为 `UNKNOWN`，不得使用脱敏占位符重放。
 
 ```powershell
 npm run test:materials

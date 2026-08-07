@@ -243,6 +243,7 @@ export interface JobRecord {
   capabilityId: string;
   operation: string;
   args: Record<string, unknown>;
+  argsRedacted?: boolean;
   replayPolicy: ReplayPolicy;
   status: JobStatus;
   lane: Lane;

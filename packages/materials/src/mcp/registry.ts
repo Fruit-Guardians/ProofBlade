@@ -56,6 +56,11 @@ export interface McpResolvedInvocationPolicy {
   innerTool?: string;
 }
 
+export interface McpPersistedInvocationInput {
+  input: Record<string, unknown>;
+  argsRedacted: boolean;
+}
+
 export interface McpProjectConfig {
   mcpServers: Record<string, McpServerDefinition>;
 }
@@ -231,7 +236,15 @@ export class McpProjectRegistry {
           resourceKeys: policy.resourceKeys,
         },
       },
-      input: redactSensitiveValues(input, "", new Set(policy.redactArguments)),
+      input: this.persistedInput(input, policy).input,
+    };
+  }
+
+  public persistedInput(input: Record<string, unknown>, policy: McpResolvedInvocationPolicy): McpPersistedInvocationInput {
+    const persisted = redactSensitiveValues(input, "", new Set(policy.redactArguments)) as Record<string, unknown>;
+    return {
+      input: persisted,
+      argsRedacted: canonicalJson(persisted) !== canonicalJson(input),
     };
   }
 

@@ -28,6 +28,12 @@ export interface CapabilityInvocationResult {
   evidenceId?: string;
 }
 
+export interface PersistedCapabilityInvocation {
+  operation: CapabilityOperationAtom;
+  input: Record<string, unknown>;
+  argsRedacted: boolean;
+}
+
 export class CapabilityRegistry {
   private readonly manifests: CapabilityManifest[];
 
@@ -73,11 +79,22 @@ export class ProofBladeCapabilityRouter {
   }
 
   public resolveInvocationPolicy(request: CapabilityInvocation): CapabilityOperationAtom {
+    return this.preparePersistence(request).operation;
+  }
+
+  public preparePersistence(request: CapabilityInvocation): PersistedCapabilityInvocation {
     const { operation } = this.registry.find(request.capabilityId, request.operation);
     validateInput(operation, request.input);
-    if (!this.mcp?.handles(request.capabilityId)) return operation;
+    if (!this.mcp?.handles(request.capabilityId)) {
+      return { operation, input: structuredClone(request.input), argsRedacted: false };
+    }
     const resolved = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
-    return { ...operation, readOnly: resolved.readOnly, sideEffect: resolved.sideEffect, replay: resolved.replay };
+    const persisted = this.mcp.persistedInput(request.input, resolved);
+    return {
+      operation: { ...operation, readOnly: resolved.readOnly, sideEffect: resolved.sideEffect, replay: resolved.replay },
+      input: persisted.input,
+      argsRedacted: persisted.argsRedacted,
+    };
   }
 
   public async invoke(request: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
