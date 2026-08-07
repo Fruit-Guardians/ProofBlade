@@ -6,6 +6,7 @@ import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
 import { BASELINE_PROTOCOL_VERSION, FixtureEvaluationRunner } from "../src/evaluation/fixture-evaluator.js";
 import type { SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { getFixtureProfile } from "../src/sandbox/fixture-catalog.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -32,8 +33,11 @@ test("fixture evaluator reports evidence and replay gates", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-eval-"));
   try {
     const summary = await new FixtureEvaluationRunner(root, config).run({ fixtureIds: ["web-source-1"], runPrefix: "EVAL-TEST", maxTurns: 1 });
-    assert.equal(summary.schemaVersion, 2);
+    assert.equal(summary.schemaVersion, 3);
     assert.equal(summary.protocolVersion, BASELINE_PROTOCOL_VERSION);
+    assert.equal(summary.fixtureCatalog.fixtures.length, 1);
+    assert.equal(summary.fixtureCatalog.hash.length, 64);
+    assert.doesNotMatch(JSON.stringify(summary.fixtureCatalog), /PB\{/);
     assert.deepEqual(summary.budget, { maxTurns: 1 });
     assert.equal(summary.attempts, 3);
     assert.equal(summary.total, 3);
@@ -85,6 +89,28 @@ test("fixture evaluator keeps unclassified failures out of environment statistic
     assert.equal(summary.failureCategories.unclassified, 1);
     assert.equal(summary.failureCategories.permission_or_environment, undefined);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture evaluator report hash binds the selected fixture content", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-eval-catalog-"));
+  const profile = getFixtureProfile("web-source-1");
+  const originalResponse = profile.files["response.json"]!;
+  const originalExpected = profile.expected;
+  try {
+    const runner = new FixtureEvaluationRunner(root, config);
+    const first = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-CATALOG-A", maxTurns: 1 });
+    profile.files["response.json"] = "{\"status\":\"ok\",\"debug\":{\"flag\":\"PB{web_source_trace_v2}\"}}\n";
+    profile.expected = "PB{web_source_trace_v2}";
+    const second = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-CATALOG-B", maxTurns: 1 });
+    assert.equal(first.successRate, second.successRate);
+    assert.notEqual(first.fixtureCatalog.hash, second.fixtureCatalog.hash);
+    assert.notEqual(first.fixtureCatalog.fixtures[0]?.expectedHash, second.fixtureCatalog.fixtures[0]?.expectedHash);
+    assert.notEqual(first.reportHash, second.reportHash);
+  } finally {
+    profile.files["response.json"] = originalResponse;
+    profile.expected = originalExpected;
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -5,16 +5,27 @@ import { createServices } from "../app/demo.js";
 import { fixtureTask } from "../app/fixture-task.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
-import { listFixtureProfiles } from "../sandbox/fixture-catalog.js";
+import { listFixtureProfiles, type FixtureProfile } from "../sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/single-agent-loop.js";
 import { sha256, canonicalJson } from "../domain/utils.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import type { PrimaryFailureCategory } from "../domain/types.js";
 
-export const BASELINE_PROTOCOL_VERSION = "baseline-v1";
+export const BASELINE_PROTOCOL_VERSION = "baseline-v2";
 export const BASELINE_REQUIRED_ATTEMPTS = 3;
 
 export type EvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
+
+export interface FixtureCatalogSnapshot {
+  hash: string;
+  fixtures: Array<{
+    id: string;
+    targetKind: FixtureProfile["targetKind"];
+    descriptionHash: string;
+    expectedHash: string;
+    files: Array<{ path: string; sha256: string }>;
+  }>;
+}
 
 export interface FixtureEvaluationOptions {
   attempts?: number;
@@ -51,10 +62,11 @@ export interface FixtureEvaluationCase {
 }
 
 export interface FixtureEvaluationSummary {
-  schemaVersion: 2;
+  schemaVersion: 3;
   protocolVersion: typeof BASELINE_PROTOCOL_VERSION;
   runPrefix: string;
   fixtureIds: string[];
+  fixtureCatalog: FixtureCatalogSnapshot;
   budget: { maxTurns: number };
   attempts: number;
   total: number;
@@ -102,6 +114,7 @@ export class FixtureEvaluationRunner {
     const requiredFixtureIds = listFixtureProfiles().map((profile) => profile.id).sort();
     const requested = [...new Set(options.fixtureIds ?? requiredFixtureIds)].sort();
     const profiles = requested.map((fixtureId) => listFixtureProfiles().find((profile) => profile.id === fixtureId) ?? (() => { throw new Error(`Unknown fixture profile: ${fixtureId}`); })());
+    const fixtureCatalog = catalogSnapshot(profiles);
     const services = createServices(this.root, this.config);
     const cases: FixtureEvaluationCase[] = [];
     for (const profile of profiles) {
@@ -126,10 +139,11 @@ export class FixtureEvaluationRunner {
       check("fact_evidence_coverage", metrics.factEvidenceCoverage === 1, metrics.factEvidenceCoverage, 1),
     ];
     const summaryBase: Omit<FixtureEvaluationSummary, "reportHash"> = {
-      schemaVersion: 2 as const,
+      schemaVersion: 3 as const,
       protocolVersion: BASELINE_PROTOCOL_VERSION,
       runPrefix,
       fixtureIds: requested,
+      fixtureCatalog,
       budget: { maxTurns },
       attempts,
       total,
@@ -310,6 +324,7 @@ function stableReportHash(summary: Omit<FixtureEvaluationSummary, "reportHash">)
     schemaVersion: summary.schemaVersion,
     protocolVersion: summary.protocolVersion,
     fixtureIds: summary.fixtureIds,
+    fixtureCatalogHash: summary.fixtureCatalog.hash,
     budget: summary.budget,
     attempts: summary.attempts,
     total: summary.total,
@@ -338,6 +353,19 @@ function orderedCounts(values: EvaluationFailureCategory[]): Partial<Record<Eval
   const counts: Partial<Record<EvaluationFailureCategory, number>> = {};
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
   return Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))) as Partial<Record<EvaluationFailureCategory, number>>;
+}
+
+function catalogSnapshot(profiles: readonly FixtureProfile[]): FixtureCatalogSnapshot {
+  const fixtures = profiles.map((profile) => ({
+    id: profile.id,
+    targetKind: profile.targetKind,
+    descriptionHash: sha256(profile.description),
+    expectedHash: sha256(profile.expected),
+    files: Object.entries(profile.files)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([path, content]) => ({ path, sha256: sha256(content) })),
+  }));
+  return { hash: sha256(canonicalJson(fixtures)), fixtures };
 }
 
 function sum(values: number[]): number {

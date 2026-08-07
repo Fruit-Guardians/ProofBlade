@@ -4,9 +4,9 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T12:06:45+08:00"
+  "updatedAt": "2026-08-07T13:17:18+08:00"
 }
 ```
 
@@ -33,7 +33,7 @@
 - Context 维护采用单调 Tool Result 表示和 idle-time 持久压缩；常规 prune 不在每次 Provider hook 中移动历史删除边界。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
-- 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算并规范化 Fixture 集合。
+- 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算和规范化 Fixture Catalog 内容哈希。
 
 ## 验证
 
