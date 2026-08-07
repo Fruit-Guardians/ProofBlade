@@ -55,11 +55,14 @@ async function main(): Promise<void> {
       break;
     }
     case "eval": {
-      const evalPositionals = positional(rest, ["--attempts", "--max-turns", "--run-prefix", "--prefix"]);
-      const attempts = parsePositiveOption(rest, "--attempts") ?? parsePositiveValue(evalPositionals[0], "attempts");
-      const maxTurns = parsePositiveOption(rest, "--max-turns") ?? parsePositiveValue(evalPositionals[1], "max-turns");
-      const runPrefix = option(rest, "--run-prefix") ?? option(rest, "--prefix") ?? evalPositionals[2];
-      print(await new FixtureEvaluationRunner(root, config).run({ attempts, maxTurns, runPrefix }));
+      const evalArgs = arg === undefined ? rest : [arg, ...rest];
+      const evalPositionals = positional(evalArgs, ["--attempts", "--max-turns", "--run-prefix", "--prefix"]);
+      const attempts = parsePositiveOption(evalArgs, "--attempts") ?? parsePositiveValue(evalPositionals[0], "attempts");
+      const maxTurns = parsePositiveOption(evalArgs, "--max-turns") ?? parsePositiveValue(evalPositionals[1], "max-turns");
+      const runPrefix = option(evalArgs, "--run-prefix") ?? option(evalArgs, "--prefix") ?? evalPositionals[2];
+      const summary = await new FixtureEvaluationRunner(root, config).run({ attempts, maxTurns, runPrefix });
+      print(summary);
+      if (evalArgs.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
       break;
     }
     case "capabilities": {
@@ -343,7 +346,7 @@ function helpText(): string {
     "  init <run-id>",
     "  run demo [--run-id ID]",
     "  fixtures",
-    "  eval [--attempts N] [--max-turns N] [--run-prefix ID]",
+    "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  capabilities",
     "  mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",

@@ -4,9 +4,9 @@
 {
   "id": "cli",
   "name": "ProofBlade CLI",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T00:22:45+08:00"
 }
 ```
 
@@ -25,6 +25,7 @@
 - 参数校验、退出码和错误文本留在 CLI；状态转换留在 Materials。
 - 新命令优先调用现有公开服务，缺少能力时先在正确的 Materials 组件补齐。
 - 不从 GUI 或 Materials 内部深路径导入。
+- `eval` 始终输出机器可读报告；只有传入 `--enforce-gate` 时，失败的 baseline 门禁才设置非零退出码。
 
 ## 验证
 
