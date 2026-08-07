@@ -33,7 +33,8 @@
         "contract:abort-after-planner-before-prompt",
         "contract:abort-before-verification",
         "contract:pause-during-verifier",
-        "contract:pause-before-finish"
+        "contract:pause-before-finish",
+        "contract:pause-before-exhaust"
       ]
     },
     {

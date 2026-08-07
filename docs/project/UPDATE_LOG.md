@@ -1,18 +1,39 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T22:44:53.9883278+08:00
+> 状态更新时间：2026-08-07T23:08:26.1335151+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-006 | 2026-08-07T22:44:53.9883278+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-004 | 2026-08-07T20:17:19+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-007
+
+时间：2026-08-07T23:08:26.1335151+08:00
+
+摘要：统一暂停状态到所有 Run 终态的原子转换策略。
+
+### 变更
+
+- ControlStore 统一拒绝 PAUSED 状态下的 finish、fail 和 exhaust
+- Reducer 拒绝所有 PAUSED 到终态的事件重放
+- Loop 在迟到的 exhaust 被拒绝后重新读取并返回 PAUSED
+- 新增 contract:pause-before-exhaust 和暂停终态策略测试
+
+### 验证
+
+- [x] contract:pause-before-exhaust
+- [x] paused runs reject every terminal command until explicitly resumed
+- [x] npm run check:change-contracts
+- [x] npm run verify
 
 ## UPDATE-20260807-006
 

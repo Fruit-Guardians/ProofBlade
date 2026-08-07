@@ -233,6 +233,9 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
 }
 
 function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
+  if (snapshot.status === "PAUSED" && (command.type === "finish" || command.type === "fail" || command.type === "exhaust")) {
+    throw new Error(`Cannot ${command.type} a paused run; resume it first`);
+  }
   if (command.type === "lease_released" && (command.ownerLane !== undefined || command.generation !== undefined)) {
     const lease = snapshot.leases[command.resourceKey];
     if (!lease) return;
@@ -285,7 +288,6 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
     throw new Error("Confirmed facts are restricted to the verifier lane");
   }
   if (command.type !== "finish" || !command.verified) return;
-  if (snapshot.status === "PAUSED") throw new Error("Cannot successfully finish a paused run; resume it first");
   if (command.lane !== "verifier") throw new Error("A successful run can only be committed by the verifier lane");
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
   if (!completion) throw new Error("A successful run requires an accepted completion proposal");

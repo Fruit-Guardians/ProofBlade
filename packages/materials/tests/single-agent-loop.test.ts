@@ -260,6 +260,42 @@ test("[contract:pause-before-finish] an atomically persisted pause wins the race
   }
 });
 
+test("[contract:pause-before-exhaust] an atomically persisted pause wins the race with budget exhaustion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-pause-before-exhaust-"));
+  const services = createServices(root, config);
+  const originalDispatch = services.control.dispatch.bind(services.control);
+  let exhaustAttempts = 0;
+  services.control.dispatch = async (runId, command) => {
+    if (command.type === "exhaust") {
+      exhaustAttempts += 1;
+      await originalDispatch(runId, { type: "pause", reason: "pause won exhaust race", lane: "main" });
+    }
+    return await originalDispatch(runId, command);
+  };
+  const idleLane: SolverLaneFactory = async () => ({
+    async prompt() { return { text: "no candidate", stopReason: "stop", usage: zeroUsage() }; },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "PAUSE-EXHAUST-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, idleLane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 1,
+    });
+    assert.equal(exhaustAttempts, 1);
+    assert.equal(result.status, "PAUSED");
+    assert.equal((await services.control.snapshot(runId)).status, "PAUSED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("completion proposals must be grounded in a successful current-generation observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-grounding-"));
   try {

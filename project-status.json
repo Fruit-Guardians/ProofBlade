@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T22:44:53.9883278+08:00",
+  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -326,6 +326,28 @@
       ],
       "validation": [
         "contract:pause-before-finish",
+        "npm run check:change-contracts",
+        "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-007",
+      "occurredAt": "2026-08-07T23:08:26.1335151+08:00",
+      "summary": "统一暂停状态到所有 Run 终态的原子转换策略。",
+      "branch": "codex/gui-shutdown-v2",
+      "commit": "self",
+      "planIds": [
+        "PLAN-130"
+      ],
+      "changes": [
+        "ControlStore 统一拒绝 PAUSED 状态下的 finish、fail 和 exhaust",
+        "Reducer 拒绝所有 PAUSED 到终态的事件重放",
+        "Loop 在迟到的 exhaust 被拒绝后重新读取并返回 PAUSED",
+        "新增 contract:pause-before-exhaust 和暂停终态策略测试"
+      ],
+      "validation": [
+        "contract:pause-before-exhaust",
+        "paused runs reject every terminal command until explicitly resumed",
         "npm run check:change-contracts",
         "npm run verify"
       ]

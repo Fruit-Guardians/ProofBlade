@@ -184,7 +184,12 @@ export class SingleAgentCtfLoop {
     }
     snapshot = await this.services.control.snapshot(options.runId);
     if (mode === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
-      await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
+      try {
+        await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
+      } catch (error) {
+        const current = await this.services.control.snapshot(options.runId);
+        if (current.status !== "PAUSED") throw error;
+      }
       snapshot = await this.services.control.snapshot(options.runId);
     }
     return outcome(snapshot, mode, turns, verification);

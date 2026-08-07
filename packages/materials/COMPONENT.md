@@ -6,13 +6,13 @@
   "name": "Materials 物资层核心",
   "version": "0.12.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T22:44:53.9883278+08:00",
+  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
   "qualityAudit": {
     "bugAuditCount": 3,
     "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-07T22:44:53.9883278+08:00",
-    "lastSecurityAuditAt": "2026-08-07T22:44:53.9883278+08:00",
-    "sourceHash": "ac68f197c5eb5691cb73cbd06a7de06959065605aa8a6c07d586398a85d6dacd",
+    "lastBugAuditAt": "2026-08-07T23:08:26.1335151+08:00",
+    "lastSecurityAuditAt": "2026-08-07T23:08:26.1335151+08:00",
+    "sourceHash": "b8f1ff943a3e5df29d20e940007ece3323733b65fff036a142654502e2ca3bdf",
     "result": "passed"
   }
 }

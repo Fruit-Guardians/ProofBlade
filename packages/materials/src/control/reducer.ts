@@ -72,7 +72,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "run_finished": {
       const status = p.status as RunStatus;
       if (!terminal.includes(status)) throw new Error(`Invalid terminal status: ${String(status)}`);
-      if (next.status === "PAUSED" && status === "SUCCEEDED") throw new Error("Cannot successfully finish a paused run; resume it first");
+      if (next.status === "PAUSED") throw new Error(`Cannot transition a paused run to ${status}; resume it first`);
       if (status === "SUCCEEDED" && (p.verified !== true || !Array.isArray(p.evidenceIds) || p.evidenceIds.length === 0)) {
         throw new Error("A successful run requires verifier approval and evidence");
       }
@@ -84,6 +84,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "run_failed":
+      if (next.status === "PAUSED") throw new Error("Cannot transition a paused run to FAILED; resume it first");
       ensureNotTerminal(next.status);
       next.status = "FAILED";
       next.terminalReason = typeof p.reason === "string" ? p.reason : "run_failed";
