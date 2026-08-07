@@ -4,9 +4,9 @@
 {
   "id": "materials-orchestration",
   "name": "Agent Orchestration",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T15:30:00+08:00"
+  "updatedAt": "2026-08-07T16:00:00+08:00"
 }
 ```
 
@@ -21,6 +21,7 @@
 - Planner 与 Executor 使用独立职责；Verifier 决定完成，不由 Orchestrator 直接确认。
 - Executor 提示要求先检查目标材料，再按需发现目标专用 Capability；不把所有题型固定为静态文件读取流程。
 - Drive Loop 在所有返回路径关闭 Lane/Runtime；仅终态 Run 释放 Fixture，暂停与可恢复异常保留目标服务。
+- `SingleAgentRunOptions.signal` 在恢复、建 Lane 和每轮执行前 fail-closed，并将 Abort 传递给当前 Solver Lane。
 
 ## 开发规则与验证
 

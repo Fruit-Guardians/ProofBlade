@@ -4,9 +4,9 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T15:30:00+08:00"
+  "updatedAt": "2026-08-07T16:00:00+08:00"
 }
 ```
 
@@ -35,6 +35,7 @@
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI 收到退出信号时中止活动 Lane 并关闭 Sandbox，释放所有进程内 HTTP Fixture 服务。
+- GUI Shutdown 先拒绝新 Chat/Solve，跟踪并等待两类运行 Promise；Abort、任务和 Sandbox 错误统一以 `AggregateError` 返回。
 
 ## 验证
 

@@ -29,6 +29,7 @@ export interface SingleAgentRunOptions {
   task: TaskContract;
   mode?: ExecutionMode;
   maxTurns?: number;
+  signal?: AbortSignal;
 }
 
 export interface SingleAgentRunOutcome {
@@ -52,6 +53,7 @@ export class SingleAgentCtfLoop {
   public async run(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome> {
     const mode = options.mode ?? "assist";
     const maxTurns = options.maxTurns ?? 3;
+    throwIfAborted(options.signal);
     const runDir = join(this.services.runsRoot, options.runId);
     let snapshot: RunSnapshot;
     if (await exists(join(runDir, "task.json"))) snapshot = await this.services.control.snapshot(options.runId);
@@ -63,12 +65,16 @@ export class SingleAgentCtfLoop {
     }
     const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox)
       .recover(options.runId, snapshot.task);
+    throwIfAborted(options.signal);
     const fixture = recovery.fixture;
     snapshot = await this.services.control.snapshot(options.runId);
+    throwIfAborted(options.signal);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
     let lane: AgentLanePort | undefined;
+    let removeAbortListener: (() => void) | undefined;
+    let abortPromise: Promise<void> | undefined;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     try {
@@ -83,7 +89,19 @@ export class SingleAgentCtfLoop {
       }
       const activeLane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
       lane = activeLane;
+      const onAbort = () => {
+        abortPromise = activeLane.abort("GUI shutting down");
+      };
+      if (options.signal) {
+        options.signal.addEventListener("abort", onAbort, { once: true });
+        removeAbortListener = () => options.signal?.removeEventListener("abort", onAbort);
+        if (options.signal.aborted) {
+          onAbort();
+          throwIfAborted(options.signal);
+        }
+      }
       while (turns < maxTurns) {
+        throwIfAborted(options.signal);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status)) break;
         await planner.prepare(options.runId);
@@ -140,7 +158,10 @@ export class SingleAgentCtfLoop {
       }
       return outcome(snapshot, mode, turns, verification);
     } finally {
+      removeAbortListener?.();
+      const abortResult = abortPromise ? await Promise.allSettled([abortPromise]) : [];
       const closed: PromiseSettledResult<void>[] = [];
+      closed.push(...abortResult);
       if (lane) closed.push(...await Promise.allSettled([lane.close()]));
       closed.push(...await Promise.allSettled([runtime.close()]));
       const finalSnapshot = await this.services.control.snapshot(options.runId);
@@ -234,4 +255,9 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error ? signal.reason : new Error("Run aborted");
 }

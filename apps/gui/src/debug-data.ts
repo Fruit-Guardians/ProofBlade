@@ -69,20 +69,26 @@ interface ContentLike {
 
 const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
+type SolveLoopFactory = (root: string, config: ProofBladeConfig, services: AppServices) => SingleAgentCtfLoop;
 
 export class DebugDataService {
   private readonly services: AppServices;
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
+  private readonly chatTasks = new Set<Promise<void>>();
+  private readonly solveTasks = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private closing = false;
+  private closePromise: Promise<void> | undefined;
 
   public constructor(
     private readonly root: string,
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
     private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
+    private readonly createSolveLoop: SolveLoopFactory = (root, config, services) => new SingleAgentCtfLoop(root, config, services),
   ) {
     this.services = createServices(root, config);
   }
@@ -92,8 +98,25 @@ export class DebugDataService {
   }
 
   public async close(): Promise<void> {
-    await Promise.allSettled([...this.activeLanes.values()].map(async (lane) => await lane.abort("GUI shutting down")));
-    await this.services.sandbox.close();
+    if (this.closePromise) return await this.closePromise;
+    this.closing = true;
+    this.closePromise = this.shutdown();
+    return await this.closePromise;
+  }
+
+  private async shutdown(): Promise<void> {
+    const aborts: Promise<unknown>[] = [];
+    for (const lane of this.activeLanes.values()) aborts.push(lane.abort("GUI shutting down"));
+    for (const task of this.solveTasks.values()) task.controller.abort("GUI shutting down");
+    const abortResults = await Promise.allSettled(aborts);
+    const taskResults = await Promise.allSettled([
+      ...this.chatTasks,
+      ...[...this.solveTasks.values()].map((task) => task.promise),
+    ]);
+    const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
+    const failures = [...abortResults, ...taskResults, ...sandboxResult]
+      .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    if (failures.length > 0) throw new AggregateError(failures, "GUI shutdown failed");
   }
 
   public bootstrap(): BootstrapData {
@@ -191,31 +214,47 @@ export class DebugDataService {
   }
 
   public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
+    this.assertOpen();
     assertRunId(input.runId);
     if (this.active.get(input.runId)?.state === "running") throw new Error(`Run is already active: ${input.runId}`);
     const info: ActiveRunInfo = { runId: input.runId, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(input.runId, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services);
-    void loop.run({
+    const loop = this.createSolveLoop(this.root, this.config, this.services);
+    const controller = new AbortController();
+    const promise = loop.run({
       runId: input.runId,
       task: fixtureTask(input.runId, input.fixtureId, this.root, this.config),
       mode: input.mode,
       maxTurns: input.maxTurns,
+      signal: controller.signal,
     }).then(() => {
       this.active.delete(input.runId);
-    }).catch((error: unknown) => {
+    }, (error: unknown) => {
+      if (controller.signal.aborted && error instanceof Error && error.message === "Run aborted") {
+        this.active.delete(input.runId);
+        return;
+      }
       this.active.set(input.runId, { ...info, state: "failed", error: error instanceof Error ? error.message : String(error) });
+      throw error;
     });
+    this.solveTasks.set(input.runId, { controller, promise });
+    void promise.then(
+      () => { if (this.solveTasks.get(input.runId)?.promise === promise) this.solveTasks.delete(input.runId); },
+      () => { if (this.solveTasks.get(input.runId)?.promise === promise) this.solveTasks.delete(input.runId); },
+    );
+    void promise.catch(() => undefined);
     return info;
   }
 
   public async createConversation(input: { runId: string; title: string; workspacePath?: string }): Promise<RunSnapshot> {
+    this.assertOpen();
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
     return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root));
   }
 
   public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+    this.assertOpen();
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
     const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
@@ -245,11 +284,30 @@ export class DebugDataService {
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
   ): Promise<void> {
+    this.assertOpen();
+    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath);
+    this.chatTasks.add(task);
+    try {
+      await task;
+    } finally {
+      this.chatTasks.delete(task);
+    }
+  }
+
+  private async runChat(
+    runId: string,
+    prompt: string,
+    emit: (event: ChatStreamEvent) => void,
+    profile?: ModelProfileConfig,
+    capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
+    workspacePath?: string,
+  ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
     if (!text) throw new Error("Prompt is required");
     if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
     const snapshot = await this.services.control.snapshot(runId);
+    this.assertOpen();
     if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
       throw new Error(`Run is terminal (${snapshot.status}); start a new conversation`);
     }
@@ -272,7 +330,9 @@ export class DebugDataService {
           capabilities,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
+        this.assertOpen();
       } else {
+        this.assertOpen();
         const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
         runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
         lane = await PiSolverLane.create({
@@ -285,6 +345,7 @@ export class DebugDataService {
           runtime,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
+        this.assertOpen();
       }
       this.activeLanes.set(runId, lane);
       if (this.pauseRequests.has(runId)) {
@@ -318,6 +379,10 @@ export class DebugDataService {
       this.streamEmitters.delete(runId);
       this.active.delete(runId);
     }
+  }
+
+  private assertOpen(): void {
+    if (this.closing) throw new Error("GUI is shutting down");
   }
 
   public async pause(runId: string, reason = "Paused by user"): Promise<ActiveRunInfo> {

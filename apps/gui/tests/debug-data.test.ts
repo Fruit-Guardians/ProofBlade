@@ -4,7 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
+import { SingleAgentCtfLoop, fixtureTask } from "@proofblade/materials";
+import type { AgentLanePort, AgentOutcome, AppServices, HarnessEvent, ProofBladeConfig, RunSnapshot, SolverLaneFactory } from "@proofblade/materials";
 import type { ChatStreamEvent } from "../src/shared.js";
 
 const entries = [
@@ -133,6 +134,67 @@ test("pauses an active coding lane and persists a resumable run state", async ()
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
     assert.deepEqual(events.filter((event) => event.type === "stopping" || event.type === "paused").map((event) => event.type), ["stopping", "paused"]);
     assert.equal(events.some((event) => event.type === "done" || event.type === "error"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GUI close aborts and awaits startSolve before closing its HTTP Fixture", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-close-"));
+  let releasePrompt: (() => void) | undefined;
+  const solveLane: SolverLaneFactory = async () => ({
+    async prompt() {
+      return await new Promise<AgentOutcome>((resolve) => {
+        releasePrompt = () => resolve({ text: "aborted", stopReason: "aborted", usage: zeroUsage() });
+      });
+    },
+    async compact() {},
+    async abort() { releasePrompt?.(); },
+    async isIdle() { return false; },
+    async close() {},
+  });
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, (projectRoot, solveConfig, services) => new SingleAgentCtfLoop(projectRoot, solveConfig, services, solveLane));
+    const services = (data as unknown as { services: AppServices }).services;
+    const runId = "GUI-SOLVE-CLOSE-web-source-1";
+    const fixture = await services.sandbox.build(fixtureTask(runId, "web-source-1", root, config));
+    assert.ok(fixture.endpoint);
+    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "assist", maxTurns: 1 });
+    assert.equal((await fetch(`${fixture.endpoint}/.proofblade/health`)).status, 200);
+    await data.close();
+    await assert.rejects(fetch(`${fixture.endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) }));
+    await assert.rejects(data.startSolve({ runId: "GUI-SOLVE-CLOSE-NEW", fixtureId: "web-source-1", mode: "assist" }), /shutting down/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GUI close reports Lane abort failures", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-abort-failure-"));
+  let promptStarted: (() => void) | undefined;
+  let releasePrompt: (() => void) | undefined;
+  const lane: AgentLanePort = {
+    async prompt() {
+      promptStarted?.();
+      return await new Promise<AgentOutcome>((resolve) => { releasePrompt = () => resolve({ text: "aborted", stopReason: "aborted", usage: zeroUsage() }); });
+    },
+    async abort() {
+      releasePrompt?.();
+      throw new Error("injected lane abort failure");
+    },
+    async compact() {},
+    async isIdle() { return false; },
+    async close() {},
+  };
+  const started = new Promise<void>((resolve) => { promptStarted = resolve; });
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "GUI-ABORT-FAILURE-001";
+    await data.createConversation({ runId, title: "abort failure", workspacePath: root });
+    const chat = data.chat(runId, "inspect", () => undefined, undefined, undefined, root);
+    await started;
+    await assert.rejects(data.close(), (error: unknown) => error instanceof AggregateError && error.errors.some((item) => String(item).includes("injected lane abort failure")));
+    await chat;
   } finally {
     await rm(root, { recursive: true, force: true });
   }
