@@ -6,13 +6,13 @@
   "name": "Control Store and Reducer",
   "version": "0.3.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T22:20:18.1243188+08:00",
+  "updatedAt": "2026-08-07T22:44:53.9883278+08:00",
   "qualityAudit": {
     "bugAuditCount": 2,
     "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T22:20:18.1243188+08:00",
-    "lastSecurityAuditAt": "2026-08-07T22:20:18.1243188+08:00",
-    "sourceHash": "0e26c1810479c91830cbd04340d9e230c8bd6437d4ecda27e87bc778e1d63dfe",
+    "lastBugAuditAt": "2026-08-07T22:44:53.9883278+08:00",
+    "lastSecurityAuditAt": "2026-08-07T22:44:53.9883278+08:00",
+    "sourceHash": "7fa0f5db262718995f521ec976e2e92db4ade607bf3d919a77c1ec2319980c4c",
     "result": "passed"
   }
 }
@@ -31,6 +31,8 @@
 ## 开发规则与验证
 
 事件必须可重放、序号连续、Schema 可迁移。状态变化只能通过事件进入 Reducer；Artifact 语义更新使用 `artifact_annotated`，不得改写历史原文或在 Reducer 中修改事件对象。Reasoning Graph 写入使用 node upsert、不可变 edge add 和 tree upsert；必须拒绝未知引用、重复边、环、断开的树和跨 generation 关系。新增事件要覆盖并发、重放哈希和旧数据读取。
+
+- 成功 `finish` 必须在 ControlStore 的单写者临界区内拒绝 `PAUSED` 状态；Reducer 重放同样不得接受 `PAUSED -> SUCCEEDED`，只有显式 `resume` 可以解除暂停。
 
 ```powershell
 npm run test:materials

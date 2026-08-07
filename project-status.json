@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T22:20:18.1243188+08:00",
+  "updatedAt": "2026-08-07T22:44:53.9883278+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -308,6 +308,26 @@
         "phase transitions do not implicitly resume a paused run",
         "npm run typecheck --workspace=@proofblade/gui",
         "npm run typecheck --workspace=@proofblade/materials"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-006",
+      "occurredAt": "2026-08-07T22:44:53.9883278+08:00",
+      "summary": "原子阻止暂停状态被最终成功提交覆盖。",
+      "branch": "codex/gui-shutdown-v2",
+      "commit": "self",
+      "planIds": [
+        "PLAN-130"
+      ],
+      "changes": [
+        "ControlStore 在单写者命令校验内拒绝 PAUSED 状态的成功 finish",
+        "Reducer 重放拒绝 PAUSED 到 SUCCEEDED 的非法状态转换",
+        "新增 contract:pause-before-finish 精确竞态回归测试"
+      ],
+      "validation": [
+        "contract:pause-before-finish",
+        "npm run check:change-contracts",
+        "npm run verify"
       ]
     }
   ],

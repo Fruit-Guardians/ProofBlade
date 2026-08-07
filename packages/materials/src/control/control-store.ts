@@ -285,6 +285,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
     throw new Error("Confirmed facts are restricted to the verifier lane");
   }
   if (command.type !== "finish" || !command.verified) return;
+  if (snapshot.status === "PAUSED") throw new Error("Cannot successfully finish a paused run; resume it first");
   if (command.lane !== "verifier") throw new Error("A successful run can only be committed by the verifier lane");
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
   if (!completion) throw new Error("A successful run requires an accepted completion proposal");

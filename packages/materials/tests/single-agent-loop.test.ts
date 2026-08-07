@@ -229,6 +229,37 @@ test("[contract:pause-during-verifier] pause during verifier remains PAUSED inst
   }
 });
 
+test("[contract:pause-before-finish] an atomically persisted pause wins the race with successful finish", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-pause-before-finish-"));
+  const services = createServices(root, config);
+  const originalDispatch = services.control.dispatch.bind(services.control);
+  let finishAttempts = 0;
+  services.control.dispatch = async (runId, command) => {
+    if (command.type === "finish" && command.verified) {
+      finishAttempts += 1;
+      await originalDispatch(runId, { type: "pause", reason: "pause won finish race", lane: "main" });
+    }
+    return await originalDispatch(runId, command);
+  };
+  try {
+    const runId = "PAUSE-FINISH-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, deterministicLane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 1,
+    });
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(finishAttempts, 1);
+    assert.equal(result.status, "PAUSED");
+    assert.equal(snapshot.status, "PAUSED");
+    assert.equal(Object.values(snapshot.completions)[0]?.status, "ACCEPTED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("completion proposals must be grounded in a successful current-generation observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-grounding-"));
   try {

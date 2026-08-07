@@ -72,6 +72,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "run_finished": {
       const status = p.status as RunStatus;
       if (!terminal.includes(status)) throw new Error(`Invalid terminal status: ${String(status)}`);
+      if (next.status === "PAUSED" && status === "SUCCEEDED") throw new Error("Cannot successfully finish a paused run; resume it first");
       if (status === "SUCCEEDED" && (p.verified !== true || !Array.isArray(p.evidenceIds) || p.evidenceIds.length === 0)) {
         throw new Error("A successful run requires verifier approval and evidence");
       }
