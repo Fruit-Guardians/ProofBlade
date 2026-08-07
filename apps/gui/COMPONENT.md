@@ -4,9 +4,17 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.0",
+  "version": "0.7.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T16:45:00+08:00"
+  "updatedAt": "2026-08-07T18:07:00+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T18:07:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T18:07:00+08:00",
+    "sourceHash": "e34e38890219523237a7a051bdd216267baa94121f1655c7ea505a4d786ee6ec",
+    "result": "passed"
+  }
 }
 ```
 
@@ -25,6 +33,7 @@
 - API 响应只暴露 `hasApiKey`，不回传 Key。
 - SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
+- Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Solver lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。
 - 模型标签和右侧配置必须显示当前对话下一轮使用的 Provider/Model/Thinking；最近一条响应的模型仅作为历史元数据，不得覆盖当前选择。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。

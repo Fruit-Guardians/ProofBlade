@@ -29,6 +29,7 @@ export interface SingleAgentRunOptions {
   task: TaskContract;
   mode?: ExecutionMode;
   maxTurns?: number;
+  onLaneReady?: (lane: AgentLanePort) => void | Promise<void>;
 }
 
 export interface SingleAgentRunOutcome {
@@ -67,8 +68,6 @@ export class SingleAgentCtfLoop {
     snapshot = await this.services.control.snapshot(options.runId);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
-    const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-    await runtime.recoverJobs();
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
@@ -77,13 +76,17 @@ export class SingleAgentCtfLoop {
       const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
-    const lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+    const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
+    await runtime.recoverJobs();
+    let lane: AgentLanePort | undefined;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     try {
+      lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+      await options.onLaneReady?.(lane);
       while (turns < maxTurns) {
         const before = await this.services.control.snapshot(options.runId);
-        if (isTerminal(before.status)) break;
+        if (isTerminal(before.status) || before.status === "PAUSED") break;
         await planner.prepare(options.runId);
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns));
@@ -103,6 +106,7 @@ export class SingleAgentCtfLoop {
           continue;
         }
         const after = await this.services.control.snapshot(options.runId);
+        if (after.status === "PAUSED") break;
         const pending = latestPending(after);
         if (pending) {
           if (mode === "assist") {
@@ -132,11 +136,11 @@ export class SingleAgentCtfLoop {
         }
       }
     } finally {
-      await lane.close();
+      await lane?.close();
       await runtime.close();
     }
     snapshot = await this.services.control.snapshot(options.runId);
-    if (mode === "auto" && !isTerminal(snapshot.status) && turns >= maxTurns) {
+    if (mode === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
       await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
       snapshot = await this.services.control.snapshot(options.runId);
     }

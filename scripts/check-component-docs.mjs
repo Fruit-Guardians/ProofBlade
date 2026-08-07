@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { componentSourceHash } from "./component-audit-lib.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const registryPath = join(root, "component-docs.json");
@@ -51,6 +52,12 @@ for (const component of affected.values()) {
   const current = parseMetadata(readFileSync(join(root, component.document), "utf8"), component.document);
   if (compareVersions(current.version, previous.version) <= 0) fail(`${component.id}: version must increase from ${previous.version}`);
   if (Date.parse(current.updatedAt) <= Date.parse(previous.updatedAt)) fail(`${component.id}: updatedAt must be later than ${previous.updatedAt}`);
+  if (previous.qualityAudit && current.qualityAudit) {
+    if (current.qualityAudit.bugAuditCount <= previous.qualityAudit.bugAuditCount) fail(`${component.id}: bugAuditCount must increase from ${previous.qualityAudit.bugAuditCount}`);
+    if (current.qualityAudit.securityAuditCount <= previous.qualityAudit.securityAuditCount) fail(`${component.id}: securityAuditCount must increase from ${previous.qualityAudit.securityAuditCount}`);
+    if (Date.parse(current.qualityAudit.lastBugAuditAt) <= Date.parse(previous.qualityAudit.lastBugAuditAt)) fail(`${component.id}: lastBugAuditAt must be later than ${previous.qualityAudit.lastBugAuditAt}`);
+    if (Date.parse(current.qualityAudit.lastSecurityAuditAt) <= Date.parse(previous.qualityAudit.lastSecurityAuditAt)) fail(`${component.id}: lastSecurityAuditAt must be later than ${previous.qualityAudit.lastSecurityAuditAt}`);
+  }
 }
 
 if (errors.length > 0) {
@@ -69,6 +76,23 @@ function validateMetadata(component, metadata) {
     if (typeof metadata[field] !== "string" || Number.isNaN(Date.parse(metadata[field]))) fail(`${component.document}: ${field} must be an ISO date/time`);
   }
   if (Date.parse(metadata.updatedAt) < Date.parse(metadata.createdAt)) fail(`${component.document}: updatedAt must not precede createdAt`);
+  const audit = metadata.qualityAudit;
+  if (!audit || typeof audit !== "object" || Array.isArray(audit)) {
+    fail(`${component.document}: qualityAudit is required`);
+    return;
+  }
+  for (const field of ["bugAuditCount", "securityAuditCount"]) {
+    if (!Number.isInteger(audit[field]) || audit[field] < 1) fail(`${component.document}: qualityAudit.${field} must be a positive integer`);
+  }
+  for (const field of ["lastBugAuditAt", "lastSecurityAuditAt"]) {
+    if (typeof audit[field] !== "string" || Number.isNaN(Date.parse(audit[field]))) fail(`${component.document}: qualityAudit.${field} must be an ISO date/time`);
+    else if (Date.parse(audit[field]) > Date.parse(metadata.updatedAt)) fail(`${component.document}: qualityAudit.${field} must not be later than updatedAt`);
+  }
+  if (!/^[a-f0-9]{64}$/.test(audit.sourceHash ?? "")) fail(`${component.document}: qualityAudit.sourceHash must be a SHA-256 hash`);
+  const expectedHash = componentSourceHash(root, registry, component);
+  if (audit.sourceHash !== expectedHash) fail(`${component.id}: quality audit is stale (expected sourceHash ${expectedHash})`);
+  if (audit.result !== "passed" && audit.result !== "findings") fail(`${component.document}: qualityAudit.result must be passed or findings`);
+  if (audit.result === "findings") fail(`${component.id}: quality audit has unresolved findings`);
 }
 
 function parseMetadata(markdown, label) {

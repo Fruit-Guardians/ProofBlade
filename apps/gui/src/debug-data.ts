@@ -20,6 +20,7 @@ import {
   type ModelProfileConfig,
   type ProofBladeConfig,
   type RunSnapshot,
+  type SolverLaneFactory,
   type TaskContract,
 } from "@proofblade/materials";
 import type {
@@ -83,6 +84,7 @@ export class DebugDataService {
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
     private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
+    private readonly createSolverLane?: SolverLaneFactory,
   ) {
     this.services = createServices(root, config);
   }
@@ -187,21 +189,44 @@ export class DebugDataService {
 
   public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     assertRunId(input.runId);
-    if (this.active.get(input.runId)?.state === "running") throw new Error(`Run is already active: ${input.runId}`);
+    const current = this.active.get(input.runId);
+    if (current && current.state !== "failed") throw new Error(`Run is already active: ${input.runId}`);
+    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    await this.ensureRunCreated(input.runId, task);
     const info: ActiveRunInfo = { runId: input.runId, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(input.runId, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services);
-    void loop.run({
+    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createSolverLane);
+    const runPromise = loop.run({
       runId: input.runId,
-      task: fixtureTask(input.runId, input.fixtureId, this.root, this.config),
+      task,
       mode: input.mode,
       maxTurns: input.maxTurns,
+      onLaneReady: async (lane) => {
+        this.activeLanes.set(input.runId, lane);
+        if (this.pauseRequests.has(input.runId)) {
+          await this.ensurePaused(input.runId, "Paused by user");
+          await lane.abort("Paused by user");
+        }
+      },
     }).then(() => {
       this.active.delete(input.runId);
     }).catch((error: unknown) => {
       this.active.set(input.runId, { ...info, state: "failed", error: error instanceof Error ? error.message : String(error) });
+    }).finally(() => {
+      this.activeLanes.delete(input.runId);
+      this.pauseRequests.delete(input.runId);
     });
+    void runPromise;
     return info;
+  }
+
+  private async ensureRunCreated(runId: string, task: TaskContract): Promise<void> {
+    try {
+      await access(join(this.services.runsRoot, runId, "task.json"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await this.services.control.createRun(runId, task);
+    }
   }
 
   public async createConversation(input: { runId: string; title: string; workspacePath?: string }): Promise<RunSnapshot> {

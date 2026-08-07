@@ -4,9 +4,17 @@
 {
   "id": "materials-verification",
   "name": "Independent Verifier",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T11:05:27+08:00"
+  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 1,
+    "securityAuditCount": 1,
+    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
+    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
+    "sourceHash": "892a95d3fe505879f3ec1c27157519a3842476516bf08e95310ed034e9c8342a",
+    "result": "passed"
+  }
 }
 ```
 
