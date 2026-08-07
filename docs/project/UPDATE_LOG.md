@@ -1,14 +1,33 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T18:37:33+08:00
+> 状态更新时间：2026-08-07T20:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-003 | 2026-08-07T20:30:00+08:00 | PLAN-001, PLAN-002 | codex/gui-shutdown-v2 | 123fdbd |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-003
+
+时间：2026-08-07T20:30:00+08:00
+
+摘要：修复组件审计哈希在 Windows 与 Linux CI 之间因换行符不同而失配的问题，并推进 GUI Shutdown PR。
+
+### 变更
+
+- 组件源码哈希统一使用 LF 规范化文本
+- 重新生成 25 个组件审计元数据和项目维护报告
+- 更新 PR #20 的 CI 失败根因与修复说明
+
+### 验证
+
+- [x] npm run check:components -- --base d61b99022545ea15e614177d59082163ab1ba5be
+- [x] npm run check:project-reports
+- [x] npm run verify
 
 ## UPDATE-20260807-002
 

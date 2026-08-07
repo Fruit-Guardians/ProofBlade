@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T18:37:33+08:00",
+  "updatedAt": "2026-08-07T20:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -239,6 +239,27 @@
       ],
       "validation": [
         "npm run reports:project",
+        "npm run check:project-reports",
+        "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-003",
+      "occurredAt": "2026-08-07T20:30:00+08:00",
+      "summary": "修复组件审计哈希在 Windows 与 Linux CI 之间因换行符不同而失配的问题，并推进 GUI Shutdown PR。",
+      "branch": "codex/gui-shutdown-v2",
+      "commit": "123fdbd",
+      "planIds": [
+        "PLAN-001",
+        "PLAN-002"
+      ],
+      "changes": [
+        "组件源码哈希统一使用 LF 规范化文本",
+        "重新生成 25 个组件审计元数据和项目维护报告",
+        "更新 PR #20 的 CI 失败根因与修复说明"
+      ],
+      "validation": [
+        "npm run check:components -- --base d61b99022545ea15e614177d59082163ab1ba5be",
         "npm run check:project-reports",
         "npm run verify"
       ]
