@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T20:30:00+08:00",
+  "updatedAt": "2026-08-07T19:55:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -10,17 +10,20 @@
       "milestone": "工程治理",
       "owner": "maintainers",
       "progress": 100,
-      "updatedAt": "2026-08-07T18:09:45+08:00",
+      "updatedAt": "2026-08-07T19:55:00+08:00",
       "objective": "让组件源码变更与 BUG、安全审计记录建立可验证关联。",
       "deliverables": [
         "25 个 COMPONENT.md 的 qualityAudit 元数据",
         "基于源码 SHA-256 的重复审计跳过机制",
-        "批量审计记录器和 CI 检查"
+        "批量审计记录器和 CI 检查",
+        "组件审计差异与高风险生命周期变更契约"
       ],
       "acceptance": [
         "源码指纹未变化时不重复增加审计次数",
+        "单个 PR 对受影响组件的审计次数只能增加一次",
         "源码变化后旧审计指纹必须使 CI 失败",
-        "批量记录失败时不产生部分写入"
+        "批量记录失败时不产生部分写入",
+        "关闭、中止和 Sandbox 生命周期改动必须保留故障路径测试"
       ],
       "dependencies": []
     },
@@ -245,22 +248,22 @@
     },
     {
       "id": "UPDATE-20260807-003",
-      "occurredAt": "2026-08-07T20:30:00+08:00",
-      "summary": "修复组件审计哈希在 Windows 与 Linux CI 之间因换行符不同而失配的问题，并推进 GUI Shutdown PR。",
-      "branch": "codex/gui-shutdown-v2",
-      "commit": "123fdbd",
+      "occurredAt": "2026-08-07T19:55:00+08:00",
+      "summary": "把 PR 审查发现的虚假审计计数和生命周期竞态转为 CI 差异门禁。",
+      "branch": "codex/ci-regression-gates",
+      "commit": "self",
       "planIds": [
-        "PLAN-001",
-        "PLAN-002"
+        "PLAN-001"
       ],
       "changes": [
-        "组件源码哈希统一使用 LF 规范化文本",
-        "重新生成 25 个组件审计元数据和项目维护报告",
-        "更新 PR #20 的 CI 失败根因与修复说明"
+        "禁止源码未变化时修改 qualityAudit，并限制受影响组件每个 PR 只增加一次审计计数",
+        "组件文本哈希统一 LF，同时保持二进制内容逐字节哈希",
+        "增加 GUI Shutdown、Solver Abort、Sandbox Cleanup 和审计脚本的高风险变更契约",
+        "增加五个 CI 门禁自测并接入 npm run verify 与 GitHub Actions"
       ],
       "validation": [
-        "npm run check:components -- --base d61b99022545ea15e614177d59082163ab1ba5be",
-        "npm run check:project-reports",
+        "npm run test:ci-gates",
+        "npm run check:change-contracts",
         "npm run verify"
       ]
     }
@@ -276,10 +279,12 @@
         "qualityAudit 元数据",
         "源码指纹检查器",
         "审计记录器",
-        "贡献规范和组件文档"
+        "贡献规范和组件文档",
+        "审计差异与高风险生命周期 CI 契约"
       ],
       "validation": [
         "Component documentation check passed (25 components)",
+        "CI gate contract tests passed (5 tests)",
         "Full repository verification passed"
       ]
     },
@@ -324,6 +329,29 @@
         "0 dependency vulnerabilities"
       ],
       "nextReviewTrigger": "任一组件 sourceHash、依赖锁文件、运行时版本或评测协议发生变化"
+    },
+    {
+      "id": "MAINT-20260807-002",
+      "performedAt": "2026-08-07T19:55:00+08:00",
+      "status": "passed",
+      "scope": "组件审计差异、GUI 关闭、Solver 中止、Sandbox 清理和 CI 工作流",
+      "actions": [
+        "复盘 PR #20 的关闭错误路径、中止竞态、重复 Abort 和虚假组件审计计数",
+        "增加组件审计转换不变量和跨平台文本哈希",
+        "增加高风险源码触发器与必需故障场景测试契约",
+        "执行门禁负向 Fixture、完整构建、测试、评测和依赖审计"
+      ],
+      "findings": [
+        "已加门禁：源码未变化时 qualityAudit 不得变化",
+        "已加门禁：受影响组件的 BUG 与安全审计次数必须各增加一次",
+        "已加门禁：关闭、中止和 Sandbox 生命周期改动缺少故障场景测试时阻止合并"
+      ],
+      "validation": [
+        "5/5 CI gate tests passed",
+        "Component documentation check passed",
+        "Full repository verification passed"
+      ],
+      "nextReviewTrigger": "修改 change-contracts、组件哈希算法、关闭协调器、AbortSignal 边界或 SandboxPort 生命周期"
     }
   ]
 }
