@@ -56,6 +56,22 @@ Start from a clean checkout with `npm ci`; it installs exactly what `package-loc
 
 Runs and artifacts are written below `runs/`. Downloads and source snapshots belong in `tmp/`; the repository ignores that directory by default.
 
+## Project plans and maintenance status
+
+`project-status.json` is the single source for current plans, update history, completion results, and maintenance work. It deterministically generates four reports:
+
+- `docs/project/PLAN.md` lists priorities, dependencies, progress, deliverables, and acceptance criteria;
+- `docs/project/UPDATE_LOG.md` records what changed, the related plans, branch, commit, and validation;
+- `docs/project/COMPLETION_REPORT.md` records completed plans, actual deliverables, and verification evidence;
+- `docs/project/MAINTENANCE_REPORT.md` records maintenance work and summarizes version and audit metadata for all 25 components.
+
+```powershell
+npm run reports:project
+npm run check:project-reports
+```
+
+Do not edit generated Markdown directly. `npm run verify` rejects stale reports, and CI requires meaningful changes to add an update-log entry in `project-status.json`.
+
 ## Live debugging GUI
 
 ```powershell
@@ -162,4 +178,4 @@ Built-in tools, the Capability Router, the Effect Journal, the project Skill Reg
 
 Every maintainable component has a versioned `COMPONENT.md`. See `docs/components.md` for the 25-component index and the enforced rule requiring a SemVer bump and updated timestamp whenever related source changes.
 
-See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts and design basis.
+See `docs/architecture.md`, `docs/task-contract.md`, `docs/tool-contract.md`, `docs/eval-protocol.md`, `docs/recovery.en.md`, `docs/gui.md`, `docs/project/PLAN.md`, `docs/project/UPDATE_LOG.md`, `docs/project/COMPLETION_REPORT.md`, `docs/project/MAINTENANCE_REPORT.md`, and `pi-ctf-agent-harness-design.md` for the implemented contracts, current work, maintenance state, and design basis.

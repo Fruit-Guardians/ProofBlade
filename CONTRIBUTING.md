@@ -57,6 +57,19 @@ npm run record:component-audit -- --components materials-runtime,gui --at 2026-0
 npm run record:component-audit -- --components all --at 2026-08-07T17:39:20+08:00 --result passed --force
 ```
 
+## 项目计划与报表
+
+`project-status.json` 是项目计划、更新、完成和维护记录的单一数据源。任何代码、配置、依赖或文档的实质变更都必须增加一条 `updates` 记录；计划状态变化同步修改 `plans`，交付完成增加 `completions`，例行检查或修复维护问题增加 `maintenance`。
+
+编辑数据源后重建并检查四份报表：
+
+```powershell
+npm run reports:project
+npm run check:project-reports
+```
+
+不要直接编辑 `docs/project/*.md`。CI 会重新生成内容进行字节级比较，并检查有实质变更的 PR 是否同步修改了 `project-status.json`。
+
 ## 验证门槛
 
 提交前运行：

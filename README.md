@@ -56,6 +56,22 @@ npm run eval
 
 运行数据和制品写入 `runs/`。下载内容和外部源码快照统一放在 `tmp/`，该目录默认被 Git 忽略。
 
+## 项目计划与维护状态
+
+项目使用 `project-status.json` 统一记录当前计划、每次更新、完成结果和维护活动，并确定性生成以下中文报表：
+
+- `docs/project/PLAN.md`：当前计划、优先级、依赖、进度、交付物和验收条件；
+- `docs/project/UPDATE_LOG.md`：每次更新的变更内容、关联计划、分支、提交和验证；
+- `docs/project/COMPLETION_REPORT.md`：已经完成的计划、实际交付和验证结果；
+- `docs/project/MAINTENANCE_REPORT.md`：维护记录以及 25 个组件的版本、检查次数、时间和源码指纹。
+
+```powershell
+npm run reports:project
+npm run check:project-reports
+```
+
+生成的 Markdown 不直接编辑。`npm run verify` 会检查报表是否过期，CI 还会要求包含实质变更的提交同步更新项目状态数据源。
+
 ## 动态调试 GUI
 
 ```powershell
@@ -174,4 +190,8 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。
 - `docs/recovery.md`：六个故障注入窗口、恢复顺序和收敛不变量。
 - `docs/gui.md`：动态调试 GUI、Tool 调试对象、Script Lab 和本地 API。
+- `docs/project/PLAN.md`：当前开发计划和依赖关系。
+- `docs/project/UPDATE_LOG.md`：按时间排列的更新记录。
+- `docs/project/COMPLETION_REPORT.md`：完成情况和验证证据。
+- `docs/project/MAINTENANCE_REPORT.md`：维护活动和组件审计状态。
 - `pi-ctf-agent-harness-design.md`：ProofBlade 的完整设计依据。

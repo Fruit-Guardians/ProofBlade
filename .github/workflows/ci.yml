@@ -33,6 +33,8 @@ jobs:
       - name: Enforce component documentation updates
         env:
           COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: npm run check:components -- --base "$COMPONENT_BASE_SHA"
+        run: |
+          npm run check:components -- --base "$COMPONENT_BASE_SHA"
+          npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"
       - name: Run repository verification
         run: npm run verify

@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-07T18:37:33+08:00",
+  "plans": [
+    {
+      "id": "PLAN-001",
+      "title": "组件质量审计台账",
+      "status": "completed",
+      "priority": "P0",
+      "milestone": "工程治理",
+      "owner": "maintainers",
+      "progress": 100,
+      "updatedAt": "2026-08-07T18:09:45+08:00",
+      "objective": "让组件源码变更与 BUG、安全审计记录建立可验证关联。",
+      "deliverables": [
+        "25 个 COMPONENT.md 的 qualityAudit 元数据",
+        "基于源码 SHA-256 的重复审计跳过机制",
+        "批量审计记录器和 CI 检查"
+      ],
+      "acceptance": [
+        "源码指纹未变化时不重复增加审计次数",
+        "源码变化后旧审计指纹必须使 CI 失败",
+        "批量记录失败时不产生部分写入"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "PLAN-002",
+      "title": "项目计划与维护报表",
+      "status": "completed",
+      "priority": "P0",
+      "milestone": "工程治理",
+      "owner": "maintainers",
+      "progress": 100,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "用统一数据源展示当前计划、每次更新、完成情况和维护范围。",
+      "deliverables": [
+        "计划报表",
+        "更新日志",
+        "完成报告",
+        "维护报告",
+        "报表生成器与 CI 一致性检查"
+      ],
+      "acceptance": [
+        "四份报表可由一条命令确定性重建",
+        "维护报告自动汇总全部组件审计状态",
+        "实质变更没有更新项目状态时 CI 失败"
+      ],
+      "dependencies": [
+        "PLAN-001"
+      ]
+    },
+    {
+      "id": "PLAN-100",
+      "title": "二进制 Artifact 与 Reverse 能力包",
+      "status": "planned",
+      "priority": "P0",
+      "milestone": "Milestone 4",
+      "owner": "unassigned",
+      "progress": 0,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "让 Solver 能对真实 ELF/PE 等二进制执行可审计、可复现的静态分析。",
+      "deliverables": [
+        "二进制流与范围读取 Artifact API",
+        "格式、架构、区段、符号、字符串、反汇编和 XRef Capability",
+        "Capability 输出到 Artifact、Evidence 和推理森林的确定性映射",
+        "至少三道真实二进制变体 Fixture"
+      ],
+      "acceptance": [
+        "核心 Tool Schema 保持稳定",
+        "所有完整原始输出均有内容哈希和可读取 Artifact",
+        "重置环境后分析结论可以独立复现"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "PLAN-110",
+      "title": "结构化 Phase Gate 与运行护栏",
+      "status": "planned",
+      "priority": "P0",
+      "milestone": "Milestone 2 debt",
+      "owner": "unassigned",
+      "progress": 0,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "阻止 Agent 在阶段产物不足、重复探索或缺少证据时提前得出确定结论。",
+      "deliverables": [
+        "Model Target、Plan 和 Reproduce 阶段",
+        "每阶段结构化进入与退出门",
+        "repeat breaker、no-progress、failure signature 和 phase deadline",
+        "Intent 去重、环境漂移和无证据 claim 降级"
+      ],
+      "acceptance": [
+        "模型文本不能绕过阶段门",
+        "重复 Tool/参数/结果达到阈值后被机械短路",
+        "验证失败会携带原因返回可证伪假设阶段"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "PLAN-120",
+      "title": "统一预算与 Provider 调度器",
+      "status": "planned",
+      "priority": "P0",
+      "milestone": "Milestone 4",
+      "owner": "unassigned",
+      "progress": 0,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "统一控制 Provider 并发、429 重试、Token、费用、阶段时间和提交次数。",
+      "deliverables": [
+        "Provider/模型级并发槽和等待队列",
+        "带抖动的 Retry-After 退避与累计重试预算",
+        "请求前 Token、成本、Tool、阶段和提交预算检查",
+        "GUI 与 telemetry 的等待、限流和预算状态"
+      ],
+      "acceptance": [
+        "同一 Provider 不超过配置的 pending 请求数",
+        "预算耗尽产生明确终态和失败分类",
+        "429 重试不会形成并发重试风暴"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "PLAN-130",
+      "title": "真实 Sandbox 与清理生命周期",
+      "status": "planned",
+      "priority": "P0",
+      "milestone": "Milestone 1 debt",
+      "owner": "unassigned",
+      "progress": 0,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "隔离 Tool Runner、目标 Fixture、Verifier 与 Host，并保证 Run 收尾无孤儿资源。",
+      "deliverables": [
+        "容器或 Windows Job Object Sandbox adapter",
+        "工作区、网络、CPU、内存、进程和输出硬限制",
+        "进程组终止、Fixture destroy 和后台 janitor",
+        "Solver 与 Verifier 的独立可写目录"
+      ],
+      "acceptance": [
+        "目标进程无法读取 Host 配置和 Provider Key",
+        "超时会终止完整进程组",
+        "Run 结束后不存在非保留 Job、Lease、进程或容器"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "PLAN-200",
+      "title": "Protocol Replay、Tool Replay 与 Shadow 评测",
+      "status": "planned",
+      "priority": "P1",
+      "milestone": "Milestone 6",
+      "owner": "unassigned",
+      "progress": 0,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "把真实 Provider 和 Tool 轨迹转为可比较、可旁路验证的回归数据。",
+      "deliverables": [
+        "Protocol Replay",
+        "Tool Replay",
+        "Shadow 路由和上下文策略",
+        "20 道以上变体与 holdout Fixture"
+      ],
+      "acceptance": [
+        "同一录制轨迹重放产生相同 projection hash",
+        "Shadow 计算不影响主 Run",
+        "策略比较报告包含成功率、成本、缓存和错误提交率"
+      ],
+      "dependencies": [
+        "PLAN-100",
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-130"
+      ]
+    },
+    {
+      "id": "PLAN-210",
+      "title": "Planner 与 Executor 双模型会话",
+      "status": "blocked",
+      "priority": "P1",
+      "milestone": "Milestone 5",
+      "owner": "unassigned",
+      "progress": 15,
+      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "objective": "在结构化 Handoff 边界后增加独立 Planner Session，并用评测证明收益。",
+      "deliverables": [
+        "planner/executor 独立模型配置与 Pi Session",
+        "确定性路由、fallback 和 fail-closed 审批边界",
+        "重复 Intent 和并行浪费指标"
+      ],
+      "acceptance": [
+        "至少 20 道题每题三次与单 Agent 配对比较",
+        "成功率、成本或 p95 延迟至少一项稳定改善",
+        "其他指标不突破预算"
+      ],
+      "dependencies": [
+        "PLAN-100",
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-130",
+        "PLAN-200"
+      ]
+    }
+  ],
+  "updates": [
+    {
+      "id": "UPDATE-20260807-001",
+      "occurredAt": "2026-08-07T18:09:45+08:00",
+      "summary": "增加组件质量审计台账并修复 Fixture 求解立即暂停竞态。",
+      "branch": "codex/component-audit-ledger",
+      "commit": "a468b14",
+      "planIds": [
+        "PLAN-001"
+      ],
+      "changes": [
+        "为 25 个组件增加 BUG、安全审计次数、时间、结果和源码指纹",
+        "增加审计记录器、重复检查跳过和批量原子写入",
+        "修复 startSolve 返回前 Run 未持久化的问题",
+        "修复暂停运行被改写为 EXHAUSTED 和暂停期间重复启动的问题"
+      ],
+      "validation": [
+        "npm run verify",
+        "87 tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260807-002",
+      "occurredAt": "2026-08-07T18:37:33+08:00",
+      "summary": "增加统一的项目计划、更新日志、完成报告和维护报告。",
+      "branch": "codex/component-audit-ledger",
+      "commit": "self",
+      "planIds": [
+        "PLAN-002"
+      ],
+      "changes": [
+        "增加 project-status.json 单一数据源",
+        "增加四份确定性生成的中文项目报表",
+        "维护报告自动读取全部 COMPONENT.md 审计元数据",
+        "增加报表一致性、引用完整性和变更日志 CI 门禁"
+      ],
+      "validation": [
+        "npm run reports:project",
+        "npm run check:project-reports",
+        "npm run verify"
+      ]
+    }
+  ],
+  "completions": [
+    {
+      "id": "DONE-20260807-001",
+      "planId": "PLAN-001",
+      "completedAt": "2026-08-07T18:09:45+08:00",
+      "result": "passed",
+      "summary": "组件审计台账已经覆盖全部 25 个组件，并通过源码变化、重复跳过和批量失败测试。",
+      "deliverables": [
+        "qualityAudit 元数据",
+        "源码指纹检查器",
+        "审计记录器",
+        "贡献规范和组件文档"
+      ],
+      "validation": [
+        "Component documentation check passed (25 components)",
+        "Full repository verification passed"
+      ]
+    },
+    {
+      "id": "DONE-20260807-002",
+      "planId": "PLAN-002",
+      "completedAt": "2026-08-07T18:37:33+08:00",
+      "result": "passed",
+      "summary": "项目状态现在可以从单一数据源生成计划、日志、完成和维护四类报表。",
+      "deliverables": [
+        "docs/project/PLAN.md",
+        "docs/project/UPDATE_LOG.md",
+        "docs/project/COMPLETION_REPORT.md",
+        "docs/project/MAINTENANCE_REPORT.md"
+      ],
+      "validation": [
+        "Generated reports match project-status.json",
+        "All plan and completion references are valid"
+      ]
+    }
+  ],
+  "maintenance": [
+    {
+      "id": "MAINT-20260807-001",
+      "performedAt": "2026-08-07T18:09:45+08:00",
+      "status": "passed",
+      "scope": "完整仓库、25 个组件、依赖、构建、测试和确定性评测",
+      "actions": [
+        "执行 npm ci 和 npm run verify",
+        "检查依赖漏斗、组件文档和源码审计指纹",
+        "执行 87 个测试和 18 次 Fixture 评测",
+        "修复 Fixture 求解立即暂停竞态和资源清理边界"
+      ],
+      "findings": [
+        "已修复：startSolve 返回时 durable Run 尚未创建",
+        "已修复：Auto Loop 会把 PAUSED 改写为 EXHAUSTED",
+        "已修复：批量组件审计失败可能产生部分更新"
+      ],
+      "validation": [
+        "87/87 tests passed",
+        "18/18 fixture evaluations passed",
+        "0 dependency vulnerabilities"
+      ],
+      "nextReviewTrigger": "任一组件 sourceHash、依赖锁文件、运行时版本或评测协议发生变化"
+    }
+  ]
+}
