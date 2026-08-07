@@ -33,10 +33,11 @@ test("fixture evaluator reports evidence and replay gates", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-eval-"));
   try {
     const summary = await new FixtureEvaluationRunner(root, config).run({ fixtureIds: ["web-source-1"], runPrefix: "EVAL-TEST", maxTurns: 1 });
-    assert.equal(summary.schemaVersion, 3);
+    assert.equal(summary.schemaVersion, 4);
     assert.equal(summary.protocolVersion, BASELINE_PROTOCOL_VERSION);
     assert.equal(summary.fixtureCatalog.fixtures.length, 1);
     assert.equal(summary.fixtureCatalog.hash.length, 64);
+    assert.equal(summary.fixtureCatalog.fixtures[0]?.http?.routes.length, 4);
     assert.doesNotMatch(JSON.stringify(summary.fixtureCatalog), /PB\{/);
     assert.deepEqual(summary.budget, { maxTurns: 1 });
     assert.equal(summary.attempts, 3);
@@ -95,21 +96,44 @@ test("fixture evaluator keeps unclassified failures out of environment statistic
 
 test("fixture evaluator report hash binds the selected fixture content", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-eval-catalog-"));
-  const profile = getFixtureProfile("web-source-1");
-  const originalResponse = profile.files["response.json"]!;
+  const profile = getFixtureProfile("reverse-strings-1");
+  const originalResponse = profile.files["strings.txt"]!;
   const originalExpected = profile.expected;
   try {
     const runner = new FixtureEvaluationRunner(root, config);
     const first = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-CATALOG-A", maxTurns: 1 });
-    profile.files["response.json"] = "{\"status\":\"ok\",\"debug\":{\"flag\":\"PB{web_source_trace_v2}\"}}\n";
-    profile.expected = "PB{web_source_trace_v2}";
+    profile.files["strings.txt"] = "usage: proofcheck <serial>\ninvalid serial\nPB{reverse_strings_path_v2}\naccepted\n";
+    profile.expected = "PB{reverse_strings_path_v2}";
     const second = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-CATALOG-B", maxTurns: 1 });
     assert.equal(first.successRate, second.successRate);
     assert.notEqual(first.fixtureCatalog.hash, second.fixtureCatalog.hash);
     assert.notEqual(first.fixtureCatalog.fixtures[0]?.expectedHash, second.fixtureCatalog.fixtures[0]?.expectedHash);
     assert.notEqual(first.reportHash, second.reportHash);
   } finally {
-    profile.files["response.json"] = originalResponse;
+    profile.files["strings.txt"] = originalResponse;
+    profile.expected = originalExpected;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture evaluator report hash binds live HTTP route content", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-eval-http-catalog-"));
+  const profile = getFixtureProfile("web-source-1");
+  const route = profile.http!.routes.find((item) => item.path === "/debug")!;
+  const originalBody = route.body;
+  const originalExpected = profile.expected;
+  try {
+    const runner = new FixtureEvaluationRunner(root, config);
+    const first = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-HTTP-CATALOG-A", maxTurns: 1 });
+    route.body = "{\"status\":\"ok\",\"debug\":{\"flag\":\"PB{web_source_trace_http_v2}\"}}\n";
+    profile.expected = "PB{web_source_trace_http_v2}";
+    const second = await runner.run({ fixtureIds: [profile.id], attempts: 1, runPrefix: "EVAL-HTTP-CATALOG-B", maxTurns: 1 });
+    assert.equal(first.successRate, second.successRate);
+    assert.notEqual(first.fixtureCatalog.hash, second.fixtureCatalog.hash);
+    assert.notEqual(first.fixtureCatalog.fixtures[0]?.http?.routes[0]?.bodyHash, second.fixtureCatalog.fixtures[0]?.http?.routes[0]?.bodyHash);
+    assert.notEqual(first.reportHash, second.reportHash);
+  } finally {
+    route.body = originalBody;
     profile.expected = originalExpected;
     await rm(root, { recursive: true, force: true });
   }

@@ -4,9 +4,9 @@
 {
   "id": "materials-tools",
   "name": "Tool Contracts and Runtime",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T00:19:34+08:00"
+  "updatedAt": "2026-08-07T15:00:00+08:00"
 }
 ```
 
@@ -20,6 +20,7 @@
 - `runtime.ts` 执行 journaled Tool；`errors.ts` 归一化失败和签名。
 - `output-rewrite.ts` 实现配置驱动的 builtin/RTK adapter、版本门槛、同 Shell 探测、RTK tee 读取和确定性回落。
 - 具体 Solver/Coding 装配留在 Runtime，副作用持久化留在 Effects。
+- Solver Runtime 将 target、Web 和允许的 MCP 调用结果统一转成 Observation/Evidence；其他能力结果只保留 Artifact 锚点。
 
 ## 开发规则与验证
 

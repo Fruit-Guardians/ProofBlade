@@ -17,10 +17,10 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 配置驱动的 Coding `bash` 输出改写：`builtin | rtk` 保持同一 Tool Schema，记录改写版本、命令哈希、原始/可见字节、压缩率和 Artifact 引用。
 - 支持 Auto 与 Assist 模式的模型驱动单 Agent 执行循环。
 - 确定性 Observer、带事实依据的完成提案和独立隐藏评分验证器。
-- 六个本地工作流测试靶场：三个合成 Web 任务和三个合成逆向任务。
+- 六个本地工作流测试靶场：三个由可恢复 loopback HTTP 服务驱动的合成 Web 任务和三个合成逆向任务。
 - 带预算的六层上下文、常驻指令/任务记忆分离、55/60/75/80/90% 分级维护、制品首尾检索、工具调用配对修复、空闲压缩、机械检查点和上下文溢出恢复。
 - 配置模型可用时启用的 Pi JSONL Session 适配器。
-- 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
+- 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability`、受 Task Scope 约束的 `proofblade.web` 和可取消、可恢复的后台任务。
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、固定 `mcp_call` 代理、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
@@ -28,7 +28,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
-- 机器可读的 `baseline-v2` 六靶场评测器，默认每题重复三次，汇总耗时、Token、成本、有效动作、首个证据时间和事实证据覆盖率，并用规范化 Fixture Catalog 哈希绑定题目内容、预算和稳定报告哈希。
+- 机器可读的 `baseline-v3` 六靶场评测器，默认每题重复三次，汇总耗时、Token、成本、有效动作、首个证据时间和事实证据覆盖率，并用包含 Live HTTP 路由的规范化 Fixture Catalog 哈希绑定题目内容、预算和稳定报告哈希。
 
 Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 

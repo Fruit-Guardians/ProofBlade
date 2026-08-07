@@ -208,9 +208,9 @@ function latestPending(snapshot: RunSnapshot) {
 function turnPrompt(snapshot: RunSnapshot, turn: number): string {
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
-    "Call inspect_target with an empty object {} to inspect every visible synthetic target file.",
+    "Inspect the visible target materials, then discover and invoke any target-specific capability needed to acquire live evidence.",
     "Preserve the returned evidence id in any hypothesis or fact proposal.",
-    "Copy one complete PB{...} value exactly from inspect_target output, then call submit_candidate with that exact value.",
+    "Copy one complete PB{...} value exactly from a target observation, then call submit_candidate with that exact value.",
     "Do not stop at a prose answer; the completion proposal tool is required.",
   ].join("\n");
 }

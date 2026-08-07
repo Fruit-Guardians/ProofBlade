@@ -6,6 +6,20 @@ export interface FixtureProfile {
   description: string;
   files: Record<string, string>;
   expected: string;
+  http?: FixtureHttpProfile;
+}
+
+export interface FixtureHttpProfile {
+  evaluationPath: string;
+  routes: readonly FixtureHttpRoute[];
+}
+
+export interface FixtureHttpRoute {
+  method?: "GET" | "HEAD" | "POST";
+  path: string;
+  status?: number;
+  headers?: Readonly<Record<string, string>>;
+  body?: string;
 }
 
 const profiles: readonly FixtureProfile[] = [
@@ -14,21 +28,37 @@ const profiles: readonly FixtureProfile[] = [
     targetKind: "web",
     description: "Inspect a captured debug response from a synthetic web service.",
     files: {
-      "README.txt": "A saved response was collected from the synthetic /debug route. Inspect response.json.\n",
-      "response.json": "{\"status\":\"ok\",\"debug\":{\"flag\":\"PB{web_source_trace}\"}}\n",
+      "README.txt": "The synthetic service exposes GET /debug. Query the live endpoint through the Web capability.\n",
+      "response.json": "{\"status\":\"live_only\",\"route\":\"/debug\"}\n",
     },
     expected: "PB{web_source_trace}",
+    http: {
+      evaluationPath: "/debug",
+      routes: [
+        { path: "/debug", headers: { "content-type": "application/json" }, body: "{\"status\":\"ok\",\"debug\":{\"flag\":\"PB{web_source_trace}\"}}\n" },
+        { method: "POST", path: "/submit", status: 202, headers: { "content-type": "application/json", "set-cookie": "fixture_session=private" }, body: "{\"accepted\":true}\n" },
+        { path: "/redirect", status: 302, headers: { location: "/debug" } },
+        { path: "/large", body: "x".repeat(2_048) },
+      ],
+    },
   },
   {
     id: "web-route-2",
     targetKind: "web",
     description: "Trace a synthetic administrative route and its captured output.",
     files: {
-      "routes.txt": "GET /health -> health.txt\nGET /internal/status -> internal-status.txt\n",
-      "health.txt": "healthy\n",
-      "internal-status.txt": "diagnostic_mode=true\nproof=PB{web_route_inventory}\n",
+      "routes.txt": "GET /health\nGET /internal/status\n",
+      "health.txt": "Live response available from GET /health.\n",
+      "internal-status.txt": "Live response available from GET /internal/status.\n",
     },
     expected: "PB{web_route_inventory}",
+    http: {
+      evaluationPath: "/internal/status",
+      routes: [
+        { path: "/health", body: "healthy\n" },
+        { path: "/internal/status", body: "diagnostic_mode=true\nproof=PB{web_route_inventory}\n" },
+      ],
+    },
   },
   {
     id: "web-header-3",
@@ -36,9 +66,15 @@ const profiles: readonly FixtureProfile[] = [
     description: "Review synthetic proxy headers for an exposed diagnostic value.",
     files: {
       "request.txt": "GET /api/profile HTTP/1.1\nHost: synthetic.local\n",
-      "response-headers.txt": "HTTP/1.1 200 OK\nX-Diagnostic-Proof: PB{web_header_boundary}\nContent-Type: application/json\n",
+      "response-headers.txt": "Live response headers are available from GET /api/profile.\n",
     },
     expected: "PB{web_header_boundary}",
+    http: {
+      evaluationPath: "/api/profile",
+      routes: [
+        { path: "/api/profile", headers: { "content-type": "application/json", "x-diagnostic-proof": "PB{web_header_boundary}" }, body: "{\"profile\":\"synthetic\"}\n" },
+      ],
+    },
   },
   {
     id: "reverse-strings-1",

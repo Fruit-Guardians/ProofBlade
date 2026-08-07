@@ -115,11 +115,12 @@ export class EffectJournal {
   }
 
   private async finish(runId: string, effectId: string, operation: string, args: Record<string, unknown>, result: RawEffectResult, artifactSensitivity?: ArtifactRef["sensitivity"]): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+    const containsCandidate = /(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`);
     const artifact = await this.artifactStore.putText(runId, JSON.stringify({ ...result, operation, args }, null, 2), {
       mime: "application/json",
       sourceEffectId: effectId,
       filename: `${operation}-${effectId}.json`,
-      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "flag_candidate" : "public"),
+      sensitivity: artifactSensitivity === "secret" ? "secret" : containsCandidate ? "flag_candidate" : artifactSensitivity ?? "public",
     });
     await this.injectFault?.("after_artifact", effectId);
     const outcome = result.exitCode === 0 ? "success" : result.exitCode === null ? "timeout" : "error";

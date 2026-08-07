@@ -17,10 +17,10 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - Config-driven Coding `bash` output rewriting (`builtin | rtk`) preserves one Tool schema and records adapter version, command hashes, raw/visible bytes, measured reduction, and an Artifact reference.
 - Model-driven single-agent Drive Loop with Auto and Assist execution modes.
 - Deterministic Observer, grounded completion proposals and an independent hidden-scorer verifier.
-- Six local workflow fixtures: three synthetic Web tasks and three synthetic Reverse tasks.
+- Six local workflow fixtures: three synthetic Web tasks backed by recoverable loopback HTTP services and three synthetic Reverse tasks.
 - Budgeted six-layer context manifests, standing-instruction/task-memory separation, staged 55/60/75/80/90% maintenance, artifact head/tail retrieval, tool-pair repair, idle compaction, mechanical checkpoints and overflow recovery.
 - Pi JSONL Session adapter that is activated when a configured model is available.
-- Stable capability catalog with canonical hashes, journaled `invoke_capability`, and durable cancellable background jobs.
+- Stable capability catalog with canonical hashes, journaled `invoke_capability`, Task-scoped `proofblade.web`, and durable cancellable background jobs.
 - Project Skill Registry with resident ContextManifest metadata and on-demand bodies through `load_skill` or native Pi Skill turns.
 - Project MCP stdio with `.mcp.json`, lazy discovery, one stable `mcp_call` proxy, capability mapping, effect journaling, redaction and process cleanup.
 - Full Tool Contract hashes covering versions, timeouts, resource keys, sensitivity and replay policy; failures return structured errors with Pi `isError` semantics.
@@ -28,7 +28,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
-- Machine-readable `baseline-v2` runner that repeats all six fixtures three times by default, aggregates latency, tokens, cost, effective actions, first-evidence time and Fact evidence coverage, and binds the stable report hash to a canonical Fixture Catalog snapshot and execution budget.
+- Machine-readable `baseline-v3` runner that repeats all six fixtures three times by default, aggregates latency, tokens, cost, effective actions, first-evidence time and Fact evidence coverage, and binds the stable report hash to a canonical Fixture Catalog snapshot including live HTTP routes and the execution budget.
 
 Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI manages multiple relay or local-model profiles and lets each conversation select its provider, model, and thinking level. Profiles and keys stay in the user's `.proofblade/gui-provider.json`; folders and conversation preferences stay in `.proofblade/gui-workspace.json`. Neither file enters the repository, and API responses never expose key values. Pi 0.83.0 declares Node.js 22.19 or newer.
 

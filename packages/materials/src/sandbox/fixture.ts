@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
 import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type { Effect, EffectRequest, RawEffectResult, ReplayPolicy, TaskContract } from "../domain/types.js";
-import { fixtureProfileFromTarget, getFixtureProfile } from "./fixture-catalog.js";
+import { fixtureProfileFromTarget, getFixtureProfile, type FixtureHttpProfile } from "./fixture-catalog.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -18,6 +20,7 @@ export interface FixtureRef {
   generation: number;
   path: string;
   privatePath: string;
+  endpoint?: string;
 }
 
 export type FixtureHealthStatus = "healthy" | "missing" | "unhealthy" | "generation-drift";
@@ -49,6 +52,7 @@ export interface SandboxPort {
 
 export class LocalFixtureSandbox implements SandboxPort {
   private readonly generations = new Map<string, number>();
+  private readonly httpServers = new Map<string, ActiveHttpFixture>();
 
   public constructor(private readonly root: string) {}
 
@@ -66,7 +70,8 @@ export class LocalFixtureSandbox implements SandboxPort {
     }
     const generation = await readGeneration(path);
     this.generations.set(fixtureId, generation);
-    return { fixtureId, profileId: profile?.id, generation, path, privatePath };
+    const endpoint = profile?.http ? await this.ensureHttpFixture(fixtureId, profile.id, profile.http, generation) : undefined;
+    return { fixtureId, profileId: profile?.id, generation, path, privatePath, ...(endpoint ? { endpoint } : {}) };
   }
 
   public async reset(fixture: FixtureRef): Promise<number> {
@@ -74,6 +79,8 @@ export class LocalFixtureSandbox implements SandboxPort {
     this.generations.set(fixture.fixtureId, generation);
     if (fixture.profileId) await writeProfile(fixture.path, fixture.privatePath, getFixtureProfile(fixture.profileId));
     await writeFile(join(fixture.path, "generation.txt"), `${generation}\n`, "utf8");
+    const active = this.httpServers.get(fixture.fixtureId);
+    if (active) active.generation = generation;
     return generation;
   }
 
@@ -134,6 +141,16 @@ export class LocalFixtureSandbox implements SandboxPort {
     if (actualGeneration !== expectedGeneration) {
       return { status: "generation-drift", expectedGeneration, actualGeneration, reason: "fixture generation differs from the control projection" };
     }
+    const profile = fixture.profileId ? getFixtureProfile(fixture.profileId) : undefined;
+    if (profile?.http) {
+      const active = this.httpServers.get(fixture.fixtureId);
+      if (!active?.server.listening || active.profileId !== profile.id || active.generation !== actualGeneration) {
+        return { status: "unhealthy", expectedGeneration, actualGeneration, reason: "fixture HTTP service is missing or stale" };
+      }
+      if (!(await httpFixtureHealthy(active.endpoint, actualGeneration))) {
+        return { status: "unhealthy", expectedGeneration, actualGeneration, reason: "fixture HTTP service health check failed" };
+      }
+    }
     return { status: "healthy", expectedGeneration, actualGeneration };
   }
 
@@ -145,6 +162,7 @@ export class LocalFixtureSandbox implements SandboxPort {
       generation: expectedGeneration,
       path: join(this.root, task.task_id),
       privatePath: join(this.root, task.task_id, ".proofblade"),
+      ...(this.httpServers.get(task.task_id)?.endpoint ? { endpoint: this.httpServers.get(task.task_id)!.endpoint } : {}),
     };
     const health = await this.health(fixture, expectedGeneration);
     if (health.status === "healthy") return { fixture, health, action: "none", generation: expectedGeneration };
@@ -153,8 +171,60 @@ export class LocalFixtureSandbox implements SandboxPort {
     return { fixture: { ...rebuilt, generation }, health, action: "reset", generation };
   }
 
-  public async destroy(_fixture: FixtureRef): Promise<void> {
-    // Local fixtures are retained for replay and inspection.
+  public async destroy(fixture: FixtureRef): Promise<void> {
+    const active = this.httpServers.get(fixture.fixtureId);
+    if (active) {
+      this.httpServers.delete(fixture.fixtureId);
+      await closeServer(active.server);
+    }
+    // Fixture files are retained for replay and inspection.
+  }
+
+  private async ensureHttpFixture(fixtureId: string, profileId: string, profile: FixtureHttpProfile, generation: number): Promise<string> {
+    const existing = this.httpServers.get(fixtureId);
+    if (existing?.server.listening && existing.profileId === profileId) {
+      existing.generation = generation;
+      return existing.endpoint;
+    }
+    if (existing) await closeServer(existing.server);
+    const server = createServer((request, response) => {
+      const active = this.httpServers.get(fixtureId);
+      if (!active) {
+        response.writeHead(503, { "content-type": "text/plain", "cache-control": "no-store" });
+        response.end("fixture unavailable\n");
+        return;
+      }
+      const requestUrl = new URL(request.url ?? "/", "http://fixture.local");
+      if (requestUrl.pathname === "/.proofblade/health") {
+        response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        response.end(JSON.stringify({ ok: true, generation: active.generation }));
+        return;
+      }
+      const method = (request.method ?? "GET").toUpperCase();
+      const route = active.profile.routes.find((item) => {
+        const routeMethod = item.method ?? "GET";
+        return item.path === requestUrl.pathname && (routeMethod === method || (method === "HEAD" && routeMethod === "GET"));
+      });
+      if (!route) {
+        response.writeHead(404, { "content-type": "text/plain", "cache-control": "no-store" });
+        response.end("not found\n");
+        return;
+      }
+      response.writeHead(route.status ?? 200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", ...route.headers });
+      response.end(method === "HEAD" ? undefined : route.body ?? "");
+    });
+    server.unref();
+    await new Promise<void>((resolveListen, reject) => {
+      const onError = (error: Error) => reject(error);
+      server.once("error", onError);
+      server.listen(0, "127.0.0.1", () => {
+        server.off("error", onError);
+        resolveListen();
+      });
+    });
+    const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    this.httpServers.set(fixtureId, { profileId, profile, generation, server, endpoint });
+    return endpoint;
   }
 
   private async executeNative(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult | undefined> {
@@ -198,6 +268,30 @@ export class LocalFixtureSandbox implements SandboxPort {
     }
     return undefined;
   }
+}
+
+interface ActiveHttpFixture {
+  profileId: string;
+  profile: FixtureHttpProfile;
+  generation: number;
+  server: Server;
+  endpoint: string;
+}
+
+async function httpFixtureHealthy(endpoint: string, generation: number): Promise<boolean> {
+  try {
+    const response = await fetch(`${endpoint}/.proofblade/health`, { signal: AbortSignal.timeout(1_000) });
+    if (!response.ok) return false;
+    const value = await response.json() as { ok?: boolean; generation?: number };
+    return value.ok === true && value.generation === generation;
+  } catch {
+    return false;
+  }
+}
+
+async function closeServer(server: Server): Promise<void> {
+  if (!server.listening) return;
+  await new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
 }
 
 async function writeProfile(path: string, privatePath: string, profile: ReturnType<typeof getFixtureProfile>): Promise<void> {

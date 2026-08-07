@@ -5,13 +5,13 @@ import { createServices } from "../app/demo.js";
 import { fixtureTask } from "../app/fixture-task.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
-import { listFixtureProfiles, type FixtureProfile } from "../sandbox/fixture-catalog.js";
+import { getFixtureProfile, listFixtureProfiles, type FixtureHttpProfile, type FixtureProfile } from "../sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/single-agent-loop.js";
 import { sha256, canonicalJson } from "../domain/utils.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import type { PrimaryFailureCategory } from "../domain/types.js";
 
-export const BASELINE_PROTOCOL_VERSION = "baseline-v2";
+export const BASELINE_PROTOCOL_VERSION = "baseline-v3";
 export const BASELINE_REQUIRED_ATTEMPTS = 3;
 
 export type EvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
@@ -24,6 +24,16 @@ export interface FixtureCatalogSnapshot {
     descriptionHash: string;
     expectedHash: string;
     files: Array<{ path: string; sha256: string }>;
+    http?: {
+      evaluationPath: string;
+      routes: Array<{
+        method: string;
+        path: string;
+        status: number;
+        headers: Array<{ name: string; valueHash: string }>;
+        bodyHash: string;
+      }>;
+    };
   }>;
 }
 
@@ -62,7 +72,7 @@ export interface FixtureEvaluationCase {
 }
 
 export interface FixtureEvaluationSummary {
-  schemaVersion: 3;
+  schemaVersion: 4;
   protocolVersion: typeof BASELINE_PROTOCOL_VERSION;
   runPrefix: string;
   fixtureIds: string[];
@@ -139,7 +149,7 @@ export class FixtureEvaluationRunner {
       check("fact_evidence_coverage", metrics.factEvidenceCoverage === 1, metrics.factEvidenceCoverage, 1),
     ];
     const summaryBase: Omit<FixtureEvaluationSummary, "reportHash"> = {
-      schemaVersion: 3 as const,
+      schemaVersion: 4 as const,
       protocolVersion: BASELINE_PROTOCOL_VERSION,
       runPrefix,
       fixtureIds: requested,
@@ -255,9 +265,12 @@ export class FixtureEvaluationRunner {
 
 const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
   async prompt() {
-    const inspected = await runtime.inspectTarget();
+    const inspected = runtime.fixture.endpoint
+      ? await runtime.invokeCapability({ capabilityId: "proofblade.web", operation: "request", input: { path: webFixturePath(runtime.fixture.profileId) } })
+      : await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
     if (!candidate) throw new Error("Fixture contains no candidate");
+    if (!inspected.evidenceId) throw new Error("Fixture inspection produced no evidence");
     await runtime.proposeHypothesis({ statement: "The observed candidate satisfies the fixture.", evidenceIds: [inspected.evidenceId] });
     await runtime.submitCandidate(candidate);
     return {
@@ -271,6 +284,12 @@ const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
   async isIdle() { return true; },
   async close() {},
 });
+
+function webFixturePath(profileId: string | undefined): string {
+  const path = profileId ? getFixtureProfile(profileId).http?.evaluationPath : undefined;
+  if (!path) throw new Error(`Fixture has no evaluation HTTP path: ${profileId ?? "unknown"}`);
+  return path;
+}
 
 function normalizePositive(value: number, label: string): number {
   if (!Number.isInteger(value) || value < 1) throw new Error(`${label} must be a positive integer`);
@@ -364,8 +383,22 @@ function catalogSnapshot(profiles: readonly FixtureProfile[]): FixtureCatalogSna
     files: Object.entries(profile.files)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([path, content]) => ({ path, sha256: sha256(content) })),
+    ...(profile.http ? { http: httpCatalogSnapshot(profile.http) } : {}),
   }));
   return { hash: sha256(canonicalJson(fixtures)), fixtures };
+}
+
+function httpCatalogSnapshot(http: FixtureHttpProfile): NonNullable<FixtureCatalogSnapshot["fixtures"][number]["http"]> {
+  const routes = http.routes.map((route) => ({
+    method: route.method ?? "GET",
+    path: route.path,
+    status: route.status ?? 200,
+    headers: Object.entries(route.headers ?? {})
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, value]) => ({ name: name.toLowerCase(), valueHash: sha256(value) })),
+    bodyHash: sha256(route.body ?? ""),
+  })).sort((left, right) => `${left.method} ${left.path}`.localeCompare(`${right.method} ${right.path}`));
+  return { evaluationPath: http.evaluationPath, routes };
 }
 
 function sum(values: number[]): number {

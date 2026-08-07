@@ -6,7 +6,7 @@ import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
-import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
+import { getFixtureProfile, listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
 
 const config: ProofBladeConfig = {
@@ -32,9 +32,12 @@ const config: ProofBladeConfig = {
 
 const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
   async prompt() {
-    const inspected = await runtime.inspectTarget();
+    const inspected = runtime.fixture.endpoint
+      ? await runtime.invokeCapability({ capabilityId: "proofblade.web", operation: "request", input: { path: getFixtureProfile(runtime.fixture.profileId!).http!.evaluationPath } })
+      : await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
     if (!candidate) throw new Error("Fixture contains no candidate");
+    if (!inspected.evidenceId) throw new Error("Fixture inspection produced no evidence");
     await runtime.proposeHypothesis({ statement: "The observed candidate satisfies the fixture.", evidenceIds: [inspected.evidenceId] });
     await runtime.submitCandidate(candidate);
     return {
@@ -103,9 +106,10 @@ test("completion proposals must be grounded in a successful current-generation o
     await services.control.dispatch(runId, { type: "fixture_reset", generation });
     const { ProofBladeToolRuntime } = await import("../src/tools/runtime.js");
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
-    await runtime.inspectTarget();
+    await runtime.invokeCapability({ capabilityId: "proofblade.web", operation: "request", input: { path: "/debug" } });
     await assert.rejects(runtime.submitCandidate("PB{fabricated_value}"), /does not occur in a successful target observation/);
     assert.equal(Object.keys((await services.control.snapshot(runId)).completions).length, 0);
+    await runtime.close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

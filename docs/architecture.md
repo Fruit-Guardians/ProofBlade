@@ -42,6 +42,8 @@ The first implementation uses one JSONL file per run. A keyed operation queue gi
 
 Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pure or idempotent work under the original effect id, adopts a result artifact that was already persisted, and marks work with an unsafe replay policy as `UNKNOWN`. Fixture generations and leases are durable control-store facts, so stale work can be rejected after reset or ownership change.
 
+`proofblade.web` is the bounded direct-HTTP path for Web targets. The Task selects the Origin and network scope; the model supplies only an origin-relative path, a limited method, non-sensitive headers and an optional bounded body. Query, Header and Body values remain process-local while Effects and Jobs retain only names, sizes and a request hash. Redirects are returned without being followed, and every request is a distinct manual-replay Effect. Browser-Reverse remains a separate provider for DOM, JavaScript and browser-state workflows.
+
 ## Single-agent loop
 
 The single-agent path keeps active control outside the model:

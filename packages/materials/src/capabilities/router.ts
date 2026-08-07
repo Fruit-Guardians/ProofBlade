@@ -6,6 +6,8 @@ import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ControlStore } from "../control/control-store.js";
 import { listBundledCapabilities } from "./catalog.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
+import { persistedWebInput, prepareWebRequest } from "./web.js";
+import { id } from "../domain/utils.js";
 
 export interface CapabilityInvocation {
   capabilityId: string;
@@ -85,6 +87,10 @@ export class ProofBladeCapabilityRouter {
   public preparePersistence(request: CapabilityInvocation): PersistedCapabilityInvocation {
     const { operation } = this.registry.find(request.capabilityId, request.operation);
     validateInput(operation, request.input);
+    if (request.capabilityId === "proofblade.web" && request.operation === "request") {
+      const persisted = persistedWebInput(request.input);
+      return { operation, input: persisted.input, argsRedacted: persisted.argsRedacted };
+    }
     if (!this.mcp?.handles(request.capabilityId)) {
       return { operation, input: structuredClone(request.input), argsRedacted: false };
     }
@@ -101,6 +107,36 @@ export class ProofBladeCapabilityRouter {
     const { manifest } = this.registry.find(request.capabilityId, request.operation);
     const operation = this.resolveInvocationPolicy(request);
     const snapshot = await this.controlStore.snapshot(this.runId);
+    if (request.capabilityId === "proofblade.web" && request.operation === "request") {
+      const prepared = prepareWebRequest(snapshot.task, this.fixture, request.input);
+      const executed = await this.journal.executeWith(
+        this.runId,
+        {
+          operation: "web_request",
+          args: { ...prepared.auditArgs, invocationId: id("W"), generation: snapshot.generation },
+          replayPolicy: operation.replay,
+          artifactSensitivity: "target",
+          cwd: this.fixture.path,
+          timeoutMs: typeof request.input.timeoutMs === "number" ? request.input.timeoutMs : 10_000,
+        },
+        async (_effect, innerSignal) => await prepared.execute(innerSignal),
+        signal,
+      );
+      if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || "Web capability request failed");
+      const output = formatOutput(executed.result.stdout, operation.outputPolicy);
+      return {
+        capabilityId: request.capabilityId,
+        operation: request.operation,
+        manifestHash: manifest.hash,
+        effectId: executed.effectId,
+        artifactId: executed.artifactId,
+        output: `<untrusted-observation capability="${request.capabilityId}" operation="${request.operation}" artifact="${executed.artifactId}">\n${output.text}\n</untrusted-observation>`,
+        stderr: executed.result.stderr,
+        outputTier: output.tier,
+        truncated: output.truncated,
+        originalChars: output.originalChars,
+      };
+    }
     if (this.mcp?.handles(request.capabilityId)) {
       const mcpPolicy = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
       const executed = await this.journal.executeWith(

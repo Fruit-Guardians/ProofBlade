@@ -1,9 +1,10 @@
 import type { ControlStore } from "../control/control-store.js";
-import type { JobRecord, Lane } from "../domain/types.js";
+import type { JobRecord, Lane, RawEffectResult } from "../domain/types.js";
 import { id } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeCapabilityRouter } from "../capabilities/router.js";
 import { snipText } from "@proofblade/molecules";
+import type { DeterministicObserver } from "../knowledge/observer.js";
 
 export interface BackgroundJobStartInput {
   capabilityId: string;
@@ -30,6 +31,7 @@ export class BackgroundJobRunner {
     private readonly controlStore: ControlStore,
     private readonly artifactStore: ArtifactStore,
     private readonly router: ProofBladeCapabilityRouter,
+    private readonly observer: DeterministicObserver,
   ) {}
 
   public async start(input: BackgroundJobStartInput): Promise<JobRecord> {
@@ -150,6 +152,20 @@ export class BackgroundJobRunner {
       const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput }, entry.controller.signal);
       const after = await this.poll(job.id);
       if (after.status === "CANCELLED") return;
+      if (isObservableCapability(job.capabilityId, job.operation)) {
+        const snapshot = await this.controlStore.snapshot(this.runId);
+        const artifact = snapshot.artifacts[result.artifactId];
+        if (artifact) {
+          const stored = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as RawEffectResult;
+          await this.observer.observe(this.runId, {
+            operation: `capability:${job.capabilityId}.${job.operation}`,
+            effectId: result.effectId,
+            artifactId: result.artifactId,
+            generation: job.generation,
+            result: stored,
+          });
+        }
+      }
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
         jobId: job.id,
@@ -174,6 +190,12 @@ export class BackgroundJobRunner {
       });
     }
   }
+}
+
+function isObservableCapability(capabilityId: string, operation: string): boolean {
+  return capabilityId === "proofblade.target"
+    || capabilityId === "proofblade.web"
+    || (capabilityId.startsWith("mcp.") && operation === "call");
 }
 
 function isTerminalRun(status: string): boolean {

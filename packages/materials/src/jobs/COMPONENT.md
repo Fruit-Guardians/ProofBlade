@@ -4,9 +4,9 @@
 {
   "id": "materials-jobs",
   "name": "Durable Background Jobs",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T12:00:00+08:00"
+  "updatedAt": "2026-08-07T15:00:00+08:00"
 }
 ```
 
@@ -27,6 +27,8 @@
 分发型 MCP Job 在排队前解析内层 Tool，并持久化内层 replay policy；禁止自动重放的浏览器或进程动作不得继承外层分发器默认值。
 
 Job 事件只持久化 Provider 提供的安全参数副本。原始参数只用于当前进程内执行；参数经过脱敏的 Job 必须标记 `argsRedacted`，进程重启后转为 `UNKNOWN`，不得使用脱敏占位符重放。
+
+后台 target、Web 和 MCP 调用成功后通过同一 Observer 建立 Observation/Evidence；取消任务不得在终态后补建证据。
 
 ```powershell
 npm run test:materials

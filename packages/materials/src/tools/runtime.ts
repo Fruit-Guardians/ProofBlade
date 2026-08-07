@@ -39,7 +39,7 @@ export class ProofBladeToolRuntime {
     this.mcp = McpProjectRegistry.load(projectRoot);
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
     this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, this.mcp);
-    this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
+    this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter, this.observer);
   }
 
   public listCapabilities(): ReturnType<ProofBladeCapabilityRouter["listCapabilities"]> {
@@ -56,7 +56,7 @@ export class ProofBladeToolRuntime {
 
   public async invokeCapability(input: { capabilityId: string; operation: string; input: Record<string, unknown> }, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
     const result = await this.capabilityRouter.invoke({ capabilityId: input.capabilityId, operation: input.operation, input: input.input }, signal);
-    if (input.capabilityId !== "proofblade.target" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
+    if (!isObservableCapability(input.capabilityId, input.operation)) return result;
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[result.artifactId];
     if (!artifact) return result;
@@ -272,6 +272,12 @@ export class ProofBladeToolRuntime {
     if (isAbsolute(path)) throw new Error("Stored artifact paths must be relative");
     return join(this.runsRoot, this.runId, path);
   }
+}
+
+function isObservableCapability(capabilityId: string, operation: string): boolean {
+  return capabilityId === "proofblade.target"
+    || capabilityId === "proofblade.web"
+    || (capabilityId.startsWith("mcp.") && operation === "call");
 }
 
 function assertEvidence(evidence: Record<string, unknown>, evidenceIds: string[]): void {

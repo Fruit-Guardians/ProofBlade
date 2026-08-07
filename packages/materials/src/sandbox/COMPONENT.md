@@ -4,9 +4,9 @@
 {
   "id": "materials-sandbox",
   "name": "Fixture Sandbox",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T15:00:00+08:00"
 }
 ```
 
@@ -18,11 +18,12 @@
 
 - `fixture-catalog.ts` 描述可见 Fixture。
 - `fixture.ts` 管理生命周期和目标执行。
+- Web Fixture 使用绑定到 loopback 随机端口的进程内 HTTP 服务；健康检查绑定 generation，进程状态丢失后重建服务并推进 generation。
 - 模型看到的是不可信 Observation，不直接拥有 Sandbox 实例或控制状态。
 
 ## 开发规则与验证
 
-Fixture 必须确定、离线可运行且可重置。重置提升 generation，旧 Effect/Evidence 不得被新一代任务采用。
+Fixture 必须确定、离线可运行且可重置。重置提升 generation，旧 Effect/Evidence 不得被新一代任务采用。HTTP 路由方法、路径、状态、Header 和 Body 属于 Fixture 内容契约。
 
 ```powershell
 npm run eval

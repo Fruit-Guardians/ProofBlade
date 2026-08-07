@@ -312,7 +312,7 @@ export interface ArtifactSemanticMetadata {
 
 export interface ArtifactRef extends ArtifactAtom {
   id: string;
-  sensitivity: "public" | "secret" | "flag_candidate";
+  sensitivity: "public" | "target" | "secret" | "flag_candidate";
   sourceEffectId?: string;
   truncated?: boolean;
   semantic?: ArtifactSemanticMetadata;
