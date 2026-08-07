@@ -3,6 +3,7 @@ import { extname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { componentSourceHash } from "./component-audit-lib.mjs";
+import { componentTransitionErrors } from "./component-transition-lib.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const registryPath = join(root, "component-docs.json");
@@ -41,23 +42,15 @@ for (const file of changed) {
   if (owner) affected.set(owner.id, owner);
 }
 
-for (const component of affected.values()) {
-  if (!changed.has(component.document)) {
-    fail(`${component.id}: source changed but ${component.document} was not updated`);
-    continue;
-  }
+for (const component of registry.components) {
+  const sourceChanged = affected.has(component.id);
+  const documentChanged = changed.has(component.document);
+  if (!sourceChanged && !documentChanged) continue;
   const previousText = gitShow(base, component.document);
   if (previousText === undefined) continue;
   const previous = parseMetadata(previousText, `${base}:${component.document}`);
   const current = parseMetadata(readFileSync(join(root, component.document), "utf8"), component.document);
-  if (compareVersions(current.version, previous.version) <= 0) fail(`${component.id}: version must increase from ${previous.version}`);
-  if (Date.parse(current.updatedAt) <= Date.parse(previous.updatedAt)) fail(`${component.id}: updatedAt must be later than ${previous.updatedAt}`);
-  if (previous.qualityAudit && current.qualityAudit) {
-    if (current.qualityAudit.bugAuditCount <= previous.qualityAudit.bugAuditCount) fail(`${component.id}: bugAuditCount must increase from ${previous.qualityAudit.bugAuditCount}`);
-    if (current.qualityAudit.securityAuditCount <= previous.qualityAudit.securityAuditCount) fail(`${component.id}: securityAuditCount must increase from ${previous.qualityAudit.securityAuditCount}`);
-    if (Date.parse(current.qualityAudit.lastBugAuditAt) <= Date.parse(previous.qualityAudit.lastBugAuditAt)) fail(`${component.id}: lastBugAuditAt must be later than ${previous.qualityAudit.lastBugAuditAt}`);
-    if (Date.parse(current.qualityAudit.lastSecurityAuditAt) <= Date.parse(previous.qualityAudit.lastSecurityAuditAt)) fail(`${component.id}: lastSecurityAuditAt must be later than ${previous.qualityAudit.lastSecurityAuditAt}`);
-  }
+  for (const error of componentTransitionErrors({ componentId: component.id, previous, current, sourceChanged, documentChanged })) fail(error);
 }
 
 if (errors.length > 0) {
@@ -144,7 +137,7 @@ function walk(directory, files) {
 }
 
 function changedFiles(base, explicitBase) {
-  const args = explicitBase ? ["diff", "--name-only", "--diff-filter=ACMR", `${base}...HEAD`] : ["diff", "--name-only", "--diff-filter=ACMR", "HEAD"];
+  const args = explicitBase ? ["diff", "--name-only", "--diff-filter=ACMRD", `${base}...HEAD`] : ["diff", "--name-only", "--diff-filter=ACMRD", "HEAD"];
   const changed = new Set(git(args).split(/\r?\n/).filter(Boolean).map(normalize));
   if (!explicitBase) {
     for (const file of git(["ls-files", "--others", "--exclude-standard"]).split(/\r?\n/).filter(Boolean)) changed.add(normalize(file));
@@ -164,15 +157,6 @@ function git(args) {
     return "";
   }
   return result.stdout;
-}
-
-function compareVersions(left, right) {
-  const a = String(left).split(".").map(Number);
-  const b = String(right).split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return a[index] - b[index];
-  }
-  return 0;
 }
 
 function argumentValue(name) {

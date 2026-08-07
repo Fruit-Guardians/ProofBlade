@@ -46,16 +46,23 @@ apps/cli + apps/gui -> packages/materials -> packages/molecules -> packages/atom
 - `qualityAudit` 记录 BUG/安全审计次数、最近审计时间、审计结果和所覆盖源码的 SHA-256 指纹。源码指纹未变化时不需要重复审计。
 - 修改组件源码、测试、包配置或构建配置时，必须同时修改最具体路径对应的 `COMPONENT.md`，提高 `version` 并更新 `updatedAt`。
 - 修改组件源码后必须重新执行 BUG 与安全检查，提高两项审计次数、更新时间并记录新的 `sourceHash`；未解决发现使用 `result: "findings"`，CI 会阻止合并。
+- 同一个 PR 对每个受影响组件只记录一次最终审计；两项审计次数都必须恰好增加 1。源码指纹未变化时，CI 禁止修改审计次数、审计时间、结果或指纹，避免换行符和批量脚本制造虚假维护记录。
 - 只更新组件文档时可以升版；修改子组件时不要求父组件连带升版。路径重叠时以 `component-docs.json` 中最长的路径前缀为准。
 
 本地运行 `npm run check:components` 会比较 `HEAD` 与工作区；CI 使用 PR 基线或 push 前提交进行比较。遗漏文档、版本未提高、更新时间未前进或新增源码没有组件归属都会让检查失败。
 
-完成审计后可用记录器更新一个或多个组件。默认情况下，源码哈希未变化的组件会被跳过，定期复审同一源码时才使用 `--force`：
+完成审计后可用记录器更新一个或多个组件。默认情况下，源码哈希未变化的组件会被跳过；`--force` 只用于本地诊断，标准 PR 门禁不会接受未改变源码的审计计数增长：
 
 ```powershell
 npm run record:component-audit -- --components materials-runtime,gui --at 2026-08-07T17:39:20+08:00 --result passed
 npm run record:component-audit -- --components all --at 2026-08-07T17:39:20+08:00 --result passed --force
 ```
+
+## 高风险变更契约
+
+`.github/change-contracts.json` 把关闭流程、中止边界、Sandbox 生命周期和审计脚本列为高风险区域。相关代码的差异命中触发词后，`npm run check:change-contracts` 会要求仓库中存在带稳定 `[contract:...]` 标识的可执行回归测试。测试名称不是说明文字，而是 CI 契约 ID；删除或改名必须同步更新契约文件。
+
+当前强制覆盖：服务清理失败后仍关闭 HTTP、活动 Run 等待、Solver 只中止一次、Planner 与验证前的中止边界、Sandbox 失败清理，以及组件审计的重复计数、单次递增和跨平台哈希。新增生命周期入口时先在契约文件登记故障场景，再实现测试和代码。
 
 ## 项目计划与报表
 

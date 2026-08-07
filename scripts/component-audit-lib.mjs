@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export function componentSourceHash(root, registry, component) {
@@ -10,10 +10,21 @@ export function componentSourceHash(root, registry, component) {
     .sort((left, right) => left.localeCompare(right));
   const hash = createHash("sha256");
   for (const file of files) {
-    const contentHash = createHash("sha256").update(readFileSync(join(root, file))).digest("hex");
+    const content = canonicalComponentContent(file, readFileSync(join(root, file)));
+    const contentHash = createHash("sha256").update(content).digest("hex");
     hash.update(`${file}\0${contentHash}\n`);
   }
   return hash.digest("hex");
+}
+
+const canonicalTextExtensions = new Set([
+  ".cjs", ".css", ".csv", ".html", ".js", ".json", ".md", ".mjs",
+  ".toml", ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml",
+]);
+
+export function canonicalComponentContent(file, content) {
+  if (!canonicalTextExtensions.has(extname(file).toLowerCase())) return content;
+  return Buffer.from(content.toString("utf8").replaceAll("\r\n", "\n"));
 }
 
 export function ownerFor(registry, file) {

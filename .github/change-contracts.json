@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    {
+      "id": "gui-shutdown-failure-cleanup",
+      "triggers": [
+        {
+          "path": "apps/gui/src/server.ts",
+          "patterns": ["shutdown", "SIGINT", "SIGTERM", "server\\.close", "vite\\.close"]
+        },
+        {
+          "path": "apps/gui/src/debug-data.ts",
+          "patterns": ["shutdown", "closePromise", "chatTasks", "solveTasks", "activeLanes", "\\.abort"]
+        }
+      ],
+      "testPaths": ["apps/gui/tests/"],
+      "scenarios": [
+        "contract:shutdown-closes-http-after-service-failure",
+        "contract:shutdown-awaits-active-runs",
+        "contract:solver-abort-exactly-once"
+      ]
+    },
+    {
+      "id": "solver-abort-boundaries",
+      "triggers": [
+        {
+          "path": "packages/materials/src/orchestration/single-agent-loop.ts",
+          "patterns": ["AbortSignal", "throwIfAborted", "signal", "abort"]
+        }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:abort-after-planner-before-prompt",
+        "contract:abort-before-verification"
+      ]
+    },
+    {
+      "id": "sandbox-lifecycle-cleanup",
+      "triggers": [
+        {
+          "path": "packages/materials/src/sandbox/fixture.ts",
+          "patterns": ["SandboxPort", "destroy", "close"]
+        }
+      ],
+      "testPaths": ["packages/materials/tests/", "apps/gui/tests/"],
+      "scenarios": [
+        "contract:sandbox-close-after-run-failure"
+      ]
+    },
+    {
+      "id": "component-audit-integrity",
+      "triggers": [
+        { "path": "scripts/component-audit-lib.mjs" },
+        { "path": "scripts/component-transition-lib.mjs" },
+        { "path": "scripts/check-component-docs.mjs" },
+        { "path": "scripts/record-component-audits.mjs" }
+      ],
+      "testPaths": ["scripts/tests/"],
+      "scenarios": [
+        "contract:unchanged-source-no-reaudit",
+        "contract:single-audit-increment",
+        "contract:cross-platform-source-hash"
+      ]
+    }
+  ]
+}

@@ -30,11 +30,12 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Enforce component documentation updates
+      - name: Enforce change and documentation contracts
         env:
           COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           npm run check:components -- --base "$COMPONENT_BASE_SHA"
+          npm run check:change-contracts -- --base "$COMPONENT_BASE_SHA"
           npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"
       - name: Run repository verification
         run: npm run verify
