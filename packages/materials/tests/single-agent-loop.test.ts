@@ -91,6 +91,34 @@ test("assist mode pauses before verification and resumes from the durable propos
   }
 });
 
+test("auto mode preserves a pause raised during a turn instead of exhausting the run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-pause-during-turn-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "PAUSE-TURN-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    const pausingLane: SolverLaneFactory = async ({ services: laneServices }) => ({
+      async prompt() {
+        await laneServices.control.dispatch(runId, { type: "pause", reason: "test pause", lane: "executor" });
+        return {
+          text: "paused",
+          stopReason: "aborted",
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 } },
+        };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const result = await new SingleAgentCtfLoop(root, config, services, pausingLane).run({ runId, task, mode: "auto", maxTurns: 1 });
+    assert.equal(result.status, "PAUSED");
+    assert.equal(result.turns, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("completion proposals must be grounded in a successful current-generation observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-grounding-"));
   try {

@@ -4,9 +4,17 @@
 {
   "id": "materials-app",
   "name": "Application Composition",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 1,
+    "securityAuditCount": 1,
+    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
+    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
+    "sourceHash": "4dadfbc608568ff907f643a21dafbb6b277ae1619494e315094f9302ee5d6085",
+    "result": "passed"
+  }
 }
 ```
 

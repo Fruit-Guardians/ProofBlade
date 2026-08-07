@@ -4,9 +4,17 @@
 {
   "id": "materials-effects",
   "name": "Effects and Artifact Store",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T22:38:40+08:00"
+  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 1,
+    "securityAuditCount": 1,
+    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
+    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
+    "sourceHash": "d39c55335693194162207c3f7d7c1d0c38e17de77aa71d69884bc43e207b3dbc",
+    "result": "passed"
+  }
 }
 ```
 

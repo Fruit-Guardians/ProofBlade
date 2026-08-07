@@ -138,6 +138,49 @@ test("pauses an active coding lane and persists a resumable run state", async ()
   }
 });
 
+test("persists a solve run before returning so an immediate pause aborts its solver lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-pause-"));
+  let releaseFactory!: () => void;
+  const factoryReady = new Promise<void>((resolve) => { releaseFactory = resolve; });
+  let resolveClosed!: () => void;
+  const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
+  let prompts = 0;
+  let aborts = 0;
+  const lane: AgentLanePort = {
+    async prompt() {
+      prompts += 1;
+      return { text: "unexpected", stopReason: "stop", usage: zeroUsage() };
+    },
+    async abort() { aborts += 1; },
+    async compact() {},
+    async isIdle() { return true; },
+    async close() { resolveClosed(); },
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => {
+      await factoryReady;
+      return lane;
+    });
+    const runId = "SOLVE-PAUSE-001";
+    const started = await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    assert.equal(started.state, "running");
+    const paused = await data.pause(runId);
+    assert.equal(paused.state, "paused");
+    assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
+    await assert.rejects(
+      data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 }),
+      /Run is already active/,
+    );
+    releaseFactory();
+    await closed;
+    assert.equal(aborts, 1);
+    assert.equal(prompts, 0);
+    assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 const config: ProofBladeConfig = {
   schemaVersion: 1,
   runtime: { piVersion: "0.83.0" },

@@ -4,9 +4,17 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-06T14:15:00+08:00"
+  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 1,
+    "securityAuditCount": 1,
+    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
+    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
+    "sourceHash": "2ca2eeabf5ce842d4e5157163663f2902151376c34a0934392a35f0757465cba",
+    "result": "passed"
+  }
 }
 ```
 

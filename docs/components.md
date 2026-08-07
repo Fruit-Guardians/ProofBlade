@@ -4,12 +4,16 @@ ProofBlade 使用 `COMPONENT.md` 记录组件级开发契约。组件归属由�
 
 ## 更新纪律
 
-修改组件源码、测试、包配置或构建配置时，必须同时更新对应文档的 `version` 和 `updatedAt`。`createdAt` 保持首次编写时间不变。版本遵循 SemVer：破坏契约升主版本，兼容新增升次版本，修复、重构和文档校准升修订号。
+修改组件源码、测试、包配置或构建配置时，必须同时更新对应文档的 `version`、`updatedAt` 和 `qualityAudit`。`createdAt` 保持首次编写时间不变。版本遵循 SemVer：破坏契约升主版本，兼容新增升次版本，修复、重构和文档校准升修订号。
+
+`qualityAudit` 分别记录 BUG 与安全审计的次数、最近时间、结果和审计覆盖的源码 SHA-256。检查器会根据组件归属计算指纹；指纹未变化时可以跳过重复检查，源码变化后必须增加两项计数并更新审计时间。`result: "findings"` 表示仍有未解决问题，会阻止验证通过。
 
 ```powershell
 npm run check:components
 npm run verify
 ```
+
+审计通过后使用 `npm run record:component-audit -- --components <id,...|all> --at <ISO时间> --result passed` 写入记录。记录器默认跳过指纹未变化的组件；只有周期性复审相同源码时才传入 `--force`。
 
 第一条命令在本地比较 `HEAD` 与工作区；CI 会比较 PR 基线与当前提交。新增组件时，需要同时创建 `COMPONENT.md` 并登记到 `component-docs.json`。
 

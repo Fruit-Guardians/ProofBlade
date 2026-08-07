@@ -43,10 +43,19 @@ apps/cli + apps/gui -> packages/materials -> packages/molecules -> packages/atom
 - `version` 使用 `主版本.次版本.修订号`。不兼容契约变更升主版本，新增兼容能力升次版本，内部修复和说明修正升修订号。
 - `createdAt` 记录文档首次编写时间，后续保持不变。
 - `updatedAt` 记录该组件最近一次变更时间，使用带时区的 ISO 8601 时间。
+- `qualityAudit` 记录 BUG/安全审计次数、最近审计时间、审计结果和所覆盖源码的 SHA-256 指纹。源码指纹未变化时不需要重复审计。
 - 修改组件源码、测试、包配置或构建配置时，必须同时修改最具体路径对应的 `COMPONENT.md`，提高 `version` 并更新 `updatedAt`。
+- 修改组件源码后必须重新执行 BUG 与安全检查，提高两项审计次数、更新时间并记录新的 `sourceHash`；未解决发现使用 `result: "findings"`，CI 会阻止合并。
 - 只更新组件文档时可以升版；修改子组件时不要求父组件连带升版。路径重叠时以 `component-docs.json` 中最长的路径前缀为准。
 
 本地运行 `npm run check:components` 会比较 `HEAD` 与工作区；CI 使用 PR 基线或 push 前提交进行比较。遗漏文档、版本未提高、更新时间未前进或新增源码没有组件归属都会让检查失败。
+
+完成审计后可用记录器更新一个或多个组件。默认情况下，源码哈希未变化的组件会被跳过，定期复审同一源码时才使用 `--force`：
+
+```powershell
+npm run record:component-audit -- --components materials-runtime,gui --at 2026-08-07T17:39:20+08:00 --result passed
+npm run record:component-audit -- --components all --at 2026-08-07T17:39:20+08:00 --result passed --force
+```
 
 ## 验证门槛
 

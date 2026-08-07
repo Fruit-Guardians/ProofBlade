@@ -4,9 +4,17 @@
 {
   "id": "materials-orchestration",
   "name": "Agent Orchestration",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-05T22:49:12+08:00"
+  "updatedAt": "2026-08-07T18:07:00+08:00",
+  "qualityAudit": {
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-07T18:07:00+08:00",
+    "lastSecurityAuditAt": "2026-08-07T18:07:00+08:00",
+    "sourceHash": "d5fa3d04b72b05794e781753518fc93f01f0763ba811f7320cd73125bdeb7953",
+    "result": "passed"
+  }
 }
 ```
 
@@ -23,6 +31,9 @@
 ## 开发规则与验证
 
 plan-only、等待确认和验证边界 fail-closed。引入新模型角色前先证明成功率、成本和延迟收益，并保持交接契约可测试。
+
+- `SingleAgentCtfLoop` 在 lane 建成后通过 `onLaneReady` 暴露运行控制句柄；每轮模型调用前后都必须检查 durable `PAUSED` 状态。
+- 暂停不是终态或预算耗尽；Auto 模式不得把暂停中的运行改写成 `EXHAUSTED`。
 
 ```powershell
 npm run test:materials
