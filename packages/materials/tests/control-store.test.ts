@@ -95,3 +95,39 @@ test("control store replay is deterministic and verifier gated", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("phase transitions do not implicitly resume a paused run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-paused-phase-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "PAUSED-PHASE-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    await control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
+    await control.dispatch(runId, { type: "pause", reason: "test pause" });
+    await control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
+    assert.equal((await control.snapshot(runId)).status, "PAUSED");
+    await control.dispatch(runId, { type: "resume" });
+    assert.equal((await control.snapshot(runId)).status, "RUNNING");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("paused runs reject every terminal command until explicitly resumed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-paused-terminal-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "PAUSED-TERMINAL-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    await control.dispatch(runId, { type: "pause", reason: "test terminal policy" });
+    await assert.rejects(control.dispatch(runId, { type: "exhaust", reason: "late budget result" }), /paused run; resume it first/);
+    await assert.rejects(control.dispatch(runId, { type: "fail", reason: "late failure", category: "unknown" }), /paused run; resume it first/);
+    await assert.rejects(control.dispatch(runId, { type: "finish", verified: false, evidenceIds: [], reason: "late finish" }), /paused run; resume it first/);
+    assert.equal((await control.snapshot(runId)).status, "PAUSED");
+    await control.dispatch(runId, { type: "resume" });
+    await control.dispatch(runId, { type: "exhaust", reason: "explicitly resumed" });
+    assert.equal((await control.snapshot(runId)).status, "EXHAUSTED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

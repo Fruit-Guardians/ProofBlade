@@ -4,15 +4,15 @@
 {
   "id": "materials-sandbox",
   "name": "Fixture Sandbox",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-07T20:17:19.5056968+08:00",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "8fbfea7aa8e4a39b673694b2dea72c38cd57b7d9a43ccae0550c44da77cda6f3",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-07T20:17:19.5056968+08:00",
+    "lastSecurityAuditAt": "2026-08-07T20:17:19.5056968+08:00",
+    "sourceHash": "115ef660ac0923ffbfe4046449d59bcc7f619494524c9e385027525c68c7573e",
     "result": "passed"
   }
 }
@@ -27,6 +27,7 @@
 - `fixture-catalog.ts` 描述可见 Fixture。
 - `fixture.ts` 管理生命周期和目标执行。
 - 模型看到的是不可信 Observation，不直接拥有 Sandbox 实例或控制状态。
+- Sandbox 暴露幂等 `close()` 生命周期钩子；HTTP-backed 实现必须释放所有 Fixture Server，本地实现无进程资源时允许为空操作。
 
 ## 开发规则与验证
 

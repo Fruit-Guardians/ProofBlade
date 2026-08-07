@@ -1,15 +1,96 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T19:55:00+08:00
+> 状态更新时间：2026-08-07T23:08:26.1335151+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
+| UPDATE-20260807-006 | 2026-08-07T22:44:53.9883278+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
+| UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
+| UPDATE-20260807-004 | 2026-08-07T20:17:19+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-007
+
+时间：2026-08-07T23:08:26.1335151+08:00
+
+摘要：统一暂停状态到所有 Run 终态的原子转换策略。
+
+### 变更
+
+- ControlStore 统一拒绝 PAUSED 状态下的 finish、fail 和 exhaust
+- Reducer 拒绝所有 PAUSED 到终态的事件重放
+- Loop 在迟到的 exhaust 被拒绝后重新读取并返回 PAUSED
+- 新增 contract:pause-before-exhaust 和暂停终态策略测试
+
+### 验证
+
+- [x] contract:pause-before-exhaust
+- [x] paused runs reject every terminal command until explicitly resumed
+- [x] npm run check:change-contracts
+- [x] npm run verify
+
+## UPDATE-20260807-006
+
+时间：2026-08-07T22:44:53.9883278+08:00
+
+摘要：原子阻止暂停状态被最终成功提交覆盖。
+
+### 变更
+
+- ControlStore 在单写者命令校验内拒绝 PAUSED 状态的成功 finish
+- Reducer 重放拒绝 PAUSED 到 SUCCEEDED 的非法状态转换
+- 新增 contract:pause-before-finish 精确竞态回归测试
+
+### 验证
+
+- [x] contract:pause-before-finish
+- [x] npm run check:change-contracts
+- [x] npm run verify
+
+## UPDATE-20260807-005
+
+时间：2026-08-07T22:17:05.6261580+08:00
+
+摘要：修复 Verifier 执行期间暂停后仍完成成功的问题。
+
+### 变更
+
+- Verifier 将 AbortSignal 传递到每次 fixture_score Effect，并在 Effect 和结果提交边界检查运行状态
+- 验证返回、report 和 finish 前增加 fail-closed 检查，暂停运行保持 PAUSED
+- phase_started 事件不再隐式恢复 PAUSED，新增暂停阶段转换回归测试
+
+### 验证
+
+- [x] contract:pause-during-verifier
+- [x] phase transitions do not implicitly resume a paused run
+- [x] npm run typecheck --workspace=@proofblade/gui
+- [x] npm run typecheck --workspace=@proofblade/materials
+
+## UPDATE-20260807-004
+
+时间：2026-08-07T20:17:19+08:00
+
+摘要：修复 GUI 关闭故障路径、Solver 单次中止和模型调用边界竞态。
+
+### 变更
+
+- 服务清理失败时仍关闭 HTTP Server 和 Vite，并统一汇总关闭错误
+- Planner 返回、模型返回和验证入口重新检查 AbortSignal
+- Chat Lane 直接中止，Solver Lane 统一只通过对应 AbortController 中止
+- 恢复未受影响组件审计台账，只对真实受影响组件递增一次
+
+### 验证
+
+- [x] GUI shutdown failure and Solver abort contract tests
+- [x] npm run check:components -- --base e2d2164
+- [x] npm run check:change-contracts -- --base e2d2164
+- [x] npm run verify
 
 ## UPDATE-20260807-003
 

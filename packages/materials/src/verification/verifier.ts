@@ -22,8 +22,9 @@ export class IndependentVerifier {
     private readonly runsRoot: string,
   ) {}
 
-  public async verify(runId: string, fixture: FixtureRef, completionId?: string): Promise<VerificationOutcome> {
+  public async verify(runId: string, fixture: FixtureRef, completionId?: string, signal?: AbortSignal): Promise<VerificationOutcome> {
     const snapshot = await this.controlStore.snapshot(runId);
+    await ensureVerifierActive(this.controlStore, runId, signal);
     const completion = completionId
       ? snapshot.completions[completionId]
       : Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
@@ -42,7 +43,8 @@ export class IndependentVerifier {
         args: { candidatePath, candidateArtifactId: artifact.id, generation: snapshot.generation, attempt },
         replayPolicy: "pure",
         cwd: fixture.path,
-      });
+      }, signal);
+      await ensureVerifierActive(this.controlStore, runId, signal);
       const result = JSON.parse(scored.result.stdout) as { accepted?: boolean; candidateHash?: string };
       const acceptedAttempt = result.accepted === true && result.candidateHash === completion.candidateHash;
       accepted.push(acceptedAttempt);
@@ -61,9 +63,12 @@ export class IndependentVerifier {
         },
         lane: "verifier",
       });
+      await ensureVerifierActive(this.controlStore, runId, signal);
     }
     const verified = accepted.length > 0 && accepted.every(Boolean);
+    await ensureVerifierActive(this.controlStore, runId, signal);
     await this.controlStore.dispatch(runId, { type: "completion_verified", completionId: completion.id, accepted: verified, evidenceIds, lane: "verifier" });
+    await ensureVerifierActive(this.controlStore, runId, signal);
     let factId: string | undefined;
     if (verified) {
       factId = id("F");
@@ -72,7 +77,14 @@ export class IndependentVerifier {
         fact: { id: factId, statement: `Hidden scorer verified candidate sha256=${completion.candidateHash}`, status: "CONFIRMED", evidenceIds },
         lane: "verifier",
       });
+      await ensureVerifierActive(this.controlStore, runId, signal);
     }
     return { completionId: completion.id, accepted: verified, candidate, candidateHash: completion.candidateHash, evidenceIds, factId };
   }
+}
+
+async function ensureVerifierActive(controlStore: ControlStore, runId: string, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error("Run aborted");
+  const snapshot = await controlStore.snapshot(runId);
+  if (snapshot.status === "PAUSED") throw new Error("Run paused during verification");
 }

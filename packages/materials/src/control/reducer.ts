@@ -49,8 +49,10 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     case "phase_started":
       next.phase = p.phase as RunSnapshot["phase"];
-      if (next.phase === "verification") next.status = "VERIFYING";
-      else if (next.status === "READY" || next.status === "PAUSED" || next.status === "VERIFYING") next.status = "RUNNING";
+      if (next.status !== "PAUSED") {
+        if (next.phase === "verification") next.status = "VERIFYING";
+        else if (next.status === "READY" || next.status === "VERIFYING") next.status = "RUNNING";
+      }
       break;
     case "phase_finished":
       if (p.phase) next.phase = p.phase as RunSnapshot["phase"];
@@ -70,6 +72,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "run_finished": {
       const status = p.status as RunStatus;
       if (!terminal.includes(status)) throw new Error(`Invalid terminal status: ${String(status)}`);
+      if (next.status === "PAUSED") throw new Error(`Cannot transition a paused run to ${status}; resume it first`);
       if (status === "SUCCEEDED" && (p.verified !== true || !Array.isArray(p.evidenceIds) || p.evidenceIds.length === 0)) {
         throw new Error("A successful run requires verifier approval and evidence");
       }
@@ -81,6 +84,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "run_failed":
+      if (next.status === "PAUSED") throw new Error("Cannot transition a paused run to FAILED; resume it first");
       ensureNotTerminal(next.status);
       next.status = "FAILED";
       next.terminalReason = typeof p.reason === "string" ? p.reason : "run_failed";

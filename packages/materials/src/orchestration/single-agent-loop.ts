@@ -30,6 +30,7 @@ export interface SingleAgentRunOptions {
   mode?: ExecutionMode;
   maxTurns?: number;
   onLaneReady?: (lane: AgentLanePort) => void | Promise<void>;
+  signal?: AbortSignal;
 }
 
 export interface SingleAgentRunOutcome {
@@ -53,6 +54,7 @@ export class SingleAgentCtfLoop {
   public async run(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome> {
     const mode = options.mode ?? "assist";
     const maxTurns = options.maxTurns ?? 3;
+    throwIfAborted(options.signal);
     const runDir = join(this.services.runsRoot, options.runId);
     let snapshot: RunSnapshot;
     if (await exists(join(runDir, "task.json"))) snapshot = await this.services.control.snapshot(options.runId);
@@ -64,8 +66,10 @@ export class SingleAgentCtfLoop {
     }
     const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox)
       .recover(options.runId, snapshot.task);
+    throwIfAborted(options.signal);
     const fixture = recovery.fixture;
     snapshot = await this.services.control.snapshot(options.runId);
+    throwIfAborted(options.signal);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
@@ -73,23 +77,49 @@ export class SingleAgentCtfLoop {
     const planner = new PlannerCoordinator(this.services.control);
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
-      const verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id);
+      throwIfAborted(options.signal);
+      let verified: VerificationOutcome;
+      try {
+        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, options.signal);
+      } catch (error) {
+        const paused = await this.services.control.snapshot(options.runId);
+        if (paused.status === "PAUSED") return outcome(paused, mode, 0);
+        throw error;
+      }
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
     await runtime.recoverJobs();
     let lane: AgentLanePort | undefined;
+    let removeAbortListener: (() => void) | undefined;
+    let abortPromise: Promise<void> | undefined;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
     try {
+      throwIfAborted(options.signal);
       lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+      const activeLane = lane;
+      const onAbort = () => {
+        abortPromise = activeLane.abort(options.signal?.reason ?? "GUI shutting down");
+      };
+      if (options.signal) {
+        options.signal.addEventListener("abort", onAbort, { once: true });
+        removeAbortListener = () => options.signal?.removeEventListener("abort", onAbort);
+        if (options.signal.aborted) {
+          onAbort();
+          throwIfAborted(options.signal);
+        }
+      }
       await options.onLaneReady?.(lane);
       while (turns < maxTurns) {
+        throwIfAborted(options.signal);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
         await planner.prepare(options.runId);
+        throwIfAborted(options.signal);
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        throwIfAborted(options.signal);
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
@@ -113,7 +143,8 @@ export class SingleAgentCtfLoop {
             await this.services.control.dispatch(options.runId, { type: "pause", reason: `Completion ${pending.id} is waiting for verifier approval.` });
             break;
           }
-          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id);
+          throwIfAborted(options.signal);
+          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, options.signal);
           if (verification.accepted) break;
           await this.moveTo(options.runId, "experiment");
           continue;
@@ -135,13 +166,30 @@ export class SingleAgentCtfLoop {
           break;
         }
       }
+    } catch (error) {
+      const paused = await this.services.control.snapshot(options.runId);
+      if (paused.status === "PAUSED") {
+        snapshot = paused;
+        return outcome(snapshot, mode, turns, verification);
+      }
+      throw error;
     } finally {
-      await lane?.close();
-      await runtime.close();
+      removeAbortListener?.();
+      const results: PromiseSettledResult<void>[] = [];
+      if (abortPromise) results.push(...await Promise.allSettled([abortPromise]));
+      if (lane) results.push(...await Promise.allSettled([lane.close()]));
+      results.push(...await Promise.allSettled([runtime.close()]));
+      const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+      if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more run resources");
     }
     snapshot = await this.services.control.snapshot(options.runId);
     if (mode === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
-      await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
+      try {
+        await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
+      } catch (error) {
+        const current = await this.services.control.snapshot(options.runId);
+        if (current.status !== "PAUSED") throw error;
+      }
       snapshot = await this.services.control.snapshot(options.runId);
     }
     return outcome(snapshot, mode, turns, verification);
@@ -157,7 +205,8 @@ export class SingleAgentCtfLoop {
     });
   }
 
-  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string): Promise<VerificationOutcome> {
+  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, signal?: AbortSignal): Promise<VerificationOutcome> {
+    throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     if (Object.keys(snapshot.hypotheses).length === 0) {
       const completion = snapshot.completions[completionId]!;
@@ -167,10 +216,15 @@ export class SingleAgentCtfLoop {
         lane: "executor",
       });
     }
+    throwIfAborted(signal);
     await this.moveTo(runId, "verification");
-    const verified = await verifier.verify(runId, fixture, completionId);
+    throwIfAborted(signal);
+    const verified = await verifier.verify(runId, fixture, completionId, signal);
+    await this.ensureVerifierActive(runId, signal);
     if (!verified.accepted) return verified;
+    await this.ensureVerifierActive(runId, signal);
     await this.moveTo(runId, "report");
+    await this.ensureVerifierActive(runId, signal);
     const report = [
       "# ProofBlade verification report",
       "",
@@ -187,8 +241,14 @@ export class SingleAgentCtfLoop {
     for (const intent of Object.values(current.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED")) {
       await this.services.control.dispatch(runId, { type: "intent", intent: { ...intent, status: "DONE" }, lane: "executor" });
     }
+    await this.ensureVerifierActive(runId, signal);
     await this.services.control.dispatch(runId, { type: "finish", verified: true, evidenceIds: verified.evidenceIds, reason: "Hidden scorer reproduced the candidate.", lane: "verifier" });
     return verified;
+  }
+
+  private async ensureVerifierActive(runId: string, signal?: AbortSignal): Promise<void> {
+    throwIfAborted(signal);
+    if ((await this.services.control.snapshot(runId)).status === "PAUSED") throw new Error("Run paused during verification");
   }
 
   private async moveTo(runId: string, phase: RunSnapshot["phase"]): Promise<void> {
@@ -231,4 +291,9 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error ? signal.reason : new Error("Run aborted");
 }

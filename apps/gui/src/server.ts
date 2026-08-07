@@ -7,6 +7,7 @@ import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
+import { closeGuiResources } from "./shutdown.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +47,29 @@ server.listen(port, host, () => {
   console.log(`Project root: ${projectRoot}`);
   console.log(`Config: ${configPath}`);
 });
+
+let shutdownPromise: Promise<void> | undefined;
+const shutdown = (signal: string): Promise<void> => {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    try {
+      await closeGuiResources({
+        closeData: () => data.close(),
+        closeHttp: () => new Promise<void>((resolve, reject) => {
+          server.close((error) => error ? reject(error) : resolve());
+        }),
+        closeVite: () => vite.close(),
+      });
+    } catch (error) {
+      process.exitCode = 1;
+      console.error(`ProofBlade GUI shutdown failed after ${signal}:`, error);
+    }
+  })();
+  return shutdownPromise;
+};
+
+process.once("SIGINT", () => { void shutdown("SIGINT"); });
+process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
 
 async function api(method: string, url: URL, request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse): Promise<void> {
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);

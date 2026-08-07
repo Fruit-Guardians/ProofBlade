@@ -233,6 +233,9 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
 }
 
 function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
+  if (snapshot.status === "PAUSED" && (command.type === "finish" || command.type === "fail" || command.type === "exhaust")) {
+    throw new Error(`Cannot ${command.type} a paused run; resume it first`);
+  }
   if (command.type === "lease_released" && (command.ownerLane !== undefined || command.generation !== undefined)) {
     const lease = snapshot.leases[command.resourceKey];
     if (!lease) return;

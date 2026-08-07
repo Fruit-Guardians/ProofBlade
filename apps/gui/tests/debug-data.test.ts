@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { SingleAgentCtfLoop } from "@proofblade/materials";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent } from "../src/shared.js";
 
@@ -142,6 +143,8 @@ test("persists a solve run before returning so an immediate pause aborts its sol
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-pause-"));
   let releaseFactory!: () => void;
   const factoryReady = new Promise<void>((resolve) => { releaseFactory = resolve; });
+  let markFactoryEntered!: () => void;
+  const factoryEntered = new Promise<void>((resolve) => { markFactoryEntered = resolve; });
   let resolveClosed!: () => void;
   const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
   let prompts = 0;
@@ -158,12 +161,14 @@ test("persists a solve run before returning so an immediate pause aborts its sol
   };
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => {
+      markFactoryEntered();
       await factoryReady;
       return lane;
     });
     const runId = "SOLVE-PAUSE-001";
     const started = await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
     assert.equal(started.state, "running");
+    await factoryEntered;
     const paused = await data.pause(runId);
     assert.equal(paused.state, "paused");
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
@@ -177,6 +182,75 @@ test("persists a solve run before returning so an immediate pause aborts its sol
     assert.equal(prompts, 0);
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:shutdown-awaits-active-runs] [contract:solver-abort-exactly-once] GUI close aborts each Solver once and awaits it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-close-"));
+  let releasePrompt!: () => void;
+  let closeFinished!: () => void;
+  let markPromptStarted!: () => void;
+  const promptStarted = new Promise<void>((resolve) => { markPromptStarted = resolve; });
+  const closed = new Promise<void>((resolve) => { closeFinished = resolve; });
+  let aborts = 0;
+  const lane: AgentLanePort = {
+    async prompt() {
+      markPromptStarted();
+      await new Promise<void>((resolve) => { releasePrompt = resolve; });
+      return { text: "aborted", stopReason: "aborted", usage: zeroUsage() };
+    },
+    async abort() { aborts += 1; releasePrompt(); },
+    async compact() {},
+    async isIdle() { return false; },
+    async close() { closeFinished(); },
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => lane);
+    const runId = "SOLVE-CLOSE-001";
+    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    await promptStarted;
+    const closing = data.close();
+    releasePrompt();
+    await closing;
+    await closed;
+    assert.equal(aborts, 1);
+    await assert.rejects(data.startSolve({ runId: "SOLVE-CLOSE-NEW", fixtureId: "web-source-1", mode: "auto" }), /GUI is shutting down/);
+  } finally {
+    releasePrompt?.();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GUI close reports Lane abort failures as AggregateError", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-abort-failure-"));
+  let releasePrompt!: () => void;
+  let markPromptStarted!: () => void;
+  const promptStarted = new Promise<void>((resolve) => { markPromptStarted = resolve; });
+  const lane: AgentLanePort = {
+    async prompt() {
+      markPromptStarted();
+      await new Promise<void>((resolve) => { releasePrompt = resolve; });
+      return { text: "aborted", stopReason: "aborted", usage: zeroUsage() };
+    },
+    async abort() {
+      releasePrompt?.();
+      throw new Error("injected lane abort failure");
+    },
+    async compact() {},
+    async isIdle() { return false; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-ABORT-FAILURE-001";
+    await data.createConversation({ runId, title: "abort failure", workspacePath: root });
+    const chat = data.chat(runId, "inspect", () => undefined, undefined, undefined, root);
+    await promptStarted;
+    await assert.rejects(data.close(), (error: unknown) => error instanceof AggregateError && error.errors.some((item) => String(item).includes("injected lane abort failure")));
+    await chat;
+  } finally {
+    releasePrompt?.();
     await rm(root, { recursive: true, force: true });
   }
 });
