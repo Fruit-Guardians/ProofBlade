@@ -3,6 +3,7 @@ import type { ContextManifest } from "../domain/types.js";
 import { estimateTokens } from "../domain/utils.js";
 import { pruneAgentMessages } from "./agent-pruner.js";
 import type { CheckpointService } from "./checkpoint.js";
+import { isRealUserTask, userMessageText } from "./user-task-anchor.js";
 
 export interface CompactionPreparationPort {
   firstKeptEntryId: string;
@@ -72,7 +73,7 @@ export class DurableCompactionCoordinator {
 }
 
 function restoreTaskAnchor(messages: AgentMessage[], taskAnchor: DurableCompactionOptions["taskAnchor"]): AgentMessage[] {
-  if (!taskAnchor) return messages;
+  if (!isRealUserTask(taskAnchor)) return messages;
   const anchorKey = userMessageKey(taskAnchor);
   if (messages.some((message) => message.role === "user" && userMessageKey(message) === anchorKey)) return messages;
   return [structuredClone(taskAnchor), ...messages];
@@ -85,9 +86,7 @@ function appendTaskAnchor(summary: string, taskAnchor: DurableCompactionOptions[
 }
 
 function taskAnchorText(message: DurableCompactionOptions["taskAnchor"]): string {
-  if (!message) return "";
-  if (typeof message.content === "string") return message.content.trim();
-  return message.content.flatMap((item) => item.type === "text" ? [item.text] : []).join("\n").trim();
+  return isRealUserTask(message) ? userMessageText(message) : "";
 }
 
 function userMessageKey(message: Extract<AgentMessage, { role: "user" }>): string {

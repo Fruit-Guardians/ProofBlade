@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T01:15:42.9850913+08:00",
+  "updatedAt": "2026-08-09T12:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -480,6 +480,28 @@
       ],
       "validation": [
         "113/113 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-002",
+      "occurredAt": "2026-08-09T12:00:00+08:00",
+      "summary": "修复连续上下文溢出时内部恢复提示冒充用户任务的问题。",
+      "branch": "codex/preserve-user-task-anchor",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "新增共享的外部用户任务锚点判定，排除自动上下文恢复提示",
+        "Coding Lane、Agent Pruner 和 Durable Compaction 共用任务锚点逻辑",
+        "恢复提示在二次压缩时可被裁剪，原始用户任务继续进入摘要和 retained tail",
+        "增加连续两次 length 恢复顺序回归测试"
+      ],
+      "validation": [
+        "116/116 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"

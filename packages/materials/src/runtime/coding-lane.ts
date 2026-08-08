@@ -11,6 +11,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
+import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { estimateTokens } from "../domain/utils.js";
@@ -134,7 +135,7 @@ export class PiCodingLane implements AgentLanePort {
     harness.on("session_before_compact", async ({ preparation }) => ({
       compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, {
         maxContextTokens: contextBudget,
-        taskAnchor: await latestUserMessage(session),
+        taskAnchor: await latestExternalUserMessageFromSession(session),
       }),
     }));
     attachPiObservability(harness, {
@@ -247,13 +248,9 @@ export class PiCodingLane implements AgentLanePort {
   }
 }
 
-async function latestUserMessage(session: { getBranch(): Promise<Array<{ type: string; message?: AgentMessage }>> }): Promise<Extract<AgentMessage, { role: "user" }> | undefined> {
+async function latestExternalUserMessageFromSession(session: { getBranch(): Promise<Array<{ type: string; message?: AgentMessage }>> }): Promise<Extract<AgentMessage, { role: "user" }> | undefined> {
   const branch = await session.getBranch();
-  for (let index = branch.length - 1; index >= 0; index -= 1) {
-    const entry = branch[index];
-    if (entry?.type === "message" && entry.message?.role === "user") return entry.message;
-  }
-  return undefined;
+  return latestExternalUserMessage(branch.flatMap((entry) => entry?.type === "message" && entry.message ? [entry.message] : []));
 }
 
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {
@@ -261,7 +258,7 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
   const output = [...messages];
   let latestUserIndex = -1;
   for (let index = output.length - 1; index >= 0; index -= 1) {
-    if (output[index]!.role === "user") { latestUserIndex = index; break; }
+    if (isRealUserTask(output[index])) { latestUserIndex = index; break; }
   }
   const insertionIndex = latestUserIndex >= 0 ? latestUserIndex : output.length;
   output.splice(insertionIndex, 0, createCustomMessage(

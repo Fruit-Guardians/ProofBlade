@@ -10,6 +10,8 @@ import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { CheckpointService } from "../src/context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../src/context/durable-compaction.js";
+import { latestExternalUserMessage } from "../src/context/user-task-anchor.js";
+import { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../src/runtime/context-length-recovery.js";
 import { repairAgentMessages, toolPairViolations } from "../src/context/agent-pruner.js";
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { RunRecoveryService } from "../src/recovery/run-recovery.js";
@@ -235,6 +237,42 @@ test("[contract:compaction-task-anchor] mechanical compaction restores a user re
     assert.equal(compaction.retainedTail.filter((message) => message.role === "user").length, 1);
     assert.match(JSON.stringify(compaction.retainedTail), /继续完成逆向并求出 flag/);
     assert.deepEqual(toolPairViolations(compaction.retainedTail), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:repeated-length-task-anchor] consecutive context recovery keeps the external task anchor", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-repeated-length-anchor-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "REPEATED-LENGTH-ANCHOR";
+    await services.control.createRun(runId, fixtureTask(runId, "reverse-branch-2", root, config));
+    const checkpointService = new CheckpointService(services.control, services.artifacts);
+    const realTask = { role: "user" as const, content: "继续完成固件逆向并求出 flag", timestamp: 10 };
+    const recoveryPrompt = { role: "user" as const, content: `${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint.`, timestamp: 20 };
+    const makeTail = (prefix: AgentMessage[]): AgentMessage[] => [...prefix, ...Array.from({ length: 8 }, (_, index) => [
+      { role: "assistant", content: [{ type: "toolCall", id: `repeat-call-${index}`, name: "evidence", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 + 30 },
+      { role: "toolResult", toolCallId: `repeat-call-${index}`, toolName: "evidence", content: [{ type: "text", text: `repeat-artifact-${index} ` + "x".repeat(2_000) }], isError: false, timestamp: index * 2 + 31 },
+    ]).flat() as AgentMessage[]];
+    const first = await new DurableCompactionCoordinator(checkpointService).provide(runId, {
+      firstKeptEntryId: "first-overflow",
+      tokensBefore: 20_000,
+      retainedTail: makeTail([realTask]),
+    }, undefined, { maxContextTokens: 4_096, taskAnchor: realTask });
+    const secondTail = makeTail([...first.retainedTail, recoveryPrompt]);
+    const anchor = latestExternalUserMessage(secondTail);
+    assert.equal(anchor?.content, realTask.content);
+    const second = await new DurableCompactionCoordinator(checkpointService).provide(runId, {
+      firstKeptEntryId: "second-overflow",
+      tokensBefore: 30_000,
+      retainedTail: secondTail,
+    }, undefined, { maxContextTokens: 4_096, taskAnchor: anchor });
+    assert.match(second.summary, /## Active user request\n继续完成固件逆向并求出 flag/);
+    const retained = JSON.stringify(second.retainedTail);
+    assert.match(retained, /继续完成固件逆向并求出 flag/);
+    assert.doesNotMatch(second.summary, new RegExp(AUTOMATIC_CONTEXT_RECOVERY_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(retained, new RegExp(AUTOMATIC_CONTEXT_RECOVERY_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

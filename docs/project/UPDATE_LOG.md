@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T01:15:42.9850913+08:00
+> 状态更新时间：2026-08-09T12:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260808-006 | 2026-08-08T22:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
 | UPDATE-20260808-005 | 2026-08-08T15:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
@@ -21,6 +22,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-002
+
+时间：2026-08-09T12:00:00+08:00
+
+摘要：修复连续上下文溢出时内部恢复提示冒充用户任务的问题。
+
+### 变更
+
+- 新增共享的外部用户任务锚点判定，排除自动上下文恢复提示
+- Coding Lane、Agent Pruner 和 Durable Compaction 共用任务锚点逻辑
+- 恢复提示在二次压缩时可被裁剪，原始用户任务继续进入摘要和 retained tail
+- 增加连续两次 length 恢复顺序回归测试
+
+### 验证
+
+- [x] 116/116 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-001
 

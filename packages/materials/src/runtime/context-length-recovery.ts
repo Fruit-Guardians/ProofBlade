@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-
-export const AUTOMATIC_CONTEXT_RECOVERY_MARKER = "[ProofBlade automatic context recovery]";
+export { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../context/user-task-anchor.js";
+import { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../context/user-task-anchor.js";
 export const DEFAULT_CONTEXT_LENGTH_RECOVERIES = 2;
 
 export interface ContextLengthRecoveryPort {
