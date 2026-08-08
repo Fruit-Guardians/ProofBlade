@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
+  "updatedAt": "2026-08-08T02:02:26.8610595+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -349,6 +349,27 @@
         "contract:pause-before-exhaust",
         "paused runs reject every terminal command until explicitly resumed",
         "npm run check:change-contracts",
+        "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-001",
+      "occurredAt": "2026-08-08T02:02:26.8610595+08:00",
+      "summary": "修复严格 OpenAI-compatible Provider 拒绝 Coding Tool Schema 的问题。",
+      "branch": "codex/provider-schema-compat",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "将 evidence 的根级判别联合改为 type object 和 operation 字符串枚举",
+        "将 Coding Tool 内部离散选项改为直接字符串 enum，消除 Provider 可见 anyOf",
+        "把 operation 的必需字段和互斥字段约束保留在确定性运行时校验中",
+        "增加全部 Coding Provider Tool 根 Schema 兼容性与跨操作字段拒绝测试"
+      ],
+      "validation": [
+        "coding provider schema compatibility contract",
+        "npm run test --workspace=@proofblade/materials",
         "npm run verify"
       ]
     }

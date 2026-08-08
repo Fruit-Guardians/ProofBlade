@@ -21,13 +21,26 @@ import { join, resolve } from "node:path";
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
   assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "add79e77d8d8222dd065a743787e2a5d218989f75941ab4b73238237a62840e6");
+  assert.equal(sha256(canonicalJson(snapshot)), "db8caf60c128c712b5afe32affeaa99e55a183fcffb2f4c71e91250ede82f33e");
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
   assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "mcp_call"]);
   assert.deepEqual(withResources, withoutResources);
+});
+
+test("coding provider tools use object-root schemas accepted by strict OpenAI-compatible providers", () => {
+  const snapshot = codingProviderToolContractSnapshot();
+  for (const tool of snapshot) {
+    const parameters = tool.parameters as { type?: unknown };
+    assert.equal(parameters.type, "object", `${tool.name} must expose an object-root parameter schema`);
+    assert.equal(JSON.stringify(parameters).includes('"anyOf"'), false, `${tool.name} must use direct enums instead of anyOf`);
+  }
+
+  const evidence = snapshot.find((tool) => tool.name === "evidence")?.parameters as { properties?: Record<string, { type?: unknown; enum?: unknown }> };
+  assert.equal(evidence.properties?.operation?.type, "string");
+  assert.deepEqual(evidence.properties?.operation?.enum, ["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
 });
 
 test("coding claim verification rejects decoys and persists a matching reproduction", async () => {
@@ -65,6 +78,10 @@ test("coding claim verification rejects decoys and persists a matching reproduct
     evidenceGraph,
   } as unknown as CodingResourceContext;
   try {
+    await assert.rejects(
+      () => executeTool("evidence", { operation: "inspect_forest", query: "unexpected cross-operation field" }, context),
+      /evidence inspect_forest does not accept: query/,
+    );
     const analysisArtifact = await services.artifacts.putText(runId, "EF01 offset=0xD4 length=0x26 nonce=fc99899b203e3fb7e7a36312", {
       filename: "ncal-ef01-analysis.txt",
       semantic: { name: "NCAL EF01 初步解析", summary: "从校准文件解析出的受保护 DID 记录。", tags: ["ncal", "ef01"], role: "intermediate", relatedIds: [], annotatedBy: "harness" },
