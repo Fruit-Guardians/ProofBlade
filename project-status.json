@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
+  "updatedAt": "2026-08-08T10:33:24+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260808-003",
+      "occurredAt": "2026-08-08T10:33:24+08:00",
+      "summary": "修复组件审计基线在多 PR 合并后的过期指纹误判，并完善 CI 审计时间自动推断。",
+      "branch": "main",
+      "commit": "self",
+      "planIds": [
+        "PLAN-001",
+        "PLAN-002"
+      ],
+      "changes": [
+        "允许源码未变化但基线审计指纹过期时进行一次精确源码哈希修复",
+        "要求修复同时满足当前源码哈希、单次 BUG/安全审计递增和审计时间递增",
+        "为 stale-audit-repair 增加 CI 回归契约测试和文档说明",
+        "保留显式、环境、PR 事件、Git 提交和当前时间的审计时间回退链"
+      ],
+      "validation": [
+        "npm run test:ci-gates",
+        "npm run check:components -- --base 9022dd9b0479832f3aba45613add2699b8997671",
+        "npm run check:change-contracts -- --base 9022dd9b0479832f3aba45613add2699b8997671",
+        "npm run check:project-reports -- --base 9022dd9b0479832f3aba45613add2699b8997671"
+      ]
+    },
     {
       "id": "UPDATE-20260808-001",
       "occurredAt": "2026-08-08T02:47:55.5788475+08:00",

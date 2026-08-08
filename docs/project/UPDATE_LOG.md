@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-08T02:47:55.5788475+08:00
+> 状态更新时间：2026-08-08T10:33:24+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260808-003 | 2026-08-08T10:33:24+08:00 | PLAN-001, PLAN-002 | main | 本条记录所在提交 |
 | UPDATE-20260808-001 | 2026-08-08T02:47:55.5788475+08:00 | PLAN-120 | codex/context-length-recovery | 本条记录所在提交 |
 | UPDATE-20260808-002 | 2026-08-08T02:02:26.8610595+08:00 | PLAN-120 | codex/provider-schema-compat | 本条记录所在提交 |
 | UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
@@ -16,6 +17,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260808-003
+
+时间：2026-08-08T10:33:24+08:00
+
+摘要：修复组件审计基线在多 PR 合并后的过期指纹误判，并完善 CI 审计时间自动推断。
+
+### 变更
+
+- 允许源码未变化但基线审计指纹过期时进行一次精确源码哈希修复
+- 要求修复同时满足当前源码哈希、单次 BUG/安全审计递增和审计时间递增
+- 为 stale-audit-repair 增加 CI 回归契约测试和文档说明
+- 保留显式、环境、PR 事件、Git 提交和当前时间的审计时间回退链
+
+### 验证
+
+- [x] npm run test:ci-gates
+- [x] npm run check:components -- --base 9022dd9b0479832f3aba45613add2699b8997671
+- [x] npm run check:change-contracts -- --base 9022dd9b0479832f3aba45613add2699b8997671
+- [x] npm run check:project-reports -- --base 9022dd9b0479832f3aba45613add2699b8997671
 
 ## UPDATE-20260808-001
 

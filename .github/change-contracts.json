@@ -62,7 +62,8 @@
       "scenarios": [
         "contract:unchanged-source-no-reaudit",
         "contract:single-audit-increment",
-        "contract:cross-platform-source-hash"
+        "contract:cross-platform-source-hash",
+        "contract:stale-audit-repair"
       ]
     },
     {

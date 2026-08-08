@@ -50,7 +50,8 @@ for (const component of registry.components) {
   if (previousText === undefined) continue;
   const previous = parseMetadata(previousText, `${base}:${component.document}`);
   const current = parseMetadata(readFileSync(join(root, component.document), "utf8"), component.document);
-  for (const error of componentTransitionErrors({ componentId: component.id, previous, current, sourceChanged, documentChanged })) fail(error);
+  const expectedSourceHash = componentSourceHash(root, registry, component);
+  for (const error of componentTransitionErrors({ componentId: component.id, previous, current, sourceChanged, documentChanged, expectedSourceHash })) fail(error);
 }
 
 if (errors.length > 0) {

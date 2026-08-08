@@ -29,6 +29,33 @@ test("[contract:single-audit-increment] accepts one audit and rejects a multi-co
   assert.equal(errors.some((error) => error.includes("securityAuditCount must increase exactly once")), true);
 });
 
+test("[contract:stale-audit-repair] permits exactly one correction to the computed source hash", () => {
+  const stale = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00Z", count: 4, hash: "a".repeat(64) });
+  const repaired = metadata({ version: "1.2.4", updatedAt: "2026-08-07T11:00:00Z", count: 5, hash: "b".repeat(64) });
+  assert.deepEqual(componentTransitionErrors({
+    componentId: "materials",
+    previous: stale,
+    current: repaired,
+    sourceChanged: false,
+    documentChanged: true,
+    expectedSourceHash: "b".repeat(64),
+  }), []);
+
+  const wrongHash = metadata({ version: "1.2.4", updatedAt: "2026-08-07T11:00:00Z", count: 5, hash: "c".repeat(64) });
+  assert.deepEqual(componentTransitionErrors({
+    componentId: "materials",
+    previous: stale,
+    current: wrongHash,
+    sourceChanged: false,
+    documentChanged: true,
+    expectedSourceHash: "b".repeat(64),
+  }), ["materials: qualityAudit must not change when component source is unchanged"]);
+
+  const jumped = metadata({ version: "1.2.4", updatedAt: "2026-08-07T11:00:00Z", count: 6, hash: "b".repeat(64) });
+  const errors = componentTransitionErrors({ componentId: "materials", previous: stale, current: jumped, sourceChanged: false, documentChanged: true, expectedSourceHash: "b".repeat(64) });
+  assert.equal(errors.some((error) => error.includes("bugAuditCount must increase exactly once")), true);
+});
+
 test("[contract:cross-platform-source-hash] normalizes text line endings without decoding binary files", () => {
   const lf = canonicalComponentContent("source.ts", Buffer.from("one\ntwo\n"));
   const crlf = canonicalComponentContent("source.ts", Buffer.from("one\r\ntwo\r\n"));

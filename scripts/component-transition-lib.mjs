@@ -1,5 +1,5 @@
 export function componentTransitionErrors(input) {
-  const { componentId, previous, current, sourceChanged, documentChanged } = input;
+  const { componentId, previous, current, sourceChanged, documentChanged, expectedSourceHash } = input;
   const errors = [];
   if (sourceChanged && !documentChanged) {
     errors.push(`${componentId}: source changed but its component document was not updated`);
@@ -19,12 +19,23 @@ export function componentTransitionErrors(input) {
   if (!previousAudit || !currentAudit) return errors;
 
   if (!sourceChanged) {
-    if (!sameAudit(previousAudit, currentAudit)) {
-      errors.push(`${componentId}: qualityAudit must not change when component source is unchanged`);
-    }
+    if (sameAudit(previousAudit, currentAudit)) return errors;
+    const repairsStaleAudit = typeof expectedSourceHash === "string"
+      && previousAudit.sourceHash !== expectedSourceHash
+      && currentAudit.sourceHash === expectedSourceHash;
+    if (repairsStaleAudit) validateAuditIncrement(errors, componentId, previousAudit, currentAudit);
+    else errors.push(`${componentId}: qualityAudit must not change when component source is unchanged`);
     return errors;
   }
 
+  validateAuditIncrement(errors, componentId, previousAudit, currentAudit);
+  if (currentAudit.sourceHash === previousAudit.sourceHash) {
+    errors.push(`${componentId}: source changed but qualityAudit.sourceHash did not change`);
+  }
+  return errors;
+}
+
+function validateAuditIncrement(errors, componentId, previousAudit, currentAudit) {
   exactIncrement(errors, componentId, "bugAuditCount", previousAudit, currentAudit);
   exactIncrement(errors, componentId, "securityAuditCount", previousAudit, currentAudit);
   if (Date.parse(currentAudit.lastBugAuditAt) <= Date.parse(previousAudit.lastBugAuditAt)) {
@@ -33,10 +44,6 @@ export function componentTransitionErrors(input) {
   if (Date.parse(currentAudit.lastSecurityAuditAt) <= Date.parse(previousAudit.lastSecurityAuditAt)) {
     errors.push(`${componentId}: lastSecurityAuditAt must be later than ${previousAudit.lastSecurityAuditAt}`);
   }
-  if (currentAudit.sourceHash === previousAudit.sourceHash) {
-    errors.push(`${componentId}: source changed but qualityAudit.sourceHash did not change`);
-  }
-  return errors;
 }
 
 function exactIncrement(errors, componentId, field, previous, current) {
