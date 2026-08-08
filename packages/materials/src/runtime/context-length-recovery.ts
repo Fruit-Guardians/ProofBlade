@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 export { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../context/user-task-anchor.js";
-import { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../context/user-task-anchor.js";
+import { AUTOMATIC_CONTEXT_RECOVERY_PROMPT } from "../context/user-task-anchor.js";
 export const DEFAULT_CONTEXT_LENGTH_RECOVERIES = 2;
 
 export interface ContextLengthRecoveryPort {
@@ -25,7 +25,7 @@ export async function promptWithContextLengthRecovery(
   while (response.stopReason === "length" && recoveryCount < limit) {
     await port.compact("Context length reached. Preserve verified knowledge and the latest complete tool exchange, then continue the unfinished task.");
     recoveryCount += 1;
-    response = await port.prompt(`${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint. Do not repeat completed exploration.`);
+    response = await port.prompt(AUTOMATIC_CONTEXT_RECOVERY_PROMPT);
   }
   return { response, recoveryCount, exhausted: response.stopReason === "length" };
 }

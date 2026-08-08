@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 export const AUTOMATIC_CONTEXT_RECOVERY_MARKER = "[ProofBlade automatic context recovery]";
+export const AUTOMATIC_CONTEXT_RECOVERY_PROMPT = `${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint. Do not repeat completed exploration.`;
 
 export type UserAgentMessage = Extract<AgentMessage, { role: "user" }>;
 
@@ -12,7 +13,7 @@ export function userMessageText(message: UserAgentMessage | undefined): string {
 
 export function isRealUserTask(message: AgentMessage | undefined): message is UserAgentMessage {
   if (!message || message.role !== "user") return false;
-  return !userMessageText(message).includes(AUTOMATIC_CONTEXT_RECOVERY_MARKER);
+  return userMessageText(message) !== AUTOMATIC_CONTEXT_RECOVERY_PROMPT;
 }
 
 export function latestExternalUserMessage(messages: Iterable<AgentMessage>): UserAgentMessage | undefined {

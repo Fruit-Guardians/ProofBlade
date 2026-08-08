@@ -12,6 +12,7 @@ import { CheckpointService } from "../src/context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../src/context/durable-compaction.js";
 import { latestExternalUserMessage } from "../src/context/user-task-anchor.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_MARKER } from "../src/runtime/context-length-recovery.js";
+import { AUTOMATIC_CONTEXT_RECOVERY_PROMPT } from "../src/context/user-task-anchor.js";
 import { repairAgentMessages, toolPairViolations } from "../src/context/agent-pruner.js";
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { RunRecoveryService } from "../src/recovery/run-recovery.js";
@@ -250,7 +251,7 @@ test("[contract:repeated-length-task-anchor] consecutive context recovery keeps 
     await services.control.createRun(runId, fixtureTask(runId, "reverse-branch-2", root, config));
     const checkpointService = new CheckpointService(services.control, services.artifacts);
     const realTask = { role: "user" as const, content: "继续完成固件逆向并求出 flag", timestamp: 10 };
-    const recoveryPrompt = { role: "user" as const, content: `${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint.`, timestamp: 20 };
+    const recoveryPrompt = { role: "user" as const, content: AUTOMATIC_CONTEXT_RECOVERY_PROMPT, timestamp: 20 };
     const makeTail = (prefix: AgentMessage[]): AgentMessage[] => [...prefix, ...Array.from({ length: 8 }, (_, index) => [
       { role: "assistant", content: [{ type: "toolCall", id: `repeat-call-${index}`, name: "evidence", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 + 30 },
       { role: "toolResult", toolCallId: `repeat-call-${index}`, toolName: "evidence", content: [{ type: "text", text: `repeat-artifact-${index} ` + "x".repeat(2_000) }], isError: false, timestamp: index * 2 + 31 },

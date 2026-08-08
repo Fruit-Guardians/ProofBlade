@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T12:00:00+08:00
+> 状态更新时间：2026-08-09T14:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260808-006 | 2026-08-08T22:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
@@ -22,6 +23,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-003
+
+时间：2026-08-09T14:00:00+08:00
+
+摘要：收紧自动上下文恢复消息识别，避免误伤引用恢复标记的正常用户任务。
+
+### 变更
+
+- 以完整固定恢复提示执行精确匹配，不再对用户正文使用 includes 标记过滤
+- 上下文恢复发送路径复用同一固定提示常量
+- 增加用户正文引用恢复标记仍被识别为真实任务的回归测试
+
+### 验证
+
+- [x] 117/117 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-002
 

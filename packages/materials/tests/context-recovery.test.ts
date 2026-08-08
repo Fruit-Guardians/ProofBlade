@@ -13,6 +13,7 @@ import { CheckpointService } from "../src/context/checkpoint.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_MARKER, promptWithContextLengthRecovery } from "../src/runtime/context-length-recovery.js";
+import { isRealUserTask, latestExternalUserMessage } from "../src/context/user-task-anchor.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -200,6 +201,22 @@ test("coding length recovery stops after its bounded retry budget", async () => 
   assert.equal(result.recoveryCount, 2);
   assert.equal(prompts, 3);
   assert.equal(compactions, 2);
+});
+
+test("[contract:user-task-anchor-marker-literal] user text quoting the recovery marker remains an external task", () => {
+  const quoted = {
+    role: "user" as const,
+    content: `请检查为什么日志出现 ${AUTOMATIC_CONTEXT_RECOVERY_MARKER}，并修复任务丢失`,
+    timestamp: 1,
+  };
+  const internal = {
+    role: "user" as const,
+    content: `${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint. Do not repeat completed exploration.`,
+    timestamp: 2,
+  };
+  assert.equal(isRealUserTask(quoted), true);
+  assert.equal(isRealUserTask(internal), false);
+  assert.equal(latestExternalUserMessage([quoted, internal])?.content, quoted.content);
 });
 
 test("[contract:solver-length-context-recovery] solver treats a length stop as recoverable context overflow", async () => {
