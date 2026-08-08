@@ -82,6 +82,19 @@
         "contract:solver-length-context-recovery",
         "contract:hidden-context-recovery-turn"
       ]
+    },
+    {
+      "id": "evidence-repeat-breaker",
+      "triggers": [
+        { "path": "packages/materials/src/runtime/coding-resources.ts", "patterns": ["inspect_forest", "maxChars"] },
+        { "path": "packages/materials/src/runtime/coding-lane.ts", "patterns": ["tool_result", "terminate", "RepeatedToolFailureBreaker"] },
+        { "path": "packages/materials/src/runtime/tool-repeat-breaker.ts", "patterns": ["RepeatedToolFailureBreaker", "threshold"] }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:evidence-inspect-forest-max-chars",
+        "contract:evidence-repeat-breaker"
+      ]
     }
   ]
 }

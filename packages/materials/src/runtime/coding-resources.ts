@@ -6,7 +6,7 @@ import {
   type AgentHarnessTool,
   type ExecutionToolContext,
 } from "@earendil-works/pi-agent-core/node";
-import type { OutputRewritePort, OutputRewriteTicket } from "@proofblade/molecules";
+import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
@@ -156,8 +156,8 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     };
     if (!("operation" in input) || !["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
     if (input.operation === "inspect_forest") {
-      assertOnly(input, ["operation"], "evidence inspect_forest");
-      return toolResult(await context.evidenceGraph.inspectForest());
+      assertOnly(input, ["operation", "maxChars"], "evidence inspect_forest");
+      return toolResult(await context.evidenceGraph.inspectForest(), false, input.maxChars);
     }
     if (input.operation === "inspect_tree") {
       assertOnly(input, ["operation", "treeId"], "evidence inspect_tree");
@@ -431,9 +431,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function toolResult(details: unknown, isError = false): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const serialized = JSON.stringify(details);
+  const visible = maxChars === undefined ? serialized : snipText(serialized, maxChars).text;
   return {
-    content: [{ type: "text", text: JSON.stringify(details) }],
+    content: [{ type: "text", text: visible }],
     details,
     isError,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
