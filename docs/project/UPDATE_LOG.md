@@ -30,11 +30,12 @@
 - 让 evidence inspect_forest 运行时契约接受 maxChars，并限制模型可见输出
 - 通过 Pi tool_result 钩子追踪工具、规范化参数和错误签名
 - 同一工具失败连续三次后终止当前 Agent 回合并返回恢复提示
-- 增加重复失败、参数契约和变更契约回归测试
+- 混合工具批次继续运行时，在下一次 Provider 请求前强制停止
+- 增加重复失败、混合批次、参数契约和变更契约回归测试
 
 ### 验证
 
-- [x] 107/107 repository tests passed
+- [x] 110/110 repository tests passed
 - [x] npm run check:components
 - [x] npm run check:change-contracts
 - [x] npm run build

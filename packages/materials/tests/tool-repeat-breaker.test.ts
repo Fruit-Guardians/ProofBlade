@@ -39,9 +39,11 @@ test("successful or different tool calls reset the repeated failure sequence", (
 });
 
 test("a breaker message only fills an otherwise empty assistant response", () => {
-  const termination = { message: "recover with different arguments" };
+  const termination = { message: "recover with different arguments", confirmed: true };
   assert.equal(projectCodingAssistantText("model explanation", termination), "model explanation");
   assert.equal(projectCodingAssistantText("", termination), termination.message);
+  termination.confirmed = false;
+  assert.equal(projectCodingAssistantText("", termination), "");
 });
 
 test("[contract:repeated-tool-failure-visible] real Harness termination produces and persists a visible assistant reply", async () => {
@@ -103,6 +105,78 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
     assert.match(outcome.text, /current agent turn was stopped/i);
     const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.text, outcome.text);
+    assert.equal(assistantEvent?.payload?.termination, "repeated_tool_failure");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:repeated-tool-failure-mixed-batch] a successful sibling cannot bypass the breaker", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-repeat-mixed-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const runId = "REPEAT-MIXED-001";
+    const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await controlStore.createRun(runId, task(runId, root));
+    const sessionRepo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await sessionRepo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    const faux = fauxProvider({ provider: `faux-${runId}` });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "inspect_forest", maxChars: 256 }, { id: "fail-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "inspect_forest", maxChars: 256 }, { id: "fail-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage([
+        fauxToolCall("evidence", { operation: "inspect_forest", maxChars: 256 }, { id: "fail-3" }),
+        fauxToolCall("probe", { value: "sibling" }, { id: "success-1" }),
+      ], { stopReason: "toolUse" }),
+    ]);
+    const evidenceTool: AgentHarnessTool<undefined> = {
+      name: "evidence",
+      label: "evidence",
+      description: "Always fails for the mixed batch test.",
+      parameters: Type.Object({ operation: Type.String(), maxChars: Type.Number() }),
+      async execute() { throw new Error("fixture evidence failure"); },
+    };
+    const successTool: AgentHarnessTool<undefined> = {
+      name: "probe",
+      label: "probe",
+      description: "Succeeds for the mixed batch test.",
+      parameters: Type.Object({ value: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "sibling succeeded" }] }; },
+    };
+    const harness = new AgentHarness({
+      session,
+      models,
+      model: faux.getModel(),
+      tools: [evidenceTool, successTool],
+      activeToolNames: ["evidence", "probe"],
+      systemPrompt: "Exercise repeated tool failures.",
+    });
+    const breaker = new RepeatedToolFailureBreaker(3);
+    const termination: CodingTurnTermination = {};
+    attachRepeatedToolFailureBreaker(harness, breaker, termination);
+
+    const response = await harness.prompt("Inspect the evidence forest.");
+    const outcome = await finalizeCodingTurn({
+      runId,
+      controlStore,
+      correlationId: `${runId}:main:chat-turn`,
+      userPrompt: "Inspect the evidence forest.",
+      response,
+      recoveryCount: 0,
+      recoveryExhausted: false,
+      termination,
+      claimVerifier: { project: () => ({ required: false, status: "not_required" }) },
+      maintainAfterTurn: async () => undefined,
+    });
+
+    assert.equal(faux.state.callCount, 3);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.confirmed, true);
+    assert.match(outcome.text, /current agent turn was stopped/i);
+    const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.termination, "repeated_tool_failure");
   } finally {
     await env.cleanup();

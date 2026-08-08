@@ -12,7 +12,7 @@
     "securityAuditCount": 6,
     "lastBugAuditAt": "2026-08-08T06:21:16.056Z",
     "lastSecurityAuditAt": "2026-08-08T06:21:16.056Z",
-    "sourceHash": "f4859aa5346cb493d4d2b93d81c7fd121d962efce759dda614aa5bb037901b58",
+    "sourceHash": "515c319c3e75d71bdf650164edd31ed31136ce8e752d9f4532c83570f30731e8",
     "result": "passed"
   }
 }
@@ -42,7 +42,7 @@
 - 推理知识以共享 DAG 持久化，并按主题投影成可折叠的 Reasoning Tree；多棵树组成 Forest，同一 Artifact/Evidence 节点可以被重复采用但不得复制权威数据。
 - 未审阅的侦察 Artifact 由 Evidence Curation Gate 限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。
 - Context 维护采用单调 Tool Result 表示、目标预算裁剪和 idle-time 持久压缩；压缩后的 recent tail 必须受模型级预算约束，`length` 恢复必须有重试上限。
-- Tool 断路器终止只有 Tool Call 的回合时，恢复原因必须同时进入 Agent 返回值和持久化 Assistant 消息，不能向 GUI 返回空文本。
+- Tool 断路器必须覆盖含成功结果的混合批次，并在后续 Provider 请求前停止；恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
 - 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算和规范化 Fixture Catalog 内容哈希。

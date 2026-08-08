@@ -12,7 +12,7 @@
     "securityAuditCount": 4,
     "lastBugAuditAt": "2026-08-08T06:21:16.056Z",
     "lastSecurityAuditAt": "2026-08-08T06:21:16.056Z",
-    "sourceHash": "d95d417af988186ec9ac93335524b435c380af4f4c35643cc5462692f373c2fa",
+    "sourceHash": "fe7806330eb58d6c9419de33c8c7bbf44d38ef5d7e43ad6812fdfbca2ecc0661",
     "result": "passed"
   }
 }
@@ -38,7 +38,7 @@
 
 Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。内部恢复提示保留在 Pi 调试轨迹中，但不冒充 GUI 用户消息。错误或人工暂停的回合不启动普通摘要请求。
 
-重复 Tool 失败断路器通过 Pi `terminate` 停止当前工具回合；当终止响应只有 Tool Call、没有 Assistant 文本时，Runtime 必须把断路器恢复提示投影到 `AgentOutcome` 和持久化的 `assistant_message`，避免 GUI 收到空回复。模型已经生成的非空文本优先保留。
+重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
 
 `evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`inspect_forest` 用于方向回顾，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 

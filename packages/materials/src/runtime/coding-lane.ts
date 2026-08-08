@@ -145,6 +145,8 @@ export class PiCodingLane implements AgentLanePort {
   public async prompt(text: string): Promise<AgentOutcome> {
     this.repeatBreaker.reset();
     delete this.termination.message;
+    this.termination.requested = false;
+    this.termination.confirmed = false;
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     await this.controlStore.append(this.runId, [{
