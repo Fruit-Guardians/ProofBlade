@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T10:33:24+08:00",
+  "updatedAt": "2026-08-08T22:15:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -416,6 +416,73 @@
         "coding provider schema compatibility contract",
         "npm run test --workspace=@proofblade/materials",
         "npm run verify"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-004",
+      "occurredAt": "2026-08-08T13:20:00+08:00",
+      "summary": "修复 Evidence Curation 阶段重复工具调用导致的 Agent 无限循环。",
+      "branch": "codex/evidence-curation-breaker",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "让 evidence inspect_forest 运行时契约接受 maxChars，并限制模型可见输出",
+        "通过 Pi tool_result 钩子追踪工具、规范化参数和错误签名",
+        "同一工具失败连续三次后终止当前 Agent 回合并返回恢复提示",
+        "混合工具批次继续运行时，在下一次 Provider 请求前强制停止",
+        "增加重复失败、混合批次、参数契约和变更契约回归测试"
+      ],
+      "validation": [
+        "110/110 repository tests passed",
+        "npm run check:components",
+        "npm run check:change-contracts",
+        "npm run build"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-005",
+      "occurredAt": "2026-08-08T15:15:00+08:00",
+      "summary": "修复断路器终止结果在 GUI 中被错误显示为 Provider 失败。",
+      "branch": "codex/evidence-curation-breaker",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "AgentOutcome 增加结构化 repeated_tool_failure 终止原因",
+        "已确认的断路器终止规范化为非错误 stop 结果并保留底层 Provider 原因",
+        "GUI 流式通道发送 done 而不是 error，并修正刷新后的持久化会话投影",
+        "增加 GUI 流式和持久化回归测试"
+      ],
+      "validation": [
+        "112/112 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-006",
+      "occurredAt": "2026-08-08T22:15:00+08:00",
+      "summary": "使用稳定 Pi Entry ID 关联断路器事件与历史 Assistant 消息。",
+      "branch": "codex/evidence-curation-breaker",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "Coding Lane 将当前回合最终 Pi Assistant Entry ID 持久化到 assistant_message 事件",
+        "GUI 只按完全匹配的 piEntryId 投影断路器恢复提示，不再查找最新空错误消息",
+        "缺少稳定 ID 的旧事件不执行模糊回填，避免污染后续真实 Provider 错误",
+        "增加断路器后再次发生 Provider 错误的历史重建回归测试"
+      ],
+      "validation": [
+        "113/113 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
       ]
     }
   ],

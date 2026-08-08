@@ -74,6 +74,51 @@ test("projects persisted provider failures into assistant conversation messages"
   assert.equal(messages[0]?.error, "Connection error.");
 });
 
+test("[contract:repeated-tool-failure-conversation] projects a persisted breaker termination as a normal assistant reply", () => {
+  const messages = conversationMessagesFromEntries([{
+    type: "message",
+    id: "assistant-breaker",
+    timestamp: "2026-08-05T00:00:03.000Z",
+    message: { role: "assistant", content: [], stopReason: "error", errorMessage: "ProofBlade repeated tool failure." },
+  }], [{
+    type: "assistant_message",
+    payload: { text: "ProofBlade repeated tool failure. Change the approach before continuing.", stopReason: "stop", termination: "repeated_tool_failure", piEntryId: "assistant-breaker" },
+  }] as HarnessEvent[]);
+  assert.equal(messages[0]?.text, "ProofBlade repeated tool failure. Change the approach before continuing.");
+  assert.equal(messages[0]?.stopReason, "stop");
+  assert.equal(messages[0]?.error, undefined);
+});
+
+test("[contract:repeated-tool-failure-entry-link] an old breaker event cannot overwrite a later provider failure", () => {
+  const messages = conversationMessagesFromEntries([
+    {
+      type: "message",
+      id: "old-breaker",
+      timestamp: "2026-08-05T00:00:03.000Z",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "old breaker raw error" },
+    },
+    {
+      type: "message",
+      id: "new-provider-failure",
+      timestamp: "2026-08-05T00:01:03.000Z",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "new provider failure" },
+    },
+  ], [{
+    type: "assistant_message",
+    payload: {
+      text: "breaker recovery guidance",
+      stopReason: "stop",
+      termination: "repeated_tool_failure",
+      piEntryId: "old-breaker",
+    },
+  }] as HarnessEvent[]);
+
+  assert.deepEqual(messages.map((message) => ({ id: message.id, text: message.text, stopReason: message.stopReason, error: message.error })), [
+    { id: "old-breaker", text: "breaker recovery guidance", stopReason: "stop", error: undefined },
+    { id: "new-provider-failure", text: "", stopReason: "error", error: "new provider failure" },
+  ]);
+});
+
 test("projects durable claim verification onto the matching assistant message", () => {
   const projected = conversationMessagesFromEntries(entries, [{
     type: "assistant_message",
@@ -143,6 +188,40 @@ test("pauses an active coding lane and persists a resumable run state", async ()
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
     assert.deepEqual(events.filter((event) => event.type === "stopping" || event.type === "paused").map((event) => event.type), ["stopping", "paused"]);
     assert.equal(events.some((event) => event.type === "done" || event.type === "error"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:repeated-tool-failure-chat-done] streams a breaker termination as a normal assistant reply", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-breaker-"));
+  const message = "ProofBlade repeated tool failure. Change the approach before continuing.";
+  const lane: AgentLanePort = {
+    async prompt() {
+      return {
+        text: message,
+        stopReason: "error",
+        errorMessage: message,
+        termination: "repeated_tool_failure",
+        usage: zeroUsage(),
+      };
+    },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-BREAKER-001";
+    await data.createConversation({ runId, title: "breaker test", workspacePath: root });
+    const events: ChatStreamEvent[] = [];
+    await data.chat(runId, "inspect the workspace", (event) => events.push(event), undefined, undefined, root);
+
+    assert.equal(events.some((event) => event.type === "error"), false);
+    const done = events.find((event): event is Extract<ChatStreamEvent, { type: "done" }> => event.type === "done");
+    assert.equal(done?.text, message);
+    assert.equal(done?.stopReason, "stop");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

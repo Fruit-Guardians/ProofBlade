@@ -381,11 +381,12 @@ export class DebugDataService {
         emit({ type: "paused", runId });
         return;
       }
-      if (outcome.errorMessage || outcome.stopReason === "error") {
+      const recoverableTermination = outcome.termination === "repeated_tool_failure";
+      if (!recoverableTermination && (outcome.errorMessage || outcome.stopReason === "error")) {
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
       }
-      emit({ type: "done", text: outcome.text, stopReason: outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
+      emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
     } catch (error) {
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
@@ -541,11 +542,23 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       raw: entry,
     });
   }
-  const claimEvents = events.filter((event) => event.type === "assistant_message" && isRecord(event.payload?.claimVerification));
-  for (const event of [...claimEvents].reverse()) {
+  const assistantEvents = events.filter((event) => event.type === "assistant_message");
+  for (const event of [...assistantEvents].reverse()) {
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
+    if (event.payload?.termination === "repeated_tool_failure" && text) {
+      const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
+      const interrupted = piEntryId
+        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && item.stopReason === "error")
+        : undefined;
+      if (interrupted) {
+        interrupted.text = text;
+        interrupted.stopReason = typeof event.payload?.stopReason === "string" ? event.payload.stopReason : "stop";
+        interrupted.error = undefined;
+      }
+    }
+    if (!isRecord(event.payload?.claimVerification)) continue;
     const message = [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
-    if (message) message.claimVerification = event.payload?.claimVerification as ChatMessageDebug["claimVerification"];
+    if (message) message.claimVerification = event.payload?.claimVerification as unknown as ChatMessageDebug["claimVerification"];
   }
   let latestUserPrompt = "";
   for (const message of messages) {

@@ -41,9 +41,10 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
   const evidence = snapshot.find((tool) => tool.name === "evidence")?.parameters as { properties?: Record<string, { type?: unknown; enum?: unknown }> };
   assert.equal(evidence.properties?.operation?.type, "string");
   assert.deepEqual(evidence.properties?.operation?.enum, ["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
+  assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
-test("coding claim verification rejects decoys and persists a matching reproduction", async () => {
+test("[contract:evidence-inspect-forest-max-chars] coding claim verification rejects decoys and persists a matching reproduction", async () => {
   assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
   assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
   assert.equal(requiresClaimVerification("修复 feature flag 的布尔判断"), false);
@@ -77,6 +78,8 @@ test("coding claim verification rejects decoys and persists a matching reproduct
     claimVerifier: verifier,
     evidenceGraph,
   } as unknown as CodingResourceContext;
+  const forest = await executeTool("evidence", { operation: "inspect_forest", maxChars: 256 }, context);
+  assert.ok((forest.content[0]?.text ?? "").length <= 256);
   try {
     await assert.rejects(
       () => executeTool("evidence", { operation: "inspect_forest", query: "unexpected cross-operation field" }, context),

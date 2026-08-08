@@ -1,12 +1,15 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-08T10:33:24+08:00
+> 状态更新时间：2026-08-08T22:15:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260808-006 | 2026-08-08T22:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
+| UPDATE-20260808-005 | 2026-08-08T15:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
+| UPDATE-20260808-004 | 2026-08-08T13:20:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
 | UPDATE-20260808-003 | 2026-08-08T10:33:24+08:00 | PLAN-001, PLAN-002 | main | 本条记录所在提交 |
 | UPDATE-20260808-001 | 2026-08-08T02:47:55.5788475+08:00 | PLAN-120 | codex/context-length-recovery | 本条记录所在提交 |
 | UPDATE-20260808-002 | 2026-08-08T02:02:26.8610595+08:00 | PLAN-120 | codex/provider-schema-compat | 本条记录所在提交 |
@@ -17,6 +20,67 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260808-006
+
+时间：2026-08-08T22:15:00+08:00
+
+摘要：使用稳定 Pi Entry ID 关联断路器事件与历史 Assistant 消息。
+
+### 变更
+
+- Coding Lane 将当前回合最终 Pi Assistant Entry ID 持久化到 assistant_message 事件
+- GUI 只按完全匹配的 piEntryId 投影断路器恢复提示，不再查找最新空错误消息
+- 缺少稳定 ID 的旧事件不执行模糊回填，避免污染后续真实 Provider 错误
+- 增加断路器后再次发生 Provider 错误的历史重建回归测试
+
+### 验证
+
+- [x] 113/113 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260808-005
+
+时间：2026-08-08T15:15:00+08:00
+
+摘要：修复断路器终止结果在 GUI 中被错误显示为 Provider 失败。
+
+### 变更
+
+- AgentOutcome 增加结构化 repeated_tool_failure 终止原因
+- 已确认的断路器终止规范化为非错误 stop 结果并保留底层 Provider 原因
+- GUI 流式通道发送 done 而不是 error，并修正刷新后的持久化会话投影
+- 增加 GUI 流式和持久化回归测试
+
+### 验证
+
+- [x] 112/112 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260808-004
+
+时间：2026-08-08T13:20:00+08:00
+
+摘要：修复 Evidence Curation 阶段重复工具调用导致的 Agent 无限循环。
+
+### 变更
+
+- 让 evidence inspect_forest 运行时契约接受 maxChars，并限制模型可见输出
+- 通过 Pi tool_result 钩子追踪工具、规范化参数和错误签名
+- 同一工具失败连续三次后终止当前 Agent 回合并返回恢复提示
+- 混合工具批次继续运行时，在下一次 Provider 请求前强制停止
+- 增加重复失败、混合批次、参数契约和变更契约回归测试
+
+### 验证
+
+- [x] 110/110 repository tests passed
+- [x] npm run check:components
+- [x] npm run check:change-contracts
+- [x] npm run build
 
 ## UPDATE-20260808-003
 
