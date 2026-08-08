@@ -26,7 +26,8 @@ import { codingActiveToolNames, createCodingTools, type CodingResourceContext } 
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
-import { RepeatedToolFailureBreaker, repeatedToolFailureMessage } from "./tool-repeat-breaker.js";
+import { attachRepeatedToolFailureBreaker, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
+import { RepeatedToolFailureBreaker } from "./tool-repeat-breaker.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -49,6 +50,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly claimVerifier: CodingClaimVerifier,
     private readonly maintenance: { compactRequested: boolean },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
+    private readonly termination: CodingTurnTermination,
   ) {}
 
   public static async create(options: {
@@ -103,6 +105,7 @@ export class PiCodingLane implements AgentLanePort {
     };
     const stableSystemPrompt = codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled));
     const repeatBreaker = new RepeatedToolFailureBreaker();
+    const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
@@ -115,21 +118,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    harness.on("tool_result", (event) => {
-      const decision = repeatBreaker.observe({
-        toolName: event.toolName,
-        input: event.input,
-        isError: event.isError,
-        content: event.content.map((item) => item.type === "text" ? { type: item.type, text: item.text } : { type: item.type }),
-      });
-      if (!decision.terminate) return undefined;
-      return {
-        content: [{ type: "text" as const, text: repeatedToolFailureMessage(event.toolName, decision.count) }],
-        details: { repeatedFailure: true, toolName: event.toolName, count: decision.count, key: decision.key },
-        isError: true,
-        terminate: true,
-      };
-    });
+    attachRepeatedToolFailureBreaker(harness, repeatBreaker, termination);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -150,11 +139,12 @@ export class PiCodingLane implements AgentLanePort {
       controlStore: options.controlStore,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp, claimVerifier, maintenance, repeatBreaker);
+    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp, claimVerifier, maintenance, repeatBreaker, termination);
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
     this.repeatBreaker.reset();
+    delete this.termination.message;
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     await this.controlStore.append(this.runId, [{
@@ -174,27 +164,18 @@ export class PiCodingLane implements AgentLanePort {
         },
       }, text);
       const response = recovered.response;
-      const output = response.content
-        .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
-        .map((item) => item.text)
-        .join("\n");
-      const claimVerification = this.claimVerifier.project(text, output);
-      await this.controlStore.append(this.runId, [{
-        schemaVersion: 1,
-        lane: "main",
+      return await finalizeCodingTurn({
+        runId: this.runId,
+        controlStore: this.controlStore,
         correlationId,
-        actor: "model",
-        type: "assistant_message",
-        payload: { text: output, stopReason: response.stopReason, claimVerification, contextRecoveryCount: recovered.recoveryCount, contextRecoveryExhausted: recovered.exhausted },
-      }]);
-      await this.maintainAfterTurn(response);
-      return {
-        text: output,
-        stopReason: response.stopReason,
-        usage: response.usage as AssistantMessage["usage"],
-        errorMessage: recovered.exhausted ? `Context length recovery exhausted after ${recovered.recoveryCount} attempts.` : response.errorMessage,
-        claimVerification,
-      };
+        userPrompt: text,
+        response,
+        recoveryCount: recovered.recoveryCount,
+        recoveryExhausted: recovered.exhausted,
+        termination: this.termination,
+        claimVerifier: this.claimVerifier,
+        maintainAfterTurn: async () => await this.maintainAfterTurn(response),
+      });
     } finally {
       this.busy = false;
     }
