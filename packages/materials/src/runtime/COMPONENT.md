@@ -4,12 +4,12 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.6",
+  "version": "0.10.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
   "updatedAt": "2026-08-08T07:10:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
     "lastBugAuditAt": "2026-08-08T07:10:00.000Z",
     "lastSecurityAuditAt": "2026-08-08T07:10:00.000Z",
     "sourceHash": "71966b10e34c96e3fd72b6608f6f0212a4fce2dcb3179ee6c45fdce2b46fb5c6",
