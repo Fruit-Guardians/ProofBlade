@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-08T22:15:00+08:00
+> 状态更新时间：2026-08-09T01:15:42.9850913+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260808-006 | 2026-08-08T22:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
 | UPDATE-20260808-005 | 2026-08-08T15:15:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
 | UPDATE-20260808-004 | 2026-08-08T13:20:00+08:00 | PLAN-110 | codex/evidence-curation-breaker | 本条记录所在提交 |
@@ -20,6 +21,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-001
+
+时间：2026-08-09T01:15:42.9850913+08:00
+
+摘要：修复长工具回合与持久压缩丢失最新用户任务的问题。
+
+### 变更
+
+- 紧急 Provider 视图裁剪永久保留最新 User Message
+- Pi retained tail 缺失用户消息时从持久化 Session 分支补回
+- 机械 Compaction 摘要显式记录当前用户请求，不再只依赖通用 Run objective
+- 增加长工具链裁剪与持久压缩任务锚点回归测试
+
+### 验证
+
+- [x] 115/115 repository tests passed
+- [x] latest-user-task-anchor and compaction-task-anchor contracts passed
+- [x] component audit limited to materials, materials-context and materials-runtime
 
 ## UPDATE-20260808-006
 

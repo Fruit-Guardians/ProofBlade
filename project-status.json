@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T22:15:00+08:00",
+  "updatedAt": "2026-08-09T01:15:42.9850913+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -483,6 +483,27 @@
         "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-001",
+      "occurredAt": "2026-08-09T01:15:42.9850913+08:00",
+      "summary": "修复长工具回合与持久压缩丢失最新用户任务的问题。",
+      "branch": "codex/preserve-user-task-anchor",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "紧急 Provider 视图裁剪永久保留最新 User Message",
+        "Pi retained tail 缺失用户消息时从持久化 Session 分支补回",
+        "机械 Compaction 摘要显式记录当前用户请求，不再只依赖通用 Run objective",
+        "增加长工具链裁剪与持久压缩任务锚点回归测试"
+      ],
+      "validation": [
+        "115/115 repository tests passed",
+        "latest-user-task-anchor and compaction-task-anchor contracts passed",
+        "component audit limited to materials, materials-context and materials-runtime"
       ]
     }
   ],

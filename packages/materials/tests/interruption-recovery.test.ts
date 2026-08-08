@@ -214,6 +214,32 @@ test("[contract:bounded-compaction-tail] mechanical compaction bounds a single o
   }
 });
 
+test("[contract:compaction-task-anchor] mechanical compaction restores a user request omitted from Pi's retained tail", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-task-anchor-compact-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "TASK-ANCHOR-COMPACTION";
+    await services.control.createRun(runId, fixtureTask(runId, "reverse-branch-2", root, config));
+    const checkpointService = new CheckpointService(services.control, services.artifacts);
+    const taskAnchor = { role: "user" as const, content: "继续完成逆向并求出 flag", timestamp: 10 };
+    const retainedTail = Array.from({ length: 8 }, (_, index) => [
+      { role: "assistant", content: [{ type: "toolCall", id: `anchor-call-${index}`, name: "evidence", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 + 11 },
+      { role: "toolResult", toolCallId: `anchor-call-${index}`, toolName: "evidence", content: [{ type: "text", text: `artifact-${index} ` + "x".repeat(2_000) }], isError: false, timestamp: index * 2 + 12 },
+    ]).flat() as AgentMessage[];
+    const compaction = await new DurableCompactionCoordinator(checkpointService).provide(runId, {
+      firstKeptEntryId: "assistant-after-user",
+      tokensBefore: 20_000,
+      retainedTail,
+    }, undefined, { maxContextTokens: 4_096, taskAnchor });
+    assert.match(compaction.summary, /## Active user request\n继续完成逆向并求出 flag/);
+    assert.equal(compaction.retainedTail.filter((message) => message.role === "user").length, 1);
+    assert.match(JSON.stringify(compaction.retainedTail), /继续完成逆向并求出 flag/);
+    assert.deepEqual(toolPairViolations(compaction.retainedTail), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("interruption 6: expired heartbeat and missing target reset lifecycle state", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-interrupt-lifecycle-"));
   try {

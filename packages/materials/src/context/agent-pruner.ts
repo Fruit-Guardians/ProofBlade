@@ -200,10 +200,11 @@ function trimToolExchanges(messages: AgentMessage[], maxTokens: number, dropped:
 }
 
 function trimOldMessages(messages: AgentMessage[], maxTokens: number, dropped: AgentContextPruneResult["dropped"]): void {
+  const latestUser = [...messages].reverse().find((message) => message.role === "user");
   let index = 0;
   while (messageTokens(messages) > maxTokens && messages.length > 4 && index < messages.length - 4) {
     const message = messages[index];
-    if (message?.role === "toolResult") {
+    if (message === latestUser || message?.role === "toolResult") {
       index += 1;
       continue;
     }

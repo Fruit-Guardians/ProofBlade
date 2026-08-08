@@ -80,6 +80,24 @@ test("agent transcript pruning keeps the latest tool call and result paired", ()
   assert.ok(pruned.estimatedTokens <= 300 || pruned.messages.length <= 4);
 });
 
+test("[contract:latest-user-task-anchor] emergency pruning preserves the active user request across a long tool-only turn", () => {
+  const activeRequest = "继续完成逆向并求出 flag，不要丢失这个任务";
+  const messages = [
+    { role: "user", content: "old request", timestamp: 1 },
+    { role: "assistant", content: [{ type: "text", text: "old response" }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "stop", timestamp: 2 },
+    { role: "user", content: activeRequest, timestamp: 3 },
+    ...Array.from({ length: 12 }, (_, index) => [
+      assistant(`task-call-${index}`, "evidence", index * 2 + 4),
+      { role: "toolResult", toolCallId: `task-call-${index}`, toolName: "evidence", content: [{ type: "text", text: `result-${index} ` + "x".repeat(1_500) }], isError: false, timestamp: index * 2 + 5 },
+    ]).flat(),
+  ] as AgentMessage[];
+  const pruned = pruneAgentMessages(messages, 300, { mode: "emergency" });
+  const serialized = JSON.stringify(pruned.messages);
+  assert.match(serialized, new RegExp(activeRequest));
+  assert.doesNotMatch(serialized, /old request/);
+  assert.match(serialized, /task-call-11/);
+});
+
 test("context pruning repairs interrupted tool calls, drops orphan results, and keeps references", () => {
   const messages = [
     {

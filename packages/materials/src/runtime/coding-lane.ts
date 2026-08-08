@@ -132,7 +132,10 @@ export class PiCodingLane implements AgentLanePort {
       return { messages: prepared.messages };
     });
     harness.on("session_before_compact", async ({ preparation }) => ({
-      compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, { maxContextTokens: contextBudget }),
+      compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, {
+        maxContextTokens: contextBudget,
+        taskAnchor: await latestUserMessage(session),
+      }),
     }));
     attachPiObservability(harness, {
       runId: options.runId,
@@ -242,6 +245,15 @@ export class PiCodingLane implements AgentLanePort {
       // The append-only Pi transcript and Control Store remain the recovery source.
     }
   }
+}
+
+async function latestUserMessage(session: { getBranch(): Promise<Array<{ type: string; message?: AgentMessage }>> }): Promise<Extract<AgentMessage, { role: "user" }> | undefined> {
+  const branch = await session.getBranch();
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const entry = branch[index];
+    if (entry?.type === "message" && entry.message?.role === "user") return entry.message;
+  }
+  return undefined;
 }
 
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {
