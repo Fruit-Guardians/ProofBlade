@@ -13,6 +13,7 @@ import { CheckpointService } from "../src/context/checkpoint.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_MARKER, promptWithContextLengthRecovery } from "../src/runtime/context-length-recovery.js";
+import { isRealUserTask, latestExternalUserMessage } from "../src/context/user-task-anchor.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -78,6 +79,24 @@ test("agent transcript pruning keeps the latest tool call and result paired", ()
   const oldResult = serialized.includes("\"toolCallId\":\"old-call\"");
   assert.equal(oldCall, oldResult);
   assert.ok(pruned.estimatedTokens <= 300 || pruned.messages.length <= 4);
+});
+
+test("[contract:latest-user-task-anchor] emergency pruning preserves the active user request across a long tool-only turn", () => {
+  const activeRequest = "继续完成逆向并求出 flag，不要丢失这个任务";
+  const messages = [
+    { role: "user", content: "old request", timestamp: 1 },
+    { role: "assistant", content: [{ type: "text", text: "old response" }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "stop", timestamp: 2 },
+    { role: "user", content: activeRequest, timestamp: 3 },
+    ...Array.from({ length: 12 }, (_, index) => [
+      assistant(`task-call-${index}`, "evidence", index * 2 + 4),
+      { role: "toolResult", toolCallId: `task-call-${index}`, toolName: "evidence", content: [{ type: "text", text: `result-${index} ` + "x".repeat(1_500) }], isError: false, timestamp: index * 2 + 5 },
+    ]).flat(),
+  ] as AgentMessage[];
+  const pruned = pruneAgentMessages(messages, 300, { mode: "emergency" });
+  const serialized = JSON.stringify(pruned.messages);
+  assert.match(serialized, new RegExp(activeRequest));
+  assert.doesNotMatch(serialized, /old request/);
+  assert.match(serialized, /task-call-11/);
 });
 
 test("context pruning repairs interrupted tool calls, drops orphan results, and keeps references", () => {
@@ -182,6 +201,22 @@ test("coding length recovery stops after its bounded retry budget", async () => 
   assert.equal(result.recoveryCount, 2);
   assert.equal(prompts, 3);
   assert.equal(compactions, 2);
+});
+
+test("[contract:user-task-anchor-marker-literal] user text quoting the recovery marker remains an external task", () => {
+  const quoted = {
+    role: "user" as const,
+    content: `请检查为什么日志出现 ${AUTOMATIC_CONTEXT_RECOVERY_MARKER}，并修复任务丢失`,
+    timestamp: 1,
+  };
+  const internal = {
+    role: "user" as const,
+    content: `${AUTOMATIC_CONTEXT_RECOVERY_MARKER}\nContinue the unfinished task from the durable checkpoint. Do not repeat completed exploration.`,
+    timestamp: 2,
+  };
+  assert.equal(isRealUserTask(quoted), true);
+  assert.equal(isRealUserTask(internal), false);
+  assert.equal(latestExternalUserMessage([quoted, internal])?.content, quoted.content);
 });
 
 test("[contract:solver-length-context-recovery] solver treats a length stop as recoverable context overflow", async () => {

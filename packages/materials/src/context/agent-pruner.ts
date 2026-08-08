@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { snipText } from "@proofblade/molecules";
 import { estimateTokens } from "../domain/utils.js";
+import { isRealUserTask, latestExternalUserMessage } from "./user-task-anchor.js";
 
 export interface AgentContextPruneResult {
   messages: AgentMessage[];
@@ -173,8 +174,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function trimOldUsers(messages: AgentMessage[], maxTokens: number, dropped: AgentContextPruneResult["dropped"]): void {
-  const userIndexes = messages.flatMap((message, index) => message.role === "user" ? [index] : []);
-  for (const index of userIndexes.slice(0, -2).reverse()) {
+  const externalUserIndexes = messages.flatMap((message, index) => isRealUserTask(message) ? [index] : []);
+  const internalRecoveryIndexes = messages.flatMap((message, index) => message.role === "user" && !isRealUserTask(message) ? [index] : []);
+  for (const index of [...internalRecoveryIndexes, ...externalUserIndexes.slice(0, -2)].sort((a, b) => b - a)) {
     if (messageTokens(messages) <= maxTokens) break;
     messages.splice(index, 1);
     dropped.push({ kind: "message", id: `user:${index}` });
@@ -200,10 +202,11 @@ function trimToolExchanges(messages: AgentMessage[], maxTokens: number, dropped:
 }
 
 function trimOldMessages(messages: AgentMessage[], maxTokens: number, dropped: AgentContextPruneResult["dropped"]): void {
+  const latestUser = latestExternalUserMessage(messages);
   let index = 0;
   while (messageTokens(messages) > maxTokens && messages.length > 4 && index < messages.length - 4) {
     const message = messages[index];
-    if (message?.role === "toolResult") {
+    if (message === latestUser || message?.role === "toolResult") {
       index += 1;
       continue;
     }
