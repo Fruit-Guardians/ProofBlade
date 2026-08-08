@@ -21,6 +21,7 @@ export interface AgentOutcome {
   usage: AssistantMessage["usage"];
   errorMessage?: string;
   claimVerification?: ClaimVerificationProjection;
+  termination?: "repeated_tool_failure";
 }
 
 export interface AgentLanePort {

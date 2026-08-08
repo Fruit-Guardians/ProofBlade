@@ -87,6 +87,12 @@ export async function finalizeCodingTurn(options: {
     && (options.response.stopReason === "toolUse" || options.response.stopReason === "error");
   options.termination.confirmed = confirmed;
   const output = projectCodingAssistantText(rawOutput, options.termination);
+  const stopReason = confirmed ? "stop" : options.response.stopReason;
+  const errorMessage = confirmed
+    ? undefined
+    : options.recoveryExhausted
+      ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
+      : options.response.errorMessage;
   const claimVerification = options.claimVerifier.project(options.userPrompt, output);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
@@ -96,19 +102,21 @@ export async function finalizeCodingTurn(options: {
     type: "assistant_message",
     payload: {
       text: output,
-      stopReason: options.response.stopReason,
+      stopReason,
       claimVerification,
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
       termination: confirmed ? "repeated_tool_failure" : undefined,
+      providerStopReason: confirmed ? options.response.stopReason : undefined,
     },
   }]);
   await options.maintainAfterTurn();
   return {
     text: output,
-    stopReason: options.response.stopReason,
+    stopReason,
     usage: options.response.usage,
-    errorMessage: options.recoveryExhausted ? `Context length recovery exhausted after ${options.recoveryCount} attempts.` : options.response.errorMessage,
+    errorMessage,
     claimVerification,
+    termination: confirmed ? "repeated_tool_failure" : undefined,
   };
 }

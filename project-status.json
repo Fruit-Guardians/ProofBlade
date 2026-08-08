@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T13:20:00+08:00",
+  "updatedAt": "2026-08-08T15:15:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -439,6 +439,28 @@
         "npm run check:components",
         "npm run check:change-contracts",
         "npm run build"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-005",
+      "occurredAt": "2026-08-08T15:15:00+08:00",
+      "summary": "修复断路器终止结果在 GUI 中被错误显示为 Provider 失败。",
+      "branch": "codex/evidence-curation-breaker",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "AgentOutcome 增加结构化 repeated_tool_failure 终止原因",
+        "已确认的断路器终止规范化为非错误 stop 结果并保留底层 Provider 原因",
+        "GUI 流式通道发送 done 而不是 error，并修正刷新后的持久化会话投影",
+        "增加 GUI 流式和持久化回归测试"
+      ],
+      "validation": [
+        "112/112 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
       ]
     }
   ],

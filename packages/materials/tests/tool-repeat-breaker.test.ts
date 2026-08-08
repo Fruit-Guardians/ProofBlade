@@ -176,8 +176,13 @@ test("[contract:repeated-tool-failure-mixed-batch] a successful sibling cannot b
     assert.equal(response.stopReason, "error");
     assert.equal(termination.confirmed, true);
     assert.match(outcome.text, /current agent turn was stopped/i);
+    assert.equal(outcome.stopReason, "stop");
+    assert.equal(outcome.errorMessage, undefined);
+    assert.equal(outcome.termination, "repeated_tool_failure");
     const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.termination, "repeated_tool_failure");
+    assert.equal(assistantEvent?.payload?.stopReason, "stop");
+    assert.equal(assistantEvent?.payload?.providerStopReason, "error");
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
