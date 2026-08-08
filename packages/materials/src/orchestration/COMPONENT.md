@@ -4,15 +4,15 @@
 {
   "id": "materials-orchestration",
   "name": "Agent Orchestration",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
+  "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
   "qualityAudit": {
-    "bugAuditCount": 4,
-    "securityAuditCount": 4,
-    "lastBugAuditAt": "2026-08-07T23:08:26.1335151+08:00",
-    "lastSecurityAuditAt": "2026-08-07T23:08:26.1335151+08:00",
-    "sourceHash": "19d0f7271100697b743f1f4012f9db00da81e641c00c69023ec3ff36aa8a1558",
+    "bugAuditCount": 5,
+    "securityAuditCount": 5,
+    "lastBugAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "lastSecurityAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "sourceHash": "8f8a1c8a4f1de11dc376388c19d9512a5b1517c75ff83b623ea6c95347640612",
     "result": "passed"
   }
 }
@@ -35,6 +35,7 @@ plan-only、等待确认和验证边界 fail-closed。引入新模型角色前�
 - `SingleAgentCtfLoop` 在 lane 建成后通过 `onLaneReady` 暴露运行控制句柄；每轮模型调用前后都必须检查 durable `PAUSED` 状态。
 - 验证 Effect、Verifier 返回、report、finish 和最终 exhaust 边界都必须 fail-closed；ControlStore 原子拒绝后的 Loop 必须重新读取状态并保留 `PAUSED`。
 - 暂停不是终态或预算耗尽；Auto 模式不得把暂停中的运行改写成 `EXHAUSTED`。
+- Provider 的 `length` stop reason 与显式 maximum-context 错误进入同一单次恢复状态机：先持久化检查点并压缩，再继续下一 Executor turn；重复溢出必须明确失败。
 
 ```powershell
 npm run test:materials

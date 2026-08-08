@@ -11,6 +11,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
+import { CheckpointService } from "../context/checkpoint.js";
+import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
+import { estimateTokens } from "../domain/utils.js";
 import { attachPiObservability } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -22,6 +25,7 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
+import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -77,6 +81,8 @@ export class PiCodingLane implements AgentLanePort {
     const tools = createCodingTools();
     const activeToolNames = codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers] });
     const artifactStore = new ArtifactStore(dirname(options.runDir), options.controlStore);
+    const checkpointService = new CheckpointService(options.controlStore, artifactStore);
+    const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
     const claimVerifier = new CodingClaimVerifier(options.runId, options.controlStore, artifactStore);
     const evidenceGraph = new CodingEvidenceGraph(options.runId, options.controlStore, artifactStore);
     const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
@@ -93,6 +99,7 @@ export class PiCodingLane implements AgentLanePort {
       evidenceCurationGate,
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
     };
+    const stableSystemPrompt = codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled));
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
@@ -102,16 +109,23 @@ export class PiCodingLane implements AgentLanePort {
       resources: { skills: resources },
       toolContext,
       thinkingLevel: profile.thinkingLevel ?? "off",
-      systemPrompt: () => codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled)),
+      systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
     const maintenance = { compactRequested: false };
-    const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - 2_048);
+    const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
+    const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
+    const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
+    const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
+    const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.5));
     harness.on("context", ({ messages }) => {
-      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext), availableTokens: contextBudget, messageBudget: contextBudget });
+      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext), availableTokens: contextBudget, messageBudget: targetMessageBudget });
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: prepared.messages };
     });
+    harness.on("session_before_compact", async ({ preparation }) => ({
+      compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, { maxContextTokens: contextBudget }),
+    }));
     attachPiObservability(harness, {
       runId: options.runId,
       lane: "main",
@@ -133,7 +147,14 @@ export class PiCodingLane implements AgentLanePort {
       payload: { promptLength: text.length },
     }]);
     try {
-      const response = await this.harness.prompt(text);
+      const recovered = await promptWithContextLengthRecovery({
+        prompt: async (prompt) => await this.harness.prompt(prompt),
+        compact: async (reason) => {
+          await this.harness.compact(reason);
+          this.maintenance.compactRequested = false;
+        },
+      }, text);
+      const response = recovered.response;
       const output = response.content
         .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
         .map((item) => item.text)
@@ -145,14 +166,14 @@ export class PiCodingLane implements AgentLanePort {
         correlationId,
         actor: "model",
         type: "assistant_message",
-        payload: { text: output, stopReason: response.stopReason, claimVerification },
+        payload: { text: output, stopReason: response.stopReason, claimVerification, contextRecoveryCount: recovered.recoveryCount, contextRecoveryExhausted: recovered.exhausted },
       }]);
       await this.maintainAfterTurn(response);
       return {
         text: output,
         stopReason: response.stopReason,
         usage: response.usage as AssistantMessage["usage"],
-        errorMessage: response.errorMessage,
+        errorMessage: recovered.exhausted ? `Context length recovery exhausted after ${recovered.recoveryCount} attempts.` : response.errorMessage,
         claimVerification,
       };
     } finally {

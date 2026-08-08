@@ -12,6 +12,7 @@ import { pruneAgentMessages } from "../src/context/agent-pruner.js";
 import { CheckpointService } from "../src/context/checkpoint.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { AUTOMATIC_CONTEXT_RECOVERY_MARKER, promptWithContextLengthRecovery } from "../src/runtime/context-length-recovery.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -151,6 +152,71 @@ test("mechanical checkpoint is durable and a second context overflow fails expli
   }
 });
 
+test("[contract:coding-length-auto-recovery] coding prompts compact and continue after a length stop", async () => {
+  const prompts: string[] = [];
+  let compactions = 0;
+  const responses = [assistantResponse("length"), assistantResponse("length"), assistantResponse("stop", "completed")];
+  const result = await promptWithContextLengthRecovery({
+    async prompt(text) {
+      prompts.push(text);
+      return responses.shift()!;
+    },
+    async compact() { compactions += 1; },
+  }, "solve the challenge");
+  assert.equal(result.response.stopReason, "stop");
+  assert.equal(result.recoveryCount, 2);
+  assert.equal(result.exhausted, false);
+  assert.equal(compactions, 2);
+  assert.equal(prompts[0], "solve the challenge");
+  assert.ok(prompts.slice(1).every((prompt) => prompt.startsWith(AUTOMATIC_CONTEXT_RECOVERY_MARKER)));
+});
+
+test("coding length recovery stops after its bounded retry budget", async () => {
+  let prompts = 0;
+  let compactions = 0;
+  const result = await promptWithContextLengthRecovery({
+    async prompt() { prompts += 1; return assistantResponse("length"); },
+    async compact() { compactions += 1; },
+  }, "solve", 2);
+  assert.equal(result.exhausted, true);
+  assert.equal(result.recoveryCount, 2);
+  assert.equal(prompts, 3);
+  assert.equal(compactions, 2);
+});
+
+test("[contract:solver-length-context-recovery] solver treats a length stop as recoverable context overflow", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-length-overflow-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "LENGTH-OVERFLOW";
+    let prompts = 0;
+    let compactions = 0;
+    const lane: SolverLaneFactory = async () => ({
+      async prompt() {
+        prompts += 1;
+        return { text: "", stopReason: prompts === 1 ? "length" : "stop", usage: zeroUsage() };
+      },
+      async compact() { compactions += 1; },
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 2,
+    });
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(prompts, 2);
+    assert.equal(compactions, 1);
+    assert.equal(snapshot.contextOverflowRecoveries, 1);
+    assert.equal(result.status, "EXHAUSTED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("target instructions stay inside an untrusted observation boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-injection-"));
   try {
@@ -185,4 +251,17 @@ function assistant(toolCallId: string, name: string, timestamp: number) {
 
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function assistantResponse(stopReason: "length" | "stop", text = "") {
+  return {
+    role: "assistant" as const,
+    content: text ? [{ type: "text" as const, text }] : [],
+    api: "openai-completions" as const,
+    provider: "test",
+    model: "test-model",
+    usage: zeroUsage(),
+    stopReason,
+    timestamp: Date.now(),
+  };
 }

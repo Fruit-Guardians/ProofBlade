@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
+  AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
   PiSolverLane,
   ProofBladeToolRuntime,
@@ -522,12 +523,14 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
     const message = asMessage(entry.message);
     if (entry.type !== "message" || (message?.role !== "user" && message?.role !== "assistant")) continue;
     const content = asContent(message.content);
+    const text = content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n");
+    if (message.role === "user" && text.startsWith(AUTOMATIC_CONTEXT_RECOVERY_MARKER)) continue;
     messages.push({
       id: entry.id ?? `${messages.length + 1}`,
       entryId: entry.id ?? `${messages.length + 1}`,
       role: message.role,
       timestamp: entry.timestamp ?? "",
-      text: content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n"),
+      text,
       thinking: content.filter((item) => item.type === "thinking").map((item) => item.thinking ?? "").join("\n"),
       toolCallIds: content.filter((item) => item.type === "toolCall" && item.id).map((item) => item.id!),
       provider: message.provider,

@@ -188,6 +188,32 @@ test("interruption 5: mechanical summary survives before Pi Session append and r
   }
 });
 
+test("[contract:bounded-compaction-tail] mechanical compaction bounds a single oversized tool turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-bounded-compact-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "BOUNDED-COMPACTION";
+    await services.control.createRun(runId, fixtureTask(runId, "reverse-branch-2", root, config));
+    const checkpointService = new CheckpointService(services.control, services.artifacts);
+    const retainedTail = Array.from({ length: 12 }, (_, index) => [
+      { role: "assistant", content: [{ type: "toolCall", id: `call-${index}`, name: "inspect_target", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 },
+      { role: "toolResult", toolCallId: `call-${index}`, toolName: "inspect_target", content: [{ type: "text", text: `A-${index} ` + "x".repeat(4_000) }], isError: false, timestamp: index * 2 + 1 },
+    ]).flat() as AgentMessage[];
+    const compaction = await new DurableCompactionCoordinator(checkpointService).provide(runId, {
+      firstKeptEntryId: "entry-1",
+      tokensBefore: 20_000,
+      retainedTail,
+    }, undefined, { maxContextTokens: 4_096 });
+    assert.ok(compaction.details.retainedTailTokensAfter < compaction.details.retainedTailTokensBefore);
+    assert.ok(compaction.details.retainedTailTokensAfter <= 2_048);
+    assert.ok(compaction.details.droppedEntries > 0);
+    assert.deepEqual(toolPairViolations(compaction.retainedTail), []);
+    assert.match(JSON.stringify(compaction.retainedTail), /call-11/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("interruption 6: expired heartbeat and missing target reset lifecycle state", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-interrupt-lifecycle-"));
   try {

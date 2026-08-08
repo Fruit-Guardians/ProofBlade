@@ -258,7 +258,7 @@ export class SingleAgentCtfLoop {
 }
 
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
-  return stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? "");
+  return stopReason === "length" || (stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? ""));
 }
 
 async function defaultLaneFactory(input: SolverLaneCreateInput): Promise<AgentLanePort> {

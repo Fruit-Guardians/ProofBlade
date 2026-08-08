@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T20:27:28.3613467+08:00",
+  "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
   "qualityAudit": {
-    "bugAuditCount": 4,
-    "securityAuditCount": 4,
-    "lastBugAuditAt": "2026-08-07T20:27:28.3613467+08:00",
-    "lastSecurityAuditAt": "2026-08-07T20:27:28.3613467+08:00",
-    "sourceHash": "55a03d59f81699b53d271ece93a8e7860f7c9e838979afc5d57cba791b1dd6ea",
+    "bugAuditCount": 5,
+    "securityAuditCount": 5,
+    "lastBugAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "lastSecurityAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "sourceHash": "f2ee3ef42e6e6e959fb0ab22ca46fa17e19684f24eaa4965aba9a81a7f7a4e6d",
     "result": "passed"
   }
 }
@@ -32,6 +32,7 @@
 
 - API 响应只暴露 `hasApiKey`，不回传 Key。
 - SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
+- Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
 - Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Solver lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。

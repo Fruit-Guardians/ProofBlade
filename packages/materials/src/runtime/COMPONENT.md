@@ -6,13 +6,13 @@
   "name": "Pi and Provider Runtime",
   "version": "0.10.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-08T02:04:30+08:00",
+  "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
   "qualityAudit": {
     "bugAuditCount": 2,
     "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-08T02:04:30+08:00",
-    "lastSecurityAuditAt": "2026-08-08T02:04:30+08:00",
-    "sourceHash": "703a675f4ce5c94e28f452af98fb461bf08d67c6f78561a95fd45e410ba05b04",
+    "lastBugAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "lastSecurityAuditAt": "2026-08-08T02:47:55.5788475+08:00",
+    "sourceHash": "afc898cfc20092f836340c19e4e7085a784310a201c29ad1fc39c1cd3ff69a64",
     "result": "passed"
   }
 }
@@ -36,7 +36,7 @@
 
 模型、URL、思考等级、缓存策略和 Provider 重试预算只能来自配置。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
 
-Coding Lane 的 context hook 只构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。错误或人工暂停的回合不启动摘要请求。
+Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。内部恢复提示保留在 Pi 调试轨迹中，但不冒充 GUI 用户消息。错误或人工暂停的回合不启动普通摘要请求。
 
 `evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`inspect_forest` 用于方向回顾，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 

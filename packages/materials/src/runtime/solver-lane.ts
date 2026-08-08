@@ -116,7 +116,7 @@ export class PiSolverLane implements AgentLanePort {
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
       const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
-      const prepared = prepareContextMaintenance({ messages, availableTokens: compiled.manifest.budget.availableInput, baseTokens: compiled.estimatedTokens, messageBudget: transcriptBudget });
+      const prepared = prepareContextMaintenance({ messages, availableTokens: compiled.manifest.budget.availableInput, baseTokens: compiled.estimatedTokens, messageBudget: Math.max(256, Math.floor(transcriptBudget * 0.5)) });
       if (prepared.checkpointRecommended) await checkpointService.create(options.runId, "context-prune", compiled.manifest);
       if (prepared.nextAction === "compact") laneRef.lane?.requestCompactionAfterTurn();
       // Keep maintenance on the existing append-only transcript. Turn state is
@@ -126,7 +126,8 @@ export class PiSolverLane implements AgentLanePort {
     harness.on("session_before_compact", async ({ preparation }) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
       const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: snapshot.phase, task: snapshot.task, snapshot, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
-      return { compaction: await compactionCoordinator.provide(options.runId, preparation, compiled.manifest) };
+      const transcriptBudget = Math.max(256, compiled.manifest.budget.availableInput - compiled.estimatedTokens);
+      return { compaction: await compactionCoordinator.provide(options.runId, preparation, compiled.manifest, { maxContextTokens: transcriptBudget }) };
     });
     attachPiObservability(harness, {
       runId: options.runId,

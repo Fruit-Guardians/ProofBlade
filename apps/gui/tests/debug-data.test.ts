@@ -54,6 +54,15 @@ test("projects user and assistant Pi entries into a conversation without tool-re
   assert.deepEqual(messages[1]?.toolCallIds, ["call-1"]);
 });
 
+test("[contract:hidden-context-recovery-turn] hides automatic context recovery prompts from chat", () => {
+  const messages = conversationMessagesFromEntries([
+    { type: "message", id: "user", message: { role: "user", content: [{ type: "text", text: "solve" }] } },
+    { type: "message", id: "recovery", message: { role: "user", content: [{ type: "text", text: "[ProofBlade automatic context recovery]\nContinue the unfinished task." }] } },
+    { type: "message", id: "assistant", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done" }] } },
+  ]);
+  assert.deepEqual(messages.map((message) => [message.role, message.text]), [["user", "solve"], ["assistant", "done"]]);
+});
+
 test("projects persisted provider failures into assistant conversation messages", () => {
   const messages = conversationMessagesFromEntries([{
     type: "message",
