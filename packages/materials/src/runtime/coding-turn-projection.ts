@@ -75,6 +75,7 @@ export async function finalizeCodingTurn(options: {
   recoveryCount: number;
   recoveryExhausted: boolean;
   termination: CodingTurnTermination;
+  piEntryId?: string;
   claimVerifier: Pick<CodingClaimVerifier, "project">;
   maintainAfterTurn: () => Promise<void>;
 }): Promise<AgentOutcome> {
@@ -106,6 +107,7 @@ export async function finalizeCodingTurn(options: {
       claimVerification,
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
+      piEntryId: options.piEntryId,
       termination: confirmed ? "repeated_tool_failure" : undefined,
       providerStopReason: confirmed ? options.response.stopReason : undefined,
     },

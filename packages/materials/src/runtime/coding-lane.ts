@@ -51,6 +51,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly maintenance: { compactRequested: boolean },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
     private readonly termination: CodingTurnTermination,
+    private readonly latestAssistantEntryId: () => Promise<string | undefined>,
   ) {}
 
   public static async create(options: {
@@ -139,7 +140,26 @@ export class PiCodingLane implements AgentLanePort {
       controlStore: options.controlStore,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    return new PiCodingLane(options.runId, options.controlStore, harness, env, closeTransport, mcp, claimVerifier, maintenance, repeatBreaker, termination);
+    return new PiCodingLane(
+      options.runId,
+      options.controlStore,
+      harness,
+      env,
+      closeTransport,
+      mcp,
+      claimVerifier,
+      maintenance,
+      repeatBreaker,
+      termination,
+      async () => {
+        const branch = await session.getBranch();
+        for (let index = branch.length - 1; index >= 0; index -= 1) {
+          const entry = branch[index]!;
+          if (entry.type === "message" && entry.message.role === "assistant") return entry.id;
+        }
+        return undefined;
+      },
+    );
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -175,6 +195,7 @@ export class PiCodingLane implements AgentLanePort {
         recoveryCount: recovered.recoveryCount,
         recoveryExhausted: recovered.exhausted,
         termination: this.termination,
+        piEntryId: await this.latestAssistantEntryId(),
         claimVerifier: this.claimVerifier,
         maintainAfterTurn: async () => await this.maintainAfterTurn(response),
       });

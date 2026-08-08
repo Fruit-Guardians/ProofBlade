@@ -82,11 +82,41 @@ test("[contract:repeated-tool-failure-conversation] projects a persisted breaker
     message: { role: "assistant", content: [], stopReason: "error", errorMessage: "ProofBlade repeated tool failure." },
   }], [{
     type: "assistant_message",
-    payload: { text: "ProofBlade repeated tool failure. Change the approach before continuing.", stopReason: "stop", termination: "repeated_tool_failure" },
+    payload: { text: "ProofBlade repeated tool failure. Change the approach before continuing.", stopReason: "stop", termination: "repeated_tool_failure", piEntryId: "assistant-breaker" },
   }] as HarnessEvent[]);
   assert.equal(messages[0]?.text, "ProofBlade repeated tool failure. Change the approach before continuing.");
   assert.equal(messages[0]?.stopReason, "stop");
   assert.equal(messages[0]?.error, undefined);
+});
+
+test("[contract:repeated-tool-failure-entry-link] an old breaker event cannot overwrite a later provider failure", () => {
+  const messages = conversationMessagesFromEntries([
+    {
+      type: "message",
+      id: "old-breaker",
+      timestamp: "2026-08-05T00:00:03.000Z",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "old breaker raw error" },
+    },
+    {
+      type: "message",
+      id: "new-provider-failure",
+      timestamp: "2026-08-05T00:01:03.000Z",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "new provider failure" },
+    },
+  ], [{
+    type: "assistant_message",
+    payload: {
+      text: "breaker recovery guidance",
+      stopReason: "stop",
+      termination: "repeated_tool_failure",
+      piEntryId: "old-breaker",
+    },
+  }] as HarnessEvent[]);
+
+  assert.deepEqual(messages.map((message) => ({ id: message.id, text: message.text, stopReason: message.stopReason, error: message.error })), [
+    { id: "old-breaker", text: "breaker recovery guidance", stopReason: "stop", error: undefined },
+    { id: "new-provider-failure", text: "", stopReason: "error", error: "new provider failure" },
+  ]);
 });
 
 test("projects durable claim verification onto the matching assistant message", () => {

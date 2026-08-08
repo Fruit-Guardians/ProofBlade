@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-08T15:15:00+08:00",
+  "updatedAt": "2026-08-08T22:15:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -458,6 +458,28 @@
       ],
       "validation": [
         "112/112 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260808-006",
+      "occurredAt": "2026-08-08T22:15:00+08:00",
+      "summary": "使用稳定 Pi Entry ID 关联断路器事件与历史 Assistant 消息。",
+      "branch": "codex/evidence-curation-breaker",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "Coding Lane 将当前回合最终 Pi Assistant Entry ID 持久化到 assistant_message 事件",
+        "GUI 只按完全匹配的 piEntryId 投影断路器恢复提示，不再查找最新空错误消息",
+        "缺少稳定 ID 的旧事件不执行模糊回填，避免污染后续真实 Provider 错误",
+        "增加断路器后再次发生 Provider 错误的历史重建回归测试"
+      ],
+      "validation": [
+        "113/113 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"

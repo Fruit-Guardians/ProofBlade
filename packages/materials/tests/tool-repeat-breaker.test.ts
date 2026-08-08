@@ -87,6 +87,9 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
     attachRepeatedToolFailureBreaker(harness, breaker, termination);
 
     const response = await harness.prompt("Inspect the evidence forest.");
+    const assistantEntries = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "assistant");
+    const piEntryId = assistantEntries[assistantEntries.length - 1]?.id;
+    assert.ok(piEntryId);
     const outcome = await finalizeCodingTurn({
       runId,
       controlStore,
@@ -96,6 +99,7 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
       recoveryCount: 0,
       recoveryExhausted: false,
       termination,
+      piEntryId,
       claimVerifier: { project: () => ({ required: false, status: "not_required" }) },
       maintainAfterTurn: async () => undefined,
     });
@@ -106,6 +110,7 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
     const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.text, outcome.text);
     assert.equal(assistantEvent?.payload?.termination, "repeated_tool_failure");
+    assert.equal(assistantEvent?.payload?.piEntryId, piEntryId);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -159,6 +164,9 @@ test("[contract:repeated-tool-failure-mixed-batch] a successful sibling cannot b
     attachRepeatedToolFailureBreaker(harness, breaker, termination);
 
     const response = await harness.prompt("Inspect the evidence forest.");
+    const assistantEntries = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "assistant");
+    const piEntryId = assistantEntries[assistantEntries.length - 1]?.id;
+    assert.ok(piEntryId);
     const outcome = await finalizeCodingTurn({
       runId,
       controlStore,
@@ -168,6 +176,7 @@ test("[contract:repeated-tool-failure-mixed-batch] a successful sibling cannot b
       recoveryCount: 0,
       recoveryExhausted: false,
       termination,
+      piEntryId,
       claimVerifier: { project: () => ({ required: false, status: "not_required" }) },
       maintainAfterTurn: async () => undefined,
     });
@@ -181,6 +190,7 @@ test("[contract:repeated-tool-failure-mixed-batch] a successful sibling cannot b
     assert.equal(outcome.termination, "repeated_tool_failure");
     const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.termination, "repeated_tool_failure");
+    assert.equal(assistantEvent?.payload?.piEntryId, piEntryId);
     assert.equal(assistantEvent?.payload?.stopReason, "stop");
     assert.equal(assistantEvent?.payload?.providerStopReason, "error");
   } finally {

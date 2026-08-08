@@ -546,7 +546,10 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
   for (const event of [...assistantEvents].reverse()) {
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
     if (event.payload?.termination === "repeated_tool_failure" && text) {
-      const interrupted = [...messages].reverse().find((item) => item.role === "assistant" && !item.text && item.stopReason === "error");
+      const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
+      const interrupted = piEntryId
+        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && item.stopReason === "error")
+        : undefined;
       if (interrupted) {
         interrupted.text = text;
         interrupted.stopReason = typeof event.payload?.stopReason === "string" ? event.payload.stopReason : "stop";
