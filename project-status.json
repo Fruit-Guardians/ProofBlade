@@ -375,7 +375,7 @@
       ]
     },
     {
-      "id": "UPDATE-20260808-001",
+      "id": "UPDATE-20260808-002",
       "occurredAt": "2026-08-08T02:02:26.8610595+08:00",
       "summary": "修复严格 OpenAI-compatible Provider 拒绝 Coding Tool Schema 的问题。",
       "branch": "codex/provider-schema-compat",

@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { resolveAuditTimestamp } from "../audit-time.mjs";
 import { canonicalComponentContent } from "../component-audit-lib.mjs";
 import { componentTransitionErrors } from "../component-transition-lib.mjs";
 import { changeContractErrors } from "../change-contract-lib.mjs";
@@ -79,6 +83,19 @@ test("change contracts reject malformed regex and non-normalized test paths", ()
     testFiles: new Map(),
   });
   assert.deepEqual(errors, ["invalid: trigger paths and regular expressions must be valid and normalized"]);
+});
+
+test("[contract:component-audit-time-fallback] resolves audit time from explicit, environment, commit, then clock", () => {
+  const now = new Date("2026-08-08T10:00:00.000Z");
+  assert.equal(resolveAuditTimestamp({ explicit: "2026-08-08T08:00:00Z", now }), "2026-08-08T08:00:00.000Z");
+  assert.equal(resolveAuditTimestamp({ env: { COMPONENT_AUDIT_AT: "2026-08-08T08:30:00Z" }, gitCommitAt: "2026-08-08T07:00:00Z", now }), "2026-08-08T08:30:00.000Z");
+  assert.equal(resolveAuditTimestamp({ gitCommitAt: "2026-08-08T09:00:00Z", now }), "2026-08-08T09:00:00.000Z");
+  const directory = mkdtempSync(join(tmpdir(), "proofblade-audit-time-"));
+  const eventPath = join(directory, "event.json");
+  writeFileSync(eventPath, JSON.stringify({ pull_request: { updated_at: "2026-08-08T09:30:00Z" } }));
+  assert.equal(resolveAuditTimestamp({ eventPath, gitCommitAt: "2026-08-08T09:00:00Z", now }), "2026-08-08T09:30:00.000Z");
+  rmSync(directory, { recursive: true, force: true });
+  assert.equal(resolveAuditTimestamp({ now }), "2026-08-08T10:00:00.000Z");
 });
 
 function metadata({ version, updatedAt, count, hash }) {

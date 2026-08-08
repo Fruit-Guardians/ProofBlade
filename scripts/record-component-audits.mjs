@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   componentSourceHash,
@@ -7,11 +8,17 @@ import {
   parseMetadataBlock,
   replaceMetadataBlock,
 } from "./component-audit-lib.mjs";
+import { resolveAuditTimestamp } from "./audit-time.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const registry = JSON.parse(readFileSync(join(root, "component-docs.json"), "utf8"));
 const selection = requiredArgument("--components");
-const auditedAt = requiredArgument("--at");
+const auditedAt = resolveAuditTimestamp({
+  explicit: optionalArgument("--at"),
+  env: process.env,
+  eventPath: process.env.GITHUB_EVENT_PATH,
+  gitCommitAt: gitCommitTimestamp(root),
+});
 const result = requiredArgument("--result");
 const force = process.argv.includes("--force");
 
@@ -68,4 +75,14 @@ function requiredArgument(name) {
   const value = index >= 0 ? process.argv[index + 1] : undefined;
   if (!value) throw new Error(`Missing ${name}`);
   return value;
+}
+
+function optionalArgument(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function gitCommitTimestamp(cwd) {
+  const result = spawnSync("git", ["log", "-1", "--format=%cI"], { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() : undefined;
 }

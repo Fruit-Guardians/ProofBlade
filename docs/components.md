@@ -13,7 +13,7 @@ npm run check:components
 npm run verify
 ```
 
-审计通过后使用 `npm run record:component-audit -- --components <id,...|all> --at <ISO时间> --result passed` 写入记录。记录器默认跳过指纹未变化的组件；只有周期性复审相同源码时才传入 `--force`。
+审计通过后使用 `npm run record:component-audit -- --components <id,...|all> --result passed` 写入记录。`--at` 可以省略，记录器依次采用显式 `--at`、`COMPONENT_AUDIT_AT`、GitHub PR 的 `updated_at`、最近提交时间或当前 UTC 时间。记录器默认跳过指纹未变化的组件；只有周期性复审相同源码时才传入 `--force`。
 
 第一条命令在本地比较 `HEAD` 与工作区；CI 会比较 PR 基线与当前提交。新增组件时，需要同时创建 `COMPONENT.md` 并登记到 `component-docs.json`。
 

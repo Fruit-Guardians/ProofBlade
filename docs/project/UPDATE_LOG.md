@@ -8,6 +8,7 @@
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
 | UPDATE-20260808-001 | 2026-08-08T02:47:55.5788475+08:00 | PLAN-120 | codex/context-length-recovery | 本条记录所在提交 |
+| UPDATE-20260808-002 | 2026-08-08T02:02:26.8610595+08:00 | PLAN-120 | codex/provider-schema-compat | 本条记录所在提交 |
 | UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-006 | 2026-08-07T22:44:53.9883278+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
@@ -35,6 +36,25 @@
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] component documentation check passed: 25 components, 5 affected
 - [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260808-002
+
+时间：2026-08-08T02:02:26.8610595+08:00
+
+摘要：修复严格 OpenAI-compatible Provider 拒绝 Coding Tool Schema 的问题。
+
+### 变更
+
+- 将 evidence 的根级判别联合改为 type object 和 operation 字符串枚举
+- 将 Coding Tool 内部离散选项改为直接字符串 enum，消除 Provider 可见 anyOf
+- 把 operation 的必需字段和互斥字段约束保留在确定性运行时校验中
+- 增加全部 Coding Provider Tool 根 Schema 兼容性与跨操作字段拒绝测试
+
+### 验证
+
+- [x] coding provider schema compatibility contract
+- [x] npm run test --workspace=@proofblade/materials
+- [x] npm run verify
 
 ## UPDATE-20260807-007
 
