@@ -1,12 +1,14 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T23:50:00+08:00
+> 状态更新时间：2026-08-09T23:59:59+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-014 | 2026-08-09T23:59:59+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-013 | 2026-08-09T23:59:30+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-012 | 2026-08-09T23:50:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-011 | 2026-08-09T23:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-010 | 2026-08-09T22:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -35,6 +37,46 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-014
+
+时间：2026-08-09T23:59:59+08:00
+
+摘要：在 fixture reset 和 Intent 终态提交边界原子隔离旧 Worker。
+
+### 变更
+
+- fixture_reset 在 Reducer 内将旧 generation 的 PROPOSED 与 CLAIMED Intent 原子标记为 STALE
+- 旧 CLAIMED Intent 保存的 leaseClaims 仅在 owner 与 epoch 匹配时释放，leaseEpochs 保持单调
+- 完成、失败和取消统一进入 ControlStore 事务，并要求 Intent 当前为同 generation 的 CLAIMED
+- 同一终态重复提交保持幂等，跨终态覆盖和 reset 后旧 Worker 结果提交被拒绝
+- 增加 reset、Lease 释放、replay、旧 Worker 拒绝和终态状态机回归测试
+
+### 验证
+
+- [x] 65 focused scheduler, durability and recovery tests passed in three consecutive iterations
+- [x] TypeScript typecheck passed
+- [x] fixture reset replay preserves stale intents, released leases and monotonic lease epochs
+
+## UPDATE-20260809-013
+
+时间：2026-08-09T23:59:30+08:00
+
+摘要：复查并收紧 Intent generation 上下文的持久快照权威性。
+
+### 变更
+
+- 原子调度使用当前 generation 的持久化开放 Intent 数量，不再采用调用方旧 openIntents 上界
+- 完成 Intent 与完成假设集合仅从当前 generation 的 ControlStore 快照推导
+- CLI 调度上下文仅统计当前 generation 的开放 Intent 和完成验证
+- 旧 generation 的调用方 completedHypothesisIds 不再抑制新环境重新验证
+- 增加旧上下文开放数量和 CLI 跨 generation 聚合回归断言
+
+### 验证
+
+- [x] 46 focused tests passed in three consecutive recheck iterations
+- [x] TypeScript typecheck passed
+- [x] component, change contract and project report gates passed
 
 ## UPDATE-20260809-012
 

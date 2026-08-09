@@ -81,7 +81,7 @@ export class IntentScheduler {
       intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
         && intent.fixtureGeneration === currentGeneration
     ).length;
-    const openIntents = Math.max(context.openIntents, persistedOpenIntents);
+    const openIntents = persistedOpenIntents;
     const schedulingContext = {
       ...context,
       openIntents,
@@ -89,11 +89,11 @@ export class IntentScheduler {
       knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
       occupiedResources: Object.keys(snapshot.leases || {}),
       completedIntentIds: new Set([
-        ...(context.completedIntentIds ?? []),
-        ...persistedIntents.filter(intent => intent.status === 'COMPLETED').map(intent => intent.id),
+        ...persistedIntents
+          .filter(intent => intent.status === 'COMPLETED' && intent.fixtureGeneration === currentGeneration)
+          .map(intent => intent.id),
       ]),
       completedHypothesisIds: new Set([
-        ...(context.completedHypothesisIds ?? []),
         ...persistedIntents
           .filter(intent => intent.status === 'COMPLETED'
             && intent.fixtureGeneration === currentGeneration
@@ -161,7 +161,7 @@ export class IntentScheduler {
         intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
           && intent.fixtureGeneration === currentGeneration
       ).length;
-      const openIntents = Math.max(context.openIntents, persistedOpenIntents);
+      const openIntents = persistedOpenIntents;
       const schedulingContext = {
         ...context,
         openIntents,
@@ -169,11 +169,11 @@ export class IntentScheduler {
         knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
         occupiedResources: Object.keys(snapshot.leases || {}),
         completedIntentIds: new Set([
-          ...(context.completedIntentIds ?? []),
-          ...persistedIntents.filter(intent => intent.status === 'COMPLETED').map(intent => intent.id),
+          ...persistedIntents
+            .filter(intent => intent.status === 'COMPLETED' && intent.fixtureGeneration === currentGeneration)
+            .map(intent => intent.id),
         ]),
         completedHypothesisIds: new Set([
-          ...(context.completedHypothesisIds ?? []),
           ...persistedIntents
             .filter(intent => intent.status === 'COMPLETED'
               && intent.fixtureGeneration === currentGeneration
@@ -458,23 +458,11 @@ export class IntentScheduler {
       producedFacts?: string[];
     }
   ): Promise<void> {
-    const snapshot = await this.controlStore.snapshot(runId);
-    const intent = snapshot.schedulerIntents[intentId];
-
-    if (!intent) {
-      throw new Error(`Intent ${intentId} not found`);
-    }
-
-    intent.status = 'COMPLETED';
-    intent.completedAt = new Date().toISOString();
-    intent.producedObservations = result.producedObservations;
-    intent.producedEvidence = result.producedEvidence;
-    intent.producedFacts = result.producedFacts;
-
-    await this.releaseIntentLeases(runId, intent);
-    await this.controlStore.dispatch(runId, {
-      type: 'scheduler_intent',
-      intent,
+    await this.transitionIntentToTerminal(runId, intentId, 'COMPLETED', intent => {
+      intent.completedAt = new Date().toISOString();
+      intent.producedObservations = result.producedObservations;
+      intent.producedEvidence = result.producedEvidence;
+      intent.producedFacts = result.producedFacts;
     });
   }
 
@@ -486,22 +474,10 @@ export class IntentScheduler {
     intentId: string,
     error: string
   ): Promise<void> {
-    const snapshot = await this.controlStore.snapshot(runId);
-    const intent = snapshot.schedulerIntents[intentId];
-
-    if (!intent) {
-      throw new Error(`Intent ${intentId} not found`);
-    }
-
-    intent.status = 'FAILED';
-    intent.completedAt = new Date().toISOString();
-    intent.lastError = error;
-    intent.attempts += 1;
-
-    await this.releaseIntentLeases(runId, intent);
-    await this.controlStore.dispatch(runId, {
-      type: 'scheduler_intent',
-      intent,
+    await this.transitionIntentToTerminal(runId, intentId, 'FAILED', intent => {
+      intent.completedAt = new Date().toISOString();
+      intent.lastError = error;
+      intent.attempts += 1;
     });
   }
 
@@ -513,20 +489,8 @@ export class IntentScheduler {
     intentId: string,
     reason: string
   ): Promise<void> {
-    const snapshot = await this.controlStore.snapshot(runId);
-    const intent = snapshot.schedulerIntents[intentId];
-
-    if (!intent) {
-      throw new Error(`Intent ${intentId} not found`);
-    }
-
-    intent.status = 'CANCELLED';
-    intent.lastError = reason;
-
-    await this.releaseIntentLeases(runId, intent);
-    await this.controlStore.dispatch(runId, {
-      type: 'scheduler_intent',
-      intent,
+    await this.transitionIntentToTerminal(runId, intentId, 'CANCELLED', intent => {
+      intent.lastError = reason;
     });
   }
 
@@ -552,16 +516,44 @@ export class IntentScheduler {
     return `intent-${kind}-${randomUUID()}`;
   }
 
-  private async releaseIntentLeases(runId: string, intent: Intent): Promise<void> {
-    if (!intent.leaseClaims || intent.resourceKeys.length === 0) return;
+  private async transitionIntentToTerminal(
+    runId: string,
+    intentId: string,
+    targetStatus: Extract<IntentStatus, 'COMPLETED' | 'FAILED' | 'CANCELLED'>,
+    update: (intent: Intent) => void,
+  ): Promise<void> {
+    await this.controlStore.dispatchTransaction(runId, snapshot => {
+      const current = snapshot.schedulerIntents[intentId];
+      if (!current) throw new Error(`Intent ${intentId} not found`);
 
-    const snapshot = await this.controlStore.snapshot(runId);
-    for (const resourceKey of intent.resourceKeys) {
-      const lease = snapshot.leases?.[resourceKey];
-      const claim = intent.leaseClaims[resourceKey];
-      if (!lease || !claim || lease.ownerLane !== claim.ownerLane || lease.generation !== claim.generation) continue;
-      await this.leaseManager.release(runId, lease);
-    }
+      const currentGeneration = snapshot.generation > 0 ? snapshot.generation : current.fixtureGeneration;
+      if (current.fixtureGeneration !== currentGeneration) {
+        throw new Error(`Intent ${intentId} belongs to fixture generation ${current.fixtureGeneration}, current generation is ${currentGeneration}`);
+      }
+      if (current.status === targetStatus) {
+        return { commands: [], project: () => undefined };
+      }
+      if (current.status !== 'CLAIMED') {
+        throw new Error(`Cannot transition Intent ${intentId} from ${current.status} to ${targetStatus}`);
+      }
+
+      const intent = { ...current, status: targetStatus };
+      update(intent);
+      const commands: DomainCommand[] = [];
+      for (const [resourceKey, claim] of Object.entries(intent.leaseClaims ?? {})) {
+        const lease = snapshot.leases[resourceKey];
+        if (!lease || lease.ownerLane !== claim.ownerLane || lease.generation !== claim.generation) continue;
+        commands.push({
+          type: 'lease_released',
+          resourceKey,
+          ownerLane: claim.ownerLane,
+          generation: claim.generation,
+          lane: claim.ownerLane,
+        });
+      }
+      commands.push({ type: 'scheduler_intent', intent });
+      return { commands, project: () => undefined };
+    });
   }
 
   private createExplorationIntent(

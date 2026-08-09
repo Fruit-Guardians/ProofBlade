@@ -59,10 +59,24 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "phase_finished":
       if (p.phase) next.phase = p.phase as RunSnapshot["phase"];
       break;
-    case "fixture_reset":
-      next.generation = Number(p.generation);
-      if (!Number.isInteger(next.generation) || next.generation < 1) throw new Error("fixture_reset requires a positive generation");
+    case "fixture_reset": {
+      const generation = Number(p.generation);
+      if (!Number.isInteger(generation) || generation < 1) throw new Error("fixture_reset requires a positive generation");
+      next.generation = generation;
+      for (const intent of Object.values(next.schedulerIntents)) {
+        if (intent.fixtureGeneration === generation || (intent.status !== "PROPOSED" && intent.status !== "CLAIMED")) continue;
+        if (intent.status === "CLAIMED") {
+          for (const [resourceKey, claim] of Object.entries(intent.leaseClaims ?? {})) {
+            const lease = next.leases[resourceKey];
+            if (lease?.ownerLane === claim.ownerLane && lease.generation === claim.generation) {
+              delete next.leases[resourceKey];
+            }
+          }
+        }
+        intent.status = "STALE";
+      }
       break;
+    }
     case "run_paused":
       ensureNotTerminal(next.status);
       next.status = "PAUSED";

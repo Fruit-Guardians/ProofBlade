@@ -8,6 +8,31 @@ import { IntentScheduler } from '../src/orchestration/intent-scheduler.js';
 import { IntentScorer } from '../src/orchestration/intent-scorer.js';
 import type { SchedulingContext, Intent } from '../src/domain/intent.js';
 
+function createTransactionalControlStore(state: any) {
+  const commands: any[] = [];
+  const apply = (command: any) => {
+    commands.push(structuredClone(command));
+    if (command.type === 'scheduler_intent') state.schedulerIntents[command.intent.id] = structuredClone(command.intent);
+    if (command.type === 'lease_acquired') state.leases[command.lease.resourceKey] = structuredClone(command.lease);
+    if (command.type === 'lease_released') delete state.leases[command.resourceKey];
+  };
+  return {
+    commands,
+    store: {
+      snapshot: mock.fn(async () => state),
+      dispatch: mock.fn(async (_runId: string, command: any) => {
+        apply(command);
+        return [];
+      }),
+      dispatchTransaction: mock.fn(async (_runId: string, prepare: any) => {
+        const transaction = prepare(state);
+        transaction.commands.forEach(apply);
+        return transaction.project(state);
+      }),
+    },
+  };
+}
+
 describe('IntentScheduler', () => {
   // Mock ControlStore
   const mockControlStore = {
@@ -189,13 +214,7 @@ describe('IntentScheduler', () => {
 
   test('schedule - proposed intents remain claimable after the first intent completes', async () => {
     const state: any = { schedulerIntents: {}, leases: {} };
-    const controlStore = {
-      snapshot: mock.fn(async () => state),
-      dispatch: mock.fn(async (_runId: string, command: any) => {
-        state.schedulerIntents[command.intent.id] = structuredClone(command.intent);
-        return [];
-      }),
-    };
+    const { store: controlStore } = createTransactionalControlStore(state);
     const leaseManager = {
       acquire: mock.fn(async (_runId: string, resourceKey: string) => ({
         resourceKey, ownerLane: 'executor', generation: 1,
@@ -528,12 +547,11 @@ describe('IntentScheduler - 持久化', () => {
 
   test('completeIntent 持久化 COMPLETED 状态', async () => {
     const intentId = 'intent-test-123';
-    const dispatchMock = mock.fn(async () => []);
-    const mockControlStore = {
-      dispatch: dispatchMock,
-      snapshot: mock.fn(async () => ({
-        schedulerIntents: {
-          [intentId]: {
+    const state = {
+      generation: 0,
+      leases: {},
+      schedulerIntents: {
+        [intentId]: {
             id: intentId,
             status: 'CLAIMED',
             priority: 'high',
@@ -550,10 +568,10 @@ describe('IntentScheduler - 持久化', () => {
             resourceKeys: [],
             dependencies: [],
             attempts: 0,
-          }
-        }
-      })),
-    } as any;
+        },
+      },
+    };
+    const { store: mockControlStore, commands } = createTransactionalControlStore(state);
 
     const mockLeaseManager = {} as any;
     const scheduler = new IntentScheduler(mockControlStore, mockLeaseManager);
@@ -563,14 +581,11 @@ describe('IntentScheduler - 持久化', () => {
       producedEvidence: ['E-NEW-001'],
     });
 
-    // 验证 dispatch 被调用
-    assert.strictEqual(dispatchMock.mock.calls.length, 1);
-    const call = dispatchMock.mock.calls[0];
-    assert.strictEqual(call.arguments[0], 'RUN-001');
-    assert.strictEqual(call.arguments[1].type, 'scheduler_intent');
-    assert.strictEqual(call.arguments[1].intent.status, 'COMPLETED');
-    assert.ok(call.arguments[1].intent.completedAt);
-    assert.deepStrictEqual(call.arguments[1].intent.producedFacts, ['F-NEW-001']);
+    assert.strictEqual(commands.length, 1);
+    assert.strictEqual(commands[0].type, 'scheduler_intent');
+    assert.strictEqual(commands[0].intent.status, 'COMPLETED');
+    assert.ok(commands[0].intent.completedAt);
+    assert.deepStrictEqual(commands[0].intent.producedFacts, ['F-NEW-001']);
   });
 
   test('terminal transitions release every lease owned by the Intent', async () => {
@@ -600,17 +615,16 @@ describe('IntentScheduler - 持久化', () => {
         ])),
         dependencies: [], attempts: 0,
       };
-      const release = mock.fn(async () => {});
-      const scheduler = new IntentScheduler({
-        snapshot: mock.fn(async () => ({ schedulerIntents: { [intentId]: intent }, leases })),
-        dispatch: mock.fn(async () => []),
-      } as any, { release } as any);
+      const state = { generation: 0, schedulerIntents: { [intentId]: intent }, leases: { ...leases } };
+      const { store, commands } = createTransactionalControlStore(state);
+      const scheduler = new IntentScheduler(store as any, {} as any);
 
       if (transition === 'complete') await scheduler.completeIntent('RUN-LEASES', intentId, {});
       if (transition === 'fail') await scheduler.failIntent('RUN-LEASES', intentId, 'failed');
       if (transition === 'cancel') await scheduler.cancelIntent('RUN-LEASES', intentId, 'cancelled');
 
-      assert.equal(release.mock.calls.length, 2);
+      assert.equal(commands.filter(command => command.type === 'lease_released').length, 2);
+      assert.deepStrictEqual(state.leases, {});
     }
   });
 });
@@ -701,7 +715,11 @@ describe('IntentScheduler - replay 持久化', () => {
       assert.equal(after.schedulerIntents[first.id].completedAt, completed.completedAt);
 
       await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
-      const third = await scheduler.schedule({ ...context, currentGeneration: 2 });
+      const third = await scheduler.schedule({
+        ...context,
+        currentGeneration: 2,
+        completedHypothesisIds: new Set(['H-001']),
+      });
       const afterReset = await controlStore.snapshot(runId);
       assert.ok(third);
       assert.notEqual(third.id, first.id);
@@ -714,7 +732,7 @@ describe('IntentScheduler - replay 持久化', () => {
     }
   });
 
-  test('fixture reset 后旧 PROPOSED Intent 会变为 STALE 且不会被认领', async () => {
+  test('fixture reset 后旧 PROPOSED 变为 STALE 且不会阻止新代调度', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
@@ -740,16 +758,139 @@ describe('IntentScheduler - replay 持久化', () => {
 
       const result = await scheduler.schedule({
         runId, phase: 'reconnaissance', knowledgeVersion: 0, currentGeneration: 2,
-        facts: [], hypotheses: [], evidence: [], openIntents: 0,
+        facts: [], hypotheses: ['H-NEW'], evidence: [], openIntents: 1,
         newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
         newHints: [], verifierRejected: false,
         remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
       });
       const snapshot = await controlStore.snapshot(runId);
-      assert.equal(result, null);
+      assert.ok(result);
+      assert.equal(result.hypothesis, 'H-NEW');
+      assert.equal(result.fixtureGeneration, 2);
       assert.equal(snapshot.schedulerIntents[oldIntent.id].status, 'STALE');
       assert.equal(Object.values(snapshot.schedulerIntents).filter(intent =>
-        intent.status === 'PROPOSED' || intent.status === 'CLAIMED').length, 0);
+        (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+          && intent.fixtureGeneration === 1).length, 0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('fixture reset 原子失效旧 CLAIMED Intent 并释放匹配 Lease', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-reset-claimed-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-RESET-CLAIMED-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Reset claimed intent test',
+      } as any);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 1 });
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.ok(claimed);
+      const beforeReset = await controlStore.snapshot(runId);
+      assert.ok(Object.keys(beforeReset.leases).length > 0);
+      const leaseEpochs = { ...beforeReset.leaseEpochs };
+
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
+      const afterReset = await controlStore.snapshot(runId);
+      assert.equal(afterReset.schedulerIntents[claimed.id].status, 'STALE');
+      assert.deepStrictEqual(afterReset.leases, {});
+      assert.deepStrictEqual(afterReset.leaseEpochs, leaseEpochs);
+
+      const replayed = await new ControlStore(events).replay(runId);
+      assert.equal(replayed.schedulerIntents[claimed.id].status, 'STALE');
+      assert.deepStrictEqual(replayed.leases, {});
+      assert.deepStrictEqual(replayed.leaseEpochs, leaseEpochs);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('reset 后旧 Worker 不能完成或失败已失效 Intent', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-reject-old-worker-'));
+
+    try {
+      const controlStore = new ControlStore(new JsonlControlStore(join(root, 'runs')));
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-REJECT-OLD-WORKER-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Reject old worker test',
+      } as any);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 1 });
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.ok(claimed);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
+
+      await assert.rejects(() => scheduler.completeIntent(runId, claimed.id, {}), /fixture generation/);
+      await assert.rejects(() => scheduler.failIntent(runId, claimed.id, 'late failure'), /fixture generation/);
+      await assert.rejects(() => scheduler.cancelIntent(runId, claimed.id, 'late cancel'), /fixture generation/);
+      assert.equal((await controlStore.snapshot(runId)).schedulerIntents[claimed.id].status, 'STALE');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('Intent 终态转换要求 CLAIMED 且同目标重复提交幂等', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-terminal-state-'));
+
+    try {
+      const controlStore = new ControlStore(new JsonlControlStore(join(root, 'runs')));
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-TERMINAL-STATE-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Intent terminal state test',
+      } as any);
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.ok(claimed);
+
+      await scheduler.completeIntent(runId, claimed.id, { producedFacts: ['F-FIRST'] });
+      const completed = (await controlStore.snapshot(runId)).schedulerIntents[claimed.id];
+      await scheduler.completeIntent(runId, claimed.id, { producedFacts: ['F-SECOND'] });
+      const repeated = (await controlStore.snapshot(runId)).schedulerIntents[claimed.id];
+      assert.equal(repeated.completedAt, completed.completedAt);
+      assert.deepStrictEqual(repeated.producedFacts, ['F-FIRST']);
+
+      await assert.rejects(() => scheduler.failIntent(runId, claimed.id, 'overwrite'), /from COMPLETED to FAILED/);
+      await assert.rejects(() => scheduler.cancelIntent(runId, claimed.id, 'overwrite'), /from COMPLETED to CANCELLED/);
+      const proposed = { ...claimed, id: 'intent-proposed-terminal-guard', status: 'PROPOSED' as const, leaseClaims: undefined };
+      await controlStore.dispatch(runId, { type: 'scheduler_intent', intent: proposed });
+      await assert.rejects(() => scheduler.completeIntent(runId, proposed.id, {}), /from PROPOSED to COMPLETED/);
+      const final = (await controlStore.snapshot(runId)).schedulerIntents[claimed.id];
+      assert.equal(final.status, 'COMPLETED');
+      assert.deepStrictEqual(final.producedFacts, ['F-FIRST']);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

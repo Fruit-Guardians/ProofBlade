@@ -162,13 +162,18 @@ test('CLI scheduling context counts proposed intents toward the concurrency limi
     evidence: {},
     leases: {},
     schedulerIntents: {
-      'intent-proposed': { status: 'PROPOSED' },
-      'intent-claimed': { status: 'CLAIMED' },
+      'intent-proposed': { status: 'PROPOSED', fixtureGeneration: 1 },
+      'intent-claimed': { status: 'CLAIMED', fixtureGeneration: 1 },
+      'intent-old': { status: 'PROPOSED', fixtureGeneration: 0 },
+      'intent-old-completed': { status: 'COMPLETED', fixtureGeneration: 0, hypothesis: 'H-OLD' },
+      'intent-current-completed': { id: 'intent-current-completed', status: 'COMPLETED', fixtureGeneration: 1, hypothesis: 'H-CURRENT' },
     },
   } as unknown as RunSnapshot;
 
   const context = buildSchedulingContext(snapshot);
   assert.equal(context.openIntents, 2);
+  assert.deepEqual([...context.completedHypothesisIds ?? []], ['H-CURRENT']);
+  assert.deepEqual([...context.completedIntentIds ?? []], ['intent-current-completed']);
 
   const scheduler = new IntentScheduler({} as ControlStore, {} as LeaseManager, { maxOpenIntents: 2 });
   assert.equal(scheduler.shouldSchedule({ ...context, newHighValueFacts: 1 }), false);

@@ -9,23 +9,28 @@ import type { IntentScheduler, ControlStore, Intent, SchedulingContext, RunSnaps
  */
 export function buildSchedulingContext(snapshot: RunSnapshot): SchedulingContext {
   const intents = Object.values(snapshot.schedulerIntents || {});
+  const currentGeneration = snapshot.generation;
   const openIntents = intents.filter(
-    intent => intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
+    intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+      && intent.fixtureGeneration === currentGeneration
   ).length;
   const occupiedResources = Object.keys(snapshot.leases || {});
 
   // 提取已完成的 Intent ID
   const completedIntentIds = new Set(
-    intents.filter(i => i.status === 'COMPLETED').map(i => i.id)
+    intents
+      .filter(i => i.status === 'COMPLETED' && i.fixtureGeneration === currentGeneration)
+      .map(i => i.id)
   );
   const completedHypothesisIds = new Set(
     intents
-      .filter(i => i.status === 'COMPLETED' && i.hypothesis)
+      .filter(i => i.status === 'COMPLETED'
+        && i.fixtureGeneration === currentGeneration
+        && i.hypothesis)
       .map(i => i.hypothesis!)
   );
 
   // 提取被反驳的假设 ID（仅限当前 generation 的证据）
-  const currentGeneration = snapshot.generation;
   const refutedHypotheses = new Set(
     Object.values(snapshot.evidence || {})
       .filter(e => e.source.generation === currentGeneration) // 同代环境约束

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T23:50:00+08:00",
+  "updatedAt": "2026-08-09T23:59:59+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,50 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-014",
+    "occurredAt": "2026-08-09T23:59:59+08:00",
+    "summary": "在 fixture reset 和 Intent 终态提交边界原子隔离旧 Worker。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "fixture_reset 在 Reducer 内将旧 generation 的 PROPOSED 与 CLAIMED Intent 原子标记为 STALE",
+      "旧 CLAIMED Intent 保存的 leaseClaims 仅在 owner 与 epoch 匹配时释放，leaseEpochs 保持单调",
+      "完成、失败和取消统一进入 ControlStore 事务，并要求 Intent 当前为同 generation 的 CLAIMED",
+      "同一终态重复提交保持幂等，跨终态覆盖和 reset 后旧 Worker 结果提交被拒绝",
+      "增加 reset、Lease 释放、replay、旧 Worker 拒绝和终态状态机回归测试"
+    ],
+    "validation": [
+      "65 focused scheduler, durability and recovery tests passed in three consecutive iterations",
+      "TypeScript typecheck passed",
+      "fixture reset replay preserves stale intents, released leases and monotonic lease epochs"
+    ]
+  },
+  {
+    "id": "UPDATE-20260809-013",
+    "occurredAt": "2026-08-09T23:59:30+08:00",
+    "summary": "复查并收紧 Intent generation 上下文的持久快照权威性。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "原子调度使用当前 generation 的持久化开放 Intent 数量，不再采用调用方旧 openIntents 上界",
+      "完成 Intent 与完成假设集合仅从当前 generation 的 ControlStore 快照推导",
+      "CLI 调度上下文仅统计当前 generation 的开放 Intent 和完成验证",
+      "旧 generation 的调用方 completedHypothesisIds 不再抑制新环境重新验证",
+      "增加旧上下文开放数量和 CLI 跨 generation 聚合回归断言"
+    ],
+    "validation": [
+      "46 focused tests passed in three consecutive recheck iterations",
+      "TypeScript typecheck passed",
+      "component, change contract and project report gates passed"
+    ]
+  },
   {
     "id": "UPDATE-20260809-012",
     "occurredAt": "2026-08-09T23:50:00+08:00",
