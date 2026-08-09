@@ -113,6 +113,106 @@ describe('IntentScheduler', () => {
     assert.equal(await scheduler.schedule(context), null);
     assert.equal(dispatch.mock.calls.length, 0);
   });
+
+  test('schedule - generation is truncated to the remaining capacity', async () => {
+    const state: any = { schedulerIntents: {}, leases: {} };
+    const controlStore = {
+      snapshot: mock.fn(async () => state),
+      dispatch: mock.fn(async (_runId: string, command: any) => {
+        state.schedulerIntents[command.intent.id] = structuredClone(command.intent);
+        return [];
+      }),
+    };
+    const leaseManager = {
+      acquire: mock.fn(async (_runId: string, resourceKey: string) => ({
+        resourceKey,
+        ownerLane: 'executor',
+        generation: 1,
+        acquiredAt: new Date().toISOString(),
+        heartbeatAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      })),
+      release: mock.fn(async () => {}),
+    };
+    const scheduler = new IntentScheduler(controlStore as any, leaseManager as any, { maxOpenIntents: 1 });
+
+    const claimed = await scheduler.schedule({
+      runId: 'RUN-CAPACITY', phase: 'RECON', knowledgeVersion: 1, currentGeneration: 1,
+      facts: ['F-001'], hypotheses: ['H-001', 'H-002', 'H-003'], evidence: [], openIntents: 0,
+      newHighValueFacts: 1, consecutiveFailures: 3, phaseBudgetUsed: 0.8,
+      newHints: ['hint-1', 'hint-2'], verifierRejected: true,
+      remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+    });
+
+    assert.ok(claimed);
+    assert.equal(Object.values(state.schedulerIntents).length, 1);
+    assert.equal(Object.values(state.schedulerIntents).filter((intent: any) =>
+      intent.status === 'PROPOSED' || intent.status === 'CLAIMED').length, 1);
+  });
+
+  test('schedule - generated intents have unique IDs within one cycle', async () => {
+    const state: any = { schedulerIntents: {}, leases: {} };
+    const controlStore = {
+      snapshot: mock.fn(async () => state),
+      dispatch: mock.fn(async (_runId: string, command: any) => {
+        state.schedulerIntents[command.intent.id] = structuredClone(command.intent);
+        return [];
+      }),
+    };
+    const scheduler = new IntentScheduler(controlStore as any, {
+      acquire: mock.fn(async (_runId: string, resourceKey: string) => ({
+        resourceKey, ownerLane: 'executor', generation: 1,
+        acquiredAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      })),
+      release: mock.fn(async () => {}),
+    } as any, { maxOpenIntents: 8 });
+
+    await scheduler.schedule({
+      runId: 'RUN-IDS', phase: 'RECON', knowledgeVersion: 1, currentGeneration: 1,
+      facts: ['F-001'], hypotheses: ['H-001', 'H-002'], evidence: [], openIntents: 0,
+      newHighValueFacts: 1, consecutiveFailures: 3, phaseBudgetUsed: 0.8,
+      newHints: ['hint-1', 'hint-2'], verifierRejected: false,
+      remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+    });
+
+    const ids = Object.keys(state.schedulerIntents);
+    assert.equal(ids.length, 6);
+    assert.equal(ids.length, new Set(ids).size);
+  });
+
+  test('schedule - proposed intents remain claimable after the first intent completes', async () => {
+    const state: any = { schedulerIntents: {}, leases: {} };
+    const controlStore = {
+      snapshot: mock.fn(async () => state),
+      dispatch: mock.fn(async (_runId: string, command: any) => {
+        state.schedulerIntents[command.intent.id] = structuredClone(command.intent);
+        return [];
+      }),
+    };
+    const leaseManager = {
+      acquire: mock.fn(async (_runId: string, resourceKey: string) => ({
+        resourceKey, ownerLane: 'executor', generation: 1,
+        acquiredAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      })),
+      release: mock.fn(async () => {}),
+    };
+    const scheduler = new IntentScheduler(controlStore as any, leaseManager as any, { maxOpenIntents: 3 });
+    const context: SchedulingContext = {
+      runId: 'RUN-RECLAIM', phase: 'RECON', knowledgeVersion: 1, currentGeneration: 1,
+      facts: ['F-001'], hypotheses: ['H-001', 'H-002'], evidence: [], openIntents: 0,
+      newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3, newHints: [], verifierRejected: false,
+      remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+    };
+    const first = await scheduler.schedule(context);
+    assert.ok(first);
+    await scheduler.completeIntent(context.runId, first.id, {});
+
+    const second = await scheduler.schedule({ ...context, newHighValueFacts: 0 });
+    assert.ok(second);
+    assert.notEqual(second.id, first.id);
+  });
   test('shouldSchedule - 多个触发条件同时满足', () => {
     const scheduler = new IntentScheduler(mockControlStore, mockLeaseManager);
 
@@ -466,6 +566,42 @@ describe('IntentScheduler - 持久化', () => {
     assert.ok(call.arguments[1].intent.completedAt);
     assert.deepStrictEqual(call.arguments[1].intent.producedFacts, ['F-NEW-001']);
   });
+
+  test('terminal transitions release every lease owned by the Intent', async () => {
+    for (const transition of ['complete', 'fail', 'cancel'] as const) {
+      const intentId = `intent-${transition}`;
+      const leases = {
+        'workspace:read': {
+          resourceKey: 'workspace:read', ownerLane: 'executor', generation: 1,
+          acquiredAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+        'target:read': {
+          resourceKey: 'target:read', ownerLane: 'executor', generation: 1,
+          acquiredAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      };
+      const intent = {
+        id: intentId, status: 'CLAIMED', priority: 'high', createdAt: new Date().toISOString(),
+        knowledgeVersion: 1, fixtureGeneration: 1, phase: 'RECON', objective: 'Test',
+        startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Test', minimumConfidence: 'medium' },
+        suggestedTools: [], estimatedCost: 1, estimatedDuration: 1,
+        resourceKeys: Object.keys(leases), leaseId: Object.keys(leases).join(','), dependencies: [], attempts: 0,
+      };
+      const release = mock.fn(async () => {});
+      const scheduler = new IntentScheduler({
+        snapshot: mock.fn(async () => ({ schedulerIntents: { [intentId]: intent }, leases })),
+        dispatch: mock.fn(async () => []),
+      } as any, { release } as any);
+
+      if (transition === 'complete') await scheduler.completeIntent('RUN-LEASES', intentId, {});
+      if (transition === 'fail') await scheduler.failIntent('RUN-LEASES', intentId, 'failed');
+      if (transition === 'cancel') await scheduler.cancelIntent('RUN-LEASES', intentId, 'cancelled');
+
+      assert.equal(release.mock.calls.length, 2);
+    }
+  });
 });
 
 describe('IntentScheduler - replay 持久化', () => {
@@ -618,6 +754,7 @@ describe('IntentScheduler - replay 持久化', () => {
       const snapshot = await controlStore.snapshot(runId);
       assert.strictEqual(snapshot.schedulerIntents[claimedIntent.id].status, 'COMPLETED');
       assert.ok(snapshot.schedulerIntents[claimedIntent.id].completedAt);
+      assert.deepStrictEqual(Object.keys(snapshot.leases), []);
 
       // Replay
       const controlStore2 = new ControlStore(events);
@@ -790,6 +927,7 @@ describe('IntentScheduler - replay 持久化', () => {
       const snapshot = await controlStore.snapshot(runId);
       assert.strictEqual(snapshot.schedulerIntents[claimedIntent.id].status, 'FAILED');
       assert.strictEqual(snapshot.schedulerIntents[claimedIntent.id].lastError, 'Test failure reason');
+      assert.deepStrictEqual(Object.keys(snapshot.leases), []);
 
       // Replay
       const controlStore2 = new ControlStore(events);

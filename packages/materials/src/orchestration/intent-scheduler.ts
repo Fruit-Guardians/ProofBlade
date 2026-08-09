@@ -22,6 +22,7 @@ import { IntentScorer } from './intent-scorer.js';
 import { IntentFilter } from './intent-filter.js';
 import { LeaseManager } from '../control/lease-manager.js';
 import type { ControlStore } from '../control/control-store.js';
+import { randomUUID } from 'node:crypto';
 
 export interface IntentSchedulerConfig {
   maxOpenIntents: number;              // 最大并发 Intent 数
@@ -85,7 +86,10 @@ export class IntentScheduler {
     }
 
     // Generate new candidates only when a scheduling trigger is active.
-    const newIntents = triggered ? await this.generateIntents(schedulingContext) : [];
+    const remainingCapacity = Math.max(0, this.config.maxOpenIntents - openIntents);
+    const newIntents = triggered
+      ? await this.generateIntents(schedulingContext, remainingCapacity)
+      : [];
 
     const candidates = [...existingIntents, ...newIntents];
     if (candidates.length === 0) {
@@ -136,48 +140,44 @@ export class IntentScheduler {
    * Uses deterministic rules today and can be extended through a Planner adapter.
    */
   private async generateIntents(
-    context: SchedulingContext
+    context: SchedulingContext,
+    maxIntents: number,
   ): Promise<Intent[]> {
     const intents: Intent[] = [];
 
+    const add = (intent: Intent) => {
+      if (intents.length < maxIntents) intents.push(intent);
+    };
+
     // 策略 1: 基于新 Fact 生成探索 Intent
-    if (context.newHighValueFacts > 0) {
-      const intent = this.createExplorationIntent(context, 'high_value_fact_follow_up');
-      await this.controlStore.dispatch(context.runId, {
-        type: 'scheduler_intent',
-        intent,
-      });
-      intents.push(intent);
+    if (context.newHighValueFacts > 0 && intents.length < maxIntents) {
+      add(this.createExplorationIntent(context, 'high_value_fact_follow_up'));
     }
 
     // 策略 2: 基于假设生成验证 Intent
     for (const hypothesisId of context.hypotheses.slice(0, 3)) {
-      const intent = this.createVerificationIntent(context, hypothesisId);
-      await this.controlStore.dispatch(context.runId, {
-        type: 'scheduler_intent',
-        intent,
-      });
-      intents.push(intent);
+      if (intents.length >= maxIntents) break;
+      add(this.createVerificationIntent(context, hypothesisId));
     }
 
     // 策略 3: 基于连续失败生成替代路线 Intent
-    if (context.consecutiveFailures >= 2) {
-      const intent = this.createAlternativeIntent(context, 'failure_recovery');
-      await this.controlStore.dispatch(context.runId, {
-        type: 'scheduler_intent',
-        intent,
-      });
-      intents.push(intent);
+    if (context.consecutiveFailures >= 2 && intents.length < maxIntents) {
+      add(this.createAlternativeIntent(context, 'failure_recovery'));
     }
 
     // 策略 4: 基于 Hint 生成定向 Intent
     for (const hint of context.newHints) {
-      const intent = this.createHintBasedIntent(context, hint);
+      if (intents.length >= maxIntents) break;
+      add(this.createHintBasedIntent(context, hint));
+    }
+
+    if (intents.length === 0) return intents;
+
+    for (const intent of intents) {
       await this.controlStore.dispatch(context.runId, {
         type: 'scheduler_intent',
         intent,
       });
-      intents.push(intent);
     }
 
     return intents;
@@ -306,6 +306,7 @@ export class IntentScheduler {
     intent.producedEvidence = result.producedEvidence;
     intent.producedFacts = result.producedFacts;
 
+    await this.releaseIntentLeases(runId, intent);
     await this.controlStore.dispatch(runId, {
       type: 'scheduler_intent',
       intent,
@@ -332,6 +333,7 @@ export class IntentScheduler {
     intent.lastError = error;
     intent.attempts += 1;
 
+    await this.releaseIntentLeases(runId, intent);
     await this.controlStore.dispatch(runId, {
       type: 'scheduler_intent',
       intent,
@@ -356,6 +358,7 @@ export class IntentScheduler {
     intent.status = 'CANCELLED';
     intent.lastError = reason;
 
+    await this.releaseIntentLeases(runId, intent);
     await this.controlStore.dispatch(runId, {
       type: 'scheduler_intent',
       intent,
@@ -364,12 +367,29 @@ export class IntentScheduler {
 
   // ========== Intent 生成辅助方法 ==========
 
+  private createIntentId(kind: string): string {
+    return `intent-${kind}-${randomUUID()}`;
+  }
+
+  private async releaseIntentLeases(runId: string, intent: Intent): Promise<void> {
+    if (!intent.leaseId || intent.resourceKeys.length === 0) return;
+
+    const leasedResources = new Set(intent.leaseId.split(',').filter(Boolean));
+    const snapshot = await this.controlStore.snapshot(runId);
+    for (const resourceKey of intent.resourceKeys) {
+      if (!leasedResources.has(resourceKey)) continue;
+      const lease = snapshot.leases?.[resourceKey];
+      if (!lease || lease.ownerLane !== 'executor') continue;
+      await this.leaseManager.release(runId, lease);
+    }
+  }
+
   private createExplorationIntent(
     context: SchedulingContext,
     reason: string
   ): Intent {
     return {
-      id: `intent-explore-${Date.now()}`,
+      id: this.createIntentId('explore'),
       status: 'PROPOSED',
       priority: 'high',
       createdAt: new Date().toISOString(),
@@ -426,7 +446,7 @@ export class IntentScheduler {
     reason: string
   ): Intent {
     return {
-      id: `intent-alternative-${Date.now()}`,
+      id: this.createIntentId('alternative'),
       status: 'PROPOSED',
       priority: 'critical',
       createdAt: new Date().toISOString(),
@@ -454,7 +474,7 @@ export class IntentScheduler {
     hint: string
   ): Intent {
     return {
-      id: `intent-hint-${Date.now()}`,
+      id: this.createIntentId('hint'),
       status: 'PROPOSED',
       priority: 'high',
       createdAt: new Date().toISOString(),

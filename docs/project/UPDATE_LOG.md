@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T20:46:53+08:00
+> 状态更新时间：2026-08-09T21:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-008 | 2026-08-09T21:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-007 | 2026-08-09T20:46:53+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-006 | 2026-08-09T20:16:22+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-005 | 2026-08-09T16:18:52+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
@@ -27,6 +28,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-008
+
+时间：2026-08-09T21:10:00+08:00
+
+摘要：收紧 Intent 候选生成边界并修复同周期标识、知识版本和资源释放问题。
+
+### 变更
+
+- 按 maxOpenIntents 剩余容量截断单次候选生成和持久化
+- 使用 UUID 生成探索、替代路线和 Hint Intent 标识，避免同毫秒覆盖
+- 将调度知识版本绑定到 Fact、Hypothesis、Evidence 和 Observation 变化，排除调度与 Lease 事件干扰
+- Intent 完成、失败或取消时释放其持有的全部 executor Lease
+- 增加容量、唯一 ID、剩余候选再次认领和终态 Lease 清理回归测试
+
+### 验证
+
+- [x] Intent and CLI focused tests passed
+- [x] TypeScript typecheck passed
+- [x] component, change contract and project report gates passed
 
 ## UPDATE-20260809-007
 

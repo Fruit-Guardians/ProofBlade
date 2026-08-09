@@ -30,7 +30,15 @@ export function buildSchedulingContext(snapshot: RunSnapshot): SchedulingContext
   return {
     runId: snapshot.runId,
     phase: snapshot.phase,
-    knowledgeVersion: snapshot.lastSeq, // 使用 lastSeq 作为知识版本
+    // Scheduler events and lease events advance lastSeq but do not change
+    // the knowledge being evaluated. Keep this version tied to knowledge.
+    knowledgeVersion: Math.max(
+      0,
+      ...Object.values(snapshot.facts || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.hypotheses || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.evidence || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.observations || {}).map(item => item.createdSeq),
+    ),
     currentGeneration: snapshot.generation,
     facts: Object.keys(snapshot.facts || {}),
     hypotheses: Object.keys(snapshot.hypotheses || {}),
