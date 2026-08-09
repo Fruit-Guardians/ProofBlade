@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -125,6 +125,38 @@ test("MCP backend retries a recovered server through the same registry", async (
   }
 });
 
+test("MCP registry rebuilds a connection after an established server exits", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-transport-retry-"));
+  let registry: import("../src/mcp/registry.js").McpProjectRegistry | undefined;
+  try {
+    const marker = join(root, "crash-marker.txt");
+    const serverPath = join(import.meta.dirname, "fixtures", "mcp-crash-after-list-server.mjs");
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers: {
+      crashy: { command: process.execPath, args: [serverPath], env: { MCP_CRASH_MARKER: marker } },
+    } }));
+
+    const { McpProjectRegistry } = await import("../src/mcp/registry.js");
+    registry = McpProjectRegistry.load(root);
+    const firstDescription = await registry.describe("crashy");
+    assert.equal(firstDescription[0]?.name, "echo");
+    await waitForMarker(marker, "crashed");
+
+    const staleCall = await registry.execute("mcp.crashy", "call", { tool: "echo", arguments: { text: "stale" } });
+    assert.equal(staleCall.exitCode, 1);
+    assert.equal(registry.summaries()[0]?.status, "failed");
+    assert.ok(registry.retryAfterMs("mcp.crashy") > 0);
+
+    registry.resetFailures("mcp.crashy");
+    const recoveredCall = await registry.execute("mcp.crashy", "call", { tool: "echo", arguments: { text: "recovered" } });
+    assert.equal(recoveredCall.exitCode, 0);
+    assert.match(recoveredCall.stdout, /recovered/);
+    assert.equal(registry.summaries()[0]?.status, "connected");
+  } finally {
+    await registry?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function fakeBackend(
   id: string,
   priority: number,
@@ -145,4 +177,12 @@ function fakeBackend(
     preparePersistence: (request) => ({ operation, input: request.input, argsRedacted: false }),
     prepareExecution: () => ({ operation: "fake", args: {}, cwd: ".", replayPolicy: "pure" }),
   };
+}
+
+async function waitForMarker(path: string, expected: string): Promise<void> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (await readFile(path, "utf8").then((value) => value === expected).catch(() => false)) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.fail(`Timed out waiting for marker ${expected}`);
 }
