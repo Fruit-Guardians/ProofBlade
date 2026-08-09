@@ -610,6 +610,82 @@ describe('IntentScheduler - 持久化', () => {
 });
 
 describe('IntentScheduler - replay 持久化', () => {
+  test('资源被占用时仍持久化一次性 Hint Intent', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-occupied-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const leaseManager = new LeaseManager(controlStore);
+      const scheduler = new IntentScheduler(controlStore, leaseManager, { maxOpenIntents: 1 });
+      const runId = 'INTENT-OCCUPIED-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Occupied resource test',
+      } as any);
+      await leaseManager.acquire(runId, 'workspace:read', 'main', 30_000);
+
+      const result = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: [], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: ['inspect this target'], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+
+      const snapshot = await controlStore.snapshot(runId);
+      const intents = Object.values(snapshot.schedulerIntents);
+      assert.equal(result, null);
+      assert.equal(intents.length, 1);
+      assert.equal(intents[0].status, 'PROPOSED');
+      assert.match(intents[0].objective, /inspect this target/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('旧 Intent 终态不会释放回收后新建的 Lease epoch', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-lease-epoch-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const leaseManager = new LeaseManager(controlStore);
+      const scheduler = new IntentScheduler(controlStore, leaseManager, { maxOpenIntents: 1 });
+      const runId = 'INTENT-LEASE-EPOCH-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Intent lease epoch test',
+      } as any);
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.ok(claimed);
+      const oldGeneration = claimed.leaseClaims?.['workspace:read'].generation;
+      assert.ok(oldGeneration);
+
+      await leaseManager.reapExpired(runId, Date.now() + claimed.estimatedDuration * 3);
+      const replacement = await leaseManager.acquire(runId, 'workspace:read', 'executor', 30_000);
+      assert.ok(replacement.generation > oldGeneration);
+
+      await scheduler.completeIntent(runId, claimed.id, {});
+      const remaining = (await controlStore.snapshot(runId)).leases['workspace:read'];
+      assert.equal(remaining.generation, replacement.generation);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('并发 schedule 保持 maxOpenIntents 原子上限', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');

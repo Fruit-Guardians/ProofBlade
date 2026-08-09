@@ -150,17 +150,21 @@ export class IntentScheduler {
         : [];
       const candidates = [...existingIntents, ...generated];
       const filtered = this.filter.filter(candidates, schedulingContext);
+      const generatedCommands: DomainCommand[] = generated.map(intent => ({
+        type: 'scheduler_intent',
+        intent,
+      }));
       if (filtered.length === 0) {
-        return { commands: [], project: () => null };
+        return { commands: generatedCommands, project: () => null };
       }
 
       const scores = this.scorer.scoreAndRank(filtered, schedulingContext);
-      const commands: DomainCommand[] = [];
       for (const score of scores) {
         const candidate = candidates.find(intent => intent.id === score.intentId);
         if (!candidate) continue;
         const claimed = structuredClone(candidate);
         const leases: Lease[] = [];
+        const candidateCommands: DomainCommand[] = [];
         let claimable = true;
         const projectedLeases = { ...snapshot.leases };
 
@@ -171,7 +175,7 @@ export class IntentScheduler {
             break;
           }
           if (existingLease) {
-            commands.push({
+            candidateCommands.push({
               type: 'lease_released',
               resourceKey,
               ownerLane: existingLease.ownerLane,
@@ -184,7 +188,7 @@ export class IntentScheduler {
           const lease: Lease = {
             resourceKey,
             ownerLane: 'executor',
-            generation: (existingLease?.generation ?? 0) + 1,
+            generation: (snapshot.leaseEpochs?.[resourceKey] ?? existingLease?.generation ?? 0) + 1,
             acquiredAt: now,
             heartbeatAt: now,
             expiresAt: new Date(Date.now() + candidate.estimatedDuration * 2).toISOString(),
@@ -204,18 +208,18 @@ export class IntentScheduler {
 
         for (const intent of generated) {
           if (intent.id === candidate.id) continue;
-          commands.push({ type: 'scheduler_intent', intent });
+          candidateCommands.push({ type: 'scheduler_intent', intent });
         }
-        for (const lease of leases) commands.push({ type: 'lease_acquired', lease, lane: 'executor' });
-        commands.push({ type: 'scheduler_intent', intent: claimed });
+        for (const lease of leases) candidateCommands.push({ type: 'lease_acquired', lease, lane: 'executor' });
+        candidateCommands.push({ type: 'scheduler_intent', intent: claimed });
 
         return {
-          commands,
+          commands: candidateCommands,
           project: (after) => after.schedulerIntents[claimed.id] ?? null,
         };
       }
 
-      return { commands: [], project: () => null };
+      return { commands: generatedCommands, project: () => null };
     });
   }
 

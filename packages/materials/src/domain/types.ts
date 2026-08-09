@@ -371,6 +371,7 @@ export interface RunSnapshot {
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
   leases: Record<string, Lease>;
+  leaseEpochs: Record<string, number>;
   activeLanes: Lane[];
   terminalReason?: string;
   failureCategory?: PrimaryFailureCategory;

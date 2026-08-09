@@ -1,16 +1,20 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T22:00:00+08:00
+> 状态更新时间：2026-08-09T22:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-010 | 2026-08-09T22:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-009 | 2026-08-09T22:00:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-008 | 2026-08-09T21:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-029 | 2026-08-09T21:05:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-007 | 2026-08-09T20:46:53+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-028 | 2026-08-09T20:45:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-006 | 2026-08-09T20:16:22+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-027 | 2026-08-09T17:01:39+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-005 | 2026-08-09T16:18:52+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
 | UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -29,6 +33,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-010
+
+时间：2026-08-09T22:30:00+08:00
+
+摘要：持久化 Lease 资源 epoch，并保留暂时无法认领的一次性生成 Intent。
+
+### 变更
+
+- RunSnapshot 新增按资源持久化的 leaseEpochs，Lease 回收后 generation 继续单调递增
+- LeaseManager 与 Intent 原子认领统一从持久 epoch 分配 generation
+- 旧 Intent 终态仅能释放其记录 epoch 对应的 Lease，不能释放回收后的后继 Lease
+- 资源暂时占用或本轮无候选可认领时，事务仍持久化生成的 PROPOSED Intent
+- 增加 Lease 回收重取和占用资源 Hint 持久化回归测试
+
+### 验证
+
+- [x] 30 durability and Intent Scheduler tests passed
+- [x] TypeScript typecheck passed
+- [x] component, change contract and project report gates passed
 
 ## UPDATE-20260809-009
 
@@ -70,6 +94,26 @@
 - [x] TypeScript typecheck passed
 - [x] component, change contract and project report gates passed
 
+## UPDATE-20260809-029
+
+时间：2026-08-09T21:05:00+08:00
+
+摘要：修复 RunDetail 字节估算边界和关闭期间的详情加载回填。
+
+### 变更
+
+- boundedJsonByteSize 补齐数组结束括号，并增加与 JSON.stringify 的嵌套数组字节对照测试
+- GUI shutdown 清理详情 in-flight 表；关闭状态禁止旧加载写入 RunDetail 缓存
+- 增加关闭竞态回归测试，确保 close 返回后迟到加载不会重新占用缓存
+
+### 验证
+
+- [x] 42/42 GUI tests passed
+- [x] 143/143 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
 ## UPDATE-20260809-007
 
 时间：2026-08-09T20:46:53+08:00
@@ -88,6 +132,26 @@
 - [x] 167/167 repository tests passed
 - [x] 17 Intent and CLI focused tests passed
 - [x] component, change contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260809-028
+
+时间：2026-08-09T20:45:00+08:00
+
+摘要：修复 RunDetail 版本化并发加载、超限缓存残留和失败刷新丢失交互重试。
+
+### 变更
+
+- RunDetail in-flight key 绑定 events.jsonl 与 Pi Session 版本，避免新请求复用旧快照；旧版本加载完成后重新校验，禁止覆盖新缓存
+- RunDetail 版本失配时先删除旧条目；加权 LRU 限制单项 8 MiB、总量 64 MiB，并使用有界大小估算，超限详情不缓存
+- 轮询首轮失败后仍消费已排队的交互刷新，尾随成功时恢复请求流程
+- 增加 Session 版本切换期间的 single-flight 回归测试和超限详情清除旧缓存回归测试
+
+### 验证
+
+- [x] 143/143 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
 - [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-006
@@ -109,6 +173,30 @@
 - [x] 35 Intent and CLI focused tests passed
 - [x] component, change contract and project report gates passed
 - [x] 18/18 deterministic fixture evaluations passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260809-027
+
+时间：2026-08-09T17:01:39+08:00
+
+摘要：消除 GUI 跨 Run 重叠刷新、迟到响应覆盖、后台等待积压、过期详情缓存、缓存堆积和恢复后残留错误。
+
+### 变更
+
+- Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时立即返回且不积压等待 Promise，交互刷新合并一次最新请求
+- 旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交
+- 未变化 Run 详情按 events.jsonl 与递归排序后的 Pi Session 文件状态命中容量 32 的 LRU
+- Session 加载期间发生变化时重读一次，连续变化的混合快照不进入缓存；RunDetail 缓存增加单项 8 MiB、总量 64 MiB 的加权上限，同一 Run 并发 miss single-flight，服务关闭时清空缓存
+- 后台与交互刷新模式贯穿单飞协调器；后台成功保留可见错误，Run 切换、手动刷新和对话完成等交互刷新成功后清除已恢复的请求错误
+- 后台刷新失败后仍消费已排队的交互尾随刷新；增加跨 Run 轮询背压、后台忙调用立即完成、失败尾随重试、Session 单独变化失效、并发 miss、加权淘汰和关闭清理回归测试
+
+### 验证
+
+- [x] 143/143 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
+- [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒
+- [x] component, contract and project report gates passed
 - [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-005

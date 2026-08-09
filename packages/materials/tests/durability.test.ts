@@ -100,6 +100,13 @@ test("leases enforce ownership and fixture generation survives process state", a
     await leases.release(runId, heartbeat);
     assert.equal(Object.keys((await services.control.snapshot(runId)).leases).length, 0);
 
+    const expired = await leases.acquire(runId, "workspace:epoch", "executor", 1);
+    await leases.reapExpired(runId, Date.now() + 1_000);
+    const replacement = await leases.acquire(runId, "workspace:epoch", "executor", 30_000);
+    assert.equal(replacement.generation, expired.generation + 1);
+    await assert.rejects(leases.release(runId, expired), /Lease ownership mismatch/);
+    await leases.release(runId, replacement);
+
     const firstSandbox = new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
     const fixture = await firstSandbox.build(task);
     const firstGeneration = await firstSandbox.reset(fixture);

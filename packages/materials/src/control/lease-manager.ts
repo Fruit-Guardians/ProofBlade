@@ -20,7 +20,7 @@ export class LeaseManager {
     const lease: Lease = {
       resourceKey,
       ownerLane,
-      generation: (existing?.generation ?? 0) + 1,
+      generation: (snapshot.leaseEpochs?.[resourceKey] ?? existing?.generation ?? 0) + 1,
       acquiredAt: timestamp,
       heartbeatAt: timestamp,
       expiresAt: new Date(now + ttlMs).toISOString(),

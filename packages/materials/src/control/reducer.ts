@@ -27,6 +27,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     artifacts: {},
     effects: {},
     leases: {},
+    leaseEpochs: {},
     activeLanes: [],
   };
 }
@@ -206,6 +207,8 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (!lease?.resourceKey) throw new Error("lease_acquired requires lease");
       if (next.leases[lease.resourceKey]) throw new Error(`Resource already leased: ${lease.resourceKey}`);
       next.leases[lease.resourceKey] = lease;
+      next.leaseEpochs ??= {};
+      next.leaseEpochs[lease.resourceKey] = Math.max(next.leaseEpochs[lease.resourceKey] ?? 0, lease.generation);
       break;
     }
     case "lease_heartbeat": {
