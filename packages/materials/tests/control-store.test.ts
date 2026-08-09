@@ -131,3 +131,31 @@ test("paused runs reject every terminal command until explicitly resumed", async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("dispatchBatch validates every command before persisting any event", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-atomic-batch-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "ATOMIC-BATCH-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const before = await control.snapshot(runId);
+    const eventCount = (await control.events(runId)).length;
+    await assert.rejects(control.dispatchBatch(runId, [
+      {
+        type: "artifact",
+        artifact: { id: "A-BATCH", path: "artifacts/batch.txt", sha256: "batch-hash", bytes: 5, mime: "text/plain", sensitivity: "public" },
+      },
+      {
+        type: "artifact_annotation",
+        artifactId: "A-MISSING",
+        semantic: { name: "invalid", summary: "must reject the entire batch", tags: [], role: "debug", relatedIds: [], annotatedBy: "agent" },
+      },
+    ]), /Unknown artifact A-MISSING/);
+    const after = await control.snapshot(runId);
+    assert.equal(after.artifacts["A-BATCH"], undefined);
+    assert.equal(after.lastSeq, before.lastSeq);
+    assert.equal((await control.events(runId)).length, eventCount);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

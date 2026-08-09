@@ -3,9 +3,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
-export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress";
+export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm";
 
 export interface CodingTurnTermination {
   message?: string;
@@ -32,6 +32,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   progressBreaker: NoProgressToolBreaker | undefined,
   termination: CodingTurnTermination,
   resolveEffectPolicy?: ToolEffectPolicyResolver,
+  failureStormBreaker?: ToolFailureStormBreaker,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -56,6 +57,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         details: event.details,
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
+      failureStormBreaker?.observe(observation);
       if (progressBreaker?.isProgress(observation) && termination.reason === "no_progress") {
         delete termination.message;
         delete termination.reason;
@@ -77,12 +79,27 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       else repeatBreaker.reset();
       return undefined;
     }
-    const decision = repeatBreaker.observe({
+    const observation = {
       toolName: event.toolName,
       input: event.input,
       isError: event.isError,
       content: event.content.map((item) => item.type === "text" ? { type: item.type, text: item.text } : { type: item.type }),
-    });
+      details: event.details,
+      effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
+    };
+    const storm = failureStormBreaker?.observe(observation);
+    const decision = repeatBreaker.observe(observation);
+    if (storm?.terminate && !decision.terminate) {
+      termination.message = toolFailureStormMessage(storm.count);
+      termination.reason = "tool_failure_storm";
+      termination.requested = true;
+      return {
+        content: [{ type: "text" as const, text: termination.message }],
+        details: { failureStorm: true, count: storm.count, key: storm.key },
+        isError: true,
+        terminate: true,
+      };
+    }
     if (!decision.terminate) return undefined;
     termination.message = repeatedToolFailureMessage(event.toolName, decision.count);
     termination.reason = "repeated_tool_failure";

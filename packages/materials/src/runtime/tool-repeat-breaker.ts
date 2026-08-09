@@ -73,7 +73,7 @@ export class NoProgressToolBreaker {
 
   public observe(observation: ToolFailureObservation): ToolFailureDecision {
     if (observation.isError) return { count: 0, terminate: false, key: "" };
-    if (!isPureReadOnlyObservation(observation)) {
+    if (!isNoProgressObservation(observation)) {
       this.reset();
       return { count: 0, terminate: false, key: "" };
     }
@@ -92,12 +92,34 @@ export class NoProgressToolBreaker {
   }
 
   public isProgress(observation: ToolFailureObservation): boolean {
-    return !observation.isError && !isPureReadOnlyObservation(observation);
+    return !observation.isError && !isNoProgressObservation(observation);
   }
 
   public reset(): void {
     this.recentKeys.length = 0;
     this.counts.clear();
+  }
+}
+
+/** Stops a turn when many different tool failures alternate without durable progress. */
+export class ToolFailureStormBreaker {
+  private count = 0;
+
+  public constructor(private readonly threshold = 12) {
+    if (!Number.isInteger(threshold) || threshold < 3) throw new Error("Tool failure storm threshold must be at least 3");
+  }
+
+  public observe(observation: ToolFailureObservation): ToolFailureDecision {
+    if (observation.isError) {
+      this.count += 1;
+      return { count: this.count, terminate: this.count >= this.threshold, key: "failure-storm" };
+    }
+    if (!isNoProgressObservation(observation)) this.reset();
+    return { count: this.count, terminate: false, key: "failure-storm" };
+  }
+
+  public reset(): void {
+    this.count = 0;
   }
 }
 
@@ -117,7 +139,17 @@ export function noProgressToolMessage(toolName: string, count: number): string {
   ].join("\n");
 }
 
+export function toolFailureStormMessage(count: number): string {
+  return [
+    `[ProofBlade tool failure budget: ${count} failures occurred without durable progress]`,
+    "The current agent turn was stopped because changing invalid arguments did not advance the task.",
+    "Inspect the relevant tool schema or evidence curation_status, then continue in a new turn with valid arguments; existing Artifacts and Evidence remain available.",
+  ].join("\n");
+}
+
 function observationKey(observation: ToolFailureObservation): string | undefined {
+  const declaredProgressKey = stableString(observation.details, "progressKey");
+  if (declaredProgressKey) return sha256(canonicalJson({ toolName: observation.toolName, progressKey: declaredProgressKey }));
   const artifactHash = stableArtifactHash(observation.details);
   const output = artifactHash ?? observation.content
     .map((item) => item.type === "text" ? item.text ?? "" : "[image]")
@@ -133,11 +165,23 @@ function isPureReadOnlyObservation(observation: ToolFailureObservation): boolean
   return observation.effectPolicy?.readOnly === true && observation.effectPolicy.sideEffect === "none";
 }
 
+function isNoProgressObservation(observation: ToolFailureObservation): boolean {
+  return stableBoolean(observation.details, "durableProgress") === false || isPureReadOnlyObservation(observation);
+}
+
 function stableArtifactHash(details: unknown): string | undefined {
   if (!isRecord(details)) return undefined;
   if (typeof details.artifactHash === "string") return details.artifactHash;
   const outputRewrite = details.outputRewrite;
   return isRecord(outputRewrite) && typeof outputRewrite.artifactHash === "string" ? outputRewrite.artifactHash : undefined;
+}
+
+function stableString(details: unknown, key: string): string | undefined {
+  return isRecord(details) && typeof details[key] === "string" ? details[key] : undefined;
+}
+
+function stableBoolean(details: unknown, key: string): boolean | undefined {
+  return isRecord(details) && typeof details[key] === "boolean" ? details[key] : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

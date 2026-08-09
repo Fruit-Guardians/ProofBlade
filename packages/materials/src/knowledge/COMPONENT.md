@@ -4,15 +4,15 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T05:00:00.000Z",
+  "updatedAt": "2026-08-09T07:11:20.246Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-09T05:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-09T05:00:00.000Z",
-    "sourceHash": "fa4e3ce465a602e4ce462b3bfe89e4fdd0e894e695de199810c91eb5f75b618e",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-09T07:11:20.246Z",
+    "lastSecurityAuditAt": "2026-08-09T07:11:20.246Z",
+    "sourceHash": "5dc76b3fdf0c3f4d4d44c6e54ee7eefe911f77f9aac70e4627b71e71e8d63d3a",
     "result": "passed"
   }
 }
@@ -39,6 +39,8 @@
 Forest 索引保留完整 orphan 总数，但只投影最近 24 个 orphan 的稳定 ID、类型、名称和摘要；即使当前没有 Tree，只要存在 orphan 知识，也必须向下一回合提供有界的方向记忆。
 
 Fact/Hypothesis 等权威语句保持完整；投影到 Reasoning Node/Tree 的展示名称独立限制为 160 字符。长 claim 不得让 `recordEvidence` 在 Evidence/Fact 已落盘后因展示标题校验而失败。
+
+`recordEvidence` 在落盘前完成全部字段、引用、Artifact 语义、图节点、边和 Tree 校验，并通过原子事务提交。Artifact 标签和关联 ID 使用确定性有界合并；相同 Artifact 集合、摘要、claim 与依赖无论顺序或并发重复提交，都必须复用同一 Evidence、Fact 和 Tree，只允许一个调用报告持久进展。`annotateArtifact` 的相同语义顺序或并发更新同样只能产生一次事件。
 
 ```powershell
 npm run test:materials

@@ -4,15 +4,15 @@
 {
   "id": "materials-control",
   "name": "Control Store and Reducer",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
+  "updatedAt": "2026-08-09T07:09:33.039Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T23:08:26.1335151+08:00",
-    "lastSecurityAuditAt": "2026-08-07T23:08:26.1335151+08:00",
-    "sourceHash": "dfda30c604222808c2836d72e97b25990b93e95f8a87568d2a050a5ecdc07872",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
+    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
+    "sourceHash": "d42d1965aa67c7c25c08f0c73d9f0459315fea4d9e8accdc762e58195b0d0fa6",
     "result": "passed"
   }
 }
@@ -33,6 +33,8 @@
 事件必须可重放、序号连续、Schema 可迁移。状态变化只能通过事件进入 Reducer；Artifact 语义更新使用 `artifact_annotated`，不得改写历史原文或在 Reducer 中修改事件对象。Reasoning Graph 写入使用 node upsert、不可变 edge add 和 tree upsert；必须拒绝未知引用、重复边、环、断开的树和跨 generation 关系。新增事件要覆盖并发、重放哈希和旧数据读取。
 
 - `PAUSED` 状态下的 `finish`、`fail`、`exhaust` 必须在 ControlStore 单写者临界区内统一拒绝，Reducer 重放执行相同策略；只有显式 `resume` 可以解除暂停。
+- 需要共同成立的一组领域命令必须通过 `dispatchBatch` 在同一单写者临界区内预验证和投影；任一命令失败时不得追加部分事件或保存部分投影。
+- 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
 
 ```powershell
 npm run test:materials

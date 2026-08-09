@@ -104,6 +104,21 @@ test("[contract:no-progress-conversation] projects a persisted convergence stop 
   assert.equal(messages[0]?.error, undefined);
 });
 
+test("[contract:tool-failure-storm-conversation] projects a failure-budget stop as a normal assistant reply", () => {
+  const messages = conversationMessagesFromEntries([{
+    type: "message",
+    id: "assistant-failure-storm",
+    timestamp: "2026-08-05T00:00:03.000Z",
+    message: { role: "assistant", content: [], stopReason: "error", errorMessage: "raw tool failure" },
+  }], [{
+    type: "assistant_message",
+    payload: { text: "Tool failures did not produce durable progress.", stopReason: "stop", termination: "tool_failure_storm", piEntryId: "assistant-failure-storm" },
+  }] as HarnessEvent[]);
+  assert.equal(messages[0]?.text, "Tool failures did not produce durable progress.");
+  assert.equal(messages[0]?.stopReason, "stop");
+  assert.equal(messages[0]?.error, undefined);
+});
+
 test("[contract:repeated-tool-failure-entry-link] an old breaker event cannot overwrite a later provider failure", () => {
   const messages = conversationMessagesFromEntries([
     {

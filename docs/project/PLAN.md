@@ -15,7 +15,7 @@
 
 | ID | 优先级 | 里程碑 | 状态 | 进度 | 负责人 | 最近更新 |
 | --- | --- | --- | --- | ---: | --- | --- |
-| PLAN-110 | P0 | Milestone 2 debt | 进行中 | 25% | unassigned | 2026-08-09T15:00:00+08:00 |
+| PLAN-110 | P0 | Milestone 2 debt | 进行中 | 35% | unassigned | 2026-08-09T15:15:00+08:00 |
 | PLAN-120 | P0 | Milestone 4 | 进行中 | 10% | unassigned | 2026-08-08T02:47:55.5788475+08:00 |
 | PLAN-100 | P0 | Milestone 4 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
