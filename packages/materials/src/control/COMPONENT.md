@@ -4,15 +4,15 @@
 {
   "id": "materials-control",
   "name": "Control Store and Reducer",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:09:33.039Z",
+  "updatedAt": "2026-08-09T20:16:22.341+08:00",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
-    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "d42d1965aa67c7c25c08f0c73d9f0459315fea4d9e8accdc762e58195b0d0fa6",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-09T20:16:22.341+08:00",
+    "lastSecurityAuditAt": "2026-08-09T20:16:22.341+08:00",
+    "sourceHash": "4be718b83acde96a5e746bd99025cabc4b278b5bdd5c9b9e4dc226efce33e51a",
     "result": "passed"
   }
 }

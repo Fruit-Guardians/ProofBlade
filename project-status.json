@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T16:18:52+08:00",
+  "updatedAt": "2026-08-09T20:46:53+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,51 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-007",
+    "occurredAt": "2026-08-09T20:46:53+08:00",
+    "summary": "????????? PROPOSED Intent ???????????",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "Scheduler ??? ControlStore ?????? PROPOSED ? CLAIMED ?????",
+      "?? maxOpenIntents ????????????????",
+      "??????????????????? PROPOSED Intent",
+      "??????????????????????"
+    ],
+    "validation": [
+      "167/167 repository tests passed",
+      "17 Intent and CLI focused tests passed",
+      "component, change contract and project report gates passed",
+      "npm audit: 0 vulnerabilities"
+    ]
+  },
+  {
+    "id": "UPDATE-20260809-006",
+    "occurredAt": "2026-08-09T20:16:22+08:00",
+    "summary": "?? Intent ?????? PROPOSED Intent ???????",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "?? Intent ????????????Lease ????? ControlStore ???",
+      "?? CLI Intent ??????????????",
+      "? PROPOSED ? CLAIMED Intent ???? openIntents???????",
+      "?? replay?CLI ???????????????"
+    ],
+    "validation": [
+      "167/167 repository tests passed",
+      "35 Intent and CLI focused tests passed",
+      "component, change contract and project report gates passed",
+      "18/18 deterministic fixture evaluations passed",
+      "npm audit: 0 vulnerabilities"
+    ]
+  },
     {
       "id": "UPDATE-20260809-005",
       "occurredAt": "2026-08-09T16:18:52+08:00",

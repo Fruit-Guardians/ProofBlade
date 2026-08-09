@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.13",
+  "version": "0.12.14",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:09:33.039Z",
+  "updatedAt": "2026-08-09T20:16:22.341+08:00",
   "qualityAudit": {
-    "bugAuditCount": 9,
-    "securityAuditCount": 9,
-    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
-    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "c8c644227ec4de9433810e61f2cb843bf87dfa15d41b2bab91b08281a0919b7a",
+    "bugAuditCount": 10,
+    "securityAuditCount": 10,
+    "lastBugAuditAt": "2026-08-09T20:16:22.341+08:00",
+    "lastSecurityAuditAt": "2026-08-09T20:16:22.341+08:00",
+    "sourceHash": "971c19555877810b717ddb5227583b53480253b3729871cb93bc8a99aa64041b",
     "result": "passed"
   }
 }

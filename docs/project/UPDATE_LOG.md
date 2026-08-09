@@ -1,12 +1,14 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T16:18:52+08:00
+> 状态更新时间：2026-08-09T20:46:53+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-007 | 2026-08-09T20:46:53+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-006 | 2026-08-09T20:16:22+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-005 | 2026-08-09T16:18:52+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
 | UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -25,6 +27,47 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-007
+
+时间：2026-08-09T20:46:53+08:00
+
+摘要：????????? PROPOSED Intent ???????????
+
+### 变更
+
+- Scheduler ??? ControlStore ?????? PROPOSED ? CLAIMED ?????
+- ?? maxOpenIntents ????????????????
+- ??????????????????? PROPOSED Intent
+- ??????????????????????
+
+### 验证
+
+- [x] 167/167 repository tests passed
+- [x] 17 Intent and CLI focused tests passed
+- [x] component, change contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260809-006
+
+时间：2026-08-09T20:16:22+08:00
+
+摘要：?? Intent ?????? PROPOSED Intent ???????
+
+### 变更
+
+- ?? Intent ????????????Lease ????? ControlStore ???
+- ?? CLI Intent ??????????????
+- ? PROPOSED ? CLAIMED Intent ???? openIntents???????
+- ?? replay?CLI ???????????????
+
+### 验证
+
+- [x] 167/167 repository tests passed
+- [x] 35 Intent and CLI focused tests passed
+- [x] component, change contract and project report gates passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-005
 
