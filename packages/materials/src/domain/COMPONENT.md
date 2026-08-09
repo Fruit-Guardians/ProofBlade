@@ -4,12 +4,12 @@
 {
   "id": "materials-domain",
   "name": "Domain Contracts",
-  "version": "0.3.5",
+  "version": "0.3.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
   "updatedAt": "2026-08-09T16:31:33.000Z",
   "qualityAudit": {
-    "bugAuditCount": 4,
-    "securityAuditCount": 4,
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
     "lastBugAuditAt": "2026-08-09T16:31:33.000Z",
     "lastSecurityAuditAt": "2026-08-09T16:31:33.000Z",
     "sourceHash": "47cb22386ff00dc37963155517392889f0304503ad5341ecc767af5a021ea410",
