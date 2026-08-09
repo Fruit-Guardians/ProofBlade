@@ -99,14 +99,22 @@ export class ControlStore {
   }
 
   public async dispatch(runId: string, command: DomainCommand): Promise<HarnessEvent[]> {
+    return await this.dispatchBatch(runId, [command]);
+  }
+
+  public async dispatchBatch(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]> {
+    if (commands.length === 0) return [];
     return await this.operations.run(runId, async () => {
-      const before = await this.snapshot(runId);
-      validateCommand(before, command);
-      const lane = command.lane ?? "main";
-      const seq = before.lastSeq + 1;
-      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq));
-      const events = [event];
-      const after = reduce(before, event);
+      let after = await this.snapshot(runId);
+      const events: HarnessEvent[] = [];
+      for (const command of commands) {
+        validateCommand(after, command);
+        const lane = command.lane ?? "main";
+        const seq = after.lastSeq + 1;
+        const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq));
+        after = reduce(after, event);
+        events.push(event);
+      }
       await this.eventStore.append(events);
       await this.eventStore.saveProjection(after);
       return events;

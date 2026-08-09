@@ -580,7 +580,7 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
 }
 
 function isRecoverableTermination(value: unknown): value is NonNullable<AgentOutcome["termination"]> {
-  return value === "repeated_tool_failure" || value === "no_progress";
+  return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm";
 }
 
 export function correlateToolCalls(

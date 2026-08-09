@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T05:00:00.000Z",
+  "updatedAt": "2026-08-09T07:09:33.039Z",
   "qualityAudit": {
-    "bugAuditCount": 7,
-    "securityAuditCount": 7,
-    "lastBugAuditAt": "2026-08-09T05:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-09T05:00:00.000Z",
-    "sourceHash": "a95a5b06f983d90c5852e1fc10d9e8f8d81d912cb2f3bde792ffc1e7528a3290",
+    "bugAuditCount": 8,
+    "securityAuditCount": 8,
+    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
+    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
+    "sourceHash": "baa221981ae8b970534c191e9d511d452725ee2bc91930924ca00ea10b1e8538",
     "result": "passed"
   }
 }
@@ -32,7 +32,7 @@
 
 - API 响应只暴露 `hasApiKey`，不回传 Key。
 - SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
-- Runtime 的 `repeated_tool_failure` 与 `no_progress` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
+- Runtime 的 `repeated_tool_failure`、`no_progress` 与 `tool_failure_storm` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
 - Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
 - Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Solver lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。

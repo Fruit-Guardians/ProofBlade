@@ -71,7 +71,7 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   load_skill: READ_ONLY_EFFECT,
 };
 
-const EVIDENCE_READ_OPERATIONS = new Set(["inspect_forest", "inspect_tree", "search", "read"]);
+const EVIDENCE_READ_OPERATIONS = new Set(["curation_status", "inspect_forest", "inspect_tree", "search", "read"]);
 
 /** Resolves the same read-only and side-effect contract used by the runtime capability boundary. */
 export function createCodingToolEffectPolicyResolver(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">): ToolEffectPolicyResolver {
@@ -132,11 +132,11 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use inspect_forest for orientation and inspect_tree for provenance. Record promotes artifacts into Evidence and an optional claim/tree. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use curation_status for the exact pending Artifact ids. Record accepts artifactIds (plural), name, and summary; it does not accept artifactId or role. Annotate accepts artifactId (singular), name, summary, and optional role. Record promotes artifacts into Evidence and an optional claim/tree. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
-      enum: ["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"],
-      description: "Evidence operation. inspect_tree requires treeId; read requires artifactId; annotate requires artifactId, name, and summary; record requires artifactIds, name, and summary; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
+      enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"],
+      description: "Evidence operation. curation_status takes no other arguments; inspect_tree requires treeId; read requires artifactId; annotate requires artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
     }),
     treeId: Type.Optional(Type.String({ minLength: 1 })),
     query: Type.Optional(Type.String({ maxLength: 200 })),
@@ -167,7 +167,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as {
-      operation: "inspect_forest" | "inspect_tree" | "search" | "read" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
+      operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
       query?: string;
       artifactId?: string;
       artifactIds?: string[];
@@ -191,7 +191,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (input.operation === "curation_status") {
+      assertOnly(input, ["operation"], "evidence curation_status");
+      return toolResult({ curation: await context.evidenceCurationGate?.inspect() ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
+    }
     if (input.operation === "inspect_forest") {
       assertOnly(input, ["operation", "maxChars"], "evidence inspect_forest");
       return toolResult(await context.evidenceGraph.inspectForest(), false, input.maxChars);
@@ -213,12 +217,14 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     if (input.operation === "annotate") {
       assertOnly(input, ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"], "evidence annotate");
       if (!input.artifactId || !input.name || !input.summary) throw new Error("evidence annotate requires artifactId, name, and summary");
-      return toolResult(await context.evidenceGraph.annotateArtifact({ artifactId: input.artifactId, name: input.name, summary: input.summary, tags: input.tags, role: input.role, relatedIds: input.relatedIds }));
+      const result = await context.evidenceGraph.annotateArtifact({ artifactId: input.artifactId, name: input.name, summary: input.summary, tags: input.tags, role: input.role, relatedIds: input.relatedIds });
+      return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
     }
     if (input.operation === "record") {
       assertOnly(input, ["operation", "artifactIds", "name", "summary", "tags", "dependsOn", "claim"], "evidence record");
       if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
-      return toolResult(await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn }));
+      const result = await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn });
+      return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
     }
     if (input.operation === "link") {
       assertOnly(input, ["operation", "from", "to", "relation", "explanation", "confidence"], "evidence link");

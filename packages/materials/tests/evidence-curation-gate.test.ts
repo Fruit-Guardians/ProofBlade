@@ -81,6 +81,64 @@ test("evidence curation gate checkpoints exploration and clears reviewed artifac
   }
 });
 
+test("evidence recording is bounded and idempotent after an artifact reaches the tag limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-curation-idempotent-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CURATION-IDEMPOTENT-001";
+    await control.createRun(runId, task(runId, root));
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const artifact = await artifacts.putText(runId, "maze map", {
+      filename: "maze.txt",
+      mime: "text/plain",
+      sensitivity: "public",
+      semantic: {
+        name: "Maze map",
+        summary: "Extracted maze map awaiting review.",
+        tags: ["read", "file-content", ...Array.from({ length: 14 }, (_, index) => `tag-${index}`)],
+        role: "intermediate",
+        relatedIds: [],
+        annotatedBy: "harness",
+      },
+    });
+
+    const first = await graph.recordEvidence({
+      name: "Maze topology",
+      summary: "The extracted map defines the traversable maze topology.",
+      artifactIds: [artifact.id],
+      tags: ["maze", "topology"],
+      claim: "The map is sufficient to compute a path.",
+    });
+    assert.equal(first.reused, false);
+    assert.equal(first.durableProgress, true);
+    const afterFirst = await control.snapshot(runId);
+    assert.equal(afterFirst.artifacts[artifact.id]!.semantic!.tags.length, 16);
+    assert.equal(Object.keys(afterFirst.evidence).length, 1);
+
+    const repeated = await graph.recordEvidence({
+      name: "Different display name does not duplicate the finding",
+      summary: "  The extracted map defines the traversable maze topology.  ",
+      artifactIds: [artifact.id],
+      tags: ["other"],
+      claim: "The map is sufficient to compute a path.",
+    });
+    assert.equal(repeated.evidenceId, first.evidenceId);
+    assert.equal(repeated.reused, true);
+    assert.equal(repeated.durableProgress, false);
+    assert.equal(Object.keys((await control.snapshot(runId)).evidence).length, 1);
+
+    const annotation = await graph.annotateArtifact({ artifactId: artifact.id, name: "Reviewed maze", summary: "Reviewed topology source.", role: "supporting", tags: ["maze"] });
+    const annotationAgain = await graph.annotateArtifact({ artifactId: artifact.id, name: "Reviewed maze", summary: "Reviewed topology source.", role: "supporting", tags: ["maze"] });
+    assert.equal(annotation.reused, false);
+    assert.equal(annotationAgain.reused, true);
+    assert.equal(annotationAgain.durableProgress, false);
+    assert.equal(annotationAgain.progressKey, annotation.progressKey);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function task(runId: string, root: string): TaskContract {
   return {
     schema_version: 1,

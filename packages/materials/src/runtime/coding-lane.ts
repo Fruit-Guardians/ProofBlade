@@ -28,13 +28,15 @@ import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker } from "./tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
 Respond naturally to ordinary conversation. Use workspace tools only when the user's request benefits from inspecting, running, or editing project files. Explain completed work concisely and preserve the user's existing changes.
 
 Ordinary conversation has no implicit challenge fixture or scorer. Read and bash results include a ProofBlade artifact anchor. When workspace inspection produces a materially useful finding, use that stable A-* id with evidence record to give the artifact a human-readable name, concise summary, tags, Evidence, and an optional proposed claim. Record already labels and promotes its artifacts, so do not annotate them first. Use annotate only for reviewed routine/debug output that should not become Evidence. Record only findings that advance or refute a hypothesis. Evidence curation checkpoints report unreviewed artifacts; resolve a required checkpoint with record or annotate before continuing read/bash exploration. Use evidence inspect_forest for orientation, inspect_tree for local provenance, and search/read to recover related findings instead of guessing ids. Reuse shared graph nodes in multiple reasoning trees; label each tree with a concise name, summary, purpose, and explanation.
+
+For evidence curation, call evidence curation_status to obtain the exact pending Artifact ids. The record operation requires artifactIds (plural), name, and summary; it never accepts artifactId or role. The annotate operation requires artifactId (singular), name, and summary. Repeating an unchanged record or annotation is not progress; use the returned curation status to select a different pending Artifact or resume investigation.
 
 When the user asks for a CTF flag, challenge answer, recovered secret, or another deterministic result from workspace evidence, inspect the real inputs and test decoy hypotheses against file structures and control flow. Before reporting a final candidate as confirmed, call verify_claim with the exact candidate and a deterministic command that derives and prints it without embedding the candidate literal. Link the supporting evidence ids used by the reproduction. Treat strings output alone as an observation, not verification. If reproduction is still missing, state that the conclusion is unverified and name the missing check.`;
 
@@ -52,6 +54,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly maintenance: { compactRequested: boolean },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
     private readonly progressBreaker: NoProgressToolBreaker,
+    private readonly failureStormBreaker: ToolFailureStormBreaker,
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
@@ -110,6 +113,7 @@ export class PiCodingLane implements AgentLanePort {
     const stableSystemPrompt = codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled));
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
+    const failureStormBreaker = new ToolFailureStormBreaker();
     const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
@@ -123,7 +127,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp));
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp), failureStormBreaker);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -158,6 +162,7 @@ export class PiCodingLane implements AgentLanePort {
       maintenance,
       repeatBreaker,
       progressBreaker,
+      failureStormBreaker,
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
       async () => {
@@ -174,6 +179,7 @@ export class PiCodingLane implements AgentLanePort {
   public async prompt(text: string): Promise<AgentOutcome> {
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
+    this.failureStormBreaker.reset();
     delete this.termination.message;
     delete this.termination.reason;
     this.termination.requested = false;
@@ -284,5 +290,14 @@ function codingSystemPrompt(skills: Array<{ name: string; description: string }>
     skills.length > 0 ? `\nEnabled Skills:\n${skills.map((skill) => `- ${skill.name}: ${skill.description}`).join("\n")}\nUse load_skill to load a Skill only when it is relevant.` : "",
     mcpServers.length > 0 ? `\nEnabled MCP servers:\n${mcpServers.map((server) => `- ${server.name}: ${server.description}`).join("\n")}\nUse mcp_call with operation=describe before operation=call.` : "",
   ].join("");
-  return `${CODING_SYSTEM_PROMPT}${resources}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance()}${resources}`;
+}
+
+export function codingHostGuidance(platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return "Keep generated intermediate files inside the current workspace so later tools can read them.";
+  return [
+    "The host is Windows. Use python or py for Python commands, never python3.",
+    "Keep generated intermediate files in workspace-relative paths such as work/.",
+    "Do not write analysis files to /tmp and then ask the Windows read tool to open them.",
+  ].join(" ");
 }

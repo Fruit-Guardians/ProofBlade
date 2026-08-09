@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { snipText } from "@proofblade/molecules";
-import type { ControlStore } from "../control/control-store.js";
+import type { ControlStore, DomainCommand } from "../control/control-store.js";
 import type {
   ArtifactRole,
   ArtifactSemanticMetadata,
@@ -56,7 +56,7 @@ export class CodingEvidenceGraph {
     tags?: string[];
     role?: ArtifactRole;
     relatedIds?: string[];
-  }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata }> {
+  }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata; reused: boolean; durableProgress: boolean; progressKey: string }> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[input.artifactId];
     if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
@@ -68,9 +68,13 @@ export class CodingEvidenceGraph {
       relatedIds: input.relatedIds,
       fallback: artifact.semantic,
     });
+    const progressKey = sha256(canonicalJson({ operation: "annotate", artifactId: input.artifactId, semantic }));
+    if (artifact.semantic && sameSemantic(artifact.semantic, semantic)) {
+      return { artifactId: input.artifactId, semantic: artifact.semantic, reused: true, durableProgress: false, progressKey };
+    }
     await this.controlStore.dispatch(this.runId, { type: "artifact_annotation", artifactId: input.artifactId, semantic, lane: "main" });
     const updated = await this.controlStore.snapshot(this.runId);
-    return { artifactId: input.artifactId, semantic: updated.artifacts[input.artifactId]!.semantic! };
+    return { artifactId: input.artifactId, semantic: updated.artifacts[input.artifactId]!.semantic!, reused: false, durableProgress: true, progressKey };
   }
 
   public async recordEvidence(input: RecordCodingEvidenceInput): Promise<{
@@ -78,6 +82,9 @@ export class CodingEvidenceGraph {
     factId?: string;
     treeId?: string;
     artifactIds: string[];
+    reused: boolean;
+    durableProgress: boolean;
+    progressKey: string;
   }> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifactIds = unique(input.artifactIds);
@@ -89,6 +96,31 @@ export class CodingEvidenceGraph {
     const summary = requiredText(input.summary, "Evidence summary", 1_000);
     const tags = normalizedTags(input.tags);
     const claim = optionalText(input.claim, "Evidence claim", 1_000);
+    const progressKey = evidenceProgressKey({ artifactIds, summary, claim, dependsOn });
+    const existingEvidence = Object.values(snapshot.evidence).find((candidate) => {
+      const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
+      return evidenceProgressKey({
+        artifactIds: evidenceArtifactIds(candidate),
+        summary: candidate.summary,
+        claim: candidateClaim,
+        dependsOn: candidate.dependsOn ?? [],
+      }) === progressKey;
+    });
+    if (existingEvidence) {
+      const existingFactId = existingEvidence.supports.find((factId) => snapshot.facts[factId]);
+      const existingTree = existingFactId
+        ? Object.values(snapshot.reasoningTrees).find((tree) => tree.rootNodeId === existingFactId && tree.nodeIds.includes(existingEvidence.id))
+        : undefined;
+      return {
+        evidenceId: existingEvidence.id,
+        factId: existingFactId,
+        treeId: existingTree?.id,
+        artifactIds,
+        reused: true,
+        durableProgress: false,
+        progressKey,
+      };
+    }
     const factId = claim ? id("F") : undefined;
     const evidenceId = id("EV");
     const evidence: Omit<Evidence, "createdSeq"> = {
@@ -103,56 +135,78 @@ export class CodingEvidenceGraph {
       supports: factId ? [factId] : [],
       refutes: [],
     };
-    await this.controlStore.dispatch(this.runId, { type: "evidence", evidence, lane: "main" });
+    const commands: DomainCommand[] = [{ type: "evidence", evidence, lane: "main" }];
     if (factId && claim) {
-      await this.controlStore.dispatch(this.runId, {
+      commands.push({
         type: "fact",
         fact: { id: factId, statement: claim, status: "PROPOSED", evidenceIds: [evidenceId] },
         lane: "main",
       });
     }
+    const updatedArtifactSemantics = new Map<string, Omit<ArtifactSemanticMetadata, "updatedSeq">>();
     for (const [index, artifactId] of artifactIds.entries()) {
-      const current = (await this.controlStore.snapshot(this.runId)).artifacts[artifactId]!;
+      const current = snapshot.artifacts[artifactId]!;
       const existing = current.semantic;
-      await this.controlStore.dispatch(this.runId, {
+      const semantic = semanticInput({
+        name: existing?.annotatedBy === "agent" ? existing.name : artifactIds.length === 1 ? name : `${name} (${index + 1}/${artifactIds.length})`,
+        summary: existing?.annotatedBy === "agent" ? existing.summary : summary,
+        tags: boundedUnion(existing?.tags ?? [], tags, 16),
+        role: "supporting",
+        relatedIds: boundedUnion(existing?.relatedIds ?? [], [evidenceId, ...(factId ? [factId] : [])], 32),
+        fallback: existing,
+      });
+      updatedArtifactSemantics.set(artifactId, semantic);
+      commands.push({
         type: "artifact_annotation",
         artifactId,
-        semantic: semanticInput({
-          name: existing?.annotatedBy === "agent" ? existing.name : artifactIds.length === 1 ? name : `${name} (${index + 1}/${artifactIds.length})`,
-          summary: existing?.annotatedBy === "agent" ? existing.summary : summary,
-          tags: [...(existing?.tags ?? []), ...tags],
-          role: "supporting",
-          relatedIds: [...(existing?.relatedIds ?? []), evidenceId, ...(factId ? [factId] : [])],
-          fallback: existing,
-        }),
+        semantic,
         lane: "main",
       });
     }
-    for (const artifactId of artifactIds) await this.ensureDomainNode(artifactId);
-    for (const dependencyId of dependsOn) await this.ensureDomainNode(dependencyId);
-    await this.ensureDomainNode(evidenceId);
-    for (const artifactId of artifactIds) await this.ensureEdge(artifactId, evidenceId, "derived_from", "该 Evidence 由此 Artifact 中的离散观察归纳生成。", 0.9);
-    for (const dependencyId of dependsOn) await this.ensureEdge(dependencyId, evidenceId, "depends_on", "该 Evidence 依赖已有 Evidence 的解释。", 0.8);
+    for (const artifactId of artifactIds) {
+      if (!snapshot.reasoningNodes[artifactId]) commands.push({
+        type: "reasoning_node",
+        node: artifactReasoningNode(snapshot.artifacts[artifactId]!, updatedArtifactSemantics.get(artifactId)!, snapshot.generation),
+        lane: "main",
+      });
+    }
+    for (const dependencyId of dependsOn) {
+      if (!snapshot.reasoningNodes[dependencyId]) commands.push({ type: "reasoning_node", node: domainReasoningNode(snapshot, dependencyId)!, lane: "main" });
+    }
+    commands.push({ type: "reasoning_node", node: evidenceReasoningNode(evidence, snapshot.generation), lane: "main" });
+    for (const artifactId of artifactIds) commands.push({
+      type: "reasoning_edge",
+      edge: reasoningEdge(artifactId, evidenceId, "derived_from", "该 Evidence 由此 Artifact 中的离散观察归纳生成。", 0.9, snapshot.generation),
+      lane: "main",
+    });
+    for (const dependencyId of dependsOn) commands.push({
+      type: "reasoning_edge",
+      edge: reasoningEdge(dependencyId, evidenceId, "depends_on", "该 Evidence 依赖已有 Evidence 的解释。", 0.8, snapshot.generation),
+      lane: "main",
+    });
     let treeId: string | undefined;
     if (factId && claim) {
-      await this.ensureDomainNode(factId);
-      await this.ensureEdge(evidenceId, factId, "supports", "该 Evidence 支撑此主张。", 0.8);
-      const current = await this.controlStore.snapshot(this.runId);
-      const relatedTreeIds = Object.values(current.reasoningTrees).filter((tree) => dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
-      const created = await this.createTree({
+      commands.push({ type: "reasoning_node", node: factReasoningNode(factId, claim, snapshot.generation), lane: "main" });
+      commands.push({ type: "reasoning_edge", edge: reasoningEdge(evidenceId, factId, "supports", "该 Evidence 支撑此主张。", 0.8, snapshot.generation), lane: "main" });
+      const relatedTreeIds = Object.values(snapshot.reasoningTrees).filter((tree) => dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
+      treeId = id("TREE");
+      commands.push({ type: "reasoning_tree", tree: {
+        id: treeId,
         name: displayText(claim, 160),
         summary,
         purpose: displayText(`组织并复核主张：${claim}`, 1_000),
         explanation: `由 ${name} 及其来源产物组成的初始推理树；Evidence Curator 可继续补充、反驳或重命名。`,
         rootNodeId: factId,
-        nodeIds: [...artifactIds, ...dependsOn, evidenceId, factId],
+        nodeIds: upstreamClosure(snapshot, unique([...artifactIds, ...dependsOn, evidenceId, factId])),
         relatedTreeIds,
         tags,
         status: "ACTIVE",
-      });
-      treeId = created.tree.id;
+        generation: snapshot.generation,
+        explainedBy: "curator",
+      }, lane: "main" });
     }
-    return { evidenceId, factId, treeId, artifactIds };
+    await this.controlStore.dispatchBatch(this.runId, commands);
+    return { evidenceId, factId, treeId, artifactIds, reused: false, durableProgress: true, progressKey };
   }
 
   public async linkNodes(input: {
@@ -393,18 +447,7 @@ function upstreamClosure(snapshot: RunSnapshot, requestedNodeIds: string[]): str
 
 function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> | undefined {
   const artifact = snapshot.artifacts[nodeId];
-  if (artifact) return {
-    id: artifact.id,
-    kind: "artifact",
-    name: displayText(artifact.semantic?.name ?? basename(artifact.path), 160),
-    summary: artifact.semantic?.summary ?? `${artifact.mime}, ${artifact.bytes} bytes`,
-    tags: artifact.semantic?.tags ?? [],
-    status: artifact.semantic?.role === "result" ? "CONFIRMED" : "OPEN",
-    explanation: artifact.semantic?.summary ?? "由 Tool 产生并归档的离散观察来源。",
-    reference: { kind: "artifact", id: artifact.id },
-    generation: snapshot.generation,
-    explainedBy: artifact.semantic?.annotatedBy === "agent" ? "agent" : "harness",
-  };
+  if (artifact) return artifactReasoningNode(artifact, artifact.semantic, snapshot.generation);
   const evidence = snapshot.evidence[nodeId];
   if (evidence) return {
     id: evidence.id,
@@ -440,6 +483,66 @@ function domainReasoningNode(snapshot: RunSnapshot, nodeId: string): Omit<Reason
   return undefined;
 }
 
+function artifactReasoningNode(
+  artifact: RunSnapshot["artifacts"][string],
+  semantic: Omit<ArtifactSemanticMetadata, "updatedSeq"> | ArtifactSemanticMetadata | undefined,
+  generation: number,
+): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
+  return {
+    id: artifact.id,
+    kind: "artifact",
+    name: displayText(semantic?.name ?? basename(artifact.path), 160),
+    summary: semantic?.summary ?? `${artifact.mime}, ${artifact.bytes} bytes`,
+    tags: semantic?.tags ?? [],
+    status: semantic?.role === "result" ? "CONFIRMED" : "OPEN",
+    explanation: semantic?.summary ?? "由 Tool 产生并归档的离散观察来源。",
+    reference: { kind: "artifact", id: artifact.id },
+    generation,
+    explainedBy: semantic?.annotatedBy === "agent" ? "agent" : "harness",
+  };
+}
+
+function evidenceReasoningNode(evidence: Omit<Evidence, "createdSeq">, generation: number): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
+  return {
+    id: evidence.id,
+    kind: evidence.kind === "reproduction" ? "reproduction" : "evidence",
+    name: displayText(evidence.name ?? evidence.summary, 160),
+    summary: evidence.summary,
+    tags: evidence.tags ?? [],
+    status: evidence.refutes.length > 0 ? "CONTESTED" : "SUPPORTED",
+    explanation: "由一个或多个来源观察归纳并保留稳定引用。",
+    reference: { kind: "evidence", id: evidence.id },
+    generation,
+    explainedBy: "curator",
+  };
+}
+
+function factReasoningNode(factId: string, claim: string, generation: number): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
+  return {
+    id: factId,
+    kind: "claim",
+    name: displayText(claim, 160),
+    summary: claim,
+    tags: [],
+    status: "OPEN",
+    explanation: "由关联 Evidence 支撑或反驳的可验证主张。",
+    reference: { kind: "fact", id: factId },
+    generation,
+    explainedBy: "curator",
+  };
+}
+
+function reasoningEdge(
+  from: string,
+  to: string,
+  relation: ReasoningEdgeRelation,
+  explanation: string,
+  confidence: number,
+  generation: number,
+): Omit<ReasoningEdge, "createdSeq"> {
+  return { id: id("RE"), from, to, relation, explanation, confidence, generation };
+}
+
 function semanticInput(input: {
   name: string;
   summary: string;
@@ -456,6 +559,32 @@ function semanticInput(input: {
     relatedIds: unique(input.relatedIds ?? input.fallback?.relatedIds ?? []).slice(0, 32),
     annotatedBy: "agent",
   };
+}
+
+function sameSemantic(
+  current: ArtifactSemanticMetadata,
+  requested: Omit<ArtifactSemanticMetadata, "updatedSeq">,
+): boolean {
+  const { updatedSeq: _updatedSeq, ...persisted } = current;
+  return canonicalJson(persisted) === canonicalJson(requested);
+}
+
+function evidenceProgressKey(input: {
+  artifactIds: string[];
+  summary: string;
+  claim?: string;
+  dependsOn: string[];
+}): string {
+  return sha256(canonicalJson({
+    artifactIds: unique(input.artifactIds).sort(),
+    summary: input.summary.trim().replace(/\s+/g, " "),
+    claim: input.claim?.trim().replace(/\s+/g, " ") ?? "",
+    dependsOn: unique(input.dependsOn).sort(),
+  }));
+}
+
+function boundedUnion(existing: string[], additions: string[], limit: number): string[] {
+  return unique([...existing, ...additions]).slice(0, limit);
 }
 
 function displayText(value: string, maxLength: number): string {

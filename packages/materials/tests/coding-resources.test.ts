@@ -18,17 +18,26 @@ import { CodingClaimVerifier, requiresClaimVerification } from "../src/verificat
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
   assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "db8caf60c128c712b5afe32affeaa99e55a183fcffb2f4c71e91250ede82f33e");
+  assert.equal(sha256(canonicalJson(snapshot)), "8137aa765a2ac199f04bba8f281d9e9918b3f3b544d47319aee942afc836766e");
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
   assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "mcp_call"]);
   assert.deepEqual(withResources, withoutResources);
+});
+
+test("coding host guidance uses Windows-compatible Python and workspace paths", () => {
+  const guidance = codingHostGuidance("win32");
+  assert.match(guidance, /python or py/);
+  assert.match(guidance, /never python3/);
+  assert.match(guidance, /workspace-relative/);
+  assert.match(guidance, /\/tmp/);
 });
 
 test("coding provider tools use object-root schemas accepted by strict OpenAI-compatible providers", () => {
@@ -41,7 +50,7 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
 
   const evidence = snapshot.find((tool) => tool.name === "evidence")?.parameters as { properties?: Record<string, { type?: unknown; enum?: unknown }> };
   assert.equal(evidence.properties?.operation?.type, "string");
-  assert.deepEqual(evidence.properties?.operation?.enum, ["inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
+  assert.deepEqual(evidence.properties?.operation?.enum, ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
@@ -81,6 +90,8 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
   } as unknown as CodingResourceContext;
   const forest = await executeTool("evidence", { operation: "inspect_forest", maxChars: 256 }, context);
   assert.ok((forest.content[0]?.text ?? "").length <= 256);
+  const curation = await executeTool("evidence", { operation: "curation_status" }, context);
+  assert.equal((curation.details as { curation: { stage: string } }).curation.stage, "clear");
   try {
     await assert.rejects(
       () => executeTool("evidence", { operation: "inspect_forest", query: "unexpected cross-operation field" }, context),
