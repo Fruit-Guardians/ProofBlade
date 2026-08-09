@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T20:45:00+08:00",
+  "updatedAt": "2026-08-09T21:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -638,6 +638,28 @@
         "增加 Session 版本切换期间的 single-flight 回归测试和超限详情清除旧缓存回归测试"
       ],
       "validation": [
+        "143/143 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-029",
+      "occurredAt": "2026-08-09T21:05:00+08:00",
+      "summary": "修复 RunDetail 字节估算边界和关闭期间的详情加载回填。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "boundedJsonByteSize 补齐数组结束括号，并增加与 JSON.stringify 的嵌套数组字节对照测试",
+        "GUI shutdown 清理详情 in-flight 表；关闭状态禁止旧加载写入 RunDetail 缓存",
+        "增加关闭竞态回归测试，确保 close 返回后迟到加载不会重新占用缓存"
+      ],
+      "validation": [
+        "42/42 GUI tests passed",
         "143/143 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",

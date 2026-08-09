@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { SingleAgentCtfLoop } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
@@ -211,6 +211,15 @@ test("reuses unchanged run details, invalidates durable changes, and clears the 
   }
 });
 
+test("bounded JSON byte estimation matches JSON.stringify for nested arrays", () => {
+  const value = {
+    outer: ["alpha", [1, true, null], { inner: ["中文", "终"] }],
+    tail: [[[]], ["omega"]],
+  };
+  const expected = Buffer.byteLength(JSON.stringify(value), "utf8");
+  assert.equal(boundedJsonByteSize(value, expected + 1), expected);
+});
+
 test("invalidates cached run details when only the Pi Session changes", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-session-cache-"));
   let env: NodeExecutionEnv | undefined;
@@ -305,6 +314,41 @@ test("does not reuse an in-flight RunDetail load after a Pi Session version chan
     await data.close();
   } finally {
     await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("does not repopulate the RunDetail cache when close races an in-flight load", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-close-flight-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-CLOSE-FLIGHT-001";
+    await data.createConversation({ runId, title: "close detail single flight", workspacePath: root });
+    const originalLoadStableSessions = (data as unknown as {
+      loadStableSessions: (...args: unknown[]) => Promise<unknown>;
+    }).loadStableSessions.bind(data);
+    let releaseLoad: (() => void) | undefined;
+    const loadPaused = new Promise<void>((resolve) => { releaseLoad = resolve; });
+    let markLoadWaiting: (() => void) | undefined;
+    const loadWaiting = new Promise<void>((resolve) => { markLoadWaiting = resolve; });
+    (data as unknown as { loadStableSessions: (...args: unknown[]) => Promise<unknown> }).loadStableSessions = async (...args) => {
+      const result = await originalLoadStableSessions(...args);
+      markLoadWaiting?.();
+      await loadPaused;
+      return result;
+    };
+
+    const detailLoad = data.getRun(runId);
+    await loadWaiting;
+    await data.close();
+    const cache = (data as unknown as { runDetailCache: { size: number; weight: number } }).runDetailCache;
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+    releaseLoad?.();
+    await detailLoad;
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

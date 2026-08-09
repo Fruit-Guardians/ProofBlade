@@ -119,6 +119,7 @@ export class DebugDataService {
   }
 
   private async shutdown(): Promise<void> {
+    this.runDetailLoads.clear();
     const aborts: Promise<unknown>[] = [];
     for (const [runId, lane] of this.activeLanes) {
       if (!this.solveTasks.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
@@ -134,6 +135,7 @@ export class DebugDataService {
       .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
     this.runListCache.clear();
     this.runDetailCache.clear();
+    this.runDetailLoads.clear();
     if (failures.length > 0) throw new AggregateError(failures, "GUI shutdown failed");
   }
 
@@ -235,7 +237,7 @@ export class DebugDataService {
     const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
-    if (currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
+    if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
       this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
@@ -568,7 +570,7 @@ function runDetailVersionKey(runId: string, eventsMtimeMs: number, eventsSize: n
   return runId + "\0" + eventsMtimeMs + "\0" + eventsSize + "\0" + sessionsVersion;
 }
 
-function boundedJsonByteSize(value: unknown, limit: number): number {
+export function boundedJsonByteSize(value: unknown, limit: number): number {
   let bytes = 0;
   const stack = new WeakSet<object>();
   const add = (amount: number): void => {
@@ -615,6 +617,7 @@ function boundedJsonByteSize(value: unknown, limit: number): number {
         if (index > 0) add(1);
         visit(item, true);
       });
+      add(1);
     } else {
       const keys = Object.keys(current);
       add(1);
