@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -11,6 +11,10 @@ import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
 import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
+
+const readOnlyEffect = { readOnly: true, sideEffect: "none" as const };
+const workspaceEffect = { readOnly: false, sideEffect: "workspace" as const };
+const testEffectPolicy = (toolName: string) => toolName === "read" ? readOnlyEffect : toolName === "write" ? workspaceEffect : undefined;
 
 const failed = (input: Record<string, unknown>, text = "tool rejected the arguments") => ({
   toolName: "evidence",
@@ -46,6 +50,7 @@ test("[contract:no-progress-breaker] repeated successful observations stop witho
     isError: false,
     content: [{ type: "text", text: "same disassembly with a new artifact id" }],
     details: { artifactId: "A-volatile", artifactHash: "content-hash" },
+    effectPolicy: readOnlyEffect,
   };
   assert.equal(breaker.observe(repeatedRead).terminate, false);
   assert.equal(breaker.observe({ ...repeatedRead, details: { artifactId: "A-other", artifactHash: "content-hash" } }).terminate, false);
@@ -56,25 +61,60 @@ test("[contract:no-progress-breaker] repeated successful observations stop witho
 
   breaker.reset();
   breaker.observe(repeatedRead);
-  breaker.observe({ toolName: "evidence", input: { operation: "record" }, isError: false, content: [{ type: "text", text: "recorded" }], details: {} });
+  breaker.observe({ toolName: "evidence", input: { operation: "record" }, isError: false, content: [{ type: "text", text: "recorded" }], details: {}, effectPolicy: workspaceEffect });
   assert.equal(breaker.observe(repeatedRead).count, 1);
-  breaker.observe({ toolName: "write", input: { path: "solve.py", content: "print('new')" }, isError: false, content: [{ type: "text", text: "ok" }], details: {} });
+  breaker.observe({ toolName: "write", input: { path: "solve.py", content: "print('new')" }, isError: false, content: [{ type: "text", text: "ok" }], details: {}, effectPolicy: workspaceEffect });
   assert.equal(breaker.observe(repeatedRead).count, 1);
 });
 
-test("no-progress comparison uses stable bash artifact hashes and ignores unrelated observations", () => {
+test("repeated bash output cannot stop durable workspace changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-bash-progress-"));
+  try {
+    const path = join(root, "chunks.txt");
+    const breaker = new NoProgressToolBreaker(3);
+    const decisions = [];
+    for (let index = 1; index <= 3; index += 1) {
+      await appendFile(path, `chunk-${index}\n`, "utf8");
+      decisions.push(breaker.observe({
+        toolName: "bash",
+        input: { command: "node append-next-chunk.mjs" },
+        isError: false,
+        content: [{ type: "text", text: "chunk written" }],
+        effectPolicy: { readOnly: false, sideEffect: "process" },
+      }));
+    }
+    assert.equal(await readFile(path, "utf8"), "chunk-1\nchunk-2\nchunk-3\n");
+    assert.deepEqual(decisions.map(({ count, terminate }) => ({ count, terminate })), [
+      { count: 0, terminate: false },
+      { count: 0, terminate: false },
+      { count: 0, terminate: false },
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a side-effecting MCP or plugin call clears the no-progress window", () => {
   const breaker = new NoProgressToolBreaker(3);
-  const bash = (hash: string) => ({
-    toolName: "bash",
-    input: { command: "objdump -d firmware.bin" },
+  const read = {
+    toolName: "objdump",
+    input: { path: "firmware.bin" },
     isError: false,
-    content: [{ type: "text", text: `[ProofBlade artifact A-${Math.random()}; use this id with the evidence tool]` }],
-    details: { outputRewrite: { artifactId: "volatile", artifactHash: hash } },
-  });
-  breaker.observe(bash("hash-1"));
-  assert.equal(breaker.observe(bash("hash-2")).count, 1);
-  assert.equal(breaker.observe(bash("hash-1")).count, 2);
-  assert.equal(breaker.observe({ toolName: "mcp_call", input: { operation: "call" }, isError: false, content: [{ type: "text", text: "ok" }], details: {} }).count, 0);
+    content: [{ type: "text", text: "stable disassembly" }],
+    effectPolicy: readOnlyEffect,
+  };
+  assert.equal(breaker.observe(read).count, 1);
+  assert.equal(breaker.observe(read).count, 2);
+  assert.equal(breaker.observe({
+    toolName: "mcp_call",
+    input: { operation: "call", server: "browser", tool: "page_eval" },
+    isError: false,
+    content: [{ type: "text", text: "page changed" }],
+    effectPolicy: { readOnly: false, sideEffect: "network" },
+  }).count, 0);
+  assert.equal(breaker.observe(read).count, 1);
+  assert.equal(breaker.observe(read).terminate, false);
+  assert.equal(breaker.observe(read).terminate, true);
 });
 
 test("a breaker message only fills an otherwise empty assistant response", () => {
@@ -275,7 +315,7 @@ test("[contract:no-progress-visible] real Harness stops repeated successful obse
       systemPrompt: "Read the same range repeatedly.",
     });
     const termination: CodingTurnTermination = {};
-    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(3), new NoProgressToolBreaker(3), termination);
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(3), new NoProgressToolBreaker(3), termination, testEffectPolicy);
 
     const response = await harness.prompt("Continue the investigation.");
     const assistantEntries = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "assistant");
@@ -334,7 +374,7 @@ test("a durable mutation in the same batch cancels an order-dependent no-progres
     const session = await repo.create({ id: "no-progress-mixed", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [stableRead, write], activeToolNames: ["read", "write"], systemPrompt: "test" });
     const termination: CodingTurnTermination = {};
-    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), new NoProgressToolBreaker(), termination);
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), new NoProgressToolBreaker(), termination, testEffectPolicy);
     const response = await harness.prompt("continue");
     assert.equal(faux.state.callCount, 4);
     assert.equal(response.stopReason, "stop");

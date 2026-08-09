@@ -1,4 +1,12 @@
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import type { ProofBladeToolContract } from "../tools/contracts.js";
+
+export type ToolEffectPolicy = Pick<ProofBladeToolContract, "readOnly" | "sideEffect">;
+
+export type ToolEffectPolicyResolver = (
+  toolName: string,
+  input: Record<string, unknown>,
+) => ToolEffectPolicy | undefined;
 
 export interface ToolFailureObservation {
   toolName: string;
@@ -6,6 +14,7 @@ export interface ToolFailureObservation {
   isError: boolean;
   content: Array<{ type: string; text?: string }>;
   details?: unknown;
+  effectPolicy?: ToolEffectPolicy;
 }
 
 export interface ToolFailureDecision {
@@ -64,7 +73,7 @@ export class NoProgressToolBreaker {
 
   public observe(observation: ToolFailureObservation): ToolFailureDecision {
     if (observation.isError) return { count: 0, terminate: false, key: "" };
-    if (isProgressMutation(observation)) {
+    if (!isPureReadOnlyObservation(observation)) {
       this.reset();
       return { count: 0, terminate: false, key: "" };
     }
@@ -83,7 +92,7 @@ export class NoProgressToolBreaker {
   }
 
   public isProgress(observation: ToolFailureObservation): boolean {
-    return !observation.isError && isProgressMutation(observation);
+    return !observation.isError && !isPureReadOnlyObservation(observation);
   }
 
   public reset(): void {
@@ -109,12 +118,6 @@ export function noProgressToolMessage(toolName: string, count: number): string {
 }
 
 function observationKey(observation: ToolFailureObservation): string | undefined {
-  if (observation.toolName === "evidence") {
-    const operation = observation.input.operation;
-    if (!(["inspect_forest", "inspect_tree", "search", "read"] as unknown[]).includes(operation)) return undefined;
-    return sha256(canonicalJson({ toolName: observation.toolName, input: observation.input }));
-  }
-  if (observation.toolName !== "read" && observation.toolName !== "bash") return undefined;
   const artifactHash = stableArtifactHash(observation.details);
   const output = artifactHash ?? observation.content
     .map((item) => item.type === "text" ? item.text ?? "" : "[image]")
@@ -126,10 +129,8 @@ function observationKey(observation: ToolFailureObservation): string | undefined
   return sha256(canonicalJson({ toolName: observation.toolName, input: observation.input, output }));
 }
 
-function isProgressMutation(observation: ToolFailureObservation): boolean {
-  if (["edit", "write", "verify_claim"].includes(observation.toolName)) return true;
-  if (observation.toolName !== "evidence") return false;
-  return (["annotate", "record", "link", "create_tree", "update_tree"] as unknown[]).includes(observation.input.operation);
+function isPureReadOnlyObservation(observation: ToolFailureObservation): boolean {
+  return observation.effectPolicy?.readOnly === true && observation.effectPolicy.sideEffect === "none";
 }
 
 function stableArtifactHash(details: unknown): string | undefined {

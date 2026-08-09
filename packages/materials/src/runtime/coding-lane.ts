@@ -23,7 +23,7 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, type CodingResourceContext } from "./coding-resources.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
@@ -123,7 +123,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp));
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));

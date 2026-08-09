@@ -6,6 +6,7 @@ import type { McpProjectRegistry, McpServerSummary } from "../src/mcp/registry.j
 import {
   codingActiveToolNames,
   codingProviderToolContractSnapshot,
+  createCodingToolEffectPolicyResolver,
   createCodingTools,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
@@ -151,6 +152,10 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
       calls.push({ kind: "execute", value: { capabilityId, operation, input } });
       return { stdout: "called", stderr: "", exitCode: 0, durationMs: 1 };
     },
+    resolveInvocation: (_capabilityId: string, _operation: string, input: Record<string, unknown>) => ({
+      readOnly: input.tool === "page_info",
+      sideEffect: input.tool === "page_info" ? "none" : "network",
+    }),
   } as unknown as McpProjectRegistry;
   const skills = {
     loadForModel: (name: string, maxChars?: number) => ({ name, maxChars, content: "loaded" }),
@@ -161,6 +166,13 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
     enabledSkills: new Set<string>(),
     enabledMcpServers: new Set(["echo"]),
   } as unknown as CodingResourceContext;
+  const resolveEffect = createCodingToolEffectPolicyResolver(mcp);
+
+  assert.deepEqual(resolveEffect("read", { path: "target.bin" }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolveEffect("bash", { command: "objdump -d target.bin" }), { readOnly: false, sideEffect: "process" });
+  assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_info", arguments: {} }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_eval", arguments: {} }), { readOnly: false, sideEffect: "network" });
+  assert.equal(resolveEffect("plugin_write", {}), undefined);
 
   const listed = await executeTool("mcp_call", { operation: "list" }, context);
   assert.deepEqual((listed.details as { servers: McpServerSummary[] }).servers.map((server) => server.name), ["echo"]);

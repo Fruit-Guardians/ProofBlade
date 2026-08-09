@@ -3,7 +3,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage } from "./tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress";
 
@@ -31,6 +31,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   repeatBreaker: RepeatedToolFailureBreaker,
   progressBreaker: NoProgressToolBreaker | undefined,
   termination: CodingTurnTermination,
+  resolveEffectPolicy?: ToolEffectPolicyResolver,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -53,6 +54,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         isError: false,
         content: event.content.map((item) => item.type === "text" ? { type: item.type, text: item.text } : { type: item.type }),
         details: event.details,
+        effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
       if (progressBreaker?.isProgress(observation) && termination.reason === "no_progress") {
         delete termination.message;

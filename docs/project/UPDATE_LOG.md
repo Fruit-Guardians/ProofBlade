@@ -29,18 +29,19 @@
 
 时间：2026-08-09T15:00:00+08:00
 
-摘要：增加有界无进展守卫并刷新推理森林，阻止 Coding Agent 重复探索。
+摘要：增加基于 Tool Contract 的有界无进展守卫并刷新推理森林，阻止 Coding Agent 重复探索。
 
 ### 变更
 
-- 在单个用户回合的滚动窗口内识别重复 read、bash 和只读 Evidence 观察，第三次无新信息时机械终止
-- 持久写入和 Evidence 推理更新重置进展窗口，混合工具批次中的真实进展不会被误停
+- 在单个用户回合的滚动窗口内只统计 Tool Contract 明确标记为只读且无副作用的重复观察，第三次无新信息时机械终止
+- 任意 Bash、未知插件、持久写入和副作用 MCP 调用均重置进展窗口，混合工具批次中的真实进展不会被误停
 - GUI 将 no_progress 投影为可见、可恢复的正常 Assistant 回复，并通过 Pi Entry ID 精确关联历史消息
 - 每个外部用户回合刷新推理森林，注入有界 orphan 摘要，并按 Artifact 内容哈希去重整理积压
 
 ### 验证
 
 - [x] npm run verify
+- [x] 124/124 automated tests passed, including durable Bash writes and side-effecting MCP/plugin reset contracts
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] real DeepSeek reverse-engineering smoke run advanced to a new PE section and .rdata analysis path
 - [x] paused smoke run aborted its in-flight Provider request without later tool calls

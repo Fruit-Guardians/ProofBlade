@@ -12,7 +12,7 @@
     "securityAuditCount": 6,
     "lastBugAuditAt": "2026-08-09T05:00:00.000Z",
     "lastSecurityAuditAt": "2026-08-09T05:00:00.000Z",
-    "sourceHash": "99209ea904854d44a78490fe79d3dd5698f62551862da18635da9b860c71eaa3",
+    "sourceHash": "e0c54f9299f4bf91c9116576822a5fba3f7037cc9cf7892a72b81b299048e7a8",
     "result": "passed"
   }
 }
@@ -28,6 +28,7 @@
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
 - Coding Provider 始终看到固定 `evidence`、`load_skill` 和 `mcp_call`；启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
+- 无进展守卫只统计 Tool Contract 明确声明为 `readOnly: true` 且 `sideEffect: none` 的成功观察；任意 Bash、未知插件和副作用 MCP 调用均按持久进展处理并清空窗口。
 - Coding `bash` 通过 `OutputRewritePort` 包装；RTK 探测和执行复用同一个 Pi `ExecutionEnv`，并在 Session details 中记录 provider/version/hash/字节数/Artifact。
 - Coding `read` 与 `bash` 都为文本结果注册语义化中间 Artifact，并在模型可见结果中返回稳定 `A-*` 锚点；`evidence record` 使用该锚点一次完成命名、提升、Evidence 与可选 Fact。
 - Coding `read/bash` 接入 Evidence Curation Gate：4 个未审阅产物触发检查点，8 个触发硬门；Agent 必须 `record` 有价值发现或 `annotate` 已审阅的普通输出后才能继续侦察。
@@ -38,7 +39,7 @@
 
 Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。内部恢复提示保留在 Pi 调试轨迹中，但不冒充 GUI 用户消息。错误或人工暂停的回合不启动普通摘要请求。
 
-重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；无进展断路器在单回合滚动窗口内比较只读工具参数和稳定 Artifact 内容哈希，第三次取回同一观察且没有文件、验证或知识图写入时停止。混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止；同批出现真实写入则取消顺序相关的无进展停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
+重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；无进展断路器在单回合滚动窗口内比较 Tool Contract 明确声明为只读且无副作用的工具参数和稳定 Artifact 内容哈希，第三次取回同一观察时停止。任意 Bash、未知工具和副作用 MCP 调用均视为潜在持久进展并清空窗口。混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止；同批出现真实进展则取消顺序相关的无进展停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
 
 `evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 
