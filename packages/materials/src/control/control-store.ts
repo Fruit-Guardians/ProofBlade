@@ -105,19 +105,21 @@ export class ControlStore {
   public async dispatchBatch(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]> {
     if (commands.length === 0) return [];
     return await this.operations.run(runId, async () => {
-      let after = await this.snapshot(runId);
-      const events: HarnessEvent[] = [];
-      for (const command of commands) {
-        validateCommand(after, command);
-        const lane = command.lane ?? "main";
-        const seq = after.lastSeq + 1;
-        const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq));
-        after = reduce(after, event);
-        events.push(event);
-      }
-      await this.eventStore.append(events);
-      await this.eventStore.saveProjection(after);
+      const { events } = await this.commitCommands(runId, await this.snapshot(runId), commands);
       return events;
+    });
+  }
+
+  public async dispatchTransaction<TResult>(
+    runId: string,
+    prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult },
+  ): Promise<TResult> {
+    return await this.operations.run(runId, async () => {
+      const before = await this.snapshot(runId);
+      const transaction = prepare(before);
+      if (transaction.commands.length === 0) return transaction.project(before);
+      const { after } = await this.commitCommands(runId, before, transaction.commands);
+      return transaction.project(after);
     });
   }
 
@@ -143,6 +145,26 @@ export class ControlStore {
   public async runHash(runId: string): Promise<string> {
     const snapshot = await this.replay(runId);
     return sha256(canonicalJson(snapshot));
+  }
+
+  private async commitCommands(
+    runId: string,
+    before: RunSnapshot,
+    commands: DomainCommand[],
+  ): Promise<{ after: RunSnapshot; events: HarnessEvent[] }> {
+    let after = before;
+    const events: HarnessEvent[] = [];
+    for (const command of commands) {
+      validateCommand(after, command);
+      const lane = command.lane ?? "main";
+      const seq = after.lastSeq + 1;
+      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq));
+      after = reduce(after, event);
+      events.push(event);
+    }
+    await this.eventStore.append(events);
+    await this.eventStore.saveProjection(after);
+    return { after, events };
   }
 }
 

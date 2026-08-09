@@ -1,13 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T15:15:00+08:00
+> 状态更新时间：2026-08-09T16:18:52+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
-| UPDATE-20260809-005 | 2026-08-09T15:15:00+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
+| UPDATE-20260809-005 | 2026-08-09T16:18:52+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
 | UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -28,21 +28,22 @@
 
 ## UPDATE-20260809-005
 
-时间：2026-08-09T15:15:00+08:00
+时间：2026-08-09T16:18:52+08:00
 
-摘要：修复 Evidence 整理半提交、重复整理假进展和多样错误循环，恢复真实逆向任务收敛。
+摘要：修复 Evidence 整理半提交、并发重复整理假进展和多样错误循环，恢复真实逆向任务收敛。
 
 ### 变更
 
 - Control Store 新增原子批量领域命令，任一校验失败时不追加部分事件
-- Evidence record 与 annotate 改为有界、幂等写入并返回稳定进展键
+- Control Store 新增按 Run 串行事务，让快照读取、幂等判断、ID 生成和批量提交处于同一临界区
+- Evidence record 与 annotate 改为有界、并发幂等写入并返回稳定进展键
 - Evidence Tool 新增 curation_status，并明确 record/annotate 的单双数参数契约
 - 增加 12 次多样 Tool 失败预算和 GUI 可恢复终止投影
 - Windows Coding Prompt 明确使用 python/py 和工作区相对中间文件
 
 ### 验证
 
-- [x] 130/130 repository tests passed
+- [x] 132/132 repository tests passed
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] component, contract and project report gates passed
 - [x] npm audit: 0 vulnerabilities

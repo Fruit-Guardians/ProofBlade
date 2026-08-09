@@ -12,7 +12,7 @@
     "securityAuditCount": 3,
     "lastBugAuditAt": "2026-08-09T07:11:20.246Z",
     "lastSecurityAuditAt": "2026-08-09T07:11:20.246Z",
-    "sourceHash": "b1c606fcd481d43747f7d93286c099a34840649d2567a0276b14827105f369ef",
+    "sourceHash": "5dc76b3fdf0c3f4d4d44c6e54ee7eefe911f77f9aac70e4627b71e71e8d63d3a",
     "result": "passed"
   }
 }
@@ -40,7 +40,7 @@ Forest 索引保留完整 orphan 总数，但只投影最近 24 个 orphan 的�
 
 Fact/Hypothesis 等权威语句保持完整；投影到 Reasoning Node/Tree 的展示名称独立限制为 160 字符。长 claim 不得让 `recordEvidence` 在 Evidence/Fact 已落盘后因展示标题校验而失败。
 
-`recordEvidence` 在落盘前完成全部字段、引用、Artifact 语义、图节点、边和 Tree 校验，并通过原子批次提交。Artifact 标签和关联 ID 使用确定性有界合并；相同 Artifact 集合、摘要、claim 与依赖重复提交时复用原 Evidence，不增加事件。`annotateArtifact` 的相同语义更新同样不得制造事件。
+`recordEvidence` 在落盘前完成全部字段、引用、Artifact 语义、图节点、边和 Tree 校验，并通过原子事务提交。Artifact 标签和关联 ID 使用确定性有界合并；相同 Artifact 集合、摘要、claim 与依赖无论顺序或并发重复提交，都必须复用同一 Evidence、Fact 和 Tree，只允许一个调用报告持久进展。`annotateArtifact` 的相同语义顺序或并发更新同样只能产生一次事件。
 
 ```powershell
 npm run test:materials

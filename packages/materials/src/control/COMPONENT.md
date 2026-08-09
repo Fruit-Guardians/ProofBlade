@@ -12,7 +12,7 @@
     "securityAuditCount": 3,
     "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
     "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "5d38ac3cc9ed19fc65916eb1c58b9102972877b95ad31dc60cb5d6ca566568b0",
+    "sourceHash": "d42d1965aa67c7c25c08f0c73d9f0459315fea4d9e8accdc762e58195b0d0fa6",
     "result": "passed"
   }
 }
@@ -34,6 +34,7 @@
 
 - `PAUSED` 状态下的 `finish`、`fail`、`exhaust` 必须在 ControlStore 单写者临界区内统一拒绝，Reducer 重放执行相同策略；只有显式 `resume` 可以解除暂停。
 - 需要共同成立的一组领域命令必须通过 `dispatchBatch` 在同一单写者临界区内预验证和投影；任一命令失败时不得追加部分事件或保存部分投影。
+- 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
 
 ```powershell
 npm run test:materials

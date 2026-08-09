@@ -24,6 +24,16 @@ export interface RecordCodingEvidenceInput {
   dependsOn?: string[];
 }
 
+export interface RecordCodingEvidenceResult {
+  evidenceId: string;
+  factId?: string;
+  treeId?: string;
+  artifactIds: string[];
+  reused: boolean;
+  durableProgress: boolean;
+  progressKey: string;
+}
+
 export interface CreateReasoningTreeInput {
   name: string;
   summary: string;
@@ -57,70 +67,71 @@ export class CodingEvidenceGraph {
     role?: ArtifactRole;
     relatedIds?: string[];
   }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata; reused: boolean; durableProgress: boolean; progressKey: string }> {
-    const snapshot = await this.controlStore.snapshot(this.runId);
-    const artifact = snapshot.artifacts[input.artifactId];
-    if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
-    const semantic = semanticInput({
-      name: input.name,
-      summary: input.summary,
-      tags: input.tags,
-      role: input.role,
-      relatedIds: input.relatedIds,
-      fallback: artifact.semantic,
+    return await this.controlStore.dispatchTransaction(this.runId, (snapshot) => {
+      const artifact = snapshot.artifacts[input.artifactId];
+      if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
+      const semantic = semanticInput({
+        name: input.name,
+        summary: input.summary,
+        tags: input.tags,
+        role: input.role,
+        relatedIds: input.relatedIds,
+        fallback: artifact.semantic,
+      });
+      const progressKey = sha256(canonicalJson({ operation: "annotate", artifactId: input.artifactId, semantic }));
+      const reused = Boolean(artifact.semantic && sameSemantic(artifact.semantic, semantic));
+      return {
+        commands: reused ? [] : [{ type: "artifact_annotation", artifactId: input.artifactId, semantic, lane: "main" }],
+        project: (after) => ({
+          artifactId: input.artifactId,
+          semantic: after.artifacts[input.artifactId]!.semantic!,
+          reused,
+          durableProgress: !reused,
+          progressKey,
+        }),
+      };
     });
-    const progressKey = sha256(canonicalJson({ operation: "annotate", artifactId: input.artifactId, semantic }));
-    if (artifact.semantic && sameSemantic(artifact.semantic, semantic)) {
-      return { artifactId: input.artifactId, semantic: artifact.semantic, reused: true, durableProgress: false, progressKey };
-    }
-    await this.controlStore.dispatch(this.runId, { type: "artifact_annotation", artifactId: input.artifactId, semantic, lane: "main" });
-    const updated = await this.controlStore.snapshot(this.runId);
-    return { artifactId: input.artifactId, semantic: updated.artifacts[input.artifactId]!.semantic!, reused: false, durableProgress: true, progressKey };
   }
 
-  public async recordEvidence(input: RecordCodingEvidenceInput): Promise<{
-    evidenceId: string;
-    factId?: string;
-    treeId?: string;
-    artifactIds: string[];
-    reused: boolean;
-    durableProgress: boolean;
-    progressKey: string;
-  }> {
-    const snapshot = await this.controlStore.snapshot(this.runId);
-    const artifactIds = unique(input.artifactIds);
-    if (artifactIds.length === 0 || artifactIds.length > 16) throw new Error("record evidence requires 1-16 artifact ids");
-    assertKnown(artifactIds, snapshot.artifacts, "artifacts");
-    const dependsOn = unique(input.dependsOn ?? []);
-    assertKnown(dependsOn, snapshot.evidence, "evidence");
-    const name = requiredText(input.name, "Evidence name", 160);
-    const summary = requiredText(input.summary, "Evidence summary", 1_000);
-    const tags = normalizedTags(input.tags);
-    const claim = optionalText(input.claim, "Evidence claim", 1_000);
-    const progressKey = evidenceProgressKey({ artifactIds, summary, claim, dependsOn });
-    const existingEvidence = Object.values(snapshot.evidence).find((candidate) => {
-      const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
-      return evidenceProgressKey({
-        artifactIds: evidenceArtifactIds(candidate),
-        summary: candidate.summary,
-        claim: candidateClaim,
-        dependsOn: candidate.dependsOn ?? [],
-      }) === progressKey;
-    });
-    if (existingEvidence) {
-      const existingFactId = existingEvidence.supports.find((factId) => snapshot.facts[factId]);
-      const existingTree = existingFactId
-        ? Object.values(snapshot.reasoningTrees).find((tree) => tree.rootNodeId === existingFactId && tree.nodeIds.includes(existingEvidence.id))
-        : undefined;
-      return {
-        evidenceId: existingEvidence.id,
-        factId: existingFactId,
-        treeId: existingTree?.id,
-        artifactIds,
-        reused: true,
-        durableProgress: false,
-        progressKey,
-      };
-    }
+  public async recordEvidence(input: RecordCodingEvidenceInput): Promise<RecordCodingEvidenceResult> {
+    return await this.controlStore.dispatchTransaction<RecordCodingEvidenceResult>(this.runId, (snapshot) => {
+      const artifactIds = unique(input.artifactIds);
+      if (artifactIds.length === 0 || artifactIds.length > 16) throw new Error("record evidence requires 1-16 artifact ids");
+      assertKnown(artifactIds, snapshot.artifacts, "artifacts");
+      const dependsOn = unique(input.dependsOn ?? []);
+      assertKnown(dependsOn, snapshot.evidence, "evidence");
+      const name = requiredText(input.name, "Evidence name", 160);
+      const summary = requiredText(input.summary, "Evidence summary", 1_000);
+      const tags = normalizedTags(input.tags);
+      const claim = optionalText(input.claim, "Evidence claim", 1_000);
+      const progressKey = evidenceProgressKey({ artifactIds, summary, claim, dependsOn });
+      const existingEvidence = Object.values(snapshot.evidence).find((candidate) => {
+        const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
+        return evidenceProgressKey({
+          artifactIds: evidenceArtifactIds(candidate),
+          summary: candidate.summary,
+          claim: candidateClaim,
+          dependsOn: candidate.dependsOn ?? [],
+        }) === progressKey;
+      });
+      if (existingEvidence) {
+        const existingFactId = existingEvidence.supports.find((factId) => snapshot.facts[factId]);
+        const existingTree = existingFactId
+          ? Object.values(snapshot.reasoningTrees).find((tree) => tree.rootNodeId === existingFactId && tree.nodeIds.includes(existingEvidence.id))
+          : undefined;
+        return {
+          commands: [],
+          project: () => ({
+            evidenceId: existingEvidence.id,
+            factId: existingFactId,
+            treeId: existingTree?.id,
+            artifactIds,
+            reused: true,
+            durableProgress: false,
+            progressKey,
+          }),
+        };
+      }
     const factId = claim ? id("F") : undefined;
     const evidenceId = id("EV");
     const evidence: Omit<Evidence, "createdSeq"> = {
@@ -205,8 +216,11 @@ export class CodingEvidenceGraph {
         explainedBy: "curator",
       }, lane: "main" });
     }
-    await this.controlStore.dispatchBatch(this.runId, commands);
-    return { evidenceId, factId, treeId, artifactIds, reused: false, durableProgress: true, progressKey };
+      return {
+        commands,
+        project: () => ({ evidenceId, factId, treeId, artifactIds, reused: false, durableProgress: true, progressKey }),
+      };
+    });
   }
 
   public async linkNodes(input: {

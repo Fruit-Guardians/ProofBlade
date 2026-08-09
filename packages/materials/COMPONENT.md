@@ -12,7 +12,7 @@
     "securityAuditCount": 9,
     "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
     "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "27e5769cb61f5c20b1be29c4fd80d0b99ab49cae46f71158535aafe5df612518",
+    "sourceHash": "c8c644227ec4de9433810e61f2cb843bf87dfa15d41b2bab91b08281a0919b7a",
     "result": "passed"
   }
 }
@@ -43,7 +43,7 @@
 - 未审阅的侦察 Artifact 由 Evidence Curation Gate 按内容哈希去重后限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。任一同内容副本完成 `record/annotate` 后，其余副本不再重复占用整理预算。
 - Context 维护采用单调 Tool Result 表示、目标预算裁剪和 idle-time 持久压缩；压缩后的 recent tail 必须受模型级预算约束，`length` 恢复必须有重试上限。
 - Tool 断路器必须同时覆盖重复失败和无信息增益的成功观察。无进展判定只统计 Tool Contract 明确声明为只读且无副作用、并在滚动窗口内返回相同内容哈希的操作；任意 Bash、未知插件和副作用 MCP 调用都会清空窗口，同批持久进展不得因工具顺序被误停。恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
-- Evidence 整理必须原子、幂等并返回稳定进展键；重复整理不得制造新 Evidence 或解除无进展计数。多样化 Tool 参数错误也受单轮失败预算约束，防止模型绕过相同失败断路器。
+- Evidence 整理必须原子、并发幂等并返回稳定进展键；读取快照、判重、生成 ID 与提交共享同一按 Run 串行事务，重复整理不得制造新 Evidence 或解除无进展计数。多样化 Tool 参数错误也受单轮失败预算约束，防止模型绕过相同失败断路器。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
 - 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算和规范化 Fixture Catalog 内容哈希。

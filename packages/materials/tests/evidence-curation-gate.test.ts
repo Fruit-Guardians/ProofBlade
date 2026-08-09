@@ -139,6 +139,87 @@ test("evidence recording is bounded and idempotent after an artifact reaches the
   }
 });
 
+test("concurrent evidence recording commits one durable finding", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-curation-concurrent-evidence-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CURATION-CONCURRENT-EVIDENCE-001";
+    await control.createRun(runId, task(runId, root));
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const artifact = await artifacts.putText(runId, "maze map", {
+      filename: "maze.txt",
+      mime: "text/plain",
+      sensitivity: "public",
+    });
+    const input = {
+      name: "Maze topology",
+      summary: "The extracted map defines the traversable maze topology.",
+      artifactIds: [artifact.id],
+      tags: ["maze", "topology"],
+      claim: "The map is sufficient to compute a path.",
+    };
+
+    const results = await Promise.all([
+      graph.recordEvidence(input),
+      graph.recordEvidence(input),
+    ]);
+
+    assert.equal(results[0]!.evidenceId, results[1]!.evidenceId);
+    assert.equal(results[0]!.factId, results[1]!.factId);
+    assert.equal(results[0]!.treeId, results[1]!.treeId);
+    assert.equal(results[0]!.progressKey, results[1]!.progressKey);
+    assert.deepEqual(results.map((result) => result.reused).sort(), [false, true]);
+    assert.deepEqual(results.map((result) => result.durableProgress).sort(), [false, true]);
+
+    const snapshot = await control.snapshot(runId);
+    assert.equal(Object.keys(snapshot.evidence).length, 1);
+    assert.equal(Object.keys(snapshot.facts).length, 1);
+    assert.equal(Object.keys(snapshot.reasoningTrees).length, 1);
+    assert.equal(Object.keys(snapshot.reasoningNodes).length, 3);
+    assert.equal(Object.keys(snapshot.reasoningEdges).length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("concurrent artifact annotation commits one durable update", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-curation-concurrent-annotation-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CURATION-CONCURRENT-ANNOTATION-001";
+    await control.createRun(runId, task(runId, root));
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const artifact = await artifacts.putText(runId, "routine output", {
+      filename: "routine.txt",
+      mime: "text/plain",
+      sensitivity: "public",
+    });
+    const input = {
+      artifactId: artifact.id,
+      name: "Reviewed routine output",
+      summary: "Reviewed and classified as non-evidentiary output.",
+      role: "debug" as const,
+      tags: ["reviewed-routine"],
+    };
+
+    const results = await Promise.all([
+      graph.annotateArtifact(input),
+      graph.annotateArtifact(input),
+    ]);
+
+    assert.equal(results[0]!.progressKey, results[1]!.progressKey);
+    assert.deepEqual(results.map((result) => result.reused).sort(), [false, true]);
+    assert.deepEqual(results.map((result) => result.durableProgress).sort(), [false, true]);
+    const annotationEvents = (await control.events(runId)).filter((event) =>
+      event.type === "artifact_annotated" && event.payload.artifactId === artifact.id);
+    assert.equal(annotationEvents.length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function task(runId: string, root: string): TaskContract {
   return {
     schema_version: 1,
