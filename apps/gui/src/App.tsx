@@ -110,10 +110,10 @@ export function App() {
 
   const refreshPollerRef = useRef<SingleFlightPoller | undefined>(undefined);
   if (!refreshPollerRef.current) {
-    refreshPollerRef.current = new SingleFlightPoller(async () => {
+    refreshPollerRef.current = new SingleFlightPoller(async (mode) => {
       await refreshRuns();
       const selected = runIdRef.current;
-      if (selected) await refreshDetail(selected, true);
+      if (selected) await refreshDetail(selected, mode === "background");
     });
   }
   const refreshPoller = refreshPollerRef.current;

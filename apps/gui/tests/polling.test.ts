@@ -63,6 +63,35 @@ test("timer ticks resolve immediately without accumulating waiters or trailing r
   assert.equal(calls, 1);
 });
 
+test("[contract:interactive-refresh-clears-stale-error] only a successful interactive refresh clears an old request error", async () => {
+  let shouldFail = true;
+  let error: string | undefined;
+  let releaseBackground: (() => void) | undefined;
+  const modes: string[] = [];
+  const poller = new SingleFlightPoller(async (mode) => {
+    modes.push(mode);
+    try {
+      if (shouldFail) throw new Error("temporary detail failure");
+      if (mode === "background") await new Promise<void>((resolve) => { releaseBackground = resolve; });
+      if (mode === "interactive") error = undefined;
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught);
+    }
+  });
+
+  await poller.poll(false);
+  assert.equal(error, "temporary detail failure");
+  shouldFail = false;
+  const background = poller.poll(false);
+  await waitFor(() => releaseBackground !== undefined);
+  const interactive = poller.poll();
+  assert.equal(error, "temporary detail failure");
+  releaseBackground?.();
+  await Promise.all([background, interactive]);
+  assert.equal(error, undefined);
+  assert.deepEqual(modes, ["background", "background", "interactive"]);
+});
+
 async function waitFor(predicate: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return;
