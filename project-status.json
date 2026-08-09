@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T23:59:59+08:00",
+  "updatedAt": "2026-08-09T23:59:59.900+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-015",
+    "occurredAt": "2026-08-09T23:59:59.900+08:00",
+    "summary": "为 generation reset 增加旧版 Intent Lease 的确定性迁移与释放。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "fixture_reset 识别仅保存 leaseId、未保存 leaseClaims 的历史 CLAIMED Intent",
+      "旧 leaseId 仅解析 Intent resourceKeys 中的 executor 资源，避免释放无关 Lease",
+      "reset 时将匹配 Lease 的 owner 与 epoch 迁移到 leaseClaims 后原子释放",
+      "迁移结果由 fixture_reset reducer 确定性派生，ControlStore replay 保持相同投影",
+      "增加旧 claimed Intent、generation reset、Lease 清理与 replay 一致性回归测试"
+    ],
+    "validation": [
+      "45 scheduler, durability and recovery tests passed in three consecutive iterations",
+      "TypeScript typecheck passed",
+      "legacy leaseId reset and replay regression passed"
+    ]
+  },
   {
     "id": "UPDATE-20260809-014",
     "occurredAt": "2026-08-09T23:59:59+08:00",

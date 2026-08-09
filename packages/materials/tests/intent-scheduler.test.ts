@@ -819,6 +819,53 @@ describe('IntentScheduler - replay 持久化', () => {
     }
   });
 
+  test('fixture reset 迁移旧 leaseId Intent、释放 Lease 并保持 replay 一致', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager, projectionHash } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-legacy-lease-reset-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const leaseManager = new LeaseManager(controlStore);
+      const runId = 'INTENT-LEGACY-LEASE-RESET-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Legacy lease reset test',
+      } as any);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 1 });
+      const lease = await leaseManager.acquire(runId, 'workspace:read', 'executor', 30_000);
+      const legacyIntent: Intent = {
+        id: 'intent-legacy-claimed', status: 'CLAIMED', priority: 'high', createdAt: new Date().toISOString(),
+        knowledgeVersion: 0, fixtureGeneration: 1, phase: 'reconnaissance', objective: 'Legacy claimed work',
+        startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Legacy evidence', minimumConfidence: 'medium' },
+        suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: ['workspace:read'],
+        dependencies: [], attempts: 0, claimedAt: new Date().toISOString(), leaseId: 'workspace:read',
+      };
+      await controlStore.dispatch(runId, { type: 'scheduler_intent', intent: legacyIntent });
+
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
+      const afterReset = await controlStore.snapshot(runId);
+      assert.equal(afterReset.schedulerIntents[legacyIntent.id].status, 'STALE');
+      assert.deepStrictEqual(afterReset.schedulerIntents[legacyIntent.id].leaseClaims, {
+        'workspace:read': { ownerLane: 'executor', generation: lease.generation },
+      });
+      assert.deepStrictEqual(afterReset.leases, {});
+      assert.equal(afterReset.leaseEpochs['workspace:read'], lease.generation);
+
+      const replayed = await new ControlStore(events).replay(runId);
+      assert.equal(projectionHash(replayed), projectionHash(afterReset));
+      assert.equal(replayed.schedulerIntents[legacyIntent.id].status, 'STALE');
+      assert.deepStrictEqual(replayed.schedulerIntents[legacyIntent.id].leaseClaims, {
+        'workspace:read': { ownerLane: 'executor', generation: lease.generation },
+      });
+      assert.deepStrictEqual(replayed.leases, {});
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('reset 后旧 Worker 不能完成或失败已失效 Intent', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');

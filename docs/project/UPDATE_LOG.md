@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T23:59:59+08:00
+> 状态更新时间：2026-08-09T23:59:59.900+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-015 | 2026-08-09T23:59:59.900+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-014 | 2026-08-09T23:59:59+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-013 | 2026-08-09T23:59:30+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-012 | 2026-08-09T23:50:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -37,6 +38,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-015
+
+时间：2026-08-09T23:59:59.900+08:00
+
+摘要：为 generation reset 增加旧版 Intent Lease 的确定性迁移与释放。
+
+### 变更
+
+- fixture_reset 识别仅保存 leaseId、未保存 leaseClaims 的历史 CLAIMED Intent
+- 旧 leaseId 仅解析 Intent resourceKeys 中的 executor 资源，避免释放无关 Lease
+- reset 时将匹配 Lease 的 owner 与 epoch 迁移到 leaseClaims 后原子释放
+- 迁移结果由 fixture_reset reducer 确定性派生，ControlStore replay 保持相同投影
+- 增加旧 claimed Intent、generation reset、Lease 清理与 replay 一致性回归测试
+
+### 验证
+
+- [x] 45 scheduler, durability and recovery tests passed in three consecutive iterations
+- [x] TypeScript typecheck passed
+- [x] legacy leaseId reset and replay regression passed
 
 ## UPDATE-20260809-014
 

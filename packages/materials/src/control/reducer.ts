@@ -72,6 +72,18 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
               delete next.leases[resourceKey];
             }
           }
+          if (!intent.leaseClaims && intent.leaseId) {
+            const legacyResourceKeys = intent.leaseId.split(",")
+              .map((resourceKey) => resourceKey.trim())
+              .filter((resourceKey) => resourceKey.length > 0 && intent.resourceKeys.includes(resourceKey));
+            for (const resourceKey of legacyResourceKeys) {
+              const lease = next.leases[resourceKey];
+              if (lease?.ownerLane !== "executor") continue;
+              intent.leaseClaims ??= {};
+              intent.leaseClaims[resourceKey] = { ownerLane: "executor", generation: lease.generation };
+              delete next.leases[resourceKey];
+            }
+          }
         }
         intent.status = "STALE";
       }
