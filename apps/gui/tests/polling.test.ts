@@ -92,6 +92,30 @@ test("[contract:interactive-refresh-clears-stale-error] only a successful intera
   assert.deepEqual(modes, ["background", "background", "interactive"]);
 });
 
+test("[contract:polling-failed-background-retries-interactive] a queued interactive refresh runs after a failed background task", async () => {
+  let attempts = 0;
+  let release: (() => void) | undefined;
+  const modes: string[] = [];
+  const poller = new SingleFlightPoller(async (mode) => {
+    modes.push(mode);
+    attempts += 1;
+    if (attempts === 1) {
+      await new Promise<void>((resolve) => { release = resolve; });
+      throw new Error("background request failed");
+    }
+  });
+
+  const background = poller.poll(false);
+  await waitFor(() => release !== undefined);
+  const interactive = poller.poll();
+  release?.();
+
+  assert.equal(await background, true);
+  assert.equal(await interactive, false);
+  assert.equal(attempts, 2);
+  assert.deepEqual(modes, ["background", "interactive"]);
+});
+
 async function waitFor(predicate: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return;

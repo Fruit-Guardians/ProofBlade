@@ -599,7 +599,7 @@
     {
       "id": "UPDATE-20260809-027",
       "occurredAt": "2026-08-09T17:01:39+08:00",
-      "summary": "消除 GUI 跨 Run 重叠刷新、迟到响应覆盖、后台等待积压、过期详情缓存和恢复后残留错误。",
+      "summary": "消除 GUI 跨 Run 重叠刷新、迟到响应覆盖、后台等待积压、过期详情缓存、缓存堆积和恢复后残留错误。",
       "branch": "codex/gui-polling-backpressure",
       "commit": "self",
       "planIds": [
@@ -609,12 +609,12 @@
         "Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时立即返回且不积压等待 Promise，交互刷新合并一次最新请求",
         "旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交",
         "未变化 Run 详情按 events.jsonl 与递归排序后的 Pi Session 文件状态命中容量 32 的 LRU",
-        "Session 加载期间发生变化时重读一次，连续变化的混合快照不进入缓存；命中缓存仍刷新进程内 active 状态，服务关闭时清空缓存",
+        "Session 加载期间发生变化时重读一次，连续变化的混合快照不进入缓存；RunDetail 缓存增加单项 8 MiB、总量 64 MiB 的加权上限，同一 Run 并发 miss single-flight，服务关闭时清空缓存",
         "后台与交互刷新模式贯穿单飞协调器；后台成功保留可见错误，Run 切换、手动刷新和对话完成等交互刷新成功后清除已恢复的请求错误",
-        "增加跨 Run 轮询背压、后台忙调用立即完成、Session 单独变化失效、交互成功清错、LRU 淘汰和关闭清理回归测试"
+        "后台刷新失败后仍消费已排队的交互尾随刷新；增加跨 Run 轮询背压、后台忙调用立即完成、失败尾随重试、Session 单独变化失效、并发 miss、加权淘汰和关闭清理回归测试"
       ],
       "validation": [
-        "138/138 repository tests passed",
+        "141/141 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms",
         "GUI 服务空闲 5 秒消耗 0.172 CPU 秒",

@@ -245,6 +245,21 @@ test("invalidates cached run details when only the Pi Session changes", async ()
   }
 });
 
+test("coalesces concurrent RunDetail cache misses for one Run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-single-flight-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-SINGLE-FLIGHT-001";
+    await data.createConversation({ runId, title: "detail single flight", workspacePath: root });
+    const [first, second] = await Promise.all([data.getRun(runId), data.getRun(runId)]);
+    assert.equal(first.sessions, second.sessions);
+    assert.equal(first.events, second.events);
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pauses an active coding lane and persists a resumable run state", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-pause-"));
   let releasePrompt: ((outcome: AgentOutcome) => void) | undefined;

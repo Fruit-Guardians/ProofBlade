@@ -20,10 +20,17 @@ export class SingleFlightPoller {
 
   private async drain(initialMode: PollMode): Promise<void> {
     let mode = initialMode;
+    let failure: { value: unknown } | undefined;
     do {
       this.rerunRequested = false;
-      await this.task(mode);
+      try {
+        await this.task(mode);
+        failure = undefined;
+      } catch (error) {
+        failure = { value: error };
+      }
       mode = "interactive";
     } while (this.rerunRequested);
+    if (failure) throw failure.value;
   }
 }

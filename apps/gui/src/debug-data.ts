@@ -1,5 +1,5 @@
 import { access, readdir, stat } from "node:fs/promises";
-import type { Dirent } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
@@ -73,6 +73,8 @@ interface ContentLike {
 
 const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 const runDetailCacheCapacity = 32;
+const runDetailCacheMaxBytes = 64 * 1024 * 1024;
+const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -84,12 +86,14 @@ export class DebugDataService {
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private readonly runDetailLoads = new Map<string, Promise<RunDetail>>();
   private readonly runDetailCache = new BoundedLruCache<string, {
     mtimeMs: number;
     size: number;
     sessionsVersion: string;
+    bytes: number;
     detail: RunDetail;
-  }>(runDetailCacheCapacity);
+  }>(runDetailCacheCapacity, runDetailCacheMaxBytes, (entry) => entry.bytes);
   private closing = false;
   private closePromise: Promise<void> | undefined;
 
@@ -206,6 +210,18 @@ export class DebugDataService {
     if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
       return { ...cached.detail, active: this.active.get(runId) };
     }
+    const existing = this.runDetailLoads.get(runId);
+    if (existing) return { ...(await existing), active: this.active.get(runId) };
+    const load = this.loadRunDetail(runId, eventsStat, sessionsRoot, sessionsVersion);
+    this.runDetailLoads.set(runId, load);
+    try {
+      return { ...(await load), active: this.active.get(runId) };
+    } finally {
+      if (this.runDetailLoads.get(runId) === load) this.runDetailLoads.delete(runId);
+    }
+  }
+
+  private async loadRunDetail(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
     const [snapshot, events, telemetry, sessionRead] = await Promise.all([
       this.services.control.snapshot(runId),
       this.services.control.events(runId),
@@ -214,8 +230,9 @@ export class DebugDataService {
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
-    if (sessionsStable) {
-      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, detail });
+    const bytes = jsonByteSize(detail);
+    if (sessionsStable && bytes <= runDetailCacheMaxEntryBytes) {
+      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
   }
@@ -530,6 +547,14 @@ async function filesystemVersion(root: string): Promise<string> {
   await visit(root);
   entries.sort();
   return entries.join("\n");
+}
+
+function jsonByteSize(value: unknown): number {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8");
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
 }
 
 export function runKind(task: Pick<TaskContract, "mode">): RunKind {
