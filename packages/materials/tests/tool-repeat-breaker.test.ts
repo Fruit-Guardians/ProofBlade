@@ -9,7 +9,7 @@ import { Type } from "typebox";
 import { ControlStore } from "../src/control/control-store.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage } from "../src/runtime/tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
 const readOnlyEffect = { readOnly: true, sideEffect: "none" as const };
@@ -65,6 +65,38 @@ test("[contract:no-progress-breaker] repeated successful observations stop witho
   assert.equal(breaker.observe(repeatedRead).count, 1);
   breaker.observe({ toolName: "write", input: { path: "solve.py", content: "print('new')" }, isError: false, content: [{ type: "text", text: "ok" }], details: {}, effectPolicy: workspaceEffect });
   assert.equal(breaker.observe(repeatedRead).count, 1);
+});
+
+test("idempotent workspace operations use their durable progress key as no-progress observations", () => {
+  const breaker = new NoProgressToolBreaker(3);
+  const reused = (summary: string) => ({
+    toolName: "evidence",
+    input: { operation: "record", summary },
+    isError: false,
+    content: [{ type: "text", text: `reused with ${summary}` }],
+    details: { reused: true, durableProgress: false, progressKey: "stable-evidence-key" },
+    effectPolicy: workspaceEffect,
+  });
+  assert.equal(breaker.observe(reused("first wording")).terminate, false);
+  assert.equal(breaker.observe(reused("second wording")).terminate, false);
+  const decision = breaker.observe(reused("third wording"));
+  assert.equal(decision.count, 3);
+  assert.equal(decision.terminate, true);
+});
+
+test("[contract:tool-failure-storm] varied failures stop after a bounded budget without durable progress", () => {
+  const breaker = new ToolFailureStormBreaker(4);
+  for (const input of [
+    { operation: "record", artifactId: "A-1" },
+    { operation: "record", role: "supporting" },
+    { operation: "record", tags: Array.from({ length: 17 }, (_, index) => `tag-${index}`) },
+  ]) assert.equal(breaker.observe(failed(input)).terminate, false);
+  const decision = breaker.observe(failed({ operation: "record", artifactId: "A-2", role: "debug" }));
+  assert.equal(decision.count, 4);
+  assert.equal(decision.terminate, true);
+  assert.match(toolFailureStormMessage(decision.count), /changing invalid arguments/i);
+  breaker.observe({ toolName: "write", input: { path: "solve.py" }, isError: false, content: [{ type: "text", text: "written" }], effectPolicy: workspaceEffect });
+  assert.equal(breaker.observe(failed({ operation: "record", artifactId: "A-3" })).count, 1);
 });
 
 test("repeated bash output cannot stop durable workspace changes", async () => {

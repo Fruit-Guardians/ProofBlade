@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T15:00:00+08:00",
+  "updatedAt": "2026-08-09T16:18:52+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -83,8 +83,8 @@
       "priority": "P0",
       "milestone": "Milestone 2 debt",
       "owner": "unassigned",
-      "progress": 25,
-      "updatedAt": "2026-08-09T15:00:00+08:00",
+      "progress": 35,
+      "updatedAt": "2026-08-09T15:15:00+08:00",
       "objective": "阻止 Agent 在阶段产物不足、重复探索或缺少证据时提前得出确定结论。",
       "deliverables": [
         "Model Target、Plan 和 Reproduce 阶段",
@@ -203,6 +203,30 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260809-005",
+      "occurredAt": "2026-08-09T16:18:52+08:00",
+      "summary": "修复 Evidence 整理半提交、并发重复整理假进展和多样错误循环，恢复真实逆向任务收敛。",
+      "branch": "codex/evidence-curation-convergence",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "Control Store 新增原子批量领域命令，任一校验失败时不追加部分事件",
+        "Control Store 新增按 Run 串行事务，让快照读取、幂等判断、ID 生成和批量提交处于同一临界区",
+        "Evidence record 与 annotate 改为有界、并发幂等写入并返回稳定进展键",
+        "Evidence Tool 新增 curation_status，并明确 record/annotate 的单双数参数契约",
+        "增加 12 次多样 Tool 失败预算和 GUI 可恢复终止投影",
+        "Windows Coding Prompt 明确使用 python/py 和工作区相对中间文件"
+      ],
+      "validation": [
+        "132/132 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260809-004",
       "occurredAt": "2026-08-09T15:00:00+08:00",
