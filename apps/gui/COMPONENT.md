@@ -4,12 +4,12 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.10",
+  "version": "0.7.9",
   "createdAt": "2026-08-05T22:49:12+08:00",
   "updatedAt": "2026-08-09T12:45:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 10,
-    "securityAuditCount": 10,
+    "bugAuditCount": 9,
+    "securityAuditCount": 9,
     "lastBugAuditAt": "2026-08-09T12:45:00.000Z",
     "lastSecurityAuditAt": "2026-08-09T12:45:00.000Z",
     "sourceHash": "bddf3d80100a85dbd4c2058075d527e2756d72e0214b294c1d63499a964d1a18",
