@@ -46,6 +46,7 @@ export interface Intent {
   claimedBy?: string;                   // Worker ID
   claimedAt?: string;
   leaseId?: string;
+  leaseClaims?: Record<string, IntentLeaseClaim>;
   attempts: number;                     // 尝试次数
   lastError?: string;
 
@@ -54,6 +55,11 @@ export interface Intent {
   producedEvidence?: string[];
   producedFacts?: string[];
   completedAt?: string;
+}
+
+export interface IntentLeaseClaim {
+  ownerLane: 'executor';
+  generation: number;
 }
 
 export interface ExpectedEvidence {

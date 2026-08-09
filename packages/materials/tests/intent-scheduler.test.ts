@@ -587,7 +587,12 @@ describe('IntentScheduler - 持久化', () => {
         knowledgeVersion: 1, fixtureGeneration: 1, phase: 'RECON', objective: 'Test',
         startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Test', minimumConfidence: 'medium' },
         suggestedTools: [], estimatedCost: 1, estimatedDuration: 1,
-        resourceKeys: Object.keys(leases), leaseId: Object.keys(leases).join(','), dependencies: [], attempts: 0,
+        resourceKeys: Object.keys(leases), leaseId: Object.keys(leases).join(','),
+        leaseClaims: Object.fromEntries(Object.values(leases).map(lease => [
+          lease.resourceKey,
+          { ownerLane: 'executor' as const, generation: lease.generation },
+        ])),
+        dependencies: [], attempts: 0,
       };
       const release = mock.fn(async () => {});
       const scheduler = new IntentScheduler({
@@ -605,6 +610,96 @@ describe('IntentScheduler - 持久化', () => {
 });
 
 describe('IntentScheduler - replay 持久化', () => {
+  test('并发 schedule 保持 maxOpenIntents 原子上限', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-concurrent-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-CONCURRENT-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Concurrent intent test',
+      } as any);
+      const context: SchedulingContext = {
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+
+      const results = await Promise.all([scheduler.schedule(context), scheduler.schedule(context)]);
+      const snapshot = await controlStore.snapshot(runId);
+      const open = Object.values(snapshot.schedulerIntents).filter(intent =>
+        intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
+      );
+      assert.equal(results.filter(Boolean).length, 1);
+      assert.equal(open.length, 1);
+      assert.equal(open[0].status, 'CLAIMED');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('剩余 PROPOSED Intent 使用知识版本而非 lastSeq 过滤', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-version-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 3 });
+      const runId = 'INTENT-VERSION-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Intent version test',
+      } as any);
+      await controlStore.dispatch(runId, {
+        type: 'fact',
+        fact: { id: 'F-001', statement: 'stable fact', status: 'CONFIRMED', evidenceIds: [] },
+        lane: 'verifier',
+      });
+      await controlStore.dispatch(runId, {
+        type: 'hypothesis',
+        hypothesis: { id: 'H-001', statement: 'first route', status: 'OPEN', evidenceIds: [] },
+      });
+      await controlStore.dispatch(runId, {
+        type: 'hypothesis',
+        hypothesis: { id: 'H-002', statement: 'second route', status: 'OPEN', evidenceIds: [] },
+      });
+      const initial = await controlStore.snapshot(runId);
+      const context: SchedulingContext = {
+        runId, phase: 'reconnaissance', knowledgeVersion: initial.lastSeq, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: ['H-001', 'H-002'], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+      const first = await scheduler.schedule(context);
+      assert.ok(first);
+      await scheduler.completeIntent(runId, first.id, {});
+
+      const afterCompletion = await controlStore.snapshot(runId);
+      const second = await scheduler.schedule({
+        ...context,
+        knowledgeVersion: afterCompletion.lastSeq,
+        openIntents: 0,
+        newHighValueFacts: 0,
+      });
+      assert.ok(second);
+      assert.notEqual(second.id, first.id);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('Intent 认领后 replay 状态保持', async () => {
     const { mkdtemp } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');

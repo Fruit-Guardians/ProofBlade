@@ -21,7 +21,8 @@ import type {
 import { IntentScorer } from './intent-scorer.js';
 import { IntentFilter } from './intent-filter.js';
 import { LeaseManager } from '../control/lease-manager.js';
-import type { ControlStore } from '../control/control-store.js';
+import type { ControlStore, DomainCommand } from '../control/control-store.js';
+import type { Lease } from '../domain/types.js';
 import { randomUUID } from 'node:crypto';
 
 export interface IntentSchedulerConfig {
@@ -62,6 +63,10 @@ export class IntentScheduler {
    * 4. Worker 原子 claim
    */
   async schedule(context: SchedulingContext): Promise<Intent | null> {
+    if (typeof this.controlStore.dispatchTransaction === 'function') {
+      return this.scheduleAtomically(context);
+    }
+
     // Load existing proposed intents before evaluating trigger conditions.
     const snapshot = await this.controlStore.snapshot(context.runId);
     const persistedIntents = Object.values(snapshot.schedulerIntents || {});
@@ -70,9 +75,12 @@ export class IntentScheduler {
       intent => intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
     ).length;
     const openIntents = Math.max(context.openIntents, persistedOpenIntents);
-    const schedulingContext = openIntents === context.openIntents
-      ? context
-      : { ...context, openIntents };
+    const schedulingContext = {
+      ...context,
+      openIntents,
+      knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
+      occupiedResources: Object.keys(snapshot.leases || {}),
+    };
 
     // Open intents, including proposed reservations, consume capacity.
     if (openIntents >= this.config.maxOpenIntents) {
@@ -91,6 +99,13 @@ export class IntentScheduler {
       ? await this.generateIntents(schedulingContext, remainingCapacity)
       : [];
 
+    for (const intent of newIntents) {
+      await this.controlStore.dispatch(context.runId, {
+        type: 'scheduler_intent',
+        intent,
+      });
+    }
+
     const candidates = [...existingIntents, ...newIntents];
     if (candidates.length === 0) {
       return null;
@@ -103,6 +118,105 @@ export class IntentScheduler {
 
     const scored = this.scorer.scoreAndRank(filtered, schedulingContext);
     return this.selectBest(scored, filtered, schedulingContext);
+  }
+
+  private async scheduleAtomically(context: SchedulingContext): Promise<Intent | null> {
+    return this.controlStore.dispatchTransaction(context.runId, (snapshot) => {
+      const persistedIntents = Object.values(snapshot.schedulerIntents || {});
+      const existingIntents = persistedIntents.filter(intent => intent.status === 'PROPOSED');
+      const persistedOpenIntents = persistedIntents.filter(
+        intent => intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
+      ).length;
+      const openIntents = Math.max(context.openIntents, persistedOpenIntents);
+      const schedulingContext = {
+        ...context,
+        openIntents,
+        knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
+        occupiedResources: Object.keys(snapshot.leases || {}),
+      };
+
+      if (openIntents >= this.config.maxOpenIntents) {
+        return { commands: [], project: () => null };
+      }
+
+      const triggered = this.shouldSchedule(schedulingContext);
+      if (!triggered && existingIntents.length === 0) {
+        return { commands: [], project: () => null };
+      }
+
+      const remainingCapacity = Math.max(0, this.config.maxOpenIntents - openIntents);
+      const generated = triggered
+        ? this.generateIntents(schedulingContext, remainingCapacity)
+        : [];
+      const candidates = [...existingIntents, ...generated];
+      const filtered = this.filter.filter(candidates, schedulingContext);
+      if (filtered.length === 0) {
+        return { commands: [], project: () => null };
+      }
+
+      const scores = this.scorer.scoreAndRank(filtered, schedulingContext);
+      const commands: DomainCommand[] = [];
+      for (const score of scores) {
+        const candidate = candidates.find(intent => intent.id === score.intentId);
+        if (!candidate) continue;
+        const claimed = structuredClone(candidate);
+        const leases: Lease[] = [];
+        let claimable = true;
+        const projectedLeases = { ...snapshot.leases };
+
+        for (const resourceKey of candidate.resourceKeys) {
+          const existingLease = projectedLeases[resourceKey];
+          if (existingLease && Date.parse(existingLease.expiresAt) > Date.now()) {
+            claimable = false;
+            break;
+          }
+          if (existingLease) {
+            commands.push({
+              type: 'lease_released',
+              resourceKey,
+              ownerLane: existingLease.ownerLane,
+              generation: existingLease.generation,
+              lane: 'main',
+            });
+            delete projectedLeases[resourceKey];
+          }
+          const now = new Date().toISOString();
+          const lease: Lease = {
+            resourceKey,
+            ownerLane: 'executor',
+            generation: (existingLease?.generation ?? 0) + 1,
+            acquiredAt: now,
+            heartbeatAt: now,
+            expiresAt: new Date(Date.now() + candidate.estimatedDuration * 2).toISOString(),
+          };
+          projectedLeases[resourceKey] = lease;
+          leases.push(lease);
+        }
+        if (!claimable) continue;
+
+        claimed.status = 'CLAIMED';
+        claimed.claimedAt = new Date().toISOString();
+        claimed.leaseId = leases.map(lease => lease.resourceKey).join(',');
+        claimed.leaseClaims = Object.fromEntries(leases.map(lease => [
+          lease.resourceKey,
+          { ownerLane: 'executor' as const, generation: lease.generation },
+        ]));
+
+        for (const intent of generated) {
+          if (intent.id === candidate.id) continue;
+          commands.push({ type: 'scheduler_intent', intent });
+        }
+        for (const lease of leases) commands.push({ type: 'lease_acquired', lease, lane: 'executor' });
+        commands.push({ type: 'scheduler_intent', intent: claimed });
+
+        return {
+          commands,
+          project: (after) => after.schedulerIntents[claimed.id] ?? null,
+        };
+      }
+
+      return { commands: [], project: () => null };
+    });
   }
 
   /**
@@ -139,10 +253,10 @@ export class IntentScheduler {
    * 简化实现：从知识图中提取候选方向
    * Uses deterministic rules today and can be extended through a Planner adapter.
    */
-  private async generateIntents(
+  private generateIntents(
     context: SchedulingContext,
     maxIntents: number,
-  ): Promise<Intent[]> {
+  ): Intent[] {
     const intents: Intent[] = [];
 
     const add = (intent: Intent) => {
@@ -169,15 +283,6 @@ export class IntentScheduler {
     for (const hint of context.newHints) {
       if (intents.length >= maxIntents) break;
       add(this.createHintBasedIntent(context, hint));
-    }
-
-    if (intents.length === 0) return intents;
-
-    for (const intent of intents) {
-      await this.controlStore.dispatch(context.runId, {
-        type: 'scheduler_intent',
-        intent,
-      });
     }
 
     return intents;
@@ -216,6 +321,10 @@ export class IntentScheduler {
           intent.status = 'CLAIMED';
           intent.claimedAt = new Date().toISOString();
           intent.leaseId = leases.map(l => l.resourceKey).join(',');
+          intent.leaseClaims = Object.fromEntries(leases.map(lease => [
+            lease.resourceKey,
+            { ownerLane: 'executor' as const, generation: lease.generation },
+          ]));
 
           // 持久化认领状态
           await this.controlStore.dispatch(context.runId, {
@@ -367,19 +476,28 @@ export class IntentScheduler {
 
   // ========== Intent 生成辅助方法 ==========
 
+  private knowledgeVersion(snapshot: Awaited<ReturnType<ControlStore['snapshot']>>, fallback: number): number {
+    const versions = [
+      ...Object.values(snapshot.facts || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.hypotheses || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.evidence || {}).map(item => item.createdSeq),
+      ...Object.values(snapshot.observations || {}).map(item => item.createdSeq),
+    ];
+    return versions.length > 0 ? Math.max(...versions) : fallback;
+  }
+
   private createIntentId(kind: string): string {
     return `intent-${kind}-${randomUUID()}`;
   }
 
   private async releaseIntentLeases(runId: string, intent: Intent): Promise<void> {
-    if (!intent.leaseId || intent.resourceKeys.length === 0) return;
+    if (!intent.leaseClaims || intent.resourceKeys.length === 0) return;
 
-    const leasedResources = new Set(intent.leaseId.split(',').filter(Boolean));
     const snapshot = await this.controlStore.snapshot(runId);
     for (const resourceKey of intent.resourceKeys) {
-      if (!leasedResources.has(resourceKey)) continue;
       const lease = snapshot.leases?.[resourceKey];
-      if (!lease || lease.ownerLane !== 'executor') continue;
+      const claim = intent.leaseClaims[resourceKey];
+      if (!lease || !claim || lease.ownerLane !== claim.ownerLane || lease.generation !== claim.generation) continue;
       await this.leaseManager.release(runId, lease);
     }
   }

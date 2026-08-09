@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T21:10:00+08:00",
+  "updatedAt": "2026-08-09T22:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-009",
+    "occurredAt": "2026-08-09T22:00:00+08:00",
+    "summary": "将 Intent 调度容量、认领和 Lease 版本校验收敛到同一按 Run 原子事务。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "并发 schedule 通过 dispatchTransaction 串行读取并预留 maxOpenIntents",
+      "在同一事务内写入候选、Lease 和 CLAIMED 状态，避免并发遗留 PROPOSED 占位",
+      "知识版本从持久化 Fact、Hypothesis、Evidence 和 Observation 推导，排除 lastSeq 生命周期事件",
+      "Intent 持久化每个资源的 ownerLane 与 generation，终态只释放仍属于自身的 Lease",
+      "增加并发调度、剩余候选认领和 Lease generation 防误释放回归测试"
+    ],
+    "validation": [
+      "21 Intent Scheduler tests passed",
+      "TypeScript typecheck passed",
+      "component, change contract and project report gates passed"
+    ]
+  },
   {
     "id": "UPDATE-20260809-008",
     "occurredAt": "2026-08-09T21:10:00+08:00",
