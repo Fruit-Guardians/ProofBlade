@@ -1,6 +1,6 @@
 import { access, readdir, stat } from "node:fs/promises";
-import type { Dirent } from "node:fs";
-import { join } from "node:path";
+import type { Dirent, Stats } from "node:fs";
+import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
@@ -38,6 +38,7 @@ import type {
   ToolCallDebug,
   TokenUsage,
 } from "./shared.js";
+import { BoundedLruCache } from "./bounded-lru-cache.js";
 import { toolPresentation } from "./tool-presentation.js";
 
 interface SessionEntryLike {
@@ -71,6 +72,9 @@ interface ContentLike {
 }
 
 const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
+const runDetailCacheCapacity = 32;
+const runDetailCacheMaxBytes = 64 * 1024 * 1024;
+const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -82,6 +86,14 @@ export class DebugDataService {
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private readonly runDetailLoads = new Map<string, Promise<RunDetail>>();
+  private readonly runDetailCache = new BoundedLruCache<string, {
+    mtimeMs: number;
+    size: number;
+    sessionsVersion: string;
+    bytes: number;
+    detail: RunDetail;
+  }>(runDetailCacheCapacity, runDetailCacheMaxBytes, (entry) => entry.bytes);
   private closing = false;
   private closePromise: Promise<void> | undefined;
 
@@ -107,6 +119,7 @@ export class DebugDataService {
   }
 
   private async shutdown(): Promise<void> {
+    this.runDetailLoads.clear();
     const aborts: Promise<unknown>[] = [];
     for (const [runId, lane] of this.activeLanes) {
       if (!this.solveTasks.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
@@ -120,6 +133,9 @@ export class DebugDataService {
     const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
       .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    this.runListCache.clear();
+    this.runDetailCache.clear();
+    this.runDetailLoads.clear();
     if (failures.length > 0) throw new AggregateError(failures, "GUI shutdown failed");
   }
 
@@ -189,14 +205,53 @@ export class DebugDataService {
 
   public async getRun(runId: string): Promise<RunDetail> {
     assertRunId(runId);
-    const [snapshot, events, telemetry, sessions, eventsStat] = await Promise.all([
+    const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
+    const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
+    const sessionsVersion = await filesystemVersion(sessionsRoot);
+    const cacheKey = runDetailVersionKey(runId, eventsStat.mtimeMs, eventsStat.size, sessionsVersion);
+    const cached = this.runDetailCache.peek(runId);
+    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
+      const current = this.runDetailCache.get(runId);
+      return { ...current!.detail, active: this.active.get(runId) };
+    }
+    if (cached) this.runDetailCache.delete(runId);
+    const existing = this.runDetailLoads.get(cacheKey);
+    if (existing) return { ...(await existing), active: this.active.get(runId) };
+    const load = this.loadRunDetail(runId, eventsStat, sessionsRoot, sessionsVersion);
+    this.runDetailLoads.set(cacheKey, load);
+    try {
+      return { ...(await load), active: this.active.get(runId) };
+    } finally {
+      if (this.runDetailLoads.get(cacheKey) === load) this.runDetailLoads.delete(cacheKey);
+    }
+  }
+
+  private async loadRunDetail(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<RunDetail> {
+    const [snapshot, events, telemetry, sessionRead] = await Promise.all([
       this.services.control.snapshot(runId),
       this.services.control.events(runId),
       new RunTelemetry(this.services.control).report(runId),
-      this.loadSessions(runId),
-      stat(join(this.services.runsRoot, runId, "events.jsonl")),
+      this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
-    return { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() };
+    const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
+    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
+    const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
+    if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
+      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
+    }
+    return detail;
+  }
+
+  private async isCurrentRunVersion(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
+    try {
+      const currentEventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
+      if (currentEventsStat.mtimeMs !== eventsStat.mtimeMs || currentEventsStat.size !== eventsStat.size) return false;
+      return await filesystemVersion(sessionsRoot) === sessionsVersion;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
   }
 
   public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
@@ -463,6 +518,124 @@ export class DebugDataService {
       await env.cleanup();
     }
   }
+
+  private async loadStableSessions(
+    runId: string,
+    sessionsRoot: string,
+    initialVersion: string,
+  ): Promise<{ sessions: PiSessionDebug[]; version: string; stable: boolean }> {
+    let version = initialVersion;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const sessions = await this.loadSessions(runId);
+      const nextVersion = await filesystemVersion(sessionsRoot);
+      if (version === nextVersion) return { sessions, version, stable: true };
+      version = nextVersion;
+      if (attempt === 1) return { sessions, version, stable: false };
+    }
+    throw new Error("Unreachable session load state");
+  }
+}
+
+async function filesystemVersion(root: string): Promise<string> {
+  const entries: string[] = [];
+  async function visit(directory: string): Promise<void> {
+    let children: Dirent<string>[];
+    try {
+      children = await readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    await Promise.all(children.map(async (child) => {
+      const path = join(directory, child.name);
+      if (child.isDirectory()) {
+        await visit(path);
+        return;
+      }
+      try {
+        const metadata = await stat(path, { bigint: true });
+        entries.push(`${relative(root, path)}\0${metadata.size}\0${metadata.mtimeNs}`);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        entries.push(`${relative(root, path)}\0missing`);
+      }
+    }));
+  }
+  await visit(root);
+  entries.sort();
+  return entries.join("\n");
+}
+
+function runDetailVersionKey(runId: string, eventsMtimeMs: number, eventsSize: number, sessionsVersion: string): string {
+  return runId + "\0" + eventsMtimeMs + "\0" + eventsSize + "\0" + sessionsVersion;
+}
+
+export function boundedJsonByteSize(value: unknown, limit: number): number {
+  let bytes = 0;
+  const stack = new WeakSet<object>();
+  const add = (amount: number): void => {
+    bytes = Math.min(limit + 1, bytes + amount);
+  };
+  const visit = (current: unknown, arrayItem = false): void => {
+    if (bytes > limit) return;
+    if (current === null) {
+      add(4);
+      return;
+    }
+    switch (typeof current) {
+      case "string":
+        if (Buffer.byteLength(current, "utf8") > limit) {
+          add(limit + 1);
+        } else {
+          add(Buffer.byteLength(JSON.stringify(current), "utf8"));
+        }
+        return;
+      case "number":
+      case "boolean":
+        add(Buffer.byteLength(JSON.stringify(current), "utf8"));
+        return;
+      case "undefined":
+      case "function":
+      case "symbol":
+        if (arrayItem) add(4);
+        return;
+      case "bigint":
+        add(limit + 1);
+        return;
+      default:
+        break;
+    }
+    if (typeof current !== "object") return;
+    if (stack.has(current)) {
+      add(limit + 1);
+      return;
+    }
+    stack.add(current);
+    if (Array.isArray(current)) {
+      add(1);
+      current.forEach((item, index) => {
+        if (index > 0) add(1);
+        visit(item, true);
+      });
+      add(1);
+    } else {
+      const keys = Object.keys(current);
+      add(1);
+      let included = 0;
+      for (const key of keys) {
+        const item = (current as Record<string, unknown>)[key];
+        if (item === undefined || typeof item === "function" || typeof item === "symbol") continue;
+        if (included > 0) add(1);
+        add(Buffer.byteLength(JSON.stringify(key), "utf8") + 1);
+        visit(item);
+        included += 1;
+      }
+      add(1);
+    }
+    stack.delete(current);
+  };
+  visit(value);
+  return bytes;
 }
 
 export function runKind(task: Pick<TaskContract, "mode">): RunKind {

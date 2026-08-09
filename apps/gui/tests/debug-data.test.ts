@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent } from "../src/shared.js";
 
@@ -184,6 +185,201 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
+});
+
+test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-CACHE-001";
+    await data.createConversation({ runId, title: "cache test", workspacePath: root });
+
+    const first = await data.getRun(runId);
+    const cached = await data.getRun(runId);
+    assert.equal(cached.snapshot, first.snapshot);
+    assert.equal(cached.sessions, first.sessions);
+
+    await data.checkpoint(runId, "invalidate detail cache");
+    const refreshed = await data.getRun(runId);
+    assert.notEqual(refreshed.snapshot, first.snapshot);
+    assert.ok(refreshed.snapshot.lastSeq > first.snapshot.lastSeq);
+    await data.close();
+    const afterClose = await data.getRun(runId);
+    assert.notEqual(afterClose.snapshot, refreshed.snapshot);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bounded JSON byte estimation matches JSON.stringify for nested arrays", () => {
+  const value = {
+    outer: ["alpha", [1, true, null], { inner: ["中文", "终"] }],
+    tail: [[[]], ["omega"]],
+  };
+  const expected = Buffer.byteLength(JSON.stringify(value), "utf8");
+  assert.equal(boundedJsonByteSize(value, expected + 1), expected);
+});
+
+test("invalidates cached run details when only the Pi Session changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-session-cache-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-SESSION-CACHE-001";
+    await data.createConversation({ runId, title: "session cache test", workspacePath: root });
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+
+    const first = await data.getRun(runId);
+    const eventsBefore = await stat(eventsPath, { bigint: true });
+    assert.equal(first.sessions.length, 0);
+
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "user", content: [{ type: "text", text: "session-only update" }], timestamp: Date.now() });
+
+    const eventsAfter = await stat(eventsPath, { bigint: true });
+    assert.equal(eventsAfter.size, eventsBefore.size);
+    assert.equal(eventsAfter.mtimeNs, eventsBefore.mtimeNs);
+
+    const refreshed = await data.getRun(runId);
+    assert.notEqual(refreshed.sessions, first.sessions);
+    assert.equal(refreshed.sessions.length, 1);
+    assert.equal(refreshed.sessions[0]?.messages[0]?.text, "session-only update");
+    await data.close();
+  } finally {
+    await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("coalesces concurrent RunDetail cache misses for one Run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-single-flight-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-SINGLE-FLIGHT-001";
+    await data.createConversation({ runId, title: "detail single flight", workspacePath: root });
+    const [first, second] = await Promise.all([data.getRun(runId), data.getRun(runId)]);
+    assert.equal(first.sessions, second.sessions);
+    assert.equal(first.events, second.events);
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("does not reuse an in-flight RunDetail load after a Pi Session version change", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-versioned-flight-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-VERSIONED-FLIGHT-001";
+    await data.createConversation({ runId, title: "versioned detail single flight", workspacePath: root });
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "user", content: [{ type: "text", text: "old" }], timestamp: Date.now() });
+
+    const originalLoadStableSessions = (data as unknown as {
+      loadStableSessions: (...args: unknown[]) => Promise<{ sessions: unknown[]; version: string; stable: boolean }>;
+    }).loadStableSessions.bind(data);
+    let releaseFirstLoad: (() => void) | undefined;
+    const firstLoadPaused = new Promise<void>((resolve) => { releaseFirstLoad = resolve; });
+    let markFirstLoadWaiting: (() => void) | undefined;
+    const firstLoadWaiting = new Promise<void>((resolve) => { markFirstLoadWaiting = resolve; });
+    let delayed = true;
+    (data as unknown as { loadStableSessions: (...args: unknown[]) => Promise<unknown> }).loadStableSessions = async (...args) => {
+      const result = await originalLoadStableSessions(...args);
+      if (delayed) {
+        delayed = false;
+        markFirstLoadWaiting?.();
+        await firstLoadPaused;
+      }
+      return result;
+    };
+
+    const oldLoad = data.getRun(runId);
+    await firstLoadWaiting;
+    await session.appendMessage({ role: "assistant", content: [{ type: "text", text: "new" }], timestamp: Date.now() });
+    const newLoad = data.getRun(runId);
+    releaseFirstLoad?.();
+    const [oldDetail, newDetail] = await Promise.all([oldLoad, newLoad]);
+
+    assert.equal(oldDetail.sessions[0]?.messages.some((message) => message.text === "old"), true);
+    assert.equal(oldDetail.sessions[0]?.messages.some((message) => message.text === "new"), false);
+    assert.equal(newDetail.sessions[0]?.messages.some((message) => message.text === "new"), true);
+    assert.notEqual(oldDetail.sessions, newDetail.sessions);
+    await data.close();
+  } finally {
+    await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("does not repopulate the RunDetail cache when close races an in-flight load", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-close-flight-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-CLOSE-FLIGHT-001";
+    await data.createConversation({ runId, title: "close detail single flight", workspacePath: root });
+    const originalLoadStableSessions = (data as unknown as {
+      loadStableSessions: (...args: unknown[]) => Promise<unknown>;
+    }).loadStableSessions.bind(data);
+    let releaseLoad: (() => void) | undefined;
+    const loadPaused = new Promise<void>((resolve) => { releaseLoad = resolve; });
+    let markLoadWaiting: (() => void) | undefined;
+    const loadWaiting = new Promise<void>((resolve) => { markLoadWaiting = resolve; });
+    (data as unknown as { loadStableSessions: (...args: unknown[]) => Promise<unknown> }).loadStableSessions = async (...args) => {
+      const result = await originalLoadStableSessions(...args);
+      markLoadWaiting?.();
+      await loadPaused;
+      return result;
+    };
+
+    const detailLoad = data.getRun(runId);
+    await loadWaiting;
+    await data.close();
+    const cache = (data as unknown as { runDetailCache: { size: number; weight: number } }).runDetailCache;
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+    releaseLoad?.();
+    await detailLoad;
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("drops the previous RunDetail cache entry when a replacement detail exceeds the byte limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-limit-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-CACHE-LIMIT-001";
+    await data.createConversation({ runId, title: "detail cache limit", workspacePath: root });
+    const first = await data.getRun(runId);
+    const cache = (data as unknown as { runDetailCache: { size: number; weight: number } }).runDetailCache;
+    assert.equal(cache.size, 1);
+    assert.ok(first.sessions.length >= 0);
+
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "assistant", content: [{ type: "text", text: "x".repeat(9 * 1024 * 1024) }], timestamp: Date.now() });
+
+    const oversized = await data.getRun(runId);
+    assert.ok(oversized.sessions[0]?.messages.some((message) => message.text.length > 8 * 1024 * 1024));
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+    await data.close();
+  } finally {
+    await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("pauses an active coding lane and persists a resumable run state", async () => {
