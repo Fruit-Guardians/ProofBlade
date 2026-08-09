@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T14:00:00+08:00",
+  "updatedAt": "2026-08-09T15:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -79,12 +79,12 @@
     {
       "id": "PLAN-110",
       "title": "结构化 Phase Gate 与运行护栏",
-      "status": "planned",
+      "status": "in_progress",
       "priority": "P0",
       "milestone": "Milestone 2 debt",
       "owner": "unassigned",
-      "progress": 0,
-      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "progress": 25,
+      "updatedAt": "2026-08-09T15:00:00+08:00",
       "objective": "阻止 Agent 在阶段产物不足、重复探索或缺少证据时提前得出确定结论。",
       "deliverables": [
         "Model Target、Plan 和 Reproduce 阶段",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260809-004",
+      "occurredAt": "2026-08-09T15:00:00+08:00",
+      "summary": "增加有界无进展守卫并刷新推理森林，阻止 Coding Agent 重复探索。",
+      "branch": "codex/convergence-progress-guard",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "在单个用户回合的滚动窗口内识别重复 read、bash 和只读 Evidence 观察，第三次无新信息时机械终止",
+        "持久写入和 Evidence 推理更新重置进展窗口，混合工具批次中的真实进展不会被误停",
+        "GUI 将 no_progress 投影为可见、可恢复的正常 Assistant 回复，并通过 Pi Entry ID 精确关联历史消息",
+        "每个外部用户回合刷新推理森林，注入有界 orphan 摘要，并按 Artifact 内容哈希去重整理积压"
+      ],
+      "validation": [
+        "npm run verify",
+        "18/18 deterministic fixture evaluations passed",
+        "real DeepSeek reverse-engineering smoke run advanced to a new PE section and .rdata analysis path",
+        "paused smoke run aborted its in-flight Provider request without later tool calls"
+      ]
+    },
     {
       "id": "UPDATE-20260808-003",
       "occurredAt": "2026-08-08T10:33:24+08:00",
