@@ -14,6 +14,7 @@ import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
+import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "mcp_call"] as const;
@@ -55,6 +56,42 @@ export function createCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
     loadSkillTool,
     mcpCallTool,
   ];
+}
+
+const READ_ONLY_EFFECT: ToolEffectPolicy = { readOnly: true, sideEffect: "none" };
+const WORKSPACE_EFFECT: ToolEffectPolicy = { readOnly: false, sideEffect: "workspace" };
+const PROCESS_EFFECT: ToolEffectPolicy = { readOnly: false, sideEffect: "process" };
+
+const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = {
+  read: READ_ONLY_EFFECT,
+  bash: PROCESS_EFFECT,
+  edit: WORKSPACE_EFFECT,
+  write: WORKSPACE_EFFECT,
+  verify_claim: WORKSPACE_EFFECT,
+  load_skill: READ_ONLY_EFFECT,
+};
+
+const EVIDENCE_READ_OPERATIONS = new Set(["inspect_forest", "inspect_tree", "search", "read"]);
+
+/** Resolves the same read-only and side-effect contract used by the runtime capability boundary. */
+export function createCodingToolEffectPolicyResolver(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">): ToolEffectPolicyResolver {
+  return (toolName, input) => {
+    const fixed = CODING_TOOL_EFFECT_POLICIES[toolName];
+    if (fixed) return fixed;
+    if (toolName === "evidence") return EVIDENCE_READ_OPERATIONS.has(String(input.operation)) ? READ_ONLY_EFFECT : WORKSPACE_EFFECT;
+    if (toolName !== "mcp_call") return undefined;
+    if (input.operation === "list") return READ_ONLY_EFFECT;
+    if (input.operation === "describe") return { readOnly: true, sideEffect: "process" };
+    if (input.operation !== "call" || typeof input.server !== "string") return undefined;
+    const capabilityId = mcp.summaries().find((server) => server.name === input.server && !server.disabled)?.capabilityId;
+    if (!capabilityId) return undefined;
+    try {
+      const policy = mcp.resolveInvocation(capabilityId, "call", { tool: input.tool, arguments: input.arguments });
+      return { readOnly: policy.readOnly, sideEffect: policy.sideEffect };
+    } catch {
+      return undefined;
+    }
+  };
 }
 
 const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T14:00:00+08:00
+> 状态更新时间：2026-08-09T15:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -23,6 +24,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-004
+
+时间：2026-08-09T15:00:00+08:00
+
+摘要：增加基于 Tool Contract 的有界无进展守卫并刷新推理森林，阻止 Coding Agent 重复探索。
+
+### 变更
+
+- 在单个用户回合的滚动窗口内只统计 Tool Contract 明确标记为只读且无副作用的重复观察，第三次无新信息时机械终止
+- 任意 Bash、未知插件、持久写入和副作用 MCP 调用均重置进展窗口，混合工具批次中的真实进展不会被误停
+- GUI 将 no_progress 投影为可见、可恢复的正常 Assistant 回复，并通过 Pi Entry ID 精确关联历史消息
+- 每个外部用户回合刷新推理森林，注入有界 orphan 摘要，并按 Artifact 内容哈希去重整理积压
+
+### 验证
+
+- [x] npm run verify
+- [x] 124/124 automated tests passed, including durable Bash writes and side-effecting MCP/plugin reset contracts
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] real DeepSeek reverse-engineering smoke run advanced to a new PE section and .rdata analysis path
+- [x] paused smoke run aborted its in-flight Provider request without later tool calls
 
 ## UPDATE-20260809-003
 
