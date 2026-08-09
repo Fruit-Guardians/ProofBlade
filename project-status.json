@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T21:05:00+08:00",
+  "updatedAt": "2026-08-09T23:32:20+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -56,14 +56,15 @@
     {
       "id": "PLAN-100",
       "title": "二进制 Artifact 与 Reverse 能力包",
-      "status": "planned",
+      "status": "in_progress",
       "priority": "P0",
       "milestone": "Milestone 4",
       "owner": "unassigned",
-      "progress": 0,
-      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "progress": 10,
+      "updatedAt": "2026-08-09T23:32:20+08:00",
       "objective": "让 Solver 能对真实 ELF/PE 等二进制执行可审计、可复现的静态分析。",
       "deliverables": [
+        "稳定逻辑 Capability 与可替换 Backend/Resolver 契约",
         "二进制流与范围读取 Artifact API",
         "格式、架构、区段、符号、字符串、反汇编和 XRef Capability",
         "Capability 输出到 Artifact、Evidence 和推理森林的确定性映射",
@@ -203,6 +204,30 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260809-030",
+      "occurredAt": "2026-08-09T23:32:20+08:00",
+      "summary": "建立稳定逻辑 Capability 与可替换执行 Backend 的基础层，为 PE/ELF、固件和 Ghidra 能力接入保留模型自主规划空间。",
+      "branch": "codex/capability-backend-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "新增统一 CapabilityBackend 与确定性 Resolver，支持 bundled、MCP、本地进程和 provider-native 实现类型",
+        "模型继续使用稳定 list_capabilities/invoke_capability 代理，不暴露重复的后端专用工具",
+        "Effect 与 Artifact 保存 capability、manifest 和 backend 来源，后台 Job 固定 Backend ID 与版本",
+        "恢复时复用已绑定 Backend 并拒绝版本漂移；仅允许在执行开始前跳过不可用实现",
+        "增加 Backend 选择、显式绑定、重复 ID、版本漂移和后台恢复回归测试"
+      ],
+      "validation": [
+        "98/98 Materials tests passed",
+        "147/147 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260809-005",
       "occurredAt": "2026-08-09T16:18:52+08:00",

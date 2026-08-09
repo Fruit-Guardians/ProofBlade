@@ -113,9 +113,27 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
     assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.target"]);
+    assert.deepEqual(catalog.backends.map((item) => [item.id, item.available]), [["proofblade-bundled", true], ["proofblade-mcp", false]]);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);
+    assert.equal(inspected.backendId, "proofblade-bundled");
+    assert.equal(inspected.backendKind, "bundled");
+    assert.equal(inspected.backendVersion, "1.0.0");
+    const invokedSnapshot = await services.control.snapshot(runId);
+    const expectedProvenance = {
+      capabilityId: "proofblade.target",
+      operation: "inspect",
+      manifestHash: catalog.capabilities.find((item) => item.id === "proofblade.target")?.hash,
+      backendId: "proofblade-bundled",
+      backendKind: "bundled",
+      backendVersion: "1.0.0",
+    };
+    assert.deepEqual(invokedSnapshot.effects[inspected.effectId]?.args.capability, expectedProvenance);
+    const invocationArtifact = invokedSnapshot.artifacts[inspected.artifactId];
+    assert.ok(invocationArtifact);
+    const artifactPayload = JSON.parse(await services.artifacts.readText(runId, invocationArtifact)) as { args?: { capability?: unknown } };
+    assert.deepEqual(artifactPayload.args?.capability, expectedProvenance);
     const archived = await runtime.invokeCapability({ capabilityId: "proofblade.artifact", operation: "read", input: { artifactId: inspected.artifactId, maxChars: 256 } });
     assert.equal(archived.truncated, true);
     await assert.rejects(() => runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: { path: "../outside" } }));
@@ -127,6 +145,7 @@ test("capability catalog and router keep stable manifests and artifact anchors",
 
 test("background jobs complete, timeout, cancel, and recover through durable records", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-jobs-"));
+  let runtime: ProofBladeToolRuntime | undefined;
   try {
     const services = createServices(root, config);
     const runId = "JOBS-001";
@@ -135,11 +154,13 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
     await services.control.dispatch(runId, { type: "fixture_reset", generation });
-    const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+    runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
     const success = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "list", input: {} });
     const completed = await runtime.waitJob(String(success.jobId));
     assert.equal(completed.status, "SUCCEEDED");
+    assert.equal(completed.backendId, "proofblade-bundled");
+    assert.equal(completed.backendVersion, "1.0.0");
     assert.match((await runtime.readJobOutput(completed.id)).output, /binary-info|strings/);
 
     const timeout = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 250 }, timeoutMs: 50 });
@@ -162,6 +183,16 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
 
     await services.control.dispatch(runId, {
       type: "job_queued",
+      job: { id: "J-BACKEND-DRIFT", capabilityId: "proofblade.target", operation: "list", backendId: "proofblade-bundled", backendVersion: "0.9.0", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
+      lane: "executor",
+    });
+    await runtime.recoverJobs();
+    const drifted = await runtime.waitJob("J-BACKEND-DRIFT");
+    assert.equal(drifted.status, "FAILED");
+    assert.match(drifted.error ?? "", /backend version changed/);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
       job: { id: "J-REDACTED", capabilityId: "proofblade.target", operation: "list", args: {}, argsRedacted: true, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
@@ -178,8 +209,8 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await services.control.dispatch(runId, { type: "fail", reason: "terminal recovery fixture" });
     await runtime.recoverJobs();
     assert.equal((await runtime.jobStatus("J-TERMINAL")).status, "UNKNOWN");
-    await runtime.close();
   } finally {
+    await runtime?.close();
     await rm(root, { recursive: true, force: true });
   }
 });

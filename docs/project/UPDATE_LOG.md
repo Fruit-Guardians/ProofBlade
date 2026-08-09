@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T21:05:00+08:00
+> 状态更新时间：2026-08-09T23:32:20+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-029 | 2026-08-09T21:05:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-028 | 2026-08-09T20:45:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-027 | 2026-08-09T17:01:39+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
@@ -28,6 +29,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-030
+
+时间：2026-08-09T23:32:20+08:00
+
+摘要：建立稳定逻辑 Capability 与可替换执行 Backend 的基础层，为 PE/ELF、固件和 Ghidra 能力接入保留模型自主规划空间。
+
+### 变更
+
+- 新增统一 CapabilityBackend 与确定性 Resolver，支持 bundled、MCP、本地进程和 provider-native 实现类型
+- 模型继续使用稳定 list_capabilities/invoke_capability 代理，不暴露重复的后端专用工具
+- Effect 与 Artifact 保存 capability、manifest 和 backend 来源，后台 Job 固定 Backend ID 与版本
+- 恢复时复用已绑定 Backend 并拒绝版本漂移；仅允许在执行开始前跳过不可用实现
+- 增加 Backend 选择、显式绑定、重复 ID、版本漂移和后台恢复回归测试
+
+### 验证
+
+- [x] 98/98 Materials tests passed
+- [x] 147/147 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-029
 
