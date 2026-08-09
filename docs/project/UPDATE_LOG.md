@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T22:30:00+08:00
+> 状态更新时间：2026-08-09T23:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-011 | 2026-08-09T23:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-010 | 2026-08-09T22:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-009 | 2026-08-09T22:00:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-008 | 2026-08-09T21:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -33,6 +34,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-011
+
+时间：2026-08-09T23:30:00+08:00
+
+摘要：允许满容量时认领已有 Intent，并保护已完成验证历史不被后续调度覆盖。
+
+### 变更
+
+- maxOpenIntents 仅限制新建候选，已有 PROPOSED 转为 CLAIMED 不再被容量检查阻止
+- 资源释放后可再次调度并认领此前保留的一次性 Hint Intent
+- 验证 Intent 使用唯一 ID，并通过 hypothesis 字段保留关联
+- 调度上下文从快照推导已完成假设，生成阶段跳过已完成验证路径
+- 空知识图使用稳定知识版本 0，避免生命周期事件再次使候选过期
+
+### 验证
+
+- [x] 44 CLI, Intent Filter and Intent Scheduler tests passed
+- [x] TypeScript typecheck passed
+- [x] component, change contract and project report gates passed
 
 ## UPDATE-20260809-010
 

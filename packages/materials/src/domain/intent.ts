@@ -140,6 +140,7 @@ export interface SchedulingContext {
 
   // 硬过滤所需状态（可选）
   completedIntentIds?: Set<string>;   // 已完成的 Intent ID 集合
+  completedHypothesisIds?: Set<string>; // 已完成验证的假设 ID 集合
   refutedHypotheses?: Set<string>;    // 被证据反驳的假设 ID 集合
 }
 

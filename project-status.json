@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T22:30:00+08:00",
+  "updatedAt": "2026-08-09T23:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-011",
+    "occurredAt": "2026-08-09T23:30:00+08:00",
+    "summary": "允许满容量时认领已有 Intent，并保护已完成验证历史不被后续调度覆盖。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "maxOpenIntents 仅限制新建候选，已有 PROPOSED 转为 CLAIMED 不再被容量检查阻止",
+      "资源释放后可再次调度并认领此前保留的一次性 Hint Intent",
+      "验证 Intent 使用唯一 ID，并通过 hypothesis 字段保留关联",
+      "调度上下文从快照推导已完成假设，生成阶段跳过已完成验证路径",
+      "空知识图使用稳定知识版本 0，避免生命周期事件再次使候选过期"
+    ],
+    "validation": [
+      "44 CLI, Intent Filter and Intent Scheduler tests passed",
+      "TypeScript typecheck passed",
+      "component, change contract and project report gates passed"
+    ]
+  },
   {
     "id": "UPDATE-20260809-010",
     "occurredAt": "2026-08-09T22:30:00+08:00",

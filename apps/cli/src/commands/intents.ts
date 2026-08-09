@@ -18,6 +18,11 @@ export function buildSchedulingContext(snapshot: RunSnapshot): SchedulingContext
   const completedIntentIds = new Set(
     intents.filter(i => i.status === 'COMPLETED').map(i => i.id)
   );
+  const completedHypothesisIds = new Set(
+    intents
+      .filter(i => i.status === 'COMPLETED' && i.hypothesis)
+      .map(i => i.hypothesis!)
+  );
 
   // 提取被反驳的假设 ID（仅限当前 generation 的证据）
   const currentGeneration = snapshot.generation;
@@ -56,6 +61,7 @@ export function buildSchedulingContext(snapshot: RunSnapshot): SchedulingContext
     },
     occupiedResources,
     completedIntentIds,
+    completedHypothesisIds,
     refutedHypotheses,
   };
 }

@@ -80,10 +80,20 @@ export class IntentScheduler {
       openIntents,
       knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
       occupiedResources: Object.keys(snapshot.leases || {}),
+      completedIntentIds: new Set([
+        ...(context.completedIntentIds ?? []),
+        ...persistedIntents.filter(intent => intent.status === 'COMPLETED').map(intent => intent.id),
+      ]),
+      completedHypothesisIds: new Set([
+        ...(context.completedHypothesisIds ?? []),
+        ...persistedIntents
+          .filter(intent => intent.status === 'COMPLETED' && intent.hypothesis)
+          .map(intent => intent.hypothesis!),
+      ]),
     };
 
-    // Open intents, including proposed reservations, consume capacity.
-    if (openIntents >= this.config.maxOpenIntents) {
+    // Capacity limits creation only. Existing PROPOSED intents may still be claimed.
+    if (openIntents >= this.config.maxOpenIntents && existingIntents.length === 0) {
       return null;
     }
 
@@ -133,9 +143,19 @@ export class IntentScheduler {
         openIntents,
         knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
         occupiedResources: Object.keys(snapshot.leases || {}),
+        completedIntentIds: new Set([
+          ...(context.completedIntentIds ?? []),
+          ...persistedIntents.filter(intent => intent.status === 'COMPLETED').map(intent => intent.id),
+        ]),
+        completedHypothesisIds: new Set([
+          ...(context.completedHypothesisIds ?? []),
+          ...persistedIntents
+            .filter(intent => intent.status === 'COMPLETED' && intent.hypothesis)
+            .map(intent => intent.hypothesis!),
+        ]),
       };
 
-      if (openIntents >= this.config.maxOpenIntents) {
+      if (openIntents >= this.config.maxOpenIntents && existingIntents.length === 0) {
         return { commands: [], project: () => null };
       }
 
@@ -275,6 +295,7 @@ export class IntentScheduler {
     // 策略 2: 基于假设生成验证 Intent
     for (const hypothesisId of context.hypotheses.slice(0, 3)) {
       if (intents.length >= maxIntents) break;
+      if (context.completedHypothesisIds?.has(hypothesisId)) continue;
       add(this.createVerificationIntent(context, hypothesisId));
     }
 
@@ -481,13 +502,19 @@ export class IntentScheduler {
   // ========== Intent 生成辅助方法 ==========
 
   private knowledgeVersion(snapshot: Awaited<ReturnType<ControlStore['snapshot']>>, fallback: number): number {
+    const hasKnowledgeProjection = snapshot.facts !== undefined
+      && snapshot.hypotheses !== undefined
+      && snapshot.evidence !== undefined
+      && snapshot.observations !== undefined;
+    if (!hasKnowledgeProjection) return fallback;
+
     const versions = [
       ...Object.values(snapshot.facts || {}).map(item => item.createdSeq),
       ...Object.values(snapshot.hypotheses || {}).map(item => item.createdSeq),
       ...Object.values(snapshot.evidence || {}).map(item => item.createdSeq),
       ...Object.values(snapshot.observations || {}).map(item => item.createdSeq),
     ];
-    return versions.length > 0 ? Math.max(...versions) : fallback;
+    return Math.max(0, ...versions);
   }
 
   private createIntentId(kind: string): string {
@@ -539,7 +566,7 @@ export class IntentScheduler {
     hypothesisId: string
   ): Intent {
     return {
-      id: `intent-verify-${hypothesisId}`,
+      id: this.createIntentId(`verify-${hypothesisId}`),
       status: 'PROPOSED',
       priority: 'medium',
       createdAt: new Date().toISOString(),

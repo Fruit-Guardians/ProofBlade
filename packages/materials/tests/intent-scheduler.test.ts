@@ -78,12 +78,18 @@ describe('IntentScheduler', () => {
     assert.strictEqual(scheduler.shouldSchedule(context), false);
   });
 
-  test('schedule - proposed intents count toward the concurrency limit across repeated calls', async () => {
+  test('schedule - an existing proposed intent can be claimed at the concurrency limit', async () => {
     const dispatch = mock.fn(async () => []);
     const snapshot = mock.fn(async () => ({
       schedulerIntents: {
-        'intent-proposed': { status: 'PROPOSED' },
+        'intent-proposed': {
+          id: 'intent-proposed', status: 'PROPOSED', priority: 'high', createdAt: new Date().toISOString(),
+          knowledgeVersion: 1, fixtureGeneration: 1, phase: 'RECON', objective: 'Claim existing',
+          startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Test', minimumConfidence: 'medium' },
+          suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: [], dependencies: [], attempts: 0,
+        },
       },
+      leases: {}, facts: {}, hypotheses: {}, evidence: {}, observations: {},
     }));
     const scheduler = new IntentScheduler(
       { dispatch, snapshot } as any,
@@ -108,10 +114,10 @@ describe('IntentScheduler', () => {
       occupiedResources: [],
     };
 
-    assert.equal(await scheduler.schedule(context), null);
-    assert.equal(await scheduler.schedule(context), null);
-    assert.equal(await scheduler.schedule(context), null);
-    assert.equal(dispatch.mock.calls.length, 0);
+    const claimed = await scheduler.schedule(context);
+    assert.equal(claimed?.id, 'intent-proposed');
+    assert.equal(claimed?.status, 'CLAIMED');
+    assert.equal(dispatch.mock.calls.length, 1);
   });
 
   test('schedule - generation is truncated to the remaining capacity', async () => {
@@ -626,7 +632,7 @@ describe('IntentScheduler - replay 持久化', () => {
       await controlStore.createRun(runId, {
         id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Occupied resource test',
       } as any);
-      await leaseManager.acquire(runId, 'workspace:read', 'main', 30_000);
+      const occupied = await leaseManager.acquire(runId, 'workspace:read', 'main', 30_000);
 
       const result = await scheduler.schedule({
         runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
@@ -642,6 +648,57 @@ describe('IntentScheduler - replay 持久化', () => {
       assert.equal(intents.length, 1);
       assert.equal(intents[0].status, 'PROPOSED');
       assert.match(intents[0].objective, /inspect this target/);
+
+      await leaseManager.release(runId, occupied);
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: snapshot.lastSeq, currentGeneration: 1,
+        facts: [], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.equal(claimed?.id, intents[0].id);
+      assert.equal(claimed?.status, 'CLAIMED');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('已完成验证假设不会被新调度覆盖或重复执行', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-completed-hypothesis-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-COMPLETED-HYPOTHESIS-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Completed hypothesis test',
+      } as any);
+      const context: SchedulingContext = {
+        runId, phase: 'hypothesis', knowledgeVersion: 1, currentGeneration: 1,
+        facts: [], hypotheses: ['H-001'], evidence: [], openIntents: 0,
+        newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+      const first = await scheduler.schedule(context);
+      assert.ok(first);
+      assert.equal(first.hypothesis, 'H-001');
+      await scheduler.completeIntent(runId, first.id, {});
+      const completed = (await controlStore.snapshot(runId)).schedulerIntents[first.id];
+      assert.equal(completed.status, 'COMPLETED');
+
+      const second = await scheduler.schedule(context);
+      const after = await controlStore.snapshot(runId);
+      assert.equal(second, null);
+      assert.equal(Object.keys(after.schedulerIntents).length, 1);
+      assert.equal(after.schedulerIntents[first.id].status, 'COMPLETED');
+      assert.equal(after.schedulerIntents[first.id].completedAt, completed.completedAt);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
