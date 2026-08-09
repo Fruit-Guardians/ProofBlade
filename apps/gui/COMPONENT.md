@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:09:33.039Z",
+  "updatedAt": "2026-08-09T13:05:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 8,
-    "securityAuditCount": 8,
-    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
-    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "baa221981ae8b970534c191e9d511d452725ee2bc91930924ca00ea10b1e8538",
+    "bugAuditCount": 9,
+    "securityAuditCount": 9,
+    "lastBugAuditAt": "2026-08-09T13:05:00.000Z",
+    "lastSecurityAuditAt": "2026-08-09T13:05:00.000Z",
+    "sourceHash": "acb2c0e774bc6d4ddc3e9d92d29ddcabe80cb07d80cc86ac7d0e3304484577a1",
     "result": "passed"
   }
 }
@@ -46,6 +46,8 @@
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。
+- Run 切换、定时器、手动操作和对话完成后的列表/详情刷新必须共用组件生命周期内唯一的单飞协调器；后台 tick 忙时立即返回且不得积压等待 Promise，交互刷新忙时只合并一次最新请求，旧 Run 的迟到响应不得覆盖当前详情。后台刷新不得清除可见错误；Run 切换、手动刷新和对话完成等交互刷新成功后必须清除已恢复的请求错误。
+- Run 详情缓存必须同时观察 durable `events.jsonl` 的 `mtimeMs`/文件大小和递归排序后的 Pi Session 文件状态；Session 加载期间发生变化时重读一次，仍不稳定则不得缓存。完整详情采用容量 32、单项 8 MiB、总量 64 MiB 的加权 LRU，超限详情只返回不缓存；同一 Run 的并发 miss 必须 single-flight，命中缓存时仍要刷新进程内 `active` 状态，服务关闭时必须与列表缓存一并清空。
 
 ## 验证
 

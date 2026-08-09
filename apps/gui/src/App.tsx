@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
+import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 
@@ -76,6 +77,8 @@ export function App() {
   const [folderOpen, setFolderOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+  const runIdRef = useRef(runId);
+  runIdRef.current = runId;
 
   const refreshRuns = useCallback(async (selectPreferred = false) => {
     const next = await getRuns();
@@ -95,14 +98,25 @@ export function App() {
     if (!quiet) setRefreshing(true);
     try {
       const next = await getRun(selected);
+      if (runIdRef.current !== selected) return;
       setDetail(next);
       if (!quiet) setError(undefined);
     } catch (caught) {
-      setError(message(caught));
+      if (runIdRef.current === selected) setError(message(caught));
     } finally {
-      if (!quiet) setRefreshing(false);
+      if (!quiet && runIdRef.current === selected) setRefreshing(false);
     }
   }, []);
+
+  const refreshPollerRef = useRef<SingleFlightPoller | undefined>(undefined);
+  if (!refreshPollerRef.current) {
+    refreshPollerRef.current = new SingleFlightPoller(async (mode) => {
+      await refreshRuns();
+      const selected = runIdRef.current;
+      if (selected) await refreshDetail(selected, mode === "background");
+    });
+  }
+  const refreshPoller = refreshPollerRef.current;
 
   useEffect(() => {
     void Promise.all([getBootstrap(), getProviderSettings(), getWorkspaceSettings(), refreshRuns(true)]).then(([data, provider, workspace]) => {
@@ -115,21 +129,21 @@ export function App() {
     localStorage.setItem("proofblade.runId", runId);
     setTab("chat");
     setDetail(undefined);
-    void refreshDetail(runId);
+    setRefreshing(true);
+    void refreshPoller.poll()
+      .catch((caught) => setError(message(caught)))
+      .finally(() => { if (runIdRef.current === runId) setRefreshing(false); });
     setLeftOpen(false);
-  }, [runId, refreshDetail]);
+  }, [refreshPoller, runId]);
 
   useEffect(() => {
     if (!bootstrap) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      void refreshRuns().then(() => {
-        if (runId) return refreshDetail(runId, true);
-        return undefined;
-      });
+      void refreshPoller.poll(false).catch((caught) => setError(message(caught)));
     }, bootstrap.refreshIntervalMs);
     return () => window.clearInterval(timer);
-  }, [bootstrap, refreshDetail, refreshRuns, runId]);
+  }, [bootstrap, refreshPoller]);
 
   const filteredRuns = useMemo(() => runs.filter((run) => {
     const matchesSearch = `${run.runId} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
@@ -148,7 +162,12 @@ export function App() {
 
   const refreshAll = async () => {
     if (!runId) return;
-    await Promise.all([refreshRuns(), refreshDetail(runId)]);
+    setRefreshing(true);
+    try {
+      await refreshPoller.poll();
+    } finally {
+      if (runIdRef.current === runId) setRefreshing(false);
+    }
   };
 
   const action = async (kind: "checkpoint" | "recover") => {
@@ -201,7 +220,7 @@ export function App() {
           {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
           <button className="icon-button" title="Provider 设置" aria-label="Provider 设置" onClick={() => setProviderOpen(true)}><Settings size={17} /></button>
           {detail?.kind === "chat" && <button className="icon-button" title="Tool、Skill、MCP" aria-label="Tool、Skill、MCP" onClick={() => setCapabilityOpen(true)}><ListChecks size={17} /></button>}
-          <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll()}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
+          <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll().catch((caught) => setError(message(caught)))}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
           <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
         </div>
       </header>
@@ -213,7 +232,7 @@ export function App() {
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
         {!detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
-        {detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={() => refreshDetail(detail.snapshot.runId, true)} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
+        {detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
         {detail && tab === "overview" && <Overview detail={detail} />}
         {detail && tab === "debugger" && <ToolDebugger detail={detail} />}
         {detail && tab === "timeline" && <Timeline detail={detail} />}
@@ -227,8 +246,8 @@ export function App() {
       <div className="metrics-mobile-head"><strong>运行指标</strong><button className="icon-button" onClick={() => setRightOpen(false)}><X size={18} /></button></div>
       {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
-    {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshRuns(); void refreshWorkspace(); }} />}
-    {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); void refreshRuns(); }} />}
+    {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
+    {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
     {capabilityOpen && detail?.kind === "chat" && workspaceSettings && <CapabilityModal runId={detail.snapshot.runId} workspace={workspaceSettings} onClose={() => setCapabilityOpen(false)} onSaved={async () => { setWorkspaceSettings(await getWorkspaceSettings()); setNotice("本对话能力配置已保存"); }} />}

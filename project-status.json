@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T16:18:52+08:00",
+  "updatedAt": "2026-08-09T21:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -594,6 +594,76 @@
         "115/115 repository tests passed",
         "latest-user-task-anchor and compaction-task-anchor contracts passed",
         "component audit limited to materials, materials-context and materials-runtime"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-027",
+      "occurredAt": "2026-08-09T17:01:39+08:00",
+      "summary": "消除 GUI 跨 Run 重叠刷新、迟到响应覆盖、后台等待积压、过期详情缓存、缓存堆积和恢复后残留错误。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时立即返回且不积压等待 Promise，交互刷新合并一次最新请求",
+        "旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交",
+        "未变化 Run 详情按 events.jsonl 与递归排序后的 Pi Session 文件状态命中容量 32 的 LRU",
+        "Session 加载期间发生变化时重读一次，连续变化的混合快照不进入缓存；RunDetail 缓存增加单项 8 MiB、总量 64 MiB 的加权上限，同一 Run 并发 miss single-flight，服务关闭时清空缓存",
+        "后台与交互刷新模式贯穿单飞协调器；后台成功保留可见错误，Run 切换、手动刷新和对话完成等交互刷新成功后清除已恢复的请求错误",
+        "后台刷新失败后仍消费已排队的交互尾随刷新；增加跨 Run 轮询背压、后台忙调用立即完成、失败尾随重试、Session 单独变化失效、并发 miss、加权淘汰和关闭清理回归测试"
+      ],
+      "validation": [
+        "143/143 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms",
+        "GUI 服务空闲 5 秒消耗 0.172 CPU 秒",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-028",
+      "occurredAt": "2026-08-09T20:45:00+08:00",
+      "summary": "修复 RunDetail 版本化并发加载、超限缓存残留和失败刷新丢失交互重试。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "RunDetail in-flight key 绑定 events.jsonl 与 Pi Session 版本，避免新请求复用旧快照；旧版本加载完成后重新校验，禁止覆盖新缓存",
+        "RunDetail 版本失配时先删除旧条目；加权 LRU 限制单项 8 MiB、总量 64 MiB，并使用有界大小估算，超限详情不缓存",
+        "轮询首轮失败后仍消费已排队的交互刷新，尾随成功时恢复请求流程",
+        "增加 Session 版本切换期间的 single-flight 回归测试和超限详情清除旧缓存回归测试"
+      ],
+      "validation": [
+        "143/143 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-029",
+      "occurredAt": "2026-08-09T21:05:00+08:00",
+      "summary": "修复 RunDetail 字节估算边界和关闭期间的详情加载回填。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "boundedJsonByteSize 补齐数组结束括号，并增加与 JSON.stringify 的嵌套数组字节对照测试",
+        "GUI shutdown 清理详情 in-flight 表；关闭状态禁止旧加载写入 RunDetail 缓存",
+        "增加关闭竞态回归测试，确保 close 返回后迟到加载不会重新占用缓存"
+      ],
+      "validation": [
+        "42/42 GUI tests passed",
+        "143/143 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
       ]
     }
   ],
