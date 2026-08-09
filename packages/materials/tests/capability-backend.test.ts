@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import {
@@ -70,6 +71,54 @@ test("MCP backend filters operations, exposes its binding catalog version, and f
       fakeBackend("mcp-fallback", 200, true, undefined, "mcp.bad", "call"),
     ]);
     assert.equal(resolver.resolve({ capabilityId: "mcp.bad", operation: "call", input: {} }).backend.id, "mcp-fallback");
+  } finally {
+    await registry?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP backend retries a recovered server through the same registry", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-retry-"));
+  let registry: import("../src/mcp/registry.js").McpProjectRegistry | undefined;
+  try {
+    const marker = join(root, "attempted.txt");
+    const echoServer = pathToFileURL(join(import.meta.dirname, "fixtures", "mcp-echo-server.mjs")).href;
+    const flakyServer = join(root, "flaky-server.mjs");
+    await writeFile(flakyServer, [
+      'import { existsSync, writeFileSync } from "node:fs";',
+      'const marker = process.env.MCP_ATTEMPTS;',
+      'if (marker && !existsSync(marker)) { writeFileSync(marker, "failed", "utf8"); process.exit(42); }',
+      `await import(${JSON.stringify(echoServer)});`,
+      "",
+    ].join("\n"));
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers: {
+      flaky: { command: process.execPath, args: [flakyServer], env: { MCP_ATTEMPTS: marker } },
+    } }));
+
+    const { McpProjectRegistry, MCP_FAILURE_RETRY_DELAY_MS } = await import("../src/mcp/registry.js");
+    registry = McpProjectRegistry.load(root);
+    const backend = new McpCapabilityBackend(registry);
+    assert.equal(backend.availability({ capabilityId: "mcp.flaky", operation: "describe", input: {} }).available, true);
+
+    await assert.rejects(() => registry!.describe("flaky"));
+    assert.equal(registry!.summaries()[0]?.status, "failed");
+    assert.ok(registry!.retryAfterMs("mcp.flaky") > 0);
+    assert.equal(
+      registry!.retryAfterMs("mcp.flaky", Date.now() + MCP_FAILURE_RETRY_DELAY_MS),
+      0,
+    );
+    assert.equal(backend.availability({ capabilityId: "mcp.flaky", operation: "describe", input: {} }).available, false);
+
+    // Once the cooldown expires, the same backend may try the recovered service.
+    await new Promise((resolve) => setTimeout(resolve, MCP_FAILURE_RETRY_DELAY_MS + 25));
+    assert.equal(backend.availability({ capabilityId: "mcp.flaky", operation: "describe", input: {} }).available, true);
+    const described = await registry!.describe("flaky");
+    assert.equal(described[0]?.name, "agent_call_tool");
+    assert.equal(registry!.summaries()[0]?.status, "connected");
+
+    // Explicit reset remains available for an operator to retry before cooldown.
+    registry!.resetFailures("mcp.flaky");
+    assert.equal(registry!.retryAfterMs("mcp.flaky"), 0);
   } finally {
     await registry?.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });

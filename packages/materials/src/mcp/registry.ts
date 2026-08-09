@@ -81,6 +81,10 @@ export interface McpToolSummary {
   readOnlyHint: boolean;
 }
 
+/** Failed MCP processes are retried after a short cooldown instead of being
+ * treated as permanently unavailable for the lifetime of a Runtime. */
+export const MCP_FAILURE_RETRY_DELAY_MS = 1_000;
+
 interface McpConnection {
   client: Client;
   transport: StdioClientTransport;
@@ -98,7 +102,7 @@ export class McpProjectRegistry {
   private readonly definitions: McpServerEntry[];
   private readonly connections = new Map<string, McpConnection>();
   private readonly connecting = new Map<string, Promise<McpConnection>>();
-  private readonly failures = new Set<string>();
+  private readonly failures = new Map<string, number>();
 
   private constructor(private readonly projectRoot: string, definitions: Record<string, McpServerDefinition>) {
     const capabilityIds = new Set<string>();
@@ -134,6 +138,25 @@ export class McpProjectRegistry {
 
   public catalogHash(): string {
     return sha256(canonicalJson(this.summaries().map(({ status: _status, ...summary }) => summary)));
+  }
+
+  /** Return the remaining cooldown before a failed server may be retried. */
+  public retryAfterMs(capabilityId: string, now = Date.now()): number {
+    const entry = this.definitions.find((item) => item.capabilityId === capabilityId);
+    if (!entry) return 0;
+    const failedAt = this.failures.get(entry.name);
+    if (failedAt === undefined) return 0;
+    return Math.max(0, failedAt + MCP_FAILURE_RETRY_DELAY_MS - now);
+  }
+
+  /** Clear failed connection state so the next operation retries immediately. */
+  public resetFailures(capabilityId?: string): void {
+    if (capabilityId === undefined) {
+      this.failures.clear();
+      return;
+    }
+    const entry = this.definitions.find((item) => item.capabilityId === capabilityId);
+    if (entry) this.failures.delete(entry.name);
   }
 
   public capabilityManifests(): CapabilityManifest[] {
@@ -334,7 +357,7 @@ export class McpProjectRegistry {
       this.failures.delete(entry.name);
       return connection;
     } catch (error) {
-      this.failures.add(entry.name);
+      this.failures.set(entry.name, Date.now());
       await client.close().catch(() => transport.close().catch(() => undefined));
       throw error;
     }
