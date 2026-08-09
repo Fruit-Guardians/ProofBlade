@@ -156,6 +156,28 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
 });
 
+test("reuses unchanged run details and invalidates the cache after a durable event", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-CACHE-001";
+    await data.createConversation({ runId, title: "cache test", workspacePath: root });
+
+    const first = await data.getRun(runId);
+    const cached = await data.getRun(runId);
+    assert.equal(cached.snapshot, first.snapshot);
+    assert.equal(cached.sessions, first.sessions);
+
+    await data.checkpoint(runId, "invalidate detail cache");
+    const refreshed = await data.getRun(runId);
+    assert.notEqual(refreshed.snapshot, first.snapshot);
+    assert.ok(refreshed.snapshot.lastSeq > first.snapshot.lastSeq);
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pauses an active coding lane and persists a resumable run state", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-pause-"));
   let releasePrompt: ((outcome: AgentOutcome) => void) | undefined;

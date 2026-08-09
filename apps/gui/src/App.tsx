@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
+import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 
@@ -121,12 +122,13 @@ export function App() {
 
   useEffect(() => {
     if (!bootstrap) return;
-    const timer = window.setInterval(() => {
+    const poller = new SingleFlightPoller(async () => {
       if (document.visibilityState !== "visible") return;
-      void refreshRuns().then(() => {
-        if (runId) return refreshDetail(runId, true);
-        return undefined;
-      });
+      await refreshRuns();
+      if (runId) await refreshDetail(runId, true);
+    });
+    const timer = window.setInterval(() => {
+      void poller.poll().catch((caught) => setError(message(caught)));
     }, bootstrap.refreshIntervalMs);
     return () => window.clearInterval(timer);
   }, [bootstrap, refreshDetail, refreshRuns, runId]);

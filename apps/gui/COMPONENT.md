@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-08T15:15:00+08:00",
+  "updatedAt": "2026-08-09T04:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 6,
-    "securityAuditCount": 6,
-    "lastBugAuditAt": "2026-08-08T15:15:00+08:00",
-    "lastSecurityAuditAt": "2026-08-08T15:15:00+08:00",
-    "sourceHash": "3b4e1e8fc4ac3ec6759c6253a98b4a418be6dd3e5033fc00386823ca6a49ac5f",
+    "bugAuditCount": 7,
+    "securityAuditCount": 7,
+    "lastBugAuditAt": "2026-08-09T04:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-09T04:00:00.000Z",
+    "sourceHash": "0f8ea409212c6d4bb9fbb5616fd5f488249aaebd04b45bf9ada7702c61d33ed3",
     "result": "passed"
   }
 }
@@ -45,6 +45,8 @@
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。
+- 定时刷新必须保持单飞；前一次 Run 列表与详情刷新未完成时跳过下一次 tick，禁止并发轮询堆积。
+- Run 详情缓存必须以 durable `events.jsonl` 的 `mtimeMs` 与文件大小共同失效；命中缓存时仍要刷新进程内 `active` 状态。
 
 ## 验证
 

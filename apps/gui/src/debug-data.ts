@@ -81,6 +81,7 @@ export class DebugDataService {
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
+  private readonly runDetailCache = new Map<string, { mtimeMs: number; size: number; detail: RunDetail }>();
   private closing = false;
   private closePromise: Promise<void> | undefined;
 
@@ -188,14 +189,20 @@ export class DebugDataService {
 
   public async getRun(runId: string): Promise<RunDetail> {
     assertRunId(runId);
-    const [snapshot, events, telemetry, sessions, eventsStat] = await Promise.all([
+    const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
+    const cached = this.runDetailCache.get(runId);
+    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size) {
+      return { ...cached.detail, active: this.active.get(runId) };
+    }
+    const [snapshot, events, telemetry, sessions] = await Promise.all([
       this.services.control.snapshot(runId),
       this.services.control.events(runId),
       new RunTelemetry(this.services.control).report(runId),
       this.loadSessions(runId),
-      stat(join(this.services.runsRoot, runId, "events.jsonl")),
     ]);
-    return { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() };
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
+    this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, detail });
+    return detail;
   }
 
   public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
