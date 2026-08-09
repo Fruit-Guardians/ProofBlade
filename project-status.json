@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T15:52:00+08:00",
+  "updatedAt": "2026-08-09T17:01:39+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -574,21 +574,22 @@
     },
     {
       "id": "UPDATE-20260809-027",
-      "occurredAt": "2026-08-09T15:00:00+08:00",
-      "summary": "消除 GUI 重叠轮询造成的事件循环饱和和 Tool 延迟放大。",
+      "occurredAt": "2026-08-09T17:01:39+08:00",
+      "summary": "消除 GUI 跨 Run 重叠刷新、迟到响应覆盖和无界详情缓存。",
       "branch": "codex/gui-polling-backpressure",
       "commit": "self",
       "planIds": [
         "PLAN-120"
       ],
       "changes": [
-        "GUI Run 列表与详情定时刷新改为单飞，前一次未完成时跳过下一次 tick",
-        "未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中缓存",
-        "缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效",
-        "增加轮询背压和详情缓存失效回归测试"
+        "Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时跳过，交互刷新合并一次最新请求",
+        "旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交",
+        "未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中容量 32 的 LRU",
+        "缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效，服务关闭时清空缓存",
+        "增加跨 Run 轮询背压、LRU 淘汰和关闭清理回归测试"
       ],
       "validation": [
-        "119/119 repository tests passed",
+        "128/128 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms",
         "GUI 服务空闲 5 秒消耗 0.172 CPU 秒",

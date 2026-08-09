@@ -171,7 +171,7 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
 });
 
-test("reuses unchanged run details and invalidates the cache after a durable event", async () => {
+test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
@@ -188,6 +188,8 @@ test("reuses unchanged run details and invalidates the cache after a durable eve
     assert.notEqual(refreshed.snapshot, first.snapshot);
     assert.ok(refreshed.snapshot.lastSeq > first.snapshot.lastSeq);
     await data.close();
+    const afterClose = await data.getRun(runId);
+    assert.notEqual(afterClose.snapshot, refreshed.snapshot);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

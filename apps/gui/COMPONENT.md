@@ -12,7 +12,7 @@
     "securityAuditCount": 8,
     "lastBugAuditAt": "2026-08-09T07:52:00.660Z",
     "lastSecurityAuditAt": "2026-08-09T07:52:00.660Z",
-    "sourceHash": "86672ca9ad5d6afb74da4bca0d7ae0dc398795053afbf83347dcc68fdee8c134",
+    "sourceHash": "a686b7644dacd7f0398863b8cf25342bb647e7afc1555fe8b298fd7fd44a3d14",
     "result": "passed"
   }
 }
@@ -46,8 +46,8 @@
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。
-- 定时刷新必须保持单飞；前一次 Run 列表与详情刷新未完成时跳过下一次 tick，禁止并发轮询堆积。
-- Run 详情缓存必须以 durable `events.jsonl` 的 `mtimeMs` 与文件大小共同失效；命中缓存时仍要刷新进程内 `active` 状态。
+- Run 切换、定时器、手动操作和对话完成后的列表/详情刷新必须共用组件生命周期内唯一的单飞协调器；后台 tick 忙时跳过，交互刷新忙时只合并一次最新请求，旧 Run 的迟到响应不得覆盖当前详情。
+- Run 详情缓存必须以 durable `events.jsonl` 的 `mtimeMs` 与文件大小共同失效；命中缓存时仍要刷新进程内 `active` 状态。完整详情采用容量 32 的 LRU，服务关闭时必须与列表缓存一并清空。
 
 ## 验证
 

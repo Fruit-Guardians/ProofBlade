@@ -38,6 +38,7 @@ import type {
   ToolCallDebug,
   TokenUsage,
 } from "./shared.js";
+import { BoundedLruCache } from "./bounded-lru-cache.js";
 import { toolPresentation } from "./tool-presentation.js";
 
 interface SessionEntryLike {
@@ -71,6 +72,7 @@ interface ContentLike {
 }
 
 const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
+const runDetailCacheCapacity = 32;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -82,7 +84,7 @@ export class DebugDataService {
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
-  private readonly runDetailCache = new Map<string, { mtimeMs: number; size: number; detail: RunDetail }>();
+  private readonly runDetailCache = new BoundedLruCache<string, { mtimeMs: number; size: number; detail: RunDetail }>(runDetailCacheCapacity);
   private closing = false;
   private closePromise: Promise<void> | undefined;
 
@@ -121,6 +123,8 @@ export class DebugDataService {
     const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
       .flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    this.runListCache.clear();
+    this.runDetailCache.clear();
     if (failures.length > 0) throw new AggregateError(failures, "GUI shutdown failed");
   }
 

@@ -1,14 +1,14 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T15:52:00+08:00
+> 状态更新时间：2026-08-09T17:01:39+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-027 | 2026-08-09T17:01:39+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
-| UPDATE-20260809-027 | 2026-08-09T15:00:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -25,6 +25,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-027
+
+时间：2026-08-09T17:01:39+08:00
+
+摘要：消除 GUI 跨 Run 重叠刷新、迟到响应覆盖和无界详情缓存。
+
+### 变更
+
+- Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时跳过，交互刷新合并一次最新请求
+- 旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交
+- 未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中容量 32 的 LRU
+- 缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效，服务关闭时清空缓存
+- 增加跨 Run 轮询背压、LRU 淘汰和关闭清理回归测试
+
+### 验证
+
+- [x] 128/128 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
+- [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-004
 
@@ -46,28 +69,6 @@
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] real DeepSeek reverse-engineering smoke run advanced to a new PE section and .rdata analysis path
 - [x] paused smoke run aborted its in-flight Provider request without later tool calls
-
-## UPDATE-20260809-027
-
-时间：2026-08-09T15:00:00+08:00
-
-摘要：消除 GUI 重叠轮询造成的事件循环饱和和 Tool 延迟放大。
-
-### 变更
-
-- GUI Run 列表与详情定时刷新改为单飞，前一次未完成时跳过下一次 tick
-- 未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中缓存
-- 缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效
-- 增加轮询背压和详情缓存失效回归测试
-
-### 验证
-
-- [x] 119/119 repository tests passed
-- [x] 18/18 deterministic fixture evaluations passed
-- [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
-- [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒
-- [x] component, contract and project report gates passed
-- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-003
 
