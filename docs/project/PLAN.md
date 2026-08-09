@@ -6,8 +6,8 @@
 ## 概览
 
 - 计划总数：8
-- 进行中：1
-- 待开始：4
+- 进行中：2
+- 待开始：3
 - 受阻：1
 - 已完成：2
 
@@ -15,12 +15,31 @@
 
 | ID | 优先级 | 里程碑 | 状态 | 进度 | 负责人 | 最近更新 |
 | --- | --- | --- | --- | ---: | --- | --- |
+| PLAN-110 | P0 | Milestone 2 debt | 进行中 | 25% | unassigned | 2026-08-09T15:00:00+08:00 |
 | PLAN-120 | P0 | Milestone 4 | 进行中 | 10% | unassigned | 2026-08-08T02:47:55.5788475+08:00 |
 | PLAN-100 | P0 | Milestone 4 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
-| PLAN-110 | P0 | Milestone 2 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-200 | P1 | Milestone 6 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-210 | P1 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-07T18:37:33+08:00 |
+
+## PLAN-110 结构化 Phase Gate 与运行护栏
+
+目标：阻止 Agent 在阶段产物不足、重复探索或缺少证据时提前得出确定结论。
+
+依赖：无
+
+### 交付物
+
+- Model Target、Plan 和 Reproduce 阶段
+- 每阶段结构化进入与退出门
+- repeat breaker、no-progress、failure signature 和 phase deadline
+- Intent 去重、环境漂移和无证据 claim 降级
+
+### 验收条件
+
+- [ ] 模型文本不能绕过阶段门
+- [ ] 重复 Tool/参数/结果达到阈值后被机械短路
+- [ ] 验证失败会携带原因返回可证伪假设阶段
 
 ## PLAN-120 统一预算与 Provider 调度器
 
@@ -59,25 +78,6 @@
 - [ ] 核心 Tool Schema 保持稳定
 - [ ] 所有完整原始输出均有内容哈希和可读取 Artifact
 - [ ] 重置环境后分析结论可以独立复现
-
-## PLAN-110 结构化 Phase Gate 与运行护栏
-
-目标：阻止 Agent 在阶段产物不足、重复探索或缺少证据时提前得出确定结论。
-
-依赖：无
-
-### 交付物
-
-- Model Target、Plan 和 Reproduce 阶段
-- 每阶段结构化进入与退出门
-- repeat breaker、no-progress、failure signature 和 phase deadline
-- Intent 去重、环境漂移和无证据 claim 降级
-
-### 验收条件
-
-- [ ] 模型文本不能绕过阶段门
-- [ ] 重复 Tool/参数/结果达到阈值后被机械短路
-- [ ] 验证失败会携带原因返回可证伪假设阶段
 
 ## PLAN-130 真实 Sandbox 与清理生命周期
 

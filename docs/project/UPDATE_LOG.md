@@ -7,7 +7,7 @@
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
-| UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
+| UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
 | UPDATE-20260809-003 | 2026-08-09T14:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-002 | 2026-08-09T12:00:00+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
 | UPDATE-20260809-001 | 2026-08-09T01:15:42.9850913+08:00 | PLAN-120 | codex/preserve-user-task-anchor | 本条记录所在提交 |
@@ -29,23 +29,22 @@
 
 时间：2026-08-09T15:00:00+08:00
 
-摘要：消除 GUI 重叠轮询造成的事件循环饱和和 Tool 延迟放大。
+摘要：增加基于 Tool Contract 的有界无进展守卫并刷新推理森林，阻止 Coding Agent 重复探索。
 
 ### 变更
 
-- GUI Run 列表与详情定时刷新改为单飞，前一次未完成时跳过下一次 tick
-- 未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中缓存
-- 缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效
-- 增加轮询背压和详情缓存失效回归测试
+- 在单个用户回合的滚动窗口内只统计 Tool Contract 明确标记为只读且无副作用的重复观察，第三次无新信息时机械终止
+- 任意 Bash、未知插件、持久写入和副作用 MCP 调用均重置进展窗口，混合工具批次中的真实进展不会被误停
+- GUI 将 no_progress 投影为可见、可恢复的正常 Assistant 回复，并通过 Pi Entry ID 精确关联历史消息
+- 每个外部用户回合刷新推理森林，注入有界 orphan 摘要，并按 Artifact 内容哈希去重整理积压
 
 ### 验证
 
-- [x] 119/119 repository tests passed
+- [x] npm run verify
+- [x] 124/124 automated tests passed, including durable Bash writes and side-effecting MCP/plugin reset contracts
 - [x] 18/18 deterministic fixture evaluations passed
-- [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
-- [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒
-- [x] component, contract and project report gates passed
-- [x] npm audit: 0 vulnerabilities
+- [x] real DeepSeek reverse-engineering smoke run advanced to a new PE section and .rdata analysis path
+- [x] paused smoke run aborted its in-flight Provider request without later tool calls
 
 ## UPDATE-20260809-003
 
