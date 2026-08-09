@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T17:01:39+08:00
+> 状态更新时间：2026-08-09T20:45:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-028 | 2026-08-09T20:45:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-027 | 2026-08-09T17:01:39+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-005 | 2026-08-09T16:18:52+08:00 | PLAN-110 | codex/evidence-curation-convergence | 本条记录所在提交 |
 | UPDATE-20260809-004 | 2026-08-09T15:00:00+08:00 | PLAN-110 | codex/convergence-progress-guard | 本条记录所在提交 |
@@ -27,6 +28,26 @@
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
 
+## UPDATE-20260809-028
+
+时间：2026-08-09T20:45:00+08:00
+
+摘要：修复 RunDetail 版本化并发加载、超限缓存残留和失败刷新丢失交互重试。
+
+### 变更
+
+- RunDetail in-flight key 绑定 events.jsonl 与 Pi Session 版本，避免新请求复用旧快照；旧版本加载完成后重新校验，禁止覆盖新缓存
+- RunDetail 版本失配时先删除旧条目；加权 LRU 限制单项 8 MiB、总量 64 MiB，并使用有界大小估算，超限详情不缓存
+- 轮询首轮失败后仍消费已排队的交互刷新，尾随成功时恢复请求流程
+- 增加 Session 版本切换期间的 single-flight 回归测试和超限详情清除旧缓存回归测试
+
+### 验证
+
+- [x] 143/143 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
 ## UPDATE-20260809-027
 
 时间：2026-08-09T17:01:39+08:00
@@ -44,7 +65,7 @@
 
 ### 验证
 
-- [x] 141/141 repository tests passed
+- [x] 143/143 repository tests passed
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
 - [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒

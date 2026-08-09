@@ -27,22 +27,30 @@ export class BoundedLruCache<TKey, TValue> {
     return entry?.value;
   }
 
+  public peek(key: TKey): TValue | undefined {
+    return this.entries.get(key)?.value;
+  }
+
+  public delete(key: TKey): boolean {
+    return this.remove(key);
+  }
+
   public set(key: TKey, value: TValue): boolean {
     const weight = this.weigh(value);
     if (!Number.isFinite(weight) || weight < 0) throw new Error("LRU cache entry weight must be finite and non-negative");
-    this.delete(key);
+    this.remove(key);
     if (weight > this.maxWeight) return false;
     this.entries.set(key, { value, weight });
     this.totalWeight += weight;
     while (this.entries.size > this.capacity) {
       const oldest = this.entries.keys().next();
       if (oldest.done) break;
-      this.delete(oldest.value);
+      this.remove(oldest.value);
     }
     while (this.totalWeight > this.maxWeight) {
       const oldest = this.entries.keys().next();
       if (oldest.done) break;
-      this.delete(oldest.value);
+      this.remove(oldest.value);
     }
     return true;
   }
@@ -52,10 +60,11 @@ export class BoundedLruCache<TKey, TValue> {
     this.totalWeight = 0;
   }
 
-  private delete(key: TKey): void {
+  private remove(key: TKey): boolean {
     const entry = this.entries.get(key);
-    if (!entry) return;
+    if (!entry) return false;
     this.entries.delete(key);
     this.totalWeight -= entry.weight;
+    return true;
   }
 }

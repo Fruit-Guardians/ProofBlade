@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T17:01:39+08:00",
+  "updatedAt": "2026-08-09T20:45:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -614,10 +614,32 @@
         "后台刷新失败后仍消费已排队的交互尾随刷新；增加跨 Run 轮询背压、后台忙调用立即完成、失败尾随重试、Session 单独变化失效、并发 miss、加权淘汰和关闭清理回归测试"
       ],
       "validation": [
-        "141/141 repository tests passed",
+        "143/143 repository tests passed",
         "18/18 deterministic fixture evaluations passed",
         "309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms",
         "GUI 服务空闲 5 秒消耗 0.172 CPU 秒",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-028",
+      "occurredAt": "2026-08-09T20:45:00+08:00",
+      "summary": "修复 RunDetail 版本化并发加载、超限缓存残留和失败刷新丢失交互重试。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "RunDetail in-flight key 绑定 events.jsonl 与 Pi Session 版本，避免新请求复用旧快照；旧版本加载完成后重新校验，禁止覆盖新缓存",
+        "RunDetail 版本失配时先删除旧条目；加权 LRU 限制单项 8 MiB、总量 64 MiB，并使用有界大小估算，超限详情不缓存",
+        "轮询首轮失败后仍消费已排队的交互刷新，尾随成功时恢复请求流程",
+        "增加 Session 版本切换期间的 single-flight 回归测试和超限详情清除旧缓存回归测试"
+      ],
+      "validation": [
+        "143/143 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"
       ]

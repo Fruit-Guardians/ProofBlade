@@ -260,6 +260,84 @@ test("coalesces concurrent RunDetail cache misses for one Run", async () => {
   }
 });
 
+test("does not reuse an in-flight RunDetail load after a Pi Session version change", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-versioned-flight-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-VERSIONED-FLIGHT-001";
+    await data.createConversation({ runId, title: "versioned detail single flight", workspacePath: root });
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "user", content: [{ type: "text", text: "old" }], timestamp: Date.now() });
+
+    const originalLoadStableSessions = (data as unknown as {
+      loadStableSessions: (...args: unknown[]) => Promise<{ sessions: unknown[]; version: string; stable: boolean }>;
+    }).loadStableSessions.bind(data);
+    let releaseFirstLoad: (() => void) | undefined;
+    const firstLoadPaused = new Promise<void>((resolve) => { releaseFirstLoad = resolve; });
+    let markFirstLoadWaiting: (() => void) | undefined;
+    const firstLoadWaiting = new Promise<void>((resolve) => { markFirstLoadWaiting = resolve; });
+    let delayed = true;
+    (data as unknown as { loadStableSessions: (...args: unknown[]) => Promise<unknown> }).loadStableSessions = async (...args) => {
+      const result = await originalLoadStableSessions(...args);
+      if (delayed) {
+        delayed = false;
+        markFirstLoadWaiting?.();
+        await firstLoadPaused;
+      }
+      return result;
+    };
+
+    const oldLoad = data.getRun(runId);
+    await firstLoadWaiting;
+    await session.appendMessage({ role: "assistant", content: [{ type: "text", text: "new" }], timestamp: Date.now() });
+    const newLoad = data.getRun(runId);
+    releaseFirstLoad?.();
+    const [oldDetail, newDetail] = await Promise.all([oldLoad, newLoad]);
+
+    assert.equal(oldDetail.sessions[0]?.messages.some((message) => message.text === "old"), true);
+    assert.equal(oldDetail.sessions[0]?.messages.some((message) => message.text === "new"), false);
+    assert.equal(newDetail.sessions[0]?.messages.some((message) => message.text === "new"), true);
+    assert.notEqual(oldDetail.sessions, newDetail.sessions);
+    await data.close();
+  } finally {
+    await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("drops the previous RunDetail cache entry when a replacement detail exceeds the byte limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-limit-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DETAIL-CACHE-LIMIT-001";
+    await data.createConversation({ runId, title: "detail cache limit", workspacePath: root });
+    const first = await data.getRun(runId);
+    const cache = (data as unknown as { runDetailCache: { size: number; weight: number } }).runDetailCache;
+    assert.equal(cache.size, 1);
+    assert.ok(first.sessions.length >= 0);
+
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "assistant", content: [{ type: "text", text: "x".repeat(9 * 1024 * 1024) }], timestamp: Date.now() });
+
+    const oversized = await data.getRun(runId);
+    assert.ok(oversized.sessions[0]?.messages.some((message) => message.text.length > 8 * 1024 * 1024));
+    assert.equal(cache.size, 0);
+    assert.equal(cache.weight, 0);
+    await data.close();
+  } finally {
+    await env?.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pauses an active coding lane and persists a resumable run state", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-pause-"));
   let releasePrompt: ((outcome: AgentOutcome) => void) | undefined;

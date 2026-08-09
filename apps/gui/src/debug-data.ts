@@ -206,18 +206,21 @@ export class DebugDataService {
     const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
     const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
     const sessionsVersion = await filesystemVersion(sessionsRoot);
-    const cached = this.runDetailCache.get(runId);
+    const cacheKey = runDetailVersionKey(runId, eventsStat.mtimeMs, eventsStat.size, sessionsVersion);
+    const cached = this.runDetailCache.peek(runId);
     if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
-      return { ...cached.detail, active: this.active.get(runId) };
+      const current = this.runDetailCache.get(runId);
+      return { ...current!.detail, active: this.active.get(runId) };
     }
-    const existing = this.runDetailLoads.get(runId);
+    if (cached) this.runDetailCache.delete(runId);
+    const existing = this.runDetailLoads.get(cacheKey);
     if (existing) return { ...(await existing), active: this.active.get(runId) };
     const load = this.loadRunDetail(runId, eventsStat, sessionsRoot, sessionsVersion);
-    this.runDetailLoads.set(runId, load);
+    this.runDetailLoads.set(cacheKey, load);
     try {
       return { ...(await load), active: this.active.get(runId) };
     } finally {
-      if (this.runDetailLoads.get(runId) === load) this.runDetailLoads.delete(runId);
+      if (this.runDetailLoads.get(cacheKey) === load) this.runDetailLoads.delete(cacheKey);
     }
   }
 
@@ -230,11 +233,23 @@ export class DebugDataService {
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
-    const bytes = jsonByteSize(detail);
-    if (sessionsStable && bytes <= runDetailCacheMaxEntryBytes) {
+    const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
+    const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
+    if (currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
       this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, bytes, detail });
     }
     return detail;
+  }
+
+  private async isCurrentRunVersion(runId: string, eventsStat: Stats, sessionsRoot: string, sessionsVersion: string): Promise<boolean> {
+    try {
+      const currentEventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
+      if (currentEventsStat.mtimeMs !== eventsStat.mtimeMs || currentEventsStat.size !== eventsStat.size) return false;
+      return await filesystemVersion(sessionsRoot) === sessionsVersion;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
   }
 
   public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
@@ -549,12 +564,75 @@ async function filesystemVersion(root: string): Promise<string> {
   return entries.join("\n");
 }
 
-function jsonByteSize(value: unknown): number {
-  try {
-    return Buffer.byteLength(JSON.stringify(value), "utf8");
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
+function runDetailVersionKey(runId: string, eventsMtimeMs: number, eventsSize: number, sessionsVersion: string): string {
+  return runId + "\0" + eventsMtimeMs + "\0" + eventsSize + "\0" + sessionsVersion;
+}
+
+function boundedJsonByteSize(value: unknown, limit: number): number {
+  let bytes = 0;
+  const stack = new WeakSet<object>();
+  const add = (amount: number): void => {
+    bytes = Math.min(limit + 1, bytes + amount);
+  };
+  const visit = (current: unknown, arrayItem = false): void => {
+    if (bytes > limit) return;
+    if (current === null) {
+      add(4);
+      return;
+    }
+    switch (typeof current) {
+      case "string":
+        if (Buffer.byteLength(current, "utf8") > limit) {
+          add(limit + 1);
+        } else {
+          add(Buffer.byteLength(JSON.stringify(current), "utf8"));
+        }
+        return;
+      case "number":
+      case "boolean":
+        add(Buffer.byteLength(JSON.stringify(current), "utf8"));
+        return;
+      case "undefined":
+      case "function":
+      case "symbol":
+        if (arrayItem) add(4);
+        return;
+      case "bigint":
+        add(limit + 1);
+        return;
+      default:
+        break;
+    }
+    if (typeof current !== "object") return;
+    if (stack.has(current)) {
+      add(limit + 1);
+      return;
+    }
+    stack.add(current);
+    if (Array.isArray(current)) {
+      add(1);
+      current.forEach((item, index) => {
+        if (index > 0) add(1);
+        visit(item, true);
+      });
+    } else {
+      const keys = Object.keys(current);
+      add(1);
+      let included = 0;
+      for (const key of keys) {
+        const item = (current as Record<string, unknown>)[key];
+        if (item === undefined || typeof item === "function" || typeof item === "symbol") continue;
+        if (included > 0) add(1);
+        add(Buffer.byteLength(JSON.stringify(key), "utf8") + 1);
+        visit(item);
+        included += 1;
+      }
+      add(1);
+    }
+    stack.delete(current);
+  };
+  visit(value);
+  return bytes;
 }
 
 export function runKind(task: Pick<TaskContract, "mode">): RunKind {
