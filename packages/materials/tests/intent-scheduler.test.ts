@@ -699,6 +699,57 @@ describe('IntentScheduler - replay 持久化', () => {
       assert.equal(Object.keys(after.schedulerIntents).length, 1);
       assert.equal(after.schedulerIntents[first.id].status, 'COMPLETED');
       assert.equal(after.schedulerIntents[first.id].completedAt, completed.completedAt);
+
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
+      const third = await scheduler.schedule({ ...context, currentGeneration: 2 });
+      const afterReset = await controlStore.snapshot(runId);
+      assert.ok(third);
+      assert.notEqual(third.id, first.id);
+      assert.equal(third.hypothesis, 'H-001');
+      assert.equal(third.fixtureGeneration, 2);
+      assert.equal(afterReset.schedulerIntents[first.id].status, 'COMPLETED');
+      assert.equal(afterReset.schedulerIntents[first.id].completedAt, completed.completedAt);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('fixture reset 后旧 PROPOSED Intent 会变为 STALE 且不会被认领', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-stale-generation-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-STALE-GENERATION-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Stale generation test',
+      } as any);
+      const oldIntent: Intent = {
+        id: 'intent-old-generation', status: 'PROPOSED', priority: 'high', createdAt: new Date().toISOString(),
+        knowledgeVersion: 0, fixtureGeneration: 1, phase: 'reconnaissance', objective: 'Old environment work',
+        startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Old evidence', minimumConfidence: 'medium' },
+        suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: [], dependencies: [], attempts: 0,
+      };
+      await controlStore.dispatch(runId, { type: 'scheduler_intent', intent: oldIntent });
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 2 });
+
+      const result = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 0, currentGeneration: 2,
+        facts: [], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      const snapshot = await controlStore.snapshot(runId);
+      assert.equal(result, null);
+      assert.equal(snapshot.schedulerIntents[oldIntent.id].status, 'STALE');
+      assert.equal(Object.values(snapshot.schedulerIntents).filter(intent =>
+        intent.status === 'PROPOSED' || intent.status === 'CLAIMED').length, 0);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

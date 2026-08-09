@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T23:30:00+08:00
+> 状态更新时间：2026-08-09T23:50:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260809-012 | 2026-08-09T23:50:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-011 | 2026-08-09T23:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-010 | 2026-08-09T22:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-009 | 2026-08-09T22:00:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -34,6 +35,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260809-012
+
+时间：2026-08-09T23:50:00+08:00
+
+摘要：按 fixture generation 隔离 Intent 新鲜度和已完成假设验证。
+
+### 变更
+
+- 硬过滤新增 fixtureGeneration 与 currentGeneration 一致性检查
+- fixture reset 后旧代 PROPOSED Intent 原子持久化为 STALE，不再占用新代开放容量
+- 开放 Intent 统计仅包含当前 fixture generation 的 PROPOSED 和 CLAIMED
+- 已完成验证假设仅在相同 fixture generation 内抑制重复生成
+- 新 generation 可为同一 hypothesis 生成唯一验证 Intent 并保留旧代完成历史
+
+### 验证
+
+- [x] 46 focused tests passed in three consecutive iterations
+- [x] TypeScript typecheck passed
+- [x] component, change contract and project report gates passed
 
 ## UPDATE-20260809-011
 

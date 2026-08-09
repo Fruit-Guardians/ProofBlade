@@ -163,6 +163,8 @@ export class IntentFilter {
    * 允许最多落后 1 个版本，因为 Intent 写入本身会增加 lastSeq。
    */
   private isStale(intent: Intent, context: SchedulingContext): boolean {
+    if (intent.fixtureGeneration !== context.currentGeneration) return true;
+
     // 允许 Intent 的知识版本等于当前版本或最多落后 1
     // 这是因为写入 scheduler_intent 命令会递增 lastSeq
     const versionDiff = context.knowledgeVersion - intent.knowledgeVersion;

@@ -280,6 +280,16 @@ describe('IntentFilter', () => {
     assert.strictEqual(result.length, 0, 'Intent with stale knowledge version should be filtered');
   });
 
+  test('isStale - fixture generation 不匹配时过滤', () => {
+    const filter = new IntentFilter(mockLeaseManager, config);
+    const intent = createTestIntent({ fixtureGeneration: 1, knowledgeVersion: 5 });
+    const context = createTestContext({ currentGeneration: 2, knowledgeVersion: 5 });
+
+    const result = filter.filter([intent], context);
+
+    assert.strictEqual(result.length, 0, 'Intent from an older fixture generation should be filtered');
+  });
+
   test('filter - 多个规则组合测试', () => {
     const filter = new IntentFilter(mockLeaseManager, { maxAttemptsPerIntent: 3 });
 

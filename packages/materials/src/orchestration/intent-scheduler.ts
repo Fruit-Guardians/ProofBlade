@@ -70,14 +70,22 @@ export class IntentScheduler {
     // Load existing proposed intents before evaluating trigger conditions.
     const snapshot = await this.controlStore.snapshot(context.runId);
     const persistedIntents = Object.values(snapshot.schedulerIntents || {});
-    const existingIntents = persistedIntents.filter(intent => intent.status === 'PROPOSED');
+    const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
+    const staleGenerationIntents = persistedIntents.filter(
+      intent => intent.status === 'PROPOSED' && intent.fixtureGeneration !== currentGeneration
+    );
+    const existingIntents = persistedIntents.filter(
+      intent => intent.status === 'PROPOSED' && intent.fixtureGeneration === currentGeneration
+    );
     const persistedOpenIntents = persistedIntents.filter(
-      intent => intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
+      intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+        && intent.fixtureGeneration === currentGeneration
     ).length;
     const openIntents = Math.max(context.openIntents, persistedOpenIntents);
     const schedulingContext = {
       ...context,
       openIntents,
+      currentGeneration,
       knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
       occupiedResources: Object.keys(snapshot.leases || {}),
       completedIntentIds: new Set([
@@ -87,10 +95,19 @@ export class IntentScheduler {
       completedHypothesisIds: new Set([
         ...(context.completedHypothesisIds ?? []),
         ...persistedIntents
-          .filter(intent => intent.status === 'COMPLETED' && intent.hypothesis)
+          .filter(intent => intent.status === 'COMPLETED'
+            && intent.fixtureGeneration === currentGeneration
+            && intent.hypothesis)
           .map(intent => intent.hypothesis!),
       ]),
     };
+
+    for (const intent of staleGenerationIntents) {
+      await this.controlStore.dispatch(context.runId, {
+        type: 'scheduler_intent',
+        intent: { ...intent, status: 'STALE' },
+      });
+    }
 
     // Capacity limits creation only. Existing PROPOSED intents may still be claimed.
     if (openIntents >= this.config.maxOpenIntents && existingIntents.length === 0) {
@@ -133,14 +150,22 @@ export class IntentScheduler {
   private async scheduleAtomically(context: SchedulingContext): Promise<Intent | null> {
     return this.controlStore.dispatchTransaction(context.runId, (snapshot) => {
       const persistedIntents = Object.values(snapshot.schedulerIntents || {});
-      const existingIntents = persistedIntents.filter(intent => intent.status === 'PROPOSED');
+      const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
+      const staleGenerationIntents = persistedIntents.filter(
+        intent => intent.status === 'PROPOSED' && intent.fixtureGeneration !== currentGeneration
+      );
+      const existingIntents = persistedIntents.filter(
+        intent => intent.status === 'PROPOSED' && intent.fixtureGeneration === currentGeneration
+      );
       const persistedOpenIntents = persistedIntents.filter(
-        intent => intent.status === 'PROPOSED' || intent.status === 'CLAIMED'
+        intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+          && intent.fixtureGeneration === currentGeneration
       ).length;
       const openIntents = Math.max(context.openIntents, persistedOpenIntents);
       const schedulingContext = {
         ...context,
         openIntents,
+        currentGeneration,
         knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
         occupiedResources: Object.keys(snapshot.leases || {}),
         completedIntentIds: new Set([
@@ -150,18 +175,24 @@ export class IntentScheduler {
         completedHypothesisIds: new Set([
           ...(context.completedHypothesisIds ?? []),
           ...persistedIntents
-            .filter(intent => intent.status === 'COMPLETED' && intent.hypothesis)
+            .filter(intent => intent.status === 'COMPLETED'
+              && intent.fixtureGeneration === currentGeneration
+              && intent.hypothesis)
             .map(intent => intent.hypothesis!),
         ]),
       };
+      const staleCommands: DomainCommand[] = staleGenerationIntents.map(intent => ({
+        type: 'scheduler_intent',
+        intent: { ...intent, status: 'STALE' },
+      }));
 
       if (openIntents >= this.config.maxOpenIntents && existingIntents.length === 0) {
-        return { commands: [], project: () => null };
+        return { commands: staleCommands, project: () => null };
       }
 
       const triggered = this.shouldSchedule(schedulingContext);
       if (!triggered && existingIntents.length === 0) {
-        return { commands: [], project: () => null };
+        return { commands: staleCommands, project: () => null };
       }
 
       const remainingCapacity = Math.max(0, this.config.maxOpenIntents - openIntents);
@@ -175,7 +206,7 @@ export class IntentScheduler {
         intent,
       }));
       if (filtered.length === 0) {
-        return { commands: generatedCommands, project: () => null };
+        return { commands: [...staleCommands, ...generatedCommands], project: () => null };
       }
 
       const scores = this.scorer.scoreAndRank(filtered, schedulingContext);
@@ -184,7 +215,7 @@ export class IntentScheduler {
         if (!candidate) continue;
         const claimed = structuredClone(candidate);
         const leases: Lease[] = [];
-        const candidateCommands: DomainCommand[] = [];
+        const candidateCommands: DomainCommand[] = [...staleCommands];
         let claimable = true;
         const projectedLeases = { ...snapshot.leases };
 
@@ -239,7 +270,7 @@ export class IntentScheduler {
         };
       }
 
-      return { commands: generatedCommands, project: () => null };
+      return { commands: [...staleCommands, ...generatedCommands], project: () => null };
     });
   }
 

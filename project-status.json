@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T23:30:00+08:00",
+  "updatedAt": "2026-08-09T23:50:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260809-012",
+    "occurredAt": "2026-08-09T23:50:00+08:00",
+    "summary": "按 fixture generation 隔离 Intent 新鲜度和已完成假设验证。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "硬过滤新增 fixtureGeneration 与 currentGeneration 一致性检查",
+      "fixture reset 后旧代 PROPOSED Intent 原子持久化为 STALE，不再占用新代开放容量",
+      "开放 Intent 统计仅包含当前 fixture generation 的 PROPOSED 和 CLAIMED",
+      "已完成验证假设仅在相同 fixture generation 内抑制重复生成",
+      "新 generation 可为同一 hypothesis 生成唯一验证 Intent 并保留旧代完成历史"
+    ],
+    "validation": [
+      "46 focused tests passed in three consecutive iterations",
+      "TypeScript typecheck passed",
+      "component, change contract and project report gates passed"
+    ]
+  },
   {
     "id": "UPDATE-20260809-011",
     "occurredAt": "2026-08-09T23:30:00+08:00",
