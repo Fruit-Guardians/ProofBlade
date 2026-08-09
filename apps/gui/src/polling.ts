@@ -6,7 +6,8 @@ export class SingleFlightPoller {
 
   public async poll(rerunIfBusy = true): Promise<boolean> {
     if (this.running) {
-      if (rerunIfBusy) this.rerunRequested = true;
+      if (!rerunIfBusy) return false;
+      this.rerunRequested = true;
       await this.running;
       return false;
     }

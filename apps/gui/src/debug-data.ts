@@ -1,6 +1,6 @@
 import { access, readdir, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
@@ -84,7 +84,12 @@ export class DebugDataService {
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
-  private readonly runDetailCache = new BoundedLruCache<string, { mtimeMs: number; size: number; detail: RunDetail }>(runDetailCacheCapacity);
+  private readonly runDetailCache = new BoundedLruCache<string, {
+    mtimeMs: number;
+    size: number;
+    sessionsVersion: string;
+    detail: RunDetail;
+  }>(runDetailCacheCapacity);
   private closing = false;
   private closePromise: Promise<void> | undefined;
 
@@ -195,18 +200,23 @@ export class DebugDataService {
   public async getRun(runId: string): Promise<RunDetail> {
     assertRunId(runId);
     const eventsStat = await stat(join(this.services.runsRoot, runId, "events.jsonl"));
+    const sessionsRoot = join(this.services.runsRoot, runId, "pi-sessions");
+    const sessionsVersion = await filesystemVersion(sessionsRoot);
     const cached = this.runDetailCache.get(runId);
-    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size) {
+    if (cached?.mtimeMs === eventsStat.mtimeMs && cached.size === eventsStat.size && cached.sessionsVersion === sessionsVersion) {
       return { ...cached.detail, active: this.active.get(runId) };
     }
-    const [snapshot, events, telemetry, sessions] = await Promise.all([
+    const [snapshot, events, telemetry, sessionRead] = await Promise.all([
       this.services.control.snapshot(runId),
       this.services.control.events(runId),
       new RunTelemetry(this.services.control).report(runId),
-      this.loadSessions(runId),
+      this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
+    const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
     const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
-    this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, detail });
+    if (sessionsStable) {
+      this.runDetailCache.set(runId, { mtimeMs: eventsStat.mtimeMs, size: eventsStat.size, sessionsVersion: loadedSessionsVersion, detail });
+    }
     return detail;
   }
 
@@ -474,6 +484,52 @@ export class DebugDataService {
       await env.cleanup();
     }
   }
+
+  private async loadStableSessions(
+    runId: string,
+    sessionsRoot: string,
+    initialVersion: string,
+  ): Promise<{ sessions: PiSessionDebug[]; version: string; stable: boolean }> {
+    let version = initialVersion;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const sessions = await this.loadSessions(runId);
+      const nextVersion = await filesystemVersion(sessionsRoot);
+      if (version === nextVersion) return { sessions, version, stable: true };
+      version = nextVersion;
+      if (attempt === 1) return { sessions, version, stable: false };
+    }
+    throw new Error("Unreachable session load state");
+  }
+}
+
+async function filesystemVersion(root: string): Promise<string> {
+  const entries: string[] = [];
+  async function visit(directory: string): Promise<void> {
+    let children: Dirent<string>[];
+    try {
+      children = await readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    await Promise.all(children.map(async (child) => {
+      const path = join(directory, child.name);
+      if (child.isDirectory()) {
+        await visit(path);
+        return;
+      }
+      try {
+        const metadata = await stat(path, { bigint: true });
+        entries.push(`${relative(root, path)}\0${metadata.size}\0${metadata.mtimeNs}`);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        entries.push(`${relative(root, path)}\0missing`);
+      }
+    }));
+  }
+  await visit(root);
+  entries.sort();
+  return entries.join("\n");
 }
 
 export function runKind(task: Pick<TaskContract, "mode">): RunKind {

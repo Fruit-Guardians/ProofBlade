@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent } from "../src/shared.js";
 
@@ -206,6 +207,40 @@ test("reuses unchanged run details, invalidates durable changes, and clears the 
     const afterClose = await data.getRun(runId);
     assert.notEqual(afterClose.snapshot, refreshed.snapshot);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("invalidates cached run details when only the Pi Session changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-session-cache-"));
+  let env: NodeExecutionEnv | undefined;
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-SESSION-CACHE-001";
+    await data.createConversation({ runId, title: "session cache test", workspacePath: root });
+    const eventsPath = join(root, "runs", runId, "events.jsonl");
+
+    const first = await data.getRun(runId);
+    const eventsBefore = await stat(eventsPath, { bigint: true });
+    assert.equal(first.sessions.length, 0);
+
+    const runDir = join(root, "runs", runId);
+    env = new NodeExecutionEnv({ cwd: runDir });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(runDir, "pi-sessions") });
+    const session = await repo.create({ id: `${runId}-chat`, cwd: root, metadata: { runId, lane: "main" } });
+    await session.appendMessage({ role: "user", content: [{ type: "text", text: "session-only update" }], timestamp: Date.now() });
+
+    const eventsAfter = await stat(eventsPath, { bigint: true });
+    assert.equal(eventsAfter.size, eventsBefore.size);
+    assert.equal(eventsAfter.mtimeNs, eventsBefore.mtimeNs);
+
+    const refreshed = await data.getRun(runId);
+    assert.notEqual(refreshed.sessions, first.sessions);
+    assert.equal(refreshed.sessions.length, 1);
+    assert.equal(refreshed.sessions[0]?.messages[0]?.text, "session-only update");
+    await data.close();
+  } finally {
+    await env?.cleanup();
     await rm(root, { recursive: true, force: true });
   }
 });

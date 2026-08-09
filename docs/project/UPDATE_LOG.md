@@ -31,19 +31,19 @@
 
 时间：2026-08-09T17:01:39+08:00
 
-摘要：消除 GUI 跨 Run 重叠刷新、迟到响应覆盖和无界详情缓存。
+摘要：消除 GUI 跨 Run 重叠刷新、迟到响应覆盖、后台等待积压和过期详情缓存。
 
 ### 变更
 
-- Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时跳过，交互刷新合并一次最新请求
+- Run 切换、定时器、手动操作和对话完成刷新共用稳定单飞协调器；后台 tick 忙时立即返回且不积压等待 Promise，交互刷新合并一次最新请求
 - 旧 Run 的迟到详情响应通过当前 Run 身份校验拒绝提交
-- 未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中容量 32 的 LRU
-- 缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效，服务关闭时清空缓存
-- 增加跨 Run 轮询背压、LRU 淘汰和关闭清理回归测试
+- 未变化 Run 详情按 events.jsonl 与递归排序后的 Pi Session 文件状态命中容量 32 的 LRU
+- Session 加载期间发生变化时重读一次，连续变化的混合快照不进入缓存；命中缓存仍刷新进程内 active 状态，服务关闭时清空缓存
+- 增加跨 Run 轮询背压、后台忙调用立即完成、Session 单独变化失效、LRU 淘汰和关闭清理回归测试
 
 ### 验证
 
-- [x] 136/136 repository tests passed
+- [x] 137/137 repository tests passed
 - [x] 18/18 deterministic fixture evaluations passed
 - [x] 309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms
 - [x] GUI 服务空闲 5 秒消耗 0.172 CPU 秒

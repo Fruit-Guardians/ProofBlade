@@ -41,7 +41,7 @@ test("[contract:polling-run-switch-single-flight] run switches coalesce behind t
   assert.equal(active, 0);
 });
 
-test("timer ticks skip without scheduling continuous trailing refreshes", async () => {
+test("timer ticks resolve immediately without accumulating waiters or trailing refreshes", async () => {
   let calls = 0;
   let release: (() => void) | undefined;
   const poller = new SingleFlightPoller(async () => {
@@ -50,11 +50,16 @@ test("timer ticks skip without scheduling continuous trailing refreshes", async 
   });
 
   const first = poller.poll(false);
-  const skipped = poller.poll(false);
+  await waitFor(() => release !== undefined);
+  const skipped = await Promise.race([
+    Promise.all(Array.from({ length: 100 }, () => poller.poll(false))),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("busy timer ticks waited for the active request")), 100)),
+  ]);
+  assert.deepEqual(skipped, Array.from({ length: 100 }, () => false));
+  assert.equal(calls, 1);
   release?.();
 
   assert.equal(await first, true);
-  assert.equal(await skipped, false);
   assert.equal(calls, 1);
 });
 
