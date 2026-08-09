@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T14:00:00+08:00",
+  "updatedAt": "2026-08-09T15:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -547,6 +547,30 @@
         "115/115 repository tests passed",
         "latest-user-task-anchor and compaction-task-anchor contracts passed",
         "component audit limited to materials, materials-context and materials-runtime"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-004",
+      "occurredAt": "2026-08-09T15:00:00+08:00",
+      "summary": "消除 GUI 重叠轮询造成的事件循环饱和和 Tool 延迟放大。",
+      "branch": "codex/gui-polling-backpressure",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "GUI Run 列表与详情定时刷新改为单飞，前一次未完成时跳过下一次 tick",
+        "未变化 Run 详情按 events.jsonl 的 mtimeMs 和文件大小命中缓存",
+        "缓存命中仍刷新进程内 active 状态，durable event 追加后自动失效",
+        "增加轮询背压和详情缓存失效回归测试"
+      ],
+      "validation": [
+        "119/119 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "309 Runs 下详情冷请求 39 ms、缓存命中 6-8 ms",
+        "GUI 服务空闲 5 秒消耗 0.172 CPU 秒",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
       ]
     }
   ],
