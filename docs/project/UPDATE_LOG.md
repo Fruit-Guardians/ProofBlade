@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T23:32:20+08:00
+> 状态更新时间：2026-08-10T00:31:33+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-029 | 2026-08-09T21:05:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
 | UPDATE-20260809-028 | 2026-08-09T20:45:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
@@ -29,6 +30,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-001
+
+时间：2026-08-10T00:31:33+08:00
+
+摘要：修复 Capability Backend 复审发现的 MCP 故障转移、操作匹配、版本投影和新 Job 绑定约束。
+
+### 变更
+
+- MCP availability 按具体 server 状态判断，连接失败后 Resolver 可选择备用 Backend
+- MCP Backend 只处理 describe/call，并用 catalogHash 统一状态与恢复绑定版本
+- ControlStore 新 job_queued 命令在类型与运行时校验 backendId/backendVersion
+- 增加 job_queued_legacy 兼容旧事件，并补齐真实 MCP 连接失败转移测试
+
+### 验证
+
+- [x] 99/99 Materials tests passed
+- [x] 148/148 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-030
 

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import {
   CapabilityBackendResolver,
+  McpCapabilityBackend,
   type CapabilityBackend,
   type CapabilityBackendKind,
   type CapabilityBackendRequest,
@@ -44,12 +48,41 @@ test("capability backend ids are unique and bound backends must handle the logic
   assert.throws(() => resolver.resolve({ capabilityId: "binary.inspect", operation: "identify", input: {}, backendId: "other" }), /does not handle/);
 });
 
+test("MCP backend filters operations, exposes its binding catalog version, and fails over after connection failure", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-backend-"));
+  let registry: import("../src/mcp/registry.js").McpProjectRegistry | undefined;
+  try {
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers: {
+      bad: { command: "proofblade-command-that-does-not-exist-for-test" },
+    } }));
+    const { McpProjectRegistry } = await import("../src/mcp/registry.js");
+    registry = McpProjectRegistry.load(root);
+    const backend = new McpCapabilityBackend(registry);
+    assert.equal(backend.handles("mcp.bad", "describe"), true);
+    assert.equal(backend.handles("mcp.bad", "call"), true);
+    assert.equal(backend.handles("mcp.bad", "bogus"), false);
+    assert.equal(backend.status().version, registry.catalogHash());
+
+    await assert.rejects(() => registry.describe("bad"));
+    assert.equal(backend.status().available, false);
+    const resolver = new CapabilityBackendResolver([
+      backend,
+      fakeBackend("mcp-fallback", 200, true, undefined, "mcp.bad", "call"),
+    ]);
+    assert.equal(resolver.resolve({ capabilityId: "mcp.bad", operation: "call", input: {} }).backend.id, "mcp-fallback");
+  } finally {
+    await registry?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function fakeBackend(
   id: string,
   priority: number,
   available: boolean,
   reason?: string,
   capabilityId = "binary.inspect",
+  operationName = operation.name,
 ): CapabilityBackend {
   const kind: CapabilityBackendKind = "local-process";
   return {
@@ -57,7 +90,8 @@ function fakeBackend(
     kind,
     priority,
     status: () => ({ id, kind, priority, version: "1.0.0", available, reason }),
-    handles: (candidate, candidateOperation) => candidate === capabilityId && candidateOperation === operation.name,
+    handles: (candidate, candidateOperation) => candidate === capabilityId && candidateOperation === operationName,
+    availability: () => ({ available, reason }),
     versionFor: (_request: CapabilityBackendRequest) => "1.0.0",
     preparePersistence: (request) => ({ operation, input: request.input, argsRedacted: false }),
     prepareExecution: () => ({ operation: "fake", args: {}, cwd: ".", replayPolicy: "pure" }),

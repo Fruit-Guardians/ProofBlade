@@ -244,8 +244,8 @@ export interface JobRecord {
   id: string;
   capabilityId: string;
   operation: string;
-  backendId?: string;
-  backendVersion?: string;
+  backendId: string;
+  backendVersion: string;
   args: Record<string, unknown>;
   argsRedacted?: boolean;
   replayPolicy: ReplayPolicy;

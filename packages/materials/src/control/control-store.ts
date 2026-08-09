@@ -59,6 +59,7 @@ export type DomainCommand =
   | { type: "lease_released"; resourceKey: string; ownerLane?: Lane; generation?: number; lane?: Lane }
   | { type: "checkpoint"; checkpoint: Omit<CheckpointRef, "createdSeq">; lane?: Lane }
   | { type: "job_queued"; job: Omit<JobRecord, "createdSeq">; lane?: Lane }
+  | { type: "job_queued_legacy"; job: Omit<JobRecord, "createdSeq" | "backendId" | "backendVersion"> & { backendId?: string; backendVersion?: string }; lane?: Lane }
   | { type: "job_started"; jobId: string; startedAt?: string; lane?: Lane }
   | { type: "job_finished"; jobId: string; status: "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "UNKNOWN"; outcome: "success" | "error" | "timeout" | "unknown"; effectId?: string; artifactId?: string; externalId?: string; error?: string; outputTier?: "small" | "medium" | "large"; finishedAt?: string; lane?: Lane }
   | { type: "job_cancelled"; jobId: string; reason: string; finishedAt?: string; lane?: Lane }
@@ -198,7 +199,8 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "lease_heartbeat": return "lease_heartbeat";
     case "lease_released": return "lease_released";
     case "checkpoint": return "checkpoint_created";
-    case "job_queued": return "job_queued";
+    case "job_queued":
+    case "job_queued_legacy": return "job_queued";
     case "job_started": return "job_started";
     case "job_finished": return "job_finished";
     case "job_cancelled": return "job_cancelled";
@@ -249,7 +251,8 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "lease_heartbeat": return { resourceKey: command.resourceKey, ownerLane: command.ownerLane, generation: command.generation, heartbeatAt: command.heartbeatAt, expiresAt: command.expiresAt };
     case "lease_released": return { resourceKey: command.resourceKey };
     case "checkpoint": return { checkpoint: { ...command.checkpoint, createdSeq: seq } };
-    case "job_queued": return { job: { ...command.job, createdSeq: seq } };
+    case "job_queued":
+    case "job_queued_legacy": return { job: { ...command.job, createdSeq: seq } };
     case "job_started": return { jobId: command.jobId, startedAt: command.startedAt ?? new Date().toISOString() };
     case "job_finished": return { jobId: command.jobId, status: command.status, outcome: command.outcome, effectId: command.effectId, artifactId: command.artifactId, externalId: command.externalId, error: command.error, outputTier: command.outputTier, finishedAt: command.finishedAt ?? new Date().toISOString() };
     case "job_cancelled": return { jobId: command.jobId, reason: command.reason, finishedAt: command.finishedAt ?? new Date().toISOString() };
@@ -281,8 +284,11 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
   if (command.type === "reasoning_node") validateReasoningNode(snapshot, command.node);
   if (command.type === "reasoning_edge") validateReasoningEdge(snapshot, command.edge);
   if (command.type === "reasoning_tree") validateReasoningTree(snapshot, command.tree);
-  if (command.type === "job_queued" && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
+  if ((command.type === "job_queued" || command.type === "job_queued_legacy") && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
     throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
+  }
+  if (command.type === "job_queued" && (!command.job.backendId || !command.job.backendVersion)) {
+    throw new Error("job_queued requires backendId and backendVersion");
   }
   if (command.type === "job_started" || command.type === "job_finished" || command.type === "job_cancelled" || command.type === "job_reconciled") {
     const jobId = command.jobId;

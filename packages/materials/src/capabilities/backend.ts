@@ -15,6 +15,11 @@ export interface CapabilityBackendStatus {
   reason?: string;
 }
 
+export interface CapabilityBackendAvailability {
+  available: boolean;
+  reason?: string;
+}
+
 export interface CapabilityBackendRequest {
   capabilityId: string;
   operation: string;
@@ -50,6 +55,7 @@ export interface CapabilityBackend {
   readonly kind: CapabilityBackendKind;
   readonly priority: number;
   status(): CapabilityBackendStatus;
+  availability(request: CapabilityBackendRequest): CapabilityBackendAvailability;
   handles(capabilityId: string, operation: string): boolean;
   versionFor(request: CapabilityBackendRequest): string;
   preparePersistence(request: CapabilityBackendRequest, operation: CapabilityOperationAtom): CapabilityBackendPersistence;
@@ -83,9 +89,9 @@ export class CapabilityBackendResolver {
     if (request.backendId && candidates.length === 0) {
       throw new Error(`Capability backend ${request.backendId} does not handle ${request.capabilityId}.${request.operation}`);
     }
-    const backend = candidates.find((candidate) => candidate.status().available);
+    const backend = candidates.find((candidate) => candidate.availability(request).available);
     if (!backend) {
-      const reasons = candidates.map((candidate) => `${candidate.id}: ${candidate.status().reason ?? "unavailable"}`).join("; ");
+      const reasons = candidates.map((candidate) => `${candidate.id}: ${candidate.availability(request).reason ?? "unavailable"}`).join("; ");
       throw new Error(`No available backend for ${request.capabilityId}.${request.operation}${reasons ? ` (${reasons})` : ""}`);
     }
     const version = backend.versionFor(request);
@@ -109,6 +115,10 @@ export class BundledCapabilityBackend implements CapabilityBackend {
   public handles(capabilityId: string, operation: string): boolean {
     return (capabilityId === "proofblade.target" && ["list", "inspect", "read", "delay"].includes(operation))
       || (capabilityId === "proofblade.artifact" && operation === "read");
+  }
+
+  public availability(_request: CapabilityBackendRequest): CapabilityBackendAvailability {
+    return { available: true };
   }
 
   public versionFor(_request: CapabilityBackendRequest): string {
@@ -135,22 +145,30 @@ export class McpCapabilityBackend implements CapabilityBackend {
 
   public status(): CapabilityBackendStatus {
     const configured = this.mcp.summaries().filter((server) => !server.disabled);
+    const available = configured.filter((server) => server.status !== "failed");
     return {
       id: this.id,
       kind: this.kind,
-      version: this.version,
+      version: this.mcp.catalogHash(),
       priority: this.priority,
-      available: configured.length > 0,
-      reason: configured.length > 0 ? undefined : "no enabled MCP servers",
+      available: available.length > 0,
+      reason: configured.length === 0 ? "no enabled MCP servers" : available.length === 0 ? "all enabled MCP servers failed" : undefined,
     };
   }
 
-  public handles(capabilityId: string, _operation: string): boolean {
-    return this.mcp.handles(capabilityId);
+  public availability(request: CapabilityBackendRequest): CapabilityBackendAvailability {
+    const server = this.mcp.summaries().find((item) => item.capabilityId === request.capabilityId);
+    if (!server || server.disabled) return { available: false, reason: "MCP capability is disabled or not configured" };
+    if (server.status === "failed") return { available: false, reason: `MCP server ${server.name} connection failed` };
+    return { available: true };
+  }
+
+  public handles(capabilityId: string, operation: string): boolean {
+    return this.mcp.handles(capabilityId) && (operation === "describe" || operation === "call");
   }
 
   public versionFor(request: CapabilityBackendRequest): string {
-    return this.mcp.summaries().find((server) => server.capabilityId === request.capabilityId)?.configHash ?? this.version;
+    return this.mcp.catalogHash();
   }
 
   public preparePersistence(request: CapabilityBackendRequest, operation: CapabilityOperationAtom): CapabilityBackendPersistence {

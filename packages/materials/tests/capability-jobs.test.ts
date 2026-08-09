@@ -156,6 +156,12 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await services.control.dispatch(runId, { type: "fixture_reset", generation });
     runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
+    await assert.rejects(() => services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-MISSING-BACKEND", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation } as never,
+      lane: "executor",
+    }), /requires backendId and backendVersion/);
+
     const success = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "list", input: {} });
     const completed = await runtime.waitJob(String(success.jobId));
     assert.equal(completed.status, "SUCCEEDED");
@@ -171,7 +177,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.equal((await runtime.waitJob(String(cancel.jobId), 2_000)).status, "CANCELLED");
 
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-RECOVER", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
@@ -192,7 +198,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.match(drifted.error ?? "", /backend version changed/);
 
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-REDACTED", capabilityId: "proofblade.target", operation: "list", args: {}, argsRedacted: true, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
@@ -202,7 +208,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.match(redacted.error ?? "", /arguments were redacted/);
 
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-TERMINAL", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });

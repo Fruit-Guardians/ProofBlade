@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T23:32:20+08:00",
+  "updatedAt": "2026-08-10T00:31:33+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -204,6 +204,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-001",
+      "occurredAt": "2026-08-10T00:31:33+08:00",
+      "summary": "修复 Capability Backend 复审发现的 MCP 故障转移、操作匹配、版本投影和新 Job 绑定约束。",
+      "branch": "codex/capability-backend-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "MCP availability 按具体 server 状态判断，连接失败后 Resolver 可选择备用 Backend",
+        "MCP Backend 只处理 describe/call，并用 catalogHash 统一状态与恢复绑定版本",
+        "ControlStore 新 job_queued 命令在类型与运行时校验 backendId/backendVersion",
+        "增加 job_queued_legacy 兼容旧事件，并补齐真实 MCP 连接失败转移测试"
+      ],
+      "validation": [
+        "99/99 Materials tests passed",
+        "148/148 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260809-030",
       "occurredAt": "2026-08-09T23:32:20+08:00",
