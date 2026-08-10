@@ -130,15 +130,17 @@ test("MCP registry rebuilds a connection after an established server exits", asy
   let registry: import("../src/mcp/registry.js").McpProjectRegistry | undefined;
   try {
     const marker = join(root, "crash-marker.txt");
+    const exitMarker = join(root, "crash-exit.txt");
     const serverPath = join(import.meta.dirname, "fixtures", "mcp-crash-after-list-server.mjs");
     await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers: {
-      crashy: { command: process.execPath, args: [serverPath], env: { MCP_CRASH_MARKER: marker } },
+      crashy: { command: process.execPath, args: [serverPath], env: { MCP_CRASH_MARKER: marker, MCP_CRASH_EXIT_MARKER: exitMarker } },
     } }));
 
     const { McpProjectRegistry } = await import("../src/mcp/registry.js");
     registry = McpProjectRegistry.load(root);
     const firstDescription = await registry.describe("crashy");
     assert.equal(firstDescription[0]?.name, "echo");
+    await writeFile(exitMarker, "exit", "utf8");
     await waitForProcessExit(marker);
 
     const staleCall = await registry.execute("mcp.crashy", "call", { tool: "echo", arguments: { text: "stale" } });

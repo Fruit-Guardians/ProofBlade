@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import { McpReverseCapabilityBackend, RizinCapabilityBackend, type CapabilityBackend } from "../src/capabilities/backend.js";
+import { createRizinAvailability } from "../src/capabilities/reverse.js";
 import { McpProjectRegistry } from "../src/mcp/registry.js";
 import type { RawEffectResult } from "../src/domain/types.js";
 
@@ -62,6 +63,25 @@ test("Rizin deep reverse Backend rejects unsafe addresses before execution", () 
   assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "bogus", input: { path: "sample.bin", address: "0x401000" } }, operation, contextFor("fixture")), /Unsupported reverse operation/);
   assert.equal(backend.handles("proofblade.binary", "functions"), true);
   assert.equal(backend.handles("proofblade.binary", "identify"), false);
+});
+
+test("Rizin availability resolves relative executable paths for tmpdir execution", () => {
+  const requested = relative(process.cwd(), process.execPath);
+  const availability = createRizinAvailability({ executable: requested });
+  assert.equal(availability.available, true, availability.reason);
+  assert.equal(isAbsolute(availability.executable ?? ""), true);
+});
+
+test("Rizin process runner preserves spawn errors when stderr is empty", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-rizin-runner-"));
+  try {
+    const availability = createRizinAvailability({ executable: process.execPath });
+    const result = await availability.runner(join(root, "missing-rizin-executable"), [], root, new AbortController().signal);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /ENOENT|not found|spawn/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("MCP reverse adapter maps and normalizes the logical operations", async () => {

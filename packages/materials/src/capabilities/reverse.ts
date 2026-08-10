@@ -1,7 +1,7 @@
 import { execFile, spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { delimiter, isAbsolute, join, sep } from "node:path";
+import { delimiter, isAbsolute, join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import type { RawEffectResult } from "../domain/types.js";
 import { readVisibleBinaryFile, validateBinaryInput, type BinaryCapabilityInput } from "./binary.js";
@@ -213,7 +213,7 @@ export function normalizeXrefs(rows: Array<Record<string, unknown>>, maxResults:
 
 async function runQuery(executable: string, file: string, command: string, runner: RizinProcessRunner, signal: AbortSignal): Promise<RawEffectResult> {
   const result = await runner(executable, ["-q", "-A", "-c", command, "-c", "q", file], tmpdir(), signal);
-  if (result.exitCode !== 0) throw new Error(result.stderr || `Rizin command failed: ${command}`);
+  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `Rizin command failed: ${command}`);
   return result;
 }
 
@@ -264,7 +264,10 @@ function resolveExecutable(requested: string): string | undefined {
 }
 
 function resolveExecutableName(name: string): string | undefined {
-  if (isAbsolute(name) || name.includes("/") || name.includes(sep)) return existsFile(name) ? name : undefined;
+  if (isAbsolute(name) || name.includes("/") || name.includes(sep)) {
+    const candidate = isAbsolute(name) ? name : resolve(name);
+    return existsFile(candidate) ? candidate : undefined;
+  }
   const pathValue = process.env.PATH ?? process.env.Path ?? "";
   const extensions = process.platform === "win32" ? (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";") : [""];
   for (const directory of pathValue.split(delimiter)) {
@@ -284,6 +287,8 @@ const defaultRizinRunner: RizinProcessRunner = async (executable, args, cwd, sig
   const started = Date.now();
   execFile(executable, args, { cwd, encoding: "utf8", maxBuffer: RIZIN_MAX_OUTPUT_BYTES, timeout: RIZIN_TIMEOUT_MS, windowsHide: true, signal }, (error, stdout, stderr) => {
     const aborted = signal.aborted || error?.name === "AbortError";
-    resolve({ stdout: String(stdout ?? ""), stderr: String(stderr ?? (error?.message ?? "")), exitCode: aborted ? null : error ? 1 : 0, durationMs: Date.now() - started });
+    const processStderr = String(stderr ?? "").trim();
+    const processError = error ? [error.message, typeof error.code === "string" ? error.code : undefined].filter(Boolean).join(" ") : "";
+    resolve({ stdout: String(stdout ?? ""), stderr: processStderr || processError, exitCode: aborted ? null : error ? 1 : 0, durationMs: Date.now() - started });
   });
 });
