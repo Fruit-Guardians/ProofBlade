@@ -34,6 +34,7 @@ jobs:
         env:
           COMPONENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
+          npm run reports:project
           npm run check:components -- --base "$COMPONENT_BASE_SHA"
           npm run check:change-contracts -- --base "$COMPONENT_BASE_SHA"
           npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"

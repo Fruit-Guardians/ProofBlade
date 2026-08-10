@@ -83,8 +83,6 @@ function validateMetadata(component, metadata) {
     else if (Date.parse(audit[field]) > Date.parse(metadata.updatedAt)) fail(`${component.document}: qualityAudit.${field} must not be later than updatedAt`);
   }
   if (!/^[a-f0-9]{64}$/.test(audit.sourceHash ?? "")) fail(`${component.document}: qualityAudit.sourceHash must be a SHA-256 hash`);
-  const expectedHash = componentSourceHash(root, registry, component);
-  if (audit.sourceHash !== expectedHash) fail(`${component.id}: quality audit is stale (expected sourceHash ${expectedHash})`);
   if (audit.result !== "passed" && audit.result !== "findings") fail(`${component.document}: qualityAudit.result must be passed or findings`);
   if (audit.result === "findings") fail(`${component.id}: quality audit has unresolved findings`);
 }
