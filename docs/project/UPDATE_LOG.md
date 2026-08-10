@@ -1,15 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T14:05:00+08:00
+> 状态更新时间：2026-08-10T14:08:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
-| UPDATE-20260810-005 | 2026-08-10T14:05:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
-| UPDATE-20260810-004 | 2026-08-10T13:20:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
-| UPDATE-20260810-003 | 2026-08-10T12:10:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
+| UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -35,61 +33,26 @@
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
 
-## UPDATE-20260810-005
-
-时间：2026-08-10T14:05:00+08:00
-
-摘要：修复 PE 地址语义和 Binary Core 硬链接私有文件泄露。
-
-### 变更
-
-- PE 入口点和区段地址现在将 ImageBase 与 RVA 相加后返回虚拟地址
-- 文件读取通过句柄检查 nlink，拒绝指向私有 Fixture 文件的硬链接
-- 增加 PE ImageBase、硬链接访问和句柄读取回归测试
-
-### 验证
-
-- [x] Binary Core tests: 5/5 passed
-- [x] component documentation gate passed
-- [x] project reports regenerated
-
-## UPDATE-20260810-004
-
-时间：2026-08-10T13:20:00+08:00
-
-摘要：修复 Binary Core 对大小写变体私有目录和越界目录链接的访问绕过。
-
-### 变更
-
-- 私有 .proofblade 路径段改为大小写无关匹配
-- 对 Fixture 根目录和目标文件执行 realpath 包含校验，拒绝符号链接或 Junction 越界
-- 增加 Windows 大小写路径和目录链接越界回归测试
-
-### 验证
-
-- [x] Binary Core tests: 4/4 passed
-- [x] component documentation gate passed
-- [x] project reports regenerated
-
 ## UPDATE-20260810-003
 
-时间：2026-08-10T12:10:00+08:00
+时间：2026-08-10T14:08:00+08:00
 
-摘要：完成 Binary Core v1，增加 PE/ELF 结构化分析与可审计二进制读取能力。
+摘要：修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。
 
 ### 变更
 
-- 新增 proofblade.binary Capability，支持 identify、read_range、sections、symbols 和 strings
-- 支持 PE32/PE32+、ELF32/ELF64、架构/端序/入口点、区段、符号和 ASCII/UTF-16LE 字符串分析
-- 增加 Fixture 根目录边界检查并阻止访问 .proofblade 私有目录
-- 将二进制分析结果投影到 Effect、Artifact、Observation 和 Evidence
+- Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞
+- 显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数
+- platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window
+- no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销
+- declared-no-progress 终止保持优先级，后续 read-window 终止不能覆盖并为 process 打开撤销路径
+- 增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试
 
 ### 验证
 
-- [x] 106/106 Materials tests passed
-- [x] 18/18 deterministic evaluation cases passed
-- [x] component and change-contract gates passed
-- [x] npm audit: 0 vulnerabilities
+- [x] 162/162 repository tests passed
+- [x] component, contract and project report gates passed
+- [x] rollback copy restored to the original SHA-256
 
 ## UPDATE-20260810-002
 

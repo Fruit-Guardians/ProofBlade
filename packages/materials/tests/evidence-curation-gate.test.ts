@@ -134,6 +134,65 @@ test("evidence recording is bounded and idempotent after an artifact reaches the
     assert.equal(annotationAgain.reused, true);
     assert.equal(annotationAgain.durableProgress, false);
     assert.equal(annotationAgain.progressKey, annotation.progressKey);
+    const renamedAnnotation = await graph.annotateArtifact({ artifactId: artifact.id, name: "Renamed review", summary: "Different wording for the same reviewed bytes.", role: "debug", tags: ["renamed"] });
+    assert.equal(renamedAnnotation.reused, false);
+    assert.equal(renamedAnnotation.durableProgress, false);
+    assert.equal(renamedAnnotation.progressKey, annotation.progressKey);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:duplicate-artifact-progress] identical artifact content cannot manufacture durable progress", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-curation-duplicate-content-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CURATION-DUPLICATE-CONTENT-001";
+    await control.createRun(runId, task(runId, root));
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const copies = await Promise.all(Array.from({ length: 3 }, (_, index) => artifacts.putText(runId, "same solver source", {
+      filename: "solver-copy-" + index + ".txt",
+      mime: "text/plain",
+      sensitivity: "public",
+    })));
+
+    assert.equal(new Set(copies.map((artifact) => artifact.id)).size, 3);
+    assert.equal(new Set(copies.map((artifact) => artifact.sha256)).size, 1);
+
+    const results = [];
+    for (const [index, artifact] of copies.entries()) {
+      results.push(await graph.recordEvidence({
+        name: "Solver source inspection " + (index + 1),
+        summary: "Wording variant " + (index + 1) + " describes the same underlying solver source.",
+        artifactIds: [artifact.id],
+      }));
+    }
+
+    assert.deepEqual(results.map((result) => result.durableProgress), [true, false, false]);
+    assert.equal(new Set(results.map((result) => result.progressKey)).size, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("duplicate artifact annotations share one durable content review", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-curation-duplicate-annotations-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CURATION-DUPLICATE-ANNOTATIONS-001";
+    await control.createRun(runId, task(runId, root));
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const first = await artifacts.putText(runId, "same command output", { filename: "first.txt", mime: "text/plain", sensitivity: "public" });
+    const second = await artifacts.putText(runId, "same command output", { filename: "second.txt", mime: "text/plain", sensitivity: "public" });
+
+    const firstReview = await graph.annotateArtifact({ artifactId: first.id, name: "Reviewed output", summary: "Routine output reviewed.", role: "debug" });
+    const secondReview = await graph.annotateArtifact({ artifactId: second.id, name: "Renamed duplicate", summary: "Different wording reviews the same bytes.", role: "intermediate" });
+
+    assert.equal(firstReview.durableProgress, true);
+    assert.equal(secondReview.durableProgress, false);
+    assert.equal(secondReview.progressKey, firstReview.progressKey);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
