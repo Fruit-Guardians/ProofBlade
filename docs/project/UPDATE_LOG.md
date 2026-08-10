@@ -43,13 +43,13 @@
 
 - Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞
 - 显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数
-- platform 和未解析策略的成功调用可撤销同批次待处理的 no_progress
-- no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 成功调用撤销
+- platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window
+- no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销
 - 增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试
 
 ### 验证
 
-- [x] 160/160 repository tests passed
+- [x] 161/161 repository tests passed
 - [x] component, contract and project report gates passed
 - [x] rollback copy restored to the original SHA-256
 

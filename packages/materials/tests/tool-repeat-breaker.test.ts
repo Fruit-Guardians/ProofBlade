@@ -109,6 +109,28 @@ test("declared non-progress evidence survives intervening process observations",
   assert.equal(breaker.observe(duplicateEvidence).terminate, true);
 });
 
+test("declared no-progress termination does not clear for unresolved tools", () => {
+  const breaker = new NoProgressToolBreaker(3);
+  const duplicateEvidence = {
+    toolName: "evidence",
+    input: { operation: "record" },
+    isError: false,
+    content: [{ type: "text" as const, text: "same evidence" }],
+    details: { durableProgress: false, progressKey: "same-evidence" },
+    effectPolicy: workspaceEffect,
+  };
+  const unresolved = {
+    toolName: "plugin_tool",
+    input: { operation: "inspect" },
+    isError: false,
+    content: [{ type: "text" as const, text: "potentially changed" }],
+  };
+  breaker.observe(duplicateEvidence);
+  breaker.observe(duplicateEvidence);
+  assert.equal(breaker.observe(duplicateEvidence).window, "declared_no_progress");
+  assert.equal(breaker.isProgress(unresolved, "declared_no_progress"), false);
+});
+
 test("[contract:tool-failure-storm] varied failures stop after a bounded budget without durable progress", () => {
   const breaker = new ToolFailureStormBreaker(4);
   for (const input of [
