@@ -497,6 +497,58 @@ for (const scenario of [
   });
 }
 
+test("process success in an evidence batch preserves a pending no-progress stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-no-progress-process-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-no-progress-process" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "record" }, { id: "evidence-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "record" }, { id: "evidence-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage([
+        fauxToolCall("evidence", { operation: "record" }, { id: "evidence-3" }),
+        fauxToolCall("bash", { command: "sed -n 1,20p solver.py" }, { id: "bash-1" }),
+      ], { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not continue"),
+    ]);
+    const evidence: AgentHarnessTool<undefined> = {
+      name: "evidence", label: "evidence", description: "reused evidence", parameters: Type.Object({ operation: Type.String() }),
+      async execute() {
+        return {
+          content: [{ type: "text" as const, text: "same evidence" }],
+          details: { durableProgress: false, progressKey: "same-evidence" },
+        };
+      },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "process-only inspection", parameters: Type.Object({ command: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "solver source" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "no-progress-process", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, bash], activeToolNames: ["evidence", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      (toolName) => toolName === "evidence" ? workspaceEffect : toolName === "bash" ? { readOnly: false, sideEffect: "process" } : undefined,
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 3);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.requested, true);
+    assert.equal(termination.reason, "no_progress");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function task(runId: string, root: string): TaskContract {
   return {
     schema_version: 1,

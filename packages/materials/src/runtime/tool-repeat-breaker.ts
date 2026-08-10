@@ -101,8 +101,9 @@ export class NoProgressToolBreaker {
     if (observation.isError) return false;
     const declaredProgress = stableBoolean(observation.details, "durableProgress");
     if (declaredProgress !== undefined) return declaredProgress;
-    // Any successful non-read-only or unresolved tool result can invalidate a pending no-progress stop.
-    return !isPureReadOnlyObservation(observation);
+    // Unresolved tools retain the conservative potential-progress behavior.
+    if (!observation.effectPolicy) return true;
+    return isDurableEffect(observation);
   }
 
   public reset(): void {

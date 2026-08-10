@@ -221,7 +221,7 @@
         "增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 副作用批次回归测试"
       ],
       "validation": [
-        "158/158 repository tests passed",
+        "159/159 repository tests passed",
         "component, contract and project report gates passed",
         "rollback copy restored to the original SHA-256"
       ]

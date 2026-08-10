@@ -48,7 +48,7 @@
 
 ### 验证
 
-- [x] 158/158 repository tests passed
+- [x] 159/159 repository tests passed
 - [x] component, contract and project report gates passed
 - [x] rollback copy restored to the original SHA-256
 
