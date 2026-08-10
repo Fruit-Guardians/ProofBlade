@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { ContextCompiler } from "../src/context/compiler.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
@@ -49,6 +49,19 @@ test("context keeps only skill metadata resident and records the catalog snapsho
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("bundled CTF reverse Skill is discoverable and remains within the model load budget", async () => {
+  const projectRoot = resolve(import.meta.dirname, "../../..");
+  const registry = await ProofBladeSkillRegistry.load(projectRoot);
+  const skill = registry.list().find((item) => item.name === "ctf-reverse");
+  assert.ok(skill, "bundled ctf-reverse Skill must be discoverable");
+  assert.match(skill.description, /reverse engineering/i);
+
+  const loaded = registry.loadForModel("ctf-reverse");
+  assert.equal(loaded.truncated, false);
+  assert.match(loaded.content, /invoke_capability/);
+  assert.match(loaded.content, /proofblade\.binary\.functions/);
 });
 
 async function skill(root: string, name: string, description: string, body: string): Promise<void> {
