@@ -9,7 +9,7 @@ import { id, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
-import { BundledCapabilityBackend, CapabilityBackendResolver, McpCapabilityBackend } from "../capabilities/backend.js";
+import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, McpCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 
@@ -39,7 +39,7 @@ export class ProofBladeToolRuntime {
     this.observer = new DeterministicObserver(controlStore);
     this.mcp = McpProjectRegistry.load(projectRoot);
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
-    const backends = new CapabilityBackendResolver([new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
+    const backends = new CapabilityBackendResolver([new BinaryCapabilityBackend(), new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
     this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, backends);
     this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
   }
@@ -58,7 +58,7 @@ export class ProofBladeToolRuntime {
 
   public async invokeCapability(input: { capabilityId: string; operation: string; input: Record<string, unknown> }, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
     const result = await this.capabilityRouter.invoke({ capabilityId: input.capabilityId, operation: input.operation, input: input.input }, signal);
-    if (input.capabilityId !== "proofblade.target" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
+    if (input.capabilityId !== "proofblade.target" && input.capabilityId !== "proofblade.binary" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[result.artifactId];
     if (!artifact) return result;

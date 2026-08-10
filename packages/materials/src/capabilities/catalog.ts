@@ -13,7 +13,94 @@ const artifactParameters = {
   additionalProperties: false,
 } as const;
 
+const binaryPathParameters = {
+  type: "object",
+  properties: { path: { type: "string", description: "Visible fixture-relative binary path" } },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const binaryReadRangeParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative binary path" },
+    offset: { type: "integer", minimum: 0 },
+    length: { type: "integer", minimum: 1, maximum: 65_536 },
+  },
+  required: ["path", "offset", "length"],
+  additionalProperties: false,
+} as const;
+
+const binaryStringsParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative binary path" },
+    minLength: { type: "integer", minimum: 3, maximum: 64 },
+    maxResults: { type: "integer", minimum: 1, maximum: 10_000 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
 const manifests: CapabilityManifest[] = [
+  withCapabilityHash({
+    id: "proofblade.binary",
+    version: "1.0.0",
+    description: "Read-only structural analysis of visible PE and ELF binaries.",
+    trust: "bundled",
+    operations: [
+      {
+        name: "identify",
+        description: "Identify a PE, ELF, or unknown binary and report stable header metadata.",
+        parameters: binaryPathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "read_range",
+        description: "Read a bounded byte range as hexadecimal and printable ASCII.",
+        parameters: binaryReadRangeParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "sections",
+        description: "List PE or ELF sections with offsets, sizes, addresses, and flags.",
+        parameters: binaryPathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "symbols",
+        description: "Extract available PE COFF or ELF symbol table entries.",
+        parameters: binaryPathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "strings",
+        description: "Extract bounded printable ASCII and UTF-16LE strings.",
+        parameters: binaryStringsParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+    ],
+  }),
   withCapabilityHash({
     id: "proofblade.target",
     version: "1.0.0",
