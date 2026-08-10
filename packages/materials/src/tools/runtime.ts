@@ -9,7 +9,7 @@ import { id, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
-import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, McpCapabilityBackend } from "../capabilities/backend.js";
+import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 
@@ -39,7 +39,7 @@ export class ProofBladeToolRuntime {
     this.observer = new DeterministicObserver(controlStore);
     this.mcp = McpProjectRegistry.load(projectRoot);
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
-    const backends = new CapabilityBackendResolver([new BinaryCapabilityBackend(), new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
+    const backends = new CapabilityBackendResolver([new RizinCapabilityBackend(), new McpReverseCapabilityBackend(this.mcp), new BinaryCapabilityBackend(), new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
     this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, backends);
     this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
   }

@@ -59,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
-  assert.equal(bundledCapabilityCatalogHash(), "c6e1f433d9752d7fc89598ff149032d06c84500c909ded96863c0958f1abb6cf");
+  assert.equal(bundledCapabilityCatalogHash(), "f4a1d9141645cb4e32106d29396667ac8293f8e13ddff2562ae37b47d71d5fcc");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -113,7 +113,11 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
     assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.binary", "proofblade.target"]);
-    assert.deepEqual(catalog.backends.map((item) => [item.id, item.available]), [["proofblade-binary", true], ["proofblade-bundled", true], ["proofblade-mcp", false]]);
+    const rizinStatus = catalog.backends.find((item) => item.id === "proofblade-rizin");
+    assert.equal(rizinStatus?.kind, "local-process");
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-binary")?.available, true);
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-bundled")?.available, true);
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-mcp")?.available, false);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);

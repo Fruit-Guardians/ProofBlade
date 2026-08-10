@@ -4,15 +4,15 @@
 {
   "id": "materials-capabilities",
   "name": "Capability Catalog and Router",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T04:00:00.000Z",
+  "updatedAt": "2026-08-10T09:59:52.000Z",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-10T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-10T04:00:00.000Z",
-    "sourceHash": "8b06943da23d888db0cf25a8888cdbcbabf96c9388b4ebcb21ab220f88afb1d0",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-10T09:59:52.000Z",
+    "lastSecurityAuditAt": "2026-08-10T09:59:52.000Z",
+    "sourceHash": "6761fe8ffa101ab02455336b0e0239c8201768b8f1b80305c3d6302d80493295",
     "result": "passed"
   }
 }
@@ -32,6 +32,8 @@
 - MCP Backend 按具体 capability 对应的 server 状态判断可用性；连接失败的 server 会被 Resolver 跳过，允许同一逻辑能力使用备用实现。
 - MCP Backend 的状态版本与 Job 绑定版本均使用 `catalogHash`，外部状态投影可以直接用于恢复绑定校验。
 - MCP 分发器调用按内层 Tool 动态解析策略，前台 Effect 与后台 Job 使用同一结果。
+- `proofblade.binary` 的 deep reverse 操作由本地 Rizin 或配置的 MCP reverse adapter 提供；Resolver 只在执行前按可用性回退。
+- `functions`、`disassemble` 和 `xrefs` 输出统一规范化、排序并受数量上限约束，Backend 来源和版本进入 Effect/Job 绑定。
 - Router 为后台 Job 生成统一的安全持久化参数计划，原始调用参数不进入 Control Store。
 - 内层敏感级别为 `secret` 时，Router 必须把分类传给 Effect Journal，确保结果 Artifact 不会降级为 `public`。
 - Provider 只看到固定代理 Schema；完整能力细节按需获取。

@@ -298,6 +298,37 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 
 敏感值只从环境变量展开，不写入事件、Artifact、日志或 Prompt。`cwd` 相对项目根目录解析。Server 必须显式配置，不扫描用户主目录的全局 MCP 设置。
 
+### 6.1.1 深度逆向 Capability 映射
+
+`proofblade.binary.functions`、`disassemble` 和 `xrefs` 可以通过 `.mcp.json` 映射到 Ghidra、Rizin 或其他兼容 MCP Server。映射只描述传输边界，模型仍通过同一个 `invoke_capability` 自由选择调用顺序；本地 `rz/rizin` Backend 可用时优先使用本地实现，未安装或不可用时才选择 MCP 映射。
+
+```json
+{
+  "binaryReverse": {
+    "functions": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "limit": "$maxResults" },
+      "output": "functions"
+    },
+    "disassemble": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "address": "$address", "limit": "$maxInstructions" },
+      "output": "disassemble"
+    },
+    "xrefs": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "address": "$address", "direction": "$direction" },
+      "output": "xrefs"
+    }
+  }
+}
+```
+
+`arguments` 的 `$path`、`$address`、`$maxResults`、`$maxInstructions` 和 `$direction` 会从逻辑 Capability 输入取值，其他值按字面量传递。若 Server 使用统一 dispatcher，可添加 `nestedTool: { "name": "functions", "toolField": "name", "argumentsField": "args" }`；它必须与该 Server 的 `nestedToolPolicy` 完全一致。为了防止把任意 MCP 动作伪装成只读逆向，映射对应的 MCP Server 或内层 Tool 必须显式声明 `readOnly: true` 且 `replay: "pure"`，输出也必须符合规范化的函数、指令或 XRef 数组。
+
 ### 6.2 延迟发现
 
 MCP 不把全部服务器 Tool Schema 注入 L0 常驻上下文。固定交互流程为：

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T14:08:00+08:00
+> 状态更新时间：2026-08-10T19:42:54+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-004 | 2026-08-10T19:42:54+08:00 | PLAN-100 | codex/deep-reverse-v1 | 本条记录所在提交 |
 | UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -32,6 +33,30 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-004
+
+时间：2026-08-10T19:42:54+08:00
+
+摘要：完成 PR C Deep Reverse v1：新增函数、反汇编和 XRef 逻辑 Capability，并接入可选 Rizin 与可配置 MCP 后端。
+
+### 变更
+
+- Rizin local-process Backend 使用受保护二进制的 0600 临时副本，支持超时、AbortSignal 和有界输出
+- functions、disassemble、xrefs 统一规范化地址、排序、去重和结果上限，拒绝未声明操作
+- MCP binaryReverse 映射支持 server、outer tool、参数绑定、嵌套 dispatcher 和严格只读纯重放策略
+- 本地 Rizin 不可用时按 Backend 优先级回退到已配置 MCP，实现来源和版本绑定
+- 参考 ctf-skills 最新 ctf-reverse 目录 commit d6662d2，保留方法论在 Skill 层而不固化进模型工具面
+- 增加 Rizin、MCP direct/nested 映射与边界回归测试
+
+### 验证
+
+- [x] 122/122 Materials tests passed
+- [x] 171/171 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+- [x] Rizin production availability is environment-dependent and remains optional
 
 ## UPDATE-20260810-003
 

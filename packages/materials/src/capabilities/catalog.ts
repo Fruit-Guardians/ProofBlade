@@ -42,11 +42,48 @@ const binaryStringsParameters = {
   additionalProperties: false,
 } as const;
 
+const reverseFunctionsParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative binary path" },
+    maxResults: { type: "integer", minimum: 1, maximum: 10_000 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const reverseAddressParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative binary path" },
+    address: { type: "string", minLength: 3, maxLength: 18, pattern: "^0x[0-9a-fA-F]{1,16}$", description: "64-bit hexadecimal virtual address from identify, sections, or functions" },
+  },
+  required: ["path", "address"],
+  additionalProperties: false,
+} as const;
+
+const reverseDisassembleParameters = {
+  ...reverseAddressParameters,
+  properties: {
+    ...reverseAddressParameters.properties,
+    maxInstructions: { type: "integer", minimum: 1, maximum: 512 },
+  },
+} as const;
+
+const reverseXrefsParameters = {
+  ...reverseAddressParameters,
+  properties: {
+    ...reverseAddressParameters.properties,
+    direction: { type: "string", enum: ["to", "from", "both"] },
+    maxResults: { type: "integer", minimum: 1, maximum: 10_000 },
+  },
+} as const;
+
 const manifests: CapabilityManifest[] = [
   withCapabilityHash({
     id: "proofblade.binary",
-    version: "1.0.0",
-    description: "Read-only structural analysis of visible PE and ELF binaries.",
+    version: "1.1.0",
+    description: "Read-only structural and deep analysis of visible PE and ELF binaries.",
     trust: "bundled",
     operations: [
       {
@@ -95,6 +132,36 @@ const manifests: CapabilityManifest[] = [
         parameters: binaryStringsParameters,
         readOnly: true,
         sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "functions",
+        description: "List normalized function ranges and names using an available deep reverse Backend.",
+        parameters: reverseFunctionsParameters,
+        readOnly: true,
+        sideEffect: "process",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "disassemble",
+        description: "Disassemble a bounded instruction window at a hexadecimal virtual address.",
+        parameters: reverseDisassembleParameters,
+        readOnly: true,
+        sideEffect: "process",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "xrefs",
+        description: "List normalized code or data cross-references to or from a hexadecimal address.",
+        parameters: reverseXrefsParameters,
+        readOnly: true,
+        sideEffect: "process",
         replay: "pure",
         outputPolicy: "summary",
         executionMode: "sequential",
