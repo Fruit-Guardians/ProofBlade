@@ -4,15 +4,15 @@
 {
   "id": "materials-jobs",
   "name": "Durable Background Jobs",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-09T15:32:20.000Z",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "6da281daa494e4333e03fdd3427909d30c88aca56c48e27a84163814bccd6582",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-09T15:32:20.000Z",
+    "lastSecurityAuditAt": "2026-08-09T15:32:20.000Z",
+    "sourceHash": "47b16225d5c8d60ec06d37fd4fb3121a33fa0a090548c5163e6f6e2ac04cbce3",
     "result": "passed"
   }
 }
@@ -26,6 +26,7 @@
 
 - `background-runner.ts` 管理 AbortController 与 Effect Journal 关联。
 - Job 生命周期通过 Control Store 事件投影；执行结果通过 Artifact 引用。
+- Job 入队时固定逻辑 Capability 对应的 Backend ID 和版本；恢复时必须复用绑定并拒绝环境漂移。
 - Run teardown 必须停止仍在进程内活动的任务。
 
 ## 开发规则与验证

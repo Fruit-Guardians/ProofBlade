@@ -4,15 +4,15 @@
 {
   "id": "materials-mcp",
   "name": "MCP Registry",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-10T00:00:00+08:00",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "28be58fd098bbe94adde5ee04d318759b48d81b3889dc2fad2ee5458ab4c3a36",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-10T00:00:00+08:00",
+    "lastSecurityAuditAt": "2026-08-10T00:00:00+08:00",
+    "sourceHash": "704d7e770b4db23f1718523204ab93c97fb42369a7957759366268faf11d19f8",
     "result": "passed"
   }
 }

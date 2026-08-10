@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { Client, type ListToolsResult } from "@modelcontextprotocol/client";
+import { Client, SdkErrorCode, type ListToolsResult } from "@modelcontextprotocol/client";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
 import type { ToolSensitivityAtom, ToolSideEffectAtom } from "@proofblade/atoms";
 import { withCapabilityHash, type CapabilityManifest } from "@proofblade/molecules";
@@ -81,6 +81,10 @@ export interface McpToolSummary {
   readOnlyHint: boolean;
 }
 
+/** Failed MCP processes are retried after a short cooldown instead of being
+ * treated as permanently unavailable for the lifetime of a Runtime. */
+export const MCP_FAILURE_RETRY_DELAY_MS = 1_000;
+
 interface McpConnection {
   client: Client;
   transport: StdioClientTransport;
@@ -98,7 +102,7 @@ export class McpProjectRegistry {
   private readonly definitions: McpServerEntry[];
   private readonly connections = new Map<string, McpConnection>();
   private readonly connecting = new Map<string, Promise<McpConnection>>();
-  private readonly failures = new Set<string>();
+  private readonly failures = new Map<string, number>();
 
   private constructor(private readonly projectRoot: string, definitions: Record<string, McpServerDefinition>) {
     const capabilityIds = new Set<string>();
@@ -134,6 +138,25 @@ export class McpProjectRegistry {
 
   public catalogHash(): string {
     return sha256(canonicalJson(this.summaries().map(({ status: _status, ...summary }) => summary)));
+  }
+
+  /** Return the remaining cooldown before a failed server may be retried. */
+  public retryAfterMs(capabilityId: string, now = Date.now()): number {
+    const entry = this.definitions.find((item) => item.capabilityId === capabilityId);
+    if (!entry) return 0;
+    const failedAt = this.failures.get(entry.name);
+    if (failedAt === undefined) return 0;
+    return Math.max(0, failedAt + MCP_FAILURE_RETRY_DELAY_MS - now);
+  }
+
+  /** Clear failed connection state so the next operation retries immediately. */
+  public resetFailures(capabilityId?: string): void {
+    if (capabilityId === undefined) {
+      this.failures.clear();
+      return;
+    }
+    const entry = this.definitions.find((item) => item.capabilityId === capabilityId);
+    if (entry) this.failures.delete(entry.name);
   }
 
   public capabilityManifests(): CapabilityManifest[] {
@@ -252,6 +275,7 @@ export class McpProjectRegistry {
     const entry = this.definitions.find((item) => item.capabilityId === capabilityId && !item.definition.disabled);
     if (!entry) throw new Error(`Unknown MCP capability: ${capabilityId}`);
     const started = Date.now();
+    let connection: McpConnection | undefined;
     try {
       if (operation === "describe") {
         if (Object.keys(input).length > 0) throw new Error("MCP describe takes no input");
@@ -263,7 +287,7 @@ export class McpProjectRegistry {
       const tool = typeof input.tool === "string" ? input.tool : "";
       const args = input.arguments;
       if (!tool || !args || typeof args !== "object" || Array.isArray(args)) throw new Error("MCP call requires tool and object arguments");
-      const connection = await this.ensureConnection(entry.name, signal);
+      connection = await this.ensureConnection(entry.name, signal);
       const tools = await this.describe(entry.name, signal);
       if (!tools.some((item) => item.name === tool)) throw new Error(`MCP tool is not allowed: ${entry.name}.${tool}`);
       const result = await connection.client.callTool({ name: tool, arguments: args as Record<string, unknown> }, requestOptions(entry.definition, signal));
@@ -271,6 +295,7 @@ export class McpProjectRegistry {
       const stdout = redactText(JSON.stringify({ server: entry.name, tool, result }, null, 2), secrets);
       return { stdout, stderr: result.isError ? `MCP tool reported an error: ${entry.name}.${tool}` : "", exitCode: result.isError ? 1 : 0, durationMs: Date.now() - started, externalId: externalId(connection) };
     } catch (error) {
+      if (connection && isTransportFailure(error)) await this.invalidateConnection(entry.name, connection);
       return { stdout: "", stderr: redactText(error instanceof Error ? error.message : String(error), resolvedEnvSecrets(entry.definition.env)), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
     }
   }
@@ -279,8 +304,13 @@ export class McpProjectRegistry {
     const entry = this.entry(name);
     const connection = await this.ensureConnection(name, signal);
     if (!connection.tools) {
-      const result = await connection.client.listTools(undefined, requestOptions(entry.definition, signal));
-      connection.tools = allowedTools(result, entry.definition).sort((a, b) => a.name.localeCompare(b.name));
+      try {
+        const result = await connection.client.listTools(undefined, requestOptions(entry.definition, signal));
+        connection.tools = allowedTools(result, entry.definition).sort((a, b) => a.name.localeCompare(b.name));
+      } catch (error) {
+        if (isTransportFailure(error)) await this.invalidateConnection(name, connection);
+        throw error;
+      }
     }
     return connection.tools.map((tool) => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) }));
   }
@@ -319,6 +349,13 @@ export class McpProjectRegistry {
     return await connecting;
   }
 
+  private async invalidateConnection(name: string, connection: McpConnection): Promise<void> {
+    if (this.connections.get(name) !== connection) return;
+    this.connections.delete(name);
+    this.failures.set(name, Date.now());
+    await connection.client.close().catch(() => connection.transport.close().catch(() => undefined));
+  }
+
   private async connect(entry: McpServerEntry, signal?: AbortSignal): Promise<McpConnection> {
     const cwd = resolve(this.projectRoot, entry.definition.cwd ?? ".");
     const env = { ...getDefaultEnvironment(), ...resolveEnvironment(entry.definition.env) };
@@ -334,11 +371,19 @@ export class McpProjectRegistry {
       this.failures.delete(entry.name);
       return connection;
     } catch (error) {
-      this.failures.add(entry.name);
+      this.failures.set(entry.name, Date.now());
       await client.close().catch(() => transport.close().catch(() => undefined));
       throw error;
     }
   }
+}
+
+function isTransportFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code?: unknown }).code) : "";
+  if ([SdkErrorCode.ConnectionClosed, SdkErrorCode.NotConnected, SdkErrorCode.SendFailed].includes(code as SdkErrorCode)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /connection\s+(?:closed|lost)|transport\s+(?:closed|error)|broken\s+pipe|not\s+connected/i.test(message);
 }
 
 function validateServer(name: string, definition: McpServerDefinition, projectRoot: string): void {

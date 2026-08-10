@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.13",
+  "version": "0.12.14",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:09:33.039Z",
+  "updatedAt": "2026-08-09T16:31:33.000Z",
   "qualityAudit": {
-    "bugAuditCount": 9,
-    "securityAuditCount": 9,
-    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
-    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "c8c644227ec4de9433810e61f2cb843bf87dfa15d41b2bab91b08281a0919b7a",
+    "bugAuditCount": 10,
+    "securityAuditCount": 10,
+    "lastBugAuditAt": "2026-08-09T16:31:33.000Z",
+    "lastSecurityAuditAt": "2026-08-09T16:31:33.000Z",
+    "sourceHash": "4077f94e14a767f761e23fe33c645c76e5720726e75b78c7cce2c5592b2fb916",
     "result": "passed"
   }
 }
@@ -38,6 +38,7 @@
 - 嵌套分发型 MCP Tool 在 Effect 前解析真实内层 Tool，未知项默认拒绝，并按内层策略记录副作用、重放、资源和脱敏元数据。
 - 显式 MCP 脱敏字段不受短值阈值限制；`secret` 调用结果保持 secret Artifact 分类，Solver/Coding 共用嵌套能力描述。
 - 后台 Job 只持久化 Provider 安全参数副本；原始参数仅用于当前进程执行，脱敏参数不能跨进程自动重放。
+- Capability Router 将稳定逻辑能力与可替换 Backend 解耦；模型不感知重复实现，选择仅发生在执行前，后台恢复绑定 Backend ID/版本并拒绝漂移。
 - Coding Agent 的 `read`/`bash` 结果保存原始材料并返回稳定 Artifact 锚点；名称、摘要、标签、用途和关联关系进入可重放的语义投影，只有 Evidence/Fact 链上的内容才视为结论依据。
 - 推理知识以共享 DAG 持久化，并按主题投影成可折叠的 Reasoning Tree；多棵树组成 Forest，同一 Artifact/Evidence 节点可以被重复采用但不得复制权威数据。
 - 未审阅的侦察 Artifact 由 Evidence Curation Gate 按内容哈希去重后限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。任一同内容副本完成 `record/annotate` 后，其余副本不再重复占用整理预算。
