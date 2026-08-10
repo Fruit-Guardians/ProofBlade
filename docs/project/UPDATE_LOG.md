@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T13:20:00+08:00
+> 状态更新时间：2026-08-10T14:05:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-005 | 2026-08-10T14:05:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
 | UPDATE-20260810-004 | 2026-08-10T13:20:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
 | UPDATE-20260810-003 | 2026-08-10T12:10:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
@@ -33,6 +34,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-005
+
+时间：2026-08-10T14:05:00+08:00
+
+摘要：修复 PE 地址语义和 Binary Core 硬链接私有文件泄露。
+
+### 变更
+
+- PE 入口点和区段地址现在将 ImageBase 与 RVA 相加后返回虚拟地址
+- 文件读取通过句柄检查 nlink，拒绝指向私有 Fixture 文件的硬链接
+- 增加 PE ImageBase、硬链接访问和句柄读取回归测试
+
+### 验证
+
+- [x] Binary Core tests: 5/5 passed
+- [x] component documentation gate passed
+- [x] project reports regenerated
 
 ## UPDATE-20260810-004
 

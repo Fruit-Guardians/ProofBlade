@@ -1,4 +1,4 @@
-import { readFile, realpath, stat } from "node:fs/promises";
+import { open, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { RawEffectResult } from "../domain/types.js";
 
@@ -91,8 +91,6 @@ async function resolveBinaryPath(root: string, inputPath: string): Promise<strin
   const resolvedPath = await realpath(candidatePath);
   const relativePath = assertInsideFixture(resolvedRoot, resolvedPath);
   if (containsPrivatePathSegment(relativePath)) throw new Error("Binary path targets private fixture data");
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error("Binary path must reference a file");
   return resolvedPath;
 }
 
@@ -107,9 +105,16 @@ function containsPrivatePathSegment(path: string): boolean {
 }
 
 async function readBoundedFile(path: string): Promise<Buffer> {
-  const metadata = await stat(path);
-  if (metadata.size > MAX_BINARY_BYTES) throw new Error(`Binary exceeds ${MAX_BINARY_BYTES} byte analysis limit`);
-  return await readFile(path);
+  const file = await open(path, "r");
+  try {
+    const metadata = await file.stat();
+    if (!metadata.isFile()) throw new Error("Binary path must reference a file");
+    if (metadata.nlink !== 1) throw new Error("Binary path must not reference a hard-linked file");
+    if (metadata.size > MAX_BINARY_BYTES) throw new Error(`Binary exceeds ${MAX_BINARY_BYTES} byte analysis limit`);
+    return await file.readFile();
+  } finally {
+    await file.close();
+  }
 }
 
 function identify(bytes: Buffer): BinaryIdentity {
@@ -121,7 +126,7 @@ function identify(bytes: Buffer): BinaryIdentity {
   }
   const pe = peHeader(bytes);
   if (pe) {
-    return { format: "pe", size: bytes.length, bits: pe.bits, endian: "little", machine: pe.machine, architecture: peArchitecture(pe.machine), entryPoint: hex(BigInt(pe.entryRva)) };
+    return { format: "pe", size: bytes.length, bits: pe.bits, endian: "little", machine: pe.machine, architecture: peArchitecture(pe.machine), entryPoint: hex(pe.imageBase + BigInt(pe.entryRva)) };
   }
   return { format: "unknown", size: bytes.length };
 }
@@ -193,7 +198,7 @@ function isElf(bytes: Buffer): boolean {
   return bytes.length >= 20 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46 && (bytes[4] === 1 || bytes[4] === 2) && (bytes[5] === 1 || bytes[5] === 2);
 }
 
-function peHeader(bytes: Buffer): { offset: number; machine: number; sectionCount: number; optionalSize: number; bits: 32 | 64; entryRva: number; symbolTable: number; symbolCount: number } | undefined {
+function peHeader(bytes: Buffer): { offset: number; machine: number; sectionCount: number; optionalSize: number; bits: 32 | 64; entryRva: number; imageBase: bigint; symbolTable: number; symbolCount: number } | undefined {
   if (bytes.length < 0x40 || bytes[0] !== 0x4d || bytes[1] !== 0x5a) return undefined;
   const offset = read32(bytes, 0x3c, "little");
   if (offset + 24 > bytes.length || bytes.toString("ascii", offset, offset + 4) !== "PE\0\0") return undefined;
@@ -206,7 +211,9 @@ function peHeader(bytes: Buffer): { offset: number; machine: number; sectionCoun
   const magic = read16(bytes, optional, "little");
   const bits = magic === 0x20b ? 64 : 32;
   if (magic !== 0x10b && magic !== 0x20b) return undefined;
-  return { offset, machine, sectionCount, optionalSize, bits, entryRva: read32(bytes, optional + 16, "little"), symbolTable, symbolCount };
+  if (optionalSize < 32 || optional + optionalSize > bytes.length) return undefined;
+  const imageBase = bits === 32 ? BigInt(read32(bytes, optional + 28, "little")) : read64(bytes, optional + 24, "little");
+  return { offset, machine, sectionCount, optionalSize, bits, entryRva: read32(bytes, optional + 16, "little"), imageBase, symbolTable, symbolCount };
 }
 
 function peSections(bytes: Buffer): { sections: BinarySection[]; characteristics: string[] } | undefined {
@@ -218,7 +225,7 @@ function peSections(bytes: Buffer): { sections: BinarySection[]; characteristics
     const base = start + index * 40;
     const rawName = bytes.toString("ascii", base, base + 8).replace(/\0.*$/, "");
     const characteristics = read32(bytes, base + 36, "little");
-    result.push({ index, name: rawName, offset: read32(bytes, base + 20, "little"), size: read32(bytes, base + 16, "little"), address: hex(BigInt(read32(bytes, base + 12, "little"))), characteristics: peSectionCharacteristics(characteristics) });
+    result.push({ index, name: rawName, offset: read32(bytes, base + 20, "little"), size: read32(bytes, base + 16, "little"), address: hex(header.imageBase + BigInt(read32(bytes, base + 12, "little"))), characteristics: peSectionCharacteristics(characteristics) });
   }
   return { sections: result, characteristics: [] };
 }

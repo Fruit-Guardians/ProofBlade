@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -49,12 +49,17 @@ test("Binary Core v1 identifies PE32 sections", async () => {
     await writeFile(join(root, "sample.exe"), makePe32());
     const backend = new BinaryCapabilityBackend();
     const operation = { name: "sections", description: "sections", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure" as const, outputPolicy: "summary" as const, executionMode: "sequential" as const };
+    const identifyOperation = { ...operation, name: "identify" };
+    const identifyPlan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "identify", input: { path: "sample.exe" } }, identifyOperation, { runId: "BINARY-PE", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: join(root, ".proofblade") }, runsRoot: root, artifacts: {} });
+    const identifyResult = await identifyPlan.execute!(new AbortController().signal);
+    assert.equal(identifyResult.exitCode, 0, identifyResult.stderr);
+    assert.equal((JSON.parse(identifyResult.stdout) as { entryPoint: string }).entryPoint, "0x401000");
     const plan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "sections", input: { path: "sample.exe" } }, operation, { runId: "BINARY-PE", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: join(root, ".proofblade") }, runsRoot: root, artifacts: {} });
     const result = await plan.execute!(new AbortController().signal);
     assert.equal(result.exitCode, 0, result.stderr);
     const output = JSON.parse(result.stdout) as { format: string; sections: Array<{ name: string; size: number }> };
     assert.equal(output.format, "pe");
-    assert.deepEqual(output.sections, [{ index: 0, name: ".text", offset: 0x200, size: 0x40, address: "0x1000", characteristics: ["code", "execute", "read"] }]);
+    assert.deepEqual(output.sections, [{ index: 0, name: ".text", offset: 0x200, size: 0x40, address: "0x401000", characteristics: ["code", "execute", "read"] }]);
     const symbolOperation = { ...operation, name: "symbols" };
     const symbolPlan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "symbols", input: { path: "sample.exe" } }, symbolOperation, { runId: "BINARY-PE", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: join(root, ".proofblade") }, runsRoot: root, artifacts: {} });
     const symbolResult = await symbolPlan.execute!(new AbortController().signal);
@@ -104,6 +109,28 @@ test("Binary Core v1 rejects directory links that escape the fixture", async (co
   }
 });
 
+test("Binary Core v1 rejects hard links to private fixture files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-binary-hardlink-"));
+  try {
+    const privateRoot = join(root, ".proofblade");
+    await mkdir(privateRoot);
+    await writeFile(join(privateRoot, "secret.bin"), "flag{private}");
+    await link(join(privateRoot, "secret.bin"), join(root, "visible.bin"));
+
+    const backend = new BinaryCapabilityBackend();
+    const operation = { name: "strings", description: "strings", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure" as const, outputPolicy: "summary" as const, executionMode: "sequential" as const };
+    const plan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "strings", input: { path: "visible.bin" } }, operation, {
+      runId: "BINARY-HARDLINK", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: privateRoot }, runsRoot: root, artifacts: {},
+    });
+    const result = await plan.execute!(new AbortController().signal);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /hard-linked file/);
+    assert.doesNotMatch(result.stdout, /flag\{private\}/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function makeElf64(): Buffer {
   const bytes = Buffer.alloc(608);
   bytes.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1], 0);
@@ -141,6 +168,7 @@ function makePe32(): Buffer {
   bytes.writeUInt16LE(0xe0, 0x94);
   bytes.writeUInt16LE(0x10b, 0x98);
   bytes.writeUInt32LE(0x1000, 0xa8);
+  bytes.writeUInt32LE(0x400000, 0xb4);
   bytes.write(".text\0\0\0", 0x178, "ascii");
   bytes.writeUInt32LE(0x40, 0x180);
   bytes.writeUInt32LE(0x1000, 0x184);

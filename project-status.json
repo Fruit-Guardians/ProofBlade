@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T13:20:00+08:00",
+  "updatedAt": "2026-08-10T14:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -204,6 +204,26 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-005",
+      "occurredAt": "2026-08-10T14:05:00+08:00",
+      "summary": "修复 PE 地址语义和 Binary Core 硬链接私有文件泄露。",
+      "branch": "codex/binary-core-v1",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "PE 入口点和区段地址现在将 ImageBase 与 RVA 相加后返回虚拟地址",
+        "文件读取通过句柄检查 nlink，拒绝指向私有 Fixture 文件的硬链接",
+        "增加 PE ImageBase、硬链接访问和句柄读取回归测试"
+      ],
+      "validation": [
+        "Binary Core tests: 5/5 passed",
+        "component documentation gate passed",
+        "project reports regenerated"
+      ]
+    },
     {
       "id": "UPDATE-20260810-004",
       "occurredAt": "2026-08-10T13:20:00+08:00",
