@@ -67,13 +67,21 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       }
       const progress = progressBreaker?.observe(observation);
       if (progress?.terminate) {
-        termination.message = noProgressToolMessage(event.toolName, progress.count);
-        termination.reason = "no_progress";
-        termination.noProgressWindow = progress.window;
-        termination.requested = true;
+        const preservesDeclaredTermination = termination.reason === "no_progress"
+          && termination.noProgressWindow === "declared_no_progress"
+          && progress.window === "read";
+        const terminationMessage = preservesDeclaredTermination
+          ? termination.message ?? noProgressToolMessage(event.toolName, progress.count)
+          : noProgressToolMessage(event.toolName, progress.count);
+        if (!preservesDeclaredTermination) {
+          termination.message = terminationMessage;
+          termination.reason = "no_progress";
+          termination.noProgressWindow = progress.window;
+          termination.requested = true;
+        }
         return {
-          content: [{ type: "text" as const, text: termination.message }],
-          details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key },
+          content: [{ type: "text" as const, text: terminationMessage }],
+          details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key, window: termination.noProgressWindow },
           isError: false,
           terminate: true,
         };

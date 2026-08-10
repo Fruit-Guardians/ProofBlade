@@ -219,10 +219,11 @@
         "显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数",
         "platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window",
         "no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销",
+        "declared-no-progress 终止保持优先级，后续 read-window 终止不能覆盖并为 process 打开撤销路径",
         "增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试"
       ],
       "validation": [
-        "161/161 repository tests passed",
+        "162/162 repository tests passed",
         "component, contract and project report gates passed",
         "rollback copy restored to the original SHA-256"
       ]
