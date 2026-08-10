@@ -549,6 +549,59 @@ test("process success in an evidence batch preserves a pending no-progress stop"
   }
 });
 
+test("process success in a read batch cancels a read-window no-progress stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-read-process-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-read-process" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage([
+        fauxToolCall("read", { path: "same" }, { id: "read-3" }),
+        fauxToolCall("bash", { command: "node write-progress.mjs" }, { id: "bash-1" }),
+      ], { stopReason: "toolUse" }),
+      fauxAssistantMessage("continued after process progress"),
+    ]);
+    const stableRead: AgentHarnessTool<undefined> = {
+      name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "process writes a workspace file", parameters: Type.Object({ command: Type.String() }),
+      async execute() {
+        await appendFile(join(root, "progress.txt"), "progress\n", "utf8");
+        return { content: [{ type: "text" as const, text: "wrote progress" }] };
+      },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "read-process", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [stableRead, bash], activeToolNames: ["read", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      (toolName) => toolName === "read" ? readOnlyEffect : toolName === "bash" ? { readOnly: false, sideEffect: "process" } : undefined,
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 4);
+    assert.equal(response.stopReason, "stop");
+    assert.equal(response.content.find((item) => item.type === "text")?.text, "continued after process progress");
+    assert.equal(termination.requested, false);
+    assert.equal(termination.reason, undefined);
+    assert.equal(termination.noProgressWindow, undefined);
+    assert.equal(await readFile(join(root, "progress.txt"), "utf8"), "progress\n");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function task(runId: string, root: string): TaskContract {
   return {
     schema_version: 1,

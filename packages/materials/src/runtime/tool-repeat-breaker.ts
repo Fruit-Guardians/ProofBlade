@@ -21,7 +21,10 @@ export interface ToolFailureDecision {
   count: number;
   terminate: boolean;
   key: string;
+  window?: NoProgressWindow;
 }
+
+export type NoProgressWindow = "read" | "declared_no_progress";
 
 /** Stops a lane when the model repeats an identical failing tool call. */
 export class RepeatedToolFailureBreaker {
@@ -78,7 +81,7 @@ export class NoProgressToolBreaker {
       this.reset();
       return { count: 0, terminate: false, key: "" };
     }
-    if (declaredProgress === false) return this.observeWindow(this.declaredNoProgressWindow, observation);
+    if (declaredProgress === false) return this.observeWindow(this.declaredNoProgressWindow, observation, "declared_no_progress");
     if (isDurableEffect(observation)) {
       this.reset();
       return { count: 0, terminate: false, key: "" };
@@ -87,20 +90,21 @@ export class NoProgressToolBreaker {
       this.readWindow.reset();
       return { count: 0, terminate: false, key: "" };
     }
-    return this.observeWindow(this.readWindow, observation);
+    return this.observeWindow(this.readWindow, observation, "read");
   }
 
-  private observeWindow(window: ObservationWindow, observation: ToolFailureObservation): ToolFailureDecision {
+  private observeWindow(window: ObservationWindow, observation: ToolFailureObservation, windowKind: NoProgressWindow): ToolFailureDecision {
     const key = observationKey(observation);
     if (!key) return { count: 0, terminate: false, key: "" };
     const count = window.observe(key, this.windowSize);
-    return { count, terminate: count >= this.threshold, key };
+    return { count, terminate: count >= this.threshold, key, window: windowKind };
   }
 
-  public isProgress(observation: ToolFailureObservation): boolean {
+  public isProgress(observation: ToolFailureObservation, activeWindow?: NoProgressWindow): boolean {
     if (observation.isError) return false;
     const declaredProgress = stableBoolean(observation.details, "durableProgress");
     if (declaredProgress !== undefined) return declaredProgress;
+    if (activeWindow === "read" && !isPureReadOnlyObservation(observation)) return true;
     // Unresolved tools retain the conservative potential-progress behavior.
     if (!observation.effectPolicy) return true;
     return isDurableEffect(observation);
