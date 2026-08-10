@@ -21,7 +21,10 @@ export interface ToolFailureDecision {
   count: number;
   terminate: boolean;
   key: string;
+  window?: NoProgressWindow;
 }
+
+export type NoProgressWindow = "read" | "declared_no_progress";
 
 /** Stops a lane when the model repeats an identical failing tool call. */
 export class RepeatedToolFailureBreaker {
@@ -60,8 +63,8 @@ export class RepeatedToolFailureBreaker {
 
 /** Stops read-only investigation loops that repeatedly recover identical information. */
 export class NoProgressToolBreaker {
-  private readonly recentKeys: string[] = [];
-  private readonly counts = new Map<string, number>();
+  private readonly readWindow = new ObservationWindow();
+  private readonly declaredNoProgressWindow = new ObservationWindow();
 
   public constructor(
     private readonly threshold = 3,
@@ -73,26 +76,61 @@ export class NoProgressToolBreaker {
 
   public observe(observation: ToolFailureObservation): ToolFailureDecision {
     if (observation.isError) return { count: 0, terminate: false, key: "" };
-    if (!isNoProgressObservation(observation)) {
+    const declaredProgress = stableBoolean(observation.details, "durableProgress");
+    if (declaredProgress === true) {
       this.reset();
       return { count: 0, terminate: false, key: "" };
     }
+    if (declaredProgress === false) return this.observeWindow(this.declaredNoProgressWindow, observation, "declared_no_progress");
+    if (isDurableEffect(observation)) {
+      this.reset();
+      return { count: 0, terminate: false, key: "" };
+    }
+    if (!isPureReadOnlyObservation(observation)) {
+      this.readWindow.reset();
+      return { count: 0, terminate: false, key: "" };
+    }
+    return this.observeWindow(this.readWindow, observation, "read");
+  }
+
+  private observeWindow(window: ObservationWindow, observation: ToolFailureObservation, windowKind: NoProgressWindow): ToolFailureDecision {
     const key = observationKey(observation);
     if (!key) return { count: 0, terminate: false, key: "" };
+    const count = window.observe(key, this.windowSize);
+    return { count, terminate: count >= this.threshold, key, window: windowKind };
+  }
+
+  public isProgress(observation: ToolFailureObservation, activeWindow?: NoProgressWindow): boolean {
+    if (observation.isError) return false;
+    const declaredProgress = stableBoolean(observation.details, "durableProgress");
+    if (declaredProgress !== undefined) return declaredProgress;
+    if (activeWindow === "read" && !isPureReadOnlyObservation(observation)) return true;
+    if (activeWindow === "declared_no_progress") return isDurableEffect(observation);
+    // Without a declared no-progress window, unresolved tools retain potential-progress semantics.
+    if (!observation.effectPolicy) return true;
+    return isDurableEffect(observation);
+  }
+
+  public reset(): void {
+    this.readWindow.reset();
+    this.declaredNoProgressWindow.reset();
+  }
+}
+
+class ObservationWindow {
+  private readonly recentKeys: string[] = [];
+  private readonly counts = new Map<string, number>();
+
+  public observe(key: string, windowSize: number): number {
     this.recentKeys.push(key);
     this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
-    if (this.recentKeys.length > this.windowSize) {
+    if (this.recentKeys.length > windowSize) {
       const expired = this.recentKeys.shift()!;
       const remaining = (this.counts.get(expired) ?? 1) - 1;
       if (remaining === 0) this.counts.delete(expired);
       else this.counts.set(expired, remaining);
     }
-    const count = this.counts.get(key) ?? 0;
-    return { count, terminate: count >= this.threshold, key };
-  }
-
-  public isProgress(observation: ToolFailureObservation): boolean {
-    return !observation.isError && !isNoProgressObservation(observation);
+    return this.counts.get(key) ?? 0;
   }
 
   public reset(): void {
@@ -163,6 +201,12 @@ function observationKey(observation: ToolFailureObservation): string | undefined
 
 function isPureReadOnlyObservation(observation: ToolFailureObservation): boolean {
   return observation.effectPolicy?.readOnly === true && observation.effectPolicy.sideEffect === "none";
+}
+
+function isDurableEffect(observation: ToolFailureObservation): boolean {
+  return observation.effectPolicy?.sideEffect === "workspace"
+    || observation.effectPolicy?.sideEffect === "network"
+    || observation.effectPolicy?.sideEffect === "platform";
 }
 
 function isNoProgressObservation(observation: ToolFailureObservation): boolean {

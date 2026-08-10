@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T11:17:00+08:00
+> 状态更新时间：2026-08-10T14:08:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -31,6 +32,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-003
+
+时间：2026-08-10T14:08:00+08:00
+
+摘要：修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。
+
+### 变更
+
+- Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞
+- 显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数
+- platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window
+- no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销
+- declared-no-progress 终止保持优先级，后续 read-window 终止不能覆盖并为 process 打开撤销路径
+- 增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试
+
+### 验证
+
+- [x] 162/162 repository tests passed
+- [x] component, contract and project report gates passed
+- [x] rollback copy restored to the original SHA-256
 
 ## UPDATE-20260810-002
 

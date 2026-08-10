@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.15",
+  "version": "0.12.16",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T03:18:16.431Z",
+  "updatedAt": "2026-08-10T07:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 11,
-    "securityAuditCount": 11,
-    "lastBugAuditAt": "2026-08-10T03:18:16.431Z",
-    "lastSecurityAuditAt": "2026-08-10T03:18:16.431Z",
-    "sourceHash": "c60819ee394b21315a72b899886dd57d5fb08ad9beb3f2fb25f403846e233ffe",
+    "bugAuditCount": 12,
+    "securityAuditCount": 12,
+    "lastBugAuditAt": "2026-08-10T07:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-10T07:00:00.000Z",
+    "sourceHash": "e1a911ed0d7ddde6658e1c6faa41230fdbd65a85e13932345f35605d4cec05df",
     "result": "passed"
   }
 }
@@ -43,7 +43,7 @@
 - 推理知识以共享 DAG 持久化，并按主题投影成可折叠的 Reasoning Tree；多棵树组成 Forest，同一 Artifact/Evidence 节点可以被重复采用但不得复制权威数据。
 - 未审阅的侦察 Artifact 由 Evidence Curation Gate 按内容哈希去重后限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。任一同内容副本完成 `record/annotate` 后，其余副本不再重复占用整理预算。
 - Context 维护采用单调 Tool Result 表示、目标预算裁剪和 idle-time 持久压缩；压缩后的 recent tail 必须受模型级预算约束，`length` 恢复必须有重试上限。
-- Tool 断路器必须同时覆盖重复失败和无信息增益的成功观察。无进展判定只统计 Tool Contract 明确声明为只读且无副作用、并在滚动窗口内返回相同内容哈希的操作；任意 Bash、未知插件和副作用 MCP 调用都会清空窗口，同批持久进展不得因工具顺序被误停。恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
+- Tool 断路器必须同时覆盖重复失败和无信息增益的成功观察。无进展判定只统计 Tool Contract 明确声明为只读且无副作用、并在滚动窗口内返回相同内容哈希的操作；read-window 终止允许同批成功的普通 process 取消，声明无进展的 declared-no-progress-window 仍要求显式 durableProgress 或真实 durable effect，未解析策略在 read-window 中按潜在进展处理，后续 read-window 不得降级已请求的 declared-no-progress 终止。恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
 - Evidence 整理必须原子、并发幂等并返回稳定进展键；读取快照、判重、生成 ID 与提交共享同一按 Run 串行事务，重复整理不得制造新 Evidence 或解除无进展计数。多样化 Tool 参数错误也受单轮失败预算约束，防止模型绕过相同失败断路器。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。

@@ -84,6 +84,53 @@ test("idempotent workspace operations use their durable progress key as no-progr
   assert.equal(decision.terminate, true);
 });
 
+test("declared non-progress evidence survives intervening process observations", () => {
+  const breaker = new NoProgressToolBreaker(3, 12);
+  const duplicateEvidence = {
+    toolName: "evidence",
+    input: { operation: "record" },
+    isError: false,
+    content: [{ type: "text", text: "wording changes between calls" }],
+    details: { durableProgress: false, progressKey: "same-content-evidence" },
+    effectPolicy: { readOnly: false, sideEffect: "workspace" as const },
+  };
+  const processObservation = {
+    toolName: "bash",
+    input: { command: "sed -n '1,240p' solver.py" },
+    isError: false,
+    content: [{ type: "text", text: "solver source" }],
+    effectPolicy: { readOnly: false, sideEffect: "process" as const },
+  };
+
+  assert.equal(breaker.observe(duplicateEvidence).count, 1);
+  assert.equal(breaker.observe(processObservation).terminate, false);
+  assert.equal(breaker.observe(duplicateEvidence).count, 2);
+  assert.equal(breaker.observe(processObservation).terminate, false);
+  assert.equal(breaker.observe(duplicateEvidence).terminate, true);
+});
+
+test("declared no-progress termination does not clear for unresolved tools", () => {
+  const breaker = new NoProgressToolBreaker(3);
+  const duplicateEvidence = {
+    toolName: "evidence",
+    input: { operation: "record" },
+    isError: false,
+    content: [{ type: "text" as const, text: "same evidence" }],
+    details: { durableProgress: false, progressKey: "same-evidence" },
+    effectPolicy: workspaceEffect,
+  };
+  const unresolved = {
+    toolName: "plugin_tool",
+    input: { operation: "inspect" },
+    isError: false,
+    content: [{ type: "text" as const, text: "potentially changed" }],
+  };
+  breaker.observe(duplicateEvidence);
+  breaker.observe(duplicateEvidence);
+  assert.equal(breaker.observe(duplicateEvidence).window, "declared_no_progress");
+  assert.equal(breaker.isProgress(unresolved, "declared_no_progress"), false);
+});
+
 test("[contract:tool-failure-storm] varied failures stop after a bounded budget without durable progress", () => {
   const breaker = new ToolFailureStormBreaker(4);
   for (const input of [
@@ -413,6 +460,228 @@ test("a durable mutation in the same batch cancels an order-dependent no-progres
     assert.equal(response.content.find((item) => item.type === "text")?.text, "continued after durable progress");
     assert.equal(termination.requested, false);
     assert.equal(termination.reason, undefined);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+for (const scenario of [
+  { name: "platform MCP", effectPolicy: { readOnly: false, sideEffect: "platform" as const } },
+  { name: "unresolved plugin", effectPolicy: undefined },
+]) {
+  test(`${scenario.name} success in a mixed batch cancels a pending no-progress stop`, async () => {
+    const root = await mkdtemp(join(tmpdir(), "proofblade-no-progress-policy-"));
+    const env = new NodeExecutionEnv({ cwd: root });
+    try {
+      const faux = fauxProvider({ provider: `faux-no-progress-${scenario.name.replace(/\s+/g, "-")}` });
+      const models = createModels();
+      models.setProvider(faux.provider);
+      faux.setResponses([
+        fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-1" }), { stopReason: "toolUse" }),
+        fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-2" }), { stopReason: "toolUse" }),
+        fauxAssistantMessage([
+          fauxToolCall("read", { path: "same" }, { id: "read-3" }),
+          fauxToolCall("side_effect", {}, { id: "side-effect-1" }),
+        ], { stopReason: "toolUse" }),
+        fauxAssistantMessage("continued after potential progress"),
+      ]);
+      const stableRead: AgentHarnessTool<undefined> = {
+        name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+        async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+      };
+      const sideEffect: AgentHarnessTool<undefined> = {
+        name: "side_effect", label: "side_effect", description: "successful non-read-only operation", parameters: Type.Object({}),
+        async execute() { return { content: [{ type: "text" as const, text: "operation completed" }] }; },
+      };
+      const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+      const session = await repo.create({ id: `no-progress-${scenario.name}`, cwd: root });
+      const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [stableRead, sideEffect], activeToolNames: ["read", "side_effect"], systemPrompt: "test" });
+      const termination: CodingTurnTermination = {};
+      attachCodingTurnGuards(
+        harness,
+        new RepeatedToolFailureBreaker(),
+        new NoProgressToolBreaker(),
+        termination,
+        (toolName) => toolName === "read" ? readOnlyEffect : toolName === "side_effect" ? scenario.effectPolicy : undefined,
+      );
+
+      const response = await harness.prompt("continue");
+      assert.equal(faux.state.callCount, 4);
+      assert.equal(response.stopReason, "stop");
+      assert.equal(response.content.find((item) => item.type === "text")?.text, "continued after potential progress");
+      assert.equal(termination.requested, false);
+      assert.equal(termination.reason, undefined);
+    } finally {
+      await env.cleanup();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("process success in an evidence batch preserves a pending no-progress stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-no-progress-process-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-no-progress-process" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "record" }, { id: "evidence-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "record" }, { id: "evidence-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage([
+        fauxToolCall("evidence", { operation: "record" }, { id: "evidence-3" }),
+        fauxToolCall("bash", { command: "sed -n 1,20p solver.py" }, { id: "bash-1" }),
+      ], { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not continue"),
+    ]);
+    const evidence: AgentHarnessTool<undefined> = {
+      name: "evidence", label: "evidence", description: "reused evidence", parameters: Type.Object({ operation: Type.String() }),
+      async execute() {
+        return {
+          content: [{ type: "text" as const, text: "same evidence" }],
+          details: { durableProgress: false, progressKey: "same-evidence" },
+        };
+      },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "process-only inspection", parameters: Type.Object({ command: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "solver source" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "no-progress-process", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, bash], activeToolNames: ["evidence", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      (toolName) => toolName === "evidence" ? workspaceEffect : toolName === "bash" ? { readOnly: false, sideEffect: "process" } : undefined,
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 3);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.requested, true);
+    assert.equal(termination.reason, "no_progress");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("process success in a read batch cancels a read-window no-progress stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-read-process-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-read-process" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage([
+        fauxToolCall("read", { path: "same" }, { id: "read-3" }),
+        fauxToolCall("bash", { command: "node write-progress.mjs" }, { id: "bash-1" }),
+      ], { stopReason: "toolUse" }),
+      fauxAssistantMessage("continued after process progress"),
+    ]);
+    const stableRead: AgentHarnessTool<undefined> = {
+      name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "process writes a workspace file", parameters: Type.Object({ command: Type.String() }),
+      async execute() {
+        await appendFile(join(root, "progress.txt"), "progress\n", "utf8");
+        return { content: [{ type: "text" as const, text: "wrote progress" }] };
+      },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "read-process", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [stableRead, bash], activeToolNames: ["read", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      (toolName) => toolName === "read" ? readOnlyEffect : toolName === "bash" ? { readOnly: false, sideEffect: "process" } : undefined,
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 4);
+    assert.equal(response.stopReason, "stop");
+    assert.equal(response.content.find((item) => item.type === "text")?.text, "continued after process progress");
+    assert.equal(termination.requested, false);
+    assert.equal(termination.reason, undefined);
+    assert.equal(termination.noProgressWindow, undefined);
+    assert.equal(await readFile(join(root, "progress.txt"), "utf8"), "progress\n");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("read-window termination cannot replace an earlier declared no-progress stop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-declared-read-priority-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-declared-read-priority" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage([
+        fauxToolCall("evidence", { operation: "record", index: 1 }, { id: "evidence-1" }),
+        fauxToolCall("evidence", { operation: "record", index: 2 }, { id: "evidence-2" }),
+        fauxToolCall("evidence", { operation: "record", index: 3 }, { id: "evidence-3" }),
+        fauxToolCall("read", { path: "same" }, { id: "read-1" }),
+        fauxToolCall("read", { path: "same" }, { id: "read-2" }),
+        fauxToolCall("read", { path: "same" }, { id: "read-3" }),
+        fauxToolCall("bash", { command: "node write-progress.mjs" }, { id: "bash-1" }),
+      ], { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not continue"),
+    ]);
+    const evidence: AgentHarnessTool<undefined> = {
+      name: "evidence", label: "evidence", description: "reused evidence", parameters: Type.Object({ operation: Type.String(), index: Type.Number() }),
+      async execute() {
+        return {
+          content: [{ type: "text" as const, text: "same evidence" }],
+          details: { durableProgress: false, progressKey: "same-evidence" },
+        };
+      },
+    };
+    const stableRead: AgentHarnessTool<undefined> = {
+      name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "process writes a workspace file", parameters: Type.Object({ command: Type.String() }),
+      async execute() {
+        await appendFile(join(root, "progress.txt"), "progress\n", "utf8");
+        return { content: [{ type: "text" as const, text: "wrote progress" }] };
+      },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "declared-read-priority", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, stableRead, bash], activeToolNames: ["evidence", "read", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      (toolName) => toolName === "evidence" ? workspaceEffect : toolName === "read" ? readOnlyEffect : toolName === "bash" ? { readOnly: false, sideEffect: "process" } : undefined,
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 1);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.requested, true);
+    assert.equal(termination.reason, "no_progress");
+    assert.equal(termination.noProgressWindow, "declared_no_progress");
+    assert.match(termination.message ?? "", /evidence/);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
