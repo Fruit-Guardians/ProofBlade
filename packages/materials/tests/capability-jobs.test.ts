@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -59,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
-  assert.equal(bundledCapabilityCatalogHash(), "7b8e742875d5d4cba6b7a0e2107376c0f19cfd90cb4985cf8bd8db397fa81b62");
+  assert.equal(bundledCapabilityCatalogHash(), "c6e1f433d9752d7fc89598ff149032d06c84500c909ded96863c0958f1abb6cf");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -112,8 +112,8 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
-    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.target"]);
-    assert.deepEqual(catalog.backends.map((item) => [item.id, item.available]), [["proofblade-bundled", true], ["proofblade-mcp", false]]);
+    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.binary", "proofblade.target"]);
+    assert.deepEqual(catalog.backends.map((item) => [item.id, item.available]), [["proofblade-binary", true], ["proofblade-bundled", true], ["proofblade-mcp", false]]);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);
@@ -136,6 +136,12 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     assert.deepEqual(artifactPayload.args?.capability, expectedProvenance);
     const archived = await runtime.invokeCapability({ capabilityId: "proofblade.artifact", operation: "read", input: { artifactId: inspected.artifactId, maxChars: 256 } });
     assert.equal(archived.truncated, true);
+    const binary = Buffer.alloc(64);
+    binary.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1], 0);
+    await writeFile(join(fixture.path, "sample.bin"), binary);
+    const binaryIdentity = await runtime.invokeCapability({ capabilityId: "proofblade.binary", operation: "identify", input: { path: "sample.bin" } });
+    assert.ok(binaryIdentity.observationId);
+    assert.ok(binaryIdentity.evidenceId);
     await assert.rejects(() => runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: { path: "../outside" } }));
     await runtime.close();
   } finally {

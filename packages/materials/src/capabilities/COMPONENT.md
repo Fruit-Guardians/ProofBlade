@@ -4,15 +4,15 @@
 {
   "id": "materials-capabilities",
   "name": "Capability Catalog and Router",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T16:31:33.000Z",
+  "updatedAt": "2026-08-10T04:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-09T16:31:33.000Z",
-    "lastSecurityAuditAt": "2026-08-09T16:31:33.000Z",
-    "sourceHash": "eae8db0243f2d08d9a508ef00e1df99d5fdaee5a4d81fb98a63a115e99c510ed",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-10T04:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-10T04:00:00.000Z",
+    "sourceHash": "4759c71596e4563becdee798f6af02f480340b3016353a8d497e16b271a9bedf",
     "result": "passed"
   }
 }
