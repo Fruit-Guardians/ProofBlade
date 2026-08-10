@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T14:08:00+08:00",
+  "updatedAt": "2026-08-10T18:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -19,9 +19,9 @@
         "组件审计差异与高风险生命周期变更契约"
       ],
       "acceptance": [
-        "源码指纹未变化时不重复增加审计次数",
-        "单个 PR 对受影响组件的审计次数只能增加一次",
-        "源码变化后旧审计指纹必须使 CI 失败",
+        "普通源码 PR 由构建、测试和变更契约验证，不写回共享审计快照",
+        "并行源码 PR 不需要修改共享 COMPONENT.md 审计快照",
+        "周期性审计记录仍保持可解析且结果为 passed",
         "批量记录失败时不产生部分写入",
         "关闭、中止和 Sandbox 生命周期改动必须保留故障路径测试"
       ],
@@ -46,8 +46,9 @@
       ],
       "acceptance": [
         "四份报表可由一条命令确定性重建",
-        "维护报告自动汇总全部组件审计状态",
-        "实质变更没有更新项目状态时 CI 失败"
+        "维护报告自动汇总全部组件的周期性审计快照",
+        "治理文件变更没有更新项目状态时 CI 失败",
+        "普通源码 PR 不要求修改共享项目状态文件"
       ],
       "dependencies": [
         "PLAN-001"
@@ -204,6 +205,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-006",
+      "occurredAt": "2026-08-10T18:00:00+08:00",
+      "summary": "消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。",
+      "branch": "codex/fix-concurrent-pr-metadata",
+      "commit": "self",
+      "planIds": [
+        "PLAN-001",
+        "PLAN-002"
+      ],
+      "changes": [
+        "源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照",
+        "源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照",
+        "普通 packages/apps/scripts 变更不再要求写入共享 project-status.json",
+        "CI 在临时工作区的契约检查前自动重生成项目报表",
+        "补充并行源码变更与治理文件边界回归检查"
+      ],
+      "validation": [
+        "component and project report gates passed",
+        "CI gates passed",
+        "168/168 repository tests passed"
+      ]
+    },
     {
       "id": "UPDATE-20260810-003",
       "occurredAt": "2026-08-10T14:08:00+08:00",

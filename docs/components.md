@@ -4,18 +4,18 @@ ProofBlade 使用 `COMPONENT.md` 记录组件级开发契约。组件归属由�
 
 ## 更新纪律
 
-修改组件源码、测试、包配置或构建配置时，必须同时更新对应文档的 `version`、`updatedAt` 和 `qualityAudit`。`createdAt` 保持首次编写时间不变。版本遵循 SemVer：破坏契约升主版本，兼容新增升次版本，修复、重构和文档校准升修订号。
+组件源码、测试、包配置或构建配置 PR 不再修改对应 `COMPONENT.md` 的版本和审计快照；这样多个并行 PR 不会争抢同一份文档。只有组件契约正文或元数据本身发生治理变更时才更新文档。`createdAt` 保持首次编写时间不变。版本遵循 SemVer：破坏契约升主版本，兼容新增升次版本，修复、重构和文档校准升修订号。
 
-`qualityAudit` 分别记录 BUG 与安全审计的次数、最近时间、结果和审计覆盖的源码 SHA-256。检查器会根据组件归属计算指纹；指纹未变化时可以跳过重复检查，源码变化后必须增加两项计数并更新审计时间。`result: "findings"` 表示仍有未解决问题，会阻止验证通过。
+`qualityAudit` 保留 BUG 与安全审计的次数、最近时间、结果和最近一次周期性审计快照。普通源码 PR 由构建、测试和变更契约完成验证，不把当前 SHA-256 写回共享文档；`result: "findings"` 表示仍有未解决问题，会阻止验证通过。
 
-合并后若组件源码未再变化、但基线里的审计指纹已因多 PR 合并而过期，检查器只允许一次精确修复：新指纹必须等于当前源码计算值，两项审计计数必须各加一，审计时间必须递增。其他无源码变化的审计改动仍会失败。
+组件源码变更不会触发版本、计数或审计快照的合并冲突；组件文档自身变更仍会校验元数据格式和无源码时的审计修改规则。
 
 ```powershell
 npm run check:components
 npm run verify
 ```
 
-审计通过后使用 `npm run record:component-audit -- --components <id,...|all> --result passed` 写入记录。`--at` 可以省略，记录器依次采用显式 `--at`、`COMPONENT_AUDIT_AT`、GitHub PR 的 `updated_at`、最近提交时间或当前 UTC 时间。记录器默认跳过指纹未变化的组件；只有周期性复审相同源码时才传入 `--force`。
+周期性审计通过后仍可使用 `npm run record:component-audit -- --components <id,...|all> --result passed` 更新快照。`--at` 可以省略，记录器依次采用显式 `--at`、`COMPONENT_AUDIT_AT`、GitHub PR 的 `updated_at`、最近提交时间或当前 UTC 时间；普通源码 PR 不需要运行记录器。
 
 第一条命令在本地比较 `HEAD` 与工作区；CI 会比较 PR 基线与当前提交。新增组件时，需要同时创建 `COMPONENT.md` 并登记到 `component-docs.json`。
 

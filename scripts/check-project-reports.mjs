@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { requiresProjectStatus } from "./project-report-change-lib.mjs";
 import { PROJECT_REPORT_FILES, renderProjectReports } from "./project-report-lib.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -28,7 +29,7 @@ console.log(`Project report check passed (${reports.size} reports, ${reports.siz
 function enforceUpdateRecord(base) {
   const changed = git(["diff", "--name-only", "--diff-filter=ACMR", `${base}...HEAD`]).split(/\r?\n/).filter(Boolean).map(normalize);
   const generated = new Set(Object.values(PROJECT_REPORT_FILES));
-  const meaningful = changed.filter((file) => !generated.has(file) && !isRuntimeOutput(file));
+  const meaningful = changed.filter((file) => !generated.has(file) && !isRuntimeOutput(file) && requiresProjectStatus(file));
   if (meaningful.length > 0 && !changed.includes("project-status.json")) {
     errors.push(`project-status.json was not updated for ${meaningful.length} changed files`);
     return;
