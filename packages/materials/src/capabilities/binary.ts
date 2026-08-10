@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { RawEffectResult } from "../domain/types.js";
 
@@ -71,7 +71,7 @@ export async function executeBinaryCapability(operation: string, input: BinaryCa
 
 export function validateBinaryInput(operation: string, input: Record<string, unknown>): void {
   if (typeof input.path !== "string" || input.path.length === 0 || isAbsolute(input.path)) throw new Error("Binary path must be a non-empty relative path");
-  if (input.path.split(/[\\/]+/).includes(".proofblade")) throw new Error("Binary path targets private fixture data");
+  if (containsPrivatePathSegment(input.path)) throw new Error("Binary path targets private fixture data");
   if (operation === "read_range") {
     assertInteger(input.offset, "offset", 0, Number.MAX_SAFE_INTEGER);
     assertInteger(input.length, "length", 1, 65_536);
@@ -84,14 +84,26 @@ export function validateBinaryInput(operation: string, input: Record<string, unk
 
 async function resolveBinaryPath(root: string, inputPath: string): Promise<string> {
   if (isAbsolute(inputPath)) throw new Error("Binary path must stay inside the fixture");
-  const resolvedRoot = resolve(root);
-  const resolvedPath = resolve(resolvedRoot, inputPath);
-  const relativePath = relative(resolvedRoot, resolvedPath);
-  if (relativePath === "" || relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) throw new Error("Binary path escapes the fixture");
-  if (relativePath.split(/[\\/]+/).includes(".proofblade")) throw new Error("Binary path targets private fixture data");
+  if (containsPrivatePathSegment(inputPath)) throw new Error("Binary path targets private fixture data");
+  const resolvedRoot = await realpath(resolve(root));
+  const candidatePath = resolve(resolvedRoot, inputPath);
+  assertInsideFixture(resolvedRoot, candidatePath);
+  const resolvedPath = await realpath(candidatePath);
+  const relativePath = assertInsideFixture(resolvedRoot, resolvedPath);
+  if (containsPrivatePathSegment(relativePath)) throw new Error("Binary path targets private fixture data");
   const metadata = await stat(resolvedPath);
   if (!metadata.isFile()) throw new Error("Binary path must reference a file");
   return resolvedPath;
+}
+
+function assertInsideFixture(root: string, path: string): string {
+  const relativePath = relative(root, path);
+  if (relativePath === "" || relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) throw new Error("Binary path escapes the fixture");
+  return relativePath;
+}
+
+function containsPrivatePathSegment(path: string): boolean {
+  return path.split(/[\\/]+/).some((segment) => segment.toLowerCase() === ".proofblade");
 }
 
 async function readBoundedFile(path: string): Promise<Buffer> {

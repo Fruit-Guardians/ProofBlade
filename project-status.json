@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T12:10:00+08:00",
+  "updatedAt": "2026-08-10T13:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -204,6 +204,26 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-004",
+      "occurredAt": "2026-08-10T13:20:00+08:00",
+      "summary": "修复 Binary Core 对大小写变体私有目录和越界目录链接的访问绕过。",
+      "branch": "codex/binary-core-v1",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "私有 .proofblade 路径段改为大小写无关匹配",
+        "对 Fixture 根目录和目标文件执行 realpath 包含校验，拒绝符号链接或 Junction 越界",
+        "增加 Windows 大小写路径和目录链接越界回归测试"
+      ],
+      "validation": [
+        "Binary Core tests: 4/4 passed",
+        "component documentation gate passed",
+        "project reports regenerated"
+      ]
+    },
     {
       "id": "UPDATE-20260810-003",
       "occurredAt": "2026-08-10T12:10:00+08:00",

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T12:10:00+08:00
+> 状态更新时间：2026-08-10T13:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-004 | 2026-08-10T13:20:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
 | UPDATE-20260810-003 | 2026-08-10T12:10:00+08:00 | PLAN-100 | codex/binary-core-v1 | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -32,6 +33,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-004
+
+时间：2026-08-10T13:20:00+08:00
+
+摘要：修复 Binary Core 对大小写变体私有目录和越界目录链接的访问绕过。
+
+### 变更
+
+- 私有 .proofblade 路径段改为大小写无关匹配
+- 对 Fixture 根目录和目标文件执行 realpath 包含校验，拒绝符号链接或 Junction 越界
+- 增加 Windows 大小写路径和目录链接越界回归测试
+
+### 验证
+
+- [x] Binary Core tests: 4/4 passed
+- [x] component documentation gate passed
+- [x] project reports regenerated
 
 ## UPDATE-20260810-003
 

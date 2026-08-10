@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -62,6 +62,45 @@ test("Binary Core v1 identifies PE32 sections", async () => {
     assert.deepEqual((JSON.parse(symbolResult.stdout) as { symbols: Array<{ name: string; value: string }> }).symbols, [{ index: 0, name: "func", value: "0x123", size: 0, section: 1, storageClass: 2 }]);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Binary Core v1 blocks case variants of its private fixture directory", async () => {
+  const backend = new BinaryCapabilityBackend();
+  const operation = { name: "strings", description: "strings", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure" as const, outputPolicy: "summary" as const, executionMode: "sequential" as const };
+  assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "strings", input: { path: ".PROOFBLADE/secret.bin" } }, operation, {
+    runId: "BINARY-PRIVATE", fixture: { fixtureId: "fixture", generation: 1, path: "fixture", privatePath: "fixture/.proofblade" }, runsRoot: "fixture", artifacts: {},
+  }), /private fixture/);
+});
+
+test("Binary Core v1 rejects directory links that escape the fixture", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-binary-link-root-"));
+  const outside = await mkdtemp(join(tmpdir(), "proofblade-binary-link-outside-"));
+  try {
+    await mkdir(join(root, ".proofblade"));
+    await writeFile(join(outside, "secret.bin"), "flag{outside}");
+    try {
+      await symlink(outside, join(root, "linked"), process.platform === "win32" ? "junction" : "dir");
+    } catch (error) {
+      if (error instanceof Error && "code" in error && ["EPERM", "ENOTSUP"].includes(String(error.code))) {
+        context.skip(`directory links are unavailable: ${String(error.code)}`);
+        return;
+      }
+      throw error;
+    }
+
+    const backend = new BinaryCapabilityBackend();
+    const operation = { name: "strings", description: "strings", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure" as const, outputPolicy: "summary" as const, executionMode: "sequential" as const };
+    const plan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "strings", input: { path: "linked/secret.bin" } }, operation, {
+      runId: "BINARY-LINK", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: join(root, ".proofblade") }, runsRoot: root, artifacts: {},
+    });
+    const result = await plan.execute!(new AbortController().signal);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /escapes the fixture/);
+    assert.doesNotMatch(result.stdout, /flag\{outside\}/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   }
 });
 
