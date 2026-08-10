@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T11:17:00+08:00",
+  "updatedAt": "2026-08-10T12:10:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -204,6 +204,28 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-003",
+      "occurredAt": "2026-08-10T12:10:00+08:00",
+      "summary": "完成 Binary Core v1，增加 PE/ELF 结构化分析与可审计二进制读取能力。",
+      "branch": "codex/binary-core-v1",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "新增 proofblade.binary Capability，支持 identify、read_range、sections、symbols 和 strings",
+        "支持 PE32/PE32+、ELF32/ELF64、架构/端序/入口点、区段、符号和 ASCII/UTF-16LE 字符串分析",
+        "增加 Fixture 根目录边界检查并阻止访问 .proofblade 私有目录",
+        "将二进制分析结果投影到 Effect、Artifact、Observation 和 Evidence"
+      ],
+      "validation": [
+        "106/106 Materials tests passed",
+        "18/18 deterministic evaluation cases passed",
+        "component and change-contract gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260810-002",
       "occurredAt": "2026-08-10T11:17:00+08:00",
