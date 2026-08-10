@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T14:08:00+08:00
+> 状态更新时间：2026-08-10T18:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-006 | 2026-08-10T18:00:00+08:00 | PLAN-001, PLAN-002 | codex/fix-concurrent-pr-metadata | 本条记录所在提交 |
 | UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -32,6 +33,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-006
+
+时间：2026-08-10T18:00:00+08:00
+
+摘要：消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。
+
+### 变更
+
+- 源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照
+- 源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照
+- 普通 packages/apps/scripts 变更不再要求写入共享 project-status.json
+- CI 在临时工作区的契约检查前自动重生成项目报表
+- 补充并行源码变更与治理文件边界回归检查
+
+### 验证
+
+- [x] component and project report gates passed
+- [x] CI gates passed
+- [x] 168/168 repository tests passed
 
 ## UPDATE-20260810-003
 
