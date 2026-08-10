@@ -139,7 +139,7 @@ test("MCP registry rebuilds a connection after an established server exits", asy
     registry = McpProjectRegistry.load(root);
     const firstDescription = await registry.describe("crashy");
     assert.equal(firstDescription[0]?.name, "echo");
-    await waitForMarker(marker, "crashed");
+    await waitForProcessExit(marker);
 
     const staleCall = await registry.execute("mcp.crashy", "call", { tool: "echo", arguments: { text: "stale" } });
     assert.equal(staleCall.exitCode, 1);
@@ -179,10 +179,26 @@ function fakeBackend(
   };
 }
 
-async function waitForMarker(path: string, expected: string): Promise<void> {
+async function waitForProcessExit(marker: string): Promise<void> {
+  let pid: number | undefined;
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    if (await readFile(path, "utf8").then((value) => value === expected).catch(() => false)) return;
+    const value = await readFile(marker, "utf8").catch(() => "");
+    const parsed = Number(value);
+    if (Number.isInteger(parsed) && parsed > 0) {
+      pid = parsed;
+      break;
+    }
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  assert.fail(`Timed out waiting for marker ${expected}`);
+  assert.ok(pid, "Timed out waiting for the MCP server PID");
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.fail(`Timed out waiting for MCP server ${pid} to exit`);
 }

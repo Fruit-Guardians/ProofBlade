@@ -21,7 +21,7 @@ await server.connect(new StdioServerTransport());
 
 if (shouldCrash && marker) {
   setTimeout(() => {
-    writeFileSync(marker, "crashed", "utf8");
+    writeFileSync(marker, String(process.pid), "utf8");
     process.exit(0);
   }, 100);
 }

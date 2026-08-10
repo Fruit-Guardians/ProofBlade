@@ -327,7 +327,7 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 }
 ```
 
-`arguments` 的 `$path`、`$address`、`$maxResults`、`$maxInstructions` 和 `$direction` 会从逻辑 Capability 输入取值，其他值按字面量传递。若 Server 使用统一 dispatcher，可添加 `nestedTool: { "name": "functions", "toolField": "name", "argumentsField": "args" }`；它必须与该 Server 的 `nestedToolPolicy` 完全一致。为了防止把任意 MCP 动作伪装成只读逆向，映射对应的 MCP Server 或内层 Tool 必须显式声明 `readOnly: true` 且 `replay: "pure"`，输出也必须符合规范化的函数、指令或 XRef 数组。
+`arguments` 的 `$address`、`$maxResults`、`$maxInstructions` 和 `$direction` 会从逻辑 Capability 输入取值，其他值按字面量传递。`$path` 会解析为已验证 Fixture 文件的短生命周期绝对副本，MCP 调用结束后立即清理；Effect、Artifact 和 Job 仍记录原始相对逻辑路径，避免临时宿主路径进入持久化审计。若 Server 使用统一 dispatcher，可添加 `nestedTool: { "name": "functions", "toolField": "name", "argumentsField": "args" }`；它必须与该 Server 的 `nestedToolPolicy` 完全一致。为了防止把任意 MCP 动作伪装成只读逆向，映射对应的 MCP Server 或内层 Tool 必须显式声明 `readOnly: true` 且 `replay: "pure"`，输出也必须符合规范化的函数、指令或 XRef 数组。
 
 ### 6.2 延迟发现
 

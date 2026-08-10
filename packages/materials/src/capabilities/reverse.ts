@@ -75,25 +75,37 @@ export async function executeRizinCapability(
   const started = Date.now();
   try {
     validateReverseInput(operation, input);
-    throwIfAborted(signal);
-    const bytes = await readVisibleBinaryFile(fixtureRoot, input.path);
-    throwIfAborted(signal);
-    const stagingRoot = await mkdtemp(join(tmpdir(), "proofblade-rizin-"));
-    const stagedPath = join(stagingRoot, "input.bin");
-    try {
-      await writeFile(stagedPath, bytes, { flag: "wx", mode: 0o600 });
+    const value = await withStagedVisibleBinary(fixtureRoot, input.path, signal, async (stagedPath) => {
       const value = operation === "functions"
         ? await queryFunctions(executable, stagedPath, runner, input, signal)
         : operation === "disassemble"
           ? await queryDisassembly(executable, stagedPath, runner, input, signal)
           : await queryXrefs(executable, stagedPath, runner, input, signal);
       throwIfAborted(signal);
-      return { stdout: JSON.stringify(value, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started };
-    } finally {
-      await rm(stagingRoot, { recursive: true, force: true });
-    }
+      return value;
+    });
+    return { stdout: JSON.stringify(value, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started };
   } catch (error) {
     return { stdout: "", stderr: error instanceof Error ? error.message : String(error), exitCode: signal.aborted ? null : 1, durationMs: Date.now() - started };
+  }
+}
+
+/**
+ * Give an external analyzer only a short-lived copy of a validated fixture
+ * binary. The caller retains the logical relative path for effects and jobs.
+ */
+export async function withStagedVisibleBinary<T>(fixtureRoot: string, inputPath: string, signal: AbortSignal, execute: (stagedPath: string) => Promise<T>): Promise<T> {
+  throwIfAborted(signal);
+  const bytes = await readVisibleBinaryFile(fixtureRoot, inputPath);
+  throwIfAborted(signal);
+  const stagingRoot = await mkdtemp(join(tmpdir(), "proofblade-reverse-"));
+  const stagedPath = join(stagingRoot, "input.bin");
+  try {
+    await writeFile(stagedPath, bytes, { flag: "wx", mode: 0o600 });
+    throwIfAborted(signal);
+    return await execute(stagedPath);
+  } finally {
+    await rm(stagingRoot, { recursive: true, force: true });
   }
 }
 

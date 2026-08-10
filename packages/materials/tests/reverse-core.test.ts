@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import test from "node:test";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import { McpReverseCapabilityBackend, RizinCapabilityBackend, type CapabilityBackend } from "../src/capabilities/backend.js";
@@ -66,14 +66,19 @@ test("Rizin deep reverse Backend rejects unsafe addresses before execution", () 
 
 test("MCP reverse adapter maps and normalizes the logical operations", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-reverse-"));
+  const fixtureRoot = join(root, "runs", "REVERSE-TEST", "fixture");
+  const pathMarker = join(root, "staged-paths.txt");
   let registry: McpProjectRegistry | undefined;
   try {
     const serverPath = resolve(import.meta.dirname, "fixtures", "mcp-reverse-server.mjs");
+    await mkdir(fixtureRoot, { recursive: true });
+    await writeFile(join(fixtureRoot, "sample.bin"), "synthetic binary");
     await writeFile(join(root, ".mcp.json"), JSON.stringify({
       mcpServers: {
         reverse: {
           command: process.execPath,
           args: [serverPath],
+          env: { MCP_PATH_MARKER: pathMarker },
           readOnly: true,
           replay: "pure",
           includeTools: ["reverse"],
@@ -90,7 +95,9 @@ test("MCP reverse adapter maps and normalizes the logical operations", async () 
     assert.equal(backend.status().available, true);
     assert.equal(backend.handles("proofblade.binary", "functions"), true);
     assert.equal(backend.handles("proofblade.binary", "identify"), false);
-    const context = contextFor(root);
+    const context = contextFor(fixtureRoot);
+    const effectPlan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "functions", input: { path: "sample.bin" } }, operationFor("functions"), context);
+    assert.equal((((effectPlan.args.input as Record<string, unknown>).arguments as Record<string, unknown>).path), "sample.bin");
 
     const functions = await invoke(backend, "functions", { path: "sample.bin", maxResults: 10 }, context);
     assert.deepEqual(functions, { format: "mcp", functions: [
@@ -104,6 +111,7 @@ test("MCP reverse adapter maps and normalizes the logical operations", async () 
       { from: "0x401020", to: "0x401000", type: "CALL" },
       { from: "0x401030", to: "0x401000", type: "JMP" },
     ]);
+    await assertStagedPathsCleaned(pathMarker, fixtureRoot, 3);
   } finally {
     await registry?.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
@@ -112,14 +120,19 @@ test("MCP reverse adapter maps and normalizes the logical operations", async () 
 
 test("MCP reverse adapter supports an explicitly matched nested dispatcher", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-reverse-nested-"));
+  const fixtureRoot = join(root, "runs", "REVERSE-TEST", "fixture");
+  const pathMarker = join(root, "staged-paths.txt");
   let registry: McpProjectRegistry | undefined;
   try {
     const serverPath = resolve(import.meta.dirname, "fixtures", "mcp-reverse-server.mjs");
+    await mkdir(fixtureRoot, { recursive: true });
+    await writeFile(join(fixtureRoot, "sample.bin"), "synthetic binary");
     await writeFile(join(root, ".mcp.json"), JSON.stringify({
       mcpServers: {
         nested: {
           command: process.execPath,
           args: [serverPath],
+          env: { MCP_PATH_MARKER: pathMarker },
           readOnly: true,
           replay: "pure",
           includeTools: ["dispatch"],
@@ -137,8 +150,13 @@ test("MCP reverse adapter supports an explicitly matched nested dispatcher", asy
     }, null, 2), "utf8");
     registry = McpProjectRegistry.load(root);
     const backend = new McpReverseCapabilityBackend(registry);
-    const functions = await invoke(backend, "functions", { path: "sample.bin" }, contextFor(root));
+    const context = contextFor(fixtureRoot);
+    const effectPlan = backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "functions", input: { path: "sample.bin" } }, operationFor("functions"), context);
+    const nestedArguments = ((effectPlan.args.input as Record<string, unknown>).arguments as Record<string, unknown>).args as Record<string, unknown>;
+    assert.equal(nestedArguments.path, "sample.bin");
+    const functions = await invoke(backend, "functions", { path: "sample.bin" }, context);
     assert.equal((functions.functions as Array<Record<string, unknown>>)[0]?.address, "0x401000");
+    await assertStagedPathsCleaned(pathMarker, fixtureRoot, 1);
   } finally {
     await registry?.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });
@@ -158,6 +176,16 @@ function operationFor(name: string): CapabilityOperationAtom {
 
 function contextFor(path: string) {
   return { runId: "REVERSE-TEST", fixture: { fixtureId: "fixture", generation: 1, path, privatePath: join(path, ".proofblade") }, runsRoot: path, artifacts: {} };
+}
+
+async function assertStagedPathsCleaned(marker: string, fixtureRoot: string, count: number): Promise<void> {
+  const paths = (await readFile(marker, "utf8")).split(/\r?\n/).filter(Boolean);
+  assert.equal(paths.length, count);
+  for (const path of paths) {
+    assert.equal(isAbsolute(path), true);
+    assert.notEqual(resolve(path), resolve(fixtureRoot, "sample.bin"));
+    await assert.rejects(() => access(path));
+  }
 }
 
 function result(stdout: string): RawEffectResult {

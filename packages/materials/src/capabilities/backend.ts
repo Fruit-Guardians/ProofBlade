@@ -4,7 +4,7 @@ import type { FixtureRef } from "../sandbox/fixture.js";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import { executeBinaryCapability, validateBinaryInput, type BinaryCapabilityInput } from "./binary.js";
-import { createRizinAvailability, executeRizinCapability, normalizeFunctions, normalizeInstructions, normalizeXrefs, reverseOperation, validateReverseInput, type ReverseCapabilityInput, type ReverseOperation, type RizinCapabilityOptions } from "./reverse.js";
+import { createRizinAvailability, executeRizinCapability, normalizeFunctions, normalizeInstructions, normalizeXrefs, reverseOperation, validateReverseInput, withStagedVisibleBinary, type ReverseCapabilityInput, type ReverseOperation, type RizinCapabilityOptions } from "./reverse.js";
 import type { McpBinaryReverseOperation, McpReverseOutput } from "../mcp/registry.js";
 
 export type CapabilityBackendKind = "bundled" | "local-process" | "mcp" | "provider-native";
@@ -295,11 +295,12 @@ export class McpReverseCapabilityBackend implements CapabilityBackend {
       replayPolicy: operation.replay,
       artifactSensitivity: policy.sensitivity === "secret" ? "secret" : undefined,
       cwd: context.runsRoot,
-      execute: async (signal) => {
-        const result = await this.mcp.execute(mapped.capabilityId, "call", mapped.input, signal);
+      execute: async (signal) => await withStagedVisibleBinary(context.fixture.path, String(request.input.path), signal, async (stagedPath) => {
+        const staged = this.prepareMcpCall(reverse, { ...request.input, path: stagedPath });
+        const result = await this.mcp.execute(staged.capabilityId, "call", staged.input, signal);
         if (result.exitCode !== 0) return result;
         return { ...result, stdout: JSON.stringify(normalizeMcpReverseOutput(reverse, result.stdout, request.input), null, 2) };
-      },
+      }),
     };
   }
 
