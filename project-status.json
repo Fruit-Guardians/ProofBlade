@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T00:31:33+08:00",
+  "updatedAt": "2026-08-10T11:17:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -204,6 +204,33 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260810-002",
+      "occurredAt": "2026-08-10T11:17:00+08:00",
+      "summary": "把确定性评测从 18 次 Fixture 重复升级为 30 项求解与运行时双矩阵门禁。",
+      "branch": "main",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-200"
+      ],
+      "changes": [
+        "保留六个 Fixture 各三次的 18 个生产循环，并新增 12 个独立运行时场景",
+        "新增缓存用量与前缀漂移、上下文单调性与用户任务锚点评测",
+        "新增重复失败、无进展、失败风暴、Evidence 整理背压与并发去重评测",
+        "新增暂停重放、Verifier 权限和 Lease 所有权隔离评测",
+        "baseline-v3 报告分列 fixtureTotal/scenarioTotal，并将两个 Catalog 与场景结果纳入稳定哈希"
+      ],
+      "validation": [
+        "104/104 Materials tests passed",
+        "153/153 repository tests passed",
+        "30/30 deterministic evaluation cases passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities",
+        "runtime scenarios cover 5 categories"
+      ]
+    },
     {
       "id": "UPDATE-20260810-001",
       "occurredAt": "2026-08-10T00:31:33+08:00",
@@ -754,6 +781,30 @@
     }
   ],
   "maintenance": [
+    {
+      "id": "MAINT-20260810-001",
+      "performedAt": "2026-08-10T11:17:00+08:00",
+      "status": "passed",
+      "scope": "确定性评测协议、缓存与上下文可观测性、收敛护栏、Evidence 整理和运行状态持久化",
+      "actions": [
+        "拆分 Fixture 求解矩阵与 Runtime Scenario 矩阵",
+        "把仅存在于单元测试的关键跨模块不变量提升为发布评测",
+        "执行 104 个 Materials 测试和 30 项 baseline-v3 评测"
+      ],
+      "findings": [
+        "旧 18 项评测只能证明六类静态题型可被确定性求解，不能发现缓存、上下文和运行时状态回归",
+        "缓存命中 Token 与 Provider 前缀稳定性需要独立评测，固定值不能代表真实前缀命中",
+        "跨模块场景应隔离失败并保留分类、目录哈希和稳定结果哈希"
+      ],
+      "validation": [
+        "104/104 Materials tests passed",
+        "153/153 repository tests passed",
+        "18/18 fixture solve cases passed",
+        "12/12 runtime scenario cases passed",
+        "npm audit: 0 vulnerabilities"
+      ],
+      "nextReviewTrigger": "新增跨题运行时能力、改变缓存前缀、上下文裁剪、证据整理、暂停恢复、Verifier 或 Lease 契约"
+    },
     {
       "id": "MAINT-20260807-001",
       "performedAt": "2026-08-07T18:09:45+08:00",

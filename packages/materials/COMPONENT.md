@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.14",
+  "version": "0.12.15",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T16:31:33.000Z",
+  "updatedAt": "2026-08-10T03:18:16.431Z",
   "qualityAudit": {
-    "bugAuditCount": 10,
-    "securityAuditCount": 10,
-    "lastBugAuditAt": "2026-08-09T16:31:33.000Z",
-    "lastSecurityAuditAt": "2026-08-09T16:31:33.000Z",
-    "sourceHash": "4077f94e14a767f761e23fe33c645c76e5720726e75b78c7cce2c5592b2fb916",
+    "bugAuditCount": 11,
+    "securityAuditCount": 11,
+    "lastBugAuditAt": "2026-08-10T03:18:16.431Z",
+    "lastSecurityAuditAt": "2026-08-10T03:18:16.431Z",
+    "sourceHash": "c60819ee394b21315a72b899886dd57d5fb08ad9beb3f2fb25f403846e233ffe",
     "result": "passed"
   }
 }
@@ -47,7 +47,7 @@
 - Evidence 整理必须原子、并发幂等并返回稳定进展键；读取快照、判重、生成 ID 与提交共享同一按 Run 串行事务，重复整理不得制造新 Evidence 或解除无进展计数。多样化 Tool 参数错误也受单轮失败预算约束，防止模型绕过相同失败断路器。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
-- 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算和规范化 Fixture Catalog 内容哈希。
+- 确定性 `baseline-v3` 默认执行六个 Fixture 各三次，并追加 12 个缓存、上下文、收敛、证据和持久化场景；子集可用于诊断，但合并门禁必须满足完整 30 项覆盖。报告哈希必须包含执行预算、规范化 Fixture Catalog 和 Runtime Scenario Catalog 内容哈希。
 
 ## 验证
 

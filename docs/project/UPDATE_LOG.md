@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T00:31:33+08:00
+> 状态更新时间：2026-08-10T11:17:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-029 | 2026-08-09T21:05:00+08:00 | PLAN-120 | codex/gui-polling-backpressure | 本条记录所在提交 |
@@ -30,6 +31,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-002
+
+时间：2026-08-10T11:17:00+08:00
+
+摘要：把确定性评测从 18 次 Fixture 重复升级为 30 项求解与运行时双矩阵门禁。
+
+### 变更
+
+- 保留六个 Fixture 各三次的 18 个生产循环，并新增 12 个独立运行时场景
+- 新增缓存用量与前缀漂移、上下文单调性与用户任务锚点评测
+- 新增重复失败、无进展、失败风暴、Evidence 整理背压与并发去重评测
+- 新增暂停重放、Verifier 权限和 Lease 所有权隔离评测
+- baseline-v3 报告分列 fixtureTotal/scenarioTotal，并将两个 Catalog 与场景结果纳入稳定哈希
+
+### 验证
+
+- [x] 104/104 Materials tests passed
+- [x] 153/153 repository tests passed
+- [x] 30/30 deterministic evaluation cases passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+- [x] runtime scenarios cover 5 categories
 
 ## UPDATE-20260810-001
 
