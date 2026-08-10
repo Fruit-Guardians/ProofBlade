@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T13:53:12+08:00",
+  "updatedAt": "2026-08-10T14:08:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -206,8 +206,8 @@
   "updates": [
     {
       "id": "UPDATE-20260810-003",
-      "occurredAt": "2026-08-10T13:53:12+08:00",
-      "summary": "修复重复 Artifact 和 Evidence 整理穿插导致的无进展循环。",
+      "occurredAt": "2026-08-10T14:08:00+08:00",
+      "summary": "修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。",
       "branch": "codex/fix-evidence-repeat-loop",
       "commit": "self",
       "planIds": [
@@ -217,10 +217,11 @@
       "changes": [
         "Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞",
         "显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数",
-        "增加重复 Artifact、副本 annotation 和混合 bash/evidence 循环回归测试"
+        "platform 和未解析策略的成功调用可撤销同批次待处理的 no_progress",
+        "增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 副作用批次回归测试"
       ],
       "validation": [
-        "156/156 repository tests passed",
+        "158/158 repository tests passed",
         "component, contract and project report gates passed",
         "rollback copy restored to the original SHA-256"
       ]

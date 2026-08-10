@@ -101,7 +101,8 @@ export class NoProgressToolBreaker {
     if (observation.isError) return false;
     const declaredProgress = stableBoolean(observation.details, "durableProgress");
     if (declaredProgress !== undefined) return declaredProgress;
-    return isDurableEffect(observation);
+    // Any successful non-read-only or unresolved tool result can invalidate a pending no-progress stop.
+    return !isPureReadOnlyObservation(observation);
   }
 
   public reset(): void {
@@ -197,7 +198,9 @@ function isPureReadOnlyObservation(observation: ToolFailureObservation): boolean
 }
 
 function isDurableEffect(observation: ToolFailureObservation): boolean {
-  return observation.effectPolicy?.sideEffect === "workspace" || observation.effectPolicy?.sideEffect === "network";
+  return observation.effectPolicy?.sideEffect === "workspace"
+    || observation.effectPolicy?.sideEffect === "network"
+    || observation.effectPolicy?.sideEffect === "platform";
 }
 
 function isNoProgressObservation(observation: ToolFailureObservation): boolean {

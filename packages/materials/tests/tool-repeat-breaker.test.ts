@@ -444,6 +444,59 @@ test("a durable mutation in the same batch cancels an order-dependent no-progres
   }
 });
 
+for (const scenario of [
+  { name: "platform MCP", effectPolicy: { readOnly: false, sideEffect: "platform" as const } },
+  { name: "unresolved plugin", effectPolicy: undefined },
+]) {
+  test(`${scenario.name} success in a mixed batch cancels a pending no-progress stop`, async () => {
+    const root = await mkdtemp(join(tmpdir(), "proofblade-no-progress-policy-"));
+    const env = new NodeExecutionEnv({ cwd: root });
+    try {
+      const faux = fauxProvider({ provider: `faux-no-progress-${scenario.name.replace(/\s+/g, "-")}` });
+      const models = createModels();
+      models.setProvider(faux.provider);
+      faux.setResponses([
+        fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-1" }), { stopReason: "toolUse" }),
+        fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "read-2" }), { stopReason: "toolUse" }),
+        fauxAssistantMessage([
+          fauxToolCall("read", { path: "same" }, { id: "read-3" }),
+          fauxToolCall("side_effect", {}, { id: "side-effect-1" }),
+        ], { stopReason: "toolUse" }),
+        fauxAssistantMessage("continued after potential progress"),
+      ]);
+      const stableRead: AgentHarnessTool<undefined> = {
+        name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+        async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+      };
+      const sideEffect: AgentHarnessTool<undefined> = {
+        name: "side_effect", label: "side_effect", description: "successful non-read-only operation", parameters: Type.Object({}),
+        async execute() { return { content: [{ type: "text" as const, text: "operation completed" }] }; },
+      };
+      const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+      const session = await repo.create({ id: `no-progress-${scenario.name}`, cwd: root });
+      const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [stableRead, sideEffect], activeToolNames: ["read", "side_effect"], systemPrompt: "test" });
+      const termination: CodingTurnTermination = {};
+      attachCodingTurnGuards(
+        harness,
+        new RepeatedToolFailureBreaker(),
+        new NoProgressToolBreaker(),
+        termination,
+        (toolName) => toolName === "read" ? readOnlyEffect : toolName === "side_effect" ? scenario.effectPolicy : undefined,
+      );
+
+      const response = await harness.prompt("continue");
+      assert.equal(faux.state.callCount, 4);
+      assert.equal(response.stopReason, "stop");
+      assert.equal(response.content.find((item) => item.type === "text")?.text, "continued after potential progress");
+      assert.equal(termination.requested, false);
+      assert.equal(termination.reason, undefined);
+    } finally {
+      await env.cleanup();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
 function task(runId: string, root: string): TaskContract {
   return {
     schema_version: 1,

@@ -1,13 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T13:53:12+08:00
+> 状态更新时间：2026-08-10T14:08:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
-| UPDATE-20260810-003 | 2026-08-10T13:53:12+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
+| UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
 | UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
 | UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
@@ -35,19 +35,20 @@
 
 ## UPDATE-20260810-003
 
-时间：2026-08-10T13:53:12+08:00
+时间：2026-08-10T14:08:00+08:00
 
-摘要：修复重复 Artifact 和 Evidence 整理穿插导致的无进展循环。
+摘要：修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。
 
 ### 变更
 
 - Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞
 - 显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数
-- 增加重复 Artifact、副本 annotation 和混合 bash/evidence 循环回归测试
+- platform 和未解析策略的成功调用可撤销同批次待处理的 no_progress
+- 增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 副作用批次回归测试
 
 ### 验证
 
-- [x] 156/156 repository tests passed
+- [x] 158/158 repository tests passed
 - [x] component, contract and project report gates passed
 - [x] rollback copy restored to the original SHA-256
 
