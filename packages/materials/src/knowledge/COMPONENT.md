@@ -4,15 +4,15 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:11:20.246Z",
+  "updatedAt": "2026-08-10T05:35:35.169Z",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-09T07:11:20.246Z",
-    "lastSecurityAuditAt": "2026-08-09T07:11:20.246Z",
-    "sourceHash": "5dc76b3fdf0c3f4d4d44c6e54ee7eefe911f77f9aac70e4627b71e71e8d63d3a",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-10T05:35:35.169Z",
+    "lastSecurityAuditAt": "2026-08-10T05:35:35.169Z",
+    "sourceHash": "43da254dff53dfc024292106cd358573b73d8f65cf63d3751b6df502d45b7130",
     "result": "passed"
   }
 }
@@ -40,7 +40,7 @@ Forest 索引保留完整 orphan 总数，但只投影最近 24 个 orphan 的�
 
 Fact/Hypothesis 等权威语句保持完整；投影到 Reasoning Node/Tree 的展示名称独立限制为 160 字符。长 claim 不得让 `recordEvidence` 在 Evidence/Fact 已落盘后因展示标题校验而失败。
 
-`recordEvidence` 在落盘前完成全部字段、引用、Artifact 语义、图节点、边和 Tree 校验，并通过原子事务提交。Artifact 标签和关联 ID 使用确定性有界合并；相同 Artifact 集合、摘要、claim 与依赖无论顺序或并发重复提交，都必须复用同一 Evidence、Fact 和 Tree，只允许一个调用报告持久进展。`annotateArtifact` 的相同语义顺序或并发更新同样只能产生一次事件。
+`recordEvidence` 在落盘前完成全部字段、引用、Artifact 语义、图节点、边和 Tree 校验，并通过原子事务提交。Artifact 标签和关联 ID 使用确定性有界合并；相同 Artifact 集合、摘要、claim 与依赖无论顺序或并发重复提交，都必须复用同一 Evidence、Fact 和 Tree。持久进展身份使用 Artifact 内容哈希、claim 与依赖，不使用临时 Artifact ID 或展示摘要；相同字节的副本和改写措辞只能报告一次持久进展。`annotateArtifact` 同样按内容哈希报告审阅进展，同一内容后续改名、改摘要或审阅其副本均不得重置收敛窗口。
 
 ```powershell
 npm run test:materials

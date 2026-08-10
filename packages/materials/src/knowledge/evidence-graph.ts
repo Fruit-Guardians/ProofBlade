@@ -78,15 +78,18 @@ export class CodingEvidenceGraph {
         relatedIds: input.relatedIds,
         fallback: artifact.semantic,
       });
-      const progressKey = sha256(canonicalJson({ operation: "annotate", artifactId: input.artifactId, semantic }));
+      const progressKey = sha256(canonicalJson({ operation: "annotate", contentKey: artifact.sha256 }));
       const reused = Boolean(artifact.semantic && sameSemantic(artifact.semantic, semantic));
+      const contentAlreadyReviewed = Object.values(snapshot.artifacts).some((candidate) =>
+        candidate.sha256 === artifact.sha256
+        && candidate.semantic?.annotatedBy === "agent");
       return {
         commands: reused ? [] : [{ type: "artifact_annotation", artifactId: input.artifactId, semantic, lane: "main" }],
         project: (after) => ({
           artifactId: input.artifactId,
           semantic: after.artifacts[input.artifactId]!.semantic!,
           reused,
-          durableProgress: !reused,
+          durableProgress: !reused && !contentAlreadyReviewed,
           progressKey,
         }),
       };
@@ -104,15 +107,17 @@ export class CodingEvidenceGraph {
       const summary = requiredText(input.summary, "Evidence summary", 1_000);
       const tags = normalizedTags(input.tags);
       const claim = optionalText(input.claim, "Evidence claim", 1_000);
-      const progressKey = evidenceProgressKey({ artifactIds, summary, claim, dependsOn });
+      const contentKeys = artifactContentKeys(snapshot, artifactIds);
+      const progressKey = evidenceProgressKey({ contentKeys, claim, dependsOn });
+      const identityKey = evidenceIdentityKey({ contentKeys, summary, claim, dependsOn });
       const existingEvidence = Object.values(snapshot.evidence).find((candidate) => {
         const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
-        return evidenceProgressKey({
-          artifactIds: evidenceArtifactIds(candidate),
+        return evidenceIdentityKey({
+          contentKeys: artifactContentKeys(snapshot, evidenceArtifactIds(candidate)),
           summary: candidate.summary,
           claim: candidateClaim,
           dependsOn: candidate.dependsOn ?? [],
-        }) === progressKey;
+        }) === identityKey;
       });
       if (existingEvidence) {
         const existingFactId = existingEvidence.supports.find((factId) => snapshot.facts[factId]);
@@ -132,6 +137,14 @@ export class CodingEvidenceGraph {
           }),
         };
       }
+      const repeatsKnownContent = Object.values(snapshot.evidence).some((candidate) => {
+        const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
+        return evidenceProgressKey({
+          contentKeys: artifactContentKeys(snapshot, evidenceArtifactIds(candidate)),
+          claim: candidateClaim,
+          dependsOn: candidate.dependsOn ?? [],
+        }) === progressKey;
+      });
     const factId = claim ? id("F") : undefined;
     const evidenceId = id("EV");
     const evidence: Omit<Evidence, "createdSeq"> = {
@@ -218,7 +231,7 @@ export class CodingEvidenceGraph {
     }
       return {
         commands,
-        project: () => ({ evidenceId, factId, treeId, artifactIds, reused: false, durableProgress: true, progressKey }),
+        project: () => ({ evidenceId, factId, treeId, artifactIds, reused: false, durableProgress: !repeatsKnownContent, progressKey }),
       };
     });
   }
@@ -584,17 +597,31 @@ function sameSemantic(
 }
 
 function evidenceProgressKey(input: {
-  artifactIds: string[];
+  contentKeys: string[];
+  claim?: string;
+  dependsOn: string[];
+}): string {
+  return sha256(canonicalJson({
+    contentKeys: unique(input.contentKeys).sort(),
+    claim: input.claim?.trim().replace(/\s+/g, " ") ?? "",
+    dependsOn: unique(input.dependsOn).sort(),
+  }));
+}
+
+function evidenceIdentityKey(input: {
+  contentKeys: string[];
   summary: string;
   claim?: string;
   dependsOn: string[];
 }): string {
   return sha256(canonicalJson({
-    artifactIds: unique(input.artifactIds).sort(),
+    progressKey: evidenceProgressKey(input),
     summary: input.summary.trim().replace(/\s+/g, " "),
-    claim: input.claim?.trim().replace(/\s+/g, " ") ?? "",
-    dependsOn: unique(input.dependsOn).sort(),
   }));
+}
+
+function artifactContentKeys(snapshot: RunSnapshot, artifactIds: string[]): string[] {
+  return artifactIds.map((artifactId) => snapshot.artifacts[artifactId]?.sha256 ?? artifactId);
 }
 
 function boundedUnion(existing: string[], additions: string[], limit: number): string[] {

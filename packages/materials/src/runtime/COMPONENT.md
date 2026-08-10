@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.9",
+  "version": "0.10.10",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T07:09:33.039Z",
+  "updatedAt": "2026-08-10T05:35:35.169Z",
   "qualityAudit": {
-    "bugAuditCount": 7,
-    "securityAuditCount": 7,
-    "lastBugAuditAt": "2026-08-09T07:09:33.039Z",
-    "lastSecurityAuditAt": "2026-08-09T07:09:33.039Z",
-    "sourceHash": "75018ad4dafbd50131f14077ba16c713fc99fdcbd92085f6785c6053e1ee96f2",
+    "bugAuditCount": 8,
+    "securityAuditCount": 8,
+    "lastBugAuditAt": "2026-08-10T05:35:35.169Z",
+    "lastSecurityAuditAt": "2026-08-10T05:35:35.169Z",
+    "sourceHash": "58983332738c8dd6b1af3e8dfba04af07b840d45cc9f6dfa809186a62a142907",
     "result": "passed"
   }
 }
@@ -41,7 +41,7 @@ Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固
 
 重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；无进展断路器在单回合滚动窗口内比较 Tool Contract 明确声明为只读且无副作用的工具参数和稳定 Artifact 内容哈希，第三次取回同一观察时停止。任意 Bash、未知工具和副作用 MCP 调用均视为潜在持久进展并清空窗口。混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止；同批出现真实进展则取消顺序相关的无进展停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
 
-Evidence 变更操作返回 `durableProgress` 和稳定 `progressKey`；幂等复用不得被当作持久进展，即使模型改变无关措辞也应进入同一无进展窗口。单轮连续 12 次不同 Tool 失败且没有持久进展时触发 `tool_failure_storm`，避免通过变换错误参数绕过完全相同失败断路器。Windows Host 提示必须要求使用 `python`/`py` 并把中间文件保存在工作区相对目录。
+Evidence 变更操作返回 `durableProgress` 和基于 Artifact 内容哈希的稳定 `progressKey`；幂等复用、相同内容的新 Artifact 以及无关措辞变化不得被当作持久进展。显式 `durableProgress=false` 的 Evidence 观察在普通进程型 `bash` 之间继续累计，只由 `durableProgress=true` 或真实 workspace/network 副作用清除，避免模型用重复读取穿插 Evidence 整理来重置收敛窗口。单轮连续 12 次不同 Tool 失败且没有持久进展时触发 `tool_failure_storm`，避免通过变换错误参数绕过完全相同失败断路器。Windows Host 提示必须要求使用 `python`/`py` 并把中间文件保存在工作区相对目录。
 
 `evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 

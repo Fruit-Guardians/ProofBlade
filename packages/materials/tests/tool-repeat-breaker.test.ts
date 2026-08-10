@@ -84,6 +84,31 @@ test("idempotent workspace operations use their durable progress key as no-progr
   assert.equal(decision.terminate, true);
 });
 
+test("declared non-progress evidence survives intervening process observations", () => {
+  const breaker = new NoProgressToolBreaker(3, 12);
+  const duplicateEvidence = {
+    toolName: "evidence",
+    input: { operation: "record" },
+    isError: false,
+    content: [{ type: "text", text: "wording changes between calls" }],
+    details: { durableProgress: false, progressKey: "same-content-evidence" },
+    effectPolicy: { readOnly: false, sideEffect: "workspace" as const },
+  };
+  const processObservation = {
+    toolName: "bash",
+    input: { command: "sed -n '1,240p' solver.py" },
+    isError: false,
+    content: [{ type: "text", text: "solver source" }],
+    effectPolicy: { readOnly: false, sideEffect: "process" as const },
+  };
+
+  assert.equal(breaker.observe(duplicateEvidence).count, 1);
+  assert.equal(breaker.observe(processObservation).terminate, false);
+  assert.equal(breaker.observe(duplicateEvidence).count, 2);
+  assert.equal(breaker.observe(processObservation).terminate, false);
+  assert.equal(breaker.observe(duplicateEvidence).terminate, true);
+});
+
 test("[contract:tool-failure-storm] varied failures stop after a bounded budget without durable progress", () => {
   const breaker = new ToolFailureStormBreaker(4);
   for (const input of [
