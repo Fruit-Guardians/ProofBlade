@@ -776,6 +776,110 @@ describe('IntentScheduler - replay 持久化', () => {
     }
   });
 
+  test('同 generation 的知识过期 PROPOSED 会原子变为 STALE 并释放容量', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-stale-knowledge-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-STALE-KNOWLEDGE-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Stale knowledge capacity test',
+      } as any);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 1 });
+      const oldIntent: Intent = {
+        id: 'intent-old-knowledge', status: 'PROPOSED', priority: 'high', createdAt: new Date().toISOString(),
+        knowledgeVersion: 1, fixtureGeneration: 1, phase: 'reconnaissance', objective: 'Outdated work',
+        startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Old evidence', minimumConfidence: 'medium' },
+        suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: [], dependencies: [], attempts: 0,
+      };
+      await controlStore.dispatch(runId, { type: 'scheduler_intent', intent: oldIntent });
+      for (const factId of ['F-001', 'F-002', 'F-003']) {
+        await controlStore.dispatch(runId, {
+          type: 'fact',
+          fact: { id: factId, statement: `Knowledge ${factId}`, status: 'CANDIDATE', evidenceIds: [] },
+        });
+      }
+
+      const claimed = await scheduler.schedule({
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001', 'F-002', 'F-003'], hypotheses: [], evidence: [], openIntents: 1,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      });
+      assert.ok(claimed);
+      assert.notEqual(claimed.id, oldIntent.id);
+
+      const snapshot = await controlStore.snapshot(runId);
+      assert.equal(snapshot.schedulerIntents[oldIntent.id].status, 'STALE');
+      assert.equal(Object.values(snapshot.schedulerIntents).filter(intent =>
+        (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+          && intent.fixtureGeneration === 1).length, 1);
+      assert.equal(snapshot.schedulerIntents[claimed.id].status, 'CLAIMED');
+
+      const replayed = await new ControlStore(events).replay(runId);
+      assert.equal(replayed.schedulerIntents[oldIntent.id].status, 'STALE');
+      assert.equal(replayed.schedulerIntents[claimed.id].status, 'CLAIMED');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('并发 schedule 清理知识过期占位时仍保持单一开放 Intent', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-stale-knowledge-concurrent-'));
+
+    try {
+      const controlStore = new ControlStore(new JsonlControlStore(join(root, 'runs')));
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 1 });
+      const runId = 'INTENT-STALE-KNOWLEDGE-CONCURRENT-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Concurrent stale knowledge test',
+      } as any);
+      await controlStore.dispatch(runId, { type: 'fixture_reset', generation: 1 });
+      await controlStore.dispatch(runId, {
+        type: 'scheduler_intent',
+        intent: {
+          id: 'intent-concurrent-old-knowledge', status: 'PROPOSED', priority: 'high', createdAt: new Date().toISOString(),
+          knowledgeVersion: 1, fixtureGeneration: 1, phase: 'reconnaissance', objective: 'Outdated concurrent work',
+          startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Old evidence', minimumConfidence: 'medium' },
+          suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: [], dependencies: [], attempts: 0,
+        },
+      });
+      for (const factId of ['F-001', 'F-002', 'F-003']) {
+        await controlStore.dispatch(runId, {
+          type: 'fact', fact: { id: factId, statement: factId, status: 'CANDIDATE', evidenceIds: [] },
+        });
+      }
+      const context: SchedulingContext = {
+        runId, phase: 'reconnaissance', knowledgeVersion: 1, currentGeneration: 1,
+        facts: ['F-001', 'F-002', 'F-003'], hypotheses: [], evidence: [], openIntents: 1,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+
+      const results = await Promise.all([scheduler.schedule(context), scheduler.schedule(context)]);
+      assert.equal(results.filter(Boolean).length, 1);
+      const snapshot = await controlStore.snapshot(runId);
+      assert.equal(snapshot.schedulerIntents['intent-concurrent-old-knowledge'].status, 'STALE');
+      assert.equal(Object.values(snapshot.schedulerIntents).filter(intent =>
+        (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
+          && intent.fixtureGeneration === 1).length, 1);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('fixture reset 原子失效旧 CLAIMED Intent 并释放匹配 Lease', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');

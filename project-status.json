@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-09T23:59:59.900+08:00",
+  "updatedAt": "2026-08-10T00:10:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,6 +203,28 @@
     }
   ],
   "updates": [
+  {
+    "id": "UPDATE-20260810-001",
+    "occurredAt": "2026-08-10T00:10:00+08:00",
+    "summary": "消除同 generation 知识过期 Intent 对开放容量的永久占位。",
+    "branch": "feat/intent-scheduler",
+    "commit": "self",
+    "planIds": [
+      "PLAN-110"
+    ],
+    "changes": [
+      "IntentFilter 暴露统一的 isStale 判断供调度容量计算复用",
+      "调度器在计算 openIntents 前识别 generation 或知识版本过期的 PROPOSED Intent",
+      "原子调度事务将过期 Intent 持久化为 STALE，并在同一事务内释放容量生成替代候选",
+      "非事务兼容路径同样先持久化 STALE，再进行容量和候选计算",
+      "增加单次调度、replay 和两个并发 schedule 的容量恢复回归测试"
+    ],
+    "validation": [
+      "68 CLI, scheduler, filter, durability and recovery tests passed in three consecutive iterations",
+      "TypeScript typecheck passed",
+      "concurrent stale cleanup preserves maxOpenIntents"
+    ]
+  },
   {
     "id": "UPDATE-20260809-015",
     "occurredAt": "2026-08-09T23:59:59.900+08:00",

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-09T23:59:59.900+08:00
+> 状态更新时间：2026-08-10T00:10:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260810-001 | 2026-08-10T00:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-015 | 2026-08-09T23:59:59.900+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-014 | 2026-08-09T23:59:59+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-013 | 2026-08-09T23:59:30+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -38,6 +39,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260810-001
+
+时间：2026-08-10T00:10:00+08:00
+
+摘要：消除同 generation 知识过期 Intent 对开放容量的永久占位。
+
+### 变更
+
+- IntentFilter 暴露统一的 isStale 判断供调度容量计算复用
+- 调度器在计算 openIntents 前识别 generation 或知识版本过期的 PROPOSED Intent
+- 原子调度事务将过期 Intent 持久化为 STALE，并在同一事务内释放容量生成替代候选
+- 非事务兼容路径同样先持久化 STALE，再进行容量和候选计算
+- 增加单次调度、replay 和两个并发 schedule 的容量恢复回归测试
+
+### 验证
+
+- [x] 68 CLI, scheduler, filter, durability and recovery tests passed in three consecutive iterations
+- [x] TypeScript typecheck passed
+- [x] concurrent stale cleanup preserves maxOpenIntents
 
 ## UPDATE-20260809-015
 

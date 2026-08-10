@@ -71,22 +71,24 @@ export class IntentScheduler {
     const snapshot = await this.controlStore.snapshot(context.runId);
     const persistedIntents = Object.values(snapshot.schedulerIntents || {});
     const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
-    const staleGenerationIntents = persistedIntents.filter(
-      intent => intent.status === 'PROPOSED' && intent.fixtureGeneration !== currentGeneration
+    const knowledgeVersion = this.knowledgeVersion(snapshot, context.knowledgeVersion);
+    const freshnessContext = { ...context, currentGeneration, knowledgeVersion };
+    const staleProposedIntents = persistedIntents.filter(
+      intent => intent.status === 'PROPOSED' && this.filter.isStale(intent, freshnessContext)
     );
+    const staleProposedIds = new Set(staleProposedIntents.map(intent => intent.id));
     const existingIntents = persistedIntents.filter(
-      intent => intent.status === 'PROPOSED' && intent.fixtureGeneration === currentGeneration
+      intent => intent.status === 'PROPOSED' && !staleProposedIds.has(intent.id)
     );
-    const persistedOpenIntents = persistedIntents.filter(
-      intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
-        && intent.fixtureGeneration === currentGeneration
+    const persistedOpenIntents = existingIntents.length + persistedIntents.filter(
+      intent => intent.status === 'CLAIMED' && intent.fixtureGeneration === currentGeneration
     ).length;
     const openIntents = persistedOpenIntents;
     const schedulingContext = {
       ...context,
       openIntents,
       currentGeneration,
-      knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
+      knowledgeVersion,
       occupiedResources: Object.keys(snapshot.leases || {}),
       completedIntentIds: new Set([
         ...persistedIntents
@@ -102,7 +104,7 @@ export class IntentScheduler {
       ]),
     };
 
-    for (const intent of staleGenerationIntents) {
+    for (const intent of staleProposedIntents) {
       await this.controlStore.dispatch(context.runId, {
         type: 'scheduler_intent',
         intent: { ...intent, status: 'STALE' },
@@ -151,22 +153,24 @@ export class IntentScheduler {
     return this.controlStore.dispatchTransaction(context.runId, (snapshot) => {
       const persistedIntents = Object.values(snapshot.schedulerIntents || {});
       const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
-      const staleGenerationIntents = persistedIntents.filter(
-        intent => intent.status === 'PROPOSED' && intent.fixtureGeneration !== currentGeneration
+      const knowledgeVersion = this.knowledgeVersion(snapshot, context.knowledgeVersion);
+      const freshnessContext = { ...context, currentGeneration, knowledgeVersion };
+      const staleProposedIntents = persistedIntents.filter(
+        intent => intent.status === 'PROPOSED' && this.filter.isStale(intent, freshnessContext)
       );
+      const staleProposedIds = new Set(staleProposedIntents.map(intent => intent.id));
       const existingIntents = persistedIntents.filter(
-        intent => intent.status === 'PROPOSED' && intent.fixtureGeneration === currentGeneration
+        intent => intent.status === 'PROPOSED' && !staleProposedIds.has(intent.id)
       );
-      const persistedOpenIntents = persistedIntents.filter(
-        intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
-          && intent.fixtureGeneration === currentGeneration
+      const persistedOpenIntents = existingIntents.length + persistedIntents.filter(
+        intent => intent.status === 'CLAIMED' && intent.fixtureGeneration === currentGeneration
       ).length;
       const openIntents = persistedOpenIntents;
       const schedulingContext = {
         ...context,
         openIntents,
         currentGeneration,
-        knowledgeVersion: this.knowledgeVersion(snapshot, context.knowledgeVersion),
+        knowledgeVersion,
         occupiedResources: Object.keys(snapshot.leases || {}),
         completedIntentIds: new Set([
           ...persistedIntents
@@ -181,7 +185,7 @@ export class IntentScheduler {
             .map(intent => intent.hypothesis!),
         ]),
       };
-      const staleCommands: DomainCommand[] = staleGenerationIntents.map(intent => ({
+      const staleCommands: DomainCommand[] = staleProposedIntents.map(intent => ({
         type: 'scheduler_intent',
         intent: { ...intent, status: 'STALE' },
       }));
