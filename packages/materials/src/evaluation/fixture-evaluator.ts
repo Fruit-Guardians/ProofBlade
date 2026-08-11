@@ -10,9 +10,16 @@ import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/sin
 import { sha256, canonicalJson } from "../domain/utils.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import type { PrimaryFailureCategory } from "../domain/types.js";
+import {
+  DEFAULT_RUNTIME_SCENARIOS,
+  RuntimeScenarioEvaluator,
+  type RuntimeScenarioSummary,
+} from "./runtime-scenario-evaluator.js";
 
-export const BASELINE_PROTOCOL_VERSION = "baseline-v2";
+export const BASELINE_PROTOCOL_VERSION = "baseline-v3";
 export const BASELINE_REQUIRED_ATTEMPTS = 3;
+export const BASELINE_REQUIRED_SCENARIOS = DEFAULT_RUNTIME_SCENARIOS.length;
+export const BASELINE_REQUIRED_TOTAL_CASES = 30;
 
 export type EvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
 
@@ -62,14 +69,18 @@ export interface FixtureEvaluationCase {
 }
 
 export interface FixtureEvaluationSummary {
-  schemaVersion: 3;
+  schemaVersion: 4;
   protocolVersion: typeof BASELINE_PROTOCOL_VERSION;
   runPrefix: string;
   fixtureIds: string[];
   fixtureCatalog: FixtureCatalogSnapshot;
   budget: { maxTurns: number };
   attempts: number;
+  fixtureTotal: number;
+  scenarioTotal: number;
   total: number;
+  fixtureSuccessCount: number;
+  scenarioSuccessCount: number;
   successCount: number;
   successRate: number;
   evidenceBackedCount: number;
@@ -92,6 +103,7 @@ export interface FixtureEvaluationSummary {
     factEvidenceCoverage: number;
   };
   failureCategories: Partial<Record<EvaluationFailureCategory, number>>;
+  runtimeScenarios: RuntimeScenarioSummary;
   gate: {
     passed: boolean;
     checks: Array<{ id: string; passed: boolean; actual: number | string; expected: number | string }>;
@@ -122,40 +134,53 @@ export class FixtureEvaluationRunner {
         cases.push(await this.runCase(services, profile.id, attempt, `${runPrefix}-${profile.id}-a${attempt}`, maxTurns));
       }
     }
-    const total = cases.length;
-    const successCount = cases.filter((item) => item.success).length;
+    const runtimeScenarios = await new RuntimeScenarioEvaluator(this.root, this.config).run(runPrefix);
+    const fixtureTotal = cases.length;
+    const scenarioTotal = runtimeScenarios.total;
+    const total = fixtureTotal + scenarioTotal;
+    const fixtureSuccessCount = cases.filter((item) => item.success).length;
+    const scenarioSuccessCount = runtimeScenarios.successCount;
+    const successCount = fixtureSuccessCount + scenarioSuccessCount;
     const evidenceBackedCount = cases.filter((item) => item.evidenceBacked).length;
     const replayParityCount = cases.filter((item) => item.replayParity).length;
     const candidateLeakCount = cases.filter((item) => item.candidateLeaked).length;
-    const metrics = aggregateMetrics(cases, successCount);
+    const metrics = aggregateMetrics(cases, fixtureSuccessCount);
     const failureCategories = orderedCounts(cases.flatMap((item) => item.failureCategory ? [item.failureCategory] : []));
     const checks = [
       check("minimum_attempts", attempts >= BASELINE_REQUIRED_ATTEMPTS, attempts, `>=${BASELINE_REQUIRED_ATTEMPTS}`),
+      check("minimum_total_cases", total >= BASELINE_REQUIRED_TOTAL_CASES, total, `>=${BASELINE_REQUIRED_TOTAL_CASES}`),
       check("fixture_coverage", sameValues(requested, requiredFixtureIds), requested.join(","), requiredFixtureIds.join(",")),
+      check("runtime_scenario_coverage", sameValues(runtimeScenarios.requiredIds, DEFAULT_RUNTIME_SCENARIOS.map((item) => item.id)), runtimeScenarios.total, BASELINE_REQUIRED_SCENARIOS),
       check("success_rate", successCount === total, rate(successCount, total), 1),
-      check("evidence_backed_rate", evidenceBackedCount === total, rate(evidenceBackedCount, total), 1),
-      check("replay_parity_rate", replayParityCount === total, rate(replayParityCount, total), 1),
+      check("runtime_scenario_success_rate", scenarioSuccessCount === scenarioTotal, runtimeScenarios.successRate, 1),
+      check("evidence_backed_rate", evidenceBackedCount === fixtureTotal, rate(evidenceBackedCount, fixtureTotal), 1),
+      check("replay_parity_rate", replayParityCount === fixtureTotal, rate(replayParityCount, fixtureTotal), 1),
       check("candidate_leaks", candidateLeakCount === 0, candidateLeakCount, 0),
       check("fact_evidence_coverage", metrics.factEvidenceCoverage === 1, metrics.factEvidenceCoverage, 1),
     ];
     const summaryBase: Omit<FixtureEvaluationSummary, "reportHash"> = {
-      schemaVersion: 3 as const,
+      schemaVersion: 4 as const,
       protocolVersion: BASELINE_PROTOCOL_VERSION,
       runPrefix,
       fixtureIds: requested,
       fixtureCatalog,
       budget: { maxTurns },
       attempts,
+      fixtureTotal,
+      scenarioTotal,
       total,
+      fixtureSuccessCount,
+      scenarioSuccessCount,
       successCount,
       successRate: rate(successCount, total),
       evidenceBackedCount,
-      evidenceBackedRate: rate(evidenceBackedCount, total),
+      evidenceBackedRate: rate(evidenceBackedCount, fixtureTotal),
       replayParityCount,
-      replayParityRate: rate(replayParityCount, total),
+      replayParityRate: rate(replayParityCount, fixtureTotal),
       candidateLeakCount,
       metrics,
       failureCategories,
+      runtimeScenarios,
       gate: { passed: checks.every((item) => item.passed), checks },
       cases,
     };
@@ -327,7 +352,11 @@ function stableReportHash(summary: Omit<FixtureEvaluationSummary, "reportHash">)
     fixtureCatalogHash: summary.fixtureCatalog.hash,
     budget: summary.budget,
     attempts: summary.attempts,
+    fixtureTotal: summary.fixtureTotal,
+    scenarioTotal: summary.scenarioTotal,
     total: summary.total,
+    fixtureSuccessCount: summary.fixtureSuccessCount,
+    scenarioSuccessCount: summary.scenarioSuccessCount,
     successCount: summary.successCount,
     evidenceBackedCount: summary.evidenceBackedCount,
     replayParityCount: summary.replayParityCount,
@@ -344,6 +373,16 @@ function stableReportHash(summary: Omit<FixtureEvaluationSummary, "reportHash">)
       factEvidenceCoverage: summary.metrics.factEvidenceCoverage,
     },
     failureCategories: summary.failureCategories,
+    runtimeScenarios: {
+      protocolVersion: summary.runtimeScenarios.protocolVersion,
+      catalogHash: summary.runtimeScenarios.catalogHash,
+      requiredIds: summary.runtimeScenarios.requiredIds,
+      total: summary.runtimeScenarios.total,
+      successCount: summary.runtimeScenarios.successCount,
+      successRate: summary.runtimeScenarios.successRate,
+      categoryCounts: summary.runtimeScenarios.categoryCounts,
+      cases: summary.runtimeScenarios.cases.map(({ durationMs: _durationMs, error: _error, ...item }) => item),
+    },
     gate: summary.gate,
     cases: stableCases,
   }));

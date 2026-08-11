@@ -1,17 +1,23 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T00:10:00+08:00
+> 状态更新时间：2026-08-10T19:42:54+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
-| UPDATE-20260810-001 | 2026-08-10T00:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260810-004 | 2026-08-10T19:42:54+08:00 | PLAN-100 | codex/deep-reverse-v1 | 本条记录所在提交 |
+| UPDATE-20260810-006 | 2026-08-10T18:00:00+08:00 | PLAN-001, PLAN-002 | codex/fix-concurrent-pr-metadata | 本条记录所在提交 |
+| UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
+| UPDATE-20260810-002 | 2026-08-10T11:17:00+08:00 | PLAN-110, PLAN-120, PLAN-200 | main | 本条记录所在提交 |
+| UPDATE-20260810-001 | 2026-08-10T00:31:33+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
+| UPDATE-20260810-000 | 2026-08-10T00:10:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-015 | 2026-08-09T23:59:59.900+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-014 | 2026-08-09T23:59:59+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-013 | 2026-08-09T23:59:30+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-012 | 2026-08-09T23:50:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
+| UPDATE-20260809-030 | 2026-08-09T23:32:20+08:00 | PLAN-100 | codex/capability-backend-foundation | 本条记录所在提交 |
 | UPDATE-20260809-011 | 2026-08-09T23:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-010 | 2026-08-09T22:30:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260809-009 | 2026-08-09T22:00:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
@@ -40,7 +46,116 @@
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
 
+## UPDATE-20260810-004
+
+时间：2026-08-10T19:42:54+08:00
+
+摘要：完成 PR C Deep Reverse v1：新增函数、反汇编和 XRef 逻辑 Capability，并接入可选 Rizin 与可配置 MCP 后端。
+
+### 变更
+
+- Rizin local-process Backend 使用受保护二进制的 0600 临时副本，支持超时、AbortSignal 和有界输出
+- functions、disassemble、xrefs 统一规范化地址、排序、去重和结果上限，拒绝未声明操作
+- MCP binaryReverse 映射支持 server、outer tool、参数绑定、嵌套 dispatcher 和严格只读纯重放策略
+- 本地 Rizin 不可用时按 Backend 优先级回退到已配置 MCP，实现来源和版本绑定
+- 参考 ctf-skills 最新 ctf-reverse 目录 commit d6662d2，保留方法论在 Skill 层而不固化进模型工具面
+- 增加 Rizin、MCP direct/nested 映射与边界回归测试
+
+### 验证
+
+- [x] 122/122 Materials tests passed
+- [x] 171/171 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+- [x] Rizin production availability is environment-dependent and remains optional
+
+## UPDATE-20260810-006
+
+时间：2026-08-10T18:00:00+08:00
+
+摘要：消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。
+
+### 变更
+
+- 源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照
+- 源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照
+- 普通 packages/apps/scripts 变更不再要求写入共享 project-status.json
+- CI 在临时工作区的契约检查前自动重生成项目报表
+- 补充并行源码变更与治理文件边界回归检查
+
+### 验证
+
+- [x] component and project report gates passed
+- [x] CI gates passed
+- [x] 168/168 repository tests passed
+
+## UPDATE-20260810-003
+
+时间：2026-08-10T14:08:00+08:00
+
+摘要：修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。
+
+### 变更
+
+- Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞
+- 显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数
+- platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window
+- no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销
+- declared-no-progress 终止保持优先级，后续 read-window 终止不能覆盖并为 process 打开撤销路径
+- 增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试
+
+### 验证
+
+- [x] 162/162 repository tests passed
+- [x] component, contract and project report gates passed
+- [x] rollback copy restored to the original SHA-256
+
+## UPDATE-20260810-002
+
+时间：2026-08-10T11:17:00+08:00
+
+摘要：把确定性评测从 18 次 Fixture 重复升级为 30 项求解与运行时双矩阵门禁。
+
+### 变更
+
+- 保留六个 Fixture 各三次的 18 个生产循环，并新增 12 个独立运行时场景
+- 新增缓存用量与前缀漂移、上下文单调性与用户任务锚点评测
+- 新增重复失败、无进展、失败风暴、Evidence 整理背压与并发去重评测
+- 新增暂停重放、Verifier 权限和 Lease 所有权隔离评测
+- baseline-v3 报告分列 fixtureTotal/scenarioTotal，并将两个 Catalog 与场景结果纳入稳定哈希
+
+### 验证
+
+- [x] 104/104 Materials tests passed
+- [x] 153/153 repository tests passed
+- [x] 30/30 deterministic evaluation cases passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+- [x] runtime scenarios cover 5 categories
+
 ## UPDATE-20260810-001
+
+时间：2026-08-10T00:31:33+08:00
+
+摘要：修复 Capability Backend 复审发现的 MCP 故障转移、操作匹配、版本投影和新 Job 绑定约束。
+
+### 变更
+
+- MCP availability 按具体 server 状态判断，连接失败后 Resolver 可选择备用 Backend
+- MCP Backend 只处理 describe/call，并用 catalogHash 统一状态与恢复绑定版本
+- ControlStore 新 job_queued 命令在类型与运行时校验 backendId/backendVersion
+- 增加 job_queued_legacy 兼容旧事件，并补齐真实 MCP 连接失败转移测试
+
+### 验证
+
+- [x] 99/99 Materials tests passed
+- [x] 148/148 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
+
+## UPDATE-20260810-000
 
 时间：2026-08-10T00:10:00+08:00
 
@@ -139,6 +254,28 @@
 - [x] 46 focused tests passed in three consecutive iterations
 - [x] TypeScript typecheck passed
 - [x] component, change contract and project report gates passed
+
+## UPDATE-20260809-030
+
+时间：2026-08-09T23:32:20+08:00
+
+摘要：建立稳定逻辑 Capability 与可替换执行 Backend 的基础层，为 PE/ELF、固件和 Ghidra 能力接入保留模型自主规划空间。
+
+### 变更
+
+- 新增统一 CapabilityBackend 与确定性 Resolver，支持 bundled、MCP、本地进程和 provider-native 实现类型
+- 模型继续使用稳定 list_capabilities/invoke_capability 代理，不暴露重复的后端专用工具
+- Effect 与 Artifact 保存 capability、manifest 和 backend 来源，后台 Job 固定 Backend ID 与版本
+- 恢复时复用已绑定 Backend 并拒绝版本漂移；仅允许在执行开始前跳过不可用实现
+- 增加 Backend 选择、显式绑定、重复 ID、版本漂移和后台恢复回归测试
+
+### 验证
+
+- [x] 98/98 Materials tests passed
+- [x] 147/147 repository tests passed
+- [x] 18/18 deterministic fixture evaluations passed
+- [x] component, contract and project report gates passed
+- [x] npm audit: 0 vulnerabilities
 
 ## UPDATE-20260809-011
 

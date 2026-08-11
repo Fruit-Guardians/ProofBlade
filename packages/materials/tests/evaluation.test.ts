@@ -29,18 +29,23 @@ const config: ProofBladeConfig = {
   },
 };
 
-test("fixture evaluator reports evidence and replay gates", async () => {
+test("[contract:fixture-runtime-gate] fixture evaluator reports evidence, runtime scenario, and replay gates", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-eval-"));
   try {
     const summary = await new FixtureEvaluationRunner(root, config).run({ fixtureIds: ["web-source-1"], runPrefix: "EVAL-TEST", maxTurns: 1 });
-    assert.equal(summary.schemaVersion, 3);
+    assert.equal(summary.schemaVersion, 4);
     assert.equal(summary.protocolVersion, BASELINE_PROTOCOL_VERSION);
     assert.equal(summary.fixtureCatalog.fixtures.length, 1);
     assert.equal(summary.fixtureCatalog.hash.length, 64);
     assert.doesNotMatch(JSON.stringify(summary.fixtureCatalog), /PB\{/);
     assert.deepEqual(summary.budget, { maxTurns: 1 });
     assert.equal(summary.attempts, 3);
-    assert.equal(summary.total, 3);
+    assert.equal(summary.fixtureTotal, 3);
+    assert.equal(summary.scenarioTotal, 12);
+    assert.equal(summary.total, 15);
+    assert.equal(summary.fixtureSuccessCount, 3);
+    assert.equal(summary.scenarioSuccessCount, 12);
+    assert.equal(summary.successCount, 15);
     assert.equal(summary.successRate, 1);
     assert.equal(summary.evidenceBackedRate, 1);
     assert.equal(summary.replayParityRate, 1);
@@ -48,6 +53,8 @@ test("fixture evaluator reports evidence and replay gates", async () => {
     assert.equal(summary.metrics.factEvidenceCoverage, 1);
     assert.equal(summary.metrics.effectiveActionRatio, 1);
     assert.equal(summary.gate.passed, false);
+    assert.equal(summary.runtimeScenarios.successRate, 1);
+    assert.equal(summary.gate.checks.find((item) => item.id === "minimum_total_cases")?.passed, false);
     assert.equal(summary.gate.checks.find((item) => item.id === "fixture_coverage")?.passed, false);
     assert.ok(summary.cases.every((item) => !item.candidateLeaked));
     assert.equal(summary.reportHash.length, 64);

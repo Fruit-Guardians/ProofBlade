@@ -3,7 +3,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm";
 
@@ -12,6 +12,7 @@ export interface CodingTurnTermination {
   requested?: boolean;
   confirmed?: boolean;
   reason?: CodingTurnTerminationReason;
+  noProgressWindow?: NoProgressWindow;
 }
 
 export function projectCodingAssistantText(output: string, termination: CodingTurnTermination): string {
@@ -58,19 +59,29 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
       failureStormBreaker?.observe(observation);
-      if (progressBreaker?.isProgress(observation) && termination.reason === "no_progress") {
+      if (progressBreaker?.isProgress(observation, termination.noProgressWindow) && termination.reason === "no_progress") {
         delete termination.message;
         delete termination.reason;
+        delete termination.noProgressWindow;
         termination.requested = false;
       }
       const progress = progressBreaker?.observe(observation);
       if (progress?.terminate) {
-        termination.message = noProgressToolMessage(event.toolName, progress.count);
-        termination.reason = "no_progress";
-        termination.requested = true;
+        const preservesDeclaredTermination = termination.reason === "no_progress"
+          && termination.noProgressWindow === "declared_no_progress"
+          && progress.window === "read";
+        const terminationMessage = preservesDeclaredTermination
+          ? termination.message ?? noProgressToolMessage(event.toolName, progress.count)
+          : noProgressToolMessage(event.toolName, progress.count);
+        if (!preservesDeclaredTermination) {
+          termination.message = terminationMessage;
+          termination.reason = "no_progress";
+          termination.noProgressWindow = progress.window;
+          termination.requested = true;
+        }
         return {
-          content: [{ type: "text" as const, text: termination.message }],
-          details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key },
+          content: [{ type: "text" as const, text: terminationMessage }],
+          details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key, window: termination.noProgressWindow },
           isError: false,
           terminate: true,
         };

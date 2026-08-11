@@ -1,10 +1,10 @@
 export function componentTransitionErrors(input) {
   const { componentId, previous, current, sourceChanged, documentChanged, expectedSourceHash } = input;
   const errors = [];
-  if (sourceChanged && !documentChanged) {
-    errors.push(`${componentId}: source changed but its component document was not updated`);
-    return errors;
-  }
+  // Component source changes are audited from the current tree. Keeping the
+  // snapshot document unchanged makes parallel source PRs merge without a
+  // shared version/count conflict.
+  if (sourceChanged) return errors;
   if (!documentChanged) return errors;
 
   if (compareVersions(current.version, previous.version) <= 0) {

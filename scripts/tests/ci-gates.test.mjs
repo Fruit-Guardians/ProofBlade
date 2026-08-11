@@ -7,6 +7,7 @@ import { resolveAuditTimestamp } from "../audit-time.mjs";
 import { canonicalComponentContent } from "../component-audit-lib.mjs";
 import { componentTransitionErrors } from "../component-transition-lib.mjs";
 import { changeContractErrors } from "../change-contract-lib.mjs";
+import { requiresProjectStatus } from "../project-report-change-lib.mjs";
 
 test("[contract:unchanged-source-no-reaudit] rejects audit churn without a source change", () => {
   const previous = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00+08:00", count: 4, hash: "a".repeat(64) });
@@ -18,15 +19,11 @@ test("[contract:unchanged-source-no-reaudit] rejects audit churn without a sourc
   assert.deepEqual(componentTransitionErrors({ componentId: "atoms", previous, current: reordered, sourceChanged: false, documentChanged: true }), []);
 });
 
-test("[contract:single-audit-increment] accepts one audit and rejects a multi-count jump", () => {
+test("[contract:single-audit-increment] [contract:parallel-source-change] accepts source changes without mutating shared audit snapshots", () => {
   const previous = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00+08:00", count: 4, hash: "a".repeat(64) });
-  const valid = metadata({ version: "1.3.0", updatedAt: "2026-08-07T11:00:00+08:00", count: 5, hash: "b".repeat(64) });
-  assert.deepEqual(componentTransitionErrors({ componentId: "gui", previous, current: valid, sourceChanged: true, documentChanged: true }), []);
-
-  const jumped = metadata({ version: "1.3.0", updatedAt: "2026-08-07T11:00:00+08:00", count: 6, hash: "b".repeat(64) });
-  const errors = componentTransitionErrors({ componentId: "gui", previous, current: jumped, sourceChanged: true, documentChanged: true });
-  assert.equal(errors.some((error) => error.includes("bugAuditCount must increase exactly once")), true);
-  assert.equal(errors.some((error) => error.includes("securityAuditCount must increase exactly once")), true);
+  assert.deepEqual(componentTransitionErrors({ componentId: "gui", previous, current: previous, sourceChanged: true, documentChanged: false }), []);
+  const independentlyAudited = metadata({ version: "1.9.0", updatedAt: "2026-08-07T11:00:00+08:00", count: 9, hash: "b".repeat(64) });
+  assert.deepEqual(componentTransitionErrors({ componentId: "gui", previous, current: independentlyAudited, sourceChanged: true, documentChanged: true }), []);
 });
 
 test("[contract:stale-audit-repair] permits exactly one correction to the computed source hash", () => {
@@ -63,6 +60,15 @@ test("[contract:cross-platform-source-hash] normalizes text line endings without
 
   const binary = Buffer.from([0xff, 0x0d, 0x0a, 0x00]);
   assert.equal(canonicalComponentContent("fixture.bin", binary), binary);
+});
+
+test("[contract:parallel-project-status] ordinary source PRs do not mutate shared project status", () => {
+  assert.equal(requiresProjectStatus("packages/materials/src/runtime/coding-lane.ts"), false);
+  assert.equal(requiresProjectStatus("apps/gui/src/server.ts"), false);
+  assert.equal(requiresProjectStatus("packages/materials/src/runtime/COMPONENT.md"), false);
+  assert.equal(requiresProjectStatus("scripts/check-component-docs.mjs"), false);
+  assert.equal(requiresProjectStatus("README.md"), true);
+  assert.equal(requiresProjectStatus("project-status.json"), true);
 });
 
 test("change contracts require executable scenario markers only when a trigger changes", () => {

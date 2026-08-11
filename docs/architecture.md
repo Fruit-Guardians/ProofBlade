@@ -72,7 +72,7 @@ The planner lane currently uses a deterministic coordinator rather than an addit
 
 ## Evaluation gate
 
-`FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane. It reports per-case status, evidence-backed completion, replay projection parity and candidate plaintext leakage, then hashes the complete report. `proofblade eval` and `npm run eval` are provider-free pre-push checks; LM Studio is reserved for a separate live smoke run.
+`FixtureEvaluationRunner` runs the six synthetic profiles through the production loop with a deterministic lane, three times each. `RuntimeScenarioEvaluator` adds twelve provider-free behavioral cases covering cache accounting and prefix stability, context monotonicity and task anchoring, convergence breakers, evidence curation and deduplication, pause/replay durability, verifier authority and lease fencing. The `baseline-v3` gate therefore requires 30/30 cases while retaining separate Fixture and scenario totals. Both catalogs and their outcomes enter the stable report hash; run ids, wall-clock duration and raw error strings do not. `proofblade eval` and `npm run eval` are pre-push checks; live Provider smoke and cache-hit measurements remain separate because they depend on external routing behavior.
 
 ## Durable observability
 

@@ -9,6 +9,7 @@ import { id, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
+import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 
@@ -38,7 +39,8 @@ export class ProofBladeToolRuntime {
     this.observer = new DeterministicObserver(controlStore);
     this.mcp = McpProjectRegistry.load(projectRoot);
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
-    this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, this.mcp);
+    const backends = new CapabilityBackendResolver([new RizinCapabilityBackend(), new McpReverseCapabilityBackend(this.mcp), new BinaryCapabilityBackend(), new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
+    this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, backends);
     this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
   }
 
@@ -56,7 +58,7 @@ export class ProofBladeToolRuntime {
 
   public async invokeCapability(input: { capabilityId: string; operation: string; input: Record<string, unknown> }, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
     const result = await this.capabilityRouter.invoke({ capabilityId: input.capabilityId, operation: input.operation, input: input.input }, signal);
-    if (input.capabilityId !== "proofblade.target" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
+    if (input.capabilityId !== "proofblade.target" && input.capabilityId !== "proofblade.binary" && !(input.capabilityId.startsWith("mcp.") && input.operation === "call")) return result;
     const snapshot = await this.controlStore.snapshot(this.runId);
     const artifact = snapshot.artifacts[result.artifactId];
     if (!artifact) return result;
@@ -73,7 +75,7 @@ export class ProofBladeToolRuntime {
 
   public async runBackground(input: BackgroundJobStartInput): Promise<Record<string, unknown>> {
     const job = await this.jobs.start(input);
-    return { jobId: job.id, status: job.status, capabilityId: job.capabilityId, operation: job.operation, replayPolicy: job.replayPolicy, generation: job.generation };
+    return { jobId: job.id, status: job.status, capabilityId: job.capabilityId, operation: job.operation, backendId: job.backendId, backendVersion: job.backendVersion, replayPolicy: job.replayPolicy, generation: job.generation };
   }
 
   public async readJobOutput(jobId: string, maxChars = 4_000): Promise<JobOutput> {
@@ -221,7 +223,7 @@ export class ProofBladeToolRuntime {
       evidence: Object.keys(snapshot.evidence),
       hypotheses: Object.keys(snapshot.hypotheses),
       completions: Object.values(snapshot.completions).map((item) => ({ id: item.id, candidateHash: item.candidateHash, status: item.status })),
-      jobs: Object.values(snapshot.jobs).map((item) => ({ id: item.id, capabilityId: item.capabilityId, operation: item.operation, status: item.status, artifactId: item.artifactId })),
+      jobs: Object.values(snapshot.jobs).map((item) => ({ id: item.id, capabilityId: item.capabilityId, operation: item.operation, backendId: item.backendId, backendVersion: item.backendVersion, status: item.status, artifactId: item.artifactId })),
       handoffs: Object.values(snapshot.handoffs).map((item) => ({ id: item.id, status: item.status, phase: item.phase, knowledgeVersion: item.knowledgeVersion, actionIds: item.nextActions.map((action) => action.id) })),
       remainingToolCalls: snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length,
     };

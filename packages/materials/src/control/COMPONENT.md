@@ -6,13 +6,13 @@
   "name": "Control Store and Reducer",
   "version": "0.3.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T15:59:59.500Z",
+  "updatedAt": "2026-08-09T16:31:33.000Z",
   "qualityAudit": {
     "bugAuditCount": 4,
     "securityAuditCount": 4,
-    "lastBugAuditAt": "2026-08-09T15:59:59.500Z",
-    "lastSecurityAuditAt": "2026-08-09T15:59:59.500Z",
-    "sourceHash": "e7988dd5e4f73f1ff68bb066884cca94d02ced6e45aaf705fecf0cc178983003",
+    "lastBugAuditAt": "2026-08-09T16:31:33.000Z",
+    "lastSecurityAuditAt": "2026-08-09T16:31:33.000Z",
+    "sourceHash": "867c38c5f8b13beb5755b3ce4ae0877d4b1c84a9ad6fa51c4ac19d0c6def3fb1",
     "result": "passed"
   }
 }
@@ -35,6 +35,7 @@
 - `PAUSED` 状态下的 `finish`、`fail`、`exhaust` 必须在 ControlStore 单写者临界区内统一拒绝，Reducer 重放执行相同策略；只有显式 `resume` 可以解除暂停。
 - 需要共同成立的一组领域命令必须通过 `dispatchBatch` 在同一单写者临界区内预验证和投影；任一命令失败时不得追加部分事件或保存部分投影。
 - 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
+- 新 `job_queued` 命令在领域层强制携带 `backendId` 与 `backendVersion`；`job_queued_legacy` 只用于读取/迁移没有 Backend 绑定的历史事件，最终仍投影为 `job_queued`。
 
 ```powershell
 npm run test:materials

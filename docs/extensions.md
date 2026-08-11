@@ -298,6 +298,37 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 
 敏感值只从环境变量展开，不写入事件、Artifact、日志或 Prompt。`cwd` 相对项目根目录解析。Server 必须显式配置，不扫描用户主目录的全局 MCP 设置。
 
+### 6.1.1 深度逆向 Capability 映射
+
+`proofblade.binary.functions`、`disassemble` 和 `xrefs` 可以通过 `.mcp.json` 映射到 Ghidra、Rizin 或其他兼容 MCP Server。映射只描述传输边界，模型仍通过同一个 `invoke_capability` 自由选择调用顺序；本地 `rz/rizin` Backend 可用时优先使用本地实现，未安装或不可用时才选择 MCP 映射。
+
+```json
+{
+  "binaryReverse": {
+    "functions": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "limit": "$maxResults" },
+      "output": "functions"
+    },
+    "disassemble": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "address": "$address", "limit": "$maxInstructions" },
+      "output": "disassemble"
+    },
+    "xrefs": {
+      "server": "ghidra",
+      "tool": "reverse",
+      "arguments": { "path": "$path", "address": "$address", "direction": "$direction" },
+      "output": "xrefs"
+    }
+  }
+}
+```
+
+`arguments` 的 `$address`、`$maxResults`、`$maxInstructions` 和 `$direction` 会从逻辑 Capability 输入取值，其他值按字面量传递。`$path` 会解析为已验证 Fixture 文件的短生命周期绝对副本，MCP 调用结束后立即清理；Effect、Artifact 和 Job 仍记录原始相对逻辑路径，避免临时宿主路径进入持久化审计。若 Server 使用统一 dispatcher，可添加 `nestedTool: { "name": "functions", "toolField": "name", "argumentsField": "args" }`；它必须与该 Server 的 `nestedToolPolicy` 完全一致。为了防止把任意 MCP 动作伪装成只读逆向，映射对应的 MCP Server 或内层 Tool 必须显式声明 `readOnly: true` 且 `replay: "pure"`，输出也必须符合规范化的函数、指令或 XRef 数组。
+
 ### 6.2 延迟发现
 
 MCP 不把全部服务器 Tool Schema 注入 L0 常驻上下文。固定交互流程为：
@@ -403,10 +434,13 @@ Skill 分两级进入上下文：
 ```powershell
 proofblade skills list
 proofblade skills show evidence-triage 4000
+proofblade skills show ctf-reverse 8000
 proofblade skill RUN-ID evidence-triage "Focus on the current handoff"
 ```
 
 Solver 的 L0 只包含可由模型选择的 Skill 元数据、内容哈希和目录哈希。`load_skill` 返回最多 12000 字符的有界正文；CLI `skill` 通过 Pi AgentHarness 原生 `skill()` 启动一个显式 Skill Turn。
+
+项目内置的 `ctf-reverse` 是面向 ProofBlade 的证据优先逆向流程，覆盖 PE/ELF、固件、字节码、虚拟机、混淆和动态升级路径。它只提供分析方法，不授予新的工具或范围；正文要求模型优先使用 `proofblade.binary` 的结构化 Capability，并根据 Backend 可用性再选择本地进程或已配置的 MCP。该 Skill 根据 `ljagiello/ctf-skills` 的 `d6662d2` 版本整理，保留上游的分类和升级思路，同时去掉宿主安装命令和不受控的执行建议。
 
 ### 7.3 Skill 与 Tool 的边界
 

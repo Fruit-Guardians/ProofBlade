@@ -70,7 +70,7 @@ npm run reports:project
 npm run check:project-reports
 ```
 
-生成的 Markdown 不直接编辑。`npm run verify` 会检查报表是否过期，CI 还会要求包含实质变更的提交同步更新项目状态数据源。
+生成的 Markdown 不直接编辑。CI 会在临时工作区重生成报表后再检查；普通 `packages/`、`apps/` 和 `scripts/` PR 不需要修改共享 `project-status.json` 或生成报表，只有项目计划、维护记录和 README 等治理文件变更才需要新增项目状态记录。
 
 ## 动态调试 GUI
 

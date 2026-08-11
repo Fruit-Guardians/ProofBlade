@@ -298,7 +298,7 @@ test("interruption 6: expired heartbeat and missing target reset lifecycle state
     });
     await services.control.dispatch(runId, { type: "effect_started", effectId: "EF-STALE", lane: "executor" });
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-STALE", capabilityId: "proofblade.target", operation: "inspect", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });

@@ -95,6 +95,19 @@
         "contract:evidence-inspect-forest-max-chars",
         "contract:evidence-repeat-breaker"
       ]
+    },
+    {
+      "id": "evaluation-baseline",
+      "triggers": [
+        { "path": "packages/materials/src/evaluation/fixture-evaluator.ts" },
+        { "path": "packages/materials/src/evaluation/runtime-scenario-evaluator.ts" }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:fixture-runtime-gate",
+        "contract:runtime-scenario-baseline",
+        "contract:runtime-scenario-failure-isolation"
+      ]
     }
   ]
 }

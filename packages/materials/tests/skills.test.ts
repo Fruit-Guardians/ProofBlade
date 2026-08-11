@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
+import { listBundledCapabilities } from "../src/capabilities/catalog.js";
 import { ContextCompiler } from "../src/context/compiler.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
 import type { TaskContract } from "../src/domain/types.js";
@@ -48,6 +49,24 @@ test("context keeps only skill metadata resident and records the catalog snapsho
     assert.deepEqual(compiled.manifest.resources.skills.map((item) => item.name), ["triage"]);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bundled CTF reverse Skill is discoverable and remains within the model load budget", async () => {
+  const projectRoot = resolve(import.meta.dirname, "../../..");
+  const registry = await ProofBladeSkillRegistry.load(projectRoot);
+  const skill = registry.list().find((item) => item.name === "ctf-reverse");
+  assert.ok(skill, "bundled ctf-reverse Skill must be discoverable");
+  assert.match(skill.description, /reverse engineering/i);
+
+  const loaded = registry.loadForModel("ctf-reverse");
+  assert.equal(loaded.truncated, false);
+  assert.match(loaded.content, /invoke_capability/);
+  const binary = listBundledCapabilities().find((capability) => capability.id === "proofblade.binary");
+  assert.ok(binary, "bundled binary Capability must exist for the reverse Skill");
+  for (const operation of ["functions", "disassemble", "xrefs"]) {
+    assert.match(loaded.content, new RegExp(`proofblade\\.binary\\.${operation}`));
+    assert.ok(binary.operations.some((candidate) => candidate.name === operation), `reverse Skill dependency proofblade.binary.${operation} must exist in the bundled Catalog`);
   }
 });
 

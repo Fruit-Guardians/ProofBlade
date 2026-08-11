@@ -42,6 +42,8 @@ export class BackgroundJobRunner {
       id: id("J"),
       capabilityId: input.capabilityId,
       operation: input.operation,
+      backendId: persistence.backendId,
+      backendVersion: persistence.backendVersion,
       args: persistence.input,
       argsRedacted: persistence.argsRedacted || undefined,
       replayPolicy: persistence.operation.replay,
@@ -147,7 +149,7 @@ export class BackgroundJobRunner {
       if (current.status === "CANCELLED") return;
       await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
       if (job.timeoutMs) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, job.timeoutMs);
-      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput }, entry.controller.signal);
+      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput, backendId: job.backendId, backendVersion: job.backendVersion }, entry.controller.signal);
       const after = await this.poll(job.id);
       if (after.status === "CANCELLED") return;
       await this.controlStore.dispatch(this.runId, {

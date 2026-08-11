@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -59,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
-  assert.equal(bundledCapabilityCatalogHash(), "7b8e742875d5d4cba6b7a0e2107376c0f19cfd90cb4985cf8bd8db397fa81b62");
+  assert.equal(bundledCapabilityCatalogHash(), "f4a1d9141645cb4e32106d29396667ac8293f8e13ddff2562ae37b47d71d5fcc");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -112,12 +112,40 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
-    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.target"]);
+    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.binary", "proofblade.target"]);
+    const rizinStatus = catalog.backends.find((item) => item.id === "proofblade-rizin");
+    assert.equal(rizinStatus?.kind, "local-process");
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-binary")?.available, true);
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-bundled")?.available, true);
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-mcp")?.available, false);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);
+    assert.equal(inspected.backendId, "proofblade-bundled");
+    assert.equal(inspected.backendKind, "bundled");
+    assert.equal(inspected.backendVersion, "1.0.0");
+    const invokedSnapshot = await services.control.snapshot(runId);
+    const expectedProvenance = {
+      capabilityId: "proofblade.target",
+      operation: "inspect",
+      manifestHash: catalog.capabilities.find((item) => item.id === "proofblade.target")?.hash,
+      backendId: "proofblade-bundled",
+      backendKind: "bundled",
+      backendVersion: "1.0.0",
+    };
+    assert.deepEqual(invokedSnapshot.effects[inspected.effectId]?.args.capability, expectedProvenance);
+    const invocationArtifact = invokedSnapshot.artifacts[inspected.artifactId];
+    assert.ok(invocationArtifact);
+    const artifactPayload = JSON.parse(await services.artifacts.readText(runId, invocationArtifact)) as { args?: { capability?: unknown } };
+    assert.deepEqual(artifactPayload.args?.capability, expectedProvenance);
     const archived = await runtime.invokeCapability({ capabilityId: "proofblade.artifact", operation: "read", input: { artifactId: inspected.artifactId, maxChars: 256 } });
     assert.equal(archived.truncated, true);
+    const binary = Buffer.alloc(64);
+    binary.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1], 0);
+    await writeFile(join(fixture.path, "sample.bin"), binary);
+    const binaryIdentity = await runtime.invokeCapability({ capabilityId: "proofblade.binary", operation: "identify", input: { path: "sample.bin" } });
+    assert.ok(binaryIdentity.observationId);
+    assert.ok(binaryIdentity.evidenceId);
     await assert.rejects(() => runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: { path: "../outside" } }));
     await runtime.close();
   } finally {
@@ -127,6 +155,7 @@ test("capability catalog and router keep stable manifests and artifact anchors",
 
 test("background jobs complete, timeout, cancel, and recover through durable records", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-jobs-"));
+  let runtime: ProofBladeToolRuntime | undefined;
   try {
     const services = createServices(root, config);
     const runId = "JOBS-001";
@@ -135,11 +164,19 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
     await services.control.dispatch(runId, { type: "fixture_reset", generation });
-    const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+    runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+
+    await assert.rejects(() => services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-MISSING-BACKEND", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation } as never,
+      lane: "executor",
+    }), /requires backendId and backendVersion/);
 
     const success = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "list", input: {} });
     const completed = await runtime.waitJob(String(success.jobId));
     assert.equal(completed.status, "SUCCEEDED");
+    assert.equal(completed.backendId, "proofblade-bundled");
+    assert.equal(completed.backendVersion, "1.0.0");
     assert.match((await runtime.readJobOutput(completed.id)).output, /binary-info|strings/);
 
     const timeout = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 250 }, timeoutMs: 50 });
@@ -150,7 +187,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.equal((await runtime.waitJob(String(cancel.jobId), 2_000)).status, "CANCELLED");
 
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-RECOVER", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
@@ -162,6 +199,16 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
 
     await services.control.dispatch(runId, {
       type: "job_queued",
+      job: { id: "J-BACKEND-DRIFT", capabilityId: "proofblade.target", operation: "list", backendId: "proofblade-bundled", backendVersion: "0.9.0", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
+      lane: "executor",
+    });
+    await runtime.recoverJobs();
+    const drifted = await runtime.waitJob("J-BACKEND-DRIFT");
+    assert.equal(drifted.status, "FAILED");
+    assert.match(drifted.error ?? "", /backend version changed/);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued_legacy",
       job: { id: "J-REDACTED", capabilityId: "proofblade.target", operation: "list", args: {}, argsRedacted: true, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
@@ -171,15 +218,15 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.match(redacted.error ?? "", /arguments were redacted/);
 
     await services.control.dispatch(runId, {
-      type: "job_queued",
+      type: "job_queued_legacy",
       job: { id: "J-TERMINAL", capabilityId: "proofblade.target", operation: "list", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
     await services.control.dispatch(runId, { type: "fail", reason: "terminal recovery fixture" });
     await runtime.recoverJobs();
     assert.equal((await runtime.jobStatus("J-TERMINAL")).status, "UNKNOWN");
-    await runtime.close();
   } finally {
+    await runtime?.close();
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -1,17 +1,17 @@
-import { join } from "node:path";
 import { capabilityCatalogHash, snipText, type CapabilityManifest, type CapabilityOperationAtom } from "@proofblade/molecules";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ControlStore } from "../control/control-store.js";
 import { listBundledCapabilities } from "./catalog.js";
-import type { McpProjectRegistry } from "../mcp/registry.js";
+import {
+  BundledCapabilityBackend,
+  CapabilityBackendResolver,
+  type CapabilityBackendRequest,
+  type CapabilityBackendStatus,
+} from "./backend.js";
 
-export interface CapabilityInvocation {
-  capabilityId: string;
-  operation: string;
-  input: Record<string, unknown>;
-}
+export interface CapabilityInvocation extends CapabilityBackendRequest {}
 
 export interface CapabilityInvocationResult {
   capabilityId: string;
@@ -24,6 +24,9 @@ export interface CapabilityInvocationResult {
   outputTier: "small" | "medium" | "large";
   truncated: boolean;
   originalChars: number;
+  backendId: string;
+  backendKind: CapabilityBackendStatus["kind"];
+  backendVersion: string;
   observationId?: string;
   evidenceId?: string;
 }
@@ -32,6 +35,8 @@ export interface PersistedCapabilityInvocation {
   operation: CapabilityOperationAtom;
   input: Record<string, unknown>;
   argsRedacted: boolean;
+  backendId: string;
+  backendVersion: string;
 }
 
 export class CapabilityRegistry {
@@ -67,11 +72,11 @@ export class ProofBladeCapabilityRouter {
     private readonly _artifactStore: ArtifactStore,
     private readonly journal: EffectJournal,
     private readonly registry = new CapabilityRegistry(),
-    private readonly mcp?: McpProjectRegistry,
+    private readonly backends = new CapabilityBackendResolver([new BundledCapabilityBackend()]),
   ) {}
 
-  public listCapabilities(): { catalogHash: string; capabilities: CapabilityManifest[] } {
-    return { catalogHash: this.registry.catalogHash(), capabilities: this.registry.list() };
+  public listCapabilities(): { catalogHash: string; capabilities: CapabilityManifest[]; backends: CapabilityBackendStatus[] } {
+    return { catalogHash: this.registry.catalogHash(), capabilities: this.registry.list(), backends: this.backends.statuses() };
   }
 
   public describe(capabilityId: string, operationName: string): CapabilityOperationAtom {
@@ -85,59 +90,50 @@ export class ProofBladeCapabilityRouter {
   public preparePersistence(request: CapabilityInvocation): PersistedCapabilityInvocation {
     const { operation } = this.registry.find(request.capabilityId, request.operation);
     validateInput(operation, request.input);
-    if (!this.mcp?.handles(request.capabilityId)) {
-      return { operation, input: structuredClone(request.input), argsRedacted: false };
-    }
-    const resolved = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
-    const persisted = this.mcp.persistedInput(request.input, resolved);
+    const resolved = this.backends.resolve(request);
+    const persisted = resolved.backend.preparePersistence(request, operation);
     return {
-      operation: { ...operation, readOnly: resolved.readOnly, sideEffect: resolved.sideEffect, replay: resolved.replay },
-      input: persisted.input,
-      argsRedacted: persisted.argsRedacted,
+      ...persisted,
+      backendId: resolved.backend.id,
+      backendVersion: resolved.version,
     };
   }
 
   public async invoke(request: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityInvocationResult> {
-    const { manifest } = this.registry.find(request.capabilityId, request.operation);
-    const operation = this.resolveInvocationPolicy(request);
+    const { manifest, operation: manifestOperation } = this.registry.find(request.capabilityId, request.operation);
+    validateInput(manifestOperation, request.input);
+    const resolved = this.backends.resolve(request);
+    const persistence = resolved.backend.preparePersistence(request, manifestOperation);
+    const operation = persistence.operation;
     const snapshot = await this.controlStore.snapshot(this.runId);
-    if (this.mcp?.handles(request.capabilityId)) {
-      const mcpPolicy = this.mcp.resolveInvocation(request.capabilityId, request.operation, request.input);
-      const executed = await this.journal.executeWith(
-        this.runId,
-        {
-          operation: `mcp:${request.capabilityId}:${request.operation}`,
-          args: { ...this.mcp.effectArgs(request.capabilityId, request.operation, request.input, mcpPolicy), generation: snapshot.generation },
-          replayPolicy: mcpPolicy.replay,
-          artifactSensitivity: mcpPolicy.sensitivity === "secret" ? "secret" : undefined,
-          cwd: this.runsRoot,
-        },
-        async (_effect, innerSignal) => await this.mcp!.execute(request.capabilityId, request.operation, request.input, innerSignal),
-        signal,
-      );
-      if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || `MCP capability failed: ${request.capabilityId}.${request.operation}`);
-      const output = formatOutput(executed.result.stdout, operation.outputPolicy);
-      return {
-        capabilityId: request.capabilityId,
-        operation: request.operation,
-        manifestHash: manifest.hash,
-        effectId: executed.effectId,
-        artifactId: executed.artifactId,
-        output: `<untrusted-observation capability="${request.capabilityId}" operation="${request.operation}" artifact="${executed.artifactId}">\n${output.text}\n</untrusted-observation>`,
-        stderr: executed.result.stderr,
-        outputTier: output.tier,
-        truncated: output.truncated,
-        originalChars: output.originalChars,
-      };
-    }
-    const mapped = mapOperation(request.capabilityId, request.operation, request.input, this.fixture, this.runsRoot, this.runId, snapshot.artifacts);
-    const executed = await this.journal.execute(this.runId, { operation: mapped.operation, args: { ...mapped.args, generation: snapshot.generation }, replayPolicy: operation.replay, cwd: mapped.cwd }, signal);
-    if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || `Capability failed: ${request.capabilityId}.${request.operation}`);
-    const output = formatOutput(executed.result.stdout, operation.outputPolicy, typeof request.input.maxChars === "number" ? request.input.maxChars : undefined);
-    return {
+    const plan = resolved.backend.prepareExecution(request, operation, {
+      runId: this.runId,
+      fixture: this.fixture,
+      runsRoot: this.runsRoot,
+      artifacts: snapshot.artifacts,
+    });
+    const provenance = {
       capabilityId: request.capabilityId,
       operation: request.operation,
       manifestHash: manifest.hash,
+      backendId: resolved.backend.id,
+      backendKind: resolved.backend.kind,
+      backendVersion: resolved.version,
+    };
+    const journalInput = {
+      operation: plan.operation,
+      args: { ...plan.args, generation: snapshot.generation, capability: provenance },
+      replayPolicy: plan.replayPolicy,
+      artifactSensitivity: plan.artifactSensitivity,
+      cwd: plan.cwd,
+    };
+    const executed = plan.execute
+      ? await this.journal.executeWith(this.runId, journalInput, async (_effect, innerSignal) => await plan.execute!(innerSignal), signal)
+      : await this.journal.execute(this.runId, journalInput, signal);
+    if (executed.result.exitCode !== 0) throw new Error(executed.result.stderr || `Capability failed: ${request.capabilityId}.${request.operation}`);
+    const output = formatOutput(executed.result.stdout, operation.outputPolicy, typeof request.input.maxChars === "number" ? request.input.maxChars : undefined);
+    return {
+      ...provenance,
       effectId: executed.effectId,
       artifactId: executed.artifactId,
       output: `<untrusted-observation capability="${request.capabilityId}" operation="${request.operation}" artifact="${executed.artifactId}">\n${output.text}\n</untrusted-observation>`,
@@ -159,23 +155,6 @@ function validateInput(operation: CapabilityOperationAtom, input: Record<string,
   if (input.artifactId !== undefined && (typeof input.artifactId !== "string" || input.artifactId.length === 0)) throw new Error("Capability artifactId must be a non-empty string");
   if (input.maxChars !== undefined && (!Number.isInteger(input.maxChars) || Number(input.maxChars) < 256 || Number(input.maxChars) > 12_000)) throw new Error("Capability maxChars must be between 256 and 12000");
   if (input.milliseconds !== undefined && (!Number.isInteger(input.milliseconds) || Number(input.milliseconds) < 50 || Number(input.milliseconds) > 120_000)) throw new Error("Capability milliseconds must be between 50 and 120000");
-}
-
-function mapOperation(capabilityId: string, operation: string, input: Record<string, unknown>, fixture: FixtureRef, runsRoot: string, runId: string, artifacts: Record<string, { path: string; sha256: string }>): { operation: string; args: Record<string, unknown>; cwd: string } {
-  if (capabilityId === "proofblade.target" && operation === "list") return { operation: "fixture_list", args: {}, cwd: fixture.path };
-  if (capabilityId === "proofblade.target" && operation === "inspect") return { operation: "fixture_inspect", args: { path: input.path ?? "" }, cwd: fixture.path };
-  if (capabilityId === "proofblade.target" && operation === "read") {
-    return { operation: "fixture_read", args: { path: input.path }, cwd: fixture.path };
-  }
-  if (capabilityId === "proofblade.target" && operation === "delay") {
-    return { operation: "fixture_delay", args: { milliseconds: input.milliseconds }, cwd: fixture.path };
-  }
-  if (capabilityId === "proofblade.artifact" && operation === "read") {
-    const artifact = artifacts[String(input.artifactId)];
-    if (!artifact) throw new Error(`Unknown artifact: ${String(input.artifactId)}`);
-    return { operation: "artifact_read", args: { artifactId: input.artifactId, path: artifact.path, sha256: artifact.sha256, maxChars: input.maxChars ?? 4_000 }, cwd: join(runsRoot, runId) };
-  }
-  throw new Error(`Unsupported capability operation: ${operation}`);
 }
 
 function formatOutput(value: string, policy: CapabilityOperationAtom["outputPolicy"], requestedMaxChars?: number): { text: string; tier: "small" | "medium" | "large"; truncated: boolean; originalChars: number } {

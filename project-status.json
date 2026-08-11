@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T00:10:00+08:00",
+  "updatedAt": "2026-08-10T19:42:54+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -56,14 +56,15 @@
     {
       "id": "PLAN-100",
       "title": "二进制 Artifact 与 Reverse 能力包",
-      "status": "planned",
+      "status": "in_progress",
       "priority": "P0",
       "milestone": "Milestone 4",
       "owner": "unassigned",
-      "progress": 0,
-      "updatedAt": "2026-08-07T18:37:33+08:00",
+      "progress": 42,
+      "updatedAt": "2026-08-10T19:42:54+08:00",
       "objective": "让 Solver 能对真实 ELF/PE 等二进制执行可审计、可复现的静态分析。",
       "deliverables": [
+        "稳定逻辑 Capability 与可替换 Backend/Resolver 契约",
         "二进制流与范围读取 Artifact API",
         "格式、架构、区段、符号、字符串、反汇编和 XRef Capability",
         "Capability 输出到 Artifact、Evidence 和推理森林的确定性映射",
@@ -203,249 +204,153 @@
     }
   ],
   "updates": [
-  {
-    "id": "UPDATE-20260810-001",
-    "occurredAt": "2026-08-10T00:10:00+08:00",
-    "summary": "消除同 generation 知识过期 Intent 对开放容量的永久占位。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "IntentFilter 暴露统一的 isStale 判断供调度容量计算复用",
-      "调度器在计算 openIntents 前识别 generation 或知识版本过期的 PROPOSED Intent",
-      "原子调度事务将过期 Intent 持久化为 STALE，并在同一事务内释放容量生成替代候选",
-      "非事务兼容路径同样先持久化 STALE，再进行容量和候选计算",
-      "增加单次调度、replay 和两个并发 schedule 的容量恢复回归测试"
-    ],
-    "validation": [
-      "68 CLI, scheduler, filter, durability and recovery tests passed in three consecutive iterations",
-      "TypeScript typecheck passed",
-      "concurrent stale cleanup preserves maxOpenIntents"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-015",
-    "occurredAt": "2026-08-09T23:59:59.900+08:00",
-    "summary": "为 generation reset 增加旧版 Intent Lease 的确定性迁移与释放。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "fixture_reset 识别仅保存 leaseId、未保存 leaseClaims 的历史 CLAIMED Intent",
-      "旧 leaseId 仅解析 Intent resourceKeys 中的 executor 资源，避免释放无关 Lease",
-      "reset 时将匹配 Lease 的 owner 与 epoch 迁移到 leaseClaims 后原子释放",
-      "迁移结果由 fixture_reset reducer 确定性派生，ControlStore replay 保持相同投影",
-      "增加旧 claimed Intent、generation reset、Lease 清理与 replay 一致性回归测试"
-    ],
-    "validation": [
-      "45 scheduler, durability and recovery tests passed in three consecutive iterations",
-      "TypeScript typecheck passed",
-      "legacy leaseId reset and replay regression passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-014",
-    "occurredAt": "2026-08-09T23:59:59+08:00",
-    "summary": "在 fixture reset 和 Intent 终态提交边界原子隔离旧 Worker。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "fixture_reset 在 Reducer 内将旧 generation 的 PROPOSED 与 CLAIMED Intent 原子标记为 STALE",
-      "旧 CLAIMED Intent 保存的 leaseClaims 仅在 owner 与 epoch 匹配时释放，leaseEpochs 保持单调",
-      "完成、失败和取消统一进入 ControlStore 事务，并要求 Intent 当前为同 generation 的 CLAIMED",
-      "同一终态重复提交保持幂等，跨终态覆盖和 reset 后旧 Worker 结果提交被拒绝",
-      "增加 reset、Lease 释放、replay、旧 Worker 拒绝和终态状态机回归测试"
-    ],
-    "validation": [
-      "65 focused scheduler, durability and recovery tests passed in three consecutive iterations",
-      "TypeScript typecheck passed",
-      "fixture reset replay preserves stale intents, released leases and monotonic lease epochs"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-013",
-    "occurredAt": "2026-08-09T23:59:30+08:00",
-    "summary": "复查并收紧 Intent generation 上下文的持久快照权威性。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "原子调度使用当前 generation 的持久化开放 Intent 数量，不再采用调用方旧 openIntents 上界",
-      "完成 Intent 与完成假设集合仅从当前 generation 的 ControlStore 快照推导",
-      "CLI 调度上下文仅统计当前 generation 的开放 Intent 和完成验证",
-      "旧 generation 的调用方 completedHypothesisIds 不再抑制新环境重新验证",
-      "增加旧上下文开放数量和 CLI 跨 generation 聚合回归断言"
-    ],
-    "validation": [
-      "46 focused tests passed in three consecutive recheck iterations",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-012",
-    "occurredAt": "2026-08-09T23:50:00+08:00",
-    "summary": "按 fixture generation 隔离 Intent 新鲜度和已完成假设验证。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "硬过滤新增 fixtureGeneration 与 currentGeneration 一致性检查",
-      "fixture reset 后旧代 PROPOSED Intent 原子持久化为 STALE，不再占用新代开放容量",
-      "开放 Intent 统计仅包含当前 fixture generation 的 PROPOSED 和 CLAIMED",
-      "已完成验证假设仅在相同 fixture generation 内抑制重复生成",
-      "新 generation 可为同一 hypothesis 生成唯一验证 Intent 并保留旧代完成历史"
-    ],
-    "validation": [
-      "46 focused tests passed in three consecutive iterations",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-011",
-    "occurredAt": "2026-08-09T23:30:00+08:00",
-    "summary": "允许满容量时认领已有 Intent，并保护已完成验证历史不被后续调度覆盖。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "maxOpenIntents 仅限制新建候选，已有 PROPOSED 转为 CLAIMED 不再被容量检查阻止",
-      "资源释放后可再次调度并认领此前保留的一次性 Hint Intent",
-      "验证 Intent 使用唯一 ID，并通过 hypothesis 字段保留关联",
-      "调度上下文从快照推导已完成假设，生成阶段跳过已完成验证路径",
-      "空知识图使用稳定知识版本 0，避免生命周期事件再次使候选过期"
-    ],
-    "validation": [
-      "44 CLI, Intent Filter and Intent Scheduler tests passed",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-010",
-    "occurredAt": "2026-08-09T22:30:00+08:00",
-    "summary": "持久化 Lease 资源 epoch，并保留暂时无法认领的一次性生成 Intent。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "RunSnapshot 新增按资源持久化的 leaseEpochs，Lease 回收后 generation 继续单调递增",
-      "LeaseManager 与 Intent 原子认领统一从持久 epoch 分配 generation",
-      "旧 Intent 终态仅能释放其记录 epoch 对应的 Lease，不能释放回收后的后继 Lease",
-      "资源暂时占用或本轮无候选可认领时，事务仍持久化生成的 PROPOSED Intent",
-      "增加 Lease 回收重取和占用资源 Hint 持久化回归测试"
-    ],
-    "validation": [
-      "30 durability and Intent Scheduler tests passed",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-009",
-    "occurredAt": "2026-08-09T22:00:00+08:00",
-    "summary": "将 Intent 调度容量、认领和 Lease 版本校验收敛到同一按 Run 原子事务。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "并发 schedule 通过 dispatchTransaction 串行读取并预留 maxOpenIntents",
-      "在同一事务内写入候选、Lease 和 CLAIMED 状态，避免并发遗留 PROPOSED 占位",
-      "知识版本从持久化 Fact、Hypothesis、Evidence 和 Observation 推导，排除 lastSeq 生命周期事件",
-      "Intent 持久化每个资源的 ownerLane 与 generation，终态只释放仍属于自身的 Lease",
-      "增加并发调度、剩余候选认领和 Lease generation 防误释放回归测试"
-    ],
-    "validation": [
-      "21 Intent Scheduler tests passed",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-008",
-    "occurredAt": "2026-08-09T21:10:00+08:00",
-    "summary": "收紧 Intent 候选生成边界并修复同周期标识、知识版本和资源释放问题。",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "按 maxOpenIntents 剩余容量截断单次候选生成和持久化",
-      "使用 UUID 生成探索、替代路线和 Hint Intent 标识，避免同毫秒覆盖",
-      "将调度知识版本绑定到 Fact、Hypothesis、Evidence 和 Observation 变化，排除调度与 Lease 事件干扰",
-      "Intent 完成、失败或取消时释放其持有的全部 executor Lease",
-      "增加容量、唯一 ID、剩余候选再次认领和终态 Lease 清理回归测试"
-    ],
-    "validation": [
-      "Intent and CLI focused tests passed",
-      "TypeScript typecheck passed",
-      "component, change contract and project report gates passed"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-007",
-    "occurredAt": "2026-08-09T20:46:53+08:00",
-    "summary": "????????? PROPOSED Intent ???????????",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "Scheduler ??? ControlStore ?????? PROPOSED ? CLAIMED ?????",
-      "?? maxOpenIntents ????????????????",
-      "??????????????????? PROPOSED Intent",
-      "??????????????????????"
-    ],
-    "validation": [
-      "167/167 repository tests passed",
-      "17 Intent and CLI focused tests passed",
-      "component, change contract and project report gates passed",
-      "npm audit: 0 vulnerabilities"
-    ]
-  },
-  {
-    "id": "UPDATE-20260809-006",
-    "occurredAt": "2026-08-09T20:16:22+08:00",
-    "summary": "?? Intent ?????? PROPOSED Intent ???????",
-    "branch": "feat/intent-scheduler",
-    "commit": "self",
-    "planIds": [
-      "PLAN-110"
-    ],
-    "changes": [
-      "?? Intent ????????????Lease ????? ControlStore ???",
-      "?? CLI Intent ??????????????",
-      "? PROPOSED ? CLAIMED Intent ???? openIntents???????",
-      "?? replay?CLI ???????????????"
-    ],
-    "validation": [
-      "167/167 repository tests passed",
-      "35 Intent and CLI focused tests passed",
-      "component, change contract and project report gates passed",
-      "18/18 deterministic fixture evaluations passed",
-      "npm audit: 0 vulnerabilities"
-    ]
-  },
+    {
+      "id": "UPDATE-20260810-006",
+      "occurredAt": "2026-08-10T18:00:00+08:00",
+      "summary": "消除并行 PR 对共享组件版本、审计快照和项目报表的合并冲突。",
+      "branch": "codex/fix-concurrent-pr-metadata",
+      "commit": "self",
+      "planIds": [
+        "PLAN-001",
+        "PLAN-002"
+      ],
+      "changes": [
+        "源码变更不再强制修改 COMPONENT.md 的版本、计数和源码指纹快照",
+        "源码 PR 通过构建、测试和变更契约验证，周期性审计仍可更新 SHA-256 快照",
+        "普通 packages/apps/scripts 变更不再要求写入共享 project-status.json",
+        "CI 在临时工作区的契约检查前自动重生成项目报表",
+        "补充并行源码变更与治理文件边界回归检查"
+      ],
+      "validation": [
+        "component and project report gates passed",
+        "CI gates passed",
+        "168/168 repository tests passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-004",
+      "occurredAt": "2026-08-10T19:42:54+08:00",
+      "summary": "完成 PR C Deep Reverse v1：新增函数、反汇编和 XRef 逻辑 Capability，并接入可选 Rizin 与可配置 MCP 后端。",
+      "branch": "codex/deep-reverse-v1",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "Rizin local-process Backend 使用受保护二进制的 0600 临时副本，支持超时、AbortSignal 和有界输出",
+        "functions、disassemble、xrefs 统一规范化地址、排序、去重和结果上限，拒绝未声明操作",
+        "MCP binaryReverse 映射支持 server、outer tool、参数绑定、嵌套 dispatcher 和严格只读纯重放策略",
+        "本地 Rizin 不可用时按 Backend 优先级回退到已配置 MCP，实现来源和版本绑定",
+        "参考 ctf-skills 最新 ctf-reverse 目录 commit d6662d2，保留方法论在 Skill 层而不固化进模型工具面",
+        "增加 Rizin、MCP direct/nested 映射与边界回归测试"
+      ],
+      "validation": [
+        "122/122 Materials tests passed",
+        "171/171 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities",
+        "Rizin production availability is environment-dependent and remains optional"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-003",
+      "occurredAt": "2026-08-10T14:08:00+08:00",
+      "summary": "修复重复 Artifact、Evidence 整理及混合副作用批次导致的无进展终止错误。",
+      "branch": "codex/fix-evidence-repeat-loop",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120"
+      ],
+      "changes": [
+        "Evidence 和 annotation 的持久进展身份改用 Artifact 内容 SHA-256，不再依赖临时 Artifact ID 或展示措辞",
+        "显式 durableProgress=false 的 Evidence 观察在进程型 bash 之间继续累计收敛计数",
+        "platform 成功调用可撤销任一来源的 no_progress，未解析策略只撤销 read-window",
+        "no_progress 终止记录 read 或 declared-no-progress 来源窗口，仅 read-window 允许普通 process 或未解析策略成功调用撤销",
+        "declared-no-progress 终止保持优先级，后续 read-window 终止不能覆盖并为 process 打开撤销路径",
+        "增加重复 Artifact、副本 annotation、混合 bash/evidence 以及真实 Harness 对称副作用批次回归测试"
+      ],
+      "validation": [
+        "162/162 repository tests passed",
+        "component, contract and project report gates passed",
+        "rollback copy restored to the original SHA-256"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-002",
+      "occurredAt": "2026-08-10T11:17:00+08:00",
+      "summary": "把确定性评测从 18 次 Fixture 重复升级为 30 项求解与运行时双矩阵门禁。",
+      "branch": "main",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-200"
+      ],
+      "changes": [
+        "保留六个 Fixture 各三次的 18 个生产循环，并新增 12 个独立运行时场景",
+        "新增缓存用量与前缀漂移、上下文单调性与用户任务锚点评测",
+        "新增重复失败、无进展、失败风暴、Evidence 整理背压与并发去重评测",
+        "新增暂停重放、Verifier 权限和 Lease 所有权隔离评测",
+        "baseline-v3 报告分列 fixtureTotal/scenarioTotal，并将两个 Catalog 与场景结果纳入稳定哈希"
+      ],
+      "validation": [
+        "104/104 Materials tests passed",
+        "153/153 repository tests passed",
+        "30/30 deterministic evaluation cases passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities",
+        "runtime scenarios cover 5 categories"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-001",
+      "occurredAt": "2026-08-10T00:31:33+08:00",
+      "summary": "修复 Capability Backend 复审发现的 MCP 故障转移、操作匹配、版本投影和新 Job 绑定约束。",
+      "branch": "codex/capability-backend-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "MCP availability 按具体 server 状态判断，连接失败后 Resolver 可选择备用 Backend",
+        "MCP Backend 只处理 describe/call，并用 catalogHash 统一状态与恢复绑定版本",
+        "ControlStore 新 job_queued 命令在类型与运行时校验 backendId/backendVersion",
+        "增加 job_queued_legacy 兼容旧事件，并补齐真实 MCP 连接失败转移测试"
+      ],
+      "validation": [
+        "99/99 Materials tests passed",
+        "148/148 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-030",
+      "occurredAt": "2026-08-09T23:32:20+08:00",
+      "summary": "建立稳定逻辑 Capability 与可替换执行 Backend 的基础层，为 PE/ELF、固件和 Ghidra 能力接入保留模型自主规划空间。",
+      "branch": "codex/capability-backend-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "新增统一 CapabilityBackend 与确定性 Resolver，支持 bundled、MCP、本地进程和 provider-native 实现类型",
+        "模型继续使用稳定 list_capabilities/invoke_capability 代理，不暴露重复的后端专用工具",
+        "Effect 与 Artifact 保存 capability、manifest 和 backend 来源，后台 Job 固定 Backend ID 与版本",
+        "恢复时复用已绑定 Backend 并拒绝版本漂移；仅允许在执行开始前跳过不可用实现",
+        "增加 Backend 选择、显式绑定、重复 ID、版本漂移和后台恢复回归测试"
+      ],
+      "validation": [
+        "98/98 Materials tests passed",
+        "147/147 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260809-005",
       "occurredAt": "2026-08-09T16:18:52+08:00",
@@ -908,6 +813,249 @@
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"
       ]
+    },
+    {
+      "id": "UPDATE-20260810-000",
+      "occurredAt": "2026-08-10T00:10:00+08:00",
+      "summary": "消除同 generation 知识过期 Intent 对开放容量的永久占位。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "IntentFilter 暴露统一的 isStale 判断供调度容量计算复用",
+        "调度器在计算 openIntents 前识别 generation 或知识版本过期的 PROPOSED Intent",
+        "原子调度事务将过期 Intent 持久化为 STALE，并在同一事务内释放容量生成替代候选",
+        "非事务兼容路径同样先持久化 STALE，再进行容量和候选计算",
+        "增加单次调度、replay 和两个并发 schedule 的容量恢复回归测试"
+      ],
+      "validation": [
+        "68 CLI, scheduler, filter, durability and recovery tests passed in three consecutive iterations",
+        "TypeScript typecheck passed",
+        "concurrent stale cleanup preserves maxOpenIntents"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-015",
+      "occurredAt": "2026-08-09T23:59:59.900+08:00",
+      "summary": "为 generation reset 增加旧版 Intent Lease 的确定性迁移与释放。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "fixture_reset 识别仅保存 leaseId、未保存 leaseClaims 的历史 CLAIMED Intent",
+        "旧 leaseId 仅解析 Intent resourceKeys 中的 executor 资源，避免释放无关 Lease",
+        "reset 时将匹配 Lease 的 owner 与 epoch 迁移到 leaseClaims 后原子释放",
+        "迁移结果由 fixture_reset reducer 确定性派生，ControlStore replay 保持相同投影",
+        "增加旧 claimed Intent、generation reset、Lease 清理与 replay 一致性回归测试"
+      ],
+      "validation": [
+        "45 scheduler, durability and recovery tests passed in three consecutive iterations",
+        "TypeScript typecheck passed",
+        "legacy leaseId reset and replay regression passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-014",
+      "occurredAt": "2026-08-09T23:59:59+08:00",
+      "summary": "在 fixture reset 和 Intent 终态提交边界原子隔离旧 Worker。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "fixture_reset 在 Reducer 内将旧 generation 的 PROPOSED 与 CLAIMED Intent 原子标记为 STALE",
+        "旧 CLAIMED Intent 保存的 leaseClaims 仅在 owner 与 epoch 匹配时释放，leaseEpochs 保持单调",
+        "完成、失败和取消统一进入 ControlStore 事务，并要求 Intent 当前为同 generation 的 CLAIMED",
+        "同一终态重复提交保持幂等，跨终态覆盖和 reset 后旧 Worker 结果提交被拒绝",
+        "增加 reset、Lease 释放、replay、旧 Worker 拒绝和终态状态机回归测试"
+      ],
+      "validation": [
+        "65 focused scheduler, durability and recovery tests passed in three consecutive iterations",
+        "TypeScript typecheck passed",
+        "fixture reset replay preserves stale intents, released leases and monotonic lease epochs"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-013",
+      "occurredAt": "2026-08-09T23:59:30+08:00",
+      "summary": "复查并收紧 Intent generation 上下文的持久快照权威性。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "原子调度使用当前 generation 的持久化开放 Intent 数量，不再采用调用方旧 openIntents 上界",
+        "完成 Intent 与完成假设集合仅从当前 generation 的 ControlStore 快照推导",
+        "CLI 调度上下文仅统计当前 generation 的开放 Intent 和完成验证",
+        "旧 generation 的调用方 completedHypothesisIds 不再抑制新环境重新验证",
+        "增加旧上下文开放数量和 CLI 跨 generation 聚合回归断言"
+      ],
+      "validation": [
+        "46 focused tests passed in three consecutive recheck iterations",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-012",
+      "occurredAt": "2026-08-09T23:50:00+08:00",
+      "summary": "按 fixture generation 隔离 Intent 新鲜度和已完成假设验证。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "硬过滤新增 fixtureGeneration 与 currentGeneration 一致性检查",
+        "fixture reset 后旧代 PROPOSED Intent 原子持久化为 STALE，不再占用新代开放容量",
+        "开放 Intent 统计仅包含当前 fixture generation 的 PROPOSED 和 CLAIMED",
+        "已完成验证假设仅在相同 fixture generation 内抑制重复生成",
+        "新 generation 可为同一 hypothesis 生成唯一验证 Intent 并保留旧代完成历史"
+      ],
+      "validation": [
+        "46 focused tests passed in three consecutive iterations",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-011",
+      "occurredAt": "2026-08-09T23:30:00+08:00",
+      "summary": "允许满容量时认领已有 Intent，并保护已完成验证历史不被后续调度覆盖。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "maxOpenIntents 仅限制新建候选，已有 PROPOSED 转为 CLAIMED 不再被容量检查阻止",
+        "资源释放后可再次调度并认领此前保留的一次性 Hint Intent",
+        "验证 Intent 使用唯一 ID，并通过 hypothesis 字段保留关联",
+        "调度上下文从快照推导已完成假设，生成阶段跳过已完成验证路径",
+        "空知识图使用稳定知识版本 0，避免生命周期事件再次使候选过期"
+      ],
+      "validation": [
+        "44 CLI, Intent Filter and Intent Scheduler tests passed",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-010",
+      "occurredAt": "2026-08-09T22:30:00+08:00",
+      "summary": "持久化 Lease 资源 epoch，并保留暂时无法认领的一次性生成 Intent。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "RunSnapshot 新增按资源持久化的 leaseEpochs，Lease 回收后 generation 继续单调递增",
+        "LeaseManager 与 Intent 原子认领统一从持久 epoch 分配 generation",
+        "旧 Intent 终态仅能释放其记录 epoch 对应的 Lease，不能释放回收后的后继 Lease",
+        "资源暂时占用或本轮无候选可认领时，事务仍持久化生成的 PROPOSED Intent",
+        "增加 Lease 回收重取和占用资源 Hint 持久化回归测试"
+      ],
+      "validation": [
+        "30 durability and Intent Scheduler tests passed",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-009",
+      "occurredAt": "2026-08-09T22:00:00+08:00",
+      "summary": "将 Intent 调度容量、认领和 Lease 版本校验收敛到同一按 Run 原子事务。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "并发 schedule 通过 dispatchTransaction 串行读取并预留 maxOpenIntents",
+        "在同一事务内写入候选、Lease 和 CLAIMED 状态，避免并发遗留 PROPOSED 占位",
+        "知识版本从持久化 Fact、Hypothesis、Evidence 和 Observation 推导，排除 lastSeq 生命周期事件",
+        "Intent 持久化每个资源的 ownerLane 与 generation，终态只释放仍属于自身的 Lease",
+        "增加并发调度、剩余候选认领和 Lease generation 防误释放回归测试"
+      ],
+      "validation": [
+        "21 Intent Scheduler tests passed",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-008",
+      "occurredAt": "2026-08-09T21:10:00+08:00",
+      "summary": "收紧 Intent 候选生成边界并修复同周期标识、知识版本和资源释放问题。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "按 maxOpenIntents 剩余容量截断单次候选生成和持久化",
+        "使用 UUID 生成探索、替代路线和 Hint Intent 标识，避免同毫秒覆盖",
+        "将调度知识版本绑定到 Fact、Hypothesis、Evidence 和 Observation 变化，排除调度与 Lease 事件干扰",
+        "Intent 完成、失败或取消时释放其持有的全部 executor Lease",
+        "增加容量、唯一 ID、剩余候选再次认领和终态 Lease 清理回归测试"
+      ],
+      "validation": [
+        "Intent and CLI focused tests passed",
+        "TypeScript typecheck passed",
+        "component, change contract and project report gates passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-007",
+      "occurredAt": "2026-08-09T20:46:53+08:00",
+      "summary": "????????? PROPOSED Intent ???????????",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "Scheduler ??? ControlStore ?????? PROPOSED ? CLAIMED ?????",
+        "?? maxOpenIntents ????????????????",
+        "??????????????????? PROPOSED Intent",
+        "??????????????????????"
+      ],
+      "validation": [
+        "167/167 repository tests passed",
+        "17 Intent and CLI focused tests passed",
+        "component, change contract and project report gates passed",
+        "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260809-006",
+      "occurredAt": "2026-08-09T20:16:22+08:00",
+      "summary": "?? Intent ?????? PROPOSED Intent ???????",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "?? Intent ????????????Lease ????? ControlStore ???",
+        "?? CLI Intent ??????????????",
+        "? PROPOSED ? CLAIMED Intent ???? openIntents???????",
+        "?? replay?CLI ???????????????"
+      ],
+      "validation": [
+        "167/167 repository tests passed",
+        "35 Intent and CLI focused tests passed",
+        "component, change contract and project report gates passed",
+        "18/18 deterministic fixture evaluations passed",
+        "npm audit: 0 vulnerabilities"
+      ]
     }
   ],
   "completions": [
@@ -949,6 +1097,30 @@
     }
   ],
   "maintenance": [
+    {
+      "id": "MAINT-20260810-001",
+      "performedAt": "2026-08-10T11:17:00+08:00",
+      "status": "passed",
+      "scope": "确定性评测协议、缓存与上下文可观测性、收敛护栏、Evidence 整理和运行状态持久化",
+      "actions": [
+        "拆分 Fixture 求解矩阵与 Runtime Scenario 矩阵",
+        "把仅存在于单元测试的关键跨模块不变量提升为发布评测",
+        "执行 104 个 Materials 测试和 30 项 baseline-v3 评测"
+      ],
+      "findings": [
+        "旧 18 项评测只能证明六类静态题型可被确定性求解，不能发现缓存、上下文和运行时状态回归",
+        "缓存命中 Token 与 Provider 前缀稳定性需要独立评测，固定值不能代表真实前缀命中",
+        "跨模块场景应隔离失败并保留分类、目录哈希和稳定结果哈希"
+      ],
+      "validation": [
+        "104/104 Materials tests passed",
+        "153/153 repository tests passed",
+        "18/18 fixture solve cases passed",
+        "12/12 runtime scenario cases passed",
+        "npm audit: 0 vulnerabilities"
+      ],
+      "nextReviewTrigger": "新增跨题运行时能力、改变缓存前缀、上下文裁剪、证据整理、暂停恢复、Verifier 或 Lease 契约"
+    },
     {
       "id": "MAINT-20260807-001",
       "performedAt": "2026-08-07T18:09:45+08:00",
