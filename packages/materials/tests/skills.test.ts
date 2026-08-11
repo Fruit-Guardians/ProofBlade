@@ -68,6 +68,12 @@ test("bundled CTF reverse Skill is discoverable and remains within the model loa
     assert.match(loaded.content, new RegExp(`proofblade\\.binary\\.${operation}`));
     assert.ok(binary.operations.some((candidate) => candidate.name === operation), `reverse Skill dependency proofblade.binary.${operation} must exist in the bundled Catalog`);
   }
+  const firmware = listBundledCapabilities().find((capability) => capability.id === "proofblade.firmware");
+  assert.ok(firmware, "bundled firmware Capability must exist for the reverse Skill");
+  for (const operation of ["scan", "partitions", "filesystems", "entropy", "file_tree", "extract"]) {
+    assert.match(loaded.content, new RegExp(`proofblade\\.firmware\\.${operation}`));
+    assert.ok(firmware.operations.some((candidate) => candidate.name === operation), `reverse Skill dependency proofblade.firmware.${operation} must exist in the bundled Catalog`);
+  }
 });
 
 async function skill(root: string, name: string, description: string, body: string): Promise<void> {
