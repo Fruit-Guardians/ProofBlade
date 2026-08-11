@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
-import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig } from "@proofblade/materials";
+import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig, providerNativeCapabilities } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
@@ -79,6 +79,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const body = await readBody(request);
     return sendJson(response, 200, await providerSettings.discover({
       profileId: optionalString(body.profileId),
+      api: optionalString(body.api) as import("@proofblade/materials").ProviderApi | undefined,
       baseUrl: optionalString(body.baseUrl),
       proxyUrl: optionalString(body.proxyUrl),
       apiKey: optionalString(body.apiKey),
@@ -254,6 +255,7 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
     id: optionalString(body.id),
     name: string(body.name, "name"),
     provider: string(body.provider, "provider"),
+    api: optionalString(body.api) as import("@proofblade/materials").ProviderApi | undefined,
     baseUrl: string(body.baseUrl, "baseUrl"),
     proxyUrl: optionalString(body.proxyUrl),
     model: string(body.model, "model"),
@@ -276,6 +278,10 @@ async function capabilityCatalog(): Promise<WorkspaceSettings["capabilities"]> {
       tools: codingToolCatalog(),
       skills: skills.list({ includeDisabled: true }).map((skill) => ({ name: skill.name, description: skill.description, path: skill.path, disabled: skill.disableModelInvocation })),
       mcpServers: mcp.summaries().map((server) => ({ name: server.name, description: server.description, status: server.status, disabled: server.disabled })),
+      providerNative: Object.fromEntries(providerSettings.publicSettings().profiles.map((profile) => [
+        profile.id,
+        providerNativeCapabilities(profile),
+      ])),
     };
   } finally {
     await mcp.close();

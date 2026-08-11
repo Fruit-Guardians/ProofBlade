@@ -489,7 +489,7 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .folder-manager-row { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 6px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
 .folder-manager-row strong { color: var(--text); font-size: 10px; }
 .capability-modal { width: min(720px, calc(100vw - 28px)); }
-.capability-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.capability-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .capability-section { min-width: 0; border: 1px solid var(--line); background: #101611; }
 .capability-section .section-head { min-height: 31px; padding: 0 8px; border-bottom: 1px solid var(--line); }
 .capability-section .section-head > div { display: flex; align-items: center; gap: 6px; }
@@ -497,6 +497,7 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .capability-row { display: flex; gap: 7px; padding: 8px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
 .capability-row:last-child { border-bottom: 0; }
 .capability-row input { width: 14px; height: 14px; margin-top: 1px; accent-color: var(--green); }
+.provider-native-section .capability-row { padding-left: 29px; cursor: default; }
 .capability-row > span { min-width: 0; }
 .capability-row strong, .capability-row small, .capability-row em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capability-row strong { color: var(--text); font-size: 9px; }

@@ -145,3 +145,49 @@ test("keeps multiple provider profiles, keys, and activation independent", async
     await rm(path, { force: true });
   }
 });
+
+test("discovers direct Anthropic models with the protocol-required headers", async () => {
+  const server = createServer((request, response) => {
+    assert.equal(request.url, "/v1/models");
+    assert.equal(request.headers["x-api-key"], "anthropic-secret");
+    assert.equal(request.headers["anthropic-version"], "2023-06-01");
+    assert.equal(request.headers.authorization, undefined);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ data: [{ id: "claude-sonnet-test" }] }));
+  });
+  await new Promise<void>((resolvePromise) => server.listen(0, "127.0.0.1", resolvePromise));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = resolve(import.meta.dirname, "../../..");
+  const path = join(root, "tmp", `provider-anthropic-discovery-${Date.now()}.json`);
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    const result = await store.discover({ api: "anthropic-messages", baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKey: "anthropic-secret" });
+    assert.deepEqual(result.models, ["claude-sonnet-test"]);
+  } finally {
+    await new Promise<void>((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise()));
+    await rm(path, { force: true });
+  }
+});
+
+test("persists the explicit wire protocol for direct Provider profiles", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const path = join(root, "tmp", `provider-protocol-${Date.now()}.json`);
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    const settings = await store.save({
+      name: "Direct Claude",
+      provider: "anthropic",
+      api: "anthropic-messages",
+      baseUrl: "https://api.anthropic.com",
+      model: "claude-sonnet-test",
+      thinkingLevel: "off",
+    });
+    const profile = settings.profiles.find((item) => item.name === "Direct Claude");
+    assert.equal(profile?.api, "anthropic-messages");
+    assert.equal(store.modelProfile(profile!.id).api, "anthropic-messages");
+    assert.equal(store.publicSettings().api, "anthropic-messages");
+  } finally {
+    await rm(path, { force: true });
+  }
+});

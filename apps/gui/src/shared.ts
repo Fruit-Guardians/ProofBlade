@@ -1,4 +1,4 @@
-import type { ClaimVerificationProjection, HarnessEvent, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { ClaimVerificationProjection, HarnessEvent, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -19,6 +19,7 @@ export interface ProviderProfile {
   id: string;
   name: string;
   provider: string;
+  api: ProviderApi;
   baseUrl: string;
   proxyUrl: string;
   model: string;
@@ -33,6 +34,7 @@ export interface ProviderSettings {
   profiles: ProviderProfile[];
   localPath: string;
   provider: string;
+  api: ProviderApi;
   baseUrl: string;
   proxyUrl: string;
   model: string;
@@ -45,6 +47,7 @@ export interface ProviderSettingsInput {
   id?: string;
   name?: string;
   provider: string;
+  api?: ProviderApi;
   baseUrl: string;
   proxyUrl?: string;
   model: string;
@@ -119,6 +122,7 @@ export interface WorkspaceSettings {
     tools: CodingToolSummary[];
     skills: SkillSummary[];
     mcpServers: McpSummary[];
+    providerNative: Record<string, ProviderNativeCapabilityStatus[]>;
   };
   localPath: string;
 }

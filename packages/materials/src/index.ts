@@ -26,6 +26,8 @@ export * from "./tools/runtime.js";
 export * from "./tools/output-rewrite.js";
 export * from "./runtime/pi-adapter.js";
 export * from "./runtime/provider-transport.js";
+export * from "./runtime/provider-native.js";
+export * from "./runtime/lmstudio-provider.js";
 export * from "./runtime/coding-resources.js";
 export * from "./runtime/coding-lane.js";
 export * from "./runtime/context-length-recovery.js";

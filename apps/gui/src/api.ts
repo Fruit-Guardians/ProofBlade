@@ -1,4 +1,5 @@
 import type { ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { ProviderApi } from "@proofblade/materials";
 
 export async function getBootstrap(): Promise<BootstrapData> {
   return await request("/api/bootstrap");
@@ -12,7 +13,7 @@ export async function getProviderSettings(): Promise<ProviderSettings> {
   return await request("/api/provider");
 }
 
-export async function discoverProviderModels(input: { profileId?: string; baseUrl: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
+export async function discoverProviderModels(input: { profileId?: string; api?: ProviderApi; baseUrl: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
   return await request("/api/provider/models", { method: "POST", body: JSON.stringify(input) });
 }
 

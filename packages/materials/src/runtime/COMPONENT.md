@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.10",
+  "version": "0.10.11",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T07:00:00.000Z",
+  "updatedAt": "2026-08-11T02:30:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 8,
-    "securityAuditCount": 8,
-    "lastBugAuditAt": "2026-08-10T07:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-10T07:00:00.000Z",
-    "sourceHash": "029dddabfb1ed756ccb31408e349be330d2bdffe1efe0c3cce813d44ee18da41",
+    "bugAuditCount": 9,
+    "securityAuditCount": 9,
+    "lastBugAuditAt": "2026-08-11T02:30:00.000Z",
+    "lastSecurityAuditAt": "2026-08-11T02:30:00.000Z",
+    "sourceHash": "69bb1d659d31385e219b57be80cee3ae6ca7720c8b664b6d53a097b3b4bf6c02",
     "result": "passed"
   }
 }
@@ -20,12 +20,13 @@
 
 ## 职责
 
-适配 Pi AgentHarness、Provider Profile、OpenAI-compatible 传输、Coding/Solver lane、系统提示和实际 Tool 装配。
+适配 Pi AgentHarness、Provider Profile、OpenAI-compatible/Responses/Anthropic Messages 传输、Coding/Solver lane、系统提示和实际 Tool 装配。
 
 ## 入口与边界
 
 - `coding-lane.ts` 驱动普通对话并在动态尾部注入隐藏 Forest 摘要；`solver-lane.ts` 驱动证据型任务。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
+- `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability。
 - `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
 - Coding Provider 始终看到固定 `evidence`、`load_skill` 和 `mcp_call`；启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
@@ -36,6 +37,8 @@
 ## 开发规则与验证
 
 模型、URL、思考等级、缓存策略和 Provider 重试预算只能来自配置。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
+
+Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 
 Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。内部恢复提示保留在 Pi 调试轨迹中，但不冒充 GUI 用户消息。错误或人工暂停的回合不启动普通摘要请求。
 
