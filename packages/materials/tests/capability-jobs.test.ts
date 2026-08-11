@@ -59,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
-  assert.equal(bundledCapabilityCatalogHash(), "f4a1d9141645cb4e32106d29396667ac8293f8e13ddff2562ae37b47d71d5fcc");
+  assert.equal(bundledCapabilityCatalogHash(), "2f2bb3f11c9147b33d851e4d4de83fd9fa27eaa999e6ead891f2c8c778a81d21");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -112,10 +112,11 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
-    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.binary", "proofblade.target"]);
+    assert.deepEqual(catalog.capabilities.map((item) => item.id), ["proofblade.artifact", "proofblade.binary", "proofblade.firmware", "proofblade.target"]);
     const rizinStatus = catalog.backends.find((item) => item.id === "proofblade-rizin");
     assert.equal(rizinStatus?.kind, "local-process");
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-binary")?.available, true);
+    assert.equal(catalog.backends.find((item) => item.id === "proofblade-firmware")?.available, true);
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-bundled")?.available, true);
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-mcp")?.available, false);
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
@@ -146,6 +147,11 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     const binaryIdentity = await runtime.invokeCapability({ capabilityId: "proofblade.binary", operation: "identify", input: { path: "sample.bin" } });
     assert.ok(binaryIdentity.observationId);
     assert.ok(binaryIdentity.evidenceId);
+    await writeFile(join(fixture.path, "firmware.bin"), Buffer.from([0x1f, 0x8b, 0x08, 0x00]));
+    const firmwareScan = await runtime.invokeCapability({ capabilityId: "proofblade.firmware", operation: "scan", input: { path: "firmware.bin" } });
+    assert.equal(firmwareScan.backendId, "proofblade-firmware");
+    assert.ok(firmwareScan.observationId);
+    assert.ok(firmwareScan.evidenceId);
     await assert.rejects(() => runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: { path: "../outside" } }));
     await runtime.close();
   } finally {

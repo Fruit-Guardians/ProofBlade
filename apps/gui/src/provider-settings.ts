@@ -1,13 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { createProviderTransport, type ModelProfileConfig, type ProofBladeConfig } from "@proofblade/materials";
+import { createProviderTransport, discoveryPathForApi, normalizeProviderBaseUrl, type ModelProfileConfig, type ProofBladeConfig, type ProviderApi } from "@proofblade/materials";
 import type { ModelDiscoveryResult, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderSettingsInput, ProviderThinkingLevel } from "./shared.js";
 
 interface LocalProviderProfile {
   id: string;
   name: string;
   provider: string;
+  api: ProviderApi;
   baseUrl: string;
   proxyUrl?: string;
   model: string;
@@ -67,6 +68,7 @@ export class ProviderSettingsStore {
     return {
       ...this.baseProfile,
       provider: profile.provider,
+      api: profile.api,
       baseUrl: profile.baseUrl,
       proxyUrl: profile.proxyUrl,
       model: model?.trim() || profile.model,
@@ -87,6 +89,7 @@ export class ProviderSettingsStore {
       profiles: this.profiles.map((profile) => publicProfile(profile)),
       localPath: this.path,
       provider: active.provider,
+      api: active.api,
       baseUrl: active.baseUrl,
       proxyUrl: active.proxyUrl ?? "",
       model: active.model,
@@ -101,7 +104,7 @@ export class ProviderSettingsStore {
     const validated = validateInput({
       ...input,
       cacheRetention: input.cacheRetention ?? existing?.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
-    });
+    }, this.baseProfile.api);
     const id = existing?.id ?? uniqueId(validated.name, new Set(this.profiles.map((profile) => profile.id)));
     const apiKey = input.clearApiKey ? undefined : input.apiKey?.trim() || existing?.apiKey;
     const next: LocalProviderProfile = { id, ...validated, ...(apiKey ? { apiKey } : {}) };
@@ -127,17 +130,19 @@ export class ProviderSettingsStore {
     return this.publicSettings();
   }
 
-  public async discover(input: { profileId?: string; baseUrl?: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
+  public async discover(input: { profileId?: string; api?: ProviderApi; baseUrl?: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
     const profile = input.profileId ? this.requireProfile(input.profileId) : this.requireProfile(this.activeProfileId);
-    const baseUrl = normalizeBaseUrl(input.baseUrl ?? profile.baseUrl);
+    const api = input.api ?? profile.api;
+    if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(api)) throw new Error(`不支持的 Provider API：${String(api)}`);
+    const baseUrl = normalizeBaseUrl(input.baseUrl ?? profile.baseUrl, api);
     const proxyUrl = normalizeOptionalUrl(input.proxyUrl ?? profile.proxyUrl, "代理 URL");
     const apiKey = input.apiKey?.trim() || profile.apiKey;
-    const headers = apiKey ? { authorization: `Bearer ${apiKey}` } : undefined;
+    const headers = providerDiscoveryHeaders(api, apiKey);
     const transport = createProviderTransport(proxyUrl);
     try {
       let response: Response;
       try {
-        response = await (transport?.fetch ?? fetch)(`${baseUrl}${normalizeDiscoveryPath(this.baseProfile.modelDiscoveryPath)}`, {
+        response = await (transport?.fetch ?? fetch)(`${baseUrl}${discoveryPathForApi(this.baseProfile.modelDiscoveryPath, api)}`, {
           headers,
           signal: AbortSignal.timeout(15_000),
         });
@@ -160,7 +165,7 @@ export class ProviderSettingsStore {
     try {
       const parsed = JSON.parse(await readFile(this.path, "utf8")) as Partial<LocalProviderFile> & Partial<LegacyProviderFile>;
       if (parsed.schemaVersion === 2) {
-        const profiles = Array.isArray(parsed.profiles) ? parsed.profiles.map(validateStoredProfile) : [];
+        const profiles = Array.isArray(parsed.profiles) ? parsed.profiles.map((profile) => validateStoredProfile(profile, this.baseProfile.api)) : [];
         if (!profiles.length) throw new Error("Provider 配置列表为空");
         this.profiles = profiles;
         this.activeProfileId = profiles.some((profile) => profile.id === parsed.activeProfileId) ? parsed.activeProfileId! : profiles[0]!.id;
@@ -177,7 +182,7 @@ export class ProviderSettingsStore {
           models: legacy.model && legacy.model !== "auto" ? [legacy.model] : [],
           thinkingLevel: legacy.thinkingLevel,
           cacheRetention: legacy.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
-        });
+        }, this.baseProfile.api);
         this.profiles = [{ id: "default", ...validated, ...(legacy.apiKey?.trim() ? { apiKey: legacy.apiKey.trim() } : {}) }];
         this.activeProfileId = "default";
         await this.persist();
@@ -193,7 +198,8 @@ export class ProviderSettingsStore {
         id: "default",
         name: this.baseProfile.provider,
         provider: this.baseProfile.provider,
-        baseUrl: normalizeBaseUrl(this.baseProfile.baseUrl),
+        api: this.baseProfile.api,
+        baseUrl: normalizeBaseUrl(this.baseProfile.baseUrl, this.baseProfile.api),
         ...(this.baseProfile.proxyUrl ? { proxyUrl: this.baseProfile.proxyUrl } : {}),
         model: this.baseProfile.model,
         models: this.baseProfile.model === "auto" ? [] : [this.baseProfile.model],
@@ -223,6 +229,7 @@ function publicProfile(profile: LocalProviderProfile): ProviderProfile {
     id: profile.id,
     name: profile.name,
     provider: profile.provider,
+    api: profile.api,
     baseUrl: profile.baseUrl,
     proxyUrl: profile.proxyUrl ?? "",
     model: profile.model,
@@ -233,7 +240,7 @@ function publicProfile(profile: LocalProviderProfile): ProviderProfile {
   };
 }
 
-function validateStoredProfile(value: unknown): LocalProviderProfile {
+function validateStoredProfile(value: unknown, fallbackApi: ProviderApi): LocalProviderProfile {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Provider 配置项格式错误");
   const input = value as Partial<LocalProviderProfile>;
   const id = required(input.id, "Provider ID");
@@ -241,21 +248,24 @@ function validateStoredProfile(value: unknown): LocalProviderProfile {
   const validated = validateInput({
     name: input.name ?? "",
     provider: input.provider ?? "",
+    api: input.api,
     baseUrl: input.baseUrl ?? "",
     proxyUrl: input.proxyUrl,
     model: input.model ?? "",
     models: input.models,
     thinkingLevel: input.thinkingLevel ?? "off",
     cacheRetention: input.cacheRetention,
-  });
+  }, fallbackApi);
   const apiKey = typeof input.apiKey === "string" && input.apiKey.trim() ? input.apiKey.trim() : undefined;
   return { id, ...validated, ...(apiKey ? { apiKey } : {}) };
 }
 
-function validateInput(input: ProviderSettingsInput): Omit<LocalProviderProfile, "id" | "apiKey"> {
+function validateInput(input: ProviderSettingsInput, fallbackApi: ProviderApi): Omit<LocalProviderProfile, "id" | "apiKey"> {
   const provider = required(input.provider, "Provider");
+  const api = input.api ?? fallbackApi;
+  if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(api)) throw new Error(`不支持的 Provider API：${String(api)}`);
   const name = required(input.name ?? provider, "配置名称");
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  const baseUrl = normalizeBaseUrl(input.baseUrl, api);
   const proxyUrl = normalizeOptionalUrl(input.proxyUrl, "代理 URL");
   const model = required(input.model, "模型");
   if (!thinkingLevels.has(input.thinkingLevel)) throw new Error(`不支持的思考等级：${String(input.thinkingLevel)}`);
@@ -263,7 +273,7 @@ function validateInput(input: ProviderSettingsInput): Omit<LocalProviderProfile,
   if (!cacheRetentions.has(cacheRetention)) throw new Error(`不支持的缓存保留策略：${String(cacheRetention)}`);
   const models = [...new Set((input.models ?? []).filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
   if (model !== "auto" && !models.includes(model)) models.unshift(model);
-  return { name, provider, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel, cacheRetention };
+  return { name, provider, api, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel, cacheRetention };
 }
 
 function required(value: unknown, label: string): string {
@@ -271,12 +281,12 @@ function required(value: unknown, label: string): string {
   return value.trim();
 }
 
-function normalizeBaseUrl(value: unknown): string {
+function normalizeBaseUrl(value: unknown, api: ProviderApi): string {
   const baseUrl = required(value, "Base URL").replace(/\/+$/, "");
   let parsed: URL;
   try { parsed = new URL(baseUrl); } catch { throw new Error("Base URL 格式错误"); }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("Base URL 必须使用 http 或 https");
-  return baseUrl;
+  return normalizeProviderBaseUrl(baseUrl, api);
 }
 
 function normalizeOptionalUrl(value: unknown, label: string): string | undefined {
@@ -289,9 +299,10 @@ function normalizeOptionalUrl(value: unknown, label: string): string | undefined
   return normalized;
 }
 
-function normalizeDiscoveryPath(value: string): string {
-  const path = value.trim() || "/models";
-  return path.startsWith("/") ? path : `/${path}`;
+function providerDiscoveryHeaders(api: ProviderApi, apiKey: string | undefined): Record<string, string> | undefined {
+  if (!apiKey) return undefined;
+  if (api === "anthropic-messages") return { "x-api-key": apiKey, "anthropic-version": "2023-06-01" };
+  return { authorization: `Bearer ${apiKey}` };
 }
 
 function uniqueId(name: string, used: Set<string>): string {

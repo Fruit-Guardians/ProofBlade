@@ -6,6 +6,7 @@ import {
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
 import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
@@ -803,6 +804,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("");
   const [provider, setProvider] = useState("");
+  const [api, setApi] = useState<ProviderApi>("openai-completions");
   const [baseUrl, setBaseUrl] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -825,17 +827,17 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
 
   const loadProfile = (profile?: ProviderProfile) => {
     if (!profile) return;
-    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setApi(profile.api); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {
     setDiscovering(true); setError(undefined);
     try {
-      const result = await discoverProviderModels({ profileId: selectedId || undefined, baseUrl, proxyUrl: proxyUrl.trim(), ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
+      const result = await discoverProviderModels({ profileId: selectedId || undefined, api, baseUrl, proxyUrl: proxyUrl.trim(), ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
       setModels(result.models); setBaseUrl(result.baseUrl); if (!result.models.includes(model)) setModel(result.models[0] ?? model);
     } catch (caught) { setError(message(caught)); } finally { setDiscovering(false); }
   };
@@ -843,7 +845,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const save = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
+      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, api, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
       setSettings(saved); setSelectedId(saved.activeProfileId); loadProfile(saved.profiles.find((profile) => profile.id === saved.activeProfileId)); setHasApiKey(saved.profiles.find((profile) => profile.id === saved.activeProfileId)?.hasApiKey ?? false); await onSaved();
     } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
@@ -862,6 +864,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
         <aside className="provider-list"><div className="section-head"><strong>Provider</strong><button type="button" className="icon-button" title="新建 Provider" aria-label="新建 Provider" onClick={createNew}><Plus size={15} /></button></div>{settings?.profiles.map((profile) => <button type="button" key={profile.id} className={`provider-list-item ${selectedId === profile.id ? "selected" : ""}`} onClick={() => loadProfile(profile)}><span className="provider-list-dot" /><span><strong>{profile.name}</strong><small>{profile.provider} · {profile.model}</small></span>{settings.activeProfileId === profile.id && <em>当前</em>}</button>)}</aside>
         <div className="provider-form">
           <div className="provider-grid"><label><span>配置名称</span><input required value={name} onChange={(event) => setName(event.target.value)} /></label><label><span>Provider ID</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label></div>
+          <label><span>Provider API</span><select value={api} onChange={(event) => setApi(event.target.value as ProviderApi)}><option value="openai-completions">OpenAI Chat Completions / compatible</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
           <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://aihub.top/v1" /></label>
           <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7897" /></label>
           <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
@@ -993,7 +996,13 @@ function CapabilityModal({ runId, workspace, onClose, onSaved }: { runId: string
     if (!preferences) return; setBusy(true); setError(undefined);
     try { await updateConversationPreferences(runId, preferences); await onSaved(); onClose(); } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal capability-modal"><header><div><ListChecks size={17} /><strong>本对话能力</strong><span className="modal-subtitle">只影响当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}{!preferences ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取能力</div> : <div className="capability-sections"><CapabilitySection title="Coding Tools" icon={<Wrench size={14} />} items={workspace.capabilities.tools.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: `${item.schemaChars} chars`, enabled: preferences.enabledTools.includes(item.name) }))} onToggle={(id) => toggle("enabledTools", id)} /><CapabilitySection title="Skills" icon={<Zap size={14} />} items={workspace.capabilities.skills.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.path, enabled: !item.disabled && preferences.enabledSkills.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledSkills", id)} /><CapabilitySection title="MCP Servers" icon={<ServerCog size={14} />} items={workspace.capabilities.mcpServers.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.status, enabled: !item.disabled && preferences.enabledMcpServers.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledMcpServers", id)} /></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={busy || !preferences} onClick={() => void save()}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存能力</button></footer></div></div>;
+  const native = preferences ? workspace.capabilities.providerNative[preferences.profileId] ?? [] : [];
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="modal capability-modal"><header><div><ListChecks size={17} /><strong>本对话能力</strong><span className="modal-subtitle">只影响当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}{!preferences ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取能力</div> : <div className="capability-sections"><CapabilitySection title="Coding Tools" icon={<Wrench size={14} />} items={workspace.capabilities.tools.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: `${item.schemaChars} chars`, enabled: preferences.enabledTools.includes(item.name) }))} onToggle={(id) => toggle("enabledTools", id)} /><CapabilitySection title="Skills" icon={<Zap size={14} />} items={workspace.capabilities.skills.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.path, enabled: !item.disabled && preferences.enabledSkills.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledSkills", id)} /><CapabilitySection title="MCP Servers" icon={<ServerCog size={14} />} items={workspace.capabilities.mcpServers.map((item) => ({ id: item.name, name: item.name, description: item.description, meta: item.status, enabled: !item.disabled && preferences.enabledMcpServers.includes(item.name), disabled: item.disabled }))} onToggle={(id) => toggle("enabledMcpServers", id)} /><ProviderNativeCapabilitySection items={native} /></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={busy || !preferences} onClick={() => void save()}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存能力</button></footer></div></div>;
+}
+
+function ProviderNativeCapabilitySection({ items }: { items: ProviderNativeCapabilityStatus[] }) {
+  const candidates = items.filter((item) => item.state === "candidate").length;
+  return <section className="capability-section provider-native-section"><div className="section-head"><div><ServerCog size={14} /><strong>Provider Native</strong><span>{candidates}/{items.length}</span></div></div>{items.map((item) => <div className="capability-row disabled" key={item.id} title={item.reason}><span><strong>{item.label}</strong><small>{item.state === "candidate" ? "协议候选，未接入" : `由 ${item.managedBy} 接管`}</small><em>{item.semanticId} · {item.api}</em></span></div>)}{!items.length && <div className="empty-list">当前协议没有已声明的原生工具</div>}</section>;
 }
 
 function CapabilitySection({ title, icon, items, onToggle }: { title: string; icon: ReactNode; items: Array<{ id: string; name: string; description: string; meta: string; enabled: boolean; disabled?: boolean }>; onToggle(id: string): void }) {

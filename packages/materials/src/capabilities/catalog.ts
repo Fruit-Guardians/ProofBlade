@@ -79,7 +79,125 @@ const reverseXrefsParameters = {
   },
 } as const;
 
+const firmwarePathParameters = {
+  type: "object",
+  properties: { path: { type: "string", description: "Visible fixture-relative firmware image path" } },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const firmwareResultsParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative firmware image path" },
+    maxResults: { type: "integer", minimum: 1, maximum: 2_000 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const firmwareEntropyParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative firmware image path" },
+    blockSize: { type: "integer", minimum: 256, maximum: 1_048_576 },
+    maxResults: { type: "integer", minimum: 1, maximum: 4_096 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const firmwareFileTreeParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative firmware image path" },
+    maxResults: { type: "integer", minimum: 1, maximum: 4_000 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const;
+
+const firmwareExtractParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative firmware image path" },
+    archiveOffset: { type: "integer", minimum: 0, maximum: 9_007_199_254_740_991, description: "Archive byte offset returned by file_tree" },
+    entryPath: { type: "string", minLength: 1, maxLength: 1_024, description: "Relative regular-file path returned by file_tree" },
+    maxBytes: { type: "integer", minimum: 1, maximum: 65_536 },
+  },
+  required: ["path", "archiveOffset", "entryPath"],
+  additionalProperties: false,
+} as const;
+
 const manifests: CapabilityManifest[] = [
+  withCapabilityHash({
+    id: "proofblade.firmware",
+    version: "1.0.0",
+    description: "Read-only structural triage of visible firmware images, partitions, filesystems, entropy, and embedded TAR/CPIO entries.",
+    trust: "bundled",
+    operations: [
+      {
+        name: "scan",
+        description: "Scan a firmware image for bounded, recognizable container, compression, filesystem, archive, and executable signatures.",
+        parameters: firmwareResultsParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "partitions",
+        description: "Parse MBR, GPT, and recognized TRX firmware partition boundaries without extracting files.",
+        parameters: firmwarePathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "filesystems",
+        description: "Find recognizable SquashFS, CramFS, UBI, UBIFS, and ext-family filesystem headers.",
+        parameters: firmwareResultsParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "entropy",
+        description: "Measure Shannon entropy over bounded firmware blocks to locate compressed, encrypted, and sparse regions.",
+        parameters: firmwareEntropyParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "file_tree",
+        description: "List entries in embedded USTAR TAR and ASCII newc CPIO archives without writing them to disk.",
+        parameters: firmwareFileTreeParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "extract",
+        description: "Read one regular TAR or CPIO archive entry into a durable Artifact as bounded UTF-8 or base64 content.",
+        parameters: firmwareExtractParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+    ],
+  }),
   withCapabilityHash({
     id: "proofblade.binary",
     version: "1.1.0",

@@ -50,6 +50,30 @@ archives, APKs, bytecode, or compressed files into a fabricated executable.
 For those formats, record the classification and branch only to a tool that is
 actually available.
 
+## Firmware workflow
+
+When a raw image, router update, boot image, or flash dump is in scope, inspect
+the `proofblade.firmware` Capability before choosing a decoder or an external
+reverse Backend:
+
+1. Start with `proofblade.firmware.scan` and preserve offsets, declared sizes,
+   image names, compression types, and architecture hints as observations.
+2. Use `proofblade.firmware.partitions` to establish MBR, GPT, or TRX boundaries. Declared offsets
+   are leads, so keep them inside the image size before treating them as facts.
+3. Use `proofblade.firmware.filesystems` for SquashFS, CramFS, UBI, UBIFS, or ext headers. A magic
+   value alone is not proof that extraction will succeed.
+4. Use bounded `proofblade.firmware.entropy` windows to separate sparse, plaintext, compressed,
+   and likely encrypted regions. Do not call high entropy "encryption" without
+   independent evidence.
+5. Use `proofblade.firmware.file_tree` for supported embedded USTAR TAR or ASCII newc CPIO
+   archives. Pass its exact archive offset and regular-file path to `proofblade.firmware.extract`.
+   Extraction is read-only and stored as an Artifact; it does not write an
+   attacker-controlled archive path to the host or fabricate a visible file.
+6. Inspect the resulting Artifact before deciding whether a script, config,
+   key, or embedded executable merits the next analysis step. Use deep binary
+   operations only on an original visible binary or a separately available,
+   validated target file.
+
 ## Structured binary workflow
 
 For native PE/ELF targets, use the following order unless an observation gives
@@ -88,8 +112,9 @@ Use these as hypotheses to test, not as recipes to apply blindly:
 - Packed or self-modifying samples need a verifiable unpacking or runtime
   observation before static disassembly is trusted.
 - For firmware, first establish container, partition, compression, filesystem,
-  and architecture facts. Firmware extraction/partition capabilities are a
-  separate optional layer; never pretend that Binary Core performed them.
+  entropy, and archive facts through `proofblade.firmware` when it is enabled.
+  Never pretend that Binary Core performed firmware extraction or that an
+  unsupported filesystem was successfully mounted.
 - For WASM, Android, .NET, Python bytecode, or game assets, classify the
   runtime and use a supported decoder or MCP mapping only if present. Otherwise
   record the missing capability and continue with safe bounded observations.

@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.17",
+  "version": "0.12.18",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T09:59:52.000Z",
+  "updatedAt": "2026-08-11T02:30:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 13,
-    "securityAuditCount": 13,
-    "lastBugAuditAt": "2026-08-10T09:59:52.000Z",
-    "lastSecurityAuditAt": "2026-08-10T09:59:52.000Z",
-    "sourceHash": "6f793c3c5d3e6276f60dff5cd3d8dae96df0a19515d70c9f822c08b2a9fc0dca",
+    "bugAuditCount": 14,
+    "securityAuditCount": 14,
+    "lastBugAuditAt": "2026-08-11T02:30:00.000Z",
+    "lastSecurityAuditAt": "2026-08-11T02:30:00.000Z",
+    "sourceHash": "6223e02a261eb8367e73adcbda3302d00ed4d2826faf454b4ad813835751c830",
     "result": "passed"
   }
 }
@@ -34,6 +34,7 @@
 - 根目录只放跨领域装配和公共导出；具体行为进入最匹配的子组件。
 - 新增导出时检查依赖漏斗，避免导出 GUI/CLI 类型。
 - 配置字段必须有默认值、解析测试和密钥边界说明。
+- Provider Profile 必须显式选择 `openai-completions`、`openai-responses` 或 `anthropic-messages`；协议选择属于可持久化运行配置，不能从模型名称或中转站品牌猜测。
 - Coding Agent 的 Skill/MCP 通过固定代理契约进入 Provider；会话启用集合必须在执行时再次校验。
 - 嵌套分发型 MCP Tool 在 Effect 前解析真实内层 Tool，未知项默认拒绝，并按内层策略记录副作用、重放、资源和脱敏元数据。
 - 显式 MCP 脱敏字段不受短值阈值限制；`secret` 调用结果保持 secret Artifact 分类，Solver/Coding 共用嵌套能力描述。
