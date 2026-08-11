@@ -1047,7 +1047,7 @@ describe('IntentScheduler - replay 持久化', () => {
     }
   });
 
-  test('Lease 过期回收后失联 CLAIMED Intent 会释放容量并重新认领', async () => {
+  test('Lease 过期失联恢复计入尝试上限并最终释放容量', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
@@ -1059,7 +1059,7 @@ describe('IntentScheduler - replay 持久化', () => {
       const events = new JsonlControlStore(join(root, 'runs'));
       const controlStore = new ControlStore(events);
       const leaseManager = new LeaseManager(controlStore);
-      const scheduler = new IntentScheduler(controlStore, leaseManager, { maxOpenIntents: 1 });
+      const scheduler = new IntentScheduler(controlStore, leaseManager, { maxOpenIntents: 1, maxAttemptsPerIntent: 3 });
       const runId = 'INTENT-EXPIRED-CLAIM-001';
       await controlStore.createRun(runId, {
         id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Expired claim recovery test',
@@ -1086,7 +1086,23 @@ describe('IntentScheduler - replay 持久化', () => {
       assert.ok(retried);
       assert.equal(retried.id, firstClaim.id);
       assert.equal(retried.status, 'CLAIMED');
+      assert.equal(retried.attempts, 1);
       assert.ok((retried.leaseClaims?.['workspace:read'].generation ?? 0) > firstLeaseGeneration);
+
+      await leaseManager.reapExpired(runId, Date.now() + retried.estimatedDuration * 3);
+      const secondRetry = await scheduler.schedule({ ...context, newHighValueFacts: 0, openIntents: 1 });
+      assert.ok(secondRetry);
+      assert.equal(secondRetry.id, firstClaim.id);
+      assert.equal(secondRetry.attempts, 2);
+
+      await leaseManager.reapExpired(runId, Date.now() + secondRetry.estimatedDuration * 3);
+      const exhausted = await scheduler.schedule({ ...context, newHighValueFacts: 0, openIntents: 1 });
+      assert.equal(exhausted, null);
+      const failed = (await controlStore.snapshot(runId)).schedulerIntents[firstClaim.id];
+      assert.equal(failed.status, 'FAILED');
+      assert.equal(failed.attempts, 3);
+      assert.match(failed.lastError ?? '', /claim expired/);
+      assert.deepStrictEqual(Object.keys((await controlStore.snapshot(runId)).leases), []);
 
       const projection = await events.loadProjection(runId);
       const replayed = await controlStore.replay(runId);
@@ -1095,6 +1111,41 @@ describe('IntentScheduler - replay 持久化', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  test('无资源 CLAIMED Intent 超时后会重新认领而非永久占用容量', async () => {
+    const claimedAt = new Date(Date.now() - 60_000).toISOString();
+    const intent: Intent = {
+      id: 'intent-no-resource', status: 'CLAIMED', priority: 'high', createdAt: claimedAt,
+      knowledgeVersion: 0, fixtureGeneration: 1, phase: 'reconnaissance', objective: 'Recover ownerless work',
+      startFromFacts: [], expectedEvidence: { kind: 'observation', description: 'Recovered result', minimumConfidence: 'medium' },
+      suggestedTools: [], estimatedCost: 1, estimatedDuration: 1, resourceKeys: [], dependencies: [],
+      claimedAt, attempts: 0,
+    };
+    const state: any = {
+      generation: 1,
+      schedulerIntents: { [intent.id]: intent },
+      leases: {},
+      facts: {},
+      hypotheses: {},
+      evidence: {},
+      observations: {},
+    };
+    const { store } = createTransactionalControlStore(state);
+    const scheduler = new IntentScheduler(store as any, {} as any, { maxOpenIntents: 1, maxAttemptsPerIntent: 3 });
+
+    const retried = await scheduler.schedule({
+      runId: 'RUN-NO-RESOURCE-RECOVERY', phase: 'reconnaissance', knowledgeVersion: 0, currentGeneration: 1,
+      facts: [], hypotheses: [], evidence: [], openIntents: 1,
+      newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+      newHints: [], verifierRejected: false,
+      remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+    });
+
+    assert.equal(retried?.id, intent.id);
+    assert.equal(retried?.status, 'CLAIMED');
+    assert.equal(retried?.attempts, 1);
+    assert.notEqual(retried?.claimedAt, claimedAt);
   });
 
   test('Intent 评分不改变未认领 Intent，projection 与 replay 保持一致', async () => {

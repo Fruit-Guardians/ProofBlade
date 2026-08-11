@@ -524,24 +524,26 @@ export class IntentScheduler {
     currentGeneration: number,
     now: number,
   ): { intents: Intent[]; leases: RunSnapshot['leases']; commands: DomainCommand[] } {
-    const retryableById = new Map<string, Intent>();
+    const recoveredById = new Map<string, Intent>();
     const leasesToRelease = new Map<string, Lease>();
 
     for (const intent of intents) {
       if (intent.status !== 'CLAIMED'
         || intent.fixtureGeneration !== currentGeneration
-        || intent.resourceKeys.length === 0
         || this.hasActiveClaim(intent, leases, now)) {
         continue;
       }
 
-      const retryable = structuredClone(intent);
-      retryable.status = 'PROPOSED';
-      delete retryable.claimedBy;
-      delete retryable.claimedAt;
-      delete retryable.leaseId;
-      delete retryable.leaseClaims;
-      retryableById.set(retryable.id, retryable);
+      const recovered = structuredClone(intent);
+      recovered.attempts += 1;
+      recovered.lastError = 'Intent claim expired before completion';
+      recovered.status = recovered.attempts >= this.config.maxAttemptsPerIntent ? 'FAILED' : 'PROPOSED';
+      if (recovered.status === 'FAILED') recovered.completedAt = new Date(now).toISOString();
+      delete recovered.claimedBy;
+      delete recovered.claimedAt;
+      delete recovered.leaseId;
+      delete recovered.leaseClaims;
+      recoveredById.set(recovered.id, recovered);
 
       const legacyResourceKeys = new Set(this.legacyLeaseResourceKeys(intent));
       for (const resourceKey of intent.resourceKeys) {
@@ -555,7 +557,7 @@ export class IntentScheduler {
       }
     }
 
-    if (retryableById.size === 0) return { intents, leases, commands: [] };
+    if (recoveredById.size === 0) return { intents, leases, commands: [] };
 
     const projectedLeases = { ...leases };
     const commands: DomainCommand[] = [];
@@ -569,18 +571,23 @@ export class IntentScheduler {
         lane: 'main',
       });
     }
-    for (const intent of retryableById.values()) {
+    for (const intent of recoveredById.values()) {
       commands.push({ type: 'scheduler_intent', intent });
     }
 
     return {
-      intents: intents.map(intent => retryableById.get(intent.id) ?? intent),
+      intents: intents.map(intent => recoveredById.get(intent.id) ?? intent),
       leases: projectedLeases,
       commands,
     };
   }
 
   private hasActiveClaim(intent: Intent, leases: RunSnapshot['leases'], now: number): boolean {
+    if (intent.resourceKeys.length === 0) {
+      const claimedAt = Date.parse(intent.claimedAt ?? '');
+      return Number.isFinite(claimedAt) && claimedAt + intent.estimatedDuration * 2 > now;
+    }
+
     if (intent.leaseClaims) {
       return intent.resourceKeys.every(resourceKey => {
         const claim = intent.leaseClaims?.[resourceKey];
