@@ -9,8 +9,16 @@ import { loadRealEvaluationCorpus } from "../src/evaluation/real-corpus.js";
 import { RealModelEvaluationRunner } from "../src/evaluation/real-model-evaluator.js";
 import type { SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
 
-const solver: SolverLaneFactory = async ({ runtime }) => ({
+const solver: SolverLaneFactory = async ({ runtime }) => testSolverLane(runtime, true);
+
+const failingSolver: SolverLaneFactory = async ({ runtime }) => testSolverLane(runtime, false);
+
+const baselineSolver: SolverLaneFactory = async ({ runtime, config }) => testSolverLane(runtime, config.modelProfiles.executor.provider === "alpha");
+
+function testSolverLane(runtime: Parameters<SolverLaneFactory>[0]["runtime"], succeeds: boolean) {
+  return {
   async prompt() {
+    if (!succeeds) return { text: "no supported candidate", stopReason: "stop", usage: zeroUsage() };
     const inspected = await runtime.inspectTarget("target.bin");
     const candidate = inspected.output.match(/[A-Za-z][A-Za-z0-9_-]{0,31}\{[^{}\r\n]{1,512}\}/)?.[0];
     if (!candidate) throw new Error("test corpus target has no candidate");
@@ -22,7 +30,8 @@ const solver: SolverLaneFactory = async ({ runtime }) => ({
   async abort() {},
   async isIdle() { return true; },
   async close() {},
-});
+  };
+}
 
 test("real model evaluator stages a hash-bound local corpus and compares variants without exposing the answer", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-"));
@@ -105,6 +114,31 @@ test("real evaluation corpus canonicalizes equivalent case order", async () => {
   }
 });
 
+test("real evaluation corpus rejects case-folded reserved paths and duplicate targets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-corpus-case-fold-"));
+  const source = "payload";
+  const sourceHash = createHash("sha256").update(source).digest("hex");
+  try {
+    await writeFile(join(root, "payload.bin"), source, "utf8");
+    const manifest = (files: unknown[]) => JSON.stringify({
+      schemaVersion: 1,
+      id: "case-folding",
+      cases: [{ id: "sample", targetKind: "reverse", objective: "Inspect payload", expected: "flag{case_fold}", files }],
+    });
+    await writeFile(join(root, "challenge.json"), manifest([{ source: "payload.bin", path: "Challenge.txt", sha256: sourceHash }]), "utf8");
+    await assert.rejects(loadRealEvaluationCorpus(join(root, "challenge.json")), /reserved target path/);
+    await writeFile(join(root, "private.json"), manifest([{ source: "payload.bin", path: ".ProofBlade/scorer.json", sha256: sourceHash }]), "utf8");
+    await assert.rejects(loadRealEvaluationCorpus(join(root, "private.json")), /reserved target path/);
+    await writeFile(join(root, "duplicate.json"), manifest([
+      { source: "payload.bin", path: "A.bin", sha256: sourceHash },
+      { source: "payload.bin", path: "a.bin", sha256: sourceHash },
+    ]), "utf8");
+    await assert.rejects(loadRealEvaluationCorpus(join(root, "duplicate.json")), /target paths must be unique/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("real model evaluation rejects unsafe run prefixes before staging a Fixture", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-path-"));
   try {
@@ -155,6 +189,63 @@ test("real model evaluation refuses variants without explicit token pricing", as
     variants: [{ id: "unpriced", config: unpriced }, { id: "priced", config: config("priced") }],
     allowLive: true,
   }), /requires positive executor pricing/);
+});
+
+test("real evaluation gate fails when every Variant fails its minimum success rate", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-min-success-"));
+  const source = "not-a-flag";
+  try {
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "minimum-success",
+      cases: [corpusCase("sample", "target.bin", "flag{minimum_success}", source)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, failingSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-MIN-SUCCESS",
+    });
+    assert.equal(summary.gate.passed, false);
+    assert.equal(summary.gate.policy.minimumSuccessRate, 0.5);
+    assert.ok(summary.gate.checks.filter((item) => item.id.startsWith("minimum_success_rate:")).every((item) => !item.passed));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation gate rejects a Variant that regresses beyond its baseline allowance", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-baseline-"));
+  const expected = "flag{baseline_gate}";
+  try {
+    await writeFile(join(root, "target.bin"), expected, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "baseline-gate",
+      cases: [corpusCase("sample", "target.bin", expected, expected)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, baselineSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      minimumSuccessRate: 0,
+      baselineVariantId: "alpha",
+      maxBaselineSuccessRateDrop: 0.1,
+      runPrefix: "REAL-BASELINE-GATE",
+    });
+    assert.equal(summary.gate.passed, false);
+    assert.equal(summary.gate.policy.baselineVariantId, "alpha");
+    assert.equal(summary.gate.checks.find((item) => item.id === "baseline_success_rate_drop:beta")?.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 function config(id: string): ProofBladeConfig {

@@ -41,7 +41,7 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
     baseUrl: config.baseUrl,
     reasoning: config.reasoning ?? false,
     input: config.input,
-    cost: modelCost(config),
+    cost: configuredModelCost(config),
     contextWindow: config.contextWindow,
     maxTokens: config.maxTokens,
     ...(config.api === "openai-completions" ? { compat: {
@@ -99,7 +99,14 @@ async function discoverModel(baseUrl: string, discoveryPath: string, providerFet
     ? (apiKey ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" } : undefined)
     : (apiKey ? { authorization: `Bearer ${apiKey}` } : undefined);
   const response = await providerFetch(`${baseUrl}${discoveryPath}`, { headers, signal: AbortSignal.timeout(10_000) });
-function modelCost(config: ModelProfileConfig): Model<ProviderApi>["cost"] {
+  if (!response.ok) throw new Error(`LM Studio model discovery failed: HTTP ${response.status}`);
+  const body = await response.json() as { data?: Array<{ id?: string }> };
+  const model = body.data?.find((item) => item.id && !item.id.toLowerCase().includes("embed"));
+  if (!model?.id) throw new Error("LM Studio returned no chat model");
+  return model.id;
+}
+
+export function configuredModelCost(config: ModelProfileConfig): Model<ProviderApi>["cost"] {
   const pricing = config.pricing;
   if (!pricing) return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   return {
@@ -108,10 +115,4 @@ function modelCost(config: ModelProfileConfig): Model<ProviderApi>["cost"] {
     cacheRead: pricing.cacheReadUsdPerMillion,
     cacheWrite: pricing.cacheWriteUsdPerMillion,
   };
-}
-  if (!response.ok) throw new Error(`LM Studio model discovery failed: HTTP ${response.status}`);
-  const body = await response.json() as { data?: Array<{ id?: string }> };
-  const model = body.data?.find((item) => item.id && !item.id.toLowerCase().includes("embed"));
-  if (!model?.id) throw new Error("LM Studio returned no chat model");
-  return model.id;
 }

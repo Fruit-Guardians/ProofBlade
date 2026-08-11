@@ -83,6 +83,9 @@ async function main(): Promise<void> {
         maxCostUsd: parsePositiveDecimalOption(rest, "--max-cost-usd"),
         deadlineMs: parsePositiveOption(rest, "--deadline-ms"),
         runPrefix: option(rest, "--run-prefix") ?? option(rest, "--prefix"),
+        minimumSuccessRate: parseRateOption(rest, "--min-success-rate"),
+        baselineVariantId: option(rest, "--baseline"),
+        maxBaselineSuccessRateDrop: parseRateOption(rest, "--max-success-rate-drop"),
       });
       print(summary);
       if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
@@ -368,6 +371,14 @@ function parsePositiveDecimalOption(args: string[], name: string): number | unde
   return parsed;
 }
 
+function parseRateOption(args: string[], name: string): number | undefined {
+  const value = option(args, name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) throw new Error(`${name} must be a finite number from 0 to 1`);
+  return parsed;
+}
+
 function parsePositiveValue(value: string | undefined, label: string): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
@@ -394,7 +405,7 @@ function helpText(): string {
     "  run demo [--run-id ID]",
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
-    "  eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--enforce-gate]",
+    "  eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  capabilities",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",

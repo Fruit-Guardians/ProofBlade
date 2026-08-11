@@ -29,6 +29,18 @@ export interface RealModelEvaluationOptions {
   maxCostUsd?: number;
   deadlineMs?: number;
   runPrefix?: string;
+  /** Every Variant must meet this rate for an enforced evaluation gate to pass. Defaults to 0.5. */
+  minimumSuccessRate?: number;
+  /** Variant used as the success-rate comparison reference. Defaults to the first canonical Variant id. */
+  baselineVariantId?: string;
+  /** Maximum success-rate regression allowed against the selected baseline. Defaults to 0.1. */
+  maxBaselineSuccessRateDrop?: number;
+}
+
+export interface RealModelEvaluationGatePolicy {
+  minimumSuccessRate: number;
+  baselineVariantId: string;
+  maxBaselineSuccessRateDrop: number;
 }
 
 export interface RealModelEvaluationCase {
@@ -87,7 +99,11 @@ export interface RealModelEvaluationSummary {
   budget: { attempts: number; maxTurns: number; maxCostUsd: number; deadlineMs: number };
   variants: RealModelVariantSummary[];
   comparisons: Array<{ baselineId: string; variantId: string; successRateDelta: number; totalCostUsdDelta: number; p95DurationMsDelta: number }>;
-  gate: { passed: boolean; checks: Array<{ id: string; passed: boolean; actual: number | string; expected: number | string }> };
+  gate: {
+    policy: RealModelEvaluationGatePolicy;
+    passed: boolean;
+    checks: Array<{ id: string; passed: boolean; actual: number | string; expected: number | string }>;
+  };
   reportHash: string;
 }
 
@@ -105,6 +121,7 @@ export class RealModelEvaluationRunner {
     const deadlineMs = positive(options.deadlineMs ?? 900_000, "deadlineMs");
     const maxCostUsd = positiveDecimal(options.maxCostUsd ?? 5, "maxCostUsd");
     const variants = normalizeVariants(options.variants);
+    const gatePolicy = gatePolicyFor(options, variants);
     const corpus = await loadRealEvaluationCorpus(options.corpusPath);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
@@ -125,12 +142,22 @@ export class RealModelEvaluationRunner {
       results.push(summarizeVariant(variant.id, profileFingerprint, cases));
       await services.sandbox.close();
     }
-    const comparisons = compareVariants(results);
+    const comparisons = compareVariants(results, gatePolicy.baselineVariantId);
+    const baseline = results.find((item) => item.id === gatePolicy.baselineVariantId)!;
     const checks = [
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
       check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
       check("candidate_leaks", results.every((item) => item.candidateLeakCount === 0), sum(results.map((item) => item.candidateLeakCount)), 0),
       check("case_cost_cap", results.every((item) => item.cases.every((candidate) => candidate.costUsd <= maxCostUsd + 1e-9)), highestCaseCost(results), `<=${maxCostUsd}`),
+      ...results.map((item) => check(`minimum_success_rate:${item.id}`, item.successRate >= gatePolicy.minimumSuccessRate, item.successRate, `>=${gatePolicy.minimumSuccessRate}`)),
+      ...results
+        .filter((item) => item.id !== baseline.id)
+        .map((item) => check(
+          `baseline_success_rate_drop:${item.id}`,
+          item.successRate >= baseline.successRate - gatePolicy.maxBaselineSuccessRateDrop,
+          item.successRate,
+          `>=${round(baseline.successRate - gatePolicy.maxBaselineSuccessRateDrop)}`,
+        )),
     ];
     const base: Omit<RealModelEvaluationSummary, "reportHash"> = {
       schemaVersion: 1,
@@ -140,7 +167,7 @@ export class RealModelEvaluationRunner {
       budget: { attempts, maxTurns, maxCostUsd, deadlineMs },
       variants: results,
       comparisons,
-      gate: { passed: checks.every((item) => item.passed), checks },
+      gate: { policy: gatePolicy, passed: checks.every((item) => item.passed), checks },
     };
     return { ...base, reportHash: stableReportHash(base) };
   }
@@ -295,10 +322,10 @@ function summarizeVariant(id: string, profileFingerprint: string, cases: RealMod
   };
 }
 
-function compareVariants(variants: RealModelVariantSummary[]): RealModelEvaluationSummary["comparisons"] {
-  const baseline = variants[0];
+function compareVariants(variants: RealModelVariantSummary[], baselineVariantId: string): RealModelEvaluationSummary["comparisons"] {
+  const baseline = variants.find((variant) => variant.id === baselineVariantId);
   if (!baseline) return [];
-  return variants.slice(1).map((variant) => ({
+  return variants.filter((variant) => variant.id !== baseline.id).map((variant) => ({
     baselineId: baseline.id,
     variantId: variant.id,
     successRateDelta: round(variant.successRate - baseline.successRate),
@@ -348,6 +375,16 @@ function normalizeVariants(variants: RealEvaluationVariant[]): RealEvaluationVar
   return sorted;
 }
 
+function gatePolicyFor(options: RealModelEvaluationOptions, variants: RealEvaluationVariant[]): RealModelEvaluationGatePolicy {
+  const minimumSuccessRate = rateThreshold(options.minimumSuccessRate ?? 0.5, "minimumSuccessRate");
+  const maxBaselineSuccessRateDrop = rateThreshold(options.maxBaselineSuccessRateDrop ?? 0.1, "maxBaselineSuccessRateDrop");
+  const baselineVariantId = options.baselineVariantId ?? variants[0]!.id;
+  if (!variants.some((variant) => variant.id === baselineVariantId)) {
+    throw new Error(`Real evaluation baseline variant is not configured: ${baselineVariantId}`);
+  }
+  return { minimumSuccessRate, baselineVariantId, maxBaselineSuccessRateDrop };
+}
+
 function fingerprint(config: ProofBladeConfig): string {
   const profile = config.modelProfiles.executor;
   return sha256(canonicalJson({
@@ -389,6 +426,11 @@ function positive(value: number, label: string): number {
 
 function positiveDecimal(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive finite number`);
+  return value;
+}
+
+function rateThreshold(value: number, label: string): number {
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error(`${label} must be a finite number from 0 to 1`);
   return value;
 }
 

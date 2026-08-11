@@ -4,15 +4,15 @@
 {
   "id": "materials-evaluation",
   "name": "Fixture Evaluation",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-11T11:32:51.204Z",
+  "updatedAt": "2026-08-11T14:56:16.000Z",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-11T11:32:51.204Z",
-    "lastSecurityAuditAt": "2026-08-11T11:32:51.204Z",
-    "sourceHash": "2ae85be62e0bae3520c5c269fef045dcafb069e825f52e0504f6506e9a9d9838",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-11T14:56:16.000Z",
+    "lastSecurityAuditAt": "2026-08-11T14:56:16.000Z",
+    "sourceHash": "a9827e9db3ca5a07f2f0e0d6962e114f9c0a8bb737e4224bdf39dd1290340175",
     "result": "passed"
   }
 }

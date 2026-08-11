@@ -131,7 +131,7 @@ function validateCase(value: unknown, index: number): RealEvaluationCorpusCase {
   if (expected.length > 1024 || /[\r\n]/.test(expected)) throw new Error(`Corpus case ${id} expected must be one line up to 1024 characters`);
   if (!Array.isArray(record.files) || record.files.length === 0) throw new Error(`Corpus case ${id} must contain at least one file`);
   const files = record.files.map((file, fileIndex) => validateFile(file, id, fileIndex));
-  const paths = new Set(files.map((file) => file.path ?? basename(file.source)));
+  const paths = new Set(files.map((file) => portableTargetKey(file.path ?? basename(file.source))));
   if (paths.size !== files.length) throw new Error(`Corpus case ${id} target paths must be unique`);
   return { id, targetKind, objective, expected, files };
 }
@@ -142,7 +142,8 @@ function validateFile(value: unknown, caseId: string, index: number): { source: 
   const source = requiredRelativePath(record.source, `Corpus case ${caseId} file ${index} source`);
   const path = record.path === undefined ? undefined : requiredRelativePath(record.path, `Corpus case ${caseId} file ${index} path`);
   const target = path ?? basename(source);
-  if (RESERVED_TARGET_PATHS.has(target) || target.split(/[\\/]/).includes(".proofblade")) throw new Error(`Corpus case ${caseId} file ${index} uses a reserved target path`);
+  const targetKey = portableTargetKey(target);
+  if (RESERVED_TARGET_PATHS.has(targetKey) || targetKey.split("/").includes(".proofblade")) throw new Error(`Corpus case ${caseId} file ${index} uses a reserved target path`);
   const fileHash = requiredString(record.sha256, `Corpus case ${caseId} file ${index} sha256`).toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(fileHash)) throw new Error(`Corpus case ${caseId} file ${index} sha256 must be lowercase SHA-256`);
   return { source, ...(path ? { path } : {}), sha256: fileHash };
@@ -196,6 +197,11 @@ function requiredRelativePath(value: unknown, label: string): string {
   const path = requiredString(value, label);
   if (isAbsolute(path) || path.split(/[\\/]/).some((segment) => segment === "" || segment === "." || segment === "..")) throw new Error(`${label} must be a safe relative path`);
   return path;
+}
+
+/** A host-independent key prevents Windows case-folding path collisions. */
+function portableTargetKey(path: string): string {
+  return path.replace(/\\/g, "/").toLowerCase();
 }
 
 function isTargetKind(value: unknown): value is TargetKind {

@@ -7,7 +7,8 @@ import {
   type Model,
   type ProviderStreams,
 } from "@earendil-works/pi-ai";
-import { ProviderBudgetExceededError, ProviderRequestBudget } from "../src/runtime/provider-budget.js";
+import type { HarnessEvent } from "../src/domain/types.js";
+import { ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "../src/runtime/provider-budget.js";
 
 const model: Model<"openai-completions"> = {
   id: "budget-test",
@@ -80,6 +81,26 @@ test("provider budget aborts an in-flight Provider request at the Run deadline",
     assert.equal(response.stopReason, "aborted");
     assert.equal(sawAbort, true);
     assert.equal(budget.termination, "deadline_exhausted");
+  } finally {
+    budget.close();
+  }
+});
+
+test("provider budget retains settled usage and an unfinished reservation after restart", () => {
+  const history: Array<Pick<HarnessEvent, "type" | "payload">> = [
+    { type: "provider_request_started", payload: { requestId: "PR-settled" } },
+    { type: "model_usage", payload: { requestId: "PR-settled", usage: { input: 100, output: 30, reasoning: 20, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } } },
+    { type: "provider_request_started", payload: { requestId: "PR-in-flight" } },
+  ];
+  const initialSpentUsd = recoverProviderSpend(history, model);
+  assert.equal(initialSpentUsd, 0.00125);
+  let starts = 0;
+  const budget = new ProviderRequestBudget({ maxCostUsd: 0.0023, deadlineAt: Date.now() + 10_000, initialSpentUsd });
+  const provider = budget.wrap(completingProvider(() => { starts += 1; return message(0); }));
+  try {
+    assert.throws(() => provider.stream(model, { messages: [] }), ProviderBudgetExceededError);
+    assert.equal(starts, 0);
+    assert.equal(budget.termination, "budget_exhausted");
   } finally {
     budget.close();
   }

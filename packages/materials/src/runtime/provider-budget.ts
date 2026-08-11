@@ -9,14 +9,52 @@ import {
   type StreamOptions,
   type Usage,
 } from "@earendil-works/pi-ai";
+import type { HarnessEvent } from "../domain/types.js";
 
 export type ProviderBudgetTermination = "budget_exhausted" | "deadline_exhausted";
+
+export interface ProviderBudgetCostModel {
+  cost: Pick<Model<Api>["cost"], "input" | "output" | "cacheRead" | "cacheWrite">;
+  contextWindow: number;
+  maxTokens: number;
+}
 
 export class ProviderBudgetExceededError extends Error {
   public constructor(message: string) {
     super(message);
     this.name = "ProviderBudgetExceededError";
   }
+}
+
+/**
+ * Rebuild a Run's conservative provider spend from its durable telemetry.
+ * A request without a terminal usage record may already have reached the
+ * Provider, so it retains a full reservation across pause or process restart.
+ */
+export function recoverProviderSpend(events: ReadonlyArray<Pick<HarnessEvent, "type" | "payload">>, model: ProviderBudgetCostModel): number {
+  const maximumUsd = maximumProviderRequestCost(model);
+  const pending = new Set<string>();
+  let spentUsd = 0;
+  for (const event of events) {
+    const payload = event.payload ?? {};
+    if (event.type === "provider_request_started") {
+      const requestId = stringField(payload, "requestId");
+      if (requestId) pending.add(requestId);
+      continue;
+    }
+    if (event.type !== "model_usage") continue;
+    const requestId = stringField(payload, "requestId");
+    if (requestId) pending.delete(requestId);
+    spentUsd += usageCost(payload, model, maximumUsd);
+  }
+  return spentUsd + (pending.size * maximumUsd);
+}
+
+/** Returns the worst permitted price for one Provider request. */
+export function maximumProviderRequestCost(model: ProviderBudgetCostModel, configuredMaxTokens?: number): number {
+  const inputRate = Math.max(model.cost.input, model.cost.cacheRead, model.cost.cacheWrite);
+  const outputTokens = Math.max(model.maxTokens, configuredMaxTokens ?? 0);
+  return ((model.contextWindow * inputRate) + (outputTokens * model.cost.output)) / 1_000_000;
 }
 
 interface ProviderReservation {
@@ -32,15 +70,20 @@ interface ProviderReservation {
 export class ProviderRequestBudget {
   private readonly deadline = new AbortController();
   private readonly timer: ReturnType<typeof setTimeout> | undefined;
-  private spentUsd = 0;
+  private spentUsd: number;
   private reservedUsd = 0;
   private stoppedAs: ProviderBudgetTermination | undefined;
 
-  public constructor(private readonly options: { maxCostUsd?: number; deadlineAt: number }) {
+  public constructor(private readonly options: { maxCostUsd?: number; deadlineAt: number; initialSpentUsd?: number }) {
     if (options.maxCostUsd !== undefined && (!Number.isFinite(options.maxCostUsd) || options.maxCostUsd <= 0)) {
       throw new Error("Provider maxCostUsd must be a positive finite number");
     }
     if (!Number.isFinite(options.deadlineAt)) throw new Error("Provider deadlineAt must be finite");
+    if (options.initialSpentUsd !== undefined && (!Number.isFinite(options.initialSpentUsd) || options.initialSpentUsd < 0)) {
+      throw new Error("Provider initialSpentUsd must be a non-negative finite number");
+    }
+    this.spentUsd = options.initialSpentUsd ?? 0;
+    if (options.maxCostUsd !== undefined && this.spentUsd >= options.maxCostUsd - 1e-9) this.stoppedAs = "budget_exhausted";
     const remaining = options.deadlineAt - Date.now();
     if (remaining <= 0) this.expireDeadline();
     else this.timer = setTimeout(() => this.expireDeadline(), remaining);
@@ -93,7 +136,7 @@ export class ProviderRequestBudget {
 
   private reserve(model: Model<Api>, options: StreamOptions | undefined): ProviderReservation {
     this.throwIfDeadlineExpired();
-    const maximumUsd = this.maximumRequestCost(model, options?.maxTokens);
+    const maximumUsd = maximumProviderRequestCost(model, options?.maxTokens);
     if (this.options.maxCostUsd !== undefined && this.spentUsd + this.reservedUsd + maximumUsd > this.options.maxCostUsd + 1e-9) {
       this.stoppedAs = "budget_exhausted";
       throw new ProviderBudgetExceededError(`Provider cost budget exhausted before request: reserved=${round(this.spentUsd + this.reservedUsd + maximumUsd)} USD limit=${this.options.maxCostUsd} USD`);
@@ -155,11 +198,36 @@ export class ProviderRequestBudget {
     this.deadline.abort(new ProviderBudgetExceededError("Provider deadline exhausted"));
   }
 
-  private maximumRequestCost(model: Model<Api>, configuredMaxTokens: number | undefined): number {
-    const inputRate = Math.max(model.cost.input, model.cost.cacheRead, model.cost.cacheWrite);
-    const outputTokens = Math.max(model.maxTokens, configuredMaxTokens ?? 0);
-    return ((model.contextWindow * inputRate) + (outputTokens * model.cost.output)) / 1_000_000;
-  }
+}
+
+function usageCost(payload: Record<string, unknown>, model: ProviderBudgetCostModel, maximumUsd: number): number {
+  const usage = objectField(payload, "usage");
+  const cost = usage ? objectField(usage, "cost") : undefined;
+  const reported = cost ? finiteNonNegative(cost.total) : undefined;
+  if (reported !== undefined && reported > 0) return reported;
+  if (!usage) return maximumUsd;
+  const calculated = (
+    (finiteNonNegative(usage.input) ?? 0) * model.cost.input
+    + (finiteNonNegative(usage.output) ?? 0) * model.cost.output
+    + (finiteNonNegative(usage.reasoning) ?? 0) * model.cost.output
+    + (finiteNonNegative(usage.cacheRead) ?? 0) * model.cost.cacheRead
+    + (finiteNonNegative(usage.cacheWrite) ?? 0) * model.cost.cacheWrite
+  ) / 1_000_000;
+  return calculated > 0 ? calculated : maximumUsd;
+}
+
+function objectField(value: Record<string, unknown>, field: string): Record<string, unknown> | undefined {
+  const candidate = value[field];
+  return candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate as Record<string, unknown> : undefined;
+}
+
+function stringField(value: Record<string, unknown>, field: string): string | undefined {
+  const candidate = value[field];
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
+}
+
+function finiteNonNegative(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 function terminalUsage(event: AssistantMessageEvent): Usage | undefined {
