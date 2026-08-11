@@ -13,7 +13,7 @@ import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
 import { configuredModelCost, createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
-import { ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
+import { assertProviderBudgetPricing, ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
 import { planContextMaintenance } from "@proofblade/molecules";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { RuntimeResourceSnapshot } from "../domain/types.js";
@@ -58,13 +58,18 @@ export class PiSolverLane implements AgentLanePort {
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const run = await options.controlStore.snapshot(options.runId);
     const startedAt = Date.parse(run.startedAt ?? new Date().toISOString());
-    const initialSpentUsd = recoverProviderSpend(await options.controlStore.events(options.runId), {
+    const maxCostUsd = run.task.constraints.max_cost_usd > 0 ? run.task.constraints.max_cost_usd : undefined;
+    const budgetCostModel = {
       cost: configuredModelCost(profile),
       contextWindow: profile.contextWindow,
       maxTokens: profile.maxTokens,
+    };
+    assertProviderBudgetPricing(maxCostUsd, budgetCostModel);
+    const initialSpentUsd = recoverProviderSpend(await options.controlStore.events(options.runId), {
+      ...budgetCostModel,
     });
     const providerBudget = new ProviderRequestBudget({
-      maxCostUsd: run.task.constraints.max_cost_usd > 0 ? run.task.constraints.max_cost_usd : undefined,
+      maxCostUsd,
       deadlineAt: startedAt + run.task.constraints.deadline_ms,
       initialSpentUsd,
     });

@@ -26,6 +26,22 @@ export class ProviderBudgetExceededError extends Error {
   }
 }
 
+export class ProviderBudgetPricingError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "ProviderBudgetPricingError";
+  }
+}
+
+/** A positive cost cap is only meaningful with explicit positive model prices. */
+export function assertProviderBudgetPricing(maxCostUsd: number | undefined, model: ProviderBudgetCostModel): void {
+  if (maxCostUsd === undefined || maxCostUsd <= 0) return;
+  const { input, output, cacheRead, cacheWrite } = model.cost;
+  if (input <= 0 || output <= 0 || ![input, output, cacheRead, cacheWrite].every(Number.isFinite) || cacheRead < 0 || cacheWrite < 0) {
+    throw new ProviderBudgetPricingError("A positive max_cost_usd requires configured model pricing with positive input and output rates");
+  }
+}
+
 /**
  * Rebuild a Run's conservative provider spend from its durable telemetry.
  * A request without a terminal usage record may already have reached the
@@ -136,6 +152,7 @@ export class ProviderRequestBudget {
 
   private reserve(model: Model<Api>, options: StreamOptions | undefined): ProviderReservation {
     this.throwIfDeadlineExpired();
+    assertProviderBudgetPricing(this.options.maxCostUsd, model);
     const maximumUsd = maximumProviderRequestCost(model, options?.maxTokens);
     if (this.options.maxCostUsd !== undefined && this.spentUsd + this.reservedUsd + maximumUsd > this.options.maxCostUsd + 1e-9) {
       this.stoppedAs = "budget_exhausted";
@@ -209,7 +226,6 @@ function usageCost(payload: Record<string, unknown>, model: ProviderBudgetCostMo
   const calculated = (
     (finiteNonNegative(usage.input) ?? 0) * model.cost.input
     + (finiteNonNegative(usage.output) ?? 0) * model.cost.output
-    + (finiteNonNegative(usage.reasoning) ?? 0) * model.cost.output
     + (finiteNonNegative(usage.cacheRead) ?? 0) * model.cost.cacheRead
     + (finiteNonNegative(usage.cacheWrite) ?? 0) * model.cost.cacheWrite
   ) / 1_000_000;

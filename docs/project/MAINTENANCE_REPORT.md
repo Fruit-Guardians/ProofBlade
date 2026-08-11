@@ -29,7 +29,7 @@
 | materials-observability | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `ea7d0b8a8bc0` |
 | materials-orchestration | 0.1.6 | 6 | 6 | 2026-08-11T11:32:51.204Z | 通过 | `34814af5ad77` |
 | materials-recovery | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `ee7b9cfae03f` |
-| materials-runtime | 0.10.12 | 10 | 10 | 2026-08-11T14:56:16.000Z | 通过 | `fd4ffc42958e` |
+| materials-runtime | 0.10.13 | 11 | 11 | 2026-08-11T15:13:39.000Z | 通过 | `f8f82e6735d0` |
 | materials-sandbox | 0.1.2 | 2 | 2 | 2026-08-07T20:17:19.5056968+08:00 | 通过 | `115ef660ac09` |
 | materials-skills | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `27123936e75c` |
 | materials-storage | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `71901f72eb87` |

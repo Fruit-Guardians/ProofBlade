@@ -8,7 +8,7 @@ import {
   type ProviderStreams,
 } from "@earendil-works/pi-ai";
 import type { HarnessEvent } from "../src/domain/types.js";
-import { ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "../src/runtime/provider-budget.js";
+import { assertProviderBudgetPricing, ProviderBudgetExceededError, ProviderBudgetPricingError, ProviderRequestBudget, recoverProviderSpend } from "../src/runtime/provider-budget.js";
 
 const model: Model<"openai-completions"> = {
   id: "budget-test",
@@ -34,6 +34,20 @@ test("provider budget rejects an over-budget request before the Provider starts"
     );
     assert.equal(starts, 0);
     assert.equal(budget.termination, "budget_exhausted");
+  } finally {
+    budget.close();
+  }
+});
+
+test("provider budget fails closed without pricing when a cost cap is configured", () => {
+  const unpriced = { ...model, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
+  assert.throws(() => assertProviderBudgetPricing(1, unpriced), ProviderBudgetPricingError);
+  let starts = 0;
+  const budget = new ProviderRequestBudget({ maxCostUsd: 1, deadlineAt: Date.now() + 10_000 });
+  const provider = budget.wrap(completingProvider(() => { starts += 1; return message(0); }));
+  try {
+    assert.throws(() => provider.stream(unpriced, { messages: [] }), ProviderBudgetPricingError);
+    assert.equal(starts, 0);
   } finally {
     budget.close();
   }
@@ -93,7 +107,7 @@ test("provider budget retains settled usage and an unfinished reservation after 
     { type: "provider_request_started", payload: { requestId: "PR-in-flight" } },
   ];
   const initialSpentUsd = recoverProviderSpend(history, model);
-  assert.equal(initialSpentUsd, 0.00125);
+  assert.equal(initialSpentUsd, 0.00123);
   let starts = 0;
   const budget = new ProviderRequestBudget({ maxCostUsd: 0.0023, deadlineAt: Date.now() + 10_000, initialSpentUsd });
   const provider = budget.wrap(completingProvider(() => { starts += 1; return message(0); }));
