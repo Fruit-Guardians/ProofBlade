@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -105,6 +105,58 @@ test("real evaluation corpus canonicalizes equivalent case order", async () => {
   }
 });
 
+test("real model evaluation rejects unsafe run prefixes before staging a Fixture", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-path-"));
+  try {
+    const source = "flag{path_guard}";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "path-guard",
+      cases: [corpusCase("safe-case", "target.bin", "flag{path_guard}", source)],
+    }), "utf8");
+    const runner = new RealModelEvaluationRunner(root, solver);
+    await assert.rejects(runner.run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "..\\..\\escaped",
+    }), /Run ID/);
+    await assert.rejects(stat(join(root, "fixtures")), { code: "ENOENT" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation corpus rejects a traversal-shaped case id", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-corpus-case-id-"));
+  try {
+    const source = "flag{case_id_guard}";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "case-id-guard",
+      cases: [corpusCase("..\\escape", "target.bin", "flag{case_id_guard}", source)],
+    }), "utf8");
+    await assert.rejects(loadRealEvaluationCorpus(join(root, "corpus.json")), /safe Run ID segment/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real model evaluation refuses variants without explicit token pricing", async () => {
+  const unpriced = config("unpriced");
+  delete unpriced.modelProfiles.executor.pricing;
+  await assert.rejects(new RealModelEvaluationRunner(process.cwd(), solver).run({
+    corpusPath: "not-read-before-variant-validation.json",
+    variants: [{ id: "unpriced", config: unpriced }, { id: "priced", config: config("priced") }],
+    allowLive: true,
+  }), /requires positive executor pricing/);
+});
+
 function config(id: string): ProofBladeConfig {
   return {
     schemaVersion: 1,
@@ -123,6 +175,12 @@ function config(id: string): ProofBladeConfig {
         requestTimeoutMs: 1_000,
         maxRetries: 0,
         input: ["text"],
+        pricing: {
+          inputUsdPerMillion: 1,
+          outputUsdPerMillion: 1,
+          cacheReadUsdPerMillion: 0.1,
+          cacheWriteUsdPerMillion: 1,
+        },
       },
     },
   };

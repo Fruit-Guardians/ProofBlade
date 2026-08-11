@@ -12,6 +12,8 @@ import {
   RunTelemetry,
   SingleAgentCtfLoop,
   createServices,
+  assertRunId,
+  RUN_ID_PATTERN,
   fixtureTask,
   listFixtureProfiles,
   requiresClaimVerification,
@@ -71,7 +73,6 @@ interface ContentLike {
   arguments?: unknown;
 }
 
-const runIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 const runDetailCacheCapacity = 32;
 const runDetailCacheMaxBytes = 64 * 1024 * 1024;
 const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
@@ -166,7 +167,7 @@ export class DebugDataService {
       throw error;
     }
     const items = await Promise.all(entries
-      .filter((entry) => entry.isDirectory() && runIdPattern.test(entry.name))
+      .filter((entry) => entry.isDirectory() && RUN_ID_PATTERN.test(entry.name))
       .map(async (entry): Promise<RunListItem | undefined> => {
         try {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
@@ -904,6 +905,4 @@ function usageFromMessages(messages: ChatMessageDebug[]): TokenUsage & { request
   return total;
 }
 
-export function assertRunId(runId: string): void {
-  if (!runIdPattern.test(runId)) throw new Error("Run ID must contain only letters, numbers, dots, underscores, and hyphens");
-}
+export { assertRunId };

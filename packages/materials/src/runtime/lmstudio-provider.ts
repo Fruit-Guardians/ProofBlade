@@ -11,6 +11,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import type { ModelProfileConfig, ProviderApi } from "../config.js";
 import { createProviderTransport } from "./provider-transport.js";
+import type { ProviderRequestBudget } from "./provider-budget.js";
 
 export interface ResolvedModelProfile extends ModelProfileConfig {
   modelId: string;
@@ -31,7 +32,7 @@ export async function resolveModelProfile(profile: ModelProfileConfig): Promise<
   return { ...profile, baseUrl, modelId };
 }
 
-export function createConfiguredModels(config: ResolvedModelProfile): { models: MutableModels; model: Model<ProviderApi>; closeTransport(): Promise<void> } {
+export function createConfiguredModels(config: ResolvedModelProfile, budget?: ProviderRequestBudget): { models: MutableModels; model: Model<ProviderApi>; closeTransport(): Promise<void> } {
   const model: Model<ProviderApi> = {
     id: config.modelId,
     name: config.modelId,
@@ -40,7 +41,7 @@ export function createConfiguredModels(config: ResolvedModelProfile): { models: 
     baseUrl: config.baseUrl,
     reasoning: config.reasoning ?? false,
     input: config.input,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    cost: modelCost(config),
     contextWindow: config.contextWindow,
     maxTokens: config.maxTokens,
     ...(config.api === "openai-completions" ? { compat: {
@@ -52,12 +53,13 @@ export function createConfiguredModels(config: ResolvedModelProfile): { models: 
   };
   const transport = createProviderTransport(config.proxyUrl);
   const baseApi = providerApi(config.api);
-  const api = transport ? {
+  const rawApi: ProviderStreams = transport ? {
     stream: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["stream"]>[1], options?: Parameters<ProviderStreams["stream"]>[2]) =>
       baseApi.stream(streamModel, context, { ...options, fetch: transport.fetch }),
     streamSimple: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["streamSimple"]>[1], options?: Parameters<ProviderStreams["streamSimple"]>[2]) =>
       baseApi.streamSimple(streamModel, context, { ...options, fetch: transport.fetch }),
   } : baseApi;
+  const api = budget ? budget.wrap(rawApi) : rawApi;
   const provider = createProvider<ProviderApi>({
     id: config.provider,
     name: config.provider,
@@ -97,6 +99,16 @@ async function discoverModel(baseUrl: string, discoveryPath: string, providerFet
     ? (apiKey ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" } : undefined)
     : (apiKey ? { authorization: `Bearer ${apiKey}` } : undefined);
   const response = await providerFetch(`${baseUrl}${discoveryPath}`, { headers, signal: AbortSignal.timeout(10_000) });
+function modelCost(config: ModelProfileConfig): Model<ProviderApi>["cost"] {
+  const pricing = config.pricing;
+  if (!pricing) return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  return {
+    input: pricing.inputUsdPerMillion,
+    output: pricing.outputUsdPerMillion,
+    cacheRead: pricing.cacheReadUsdPerMillion,
+    cacheWrite: pricing.cacheWriteUsdPerMillion,
+  };
+}
   if (!response.ok) throw new Error(`LM Studio model discovery failed: HTTP ${response.status}`);
   const body = await response.json() as { data?: Array<{ id?: string }> };
   const model = body.data?.find((item) => item.id && !item.id.toLowerCase().includes("embed"));

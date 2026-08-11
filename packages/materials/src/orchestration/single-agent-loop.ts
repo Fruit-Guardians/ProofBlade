@@ -120,6 +120,10 @@ export class SingleAgentCtfLoop {
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns));
         throwIfAborted(options.signal);
+        if (agentOutcome.termination === "budget_exhausted" || agentOutcome.termination === "deadline_exhausted") {
+          await this.exhaust(options.runId, agentOutcome.termination === "deadline_exhausted" ? "Run deadline exhausted during a Provider request." : "Run provider cost budget exhausted.");
+          break;
+        }
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
@@ -162,7 +166,7 @@ export class SingleAgentCtfLoop {
           }
         }
         if (Date.now() - Date.parse(before.startedAt ?? new Date().toISOString()) >= before.task.constraints.deadline_ms) {
-          await this.services.control.dispatch(options.runId, { type: "exhaust", reason: "Run deadline exhausted." });
+          await this.exhaust(options.runId, "Run deadline exhausted.");
           break;
         }
       }
@@ -254,6 +258,14 @@ export class SingleAgentCtfLoop {
   private async moveTo(runId: string, phase: RunSnapshot["phase"]): Promise<void> {
     const snapshot = await this.services.control.snapshot(runId);
     for (const next of pathToPhase(snapshot.phase, phase)) await this.services.control.dispatch(runId, { type: "start_phase", phase: next });
+  }
+
+  private async exhaust(runId: string, reason: string): Promise<void> {
+    try {
+      await this.services.control.dispatch(runId, { type: "exhaust", reason });
+    } catch (error) {
+      if ((await this.services.control.snapshot(runId)).status !== "PAUSED") throw error;
+    }
   }
 }
 

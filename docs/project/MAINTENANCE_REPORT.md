@@ -20,14 +20,14 @@
 | materials-cli | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `e3b0c44298fc` |
 | materials-context | 0.4.4 | 3 | 3 | 2026-08-09T04:00:00.000Z | 通过 | `169c106d3946` |
 | materials-control | 0.3.4 | 4 | 4 | 2026-08-09T16:31:33.000Z | 通过 | `867c38c5f8b1` |
-| materials-domain | 0.3.4 | 3 | 3 | 2026-08-09T16:31:33.000Z | 通过 | `47cb22386ff0` |
+| materials-domain | 0.3.5 | 4 | 4 | 2026-08-11T11:32:51.204Z | 通过 | `4f34482a1496` |
 | materials-effects | 0.2.2 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `d39c55335693` |
-| materials-evaluation | 0.2.4 | 2 | 2 | 2026-08-10T03:18:16.431Z | 通过 | `0ca3bf7939dc` |
+| materials-evaluation | 0.2.5 | 3 | 3 | 2026-08-11T11:32:51.204Z | 通过 | `2ae85be62e0b` |
 | materials-jobs | 0.2.3 | 2 | 2 | 2026-08-09T15:32:20.000Z | 通过 | `47b16225d5c8` |
 | materials-knowledge | 0.6.4 | 4 | 4 | 2026-08-10T05:35:35.169Z | 通过 | `43da254dff53` |
 | materials-mcp | 0.2.6 | 4 | 4 | 2026-08-11T10:58:11.000Z | 通过 | `483131e03b81` |
 | materials-observability | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `ea7d0b8a8bc0` |
-| materials-orchestration | 0.1.5 | 5 | 5 | 2026-08-08T02:47:55.5788475+08:00 | 通过 | `8f8a1c8a4f1d` |
+| materials-orchestration | 0.1.6 | 6 | 6 | 2026-08-11T11:32:51.204Z | 通过 | `34814af5ad77` |
 | materials-recovery | 0.1.1 | 1 | 1 | 2026-08-07T17:39:20+08:00 | 通过 | `ee7b9cfae03f` |
 | materials-runtime | 0.10.11 | 9 | 9 | 2026-08-11T02:30:00.000Z | 通过 | `69bb1d659d31` |
 | materials-sandbox | 0.1.2 | 2 | 2 | 2026-08-07T20:17:19.5056968+08:00 | 通过 | `115ef660ac09` |

@@ -10,7 +10,26 @@ Keep the corpus, samples, and expected values under `.proofblade/evaluation/`; t
 
 Each corpus file path is relative to the Manifest directory. The loader rejects absolute paths, directory escapes, symlinks, files over 128 MiB, and hash mismatches. Every evaluation attempt copies the verified files into a fresh Fixture; the expected value is only written to that Fixture's private scorer.
 
-Create one ordinary ProofBlade config per provider/model. API keys remain environment variables referenced by each config. Then run a paired comparison:
+Create one ordinary ProofBlade config per provider/model. API keys remain environment variables referenced by each config. Real evaluation requires a published USD token price for every Variant; without it, `eval-real` refuses to start. Prices are per one million tokens and should include the Provider's cache-read and cache-write rates when it reports them:
+
+```json
+{
+  "modelProfiles": {
+    "executor": {
+      "pricing": {
+        "inputUsdPerMillion": 0.28,
+        "outputUsdPerMillion": 0.42,
+        "cacheReadUsdPerMillion": 0.028,
+        "cacheWriteUsdPerMillion": 0.28
+      }
+    }
+  }
+}
+```
+
+`--max-cost-usd` is enforced per Run, not merely reported afterwards. Before each Provider request, ProofBlade reserves the maximum charge permitted by that model's context window and output limit. If the next reservation would exceed the cap, no HTTP request is sent. Requests already in flight receive the Run deadline through their abort signal. Provider-internal retries are disabled for these budgeted requests, because every retry is a separate potential charge. A Provider that omits usage is charged the reserved maximum, so incomplete billing metadata cannot make a comparison look free.
+
+Run prefixes and corpus case ids must be safe Run ID segments (`[A-Za-z0-9][A-Za-z0-9._-]{0,95}`); this keeps Fixture staging within the configured Fixture root. Then run a paired comparison:
 
 ```powershell
 npm run cli -- eval-real .proofblade/evaluation/corpus.json --allow-live `

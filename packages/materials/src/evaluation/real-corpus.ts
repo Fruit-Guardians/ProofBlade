@@ -4,6 +4,7 @@ import { copyFile, lstat, mkdir, readFile, realpath, stat, writeFile } from "nod
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { TargetKind } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import { assertRunId } from "../domain/run-id.js";
 
 const MAX_CORPUS_FILE_BYTES = 128 * 1024 * 1024;
 const RESERVED_TARGET_PATHS = new Set(["challenge.txt", "generation.txt"]);
@@ -74,8 +75,11 @@ export async function loadRealEvaluationCorpus(inputPath: string): Promise<Loade
 }
 
 /** Stage a fresh, read-only corpus case before the normal Fixture Sandbox builds it. */
-export async function stageRealEvaluationCase(fixtureRoot: string, corpus: LoadedRealEvaluationCorpus, item: LoadedRealEvaluationCase): Promise<void> {
-  await mkdir(dirname(fixtureRoot), { recursive: true });
+export async function stageRealEvaluationCase(fixturesRoot: string, runId: string, corpus: LoadedRealEvaluationCorpus, item: LoadedRealEvaluationCase): Promise<void> {
+  assertRunId(runId);
+  const fixtureRoot = resolve(fixturesRoot, runId);
+  assertInside(fixturesRoot, fixtureRoot, "Real evaluation Run ID escapes the fixtures directory");
+  await mkdir(fixturesRoot, { recursive: true });
   try {
     await mkdir(fixtureRoot);
   } catch (error) {
@@ -115,6 +119,11 @@ function validateCase(value: unknown, index: number): RealEvaluationCorpusCase {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`Corpus case ${index} must be an object`);
   const record = value as Partial<RealEvaluationCorpusCase>;
   const id = requiredString(record.id, `corpus case ${index} id`);
+  try {
+    assertRunId(id);
+  } catch {
+    throw new Error(`Corpus case ${index} id must be a safe Run ID segment`);
+  }
   const targetKind = record.targetKind;
   if (!isTargetKind(targetKind)) throw new Error(`Corpus case ${id} has unsupported targetKind`);
   const objective = requiredString(record.objective, `corpus case ${id} objective`);

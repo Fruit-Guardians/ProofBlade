@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { PrimaryFailureCategory, TaskContract } from "../domain/types.js";
+import { assertRunId } from "../domain/run-id.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createServices, type AppServices } from "../app/demo.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
@@ -10,7 +11,7 @@ import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/sin
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { loadRealEvaluationCorpus, stageRealEvaluationCase, type LoadedRealEvaluationCase, type RealEvaluationCorpusSnapshot } from "./real-corpus.js";
 
-export const REAL_MODEL_EVALUATION_PROTOCOL_VERSION = "real-model-eval-v1";
+export const REAL_MODEL_EVALUATION_PROTOCOL_VERSION = "real-model-eval-v2";
 
 export type RealEvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
 
@@ -106,6 +107,7 @@ export class RealModelEvaluationRunner {
     const variants = normalizeVariants(options.variants);
     const corpus = await loadRealEvaluationCorpus(options.corpusPath);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
+    assertRunId(runPrefix);
     const results: RealModelVariantSummary[] = [];
     for (const variant of variants) {
       const profileFingerprint = fingerprint(variant.config);
@@ -114,7 +116,8 @@ export class RealModelEvaluationRunner {
       for (const corpusCase of corpus.cases) {
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
           const runId = `${runPrefix}-${variant.id}-${corpusCase.id}-a${attempt}`;
-          await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir, runId), corpus, corpusCase);
+          assertRunId(runId);
+          await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, corpusCase);
           const task = realEvaluationTask(runId, corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
           cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns));
         }
@@ -127,6 +130,7 @@ export class RealModelEvaluationRunner {
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
       check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
       check("candidate_leaks", results.every((item) => item.candidateLeakCount === 0), sum(results.map((item) => item.candidateLeakCount)), 0),
+      check("case_cost_cap", results.every((item) => item.cases.every((candidate) => candidate.costUsd <= maxCostUsd + 1e-9)), highestCaseCost(results), `<=${maxCostUsd}`),
     ];
     const base: Omit<RealModelEvaluationSummary, "reportHash"> = {
       schemaVersion: 1,
@@ -338,6 +342,7 @@ function normalizeVariants(variants: RealEvaluationVariant[]): RealEvaluationVar
   const ids = new Set<string>();
   for (const variant of sorted) {
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(variant.id) || ids.has(variant.id)) throw new Error("Real evaluation variant ids must be unique alphanumeric identifiers");
+    if (!hasLiveEvaluationPricing(variant.config)) throw new Error(`Real evaluation variant ${variant.id} requires positive executor pricing`);
     ids.add(variant.id);
   }
   return sorted;
@@ -356,7 +361,25 @@ function fingerprint(config: ProofBladeConfig): string {
     maxRetries: profile.maxRetries,
     input: profile.input,
     thinkingLevel: profile.thinkingLevel,
+    pricing: profile.pricing,
   }));
+}
+
+function hasLiveEvaluationPricing(config: ProofBladeConfig): boolean {
+  const pricing = config.modelProfiles.executor.pricing;
+  return Boolean(pricing
+    && Number.isFinite(pricing.inputUsdPerMillion)
+    && pricing.inputUsdPerMillion > 0
+    && Number.isFinite(pricing.outputUsdPerMillion)
+    && pricing.outputUsdPerMillion > 0
+    && Number.isFinite(pricing.cacheReadUsdPerMillion)
+    && pricing.cacheReadUsdPerMillion >= 0
+    && Number.isFinite(pricing.cacheWriteUsdPerMillion)
+    && pricing.cacheWriteUsdPerMillion >= 0);
+}
+
+function highestCaseCost(variants: RealModelVariantSummary[]): number {
+  return round(Math.max(0, ...variants.flatMap((variant) => variant.cases.map((candidate) => candidate.costUsd))));
 }
 
 function positive(value: number, label: string): number {

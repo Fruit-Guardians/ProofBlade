@@ -44,6 +44,15 @@ export interface ModelProfileConfig {
   reasoning?: boolean;
   supportsReasoningEffort?: boolean;
   maxTokensField?: "max_tokens" | "max_completion_tokens";
+  /** Provider-published USD prices per one million tokens. Required for live cost-capped evaluation. */
+  pricing?: ModelPricingConfig;
+}
+
+export interface ModelPricingConfig {
+  inputUsdPerMillion: number;
+  outputUsdPerMillion: number;
+  cacheReadUsdPerMillion: number;
+  cacheWriteUsdPerMillion: number;
 }
 
 export interface ProofBladeConfig {
@@ -88,6 +97,7 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (profile.thinkingLevel !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(profile.thinkingLevel)) throw new Error(`Invalid thinkingLevel in ${path}`);
   if (profile.cacheRetention !== undefined && !["none", "short", "long"].includes(profile.cacheRetention)) throw new Error(`Invalid cacheRetention in ${path}`);
   if (profile.maxTokensField !== undefined && profile.maxTokensField !== "max_tokens" && profile.maxTokensField !== "max_completion_tokens") throw new Error(`Invalid maxTokensField in ${path}`);
+  if (profile.pricing !== undefined) validatePricing(profile.pricing, path);
   const rewrite = config.tools?.outputRewrite;
   if (rewrite !== undefined) {
     if (rewrite.provider !== "builtin" && rewrite.provider !== "rtk") throw new Error(`Invalid outputRewrite provider in ${path}`);
@@ -95,6 +105,15 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
     if (rewrite.fallback !== undefined && rewrite.fallback !== "builtin" && rewrite.fallback !== "fail") throw new Error(`Invalid outputRewrite fallback in ${path}`);
     if (rewrite.rewriteTimeoutMs !== undefined && (!Number.isInteger(rewrite.rewriteTimeoutMs) || rewrite.rewriteTimeoutMs < 100 || rewrite.rewriteTimeoutMs > 30_000)) throw new Error(`Invalid outputRewrite rewriteTimeoutMs in ${path}`);
     if (rewrite.maxRawBytes !== undefined && (!Number.isInteger(rewrite.maxRawBytes) || rewrite.maxRawBytes < 512 || rewrite.maxRawBytes > 16_777_216)) throw new Error(`Invalid outputRewrite maxRawBytes in ${path}`);
+  }
+}
+
+function validatePricing(pricing: ModelPricingConfig, path: string): void {
+  for (const [field, value] of Object.entries(pricing)) {
+    if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid pricing.${field} in ${path}`);
+  }
+  if (pricing.inputUsdPerMillion <= 0 || pricing.outputUsdPerMillion <= 0) {
+    throw new Error(`pricing inputUsdPerMillion and outputUsdPerMillion must be positive in ${path}`);
   }
 }
 
