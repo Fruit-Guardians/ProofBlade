@@ -60,10 +60,10 @@ a stronger lead:
 2. Request `proofblade.binary.functions` with a bounded result count. Select a
    candidate using address, name, size, or a prior observation; do not inspect
    every function by default.
-3. Request `disassemble` at the selected virtual address with a small
+3. Request `proofblade.binary.disassemble` at the selected virtual address with a small
    instruction limit. Check calling convention, comparisons, table lookups,
    loop bounds, and input/output paths before inferring an algorithm.
-4. Use `xrefs` in the direction that tests the current question:
+4. Use `proofblade.binary.xrefs` in the direction that tests the current question:
    `to` for callers/references to a target, `from` for data/control references
    made by it, and `both` only when the bounded neighborhood is necessary.
 5. Move outward one edge at a time: caller -> validation function -> data
@@ -118,4 +118,3 @@ switch to the relevant method rather than forcing it through reverse analysis.
 - Before claiming a flag, reproduce the transformation or acceptance condition
   from bounded evidence. Distinguish a plausible candidate from a verified
   candidate and submit only through the official task path when it is enabled.
-
