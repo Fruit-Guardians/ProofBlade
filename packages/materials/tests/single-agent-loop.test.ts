@@ -119,6 +119,36 @@ test("auto mode preserves a pause raised during a turn instead of exhausting the
   }
 });
 
+test("[contract:provider-budget-exhaustion] a Provider budget termination ends the Run before another model turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-provider-budget-exhaustion-"));
+  try {
+    const services = createServices(root, config);
+    let prompts = 0;
+    const budgetLane: SolverLaneFactory = async () => ({
+      async prompt() {
+        prompts += 1;
+        return { text: "", stopReason: "error", errorMessage: "Provider cost budget exhausted", termination: "budget_exhausted", usage: zeroUsage() };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const runId = "PROVIDER-BUDGET-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, budgetLane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 3,
+    });
+    assert.equal(prompts, 1);
+    assert.equal(result.status, "EXHAUSTED");
+    assert.match((await services.control.snapshot(runId)).terminalReason ?? "", /cost budget/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after-run-failure] aborting in Planner prevents a new model request and permits Sandbox cleanup", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-abort-after-planner-"));
   const services = createServices(root, config);

@@ -23,6 +23,7 @@ import {
   SingleAgentCtfLoop,
   snapshotContext,
   FixtureEvaluationRunner,
+  RealModelEvaluationRunner,
   RunTelemetry,
   RunRecoveryService,
 } from "@proofblade/materials";
@@ -63,6 +64,31 @@ async function main(): Promise<void> {
       const summary = await new FixtureEvaluationRunner(root, config).run({ attempts, maxTurns, runPrefix });
       print(summary);
       if (evalArgs.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
+      break;
+    }
+    case "eval-real": {
+      const corpusPath = required(arg, "real evaluation corpus path");
+      if (!rest.includes("--allow-live")) throw new Error("eval-real requires --allow-live because it sends real Provider requests");
+      const variants = await Promise.all(optionValues(rest, "--variant").map(async (value) => {
+        const separator = value.indexOf("=");
+        if (separator <= 0 || separator === value.length - 1) throw new Error("--variant must use id=config-path");
+        return { id: value.slice(0, separator), config: await loadConfig(root, value.slice(separator + 1)) };
+      }));
+      const summary = await new RealModelEvaluationRunner(root).run({
+        corpusPath,
+        variants,
+        allowLive: true,
+        attempts: parsePositiveOption(rest, "--attempts"),
+        maxTurns: parsePositiveOption(rest, "--max-turns"),
+        maxCostUsd: parsePositiveDecimalOption(rest, "--max-cost-usd"),
+        deadlineMs: parsePositiveOption(rest, "--deadline-ms"),
+        runPrefix: option(rest, "--run-prefix") ?? option(rest, "--prefix"),
+        minimumSuccessRate: parseRateOption(rest, "--min-success-rate"),
+        baselineVariantId: option(rest, "--baseline"),
+        maxBaselineSuccessRateDrop: parseRateOption(rest, "--max-success-rate-drop"),
+      });
+      print(summary);
+      if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
       break;
     }
     case "capabilities": {
@@ -306,6 +332,12 @@ function option(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function optionValues(args: string[], name: string): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < args.length; index += 1) if (args[index] === name && args[index + 1] !== undefined) values.push(args[index + 1]!);
+  return values;
+}
+
 function withoutOption(args: string[], name: string): string[] {
   const index = args.indexOf(name);
   return index < 0 ? args : [...args.slice(0, index), ...args.slice(index + 2)];
@@ -328,6 +360,22 @@ function parsePositiveOption(args: string[], name: string): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`);
+  return parsed;
+}
+
+function parsePositiveDecimalOption(args: string[], name: string): number | undefined {
+  const value = option(args, name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive finite number`);
+  return parsed;
+}
+
+function parseRateOption(args: string[], name: string): number | undefined {
+  const value = option(args, name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) throw new Error(`${name} must be a finite number from 0 to 1`);
   return parsed;
 }
 
@@ -357,6 +405,7 @@ function helpText(): string {
     "  run demo [--run-id ID]",
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
+    "  eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  capabilities",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",

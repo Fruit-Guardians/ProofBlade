@@ -5,6 +5,7 @@ apps/*/dist/
 apps/*/dist-server/
 runs/
 fixtures/runtime/
+.proofblade/
 tmp/
 *.log
 .env

@@ -4,15 +4,15 @@
 {
   "id": "cli",
   "name": "ProofBlade CLI",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-11T14:56:16.000Z",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "3a0fe6c70283909a63c9d7da4ae400a6a349b03e140b9c1490745d8cebf48756",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-11T14:56:16.000Z",
+    "lastSecurityAuditAt": "2026-08-11T14:56:16.000Z",
+    "sourceHash": "cfaf3b4c8fa17979ea2345d2be3e1d5d6a3df779684cd968d030be88250f2315",
     "result": "passed"
   }
 }

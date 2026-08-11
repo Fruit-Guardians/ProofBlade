@@ -4,15 +4,15 @@
 {
   "id": "materials-orchestration",
   "name": "Agent Orchestration",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
+  "updatedAt": "2026-08-11T11:32:51.204Z",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
-    "lastBugAuditAt": "2026-08-08T02:47:55.5788475+08:00",
-    "lastSecurityAuditAt": "2026-08-08T02:47:55.5788475+08:00",
-    "sourceHash": "8f8a1c8a4f1de11dc376388c19d9512a5b1517c75ff83b623ea6c95347640612",
+    "bugAuditCount": 6,
+    "securityAuditCount": 6,
+    "lastBugAuditAt": "2026-08-11T11:32:51.204Z",
+    "lastSecurityAuditAt": "2026-08-11T11:32:51.204Z",
+    "sourceHash": "34814af5ad77b8a60b176108d7e0a8d9267439b5b700874151f19b8b0d832a9d",
     "result": "passed"
   }
 }

@@ -11,8 +11,9 @@ import { DurableCompactionCoordinator, type CompactionFaultInjector } from "../c
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
-import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { configuredModelCost, createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
+import { assertProviderBudgetPricing, ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
 import { planContextMaintenance } from "@proofblade/molecules";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { RuntimeResourceSnapshot } from "../domain/types.js";
@@ -32,6 +33,7 @@ export class PiSolverLane implements AgentLanePort {
     private readonly skills: ProofBladeSkillRegistry,
     private readonly resourceSnapshot: RuntimeResourceSnapshot,
     private readonly closeTransport: () => Promise<void>,
+    private readonly providerBudget: ProviderRequestBudget,
   ) {}
 
   public static async create(options: {
@@ -54,9 +56,26 @@ export class PiSolverLane implements AgentLanePort {
       ? await repo.open(metadata)
       : await repo.create({ id: sessionId, cwd: options.runDir, metadata: { runId: options.runId, lane: "executor", purpose: "solve" } });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
+    const run = await options.controlStore.snapshot(options.runId);
+    const startedAt = Date.parse(run.startedAt ?? new Date().toISOString());
+    const maxCostUsd = run.task.constraints.max_cost_usd > 0 ? run.task.constraints.max_cost_usd : undefined;
+    const budgetCostModel = {
+      cost: configuredModelCost(profile),
+      contextWindow: profile.contextWindow,
+      maxTokens: profile.maxTokens,
+    };
+    assertProviderBudgetPricing(maxCostUsd, budgetCostModel);
+    const initialSpentUsd = recoverProviderSpend(await options.controlStore.events(options.runId), {
+      ...budgetCostModel,
+    });
+    const providerBudget = new ProviderRequestBudget({
+      maxCostUsd,
+      deadlineAt: startedAt + run.task.constraints.deadline_ms,
+      initialSpentUsd,
+    });
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
     const resourceSnapshot = options.runtime.resourceSnapshot(skills.contextSnapshot());
-    const { models, model, closeTransport } = createConfiguredModels(profile);
+    const { models, model, closeTransport } = createConfiguredModels(profile, providerBudget);
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService, options.compactionFault);
@@ -89,6 +108,9 @@ export class PiSolverLane implements AgentLanePort {
       },
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
+    providerBudget.signal.addEventListener("abort", () => {
+      void harness.abort().catch(() => undefined);
+    }, { once: true });
     // Reasonix keeps turn-specific state as a persisted suffix of the current
     // turn. That lets the next provider request reuse the complete previous
     // request prefix. Injecting this state in front of session history would
@@ -144,7 +166,7 @@ export class PiSolverLane implements AgentLanePort {
       },
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
-    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot, closeTransport);
+    const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot, closeTransport, providerBudget);
     laneRef.lane = lane;
     return lane;
   }
@@ -155,15 +177,19 @@ export class PiSolverLane implements AgentLanePort {
     await this.controlStore.append(this.runId, [{ schemaVersion: 1, lane: "executor", correlationId, actor: "orchestrator", type: "turn_started", payload: { promptLength: text.length } }]);
     try {
       const response = await this.harness.prompt(text);
-      await this.maintainAfterTurn(response);
+      const termination = this.providerBudget.termination;
+      if (!termination) await this.maintainAfterTurn(response);
       const output = response.content
         .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
         .map((item) => item.text)
         .join("\n");
       await this.controlStore.append(this.runId, [
-        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason } },
+        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason, termination } },
       ]);
-      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage };
+      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage, termination };
+    } catch (error) {
+      if (!(error instanceof ProviderBudgetExceededError) && !this.providerBudget.termination) throw error;
+      return await this.budgetOutcome(correlationId, error);
     } finally {
       this.busy = false;
     }
@@ -175,12 +201,16 @@ export class PiSolverLane implements AgentLanePort {
     await this.controlStore.append(this.runId, [{ schemaVersion: 1, lane: "executor", correlationId, actor: "orchestrator", type: "turn_started", payload: { skill: name, skillCatalogHash: this.skills.catalogHash() } }]);
     try {
       const response = await this.harness.skill(name, additionalInstructions);
-      await this.maintainAfterTurn(response);
+      const termination = this.providerBudget.termination;
+      if (!termination) await this.maintainAfterTurn(response);
       const output = response.content.filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text").map((item) => item.text).join("\n");
       await this.controlStore.append(this.runId, [
-        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason, skill: name } },
+        { schemaVersion: 1, lane: "executor", correlationId, actor: "model", type: "assistant_message", payload: { text: output, stopReason: response.stopReason, skill: name, termination } },
       ]);
-      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage };
+      return { text: output, stopReason: response.stopReason, usage: response.usage as AssistantMessage["usage"], errorMessage: response.errorMessage, termination };
+    } catch (error) {
+      if (!(error instanceof ProviderBudgetExceededError) && !this.providerBudget.termination) throw error;
+      return await this.budgetOutcome(correlationId, error, name);
     } finally {
       this.busy = false;
     }
@@ -202,8 +232,34 @@ export class PiSolverLane implements AgentLanePort {
     try {
       await this.harness.waitForIdle();
     } finally {
-      await this.closeTransport();
+      try {
+        await this.closeTransport();
+      } finally {
+        this.providerBudget.close();
+      }
     }
+  }
+
+  private async budgetOutcome(correlationId: string, error: unknown, skill?: string): Promise<AgentOutcome> {
+    const termination = this.providerBudget.termination ?? "budget_exhausted";
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const usage: AssistantMessage["usage"] = {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+    await this.controlStore.append(this.runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId,
+      actor: "model",
+      type: "assistant_message",
+      payload: { text: "", stopReason: "error", errorMessage, termination, ...(skill ? { skill } : {}) },
+    }]);
+    return { text: "", stopReason: "error", usage, errorMessage, termination };
   }
 
   private requestCompactionAfterTurn(): void {
