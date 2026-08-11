@@ -460,10 +460,11 @@ function parseArchiveCandidates(bytes: Buffer, starts: Array<{ format: "tar" | "
   let remaining = maxEntries;
   const candidates = starts.sort((left, right) => left.offset - right.offset || left.format.localeCompare(right.format));
   for (let index = 0; index < candidates.length; index += 1) {
-    if (remaining <= 0) return { items: archives, truncated: true };
     const candidate = candidates[index]!;
-    const archive = candidate.format === "tar" ? parseTarArchive(bytes, candidate.offset, remaining, signal) : parseCpioArchive(bytes, candidate.offset, remaining, signal);
+    const limit = Math.max(1, remaining);
+    const archive = candidate.format === "tar" ? parseTarArchive(bytes, candidate.offset, limit, signal) : parseCpioArchive(bytes, candidate.offset, limit, signal);
     if (!archive || archive.entries.length === 0) continue;
+    if (remaining <= 0) return { items: archives, truncated: true };
     archives.push(archive);
     remaining -= archive.entries.length;
     if (archive.truncated) return { items: archives, truncated: true };
@@ -499,7 +500,7 @@ function parseTarArchive(bytes: Buffer, offset: number, maxEntries: number, sign
     const fullPath = prefix ? `${prefix}/${name}` : name;
     entries.push({ path: fullPath, type: tarEntryType(bytes[cursor + 156] ?? 0), size, dataOffset: cursor + TAR_BLOCK_SIZE });
     cursor = align(cursor + TAR_BLOCK_SIZE + size, TAR_BLOCK_SIZE);
-    if (entries.length >= maxEntries) return { format: "tar", offset, size: cursor - offset, entries, truncated: true };
+    if (entries.length > maxEntries) return { format: "tar", offset, size: cursor - offset, entries: entries.slice(0, maxEntries), truncated: true };
   }
   if (!terminated && entries.length === 0) return undefined;
   return { format: "tar", offset, size: Math.min(bytes.length - offset, cursor - offset), entries, truncated: !terminated };
@@ -534,7 +535,7 @@ function parseCpioArchive(bytes: Buffer, offset: number, maxEntries: number, sig
     }
     entries.push({ path, type: cpioEntryType(mode), size, dataOffset });
     cursor = next;
-    if (entries.length >= maxEntries) return { format: "cpio-newc", offset, size: cursor - offset, entries, truncated: true };
+    if (entries.length > maxEntries) return { format: "cpio-newc", offset, size: cursor - offset, entries: entries.slice(0, maxEntries), truncated: true };
   }
   if (!terminated && entries.length === 0) return undefined;
   return { format: "cpio-newc", offset, size: Math.min(bytes.length - offset, cursor - offset), entries, truncated: !terminated };
