@@ -11,6 +11,9 @@ const MAX_TREE_RESULTS = 4_000;
 const MAX_ENTROPY_RESULTS = 4_096;
 const MAX_EXTRACT_BYTES = 65_536;
 const MAX_EXTRACT_ENTRIES = 10_000;
+const MAX_PARTITION_RESULTS = 2_000;
+const MAX_TRX_CONTAINERS = Math.ceil(MAX_PARTITION_RESULTS / 3);
+const MAX_ARCHIVE_CANDIDATES = MAX_TREE_RESULTS;
 const DEFAULT_ENTROPY_BLOCK_SIZE = 4_096;
 const MAX_ENTROPY_BLOCK_SIZE = 1_048_576;
 const TAR_BLOCK_SIZE = 512;
@@ -130,12 +133,13 @@ function inspectPartitions(bytes: Buffer, signal: AbortSignal): Record<string, u
     tables.push({ format: "mbr", offset: 0, diskSignature: mbr.diskSignature, partitionCount: mbr.partitions.length });
     partitions.push(...mbr.partitions);
   }
-  const gpt = parseGpt(bytes);
+  const gpt = parseGpt(bytes, MAX_PARTITION_RESULTS, signal);
   if (gpt) {
     tables.push({ format: "gpt", offset: gpt.offset, firstUsableLba: gpt.firstUsableLba, lastUsableLba: gpt.lastUsableLba, partitionCount: gpt.partitions.length, entrySize: gpt.entrySize });
     partitions.push(...gpt.partitions);
   }
-  for (const finding of findTrxContainers(bytes, signal)) {
+  const trx = findTrxContainers(bytes, signal);
+  for (const finding of trx.items) {
     if (finding.format !== "trx") continue;
     const offsets = finding.metadata?.partitionOffsets;
     if (!Array.isArray(offsets)) continue;
@@ -147,10 +151,11 @@ function inspectPartitions(bytes: Buffer, signal: AbortSignal): Record<string, u
     }
   }
   partitions.sort((left, right) => left.offset - right.offset || left.source.localeCompare(right.source) || left.index - right.index);
-  return { format: "proofblade-firmware-partitions-v1", size: bytes.length, tables, partitions };
+  const truncated = Boolean(gpt?.truncated) || trx.truncated || partitions.length > MAX_PARTITION_RESULTS;
+  return { format: "proofblade-firmware-partitions-v1", size: bytes.length, tables, partitions: partitions.slice(0, MAX_PARTITION_RESULTS), truncated };
 }
 
-function findTrxContainers(bytes: Buffer, signal: AbortSignal): FirmwareFinding[] {
+function findTrxContainers(bytes: Buffer, signal: AbortSignal): { items: FirmwareFinding[]; truncated: boolean } {
   const magic = Buffer.from("HDR0");
   const findings: FirmwareFinding[] = [];
   let cursor = 0;
@@ -160,9 +165,11 @@ function findTrxContainers(bytes: Buffer, signal: AbortSignal): FirmwareFinding[
     if (offset < 0) break;
     cursor = offset + 1;
     const finding = trxFinding(bytes, offset);
-    if (finding) findings.push(finding);
+    if (!finding) continue;
+    if (findings.length >= MAX_TRX_CONTAINERS) return { items: findings, truncated: true };
+    findings.push(finding);
   }
-  return findings;
+  return { items: findings, truncated: false };
 }
 
 function inspectFilesystems(bytes: Buffer, maxResults: number, signal: AbortSignal): Record<string, unknown> {
@@ -216,7 +223,7 @@ function inspectFileTree(bytes: Buffer, maxResults: number, signal: AbortSignal)
   return {
     format: "proofblade-firmware-file-tree-v1",
     size: bytes.length,
-    archives: archives.map((archive) => ({
+    archives: archives.items.map((archive) => ({
       format: archive.format,
       offset: archive.offset,
       size: archive.size,
@@ -224,6 +231,7 @@ function inspectFileTree(bytes: Buffer, maxResults: number, signal: AbortSignal)
       truncated: archive.truncated,
       entries: archive.entries.map(({ dataOffset: _dataOffset, ...entry }) => entry),
     })),
+    truncated: archives.truncated,
   };
 }
 
@@ -388,7 +396,7 @@ function parseMbr(bytes: Buffer): { diskSignature: string; partitions: FirmwareP
   return { diskSignature: `0x${readUInt32(bytes, 440, "le").toString(16).padStart(8, "0")}`, partitions };
 }
 
-function parseGpt(bytes: Buffer): { offset: number; firstUsableLba: number; lastUsableLba: number; entrySize: number; partitions: FirmwarePartition[] } | undefined {
+function parseGpt(bytes: Buffer, maxPartitions: number, signal: AbortSignal): { offset: number; firstUsableLba: number; lastUsableLba: number; entrySize: number; partitions: FirmwarePartition[]; truncated: boolean } | undefined {
   const offset = bytes.indexOf(Buffer.from("EFI PART"));
   if (offset < 0 || offset + 92 > bytes.length) return undefined;
   const headerSize = readUInt32(bytes, offset + 12, "le");
@@ -402,15 +410,17 @@ function parseGpt(bytes: Buffer): { offset: number; firstUsableLba: number; last
   if (entriesOffset < 0 || entriesOffset >= bytes.length) return undefined;
   const partitions: FirmwarePartition[] = [];
   for (let index = 0; index < entryCount && entriesOffset + (index + 1) * entrySize <= bytes.length; index += 1) {
+    if ((index & 0x3ff) === 0) throwIfAborted(signal);
     const base = entriesOffset + index * entrySize;
     if (isZero(bytes, base, base + 16)) continue;
     const firstLba = safeLba(readUInt64(bytes, base + 32, "le"));
     const lastLba = safeLba(readUInt64(bytes, base + 40, "le"));
     if (firstLba === undefined || lastLba === undefined || lastLba < firstLba) continue;
+    if (partitions.length >= maxPartitions) return { offset, firstUsableLba, lastUsableLba, entrySize, partitions, truncated: true };
     const name = readUtf16Le(bytes, base + 56, base + entrySize);
     partitions.push({ index, type: "gpt", offset: firstLba * 512, size: (lastLba - firstLba + 1) * 512, source: "gpt", ...(name ? { name } : {}) });
   }
-  return { offset, firstUsableLba, lastUsableLba, entrySize, partitions };
+  return { offset, firstUsableLba, lastUsableLba, entrySize, partitions, truncated: false };
 }
 
 function extFinding(bytes: Buffer, magicOffset: number): FirmwareFinding | undefined {
@@ -423,26 +433,42 @@ function extFinding(bytes: Buffer, magicOffset: number): FirmwareFinding | undef
   return { kind: "filesystem", format: "ext", offset, description: "ext-family filesystem", metadata: { inodes, blocks, blockSize: 1024 << logBlockSize } };
 }
 
-function discoverArchives(bytes: Buffer, maxEntries: number, signal: AbortSignal): ParsedArchive[] {
-  const starts = new Map<string, { format: "tar" | "cpio-newc"; offset: number }>();
+function discoverArchives(bytes: Buffer, maxEntries: number, signal: AbortSignal): { items: ParsedArchive[]; truncated: boolean } {
+  const starts: Array<{ format: "tar" | "cpio-newc"; offset: number }> = [];
+  // A magic match is cheap but not necessarily a valid archive. Keep a
+  // bounded false-positive budget so early decoys do not hide a later image.
+  const maxCandidates = Math.min(MAX_ARCHIVE_CANDIDATES, maxEntries * 8);
   const tarMagic = Buffer.from("ustar");
   const cpioNewc = Buffer.from("070701");
   const cpioCrc = Buffer.from("070702");
   for (let cursor = 0; cursor < bytes.length; cursor += 1) {
     if ((cursor & 0x3fff) === 0) throwIfAborted(signal);
-    if (cursor >= 257 && matchesAt(bytes, tarMagic, cursor)) starts.set(`tar:${cursor - 257}`, { format: "tar", offset: cursor - 257 });
-    if (matchesAt(bytes, cpioNewc, cursor) || matchesAt(bytes, cpioCrc, cursor)) starts.set(`cpio:${cursor}`, { format: "cpio-newc", offset: cursor });
+    if (cursor >= 257 && matchesAt(bytes, tarMagic, cursor)) {
+      if (starts.length >= maxCandidates) return parseArchiveCandidates(bytes, starts, maxEntries, signal, true);
+      starts.push({ format: "tar", offset: cursor - 257 });
+    }
+    if (matchesAt(bytes, cpioNewc, cursor) || matchesAt(bytes, cpioCrc, cursor)) {
+      if (starts.length >= maxCandidates) return parseArchiveCandidates(bytes, starts, maxEntries, signal, true);
+      starts.push({ format: "cpio-newc", offset: cursor });
+    }
   }
+  return parseArchiveCandidates(bytes, starts, maxEntries, signal, false);
+}
+
+function parseArchiveCandidates(bytes: Buffer, starts: Array<{ format: "tar" | "cpio-newc"; offset: number }>, maxEntries: number, signal: AbortSignal, candidateTruncated: boolean): { items: ParsedArchive[]; truncated: boolean } {
   const archives: ParsedArchive[] = [];
   let remaining = maxEntries;
-  for (const candidate of [...starts.values()].sort((left, right) => left.offset - right.offset || left.format.localeCompare(right.format))) {
-    if (remaining <= 0) break;
+  const candidates = starts.sort((left, right) => left.offset - right.offset || left.format.localeCompare(right.format));
+  for (let index = 0; index < candidates.length; index += 1) {
+    if (remaining <= 0) return { items: archives, truncated: true };
+    const candidate = candidates[index]!;
     const archive = candidate.format === "tar" ? parseTarArchive(bytes, candidate.offset, remaining, signal) : parseCpioArchive(bytes, candidate.offset, remaining, signal);
     if (!archive || archive.entries.length === 0) continue;
     archives.push(archive);
     remaining -= archive.entries.length;
+    if (archive.truncated) return { items: archives, truncated: true };
   }
-  return archives;
+  return { items: archives, truncated: candidateTruncated };
 }
 
 function parseArchiveAt(bytes: Buffer, offset: number, maxEntries: number, signal: AbortSignal): ParsedArchive | undefined {

@@ -112,6 +112,33 @@ test("Firmware Core v1 bounds archive parsing before extracting an entry", async
   }
 });
 
+test("Firmware Core v1 bounds dense archive and TRX discovery before allocating result objects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-firmware-discovery-bound-"));
+  try {
+    await writeFile(join(root, "magic.bin"), Buffer.from("070701".repeat(100_000), "ascii"));
+    const treeResult = await executeFirmwareCapability("file_tree", { path: "magic.bin", maxResults: 1 }, root, new AbortController().signal);
+    assert.equal(treeResult.exitCode, 0, treeResult.stderr);
+    const tree = JSON.parse(treeResult.stdout) as { archives: unknown[]; truncated: boolean };
+    assert.deepEqual(tree.archives, []);
+    assert.equal(tree.truncated, true);
+
+    const trx = Buffer.alloc(28 * 2_100);
+    for (let offset = 0; offset < trx.length; offset += 28) {
+      trx.write("HDR0", offset, "ascii");
+      trx.writeUInt32LE(28, offset + 4);
+      trx.writeUInt32LE(16, offset + 16);
+    }
+    await writeFile(join(root, "trx.bin"), trx);
+    const partitionsResult = await executeFirmwareCapability("partitions", { path: "trx.bin" }, root, new AbortController().signal);
+    assert.equal(partitionsResult.exitCode, 0, partitionsResult.stderr);
+    const partitions = JSON.parse(partitionsResult.stdout) as { partitions: unknown[]; truncated: boolean };
+    assert.ok(partitions.partitions.length <= 2_000);
+    assert.equal(partitions.truncated, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function makeFirmwareImage(): Buffer {
   const image = Buffer.alloc(8_192);
   image.writeUInt32LE(0x12345678, 440);
