@@ -188,7 +188,7 @@ export class IntentScorer {
   ): number {
     // 简化实现：基于工具组合的新颖性
     // Uses the normalized suggested-tool set as a deterministic heuristic.
-    const toolSignature = intent.suggestedTools.sort().join(',');
+    const toolSignature = [...intent.suggestedTools].sort().join(',');
     const isNovel = !this.hasSeenToolCombination(toolSignature, context);
 
     return isNovel ? 0.8 : 0.3;

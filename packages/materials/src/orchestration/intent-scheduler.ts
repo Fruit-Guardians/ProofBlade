@@ -22,7 +22,7 @@ import { IntentScorer } from './intent-scorer.js';
 import { IntentFilter } from './intent-filter.js';
 import { LeaseManager } from '../control/lease-manager.js';
 import type { ControlStore, DomainCommand } from '../control/control-store.js';
-import type { Lease } from '../domain/types.js';
+import type { Lease, RunSnapshot } from '../domain/types.js';
 import { randomUUID } from 'node:crypto';
 
 export interface IntentSchedulerConfig {
@@ -71,16 +71,23 @@ export class IntentScheduler {
     const snapshot = await this.controlStore.snapshot(context.runId);
     const persistedIntents = Object.values(snapshot.schedulerIntents || {});
     const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
+    const recovery = this.prepareClaimRecovery(
+      persistedIntents,
+      snapshot.leases || {},
+      currentGeneration,
+      Date.now(),
+    );
+    const effectiveIntents = recovery.intents;
     const knowledgeVersion = this.knowledgeVersion(snapshot, context.knowledgeVersion);
     const freshnessContext = { ...context, currentGeneration, knowledgeVersion };
-    const staleProposedIntents = persistedIntents.filter(
+    const staleProposedIntents = effectiveIntents.filter(
       intent => intent.status === 'PROPOSED' && this.filter.isStale(intent, freshnessContext)
     );
     const staleProposedIds = new Set(staleProposedIntents.map(intent => intent.id));
-    const existingIntents = persistedIntents.filter(
+    const existingIntents = effectiveIntents.filter(
       intent => intent.status === 'PROPOSED' && !staleProposedIds.has(intent.id)
     );
-    const persistedOpenIntents = existingIntents.length + persistedIntents.filter(
+    const persistedOpenIntents = existingIntents.length + effectiveIntents.filter(
       intent => intent.status === 'CLAIMED' && intent.fixtureGeneration === currentGeneration
     ).length;
     const openIntents = persistedOpenIntents;
@@ -89,14 +96,14 @@ export class IntentScheduler {
       openIntents,
       currentGeneration,
       knowledgeVersion,
-      occupiedResources: Object.keys(snapshot.leases || {}),
+      occupiedResources: Object.keys(recovery.leases),
       completedIntentIds: new Set([
-        ...persistedIntents
+        ...effectiveIntents
           .filter(intent => intent.status === 'COMPLETED' && intent.fixtureGeneration === currentGeneration)
           .map(intent => intent.id),
       ]),
       completedHypothesisIds: new Set([
-        ...persistedIntents
+        ...effectiveIntents
           .filter(intent => intent.status === 'COMPLETED'
             && intent.fixtureGeneration === currentGeneration
             && intent.hypothesis)
@@ -104,6 +111,9 @@ export class IntentScheduler {
       ]),
     };
 
+    for (const command of recovery.commands) {
+      await this.controlStore.dispatch(context.runId, command);
+    }
     for (const intent of staleProposedIntents) {
       await this.controlStore.dispatch(context.runId, {
         type: 'scheduler_intent',
@@ -153,16 +163,23 @@ export class IntentScheduler {
     return this.controlStore.dispatchTransaction(context.runId, (snapshot) => {
       const persistedIntents = Object.values(snapshot.schedulerIntents || {});
       const currentGeneration = snapshot.generation > 0 ? snapshot.generation : context.currentGeneration;
+      const recovery = this.prepareClaimRecovery(
+        persistedIntents,
+        snapshot.leases || {},
+        currentGeneration,
+        Date.now(),
+      );
+      const effectiveIntents = recovery.intents;
       const knowledgeVersion = this.knowledgeVersion(snapshot, context.knowledgeVersion);
       const freshnessContext = { ...context, currentGeneration, knowledgeVersion };
-      const staleProposedIntents = persistedIntents.filter(
+      const staleProposedIntents = effectiveIntents.filter(
         intent => intent.status === 'PROPOSED' && this.filter.isStale(intent, freshnessContext)
       );
       const staleProposedIds = new Set(staleProposedIntents.map(intent => intent.id));
-      const existingIntents = persistedIntents.filter(
+      const existingIntents = effectiveIntents.filter(
         intent => intent.status === 'PROPOSED' && !staleProposedIds.has(intent.id)
       );
-      const persistedOpenIntents = existingIntents.length + persistedIntents.filter(
+      const persistedOpenIntents = existingIntents.length + effectiveIntents.filter(
         intent => intent.status === 'CLAIMED' && intent.fixtureGeneration === currentGeneration
       ).length;
       const openIntents = persistedOpenIntents;
@@ -171,14 +188,14 @@ export class IntentScheduler {
         openIntents,
         currentGeneration,
         knowledgeVersion,
-        occupiedResources: Object.keys(snapshot.leases || {}),
+        occupiedResources: Object.keys(recovery.leases),
         completedIntentIds: new Set([
-          ...persistedIntents
+          ...effectiveIntents
             .filter(intent => intent.status === 'COMPLETED' && intent.fixtureGeneration === currentGeneration)
             .map(intent => intent.id),
         ]),
         completedHypothesisIds: new Set([
-          ...persistedIntents
+          ...effectiveIntents
             .filter(intent => intent.status === 'COMPLETED'
               && intent.fixtureGeneration === currentGeneration
               && intent.hypothesis)
@@ -189,14 +206,15 @@ export class IntentScheduler {
         type: 'scheduler_intent',
         intent: { ...intent, status: 'STALE' },
       }));
+      const baseCommands = [...recovery.commands, ...staleCommands];
 
       if (openIntents >= this.config.maxOpenIntents && existingIntents.length === 0) {
-        return { commands: staleCommands, project: () => null };
+        return { commands: baseCommands, project: () => null };
       }
 
       const triggered = this.shouldSchedule(schedulingContext);
       if (!triggered && existingIntents.length === 0) {
-        return { commands: staleCommands, project: () => null };
+        return { commands: baseCommands, project: () => null };
       }
 
       const remainingCapacity = Math.max(0, this.config.maxOpenIntents - openIntents);
@@ -210,7 +228,7 @@ export class IntentScheduler {
         intent,
       }));
       if (filtered.length === 0) {
-        return { commands: [...staleCommands, ...generatedCommands], project: () => null };
+        return { commands: [...baseCommands, ...generatedCommands], project: () => null };
       }
 
       const scores = this.scorer.scoreAndRank(filtered, schedulingContext);
@@ -219,9 +237,9 @@ export class IntentScheduler {
         if (!candidate) continue;
         const claimed = structuredClone(candidate);
         const leases: Lease[] = [];
-        const candidateCommands: DomainCommand[] = [...staleCommands];
+        const candidateCommands: DomainCommand[] = [...baseCommands];
         let claimable = true;
-        const projectedLeases = { ...snapshot.leases };
+        const projectedLeases = { ...recovery.leases };
 
         for (const resourceKey of candidate.resourceKeys) {
           const existingLease = projectedLeases[resourceKey];
@@ -274,7 +292,7 @@ export class IntentScheduler {
         };
       }
 
-      return { commands: [...staleCommands, ...generatedCommands], project: () => null };
+      return { commands: [...baseCommands, ...generatedCommands], project: () => null };
     });
   }
 
@@ -499,6 +517,97 @@ export class IntentScheduler {
   }
 
   // ========== Intent 生成辅助方法 ==========
+
+  private prepareClaimRecovery(
+    intents: Intent[],
+    leases: RunSnapshot['leases'],
+    currentGeneration: number,
+    now: number,
+  ): { intents: Intent[]; leases: RunSnapshot['leases']; commands: DomainCommand[] } {
+    const retryableById = new Map<string, Intent>();
+    const leasesToRelease = new Map<string, Lease>();
+
+    for (const intent of intents) {
+      if (intent.status !== 'CLAIMED'
+        || intent.fixtureGeneration !== currentGeneration
+        || intent.resourceKeys.length === 0
+        || this.hasActiveClaim(intent, leases, now)) {
+        continue;
+      }
+
+      const retryable = structuredClone(intent);
+      retryable.status = 'PROPOSED';
+      delete retryable.claimedBy;
+      delete retryable.claimedAt;
+      delete retryable.leaseId;
+      delete retryable.leaseClaims;
+      retryableById.set(retryable.id, retryable);
+
+      const legacyResourceKeys = new Set(this.legacyLeaseResourceKeys(intent));
+      for (const resourceKey of intent.resourceKeys) {
+        const lease = leases[resourceKey];
+        if (!lease) continue;
+        const claim = intent.leaseClaims?.[resourceKey];
+        const ownsLease = claim
+          ? lease.ownerLane === claim.ownerLane && lease.generation === claim.generation
+          : legacyResourceKeys.has(resourceKey) && lease.ownerLane === 'executor';
+        if (ownsLease) leasesToRelease.set(resourceKey, lease);
+      }
+    }
+
+    if (retryableById.size === 0) return { intents, leases, commands: [] };
+
+    const projectedLeases = { ...leases };
+    const commands: DomainCommand[] = [];
+    for (const lease of leasesToRelease.values()) {
+      delete projectedLeases[lease.resourceKey];
+      commands.push({
+        type: 'lease_released',
+        resourceKey: lease.resourceKey,
+        ownerLane: lease.ownerLane,
+        generation: lease.generation,
+        lane: 'main',
+      });
+    }
+    for (const intent of retryableById.values()) {
+      commands.push({ type: 'scheduler_intent', intent });
+    }
+
+    return {
+      intents: intents.map(intent => retryableById.get(intent.id) ?? intent),
+      leases: projectedLeases,
+      commands,
+    };
+  }
+
+  private hasActiveClaim(intent: Intent, leases: RunSnapshot['leases'], now: number): boolean {
+    if (intent.leaseClaims) {
+      return intent.resourceKeys.every(resourceKey => {
+        const claim = intent.leaseClaims?.[resourceKey];
+        const lease = leases[resourceKey];
+        return claim !== undefined
+          && lease !== undefined
+          && lease.ownerLane === claim.ownerLane
+          && lease.generation === claim.generation
+          && Date.parse(lease.expiresAt) > now;
+      });
+    }
+
+    const legacyResourceKeys = new Set(this.legacyLeaseResourceKeys(intent));
+    return intent.resourceKeys.every(resourceKey => {
+      const lease = leases[resourceKey];
+      return legacyResourceKeys.has(resourceKey)
+        && lease?.ownerLane === 'executor'
+        && Date.parse(lease.expiresAt) > now;
+    });
+  }
+
+  private legacyLeaseResourceKeys(intent: Intent): string[] {
+    if (!intent.leaseId) return [];
+    return intent.leaseId.split(',')
+      .map(resourceKey => resourceKey.trim())
+      .filter(resourceKey => resourceKey.length > 0 && intent.resourceKeys.includes(resourceKey));
+  }
 
   private knowledgeVersion(snapshot: Awaited<ReturnType<ControlStore['snapshot']>>, fallback: number): number {
     const hasKnowledgeProjection = snapshot.facts !== undefined

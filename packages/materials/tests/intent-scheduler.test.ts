@@ -1047,6 +1047,115 @@ describe('IntentScheduler - replay 持久化', () => {
     }
   });
 
+  test('Lease 过期回收后失联 CLAIMED Intent 会释放容量并重新认领', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const { projectionHash } = await import('../src/control/reducer.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-expired-claim-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const leaseManager = new LeaseManager(controlStore);
+      const scheduler = new IntentScheduler(controlStore, leaseManager, { maxOpenIntents: 1 });
+      const runId = 'INTENT-EXPIRED-CLAIM-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Expired claim recovery test',
+      } as any);
+      const context: SchedulingContext = {
+        runId, phase: 'reconnaissance', knowledgeVersion: 0, currentGeneration: 1,
+        facts: ['F-001'], hypotheses: [], evidence: [], openIntents: 0,
+        newHighValueFacts: 1, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+
+      const firstClaim = await scheduler.schedule(context);
+      assert.ok(firstClaim);
+      const firstLeaseGeneration = firstClaim.leaseClaims?.['workspace:read'].generation;
+      assert.ok(firstLeaseGeneration);
+
+      await leaseManager.reapExpired(runId, Date.now() + firstClaim.estimatedDuration * 3);
+      const afterReap = await controlStore.snapshot(runId);
+      assert.equal(afterReap.schedulerIntents[firstClaim.id].status, 'CLAIMED');
+      assert.equal(afterReap.leases['workspace:read'], undefined);
+
+      const retried = await scheduler.schedule({ ...context, newHighValueFacts: 0, openIntents: 1 });
+      assert.ok(retried);
+      assert.equal(retried.id, firstClaim.id);
+      assert.equal(retried.status, 'CLAIMED');
+      assert.ok((retried.leaseClaims?.['workspace:read'].generation ?? 0) > firstLeaseGeneration);
+
+      const projection = await events.loadProjection(runId);
+      const replayed = await controlStore.replay(runId);
+      assert.ok(projection);
+      assert.equal(projectionHash(projection), projectionHash(replayed));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('Intent 评分不改变未认领 Intent，projection 与 replay 保持一致', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { JsonlControlStore, ControlStore, LeaseManager } = await import('../src/index.js');
+    const { projectionHash } = await import('../src/control/reducer.js');
+    const root = await mkdtemp(join(tmpdir(), 'proofblade-intent-score-parity-'));
+
+    try {
+      const events = new JsonlControlStore(join(root, 'runs'));
+      const controlStore = new ControlStore(events);
+      const scheduler = new IntentScheduler(controlStore, new LeaseManager(controlStore), { maxOpenIntents: 2 });
+      const runId = 'INTENT-SCORE-PARITY-001';
+      await controlStore.createRun(runId, {
+        id: runId, kind: 'fixture_evaluation', targetKind: 'web', title: 'Intent score parity test',
+      } as any);
+      const baseIntent: Intent = {
+        id: 'intent-selected', status: 'PROPOSED', priority: 'critical',
+        createdAt: new Date().toISOString(), knowledgeVersion: 0, fixtureGeneration: 1,
+        phase: 'reconnaissance', objective: 'Select this intent', startFromFacts: [],
+        expectedEvidence: { kind: 'observation', description: 'selected', minimumConfidence: 'high' },
+        suggestedTools: ['z-tool', 'a-tool'], estimatedCost: 1, estimatedDuration: 1000,
+        resourceKeys: [], dependencies: [], attempts: 0,
+      };
+      const unclaimedTools = ['y-tool', 'b-tool'];
+      await controlStore.dispatchBatch(runId, [
+        { type: 'scheduler_intent', intent: baseIntent },
+        {
+          type: 'scheduler_intent',
+          intent: {
+            ...baseIntent,
+            id: 'intent-unclaimed',
+            priority: 'low',
+            objective: 'Leave this intent proposed',
+            suggestedTools: [...unclaimedTools],
+          },
+        },
+      ]);
+      const context: SchedulingContext = {
+        runId, phase: 'reconnaissance', knowledgeVersion: 0, currentGeneration: 1,
+        facts: [], hypotheses: [], evidence: [], openIntents: 2,
+        newHighValueFacts: 0, consecutiveFailures: 0, phaseBudgetUsed: 0.3,
+        newHints: [], verifierRejected: false,
+        remainingBudget: { tokens: 10000, costUsd: 1, timeMs: 300000 }, occupiedResources: [],
+      };
+
+      const claimed = await scheduler.schedule(context);
+      assert.equal(claimed?.id, 'intent-selected');
+      const projection = await events.loadProjection(runId);
+      const replayed = await controlStore.replay(runId);
+      assert.ok(projection);
+      assert.deepStrictEqual(projection.schedulerIntents['intent-unclaimed'].suggestedTools, unclaimedTools);
+      assert.deepStrictEqual(replayed.schedulerIntents['intent-unclaimed'].suggestedTools, unclaimedTools);
+      assert.equal(projectionHash(projection), projectionHash(replayed));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('旧 Intent 终态不会释放回收后新建的 Lease epoch', async () => {
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');

@@ -209,17 +209,21 @@ async function exportIntentGraph(
   format: string,
   logFn: (msg: string) => void = console.log
 ): Promise<void> {
-  logFn(`\n📊 导出 Intent 图 - ${runId} (格式: ${format})\n`);
-
   const snapshot = await controlStore.snapshot(runId);
   const intents: Intent[] = Object.values(snapshot.schedulerIntents || {});
 
-  if (intents.length === 0) {
-    logFn('暂无 Intent');
+  if (format === 'json') {
+    logFn(JSON.stringify(intents, null, 2));
     return;
   }
 
   if (format === 'mermaid') {
+    logFn(`\n📊 导出 Intent 图 - ${runId} (格式: ${format})\n`);
+    if (intents.length === 0) {
+      logFn('暂无 Intent');
+      return;
+    }
+
     logFn('```mermaid');
     logFn('graph TB');
 
@@ -251,8 +255,6 @@ async function exportIntentGraph(
     logFn('  classDef cancelled fill:#eeeeee');
     logFn('  classDef stale fill:#fce4ec');
     logFn('```');
-  } else if (format === 'json') {
-    logFn(JSON.stringify(intents, null, 2));
   } else {
     logFn(`不支持的格式: ${format}`);
     logFn('支持的格式: mermaid, json');

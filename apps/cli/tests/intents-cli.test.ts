@@ -115,6 +115,18 @@ test('CLI intents commands integration', async () => {
     assert.ok(joined.length > 0);
   }
 
+  // Test 5b: graph json - 标准输出只包含可解析的 JSON
+  {
+    const output: string[] = [];
+    const mockLog = (msg: string) => output.push(msg);
+
+    await handleIntentsCommand(['graph', runId, 'json'], scheduler, controlStore, mockLog);
+
+    assert.equal(output.length, 1);
+    const payload = JSON.parse(output[0]) as Array<{ id: string }>;
+    assert.deepEqual(payload.map(intent => intent.id), ['intent-1']);
+  }
+
   // Test 6: claim - 认领 Intent 并持久化为 CLAIMED
   {
     const output: string[] = [];
