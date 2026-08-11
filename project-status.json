@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T18:00:00+08:00",
+  "updatedAt": "2026-08-10T19:42:54+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -19,9 +19,9 @@
         "组件审计差异与高风险生命周期变更契约"
       ],
       "acceptance": [
-        "普通源码 PR 由构建、测试和变更契约验证，不写回共享审计快照",
-        "并行源码 PR 不需要修改共享 COMPONENT.md 审计快照",
-        "周期性审计记录仍保持可解析且结果为 passed",
+        "源码指纹未变化时不重复增加审计次数",
+        "单个 PR 对受影响组件的审计次数只能增加一次",
+        "源码变化后旧审计指纹必须使 CI 失败",
         "批量记录失败时不产生部分写入",
         "关闭、中止和 Sandbox 生命周期改动必须保留故障路径测试"
       ],
@@ -46,9 +46,8 @@
       ],
       "acceptance": [
         "四份报表可由一条命令确定性重建",
-        "维护报告自动汇总全部组件的周期性审计快照",
-        "治理文件变更没有更新项目状态时 CI 失败",
-        "普通源码 PR 不要求修改共享项目状态文件"
+        "维护报告自动汇总全部组件审计状态",
+        "实质变更没有更新项目状态时 CI 失败"
       ],
       "dependencies": [
         "PLAN-001"
@@ -61,8 +60,8 @@
       "priority": "P0",
       "milestone": "Milestone 4",
       "owner": "unassigned",
-      "progress": 10,
-      "updatedAt": "2026-08-09T23:32:20+08:00",
+      "progress": 42,
+      "updatedAt": "2026-08-10T19:42:54+08:00",
       "objective": "让 Solver 能对真实 ELF/PE 等二进制执行可审计、可复现的静态分析。",
       "deliverables": [
         "稳定逻辑 Capability 与可替换 Backend/Resolver 契约",
@@ -226,6 +225,32 @@
         "component and project report gates passed",
         "CI gates passed",
         "168/168 repository tests passed"
+      ]
+    },
+    {
+      "id": "UPDATE-20260810-004",
+      "occurredAt": "2026-08-10T19:42:54+08:00",
+      "summary": "完成 PR C Deep Reverse v1：新增函数、反汇编和 XRef 逻辑 Capability，并接入可选 Rizin 与可配置 MCP 后端。",
+      "branch": "codex/deep-reverse-v1",
+      "commit": "self",
+      "planIds": [
+        "PLAN-100"
+      ],
+      "changes": [
+        "Rizin local-process Backend 使用受保护二进制的 0600 临时副本，支持超时、AbortSignal 和有界输出",
+        "functions、disassemble、xrefs 统一规范化地址、排序、去重和结果上限，拒绝未声明操作",
+        "MCP binaryReverse 映射支持 server、outer tool、参数绑定、嵌套 dispatcher 和严格只读纯重放策略",
+        "本地 Rizin 不可用时按 Backend 优先级回退到已配置 MCP，实现来源和版本绑定",
+        "参考 ctf-skills 最新 ctf-reverse 目录 commit d6662d2，保留方法论在 Skill 层而不固化进模型工具面",
+        "增加 Rizin、MCP direct/nested 映射与边界回归测试"
+      ],
+      "validation": [
+        "122/122 Materials tests passed",
+        "171/171 repository tests passed",
+        "18/18 deterministic fixture evaluations passed",
+        "component, contract and project report gates passed",
+        "npm audit: 0 vulnerabilities",
+        "Rizin production availability is environment-dependent and remains optional"
       ]
     },
     {

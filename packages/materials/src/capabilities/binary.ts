@@ -82,6 +82,12 @@ export function validateBinaryInput(operation: string, input: Record<string, unk
   }
 }
 
+export async function readVisibleBinaryFile(root: string, inputPath: string): Promise<Buffer> {
+  validateBinaryInput("identify", { path: inputPath });
+  const path = await resolveBinaryPath(root, inputPath);
+  return await readBoundedFile(path);
+}
+
 async function resolveBinaryPath(root: string, inputPath: string): Promise<string> {
   if (isAbsolute(inputPath)) throw new Error("Binary path must stay inside the fixture");
   if (containsPrivatePathSegment(inputPath)) throw new Error("Binary path targets private fixture data");

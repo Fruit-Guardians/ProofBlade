@@ -27,6 +27,27 @@ export interface McpServerDefinition {
   protocolVersion?: "legacy" | "auto" | "2026-07-28";
 }
 
+export type McpReverseOutput = "functions" | "disassemble" | "xrefs";
+export type McpReverseArgumentValue = string | number | boolean | null;
+
+export interface McpBinaryReverseOperation {
+  server: string;
+  tool: string;
+  arguments: Record<string, McpReverseArgumentValue>;
+  output: McpReverseOutput;
+  nestedTool?: {
+    name: string;
+    toolField: string;
+    argumentsField?: string;
+  };
+}
+
+export interface McpBinaryReverseConfig {
+  functions?: McpBinaryReverseOperation;
+  disassemble?: McpBinaryReverseOperation;
+  xrefs?: McpBinaryReverseOperation;
+}
+
 export interface McpNestedToolPolicy {
   dispatcherTool: string;
   toolField: string;
@@ -63,6 +84,7 @@ export interface McpPersistedInvocationInput {
 
 export interface McpProjectConfig {
   mcpServers: Record<string, McpServerDefinition>;
+  binaryReverse?: McpBinaryReverseConfig;
 }
 
 export interface McpServerSummary {
@@ -104,7 +126,9 @@ export class McpProjectRegistry {
   private readonly connecting = new Map<string, Promise<McpConnection>>();
   private readonly failures = new Map<string, number>();
 
-  private constructor(private readonly projectRoot: string, definitions: Record<string, McpServerDefinition>) {
+  private readonly binaryReverseConfig: McpBinaryReverseConfig;
+
+  private constructor(private readonly projectRoot: string, definitions: Record<string, McpServerDefinition>, binaryReverse: McpBinaryReverseConfig = {}) {
     const capabilityIds = new Set<string>();
     this.definitions = Object.entries(definitions).sort(([a], [b]) => a.localeCompare(b)).map(([name, definition]) => {
       validateServer(name, definition, projectRoot);
@@ -113,6 +137,8 @@ export class McpProjectRegistry {
       capabilityIds.add(capabilityId);
       return { name, capabilityId, definition: structuredClone(definition), configHash: serverConfigHash(name, definition) };
     });
+    validateBinaryReverseConfig(binaryReverse, definitions);
+    this.binaryReverseConfig = structuredClone(binaryReverse);
   }
 
   public static load(projectRoot: string, configPath = ".mcp.json"): McpProjectRegistry {
@@ -122,7 +148,16 @@ export class McpProjectRegistry {
     if (!existsSync(path)) return new McpProjectRegistry(root, {});
     const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<McpProjectConfig>;
     if (!parsed.mcpServers || typeof parsed.mcpServers !== "object" || Array.isArray(parsed.mcpServers)) throw new Error(`Invalid MCP config: ${path}`);
-    return new McpProjectRegistry(root, parsed.mcpServers);
+    return new McpProjectRegistry(root, parsed.mcpServers, parsed.binaryReverse ?? {});
+  }
+
+  public binaryReverse(operation: McpReverseOutput): McpBinaryReverseOperation | undefined {
+    const binding = this.binaryReverseConfig[operation];
+    return binding ? structuredClone(binding) : undefined;
+  }
+
+  public serverCapabilityId(name: string): string | undefined {
+    return this.definitions.find((entry) => entry.name === name)?.capabilityId;
   }
 
   public summaries(): McpServerSummary[] {
@@ -137,7 +172,8 @@ export class McpProjectRegistry {
   }
 
   public catalogHash(): string {
-    return sha256(canonicalJson(this.summaries().map(({ status: _status, ...summary }) => summary)));
+    const summaries = this.summaries().map(({ status: _status, ...summary }) => summary);
+    return sha256(canonicalJson(Object.keys(this.binaryReverseConfig).length === 0 ? summaries : { summaries, binaryReverse: this.binaryReverseConfig }));
   }
 
   /** Return the remaining cooldown before a failed server may be retried. */
@@ -399,6 +435,38 @@ function validateServer(name: string, definition: McpServerDefinition, projectRo
   if (!isWithin(projectRoot, resolve(projectRoot, definition.cwd ?? "."))) throw new Error(`MCP server ${name} cwd escapes the project root`);
 }
 
+function validateBinaryReverseConfig(config: unknown, definitions: Record<string, McpServerDefinition>): asserts config is McpBinaryReverseConfig {
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Invalid binaryReverse MCP configuration");
+  for (const [operation, binding] of Object.entries(config as Record<string, unknown>)) {
+    if (operation !== "functions" && operation !== "disassemble" && operation !== "xrefs") throw new Error(`Unsupported binaryReverse operation: ${operation}`);
+    if (!binding || typeof binding !== "object" || Array.isArray(binding)) throw new Error(`Invalid binaryReverse mapping for ${operation}`);
+    const item = binding as Record<string, unknown>;
+    if (typeof item.server !== "string" || !Object.hasOwn(definitions, item.server)) throw new Error(`binaryReverse.${operation} references an unknown MCP server`);
+    if (definitions[item.server]?.disabled === true) throw new Error(`binaryReverse.${operation} references a disabled MCP server`);
+    if (typeof item.tool !== "string" || item.tool.length === 0) throw new Error(`binaryReverse.${operation} requires tool`);
+    if (item.output !== operation) throw new Error(`binaryReverse.${operation}.output must be ${operation}`);
+    if (!item.arguments || typeof item.arguments !== "object" || Array.isArray(item.arguments)) throw new Error(`binaryReverse.${operation} requires an arguments mapping`);
+    for (const [argument, value] of Object.entries(item.arguments as Record<string, unknown>)) {
+      if (!argument || !isMcpReverseArgumentValue(value)) throw new Error(`binaryReverse.${operation} has an invalid argument mapping for ${argument}`);
+      if (typeof value === "string" && value.startsWith("$") && !REVERSE_INPUT_FIELDS.has(value.slice(1))) {
+        throw new Error(`binaryReverse.${operation} references an unknown input field: ${value}`);
+      }
+    }
+    if (item.nestedTool !== undefined) {
+      if (!item.nestedTool || typeof item.nestedTool !== "object" || Array.isArray(item.nestedTool)) throw new Error(`binaryReverse.${operation}.nestedTool must be an object`);
+      const nested = item.nestedTool as Record<string, unknown>;
+      if (typeof nested.name !== "string" || nested.name.length === 0 || typeof nested.toolField !== "string" || nested.toolField.length === 0) throw new Error(`binaryReverse.${operation}.nestedTool requires name and toolField`);
+      if (nested.argumentsField !== undefined && (typeof nested.argumentsField !== "string" || nested.argumentsField.length === 0)) throw new Error(`binaryReverse.${operation}.nestedTool has invalid argumentsField`);
+      const serverPolicy = definitions[String(item.server)]?.nestedToolPolicy;
+      if (!serverPolicy || serverPolicy.dispatcherTool !== item.tool || serverPolicy.toolField !== nested.toolField || serverPolicy.argumentsField !== nested.argumentsField) throw new Error(`binaryReverse.${operation}.nestedTool must match the MCP server nestedToolPolicy`);
+    }
+  }
+}
+
+function isMcpReverseArgumentValue(value: unknown): value is McpReverseArgumentValue {
+  return value === null || typeof value === "string" || typeof value === "number" && Number.isFinite(value) || typeof value === "boolean";
+}
+
 function validateEffectPolicy(name: string, definition: Pick<McpServerDefinition, "sideEffect" | "replay" | "sensitivity" | "resourceKeys" | "redactArguments">): void {
   if (definition.sideEffect !== undefined && !SIDE_EFFECTS.has(definition.sideEffect)) throw new Error(`MCP server ${name} has invalid sideEffect`);
   if (definition.replay !== undefined && !REPLAY_POLICIES.has(definition.replay)) throw new Error(`MCP server ${name} has invalid replay policy`);
@@ -513,6 +581,7 @@ function serverInvocationPolicy(entry: McpServerEntry): McpResolvedInvocationPol
 const SIDE_EFFECTS = new Set<ToolSideEffectAtom>(["none", "workspace", "process", "network", "platform"]);
 const REPLAY_POLICIES = new Set<ReplayPolicy>(["pure", "idempotent", "resumable", "reconcile", "manual", "forbidden-replay"]);
 const SENSITIVITIES = new Set<ToolSensitivityAtom>(["public", "target", "secret"]);
+const REVERSE_INPUT_FIELDS = new Set(["path", "address", "maxResults", "maxInstructions", "direction"]);
 
 function redactText(value: string, secrets: string[]): string {
   return [...new Set(secrets)].sort((a, b) => b.length - a.length).reduce((text, secret) => text.split(secret).join("[REDACTED]"), value);

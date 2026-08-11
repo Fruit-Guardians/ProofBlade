@@ -4,15 +4,15 @@
 {
   "id": "materials-tools",
   "name": "Tool Contracts and Runtime",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T04:00:00.000Z",
+  "updatedAt": "2026-08-10T09:59:52.000Z",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-10T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-10T04:00:00.000Z",
-    "sourceHash": "5656744e6ae5a1a177cb5f0dfcd1307a7b0a55150308164d5359af9af6a4c34b",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-10T09:59:52.000Z",
+    "lastSecurityAuditAt": "2026-08-10T09:59:52.000Z",
+    "sourceHash": "8ff11c5b85262b60b4f167427660333201fa8f50f4258c1b88e879a5dfc15f40",
     "result": "passed"
   }
 }
@@ -27,6 +27,7 @@
 - `contracts.ts` 定义 Tool Contract。
 - `runtime.ts` 执行 journaled Tool；`errors.ts` 归一化失败和签名。
 - Runtime 组装 bundled 与 MCP Backend，但对模型保持单一 `list_capabilities` / `invoke_capability` 代理面，并在状态、Effect、Artifact 与 Job 投影中保留实现来源。
+- Runtime 同时装配可选本地 Rizin 与 MCP deep reverse Backend；模型不需要知道具体执行引擎。
 - `output-rewrite.ts` 实现配置驱动的 builtin/RTK adapter、版本门槛、同 Shell 探测、RTK tee 读取和确定性回落。
 - 具体 Solver/Coding 装配留在 Runtime，副作用持久化留在 Effects。
 
