@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { IntentScoringWeights } from "./domain/intent.js";
 
 export type CacheRetention = "none" | "short" | "long";
 export type OutputRewriteProvider = "builtin" | "rtk";
@@ -21,6 +22,12 @@ export interface ResolvedOutputRewriteConfig {
   fallback: "builtin" | "fail";
   rewriteTimeoutMs: number;
   maxRawBytes: number;
+}
+
+export interface IntentSchedulerConfig {
+  maxOpenIntents?: number;
+  maxAttemptsPerIntent?: number;
+  scoringWeights?: Partial<IntentScoringWeights>;
 }
 
 export interface ModelProfileConfig {
@@ -51,6 +58,7 @@ export interface ProofBladeConfig {
   runtime: { piVersion: string };
   storage: { runsDir: string; fixturesDir: string };
   tools?: { outputRewrite?: OutputRewriteConfig };
+  intentScheduler?: IntentSchedulerConfig;
   modelProfiles: { executor: ModelProfileConfig };
 }
 
@@ -96,6 +104,30 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
     if (rewrite.rewriteTimeoutMs !== undefined && (!Number.isInteger(rewrite.rewriteTimeoutMs) || rewrite.rewriteTimeoutMs < 100 || rewrite.rewriteTimeoutMs > 30_000)) throw new Error(`Invalid outputRewrite rewriteTimeoutMs in ${path}`);
     if (rewrite.maxRawBytes !== undefined && (!Number.isInteger(rewrite.maxRawBytes) || rewrite.maxRawBytes < 512 || rewrite.maxRawBytes > 16_777_216)) throw new Error(`Invalid outputRewrite maxRawBytes in ${path}`);
   }
+  const scheduler = config.intentScheduler;
+  if (scheduler !== undefined) {
+    if (!isObject(scheduler)) throw new Error(`Invalid intentScheduler in ${path}`);
+    const maxOpenIntents = scheduler.maxOpenIntents;
+    const maxAttemptsPerIntent = scheduler.maxAttemptsPerIntent;
+    if (maxOpenIntents !== undefined && (typeof maxOpenIntents !== "number" || !Number.isInteger(maxOpenIntents) || maxOpenIntents < 1)) throw new Error(`Invalid intentScheduler maxOpenIntents in ${path}`);
+    if (maxAttemptsPerIntent !== undefined && (typeof maxAttemptsPerIntent !== "number" || !Number.isInteger(maxAttemptsPerIntent) || maxAttemptsPerIntent < 1)) throw new Error(`Invalid intentScheduler maxAttemptsPerIntent in ${path}`);
+    if (scheduler.scoringWeights !== undefined) {
+      if (!isObject(scheduler.scoringWeights)) throw new Error(`Invalid intentScheduler scoringWeights in ${path}`);
+      const knownWeights = new Set<keyof IntentScoringWeights>([
+        "informationGain", "successProbability", "evidenceRelevance", "novelty",
+        "cost", "environmentRisk", "duplicateSimilarity", "dependencyDepth",
+      ]);
+      for (const [name, value] of Object.entries(scheduler.scoringWeights)) {
+        if (!knownWeights.has(name as keyof IntentScoringWeights) || typeof value !== "number" || !Number.isFinite(value)) {
+          throw new Error(`Invalid intentScheduler scoring weight ${name} in ${path}`);
+        }
+      }
+    }
+  }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateHttpUrl(value: string, label: string): void {

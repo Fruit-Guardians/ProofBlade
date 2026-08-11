@@ -4,6 +4,8 @@ import type { ProofBladeConfig } from "../config.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import { PiSolverLane } from "../runtime/solver-lane.js";
 import type { AppServices } from "../app/demo.js";
+import { LeaseManager } from "../control/lease-manager.js";
+import type { Intent } from "../domain/intent.js";
 import type { ExecutionMode, RunSnapshot, TaskContract } from "../domain/types.js";
 import { id, isTerminal } from "../domain/utils.js";
 import { pathToPhase } from "../control/phase-machine.js";
@@ -12,6 +14,8 @@ import { IndependentVerifier, type VerificationOutcome } from "../verification/v
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 import { RunRecoveryService } from "../recovery/run-recovery.js";
+import { IntentScheduler } from "./intent-scheduler.js";
+import { buildSchedulingContext } from "./scheduling-context.js";
 
 export interface SolverLaneCreateInput {
   projectRoot: string;
@@ -71,7 +75,11 @@ export class SingleAgentCtfLoop {
     snapshot = await this.services.control.snapshot(options.runId);
     throwIfAborted(options.signal);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
-    await this.ensureIntent(options.runId);
+    const intentScheduler = new IntentScheduler(
+      this.services.control,
+      new LeaseManager(this.services.control),
+      this.config.intentScheduler,
+    );
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
@@ -80,7 +88,7 @@ export class SingleAgentCtfLoop {
       throwIfAborted(options.signal);
       let verified: VerificationOutcome;
       try {
-        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, options.signal);
+        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, intentScheduler, options.signal);
       } catch (error) {
         const paused = await this.services.control.snapshot(options.runId);
         if (paused.status === "PAUSED") return outcome(paused, mode, 0);
@@ -113,12 +121,13 @@ export class SingleAgentCtfLoop {
       await options.onLaneReady?.(lane);
       while (turns < maxTurns) {
         throwIfAborted(options.signal);
+        const activeIntent = await this.claimIntent(options.runId, intentScheduler);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
         await planner.prepare(options.runId);
         throwIfAborted(options.signal);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(before, turns));
+        const agentOutcome = await lane.prompt(turnPrompt(before, turns, activeIntent));
         throwIfAborted(options.signal);
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
@@ -144,11 +153,12 @@ export class SingleAgentCtfLoop {
             break;
           }
           throwIfAborted(options.signal);
-          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, options.signal);
+          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, intentScheduler, options.signal);
           if (verification.accepted) break;
           await this.moveTo(options.runId, "experiment");
           continue;
         }
+        await this.settleIntentAfterTurn(options.runId, intentScheduler, activeIntent, before, after);
         if (mode === "assist") {
           await this.services.control.dispatch(options.runId, { type: "pause", reason: "Assist turn completed without a completion proposal." });
           break;
@@ -195,17 +205,7 @@ export class SingleAgentCtfLoop {
     return outcome(snapshot, mode, turns, verification);
   }
 
-  private async ensureIntent(runId: string): Promise<void> {
-    const snapshot = await this.services.control.snapshot(runId);
-    if (Object.keys(snapshot.intents).length > 0) return;
-    await this.services.control.dispatch(runId, {
-      type: "intent",
-      intent: { id: id("I"), title: "Inspect target and propose an evidenced candidate", description: "Use the stable target tools, preserve observations, then submit one candidate for independent verification.", phase: "reconnaissance", status: "CLAIMED", priority: 10, ownerLane: "executor" },
-      lane: "executor",
-    });
-  }
-
-  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, signal?: AbortSignal): Promise<VerificationOutcome> {
+  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, scheduler: IntentScheduler, signal?: AbortSignal): Promise<VerificationOutcome> {
     throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     if (Object.keys(snapshot.hypotheses).length === 0) {
@@ -221,7 +221,10 @@ export class SingleAgentCtfLoop {
     throwIfAborted(signal);
     const verified = await verifier.verify(runId, fixture, completionId, signal);
     await this.ensureVerifierActive(runId, signal);
-    if (!verified.accepted) return verified;
+    if (!verified.accepted) {
+      await this.failClaimedIntent(runId, scheduler, `Verifier rejected completion ${completionId}`);
+      return verified;
+    }
     await this.ensureVerifierActive(runId, signal);
     await this.moveTo(runId, "report");
     await this.ensureVerifierActive(runId, signal);
@@ -238,6 +241,13 @@ export class SingleAgentCtfLoop {
     ].join("\n");
     await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
     const current = await this.services.control.snapshot(runId);
+    for (const intent of this.claimedSchedulerIntents(current)) {
+      await scheduler.completeIntent(runId, intent.id, {
+        producedObservations: Object.keys(current.observations),
+        producedEvidence: verified.evidenceIds,
+        producedFacts: Object.keys(current.facts),
+      });
+    }
     for (const intent of Object.values(current.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED")) {
       await this.services.control.dispatch(runId, { type: "intent", intent: { ...intent, status: "DONE" }, lane: "executor" });
     }
@@ -255,6 +265,40 @@ export class SingleAgentCtfLoop {
     const snapshot = await this.services.control.snapshot(runId);
     for (const next of pathToPhase(snapshot.phase, phase)) await this.services.control.dispatch(runId, { type: "start_phase", phase: next });
   }
+
+  private async claimIntent(runId: string, scheduler: IntentScheduler): Promise<Intent | undefined> {
+    const snapshot = await this.services.control.snapshot(runId);
+    const claimed = this.claimedSchedulerIntents(snapshot).find(intent => hasActiveClaim(intent, snapshot));
+    if (claimed) return claimed;
+    return await scheduler.schedule(buildSchedulingContext(snapshot)) ?? undefined;
+  }
+
+  private async settleIntentAfterTurn(runId: string, scheduler: IntentScheduler, intent: Intent | undefined, before: RunSnapshot, after: RunSnapshot): Promise<void> {
+    if (!intent) return;
+    const producedObservations = newIds(before.observations, after.observations);
+    const producedEvidence = newIds(before.evidence, after.evidence);
+    const producedFacts = newIds(before.facts, after.facts);
+    const progressed = producedObservations.length > 0
+      || producedEvidence.length > 0
+      || producedFacts.length > 0
+      || newIds(before.hypotheses, after.hypotheses).length > 0;
+    if (progressed) {
+      await scheduler.completeIntent(runId, intent.id, { producedObservations, producedEvidence, producedFacts });
+    } else {
+      await scheduler.failIntent(runId, intent.id, "Solver turn produced no durable progress");
+    }
+  }
+
+  private async failClaimedIntent(runId: string, scheduler: IntentScheduler, reason: string): Promise<void> {
+    const snapshot = await this.services.control.snapshot(runId);
+    for (const intent of this.claimedSchedulerIntents(snapshot)) await scheduler.failIntent(runId, intent.id, reason);
+  }
+
+  private claimedSchedulerIntents(snapshot: RunSnapshot): Intent[] {
+    return Object.values(snapshot.schedulerIntents)
+      .filter(intent => intent.status === "CLAIMED" && intent.fixtureGeneration === snapshot.generation)
+      .sort((a, b) => (a.claimedAt ?? "").localeCompare(b.claimedAt ?? ""));
+  }
 }
 
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
@@ -269,14 +313,45 @@ function latestPending(snapshot: RunSnapshot) {
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
-function turnPrompt(snapshot: RunSnapshot, turn: number): string {
+function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: Intent): string {
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
+    ...(intent ? [
+      `Current Intent ${intent.id}: ${intent.objective}`,
+      `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`,
+    ] : []),
     "Call inspect_target with an empty object {} to inspect every visible synthetic target file.",
     "Preserve the returned evidence id in any hypothesis or fact proposal.",
     "Copy one complete PB{...} value exactly from inspect_target output, then call submit_candidate with that exact value.",
     "Do not stop at a prose answer; the completion proposal tool is required.",
   ].join("\n");
+}
+
+function newIds(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  return Object.keys(after).filter(id => !(id in before));
+}
+
+function hasActiveClaim(intent: Intent, snapshot: RunSnapshot, now = Date.now()): boolean {
+  if (intent.resourceKeys.length === 0) {
+    const claimedAt = Date.parse(intent.claimedAt ?? "");
+    return Number.isFinite(claimedAt) && claimedAt + intent.estimatedDuration * 2 > now;
+  }
+  if (intent.leaseClaims) {
+    return intent.resourceKeys.every(resourceKey => {
+      const claim = intent.leaseClaims?.[resourceKey];
+      const lease = snapshot.leases[resourceKey];
+      return claim !== undefined
+        && lease !== undefined
+        && lease.ownerLane === claim.ownerLane
+        && lease.generation === claim.generation
+        && Date.parse(lease.expiresAt) > now;
+    });
+  }
+  const legacyResourceKeys = new Set((intent.leaseId ?? "").split(",").map(key => key.trim()).filter(Boolean));
+  return intent.resourceKeys.every(resourceKey => {
+    const lease = snapshot.leases[resourceKey];
+    return legacyResourceKeys.has(resourceKey) && lease?.ownerLane === "executor" && Date.parse(lease.expiresAt) > now;
+  });
 }
 
 function outcome(snapshot: RunSnapshot, mode: ExecutionMode, turns: number, verification?: VerificationOutcome): SingleAgentRunOutcome {

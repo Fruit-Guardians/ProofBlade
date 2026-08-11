@@ -23,6 +23,7 @@ export * from "./orchestration/planner.js";
 export * from "./orchestration/intent-scheduler.js";
 export * from "./orchestration/intent-scorer.js";
 export * from "./orchestration/intent-filter.js";
+export * from "./orchestration/scheduling-context.js";
 export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
 export * from "./tools/errors.js";

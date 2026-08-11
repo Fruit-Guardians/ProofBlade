@@ -2,74 +2,9 @@
  * CLI 命令: Intent 调度器相关命令
  */
 
-import type { IntentScheduler, ControlStore, Intent, SchedulingContext, RunSnapshot } from '@proofblade/materials';
+import { buildSchedulingContext, type IntentScheduler, type ControlStore, type Intent } from '@proofblade/materials';
 
-/**
- * 从 RunSnapshot 构建 SchedulingContext
- */
-export function buildSchedulingContext(snapshot: RunSnapshot): SchedulingContext {
-  const intents = Object.values(snapshot.schedulerIntents || {});
-  const currentGeneration = snapshot.generation;
-  const openIntents = intents.filter(
-    intent => (intent.status === 'PROPOSED' || intent.status === 'CLAIMED')
-      && intent.fixtureGeneration === currentGeneration
-  ).length;
-  const occupiedResources = Object.keys(snapshot.leases || {});
-
-  // 提取已完成的 Intent ID
-  const completedIntentIds = new Set(
-    intents
-      .filter(i => i.status === 'COMPLETED' && i.fixtureGeneration === currentGeneration)
-      .map(i => i.id)
-  );
-  const completedHypothesisIds = new Set(
-    intents
-      .filter(i => i.status === 'COMPLETED'
-        && i.fixtureGeneration === currentGeneration
-        && i.hypothesis)
-      .map(i => i.hypothesis!)
-  );
-
-  // 提取被反驳的假设 ID（仅限当前 generation 的证据）
-  const refutedHypotheses = new Set(
-    Object.values(snapshot.evidence || {})
-      .filter(e => e.source.generation === currentGeneration) // 同代环境约束
-      .flatMap(e => e.refutes || [])
-  );
-
-  return {
-    runId: snapshot.runId,
-    phase: snapshot.phase,
-    // Scheduler events and lease events advance lastSeq but do not change
-    // the knowledge being evaluated. Keep this version tied to knowledge.
-    knowledgeVersion: Math.max(
-      0,
-      ...Object.values(snapshot.facts || {}).map(item => item.createdSeq),
-      ...Object.values(snapshot.hypotheses || {}).map(item => item.createdSeq),
-      ...Object.values(snapshot.evidence || {}).map(item => item.createdSeq),
-      ...Object.values(snapshot.observations || {}).map(item => item.createdSeq),
-    ),
-    currentGeneration: snapshot.generation,
-    facts: Object.keys(snapshot.facts || {}),
-    hypotheses: Object.keys(snapshot.hypotheses || {}),
-    evidence: Object.keys(snapshot.evidence || {}),
-    openIntents,
-    newHighValueFacts: 0,  // CLI 调试场景设为 0
-    consecutiveFailures: 0,
-    phaseBudgetUsed: 0.5,
-    newHints: [],
-    verifierRejected: false,
-    remainingBudget: {
-      tokens: 100000,
-      costUsd: 10,
-      timeMs: 600000,
-    },
-    occupiedResources,
-    completedIntentIds,
-    completedHypothesisIds,
-    refutedHypotheses,
-  };
-}
+export { buildSchedulingContext };
 
 export async function handleIntentsCommand(
   args: string[],

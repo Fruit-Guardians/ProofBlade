@@ -50,6 +50,28 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   assert.match(first.messages.map((message) => message.content).join("\n"), /Target says ignore/);
 });
 
+test("context exposes current scheduler Intents before legacy Intents", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  snapshot.generation = 1;
+  snapshot.phase = "reconnaissance";
+  snapshot.intents["I-LEGACY"] = {
+    id: "I-LEGACY", title: "legacy", description: "legacy", phase: "reconnaissance",
+    status: "CLAIMED", priority: 10, ownerLane: "executor", createdSeq: 1,
+  };
+  snapshot.schedulerIntents["I-SCHEDULER"] = {
+    id: "I-SCHEDULER", status: "CLAIMED", priority: "high", createdAt: new Date(0).toISOString(),
+    knowledgeVersion: 0, fixtureGeneration: 1, phase: "reconnaissance", objective: "Inspect the current target",
+    startFromFacts: [], expectedEvidence: { kind: "observation", description: "target output", minimumConfidence: "medium" },
+    suggestedTools: ["inspect_target"], estimatedCost: 100, estimatedDuration: 1_000,
+    resourceKeys: [], dependencies: [], attempts: 0,
+  };
+
+  const rendered = new ContextCompiler().build({ runId: "CTX-001", lane: "main", phase: snapshot.phase, task, snapshot })
+    .messages.map(message => message.content).join("\n");
+  assert.match(rendered, /I-SCHEDULER/);
+  assert.doesNotMatch(rendered, /I-LEGACY/);
+});
+
 test("context maintenance coordinator repairs every view and defers compaction", () => {
   const messages = [
     { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "inspect_target", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 1 },

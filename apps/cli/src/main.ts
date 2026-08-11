@@ -284,10 +284,7 @@ async function main(): Promise<void> {
       const scheduler = new IntentScheduler(
         services.control,
         leaseManager,
-        {
-          maxOpenIntents: 8,
-          maxAttemptsPerIntent: 3,
-        }
+        config.intentScheduler,
       );
 
       const { handleIntentsCommand } = await import("./commands/intents.js");

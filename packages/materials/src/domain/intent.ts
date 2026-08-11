@@ -120,6 +120,7 @@ export interface SchedulingContext {
   hypotheses: string[];
   evidence: string[];
   openIntents: number;
+  hasIntentHistory?: boolean;
 
   // 触发条件
   newHighValueFacts: number;

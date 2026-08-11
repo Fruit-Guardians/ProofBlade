@@ -40,7 +40,12 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
   const confirmed = Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").sort(bySeq);
   const rejected = Object.values(snapshot.hypotheses).filter((item) => item.status === "REJECTED").sort(bySeq);
   const completed = Object.values(snapshot.effects).filter((item) => item.status === "FINISHED" || item.status === "RECONCILED").sort(bySeq);
-  const next = Object.values(snapshot.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+  const schedulerNext = Object.values(snapshot.schedulerIntents)
+    .filter(intent => intent.fixtureGeneration === snapshot.generation && (intent.status === "PROPOSED" || intent.status === "CLAIMED"))
+    .sort((a, b) => schedulerPriority(b.priority) - schedulerPriority(a.priority))
+    .map(intent => ({ id: intent.id, title: intent.objective }));
+  const legacyNext = Object.values(snapshot.intents).filter(item => item.status === "OPEN" || item.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+  const next = schedulerNext.length > 0 ? schedulerNext : legacyNext;
   const observations = Object.values(snapshot.observations).sort(bySeq).slice(-24);
   const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-24);
   const activeEffects = Object.values(snapshot.effects).filter((item) => item.status === "PROPOSED" || item.status === "STARTED" || item.status === "UNKNOWN").sort(bySeq);
@@ -109,4 +114,8 @@ function orNone(values: string[]): string[] {
 
 function bySeq(a: { createdSeq: number }, b: { createdSeq: number }): number {
   return a.createdSeq - b.createdSeq;
+}
+
+function schedulerPriority(priority: import("../domain/intent.js").IntentPriority): number {
+  return { low: 1, medium: 2, high: 3, critical: 4 }[priority];
 }

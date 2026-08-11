@@ -72,6 +72,107 @@ test("auto mode solves all three web and three reverse fixtures through the veri
   }
 });
 
+test("production loop claims a scheduler Intent, includes it in the prompt, and releases its leases", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-scheduler-loop-"));
+  const schedulerConfig: ProofBladeConfig = {
+    ...config,
+    intentScheduler: {
+      maxOpenIntents: 1,
+      maxAttemptsPerIntent: 2,
+      scoringWeights: { novelty: 2.5 },
+    },
+  };
+  const prompts: string[] = [];
+  const lane: SolverLaneFactory = async ({ runtime }) => ({
+    async prompt(prompt) {
+      prompts.push(prompt);
+      await runtime.inspectTarget();
+      return { text: "inspection recorded", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const services = createServices(root, schedulerConfig);
+    const runId = "SCHEDULER-LOOP-web-source-1";
+    await new SingleAgentCtfLoop(root, schedulerConfig, services, lane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, schedulerConfig),
+      mode: "auto",
+      maxTurns: 1,
+    });
+
+    const snapshot = await services.control.snapshot(runId);
+    const intents = Object.values(snapshot.schedulerIntents);
+    assert.equal(intents.length, 1);
+    assert.equal(intents[0]?.status, "COMPLETED");
+    assert.equal(Object.keys(snapshot.intents).length, 0);
+    assert.deepEqual(snapshot.leases, {});
+    assert.match(prompts[0] ?? "", new RegExp(`Current Intent ${escapeRegExp(intents[0]!.id)}:`));
+    assert.match(prompts[0] ?? "", new RegExp(escapeRegExp(intents[0]!.objective)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("production loop recovers an expired scheduler claim without bypassing the attempt limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-scheduler-recovery-"));
+  const schedulerConfig: ProofBladeConfig = {
+    ...config,
+    intentScheduler: { maxOpenIntents: 1, maxAttemptsPerIntent: 1 },
+  };
+  const crashingLane: SolverLaneFactory = async () => ({
+    async prompt() { throw new Error("simulated solver crash"); },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  const progressLane: SolverLaneFactory = async ({ runtime }) => ({
+    async prompt() {
+      await runtime.inspectTarget();
+      return { text: "inspection recorded", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const services = createServices(root, schedulerConfig);
+    const runId = "SCHEDULER-RECOVERY-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, schedulerConfig);
+    await assert.rejects(
+      new SingleAgentCtfLoop(root, schedulerConfig, services, crashingLane).run({ runId, task, mode: "auto", maxTurns: 1 }),
+      /simulated solver crash/,
+    );
+    const crashed = await services.control.snapshot(runId);
+    const claimed = Object.values(crashed.schedulerIntents)[0]!;
+    for (const [resourceKey, claim] of Object.entries(claimed.leaseClaims ?? {})) {
+      await services.control.dispatch(runId, {
+        type: "lease_heartbeat",
+        resourceKey,
+        ownerLane: claim.ownerLane,
+        generation: claim.generation,
+        heartbeatAt: new Date(0).toISOString(),
+        expiresAt: new Date(0).toISOString(),
+        lane: claim.ownerLane,
+      });
+    }
+
+    await new SingleAgentCtfLoop(root, schedulerConfig, services, progressLane).run({ runId, task, mode: "auto", maxTurns: 1 });
+    const afterRecovery = await services.control.snapshot(runId);
+    const recovered = afterRecovery.schedulerIntents[claimed.id]!;
+    assert.equal(recovered.status, "FAILED");
+    assert.equal(recovered.attempts, 1);
+    assert.equal(Object.keys(afterRecovery.schedulerIntents).length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("assist mode pauses before verification and resumes from the durable proposal", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-assist-"));
   try {

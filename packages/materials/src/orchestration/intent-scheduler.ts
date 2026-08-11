@@ -23,24 +23,24 @@ import { IntentFilter } from './intent-filter.js';
 import { LeaseManager } from '../control/lease-manager.js';
 import type { ControlStore, DomainCommand } from '../control/control-store.js';
 import type { Lease, RunSnapshot } from '../domain/types.js';
+import type { IntentSchedulerConfig } from '../config.js';
 import { randomUUID } from 'node:crypto';
 
-export interface IntentSchedulerConfig {
+interface ResolvedIntentSchedulerConfig {
   maxOpenIntents: number;              // 最大并发 Intent 数
   maxAttemptsPerIntent: number;        // 每个 Intent 最大尝试次数
-  scoringWeights?: Record<string, number>;
 }
 
 export class IntentScheduler {
   private scorer: IntentScorer;
   private filter: IntentFilter;
   private leaseManager: LeaseManager;
-  private config: IntentSchedulerConfig;
+  private config: ResolvedIntentSchedulerConfig;
 
   constructor(
     private controlStore: ControlStore,
     leaseManager: LeaseManager,
-    config?: Partial<IntentSchedulerConfig>
+    config?: IntentSchedulerConfig
   ) {
     this.leaseManager = leaseManager;
     this.config = {
@@ -94,6 +94,7 @@ export class IntentScheduler {
     const schedulingContext = {
       ...context,
       openIntents,
+      hasIntentHistory: effectiveIntents.some(intent => intent.fixtureGeneration === currentGeneration),
       currentGeneration,
       knowledgeVersion,
       occupiedResources: Object.keys(recovery.leases),
@@ -186,6 +187,7 @@ export class IntentScheduler {
       const schedulingContext = {
         ...context,
         openIntents,
+        hasIntentHistory: effectiveIntents.some(intent => intent.fixtureGeneration === currentGeneration),
         currentGeneration,
         knowledgeVersion,
         occupiedResources: Object.keys(recovery.leases),
@@ -361,6 +363,17 @@ export class IntentScheduler {
     for (const hint of context.newHints) {
       if (intents.length >= maxIntents) break;
       add(this.createHintBasedIntent(context, hint));
+    }
+
+    // An empty queue is itself a scheduling trigger, including on a fresh run
+    // where no facts or hypotheses exist yet.
+    if (intents.length === 0
+      && context.openIntents === 0
+      && context.facts.length === 0
+      && context.hypotheses.length === 0
+      && context.evidence.length === 0
+      && !context.hasIntentHistory) {
+      add(this.createExplorationIntent(context, 'initial_reconnaissance'));
     }
 
     return intents;
