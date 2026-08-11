@@ -4,6 +4,7 @@ import type { FixtureRef } from "../sandbox/fixture.js";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import { executeBinaryCapability, validateBinaryInput, type BinaryCapabilityInput } from "./binary.js";
+import { executeFirmwareCapability, validateFirmwareInput, type FirmwareCapabilityInput } from "./firmware.js";
 import { createRizinAvailability, executeRizinCapability, normalizeFunctions, normalizeInstructions, normalizeXrefs, reverseOperation, validateReverseInput, withStagedVisibleBinary, type ReverseCapabilityInput, type ReverseOperation, type RizinCapabilityOptions } from "./reverse.js";
 import type { McpBinaryReverseOperation, McpReverseOutput } from "../mcp/registry.js";
 
@@ -173,6 +174,45 @@ export class BinaryCapabilityBackend implements CapabilityBackend {
       replayPolicy: operation.replay,
       cwd: context.fixture.path,
       execute: async (signal) => await executeBinaryCapability(request.operation, request.input as unknown as BinaryCapabilityInput, context.fixture.path, signal),
+    };
+  }
+}
+
+export class FirmwareCapabilityBackend implements CapabilityBackend {
+  public readonly id = "proofblade-firmware";
+  public readonly kind = "bundled" as const;
+  public readonly priority = 89;
+  private readonly version = "1.0.0";
+
+  public status(): CapabilityBackendStatus {
+    return { id: this.id, kind: this.kind, version: this.version, priority: this.priority, available: true };
+  }
+
+  public handles(capabilityId: string, operation: string): boolean {
+    return capabilityId === "proofblade.firmware" && ["scan", "partitions", "filesystems", "entropy", "file_tree", "extract"].includes(operation);
+  }
+
+  public availability(_request: CapabilityBackendRequest): CapabilityBackendAvailability {
+    return { available: true };
+  }
+
+  public versionFor(_request: CapabilityBackendRequest): string {
+    return this.version;
+  }
+
+  public preparePersistence(request: CapabilityBackendRequest, operation: CapabilityOperationAtom): CapabilityBackendPersistence {
+    validateFirmwareInput(request.operation, request.input);
+    return { operation, input: structuredClone(request.input), argsRedacted: false };
+  }
+
+  public prepareExecution(request: CapabilityBackendRequest, operation: CapabilityOperationAtom, context: CapabilityBackendContext): CapabilityBackendExecution {
+    validateFirmwareInput(request.operation, request.input);
+    return {
+      operation: `firmware:${request.operation}`,
+      args: structuredClone(request.input),
+      replayPolicy: operation.replay,
+      cwd: context.fixture.path,
+      execute: async (signal) => await executeFirmwareCapability(request.operation, request.input as unknown as FirmwareCapabilityInput, context.fixture.path, signal),
     };
   }
 }

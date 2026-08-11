@@ -37,6 +37,7 @@ export * from "./observability/run-telemetry.js";
 export * from "./capabilities/catalog.js";
 export * from "./capabilities/router.js";
 export * from "./capabilities/backend.js";
+export * from "./capabilities/firmware.js";
 export * from "./capabilities/reverse.js";
 export * from "./jobs/background-runner.js";
 export * from "./skills/registry.js";
