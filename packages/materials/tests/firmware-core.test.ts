@@ -139,6 +139,26 @@ test("Firmware Core v1 bounds dense archive and TRX discovery before allocating 
   }
 });
 
+test("Firmware Core v1 does not mark an archive truncated at its exact result limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-firmware-exact-limit-"));
+  try {
+    const tar = Buffer.alloc(2_048);
+    makeTar(tar, 0, "one.txt", "x");
+    await writeFile(join(root, "one.tar"), tar);
+    await writeFile(join(root, "one.cpio"), Buffer.concat([cpioEntry("one", "x", 0o100644), cpioEntry("TRAILER!!!", "", 0)]));
+
+    for (const path of ["one.tar", "one.cpio"]) {
+      const result = await executeFirmwareCapability("file_tree", { path, maxResults: 1 }, root, new AbortController().signal);
+      assert.equal(result.exitCode, 0, result.stderr);
+      const output = JSON.parse(result.stdout) as { archives: Array<{ truncated: boolean }>; truncated: boolean };
+      assert.equal(output.truncated, false);
+      assert.deepEqual(output.archives.map((archive) => archive.truncated), [false]);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function makeFirmwareImage(): Buffer {
   const image = Buffer.alloc(8_192);
   image.writeUInt32LE(0x12345678, 440);
