@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { Client, SdkErrorCode, type ListToolsResult } from "@modelcontextprotocol/client";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
@@ -25,7 +25,22 @@ export interface McpServerDefinition {
   redactArguments?: string[];
   nestedToolPolicy?: McpNestedToolPolicy;
   protocolVersion?: "legacy" | "auto" | "2026-07-28";
+  toolchain?: McpToolchainProfile;
 }
+
+/**
+ * A portable declaration for an external program that an MCP server controls.
+ * The path itself stays in the host environment, not in project configuration.
+ */
+export interface McpToolchainProfile {
+  kind: McpToolchainKind;
+  pathEnvironment: string;
+  injectEnvironment?: string;
+  pathKind?: "file" | "directory";
+}
+
+export type McpToolchainKind = "ida-pro" | "idalib" | "jadx" | "ghidra" | "rizin" | "custom";
+export type McpToolchainState = "ready" | "missing" | "invalid";
 
 export type McpReverseOutput = "functions" | "disassemble" | "xrefs";
 export type McpReverseArgumentValue = string | number | boolean | null;
@@ -92,8 +107,17 @@ export interface McpServerSummary {
   capabilityId: string;
   description: string;
   disabled: boolean;
-  status: "configured" | "connected" | "failed" | "disabled";
+  status: "configured" | "connected" | "failed" | "disabled" | "unavailable";
   configHash: string;
+  toolchain?: McpToolchainSummary;
+}
+
+export interface McpToolchainSummary {
+  kind: McpToolchainKind;
+  state: McpToolchainState;
+  pathEnvironment: string;
+  injectEnvironment: string;
+  reason?: string;
 }
 
 export interface McpToolSummary {
@@ -161,18 +185,31 @@ export class McpProjectRegistry {
   }
 
   public summaries(): McpServerSummary[] {
-    return this.definitions.map((entry) => ({
+    return this.definitions.map((entry) => {
+      const toolchain = diagnoseToolchain(entry.definition.toolchain);
+      const disabled = entry.definition.disabled === true;
+      return {
+        name: entry.name,
+        capabilityId: entry.capabilityId,
+        description: entry.definition.description ?? `Project MCP server ${entry.name}`,
+        disabled,
+        status: disabled ? "disabled" : toolchain && toolchain.state !== "ready" ? "unavailable" : this.connections.has(entry.name) ? "connected" : this.failures.has(entry.name) ? "failed" : "configured",
+        configHash: entry.configHash,
+        ...(toolchain ? { toolchain } : {}),
+      };
+    });
+  }
+
+  public catalogHash(): string {
+    // Host paths and their current availability are intentionally excluded. They
+    // must not change a portable catalog or be persisted into a Run snapshot.
+    const summaries = this.definitions.map((entry) => ({
       name: entry.name,
       capabilityId: entry.capabilityId,
       description: entry.definition.description ?? `Project MCP server ${entry.name}`,
       disabled: entry.definition.disabled === true,
-      status: entry.definition.disabled === true ? "disabled" : this.connections.has(entry.name) ? "connected" : this.failures.has(entry.name) ? "failed" : "configured",
       configHash: entry.configHash,
     }));
-  }
-
-  public catalogHash(): string {
-    const summaries = this.summaries().map(({ status: _status, ...summary }) => summary);
     return sha256(canonicalJson(Object.keys(this.binaryReverseConfig).length === 0 ? summaries : { summaries, binaryReverse: this.binaryReverseConfig }));
   }
 
@@ -327,12 +364,12 @@ export class McpProjectRegistry {
       const tools = await this.describe(entry.name, signal);
       if (!tools.some((item) => item.name === tool)) throw new Error(`MCP tool is not allowed: ${entry.name}.${tool}`);
       const result = await connection.client.callTool({ name: tool, arguments: args as Record<string, unknown> }, requestOptions(entry.definition, signal));
-      const secrets = [...resolvedEnvSecrets(entry.definition.env), ...sensitiveArgumentValues(args as Record<string, unknown>, new Set(policy.redactArguments))];
+      const secrets = [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain), ...sensitiveArgumentValues(args as Record<string, unknown>, new Set(policy.redactArguments))];
       const stdout = redactText(JSON.stringify({ server: entry.name, tool, result }, null, 2), secrets);
       return { stdout, stderr: result.isError ? `MCP tool reported an error: ${entry.name}.${tool}` : "", exitCode: result.isError ? 1 : 0, durationMs: Date.now() - started, externalId: externalId(connection) };
     } catch (error) {
       if (connection && isTransportFailure(error)) await this.invalidateConnection(entry.name, connection);
-      return { stdout: "", stderr: redactText(error instanceof Error ? error.message : String(error), resolvedEnvSecrets(entry.definition.env)), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
+      return { stdout: "", stderr: redactText(error instanceof Error ? error.message : String(error), [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain)]), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
     }
   }
 
@@ -380,6 +417,8 @@ export class McpProjectRegistry {
     const pending = this.connecting.get(name);
     if (pending) return await pending;
     const entry = this.entry(name);
+    const toolchain = diagnoseToolchain(entry.definition.toolchain);
+    if (toolchain && toolchain.state !== "ready") throw new Error(toolchain.reason ?? `MCP server ${name} toolchain is unavailable`);
     const connecting = this.connect(entry, signal).finally(() => this.connecting.delete(name));
     this.connecting.set(name, connecting);
     return await connecting;
@@ -394,7 +433,7 @@ export class McpProjectRegistry {
 
   private async connect(entry: McpServerEntry, signal?: AbortSignal): Promise<McpConnection> {
     const cwd = resolve(this.projectRoot, entry.definition.cwd ?? ".");
-    const env = { ...getDefaultEnvironment(), ...resolveEnvironment(entry.definition.env) };
+    const env = { ...getDefaultEnvironment(), ...resolveEnvironment(entry.definition.env), ...toolchainEnvironment(entry.definition.toolchain) };
     const transport = new StdioClientTransport({ command: entry.definition.command, args: entry.definition.args, cwd, env, stderr: "pipe" });
     const client = new Client(
       { name: `proofblade-${entry.name}`, version: "0.1.0" },
@@ -427,12 +466,23 @@ function validateServer(name: string, definition: McpServerDefinition, projectRo
   if (!definition || typeof definition !== "object" || typeof definition.command !== "string" || definition.command.trim() === "") throw new Error(`MCP server ${name} requires command`);
   if (definition.args && (!Array.isArray(definition.args) || definition.args.some((item) => typeof item !== "string"))) throw new Error(`MCP server ${name} has invalid args`);
   if (definition.env && (typeof definition.env !== "object" || Array.isArray(definition.env) || Object.values(definition.env).some((item) => typeof item !== "string"))) throw new Error(`MCP server ${name} has invalid env`);
+  validateToolchain(name, definition.toolchain, definition.env);
   if (definition.readOnly !== undefined && typeof definition.readOnly !== "boolean") throw new Error(`MCP server ${name} has invalid readOnly`);
   if (definition.requestTimeoutMs !== undefined && (!Number.isInteger(definition.requestTimeoutMs) || definition.requestTimeoutMs < 50 || definition.requestTimeoutMs > 120_000)) throw new Error(`MCP server ${name} requestTimeoutMs must be between 50 and 120000`);
   for (const list of [definition.includeTools, definition.excludeTools]) if (list && (!Array.isArray(list) || list.some((item) => typeof item !== "string" || item.length === 0))) throw new Error(`MCP server ${name} has an invalid tool filter`);
   validateEffectPolicy(name, definition);
   validateNestedToolPolicy(name, definition.nestedToolPolicy);
   if (!isWithin(projectRoot, resolve(projectRoot, definition.cwd ?? "."))) throw new Error(`MCP server ${name} cwd escapes the project root`);
+}
+
+function validateToolchain(name: string, toolchain: McpToolchainProfile | undefined, environment: Record<string, string> | undefined): void {
+  if (!toolchain) return;
+  if (!TOOLCHAIN_KINDS.has(toolchain.kind)) throw new Error(`MCP server ${name} has an unsupported toolchain kind`);
+  if (!environmentName(toolchain.pathEnvironment)) throw new Error(`MCP server ${name} toolchain requires a valid pathEnvironment`);
+  if (toolchain.injectEnvironment !== undefined && !environmentName(toolchain.injectEnvironment)) throw new Error(`MCP server ${name} toolchain has an invalid injectEnvironment`);
+  if (toolchain.pathKind !== undefined && toolchain.pathKind !== "file" && toolchain.pathKind !== "directory") throw new Error(`MCP server ${name} toolchain has an invalid pathKind`);
+  const inject = toolchainInjectEnvironment(toolchain);
+  if (environment && Object.hasOwn(environment, inject)) throw new Error(`MCP server ${name} toolchain injectEnvironment must not also be declared in env`);
 }
 
 function validateBinaryReverseConfig(config: unknown, definitions: Record<string, McpServerDefinition>): asserts config is McpBinaryReverseConfig {
@@ -522,6 +572,48 @@ function resolveEnvironment(values: Record<string, string> | undefined): Record<
   return output;
 }
 
+function diagnoseToolchain(profile: McpToolchainProfile | undefined): McpToolchainSummary | undefined {
+  if (!profile) return undefined;
+  const injectEnvironment = toolchainInjectEnvironment(profile);
+  const base = {
+    kind: profile.kind,
+    pathEnvironment: profile.pathEnvironment,
+    injectEnvironment,
+  };
+  const path = process.env[profile.pathEnvironment]?.trim();
+  if (!path) return { ...base, state: "missing", reason: `Set ${profile.pathEnvironment} to the installed ${profile.kind} path` };
+  if (!isAbsolute(path)) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must be an absolute path` };
+  try {
+    const stats = statSync(path);
+    const expected = profile.pathKind ?? DEFAULT_TOOLCHAIN_PATH_KINDS[profile.kind];
+    if (expected === "file" && !stats.isFile()) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must reference a file` };
+    if (expected === "directory" && !stats.isDirectory()) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must reference a directory` };
+  } catch {
+    return { ...base, state: "missing", reason: `${profile.pathEnvironment} does not reference an installed ${profile.kind} path` };
+  }
+  return { ...base, state: "ready" };
+}
+
+function toolchainEnvironment(profile: McpToolchainProfile | undefined): Record<string, string> {
+  if (!profile) return {};
+  const path = process.env[profile.pathEnvironment]?.trim();
+  if (!path) throw new Error(`Missing MCP toolchain environment variable: ${profile.pathEnvironment}`);
+  return { [toolchainInjectEnvironment(profile)]: path };
+}
+
+function resolvedToolchainValues(profile: McpToolchainProfile | undefined): string[] {
+  const path = profile ? process.env[profile.pathEnvironment]?.trim() : undefined;
+  return path ? [path] : [];
+}
+
+function toolchainInjectEnvironment(profile: McpToolchainProfile): string {
+  return profile.injectEnvironment ?? DEFAULT_TOOLCHAIN_ENVIRONMENTS[profile.kind];
+}
+
+function environmentName(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
 function resolvedEnvSecrets(values: Record<string, string> | undefined): string[] {
   try {
     return Object.values(resolveEnvironment(values)).filter((value) => value.length >= 4);
@@ -582,9 +674,41 @@ const SIDE_EFFECTS = new Set<ToolSideEffectAtom>(["none", "workspace", "process"
 const REPLAY_POLICIES = new Set<ReplayPolicy>(["pure", "idempotent", "resumable", "reconcile", "manual", "forbidden-replay"]);
 const SENSITIVITIES = new Set<ToolSensitivityAtom>(["public", "target", "secret"]);
 const REVERSE_INPUT_FIELDS = new Set(["path", "address", "maxResults", "maxInstructions", "direction"]);
+const TOOLCHAIN_KINDS = new Set<McpToolchainKind>(["ida-pro", "idalib", "jadx", "ghidra", "rizin", "custom"]);
+const DEFAULT_TOOLCHAIN_ENVIRONMENTS: Record<McpToolchainKind, string> = {
+  "ida-pro": "IDA_PATH",
+  idalib: "IDA_PATH",
+  jadx: "JADX_HOME",
+  ghidra: "GHIDRA_HOME",
+  rizin: "RIZIN_HOME",
+  custom: "PROOFBLADE_TOOLCHAIN_PATH",
+};
+
+const DEFAULT_TOOLCHAIN_PATH_KINDS: Record<McpToolchainKind, "file" | "directory"> = {
+  "ida-pro": "file",
+  idalib: "file",
+  jadx: "directory",
+  ghidra: "directory",
+  rizin: "directory",
+  custom: "file",
+};
 
 function redactText(value: string, secrets: string[]): string {
-  return [...new Set(secrets)].sort((a, b) => b.length - a.length).reduce((text, secret) => text.split(secret).join("[REDACTED]"), value);
+  const variants = [...new Set(secrets.flatMap((secret) => escapedVariants(secret)))];
+  return variants.sort((a, b) => b.length - a.length).reduce((text, secret) => text.split(secret).join("[REDACTED]"), value);
+}
+
+function escapedVariants(secret: string): string[] {
+  const variants = [secret];
+  let escaped = secret;
+  // MCP content is often JSON embedded in a JSON-RPC result. Cover the
+  // resulting escape layers without attempting to parse arbitrary tool output.
+  for (let depth = 0; depth < 4; depth += 1) {
+    escaped = JSON.stringify(escaped).slice(1, -1);
+    if (escaped === variants.at(-1)) break;
+    variants.push(escaped);
+  }
+  return variants;
 }
 
 function externalId(connection: McpConnection | undefined): string | undefined {

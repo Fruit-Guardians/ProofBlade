@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
+import { McpCapabilityBackend } from "../src/capabilities/backend.js";
 import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { McpProjectRegistry } from "../src/mcp/registry.js";
@@ -163,6 +164,119 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     assert.doesNotMatch(JSON.stringify(resources), /ENV-SECRET-123/);
     await runtime.close();
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP toolchain profiles keep host paths out of summaries and gate unavailable servers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-"));
+  const target = join(root, "ida64.exe");
+  const pathEnvironment = "PROOFBLADE_TEST_IDA_PATH";
+  const previous = process.env[pathEnvironment];
+  let ready: McpProjectRegistry | undefined;
+  try {
+    delete process.env[pathEnvironment];
+    await writeFile(target, "synthetic executable", "utf8");
+    const serverPath = resolve(import.meta.dirname, "fixtures", "mcp-echo-server.mjs");
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        ida: {
+          command: process.execPath,
+          args: [serverPath],
+          includeTools: ["echo"],
+          requestTimeoutMs: 5_000,
+          readOnly: true,
+          replay: "pure",
+          toolchain: {
+            kind: "ida-pro",
+            pathEnvironment,
+            injectEnvironment: "MCP_SECRET",
+            pathKind: "file",
+          },
+        },
+      },
+    }), "utf8");
+
+    const missing = McpProjectRegistry.load(root);
+    const unavailable = missing.summaries()[0]!;
+    assert.equal(unavailable.status, "unavailable");
+    assert.deepEqual(unavailable.toolchain && {
+      kind: unavailable.toolchain.kind,
+      state: unavailable.toolchain.state,
+      pathEnvironment: unavailable.toolchain.pathEnvironment,
+      injectEnvironment: unavailable.toolchain.injectEnvironment,
+    }, { kind: "ida-pro", state: "missing", pathEnvironment, injectEnvironment: "MCP_SECRET" });
+    assert.doesNotMatch(JSON.stringify(unavailable), new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const unavailableBackend = new McpCapabilityBackend(missing).availability({ capabilityId: "mcp.ida", operation: "call", input: {} });
+    assert.equal(unavailableBackend.available, false);
+    assert.match(unavailableBackend.reason ?? "", new RegExp(pathEnvironment));
+    await missing.close();
+
+    process.env[pathEnvironment] = target;
+    ready = McpProjectRegistry.load(root);
+    assert.equal(ready.summaries()[0]?.status, "configured");
+    assert.equal(ready.summaries()[0]?.toolchain?.state, "ready");
+    const result = await ready.execute("mcp.ida", "call", { tool: "echo", arguments: { text: "toolchain" } });
+    assert.equal(result.exitCode, 0);
+    assert.match(result.stdout, /toolchain/);
+    assert.match(result.stdout, /\[REDACTED\]/);
+    assert.doesNotMatch(result.stdout, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await ready.close();
+    ready = undefined;
+
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        invalid: {
+          command: process.execPath,
+          env: { MCP_SECRET: "not-allowed" },
+          toolchain: { kind: "custom", pathEnvironment, injectEnvironment: "MCP_SECRET" },
+        },
+      },
+    }), "utf8");
+    assert.throws(() => McpProjectRegistry.load(root), /injectEnvironment must not also be declared in env/);
+  } finally {
+    await ready?.close().catch(() => undefined);
+    if (previous === undefined) delete process.env[pathEnvironment];
+    else process.env[pathEnvironment] = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP toolchain profiles default JADX, Ghidra, and Rizin homes to directories", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-directories-"));
+  const profiles = [
+    { name: "jadx", kind: "jadx", pathEnvironment: "PROOFBLADE_TEST_JADX_HOME" },
+    { name: "ghidra", kind: "ghidra", pathEnvironment: "PROOFBLADE_TEST_GHIDRA_HOME" },
+    { name: "rizin", kind: "rizin", pathEnvironment: "PROOFBLADE_TEST_RIZIN_HOME" },
+  ] as const;
+  const previous = new Map(profiles.map((profile) => [profile.pathEnvironment, process.env[profile.pathEnvironment]]));
+  try {
+    const mcpServers: Record<string, unknown> = {};
+    for (const profile of profiles) {
+      const installation = join(root, profile.kind);
+      await mkdir(installation);
+      process.env[profile.pathEnvironment] = installation;
+      mcpServers[profile.name] = {
+        command: process.execPath,
+        toolchain: { kind: profile.kind, pathEnvironment: profile.pathEnvironment },
+      };
+    }
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers }), "utf8");
+    const registry = McpProjectRegistry.load(root);
+    const backend = new McpCapabilityBackend(registry);
+    for (const profile of profiles) {
+      const summary = registry.summaries().find((item) => item.name === profile.name)!;
+      assert.equal(summary.status, "configured");
+      assert.equal(summary.toolchain?.state, "ready");
+      assert.equal(backend.availability({ capabilityId: summary.capabilityId, operation: "call", input: {} }).available, true);
+    }
+    await registry.close();
+  } finally {
+    for (const profile of profiles) {
+      const value = previous.get(profile.pathEnvironment);
+      if (value === undefined) delete process.env[profile.pathEnvironment];
+      else process.env[profile.pathEnvironment] = value;
+    }
     await rm(root, { recursive: true, force: true });
   }
 });

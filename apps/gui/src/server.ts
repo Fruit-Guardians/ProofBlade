@@ -277,7 +277,13 @@ async function capabilityCatalog(): Promise<WorkspaceSettings["capabilities"]> {
     return {
       tools: codingToolCatalog(),
       skills: skills.list({ includeDisabled: true }).map((skill) => ({ name: skill.name, description: skill.description, path: skill.path, disabled: skill.disableModelInvocation })),
-      mcpServers: mcp.summaries().map((server) => ({ name: server.name, description: server.description, status: server.status, disabled: server.disabled })),
+      mcpServers: mcp.summaries().map((server) => ({
+        name: server.name,
+        description: server.description,
+        status: server.status,
+        disabled: server.disabled,
+        ...(server.toolchain ? { toolchain: server.toolchain } : {}),
+      })),
       providerNative: Object.fromEntries(providerSettings.publicSettings().profiles.map((profile) => [
         profile.id,
         providerNativeCapabilities(profile),
