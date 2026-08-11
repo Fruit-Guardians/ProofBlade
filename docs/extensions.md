@@ -434,10 +434,13 @@ Skill 分两级进入上下文：
 ```powershell
 proofblade skills list
 proofblade skills show evidence-triage 4000
+proofblade skills show ctf-reverse 8000
 proofblade skill RUN-ID evidence-triage "Focus on the current handoff"
 ```
 
 Solver 的 L0 只包含可由模型选择的 Skill 元数据、内容哈希和目录哈希。`load_skill` 返回最多 12000 字符的有界正文；CLI `skill` 通过 Pi AgentHarness 原生 `skill()` 启动一个显式 Skill Turn。
+
+项目内置的 `ctf-reverse` 是面向 ProofBlade 的证据优先逆向流程，覆盖 PE/ELF、固件、字节码、虚拟机、混淆和动态升级路径。它只提供分析方法，不授予新的工具或范围；正文要求模型优先使用 `proofblade.binary` 的结构化 Capability，并根据 Backend 可用性再选择本地进程或已配置的 MCP。该 Skill 根据 `ljagiello/ctf-skills` 的 `d6662d2` 版本整理，保留上游的分类和升级思路，同时去掉宿主安装命令和不受控的执行建议。
 
 ### 7.3 Skill 与 Tool 的边界
 
