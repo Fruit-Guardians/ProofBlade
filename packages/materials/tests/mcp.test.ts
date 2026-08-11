@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -238,6 +238,45 @@ test("MCP toolchain profiles keep host paths out of summaries and gate unavailab
     await ready?.close().catch(() => undefined);
     if (previous === undefined) delete process.env[pathEnvironment];
     else process.env[pathEnvironment] = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP toolchain profiles default JADX, Ghidra, and Rizin homes to directories", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-directories-"));
+  const profiles = [
+    { name: "jadx", kind: "jadx", pathEnvironment: "PROOFBLADE_TEST_JADX_HOME" },
+    { name: "ghidra", kind: "ghidra", pathEnvironment: "PROOFBLADE_TEST_GHIDRA_HOME" },
+    { name: "rizin", kind: "rizin", pathEnvironment: "PROOFBLADE_TEST_RIZIN_HOME" },
+  ] as const;
+  const previous = new Map(profiles.map((profile) => [profile.pathEnvironment, process.env[profile.pathEnvironment]]));
+  try {
+    const mcpServers: Record<string, unknown> = {};
+    for (const profile of profiles) {
+      const installation = join(root, profile.kind);
+      await mkdir(installation);
+      process.env[profile.pathEnvironment] = installation;
+      mcpServers[profile.name] = {
+        command: process.execPath,
+        toolchain: { kind: profile.kind, pathEnvironment: profile.pathEnvironment },
+      };
+    }
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({ mcpServers }), "utf8");
+    const registry = McpProjectRegistry.load(root);
+    const backend = new McpCapabilityBackend(registry);
+    for (const profile of profiles) {
+      const summary = registry.summaries().find((item) => item.name === profile.name)!;
+      assert.equal(summary.status, "configured");
+      assert.equal(summary.toolchain?.state, "ready");
+      assert.equal(backend.availability({ capabilityId: summary.capabilityId, operation: "call", input: {} }).available, true);
+    }
+    await registry.close();
+  } finally {
+    for (const profile of profiles) {
+      const value = previous.get(profile.pathEnvironment);
+      if (value === undefined) delete process.env[profile.pathEnvironment];
+      else process.env[profile.pathEnvironment] = value;
+    }
     await rm(root, { recursive: true, force: true });
   }
 });

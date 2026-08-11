@@ -329,7 +329,7 @@ $env:PROOFBLADE_IDA_PRO_PATH = 'D:\\tools\\IDA 9.1\\ida64.exe'
 npm run cli -- mcp doctor
 ```
 
-`kind` 支持 `ida-pro`、`idalib`、`jadx`、`ghidra`、`rizin` 和 `custom`。`injectEnvironment` 未指定时会使用相应的常见变量（IDA/idalib 为 `IDA_PATH`，JADX 为 `JADX_HOME`，Ghidra 为 `GHIDRA_HOME`）。缺少路径、相对路径或类型不匹配时，Server 状态会显示为 `unavailable`，统一 Capability Resolver 会继续选择可用的 Rizin 或其他 MCP 后端，而不会尝试启动一个必然失败的进程。
+`kind` 支持 `ida-pro`、`idalib`、`jadx`、`ghidra`、`rizin` 和 `custom`。`injectEnvironment` 未指定时会使用相应的常见变量（IDA/idalib 为 `IDA_PATH`，JADX 为 `JADX_HOME`，Ghidra 为 `GHIDRA_HOME`）。省略 `pathKind` 时，IDA/idalib 与 custom 默认检查可执行文件，JADX、Ghidra 与 Rizin 默认检查安装目录；可通过显式 `pathKind` 覆盖。缺少路径、相对路径或类型不匹配时，Server 状态会显示为 `unavailable`，统一 Capability Resolver 会继续选择可用的 Rizin 或其他 MCP 后端，而不会尝试启动一个必然失败的进程。
 
 ### 6.1.2 深度逆向 Capability 映射
 

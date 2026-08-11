@@ -585,7 +585,7 @@ function diagnoseToolchain(profile: McpToolchainProfile | undefined): McpToolcha
   if (!isAbsolute(path)) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must be an absolute path` };
   try {
     const stats = statSync(path);
-    const expected = profile.pathKind ?? "file";
+    const expected = profile.pathKind ?? DEFAULT_TOOLCHAIN_PATH_KINDS[profile.kind];
     if (expected === "file" && !stats.isFile()) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must reference a file` };
     if (expected === "directory" && !stats.isDirectory()) return { ...base, state: "invalid", reason: `${profile.pathEnvironment} must reference a directory` };
   } catch {
@@ -682,6 +682,15 @@ const DEFAULT_TOOLCHAIN_ENVIRONMENTS: Record<McpToolchainKind, string> = {
   ghidra: "GHIDRA_HOME",
   rizin: "RIZIN_HOME",
   custom: "PROOFBLADE_TOOLCHAIN_PATH",
+};
+
+const DEFAULT_TOOLCHAIN_PATH_KINDS: Record<McpToolchainKind, "file" | "directory"> = {
+  "ida-pro": "file",
+  idalib: "file",
+  jadx: "directory",
+  ghidra: "directory",
+  rizin: "directory",
+  custom: "file",
 };
 
 function redactText(value: string, secrets: string[]): string {
