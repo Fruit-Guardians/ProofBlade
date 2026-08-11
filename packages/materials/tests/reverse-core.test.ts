@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
@@ -70,6 +70,32 @@ test("Rizin availability resolves relative executable paths for tmpdir execution
   const availability = createRizinAvailability({ executable: requested });
   assert.equal(availability.available, true, availability.reason);
   assert.equal(isAbsolute(availability.executable ?? ""), true);
+});
+
+test("Rizin availability resolves executables found through relative PATH directories", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-rizin-path-"));
+  const executable = join(root, process.platform === "win32" ? "rz.EXE" : "rz");
+  const previousPath = process.env.PATH;
+  const previousPathExt = process.env.PATHEXT;
+  try {
+    await copyFile(process.execPath, executable);
+    if (process.platform !== "win32") await chmod(executable, 0o755);
+    process.env.PATH = relative(process.cwd(), root) || ".";
+    if (process.platform === "win32") process.env.PATHEXT = ".EXE";
+
+    const availability = createRizinAvailability();
+    assert.equal(availability.available, true, availability.reason);
+    assert.equal(resolve(availability.executable ?? ""), resolve(executable));
+    assert.equal(isAbsolute(availability.executable ?? ""), true);
+    const executed = await availability.runner(availability.executable!, ["-v"], tmpdir(), new AbortController().signal);
+    assert.equal(executed.exitCode, 0, executed.stderr);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousPathExt === undefined) delete process.env.PATHEXT;
+    else process.env.PATHEXT = previousPathExt;
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("Rizin process runner preserves spawn errors when stderr is empty", async () => {

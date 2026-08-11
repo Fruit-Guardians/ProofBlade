@@ -272,7 +272,7 @@ function resolveExecutableName(name: string): string | undefined {
   const extensions = process.platform === "win32" ? (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";") : [""];
   for (const directory of pathValue.split(delimiter)) {
     for (const extension of extensions) {
-      const candidate = join(directory, `${name}${extension}`);
+      const candidate = resolve(directory, `${name}${extension}`);
       if (existsFile(candidate)) return candidate;
     }
   }
