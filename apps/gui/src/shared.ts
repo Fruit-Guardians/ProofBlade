@@ -111,8 +111,15 @@ export interface SkillSummary {
 export interface McpSummary {
   name: string;
   description: string;
-  status: "configured" | "connected" | "failed" | "disabled";
+  status: "configured" | "connected" | "failed" | "disabled" | "unavailable";
   disabled: boolean;
+  toolchain?: {
+    kind: string;
+    state: "ready" | "missing" | "invalid";
+    pathEnvironment: string;
+    injectEnvironment: string;
+    reason?: string;
+  };
 }
 
 export interface WorkspaceSettings {

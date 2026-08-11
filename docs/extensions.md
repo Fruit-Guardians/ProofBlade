@@ -298,7 +298,40 @@ Capability 返回的目标内容使用 `<untrusted-observation>` 包裹，不能
 
 敏感值只从环境变量展开，不写入事件、Artifact、日志或 Prompt。`cwd` 相对项目根目录解析。Server 必须显式配置，不扫描用户主目录的全局 MCP 设置。
 
-### 6.1.1 深度逆向 Capability 映射
+### 6.1.1 外部逆向工具链 Profile
+
+IDA Pro、idalib、JADX 和 Ghidra 的安装位置因设备而异。不要把绝对安装路径提交到 `.mcp.json`；为相应 MCP Server 声明 `toolchain`，再在宿主机设置路径环境变量。ProofBlade 会在启动 Server 前检查它是否为所需文件或目录，并仅将该值注入 MCP 子进程；模型、Run 快照、Effect、Artifact 和 GUI 都不会显示绝对路径。
+
+```json
+{
+  "mcpServers": {
+    "ida_pro": {
+      "command": "npx",
+      "args": ["-y", "ida-pro-mcp"],
+      "description": "IDA Pro reverse analysis through a project-scoped MCP server.",
+      "toolchain": {
+        "kind": "ida-pro",
+        "pathEnvironment": "PROOFBLADE_IDA_PRO_PATH",
+        "injectEnvironment": "IDA_PATH",
+        "pathKind": "file"
+      },
+      "readOnly": true,
+      "replay": "pure"
+    }
+  }
+}
+```
+
+PowerShell 示例：
+
+```powershell
+$env:PROOFBLADE_IDA_PRO_PATH = 'D:\\tools\\IDA 9.1\\ida64.exe'
+npm run cli -- mcp doctor
+```
+
+`kind` 支持 `ida-pro`、`idalib`、`jadx`、`ghidra`、`rizin` 和 `custom`。`injectEnvironment` 未指定时会使用相应的常见变量（IDA/idalib 为 `IDA_PATH`，JADX 为 `JADX_HOME`，Ghidra 为 `GHIDRA_HOME`）。缺少路径、相对路径或类型不匹配时，Server 状态会显示为 `unavailable`，统一 Capability Resolver 会继续选择可用的 Rizin 或其他 MCP 后端，而不会尝试启动一个必然失败的进程。
+
+### 6.1.2 深度逆向 Capability 映射
 
 `proofblade.binary.functions`、`disassemble` 和 `xrefs` 可以通过 `.mcp.json` 映射到 Ghidra、Rizin 或其他兼容 MCP Server。映射只描述传输边界，模型仍通过同一个 `invoke_capability` 自由选择调用顺序；本地 `rz/rizin` Backend 可用时优先使用本地实现，未安装或不可用时才选择 MCP 映射。
 

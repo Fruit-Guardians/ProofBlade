@@ -348,6 +348,7 @@ export class McpReverseCapabilityBackend implements CapabilityBackend {
     const capabilityId = this.mcp.serverCapabilityId(binding.server);
     const server = capabilityId ? this.mcp.summaries().find((item) => item.capabilityId === capabilityId) : undefined;
     if (!capabilityId || !server || server.disabled) return { available: false, reason: `MCP server ${binding.server} is not configured or disabled` };
+    if (server.status === "unavailable") return { available: false, reason: server.toolchain?.reason ?? `MCP server ${binding.server} toolchain is unavailable` };
     const retryAfterMs = this.mcp.retryAfterMs(capabilityId);
     if (server.status === "failed" && retryAfterMs > 0) return { available: false, reason: `MCP server ${binding.server} connection failed; retry available in ${retryAfterMs}ms` };
     return { available: true };
@@ -380,7 +381,7 @@ export class McpCapabilityBackend implements CapabilityBackend {
 
   public status(): CapabilityBackendStatus {
     const configured = this.mcp.summaries().filter((server) => !server.disabled);
-    const available = configured.filter((server) => server.status !== "failed" || this.mcp.retryAfterMs(server.capabilityId) === 0);
+    const available = configured.filter((server) => server.status !== "unavailable" && (server.status !== "failed" || this.mcp.retryAfterMs(server.capabilityId) === 0));
     return {
       id: this.id,
       kind: this.kind,
@@ -394,6 +395,7 @@ export class McpCapabilityBackend implements CapabilityBackend {
   public availability(request: CapabilityBackendRequest): CapabilityBackendAvailability {
     const server = this.mcp.summaries().find((item) => item.capabilityId === request.capabilityId);
     if (!server || server.disabled) return { available: false, reason: "MCP capability is disabled or not configured" };
+    if (server.status === "unavailable") return { available: false, reason: server.toolchain?.reason ?? `MCP server ${server.name} toolchain is unavailable` };
     const retryAfterMs = this.mcp.retryAfterMs(server.capabilityId);
     if (server.status === "failed" && retryAfterMs > 0) {
       return { available: false, reason: `MCP server ${server.name} connection failed; retry available in ${retryAfterMs}ms` };

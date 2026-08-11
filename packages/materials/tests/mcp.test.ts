@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
+import { McpCapabilityBackend } from "../src/capabilities/backend.js";
 import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { McpProjectRegistry } from "../src/mcp/registry.js";
@@ -163,6 +164,80 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     assert.doesNotMatch(JSON.stringify(resources), /ENV-SECRET-123/);
     await runtime.close();
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP toolchain profiles keep host paths out of summaries and gate unavailable servers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-"));
+  const target = join(root, "ida64.exe");
+  const pathEnvironment = "PROOFBLADE_TEST_IDA_PATH";
+  const previous = process.env[pathEnvironment];
+  let ready: McpProjectRegistry | undefined;
+  try {
+    delete process.env[pathEnvironment];
+    await writeFile(target, "synthetic executable", "utf8");
+    const serverPath = resolve(import.meta.dirname, "fixtures", "mcp-echo-server.mjs");
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        ida: {
+          command: process.execPath,
+          args: [serverPath],
+          includeTools: ["echo"],
+          requestTimeoutMs: 5_000,
+          readOnly: true,
+          replay: "pure",
+          toolchain: {
+            kind: "ida-pro",
+            pathEnvironment,
+            injectEnvironment: "MCP_SECRET",
+            pathKind: "file",
+          },
+        },
+      },
+    }), "utf8");
+
+    const missing = McpProjectRegistry.load(root);
+    const unavailable = missing.summaries()[0]!;
+    assert.equal(unavailable.status, "unavailable");
+    assert.deepEqual(unavailable.toolchain && {
+      kind: unavailable.toolchain.kind,
+      state: unavailable.toolchain.state,
+      pathEnvironment: unavailable.toolchain.pathEnvironment,
+      injectEnvironment: unavailable.toolchain.injectEnvironment,
+    }, { kind: "ida-pro", state: "missing", pathEnvironment, injectEnvironment: "MCP_SECRET" });
+    assert.doesNotMatch(JSON.stringify(unavailable), new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const unavailableBackend = new McpCapabilityBackend(missing).availability({ capabilityId: "mcp.ida", operation: "call", input: {} });
+    assert.equal(unavailableBackend.available, false);
+    assert.match(unavailableBackend.reason ?? "", new RegExp(pathEnvironment));
+    await missing.close();
+
+    process.env[pathEnvironment] = target;
+    ready = McpProjectRegistry.load(root);
+    assert.equal(ready.summaries()[0]?.status, "configured");
+    assert.equal(ready.summaries()[0]?.toolchain?.state, "ready");
+    const result = await ready.execute("mcp.ida", "call", { tool: "echo", arguments: { text: "toolchain" } });
+    assert.equal(result.exitCode, 0);
+    assert.match(result.stdout, /toolchain/);
+    assert.match(result.stdout, /\[REDACTED\]/);
+    assert.doesNotMatch(result.stdout, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await ready.close();
+    ready = undefined;
+
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        invalid: {
+          command: process.execPath,
+          env: { MCP_SECRET: "not-allowed" },
+          toolchain: { kind: "custom", pathEnvironment, injectEnvironment: "MCP_SECRET" },
+        },
+      },
+    }), "utf8");
+    assert.throws(() => McpProjectRegistry.load(root), /injectEnvironment must not also be declared in env/);
+  } finally {
+    await ready?.close().catch(() => undefined);
+    if (previous === undefined) delete process.env[pathEnvironment];
+    else process.env[pathEnvironment] = previous;
     await rm(root, { recursive: true, force: true });
   }
 });
