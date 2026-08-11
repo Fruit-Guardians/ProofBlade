@@ -18,7 +18,8 @@ const defaults: ConversationPreferences = {
 const capabilities: WorkspaceSettings["capabilities"] = {
   tools: [{ name: "read", description: "Read a file", schemaChars: 120 }],
   skills: [{ name: "evidence-triage", description: "Triage evidence", disabled: false }],
-  mcp: [{ name: "local", enabled: true, command: "node", toolCount: 2 }],
+  mcpServers: [{ name: "local", description: "Local tools", status: "configured", disabled: false }],
+  providerNative: { default: [] },
 };
 
 test("persists folders and per-conversation provider and capability choices", async () => {

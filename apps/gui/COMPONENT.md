@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T13:05:00.000Z",
+  "updatedAt": "2026-08-11T02:30:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 9,
-    "securityAuditCount": 9,
-    "lastBugAuditAt": "2026-08-09T13:05:00.000Z",
-    "lastSecurityAuditAt": "2026-08-09T13:05:00.000Z",
-    "sourceHash": "acb2c0e774bc6d4ddc3e9d92d29ddcabe80cb07d80cc86ac7d0e3304484577a1",
+    "bugAuditCount": 10,
+    "securityAuditCount": 10,
+    "lastBugAuditAt": "2026-08-11T02:30:00.000Z",
+    "lastSecurityAuditAt": "2026-08-11T02:30:00.000Z",
+    "sourceHash": "39a1c965bd678b4d46f028844ddc6bdddd93c676d98fa28695e51c02361f7054",
     "result": "passed"
   }
 }
@@ -38,6 +38,7 @@
 - Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Solver lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。
 - 模型标签和右侧配置必须显示当前对话下一轮使用的 Provider/Model/Thinking；最近一条响应的模型仅作为历史元数据，不得覆盖当前选择。
+- Provider Profile 必须显示并保存实际 wire protocol；模型发现按 OpenAI Bearer 或 Anthropic `x-api-key`/版本头发送。能力面板按本对话 Profile 显示 Provider Native 状态：协议候选未接入时不可勾选，和受控 workspace 工具语义重合时显示被接管原因，不能把产品内置工具误展示为 ProofBlade 可执行能力。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。

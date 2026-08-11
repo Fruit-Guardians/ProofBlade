@@ -4,6 +4,8 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
 export type CacheRetention = "none" | "short" | "long";
 export type OutputRewriteProvider = "builtin" | "rtk";
+/** Provider protocols that ProofBlade can send through Pi's audited tool loop. */
+export type ProviderApi = "openai-completions" | "openai-responses" | "anthropic-messages";
 
 export interface OutputRewriteConfig {
   provider: OutputRewriteProvider;
@@ -23,7 +25,7 @@ export interface ResolvedOutputRewriteConfig {
 
 export interface ModelProfileConfig {
   provider: string;
-  api: "openai-completions";
+  api: ProviderApi;
   baseUrl: string;
   model: string;
   modelDiscoveryPath: string;
@@ -76,7 +78,7 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (config.runtime?.piVersion !== "0.83.0") throw new Error(`Config ${path} must lock Pi to 0.83.0`);
   const profile = config.modelProfiles?.executor;
   if (!profile) throw new Error(`Config ${path} is missing modelProfiles.executor`);
-  if (profile.api !== "openai-completions") throw new Error(`Unsupported provider API: ${String(profile.api)}`);
+  if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(profile.api)) throw new Error(`Unsupported provider API: ${String(profile.api)}`);
   if (!profile.provider || !profile.baseUrl || !profile.model) throw new Error(`Config ${path} has an incomplete executor profile`);
   if (profile.proxyUrl !== undefined) validateHttpUrl(profile.proxyUrl, `proxyUrl in ${path}`);
   if (!Number.isFinite(profile.contextWindow) || profile.contextWindow < 1024) throw new Error(`Invalid contextWindow in ${path}`);
