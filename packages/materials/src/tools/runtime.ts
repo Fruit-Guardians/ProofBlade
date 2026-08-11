@@ -6,6 +6,7 @@ import type { FixtureRef } from "../sandbox/fixture.js";
 import type { JobRecord, RawEffectResult, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
 import { id, sha256 } from "../domain/utils.js";
+import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
@@ -177,7 +178,7 @@ export class ProofBladeToolRuntime {
 
   public async submitCandidate(candidate: string): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = candidate.trim();
-    if (!/^PB\{[^}\r\n]+\}$/.test(normalized)) throw new Error("Candidate must be one complete PB{...} value");
+    if (!isCtfCandidate(normalized)) throw new Error("Candidate must be one complete CTF prefix{...} value");
     const snapshot = await this.controlStore.snapshot(this.runId);
     const supportingObservations = Object.values(snapshot.observations).filter((item) =>
       item.source.generation === snapshot.generation && item.candidateKinds.includes("flag-shaped-value"),
@@ -282,5 +283,5 @@ function assertEvidence(evidence: Record<string, unknown>, evidenceIds: string[]
 }
 
 function scrubCandidate(statement: string): string {
-  return statement.replace(/PB\{[^}\r\n]+\}/g, (candidate) => `[candidate sha256=${sha256(candidate)}]`);
+  return redactCtfCandidates(statement, (candidate) => `[candidate sha256=${sha256(candidate)}]`);
 }

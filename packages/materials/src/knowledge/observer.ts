@@ -1,6 +1,7 @@
 import type { ControlStore } from "../control/control-store.js";
 import type { RawEffectResult } from "../domain/types.js";
 import { id } from "../domain/utils.js";
+import { containsCtfCandidate } from "../domain/candidate.js";
 
 export interface ObservedEffect {
   operation: string;
@@ -29,7 +30,7 @@ export class DeterministicObserver {
     }
     const combined = `${effect.result.stdout}\n${effect.result.stderr}`;
     const candidateKinds = [
-      /PB\{[^}\r\n]+\}/.test(combined) ? "flag-shaped-value" : undefined,
+      containsCtfCandidate(combined) ? "flag-shaped-value" : undefined,
       /(?:error|exception|rejected|invalid)/i.test(combined) ? "failure-signature" : undefined,
     ].filter((value): value is string => value !== undefined);
     const observationId = id("O");

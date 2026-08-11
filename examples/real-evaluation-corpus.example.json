@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "private-reverse-corpus",
+  "cases": [
+    {
+      "id": "pe-check-1",
+      "targetKind": "reverse",
+      "objective": "Analyze challenge.exe and recover the verified CTF flag.",
+      "expected": "flag{replace_with_private_expected_value}",
+      "files": [
+        {
+          "source": "samples/pe-check-1/challenge.exe",
+          "path": "challenge.exe",
+          "sha256": "replace_with_lowercase_sha256"
+        }
+      ]
+    },
+    {
+      "id": "elf-check-1",
+      "targetKind": "reverse",
+      "objective": "Analyze challenge.elf and recover the verified CTF flag.",
+      "expected": "flag{replace_with_private_expected_value}",
+      "files": [
+        {
+          "source": "samples/elf-check-1/challenge.elf",
+          "path": "challenge.elf",
+          "sha256": "replace_with_lowercase_sha256"
+        }
+      ]
+    },
+    {
+      "id": "firmware-check-1",
+      "targetKind": "reverse",
+      "objective": "Analyze firmware.bin, identify its components, and recover the verified CTF flag.",
+      "expected": "flag{replace_with_private_expected_value}",
+      "files": [
+        {
+          "source": "samples/firmware-check-1/firmware.bin",
+          "path": "firmware.bin",
+          "sha256": "replace_with_lowercase_sha256"
+        }
+      ]
+    }
+  ]
+}

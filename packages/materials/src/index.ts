@@ -1,6 +1,7 @@
 export * from "./config.js";
 export * from "./domain/types.js";
 export * from "./domain/reasoning.js";
+export * from "./domain/candidate.js";
 export * from "./control/control-store.js";
 export * from "./control/lease-manager.js";
 export * from "./control/phase-machine.js";
@@ -45,6 +46,8 @@ export * from "./jobs/background-runner.js";
 export * from "./skills/registry.js";
 export * from "./mcp/registry.js";
 export * from "./evaluation/fixture-evaluator.js";
+export * from "./evaluation/real-corpus.js";
+export * from "./evaluation/real-model-evaluator.js";
 export * from "./evaluation/runtime-scenario-evaluator.js";
 export * from "./sandbox/fixture.js";
 export * from "./sandbox/fixture-catalog.js";
