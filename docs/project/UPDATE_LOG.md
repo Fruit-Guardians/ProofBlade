@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-12T16:05:00+08:00
+> 状态更新时间：2026-08-12T16:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260812-002 | 2026-08-12T16:30:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
 | UPDATE-20260812-001 | 2026-08-12T16:05:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
 | UPDATE-20260810-004 | 2026-08-10T19:42:54+08:00 | PLAN-100 | codex/deep-reverse-v1 | 本条记录所在提交 |
 | UPDATE-20260810-006 | 2026-08-10T18:00:00+08:00 | PLAN-001, PLAN-002 | codex/fix-concurrent-pr-metadata | 本条记录所在提交 |
@@ -35,6 +36,26 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260812-002
+
+时间：2026-08-12T16:30:00+08:00
+
+摘要：修复 Provider 调度器在并发返回、运行中修改上限和多中转站配置下的关联与隔离问题。
+
+### 变更
+
+- 调度器为每个 Provider stream 保留唯一 requestId；HTTP response、payload 前缀和最终 usage 由同一流回传，不再按 Pi 事件到达顺序关联
+- 完成或排队取消后清理该 requestId 的临时遥测状态，避免长会话累积 Pending 记录
+- 已存在调度池使用最新完整 Profile 的并发上限；上限提高后立即 drain 等待队列，降低时保留当前活跃请求
+- 池键加入非敏感 endpoint 指纹，base URL、代理、协议或 API Key 环境变量不同的 Profile 不共享队列
+- 新增乱序完成关联、1 到 4 动态提额和相同模型跨 endpoint 隔离回归测试
+
+### 验证
+
+- [x] npm run typecheck passed
+- [x] 162/162 Materials tests passed
+- [x] component documentation check passed (25 components, 6 affected)
 
 ## UPDATE-20260812-001
 

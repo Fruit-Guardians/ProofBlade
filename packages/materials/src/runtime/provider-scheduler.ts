@@ -3,6 +3,7 @@ import {
   type Api,
   type AssistantMessageEvent,
   type AssistantMessageEventStream,
+  type AssistantMessage,
   type Context,
   type Model,
   type ProviderStreams,
@@ -12,6 +13,8 @@ import {
 export interface ProviderRequestScope {
   provider: string;
   model: string;
+  /** Stable, non-secret identity of the selected profile endpoint. */
+  endpoint: string;
   maxConcurrentRequests: number;
 }
 
@@ -36,6 +39,9 @@ export interface ProviderRequestSchedulingObserver {
   queued(info: ProviderRequestQueueInfo): Promise<string | undefined> | string | undefined;
   started(requestId: string | undefined, info: ProviderRequestStartInfo): Promise<void> | void;
   cancelled(requestId: string | undefined, info: ProviderRequestCancelInfo): Promise<void> | void;
+  payload?(requestId: string | undefined, payload: unknown): Promise<void> | void;
+  response?(requestId: string | undefined, response: { status: number; headers: Record<string, string> }): Promise<void> | void;
+  completed?(requestId: string | undefined, message: AssistantMessage): Promise<void> | void;
 }
 
 export interface ProviderRequestSchedulerStatus extends ProviderRequestScope {
@@ -126,9 +132,13 @@ export class ProviderRequestScheduler {
       requestId = await observer?.queued({ ...scope, queueDepth });
       permit = await this.acquire(pool, options?.signal);
       await observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs });
-      const source = start(model, context, options);
+      const source = start(model, context, observedOptions(options, requestId, observer));
       sourceCreated = true;
-      for await (const event of source) output.push(event);
+      for await (const event of source) {
+        output.push(event);
+        if (event.type === "done") await observer?.completed?.(requestId, event.message);
+        else if (event.type === "error") await observer?.completed?.(requestId, event.error);
+      }
     } catch (error) {
       if (!sourceCreated) {
         const waitMs = Math.max(0, Date.now() - requestedAt);
@@ -147,13 +157,14 @@ export class ProviderRequestScheduler {
   }
 
   private pool(scope: ProviderRequestScope): SchedulerPool {
-    const key = `${scope.provider}\u0000${scope.model}`;
+    const key = `${scope.provider}\u0000${scope.model}\u0000${scope.endpoint}`;
     const existing = this.pools.get(key);
     if (existing) {
-      // A live process can briefly contain old and new GUI profile revisions.
-      // Taking the stricter limit guarantees a late configuration update never
-      // widens an already active pool unexpectedly.
-      existing.scope.maxConcurrentRequests = Math.min(existing.scope.maxConcurrentRequests, scope.maxConcurrentRequests);
+      // Provider profiles can be edited while the GUI remains open. The latest
+      // complete profile is authoritative; drain immediately if it raises the
+      // limit, while existing active requests finish normally if it lowers it.
+      existing.scope = { ...scope };
+      this.drain(existing);
       return existing;
     }
     const pool: SchedulerPool = { scope: { ...scope }, active: 0, queue: [] };
@@ -213,10 +224,26 @@ export function configuredMaxConcurrentRequests(value: number | undefined): numb
 }
 
 function assertScope(scope: ProviderRequestScope): void {
-  if (!scope.provider.trim() || !scope.model.trim()) throw new Error("Provider scheduling requires non-empty provider and model ids");
+  if (!scope.provider.trim() || !scope.model.trim() || !scope.endpoint.trim()) throw new Error("Provider scheduling requires non-empty provider, model, and endpoint ids");
   if (!Number.isInteger(scope.maxConcurrentRequests) || scope.maxConcurrentRequests < 1 || scope.maxConcurrentRequests > 32) {
     throw new Error("Provider maxConcurrentRequests must be an integer between 1 and 32");
   }
+}
+
+function observedOptions(options: StreamOptions | undefined, requestId: string | undefined, observer: ProviderRequestSchedulingObserver | undefined): StreamOptions | undefined {
+  if (!observer?.payload && !observer?.response) return options;
+  return {
+    ...options,
+    onPayload: async (payload, model) => {
+      const next = await options?.onPayload?.(payload, model);
+      await observer.payload?.(requestId, next ?? payload);
+      return next;
+    },
+    onResponse: async (response, model) => {
+      await options?.onResponse?.(response, model);
+      await observer.response?.(requestId, response);
+    },
+  };
 }
 
 function errorEvent(model: Model<Api>, error: unknown): Extract<AssistantMessageEvent, { type: "error" }> {

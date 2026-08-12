@@ -49,6 +49,9 @@ export class ProviderSchedulingTelemetry {
     queued: async (info) => await this.queued(info),
     started: async (requestId, info) => await this.started(requestId, info),
     cancelled: async (requestId, info) => await this.cancelledRequest(requestId, info),
+    payload: async (requestId, payload) => await this.payload(requestId, payload),
+    response: async (requestId, response) => await this.response(requestId, response),
+    completed: async (requestId, message) => await this.completed(requestId, message),
   };
 
   public register(pending: PendingProvider): void {
@@ -93,6 +96,47 @@ export class ProviderSchedulingTelemetry {
   private async cancelledRequest(requestId: string | undefined, info: ProviderRequestCancelInfo): Promise<void> {
     if (requestId) this.cancelled.add(requestId);
     await append(this.options, "provider_request_queue_cancelled", "orchestrator", { requestId, provider: info.provider, model: info.model, maxConcurrentRequests: info.maxConcurrentRequests, queueDepth: info.queueDepth, waitMs: info.waitMs, reason: info.reason });
+    if (requestId) this.requests.delete(requestId);
+  }
+
+  private async payload(requestId: string | undefined, payload: unknown): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    if (pending) pending.cachePrefix = captureProviderPrefixShape(payload);
+  }
+
+  private async response(requestId: string | undefined, response: { status: number; headers: Record<string, string> }): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    if (pending) pending.responseStatus = response.status;
+    await append(this.options, "provider_response_received", "model", {
+      requestId,
+      status: response.status,
+      headerNames: Object.keys(response.headers).map((name) => name.toLowerCase()).sort(),
+      responseHeaderCount: Object.keys(response.headers).length,
+    });
+  }
+
+  private async completed(requestId: string | undefined, message: AssistantMessage): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "model_usage", "model", {
+      requestId,
+      provider: message.provider,
+      model: message.model,
+      phase: pending?.phase ?? (await this.options.controlStore.snapshot(this.options.runId)).phase,
+      durationMs: pending ? Date.now() - pending.startedAt : undefined,
+      httpStatus: pending?.responseStatus,
+      finishReason: message.stopReason,
+      toolCallCount: message.content.filter((item) => item.type === "toolCall").length,
+      contextEstimatedTokens: pending?.contextEstimatedTokens,
+      contextManifestHash: pending?.contextManifestHash,
+      contextCache: pending?.contextCache,
+      cachePrefix: pending?.cachePrefix,
+      queueCancelled: this.isCancelled(requestId),
+      usage: message.usage,
+    });
+    if (requestId) {
+      this.requests.delete(requestId);
+      this.cancelled.delete(requestId);
+    }
   }
 }
 
@@ -131,9 +175,10 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       retryLimit: event.streamOptions.maxRetries ?? 0,
       cacheRetention: event.streamOptions.cacheRetention ?? "short",
     };
-    providers.push(pending);
     if (options.scheduling) options.scheduling.register(pending);
-    else await append(options, "provider_request_started", "model", {
+    else {
+      providers.push(pending);
+      await append(options, "provider_request_started", "model", {
       requestId: pending.requestId,
       provider: pending.provider,
       model: pending.model,
@@ -144,10 +189,11 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       contextCache: pending.contextCache,
       retryLimit: pending.retryLimit,
       cacheRetention: pending.cacheRetention,
-    });
+      });
+    }
     return undefined;
   });
-  const unsubscribeAfter = harness.on("after_provider_response", async (event) => {
+  const unsubscribeAfter = options.scheduling ? undefined : harness.on("after_provider_response", async (event) => {
     const pending = providers.find((item) => item.responseStatus === undefined);
     if (!pending) return undefined;
     pending.responseStatus = event.status;
@@ -159,13 +205,13 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     });
     return undefined;
   });
-  const unsubscribePayload = harness.on("before_provider_payload", async (event) => {
+  const unsubscribePayload = options.scheduling ? undefined : harness.on("before_provider_payload", async (event) => {
     const pending = providers.find((item) => item.responseStatus === undefined);
     if (pending) pending.cachePrefix = captureProviderPrefixShape(event.payload);
     return undefined;
   });
   const unsubscribeEvents = harness.subscribe(async (event) => {
-    if (event.type === "message_end" && isAssistantMessage(event.message)) {
+    if (!options.scheduling && event.type === "message_end" && isAssistantMessage(event.message)) {
       const pending = providers.shift();
       const message = event.message;
       await append(options, "model_usage", "model", {
@@ -181,7 +227,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         contextManifestHash: pending?.contextManifestHash,
         contextCache: pending?.contextCache,
         cachePrefix: pending?.cachePrefix,
-        queueCancelled: options.scheduling?.isCancelled(pending?.requestId) ?? false,
+        queueCancelled: false,
         usage: message.usage,
       });
       return;
@@ -236,8 +282,8 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   });
   return () => {
     unsubscribeEvents();
-    unsubscribePayload();
-    unsubscribeAfter();
+    unsubscribePayload?.();
+    unsubscribeAfter?.();
     unsubscribeBefore();
   };
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-12T16:05:00+08:00",
+  "updatedAt": "2026-08-12T16:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -108,7 +108,7 @@
       "milestone": "Milestone 4",
       "owner": "unassigned",
       "progress": 35,
-      "updatedAt": "2026-08-12T16:05:00+08:00",
+      "updatedAt": "2026-08-12T16:30:00+08:00",
       "objective": "统一控制 Provider 并发、429 重试、Token、费用、阶段时间和提交次数。",
       "deliverables": [
         "Provider/模型级并发槽和等待队列",
@@ -836,6 +836,28 @@
         "component, change-contract and project-report gates passed",
         "fixture evaluation gate passed",
         "npm audit --omit=dev: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260812-002",
+      "occurredAt": "2026-08-12T16:30:00+08:00",
+      "summary": "修复 Provider 调度器在并发返回、运行中修改上限和多中转站配置下的关联与隔离问题。",
+      "branch": "codex/provider-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "调度器为每个 Provider stream 保留唯一 requestId；HTTP response、payload 前缀和最终 usage 由同一流回传，不再按 Pi 事件到达顺序关联",
+        "完成或排队取消后清理该 requestId 的临时遥测状态，避免长会话累积 Pending 记录",
+        "已存在调度池使用最新完整 Profile 的并发上限；上限提高后立即 drain 等待队列，降低时保留当前活跃请求",
+        "池键加入非敏感 endpoint 指纹，base URL、代理、协议或 API Key 环境变量不同的 Profile 不共享队列",
+        "新增乱序完成关联、1 到 4 动态提额和相同模型跨 endpoint 隔离回归测试"
+      ],
+      "validation": [
+        "npm run typecheck passed",
+        "162/162 Materials tests passed",
+        "component documentation check passed (25 components, 6 affected)"
       ]
     }
   ],

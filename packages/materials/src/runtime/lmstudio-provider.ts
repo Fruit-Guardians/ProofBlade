@@ -10,6 +10,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import type { ModelProfileConfig, ProviderApi } from "../config.js";
+import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createProviderTransport } from "./provider-transport.js";
 import type { ProviderRequestBudget } from "./provider-budget.js";
 import { configuredMaxConcurrentRequests, providerRequestScheduler, type ProviderRequestScheduler, type ProviderRequestSchedulingObserver } from "./provider-scheduler.js";
@@ -67,7 +68,12 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   // a billable reservation, and cannot call the Provider until it owns a slot.
   const api = (scheduling?.scheduler ?? providerRequestScheduler()).wrap(
     budget ? budget.wrap(rawApi) : rawApi,
-    { provider: config.provider, model: config.modelId, maxConcurrentRequests: configuredMaxConcurrentRequests(config.maxConcurrentRequests) },
+    {
+      provider: config.provider,
+      model: config.modelId,
+      endpoint: providerEndpointIdentity(config),
+      maxConcurrentRequests: configuredMaxConcurrentRequests(config.maxConcurrentRequests),
+    },
     scheduling?.observer,
   );
   const provider = createProvider<ProviderApi>({
@@ -82,6 +88,11 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   const models = createModels();
   models.setProvider(provider);
   return { models, model, closeTransport: async () => { await transport?.close(); } };
+}
+
+/** Non-secret pool identity: credentials are intentionally excluded. */
+export function providerEndpointIdentity(config: Pick<ModelProfileConfig, "api" | "baseUrl" | "proxyUrl" | "apiKeyEnv">): string {
+  return sha256(canonicalJson({ api: config.api, baseUrl: config.baseUrl, proxyUrl: config.proxyUrl ?? "", apiKeyEnv: config.apiKeyEnv }));
 }
 
 function providerApi(api: ProviderApi): ProviderStreams {
