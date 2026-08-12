@@ -120,6 +120,15 @@ test("provider budget retains settled usage and an unfinished reservation after 
   }
 });
 
+test("provider budget ignores a durable queue cancellation without a started request", () => {
+  const history: Array<Pick<HarnessEvent, "type" | "payload">> = [
+    { type: "provider_request_queued", payload: { requestId: "PR-queued" } },
+    { type: "provider_request_queue_cancelled", payload: { requestId: "PR-queued" } },
+    { type: "model_usage", payload: { requestId: "PR-queued", queueCancelled: true, usage: { input: 0, output: 0, cost: { total: 0 } } } },
+  ];
+  assert.equal(recoverProviderSpend(history, model), 0);
+});
+
 function completingProvider(createMessage: () => AssistantMessage): ProviderStreams {
   const stream = (): AssistantMessageEventStream => {
     const output = createAssistantMessageEventStream();

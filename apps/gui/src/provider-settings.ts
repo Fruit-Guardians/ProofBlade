@@ -15,6 +15,7 @@ interface LocalProviderProfile {
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
+  maxConcurrentRequests?: number;
   apiKey?: string;
 }
 
@@ -32,6 +33,7 @@ interface LegacyProviderFile {
   model: string;
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
+  maxConcurrentRequests?: number;
   apiKey?: string;
 }
 
@@ -74,6 +76,7 @@ export class ProviderSettingsStore {
       model: model?.trim() || profile.model,
       thinkingLevel: level,
       cacheRetention: profile.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
+      maxConcurrentRequests: profile.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
       apiKeyEnv,
       reasoning: reasoningEnabled || (this.baseProfile.reasoning ?? false),
       supportsReasoningEffort: reasoningEnabled ? true : this.baseProfile.supportsReasoningEffort,
@@ -95,6 +98,7 @@ export class ProviderSettingsStore {
       model: active.model,
       thinkingLevel: active.thinkingLevel,
       cacheRetention: active.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
+      maxConcurrentRequests: active.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
       hasApiKey: Boolean(active.apiKey),
     };
   }
@@ -104,6 +108,7 @@ export class ProviderSettingsStore {
     const validated = validateInput({
       ...input,
       cacheRetention: input.cacheRetention ?? existing?.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
+      maxConcurrentRequests: input.maxConcurrentRequests ?? existing?.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
     }, this.baseProfile.api);
     const id = existing?.id ?? uniqueId(validated.name, new Set(this.profiles.map((profile) => profile.id)));
     const apiKey = input.clearApiKey ? undefined : input.apiKey?.trim() || existing?.apiKey;
@@ -182,6 +187,7 @@ export class ProviderSettingsStore {
           models: legacy.model && legacy.model !== "auto" ? [legacy.model] : [],
           thinkingLevel: legacy.thinkingLevel,
           cacheRetention: legacy.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
+          maxConcurrentRequests: legacy.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
         }, this.baseProfile.api);
         this.profiles = [{ id: "default", ...validated, ...(legacy.apiKey?.trim() ? { apiKey: legacy.apiKey.trim() } : {}) }];
         this.activeProfileId = "default";
@@ -205,6 +211,7 @@ export class ProviderSettingsStore {
         models: this.baseProfile.model === "auto" ? [] : [this.baseProfile.model],
         thinkingLevel: this.baseProfile.thinkingLevel ?? "off",
         cacheRetention: this.baseProfile.cacheRetention ?? "short",
+        maxConcurrentRequests: this.baseProfile.maxConcurrentRequests ?? 1,
         ...(apiKey ? { apiKey } : {}),
       }];
       this.activeProfileId = "default";
@@ -236,6 +243,7 @@ function publicProfile(profile: LocalProviderProfile): ProviderProfile {
     models: [...profile.models],
     thinkingLevel: profile.thinkingLevel,
     cacheRetention: profile.cacheRetention ?? "short",
+    maxConcurrentRequests: profile.maxConcurrentRequests ?? 1,
     hasApiKey: Boolean(profile.apiKey),
   };
 }
@@ -255,6 +263,7 @@ function validateStoredProfile(value: unknown, fallbackApi: ProviderApi): LocalP
     models: input.models,
     thinkingLevel: input.thinkingLevel ?? "off",
     cacheRetention: input.cacheRetention,
+    maxConcurrentRequests: input.maxConcurrentRequests,
   }, fallbackApi);
   const apiKey = typeof input.apiKey === "string" && input.apiKey.trim() ? input.apiKey.trim() : undefined;
   return { id, ...validated, ...(apiKey ? { apiKey } : {}) };
@@ -271,9 +280,11 @@ function validateInput(input: ProviderSettingsInput, fallbackApi: ProviderApi): 
   if (!thinkingLevels.has(input.thinkingLevel)) throw new Error(`不支持的思考等级：${String(input.thinkingLevel)}`);
   const cacheRetention = input.cacheRetention ?? "short";
   if (!cacheRetentions.has(cacheRetention)) throw new Error(`不支持的缓存保留策略：${String(cacheRetention)}`);
+  const maxConcurrentRequests = input.maxConcurrentRequests ?? 1;
+  if (!Number.isInteger(maxConcurrentRequests) || maxConcurrentRequests < 1 || maxConcurrentRequests > 32) throw new Error(`并发请求上限必须是 1 到 32 的整数：${String(maxConcurrentRequests)}`);
   const models = [...new Set((input.models ?? []).filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
   if (model !== "auto" && !models.includes(model)) models.unshift(model);
-  return { name, provider, api, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel, cacheRetention };
+  return { name, provider, api, baseUrl, ...(proxyUrl ? { proxyUrl } : {}), model, models, thinkingLevel: input.thinkingLevel, cacheRetention, maxConcurrentRequests };
 }
 
 function required(value: unknown, label: string): string {

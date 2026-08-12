@@ -31,6 +31,7 @@ export * from "./runtime/provider-transport.js";
 export * from "./runtime/provider-native.js";
 export * from "./runtime/lmstudio-provider.js";
 export * from "./runtime/provider-budget.js";
+export * from "./runtime/provider-scheduler.js";
 export * from "./runtime/coding-resources.js";
 export * from "./runtime/coding-lane.js";
 export * from "./runtime/context-length-recovery.js";

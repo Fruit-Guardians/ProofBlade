@@ -48,6 +48,7 @@ export interface RunTelemetryReport {
     toolCallCount: number;
     finishReasons: Record<string, number>;
     byModel: Array<{ provider: string; model: string; requests: number; tokens: number; costUsd: number }>;
+    scheduling: { queued: number; cancelled: number; maxQueueDepth: number; waitMs: number; averageWaitMs: number };
   };
   tools: {
     agentCalls: number;
@@ -115,8 +116,11 @@ export class RunTelemetry {
 
 function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] {
   const starts = events.filter((event) => event.type === "provider_request_started");
+  const queued = events.filter((event) => event.type === "provider_request_queued");
+  const acquired = events.filter((event) => event.type === "provider_request_slot_acquired");
+  const cancelled = events.filter((event) => event.type === "provider_request_queue_cancelled");
   const responses = events.filter((event) => event.type === "provider_response_received");
-  const usages = events.filter((event) => event.type === "model_usage");
+  const usages = events.filter((event) => event.type === "model_usage" && event.payload?.queueCancelled !== true);
   const tokens: TokenTotals = { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
   const cost: CostTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalUsd: 0 };
   const latencies: number[] = [];
@@ -166,6 +170,13 @@ function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] 
     toolCallCount,
     finishReasons: orderedRecord(finishReasons),
     byModel: [...models.values()].sort((a, b) => a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model)),
+    scheduling: {
+      queued: queued.length,
+      cancelled: cancelled.length,
+      maxQueueDepth: Math.max(0, ...queued.map((event) => number(event.payload?.queueDepth))),
+      waitMs: sum(acquired.map((event) => number(event.payload?.waitMs))),
+      averageWaitMs: acquired.length ? round(sum(acquired.map((event) => number(event.payload?.waitMs))) / acquired.length) : 0,
+    },
   };
 }
 

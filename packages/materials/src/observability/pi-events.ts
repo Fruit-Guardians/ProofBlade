@@ -6,6 +6,7 @@ import type { ContextManifest, Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
+import type { ProviderRequestCancelInfo, ProviderRequestQueueInfo, ProviderRequestSchedulingObserver, ProviderRequestStartInfo } from "../runtime/provider-scheduler.js";
 
 export interface PiObservabilityOptions {
   runId: string;
@@ -17,6 +18,7 @@ export interface PiObservabilityOptions {
     manifestHash?: string;
     cache?: ContextManifest["cache"];
   } | undefined>;
+  scheduling?: ProviderSchedulingTelemetry;
 }
 
 interface PendingProvider {
@@ -30,6 +32,72 @@ interface PendingProvider {
   contextCache?: ContextManifest["cache"];
   cachePrefix?: ProviderPrefixShape;
   responseStatus?: number;
+  api: string;
+  retryLimit: number;
+  cacheRetention: string;
+}
+
+/** Correlates Pi's pre-request hook with the scheduler's later slot grant. */
+export class ProviderSchedulingTelemetry {
+  private readonly waiting = new Map<string, PendingProvider[]>();
+  private readonly requests = new Map<string, PendingProvider>();
+  private readonly cancelled = new Set<string>();
+
+  public constructor(private readonly options: Pick<PiObservabilityOptions, "runId" | "lane" | "controlStore">) {}
+
+  public readonly observer: ProviderRequestSchedulingObserver = {
+    queued: async (info) => await this.queued(info),
+    started: async (requestId, info) => await this.started(requestId, info),
+    cancelled: async (requestId, info) => await this.cancelledRequest(requestId, info),
+  };
+
+  public register(pending: PendingProvider): void {
+    const key = providerKey(pending.provider, pending.model);
+    const waiting = this.waiting.get(key) ?? [];
+    waiting.push(pending);
+    this.waiting.set(key, waiting);
+  }
+
+  public isCancelled(requestId: string | undefined): boolean {
+    return requestId !== undefined && this.cancelled.has(requestId);
+  }
+
+  private async queued(info: ProviderRequestQueueInfo): Promise<string> {
+    const pending = this.waiting.get(providerKey(info.provider, info.model))?.shift();
+    const requestId = pending?.requestId ?? id("PR");
+    if (pending) this.requests.set(requestId, pending);
+    await append(this.options, "provider_request_queued", "orchestrator", { requestId, provider: info.provider, model: info.model, maxConcurrentRequests: info.maxConcurrentRequests, queueDepth: info.queueDepth });
+    return requestId;
+  }
+
+  private async started(requestId: string | undefined, info: ProviderRequestStartInfo): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    if (pending) pending.startedAt = Date.now();
+    await append(this.options, "provider_request_slot_acquired", "orchestrator", { requestId, provider: info.provider, model: info.model, maxConcurrentRequests: info.maxConcurrentRequests, queueDepth: info.queueDepth, waitMs: info.waitMs });
+    await append(this.options, "provider_request_started", "model", {
+      requestId,
+      provider: info.provider,
+      model: info.model,
+      ...(pending ? {
+        api: pending.api,
+        phase: pending.phase,
+        contextEstimatedTokens: pending.contextEstimatedTokens,
+        contextManifestHash: pending.contextManifestHash,
+        contextCache: pending.contextCache,
+        retryLimit: pending.retryLimit,
+        cacheRetention: pending.cacheRetention,
+      } : {}),
+    });
+  }
+
+  private async cancelledRequest(requestId: string | undefined, info: ProviderRequestCancelInfo): Promise<void> {
+    if (requestId) this.cancelled.add(requestId);
+    await append(this.options, "provider_request_queue_cancelled", "orchestrator", { requestId, provider: info.provider, model: info.model, maxConcurrentRequests: info.maxConcurrentRequests, queueDepth: info.queueDepth, waitMs: info.waitMs, reason: info.reason });
+  }
+}
+
+export function createProviderSchedulingTelemetry(options: Pick<PiObservabilityOptions, "runId" | "lane" | "controlStore">): ProviderSchedulingTelemetry {
+  return new ProviderSchedulingTelemetry(options);
 }
 
 interface PendingTool {
@@ -59,19 +127,23 @@ export function attachPiObservability<TContext extends object | undefined>(harne
           : {}),
       ...(context?.manifestHash ? { contextManifestHash: context.manifestHash } : {}),
       ...(context?.cache ? { contextCache: context.cache } : {}),
+      api: event.model.api,
+      retryLimit: event.streamOptions.maxRetries ?? 0,
+      cacheRetention: event.streamOptions.cacheRetention ?? "short",
     };
     providers.push(pending);
-    await append(options, "provider_request_started", "model", {
+    if (options.scheduling) options.scheduling.register(pending);
+    else await append(options, "provider_request_started", "model", {
       requestId: pending.requestId,
       provider: pending.provider,
       model: pending.model,
-      api: event.model.api,
+      api: pending.api,
       phase: pending.phase,
       contextEstimatedTokens: pending.contextEstimatedTokens,
       contextManifestHash: pending.contextManifestHash,
       contextCache: pending.contextCache,
-      retryLimit: event.streamOptions.maxRetries ?? 0,
-      cacheRetention: event.streamOptions.cacheRetention ?? "short",
+      retryLimit: pending.retryLimit,
+      cacheRetention: pending.cacheRetention,
     });
     return undefined;
   });
@@ -109,6 +181,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         contextManifestHash: pending?.contextManifestHash,
         contextCache: pending?.contextCache,
         cachePrefix: pending?.cachePrefix,
+        queueCancelled: options.scheduling?.isCancelled(pending?.requestId) ?? false,
         usage: message.usage,
       });
       return;
@@ -169,8 +242,12 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   };
 }
 
-function append(options: PiObservabilityOptions, type: "provider_request_started" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
+function append(options: PiObservabilityOptions, type: "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
   return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]);
+}
+
+function providerKey(provider: string, model: string): string {
+  return `${provider}\u0000${model}`;
 }
 
 function isAssistantMessage(message: unknown): message is AssistantMessage {

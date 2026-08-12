@@ -18,7 +18,7 @@ import { planContextMaintenance } from "@proofblade/molecules";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { RuntimeResourceSnapshot } from "../domain/types.js";
 import { SOLVER_PROTOCOL_INSTRUCTIONS } from "./version.js";
-import { attachPiObservability } from "../observability/pi-events.js";
+import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 
 export class PiSolverLane implements AgentLanePort {
   private busy = false;
@@ -75,7 +75,8 @@ export class PiSolverLane implements AgentLanePort {
     });
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
     const resourceSnapshot = options.runtime.resourceSnapshot(skills.contextSnapshot());
-    const { models, model, closeTransport } = createConfiguredModels(profile, providerBudget);
+    const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "executor", controlStore: options.controlStore });
+    const { models, model, closeTransport } = createConfiguredModels(profile, providerBudget, { observer: scheduling.observer });
     const tools = createSolverTools();
     const checkpointService = new CheckpointService(options.controlStore, options.artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService, options.compactionFault);
@@ -164,6 +165,7 @@ export class PiSolverLane implements AgentLanePort {
         const compiled = new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot });
         return { estimatedTokens: compiled.estimatedTokens, manifestHash: compiled.manifest.hash, cache: compiled.manifest.cache };
       },
+      scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
     const lane = new PiSolverLane(options.runId, options.controlStore, harness, checkpointService, profile, skills, resourceSnapshot, closeTransport, providerBudget);
