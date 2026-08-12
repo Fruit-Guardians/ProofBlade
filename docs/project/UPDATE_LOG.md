@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T19:42:54+08:00
+> 状态更新时间：2026-08-12T16:05:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260812-001 | 2026-08-12T16:05:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
 | UPDATE-20260810-004 | 2026-08-10T19:42:54+08:00 | PLAN-100 | codex/deep-reverse-v1 | 本条记录所在提交 |
 | UPDATE-20260810-006 | 2026-08-10T18:00:00+08:00 | PLAN-001, PLAN-002 | codex/fix-concurrent-pr-metadata | 本条记录所在提交 |
 | UPDATE-20260810-003 | 2026-08-10T14:08:00+08:00 | PLAN-110, PLAN-120 | codex/fix-evidence-repeat-loop | 本条记录所在提交 |
@@ -34,6 +35,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260812-001
+
+时间：2026-08-12T16:05:00+08:00
+
+摘要：为同一 Provider/模型的实际请求加入共享 FIFO 并发调度，并将排队、取消和等待时间纳入持久化遥测与 GUI 配置。
+
+### 变更
+
+- 新增 1-32 可配置的 Provider/模型级并发槽；普通 Coding Lane、Solver Lane 与 Pi Agent Lane 复用同一调度器
+- 等待中的请求可由 AbortSignal 取消，取消前不发送 Provider 请求，也不占用成本 reservation
+- 持久化 provider_request_queued、provider_request_slot_acquired 与 provider_request_queue_cancelled 事件，并在 Run telemetry 中汇总队列指标
+- GUI Provider Profile 保存并发上限，运行详情显示排队请求、排队取消、最大队列深度和平均等待时间
+- 加入 FIFO、并发上限、排队取消与预算恢复回归测试
+
+### 验证
+
+- [x] npm run typecheck passed
+- [x] npm run verify passed
+- [x] component, change-contract and project-report gates passed
+- [x] fixture evaluation gate passed
+- [x] npm audit --omit=dev: 0 vulnerabilities
 
 ## UPDATE-20260810-004
 

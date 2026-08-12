@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-10T19:42:54+08:00",
+  "updatedAt": "2026-08-12T16:05:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -107,8 +107,8 @@
       "priority": "P0",
       "milestone": "Milestone 4",
       "owner": "unassigned",
-      "progress": 10,
-      "updatedAt": "2026-08-08T02:47:55.5788475+08:00",
+      "progress": 35,
+      "updatedAt": "2026-08-12T16:05:00+08:00",
       "objective": "统一控制 Provider 并发、429 重试、Token、费用、阶段时间和提交次数。",
       "deliverables": [
         "Provider/模型级并发槽和等待队列",
@@ -812,6 +812,30 @@
         "18/18 deterministic fixture evaluations passed",
         "component, contract and project report gates passed",
         "npm audit: 0 vulnerabilities"
+      ]
+    },
+    {
+      "id": "UPDATE-20260812-001",
+      "occurredAt": "2026-08-12T16:05:00+08:00",
+      "summary": "为同一 Provider/模型的实际请求加入共享 FIFO 并发调度，并将排队、取消和等待时间纳入持久化遥测与 GUI 配置。",
+      "branch": "codex/provider-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120"
+      ],
+      "changes": [
+        "新增 1-32 可配置的 Provider/模型级并发槽；普通 Coding Lane、Solver Lane 与 Pi Agent Lane 复用同一调度器",
+        "等待中的请求可由 AbortSignal 取消，取消前不发送 Provider 请求，也不占用成本 reservation",
+        "持久化 provider_request_queued、provider_request_slot_acquired 与 provider_request_queue_cancelled 事件，并在 Run telemetry 中汇总队列指标",
+        "GUI Provider Profile 保存并发上限，运行详情显示排队请求、排队取消、最大队列深度和平均等待时间",
+        "加入 FIFO、并发上限、排队取消与预算恢复回归测试"
+      ],
+      "validation": [
+        "npm run typecheck passed",
+        "npm run verify passed",
+        "component, change-contract and project-report gates passed",
+        "fixture evaluation gate passed",
+        "npm audit --omit=dev: 0 vulnerabilities"
       ]
     }
   ],
