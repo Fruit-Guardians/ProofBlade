@@ -10,8 +10,10 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import type { ModelProfileConfig, ProviderApi } from "../config.js";
+import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createProviderTransport } from "./provider-transport.js";
 import type { ProviderRequestBudget } from "./provider-budget.js";
+import { configuredMaxConcurrentRequests, providerRequestScheduler, type ProviderRequestScheduler, type ProviderRequestSchedulingObserver } from "./provider-scheduler.js";
 
 export interface ResolvedModelProfile extends ModelProfileConfig {
   modelId: string;
@@ -32,7 +34,10 @@ export async function resolveModelProfile(profile: ModelProfileConfig): Promise<
   return { ...profile, baseUrl, modelId };
 }
 
-export function createConfiguredModels(config: ResolvedModelProfile, budget?: ProviderRequestBudget): { models: MutableModels; model: Model<ProviderApi>; closeTransport(): Promise<void> } {
+export function createConfiguredModels(config: ResolvedModelProfile, budget?: ProviderRequestBudget, scheduling?: {
+  scheduler?: ProviderRequestScheduler;
+  observer?: ProviderRequestSchedulingObserver;
+}): { models: MutableModels; model: Model<ProviderApi>; closeTransport(): Promise<void> } {
   const model: Model<ProviderApi> = {
     id: config.modelId,
     name: config.modelId,
@@ -59,7 +64,18 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
     streamSimple: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["streamSimple"]>[1], options?: Parameters<ProviderStreams["streamSimple"]>[2]) =>
       baseApi.streamSimple(streamModel, context, { ...options, fetch: transport.fetch }),
   } : baseApi;
-  const api = budget ? budget.wrap(rawApi) : rawApi;
+  // Scheduling is deliberately outermost: a waiting request has not yet made
+  // a billable reservation, and cannot call the Provider until it owns a slot.
+  const api = (scheduling?.scheduler ?? providerRequestScheduler()).wrap(
+    budget ? budget.wrap(rawApi) : rawApi,
+    {
+      provider: config.provider,
+      model: config.modelId,
+      endpoint: providerEndpointIdentity(config),
+      maxConcurrentRequests: configuredMaxConcurrentRequests(config.maxConcurrentRequests),
+    },
+    scheduling?.observer,
+  );
   const provider = createProvider<ProviderApi>({
     id: config.provider,
     name: config.provider,
@@ -72,6 +88,11 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   const models = createModels();
   models.setProvider(provider);
   return { models, model, closeTransport: async () => { await transport?.close(); } };
+}
+
+/** Non-secret pool identity: credentials are intentionally excluded. */
+export function providerEndpointIdentity(config: Pick<ModelProfileConfig, "api" | "baseUrl" | "proxyUrl" | "apiKeyEnv">): string {
+  return sha256(canonicalJson({ api: config.api, baseUrl: config.baseUrl, proxyUrl: config.proxyUrl ?? "", apiKeyEnv: config.apiKeyEnv }));
 }
 
 function providerApi(api: ProviderApi): ProviderStreams {

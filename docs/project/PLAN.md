@@ -1,7 +1,7 @@
 # 项目计划
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-10T19:42:54+08:00
+> 状态更新时间：2026-08-12T16:30:00+08:00
 
 ## 概览
 
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | ---: | --- | --- |
 | PLAN-100 | P0 | Milestone 4 | 进行中 | 42% | unassigned | 2026-08-10T19:42:54+08:00 |
 | PLAN-110 | P0 | Milestone 2 debt | 进行中 | 35% | unassigned | 2026-08-09T15:15:00+08:00 |
-| PLAN-120 | P0 | Milestone 4 | 进行中 | 10% | unassigned | 2026-08-08T02:47:55.5788475+08:00 |
+| PLAN-120 | P0 | Milestone 4 | 进行中 | 35% | unassigned | 2026-08-12T16:30:00+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-200 | P1 | Milestone 6 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-210 | P1 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-07T18:37:33+08:00 |

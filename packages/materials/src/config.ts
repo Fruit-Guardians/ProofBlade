@@ -35,6 +35,8 @@ export interface ModelProfileConfig {
   maxTokens: number;
   requestTimeoutMs: number;
   maxRetries: number;
+  /** Maximum simultaneous HTTP requests for this Provider/model in one process. */
+  maxConcurrentRequests?: number;
   /** Maximum provider-requested Retry-After delay accepted for one attempt. */
   maxRetryDelayMs?: number;
   input: Array<"text" | "image">;
@@ -93,6 +95,7 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (!Number.isFinite(profile.contextWindow) || profile.contextWindow < 1024) throw new Error(`Invalid contextWindow in ${path}`);
   if (!Number.isFinite(profile.maxTokens) || profile.maxTokens < 1) throw new Error(`Invalid maxTokens in ${path}`);
   if (!Number.isInteger(profile.maxRetries) || profile.maxRetries < 0 || profile.maxRetries > 8) throw new Error(`Invalid maxRetries in ${path}`);
+  if (profile.maxConcurrentRequests !== undefined && (!Number.isInteger(profile.maxConcurrentRequests) || profile.maxConcurrentRequests < 1 || profile.maxConcurrentRequests > 32)) throw new Error(`Invalid maxConcurrentRequests in ${path}`);
   if (profile.maxRetryDelayMs !== undefined && (!Number.isInteger(profile.maxRetryDelayMs) || profile.maxRetryDelayMs < 0 || profile.maxRetryDelayMs > 300_000)) throw new Error(`Invalid maxRetryDelayMs in ${path}`);
   if (profile.thinkingLevel !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(profile.thinkingLevel)) throw new Error(`Invalid thinkingLevel in ${path}`);
   if (profile.cacheRetention !== undefined && !["none", "short", "long"].includes(profile.cacheRetention)) throw new Error(`Invalid cacheRetention in ${path}`);

@@ -43,6 +43,7 @@ test("persists provider overrides outside the repository response without exposi
       model: "small-model",
       thinkingLevel: "low",
       cacheRetention: "long",
+      maxConcurrentRequests: 3,
       apiKey: "test-secret",
     });
     assert.equal(settings.baseUrl, "https://example.test/v1");
@@ -59,6 +60,8 @@ test("persists provider overrides outside the repository response without exposi
     assert.equal(reloaded.publicSettings().cacheRetention, "long");
     assert.equal(reloaded.modelProfile().cacheRetention, "long");
     assert.equal(reloaded.modelProfile().proxyUrl, "http://127.0.0.1:7897");
+    assert.equal(reloaded.publicSettings().maxConcurrentRequests, 3);
+    assert.equal(reloaded.modelProfile().maxConcurrentRequests, 3);
     assert.equal(reloaded.modelProfile().reasoning, true);
     assert.equal(reloaded.modelProfile().supportsReasoningEffort, true);
     assert.equal(reloaded.modelProfile().maxTokensField, "max_completion_tokens");
@@ -106,6 +109,7 @@ test("keeps multiple provider profiles, keys, and activation independent", async
       models: ["model-a", "model-a-fast"],
       thinkingLevel: "low",
       cacheRetention: "short",
+      maxConcurrentRequests: 2,
       apiKey: "secret-a",
     });
     const relayA = settings.profiles.find((profile) => profile.name === "Relay A");
@@ -119,6 +123,7 @@ test("keeps multiple provider profiles, keys, and activation independent", async
       models: ["model-b"],
       thinkingLevel: "medium",
       cacheRetention: "long",
+      maxConcurrentRequests: 4,
       apiKey: "secret-b",
     });
     const relayB = settings.profiles.find((profile) => profile.name === "Relay B");
@@ -126,6 +131,8 @@ test("keeps multiple provider profiles, keys, and activation independent", async
     assert.equal(settings.activeProfileId, relayB.id);
     assert.equal(settings.profiles.find((profile) => profile.id === relayB.id)?.cacheRetention, "long");
     assert.equal(store.modelProfile(relayA.id).cacheRetention, "short");
+    assert.equal(store.modelProfile(relayA.id).maxConcurrentRequests, 2);
+    assert.equal(store.modelProfile(relayB.id).maxConcurrentRequests, 4);
     assert.equal("apiKey" in relayA, false);
     assert.equal("apiKey" in relayB, false);
 

@@ -7,6 +7,7 @@ import { captureProviderPrefixShape } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
+import { createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
 
 const config: ProofBladeConfig = {
@@ -44,6 +45,8 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
 
     await services.control.append(runId, [
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_started", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", contextEstimatedTokens: 800, retryLimit: 0 } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_queued", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2 } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_slot_acquired", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2, waitMs: 40 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_response_received", payload: { requestId: "PR-1", status: 200, headerNames: ["content-type"], responseHeaderCount: 1 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "model_usage", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", durationMs: 120, finishReason: "toolUse", toolCallCount: 1, usage: { input: 100, output: 20, reasoning: 5, cacheRead: 25, cacheWrite: 10, totalTokens: 120, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } },
       { schemaVersion: 1, lane: "executor", correlationId: "tool-1", actor: "model", type: "tool_call_recorded", payload: { toolCallId: "TC-1", toolName: "inspect_target", argsHash: sha256("{}"), waitMs: 4, executionMode: "sequential", sensitivity: "target", timeoutMs: 30_000 } },
@@ -63,6 +66,7 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     assert.equal(report.provider.cacheHitRate, 0.2);
     assert.equal(report.provider.latencyMs.p95, 120);
     assert.equal(report.provider.cost.totalUsd, 0);
+    assert.deepEqual(report.provider.scheduling, { queued: 1, cancelled: 0, maxQueueDepth: 2, waitMs: 40, averageWaitMs: 40 });
     assert.equal(report.tools.agentCalls, 1);
     assert.equal(report.tools.effectiveActionRatio, 1);
     assert.equal(report.tools.effectTimeouts, 1);
@@ -110,3 +114,47 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("provider scheduling telemetry preserves request correlation when responses finish out of order", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-observe-concurrent-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "OBSERVE-CONCURRENT-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const scheduling = createProviderSchedulingTelemetry({ runId, lane: "executor", controlStore: services.control });
+    scheduling.register({ requestId: "PR-first", startedAt: 1, phase: "intake", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
+    scheduling.register({ requestId: "PR-second", startedAt: 2, phase: "plan", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
+    const first = await scheduling.observer.queued({ provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 0 });
+    const second = await scheduling.observer.queued({ provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 1 });
+    await scheduling.observer.started(first, { provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 0, waitMs: 0 });
+    await scheduling.observer.started(second, { provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 1, waitMs: 0 });
+    await scheduling.observer.response(second, { status: 202, headers: { "x-second": "yes" } });
+    await scheduling.observer.completed(second, assistantMessage("fixture-model", "second"));
+    await scheduling.observer.response(first, { status: 201, headers: { "x-first": "yes" } });
+    await scheduling.observer.completed(first, assistantMessage("fixture-model", "first"));
+    const events = await services.control.events(runId);
+    const usage = events
+      .filter((event) => event.type === "model_usage")
+      .map((event) => event.payload as { requestId: string; httpStatus: number; phase: string })
+      .map(({ requestId, httpStatus, phase }) => ({ requestId, httpStatus, phase }));
+    assert.deepEqual(usage, [
+      { requestId: "PR-second", httpStatus: 202, phase: "plan" },
+      { requestId: "PR-first", httpStatus: 201, phase: "intake" },
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+function assistantMessage(model: string, text: string) {
+  return {
+    role: "assistant" as const,
+    api: "openai-completions" as const,
+    provider: "local",
+    model,
+    content: [{ type: "text" as const, text }],
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: "stop" as const,
+    timestamp: Date.now(),
+  };
+}

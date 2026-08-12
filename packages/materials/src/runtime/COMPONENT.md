@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.13",
+  "version": "0.10.16",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-11T15:13:39.000Z",
+  "updatedAt": "2026-08-12T08:30:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 11,
-    "securityAuditCount": 11,
-    "lastBugAuditAt": "2026-08-11T15:13:39.000Z",
-    "lastSecurityAuditAt": "2026-08-11T15:13:39.000Z",
-    "sourceHash": "f8f82e6735d0d602828c3c2e1522b3841b5f85209132a575c8e7acb91a7c9998",
+    "bugAuditCount": 14,
+    "securityAuditCount": 14,
+    "lastBugAuditAt": "2026-08-12T08:30:00.000Z",
+    "lastSecurityAuditAt": "2026-08-12T08:30:00.000Z",
+    "sourceHash": "502937070d7c7074209890d2d9cedb60849074a51ce686edf86afb110785172e",
     "result": "passed"
   }
 }
@@ -26,7 +26,7 @@
 
 - `coding-lane.ts` 驱动普通对话并在动态尾部注入隐藏 Forest 摘要；`solver-lane.ts` 驱动证据型任务。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
-- `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability。
+- `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
 - Coding Provider 始终看到固定 `evidence`、`load_skill` 和 `mcp_call`；启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
@@ -36,7 +36,7 @@
 
 ## 开发规则与验证
 
-模型、URL、思考等级、缓存策略和 Provider 重试预算只能来自配置。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
+模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 

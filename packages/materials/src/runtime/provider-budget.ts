@@ -58,9 +58,15 @@ export function recoverProviderSpend(events: ReadonlyArray<Pick<HarnessEvent, "t
       if (requestId) pending.add(requestId);
       continue;
     }
+    if (event.type === "provider_request_queue_cancelled") {
+      const requestId = stringField(payload, "requestId");
+      if (requestId) pending.delete(requestId);
+      continue;
+    }
     if (event.type !== "model_usage") continue;
     const requestId = stringField(payload, "requestId");
     if (requestId) pending.delete(requestId);
+    if (payload.queueCancelled === true) continue;
     spentUsd += usageCost(payload, model, maximumUsd);
   }
   return spentUsd + (pending.size * maximumUsd);

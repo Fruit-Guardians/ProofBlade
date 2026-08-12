@@ -12,7 +12,7 @@ import type { Lane } from "../domain/types.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
-import { attachPiObservability } from "../observability/pi-events.js";
+import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import type { ClaimVerificationProjection } from "../verification/claim-verification.js";
 
 export interface AgentOutcome {
@@ -59,7 +59,8 @@ export class PiAgentLane implements AgentLanePort {
       ? await repo.open(metadata)
       : await repo.create({ id: sessionId, cwd: options.runDir, metadata: { runId: options.runId, lane } });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
-    const { models, model } = createConfiguredModels(profile);
+    const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane, controlStore: options.controlStore });
+    const { models, model } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     const snapshot = await options.controlStore.snapshot(options.runId);
     const compiled = new ContextCompiler().build({
       runId: options.runId,
@@ -89,6 +90,7 @@ export class PiAgentLane implements AgentLanePort {
         const current = await options.controlStore.snapshot(options.runId);
         return new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow }).estimatedTokens;
       },
+      scheduling,
     });
     return new PiAgentLane(options.runId, lane, options.controlStore, harness);
   }

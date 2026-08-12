@@ -81,7 +81,7 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”可输入或浏览选择绝对工作目录，创建不绑定 Fixture 的普通 Coding Agent 会话；每轮都以该目录启动 Coding Lane，并按需使用 `read`、`bash`、`edit` 和 `write`。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
 
-右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表和默认思考等级；模型发现和真实对话共用该代理。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
+右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表、默认思考等级和并发请求上限（1-32，默认 1）；模型发现和真实对话共用该代理。相同 Provider/模型的对话共用 FIFO 并发槽，排队请求可暂停取消且不会先占用成本预算。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
 
 对话可以放入自定义文件夹并在侧栏筛选，也可从输入框下方随时切换工作目录。能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。工作目录、文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 

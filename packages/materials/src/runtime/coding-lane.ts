@@ -15,7 +15,7 @@ import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { estimateTokens } from "../domain/utils.js";
-import { attachPiObservability } from "../observability/pi-events.js";
+import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
@@ -82,7 +82,8 @@ export class PiCodingLane implements AgentLanePort {
         metadata: { runId: options.runId, lane: "main", purpose: "chat" },
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
-    const { models, model, closeTransport } = createConfiguredModels(profile);
+    const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
+    const { models, model, closeTransport } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
     const mcp = McpProjectRegistry.load(options.projectRoot);
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
@@ -149,6 +150,7 @@ export class PiCodingLane implements AgentLanePort {
       runId: options.runId,
       lane: "main",
       controlStore: options.controlStore,
+      scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
     return new PiCodingLane(

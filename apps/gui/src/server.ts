@@ -262,6 +262,7 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
     models: stringArray(body.models),
     thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
     cacheRetention: typeof body.cacheRetention === "string" ? body.cacheRetention as ProviderCacheRetention : undefined,
+    maxConcurrentRequests: body.maxConcurrentRequests === undefined ? undefined : Number(body.maxConcurrentRequests),
     apiKey: optionalString(body.apiKey),
     clearApiKey: body.clearApiKey === true,
     setActive: body.setActive === true,

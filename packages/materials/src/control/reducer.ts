@@ -309,6 +309,9 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "turn_started":
     case "assistant_message":
     case "provider_request_started":
+    case "provider_request_queued":
+    case "provider_request_slot_acquired":
+    case "provider_request_queue_cancelled":
     case "provider_response_received":
     case "tool_call_recorded":
     case "tool_result_recorded":

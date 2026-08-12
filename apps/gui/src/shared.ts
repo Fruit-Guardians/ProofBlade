@@ -14,6 +14,7 @@ export interface BootstrapData {
 
 export type ProviderThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type ProviderCacheRetention = "none" | "short" | "long";
+export type ProviderMaxConcurrentRequests = number;
 
 export interface ProviderProfile {
   id: string;
@@ -26,6 +27,7 @@ export interface ProviderProfile {
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
 
@@ -40,6 +42,7 @@ export interface ProviderSettings {
   model: string;
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
 
@@ -54,6 +57,7 @@ export interface ProviderSettingsInput {
   models?: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
+  maxConcurrentRequests?: ProviderMaxConcurrentRequests;
   apiKey?: string;
   clearApiKey?: boolean;
   setActive?: boolean;
