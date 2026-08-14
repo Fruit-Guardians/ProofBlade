@@ -7,6 +7,7 @@ import { listBundledCapabilities } from "./catalog.js";
 import {
   BundledCapabilityBackend,
   CapabilityBackendResolver,
+  type CapabilityBackendCandidate,
   type CapabilityBackendRequest,
   type CapabilityBackendStatus,
 } from "./backend.js";
@@ -37,6 +38,41 @@ export interface PersistedCapabilityInvocation {
   argsRedacted: boolean;
   backendId: string;
   backendVersion: string;
+}
+
+export interface CapabilityDiscoveryInput {
+  query?: string;
+  capabilityId?: string;
+  operation?: string;
+  includeSchemas?: boolean;
+  maxResults?: number;
+}
+
+export interface CapabilityOperationDiscovery {
+  capabilityId: string;
+  capabilityVersion: string;
+  capabilityDescription: string;
+  trust: CapabilityManifest["trust"];
+  manifestHash: string;
+  operation: string;
+  description: string;
+  readOnly: boolean;
+  sideEffect: CapabilityOperationAtom["sideEffect"];
+  replay: CapabilityOperationAtom["replay"];
+  outputPolicy: CapabilityOperationAtom["outputPolicy"];
+  executionMode: CapabilityOperationAtom["executionMode"];
+  available: boolean;
+  selectedBackend?: { id: string; kind: CapabilityBackendStatus["kind"]; version: string };
+  backends: CapabilityBackendCandidate[];
+  parameters?: Record<string, unknown>;
+}
+
+export interface CapabilityDiscoveryResult {
+  catalogHash: string;
+  query?: string;
+  totalMatches: number;
+  truncated: boolean;
+  results: CapabilityOperationDiscovery[];
 }
 
 export class CapabilityRegistry {
@@ -81,6 +117,51 @@ export class ProofBladeCapabilityRouter {
 
   public describe(capabilityId: string, operationName: string): CapabilityOperationAtom {
     return this.registry.find(capabilityId, operationName).operation;
+  }
+
+  public discover(input: CapabilityDiscoveryInput = {}): CapabilityDiscoveryResult {
+    const query = normalizeDiscoveryQuery(input.query);
+    const maxResults = normalizeDiscoveryLimit(input.maxResults);
+    if (input.operation && !input.capabilityId) throw new Error("Capability discovery operation requires capabilityId");
+    const terms = query ? query.split(/\s+/).filter(Boolean) : [];
+    const matches: CapabilityOperationDiscovery[] = [];
+    for (const manifest of this.registry.list()) {
+      if (input.capabilityId && manifest.id !== input.capabilityId) continue;
+      for (const operation of manifest.operations) {
+        if (input.operation && operation.name !== input.operation) continue;
+        const haystack = [manifest.id, manifest.description, operation.name, operation.description].join(" ").toLowerCase();
+        if (terms.some((term) => !haystack.includes(term))) continue;
+        const request = { capabilityId: manifest.id, operation: operation.name, input: {} };
+        const backends = this.backends.candidates(request);
+        const selected = backends.find((backend) => backend.selected);
+        matches.push({
+          capabilityId: manifest.id,
+          capabilityVersion: manifest.version,
+          capabilityDescription: manifest.description,
+          trust: manifest.trust,
+          manifestHash: manifest.hash,
+          operation: operation.name,
+          description: operation.description,
+          readOnly: operation.readOnly,
+          sideEffect: operation.sideEffect,
+          replay: operation.replay,
+          outputPolicy: operation.outputPolicy,
+          executionMode: operation.executionMode,
+          available: selected !== undefined,
+          ...(selected ? { selectedBackend: { id: selected.id, kind: selected.kind, version: selected.version } } : {}),
+          backends,
+          ...(input.includeSchemas ? { parameters: structuredClone(operation.parameters) } : {}),
+        });
+      }
+    }
+    matches.sort((left, right) => left.capabilityId.localeCompare(right.capabilityId) || left.operation.localeCompare(right.operation));
+    return {
+      catalogHash: this.registry.catalogHash(),
+      ...(query ? { query } : {}),
+      totalMatches: matches.length,
+      truncated: matches.length > maxResults,
+      results: matches.slice(0, maxResults),
+    };
   }
 
   public resolveInvocationPolicy(request: CapabilityInvocation): CapabilityOperationAtom {
@@ -143,6 +224,21 @@ export class ProofBladeCapabilityRouter {
       originalChars: output.originalChars,
     };
   }
+}
+
+function normalizeDiscoveryQuery(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new Error("Capability discovery query must be a string");
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!normalized) return undefined;
+  if (normalized.length > 200) throw new Error("Capability discovery query must not exceed 200 characters");
+  return normalized;
+}
+
+function normalizeDiscoveryLimit(value: number | undefined): number {
+  if (value === undefined) return 20;
+  if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error("Capability discovery maxResults must be between 1 and 100");
+  return value;
 }
 
 function validateInput(operation: CapabilityOperationAtom, input: Record<string, unknown>): void {

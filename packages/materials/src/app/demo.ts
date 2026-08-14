@@ -5,7 +5,7 @@ import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { ControlStore } from "../control/control-store.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import { EffectJournal } from "../effects/effect-journal.js";
-import { LocalFixtureSandbox } from "../sandbox/fixture.js";
+import { LocalFixtureSandbox, type SandboxPort } from "../sandbox/fixture.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createRunVersionSnapshot } from "../runtime/version.js";
 
@@ -14,16 +14,24 @@ export interface AppServices {
   control: ControlStore;
   artifacts: ArtifactStore;
   journal: EffectJournal;
-  sandbox: LocalFixtureSandbox;
+  sandbox: SandboxPort;
   runsRoot: string;
 }
 
-export function createServices(root: string, config: ProofBladeConfig, effectFault?: import("../effects/effect-journal.js").EffectFaultInjector): AppServices {
+export interface CreateServicesOptions {
+  effectFault?: import("../effects/effect-journal.js").EffectFaultInjector;
+  /** Inject a non-local sandbox (e.g. CompetitionSandbox). Defaults to LocalFixtureSandbox. */
+  sandbox?: SandboxPort;
+}
+
+export function createServices(root: string, config: ProofBladeConfig, options: CreateServicesOptions | import("../effects/effect-journal.js").EffectFaultInjector = {}): AppServices {
+  // Back-compat: a bare EffectFaultInjector (a function) may still be passed positionally.
+  const resolved: CreateServicesOptions = typeof options === "function" ? { effectFault: options } : options;
   const runsRoot = join(root, config.storage.runsDir);
   const control = new ControlStore(new JsonlControlStore(runsRoot), async () => await createRunVersionSnapshot(root, config));
   const artifacts = new ArtifactStore(runsRoot, control);
-  const sandbox = new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
-  const journal = new EffectJournal(control, artifacts, sandbox, effectFault);
+  const sandbox = resolved.sandbox ?? new LocalFixtureSandbox(join(root, config.storage.fixturesDir));
+  const journal = new EffectJournal(control, artifacts, sandbox, resolved.effectFault);
   return { projectRoot: root, control, artifacts, journal, sandbox, runsRoot };
 }
 

@@ -27,7 +27,12 @@ export type SolverLaneFactory = (input: SolverLaneCreateInput) => Promise<AgentL
 export interface SingleAgentRunOptions {
   runId: string;
   task: TaskContract;
-  mode?: ExecutionMode;
+  /**
+   * Execution mode. A function is re-read every turn (tier-2 live control): a
+   * mid-run flip to "assist" pauses before the next submission; a flip back to
+   * "auto" resumes autonomous verification. A bare value behaves as before.
+   */
+  mode?: ExecutionMode | (() => ExecutionMode);
   maxTurns?: number;
   onLaneReady?: (lane: AgentLanePort) => void | Promise<void>;
   signal?: AbortSignal;
@@ -52,7 +57,8 @@ export class SingleAgentCtfLoop {
   ) {}
 
   public async run(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome> {
-    const mode = options.mode ?? "assist";
+    const modeSource = options.mode ?? "assist";
+    const mode = (): ExecutionMode => (typeof modeSource === "function" ? modeSource() : modeSource);
     const maxTurns = options.maxTurns ?? 3;
     throwIfAborted(options.signal);
     const runDir = join(this.services.runsRoot, options.runId);
@@ -143,7 +149,7 @@ export class SingleAgentCtfLoop {
         if (after.status === "PAUSED") break;
         const pending = latestPending(after);
         if (pending) {
-          if (mode === "assist") {
+          if (mode() === "assist") {
             await this.services.control.dispatch(options.runId, { type: "pause", reason: `Completion ${pending.id} is waiting for verifier approval.` });
             break;
           }
@@ -153,7 +159,7 @@ export class SingleAgentCtfLoop {
           await this.moveTo(options.runId, "experiment");
           continue;
         }
-        if (mode === "assist") {
+        if (mode() === "assist") {
           await this.services.control.dispatch(options.runId, { type: "pause", reason: "Assist turn completed without a completion proposal." });
           break;
         }
@@ -187,7 +193,7 @@ export class SingleAgentCtfLoop {
       if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more run resources");
     }
     snapshot = await this.services.control.snapshot(options.runId);
-    if (mode === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
+    if (mode() === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
       try {
         await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
       } catch (error) {
@@ -291,9 +297,10 @@ function turnPrompt(snapshot: RunSnapshot, turn: number): string {
   ].join("\n");
 }
 
-function outcome(snapshot: RunSnapshot, mode: ExecutionMode, turns: number, verification?: VerificationOutcome): SingleAgentRunOutcome {
+function outcome(snapshot: RunSnapshot, mode: ExecutionMode | (() => ExecutionMode), turns: number, verification?: VerificationOutcome): SingleAgentRunOutcome {
+  const resolvedMode = typeof mode === "function" ? mode() : mode;
   const completion = verification ? snapshot.completions[verification.completionId] : Object.values(snapshot.completions).sort((a, b) => b.createdSeq - a.createdSeq)[0];
-  return { runId: snapshot.runId, mode, status: snapshot.status, phase: snapshot.phase, turns, completionId: completion?.id, evidenceIds: completion?.evidenceIds ?? [] };
+  return { runId: snapshot.runId, mode: resolvedMode, status: snapshot.status, phase: snapshot.phase, turns, completionId: completion?.id, evidenceIds: completion?.evidenceIds ?? [] };
 }
 
 async function exists(path: string): Promise<boolean> {

@@ -37,6 +37,7 @@ test("core solver tool contract has a stable ordered surface", () => {
   assert.deepEqual(solverToolContractSnapshot().map((tool) => tool.name), [
     "inspect_target",
     "list_capabilities",
+    "discover_capabilities",
     "invoke_capability",
     "run_background",
     "read_job_output",
@@ -58,7 +59,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.sensitivity), /^(public|target|secret)$/);
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
-  assert.equal(solverToolContractHash(), "e6205b8076af79ef76d26d031eb4313ce472541265634b60de91a111eb552ca5");
+  assert.equal(solverToolContractHash(), "de45f9ec53c2f8f4b5d946cfe7e7283e76486cedd1ca005b5d160fad8c25a3ac");
   assert.equal(bundledCapabilityCatalogHash(), "2f2bb3f11c9147b33d851e4d4de83fd9fa27eaa999e6ead891f2c8c778a81d21");
 });
 
@@ -119,6 +120,22 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-firmware")?.available, true);
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-bundled")?.available, true);
     assert.equal(catalog.backends.find((item) => item.id === "proofblade-mcp")?.available, false);
+    const search = runtime.discoverCapabilities({ query: "binary disassemble", maxResults: 10 });
+    assert.equal(search.totalMatches, 1);
+    assert.equal(search.results[0]?.capabilityId, "proofblade.binary");
+    assert.equal(search.results[0]?.operation, "disassemble");
+    assert.equal(search.results[0]?.parameters, undefined);
+    assert.ok(search.results[0]?.backends.some((backend) => backend.id === "proofblade-rizin"));
+    const described = runtime.discoverCapabilities({ capabilityId: "proofblade.binary", operation: "identify", includeSchemas: true, maxResults: 1 });
+    assert.equal(described.totalMatches, 1);
+    assert.equal((described.results[0]?.parameters as { type?: string }).type, "object");
+    assert.equal(described.results[0]?.selectedBackend?.id, "proofblade-binary");
+    const limited = runtime.discoverCapabilities({ query: "binary", maxResults: 2 });
+    assert.equal(limited.results.length, 2);
+    assert.equal(limited.truncated, true);
+    assert.throws(() => runtime.discoverCapabilities({ operation: "identify" }), /requires capabilityId/);
+    assert.throws(() => runtime.discoverCapabilities({ maxResults: 0 }), /between 1 and 100/);
+    assert.equal(Object.keys((await services.control.snapshot(runId)).effects).length, 0, "discovery must not execute a capability");
     const inspected = await runtime.invokeCapability({ capabilityId: "proofblade.target", operation: "inspect", input: {} });
     assert.match(inspected.output, /^<untrusted-observation/);
     assert.equal(inspected.artifactId.length > 0, true);

@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-12T02:41:59.000Z",
+  "updatedAt": "2026-08-13T04:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 11,
-    "securityAuditCount": 11,
-    "lastBugAuditAt": "2026-08-12T02:41:59.000Z",
-    "lastSecurityAuditAt": "2026-08-12T02:41:59.000Z",
-    "sourceHash": "d745620659925130117e6cd58f02614dfc535c160f144d125dffa388aaa8f86b",
+    "bugAuditCount": 12,
+    "securityAuditCount": 12,
+    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
+    "sourceHash": "285e754a3e2cef90ee4801ee3b088d43560771a374e0dfb7b0eb62af87f183dd",
     "result": "passed"
   }
 }
@@ -42,6 +42,7 @@
 - Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 1）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
+- GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
 - 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
 - “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。

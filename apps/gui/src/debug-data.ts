@@ -403,9 +403,12 @@ export class DebugDataService {
       if (runKind(snapshot.task) === "chat") {
         lane = await this.createCodingLane({
           projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
+          installRoot: this.root,
           runId,
           runDir: join(this.services.runsRoot, runId),
           controlStore: this.services.control,
+          artifactStore: this.services.artifacts,
+          journal: this.services.journal,
           config: runConfig,
           capabilities,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),

@@ -3,12 +3,12 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { JobRecord, RawEffectResult, RuntimeResourceSnapshot } from "../domain/types.js";
+import type { CompletionProposal, JobRecord, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
 import { id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
 import { snipText } from "@proofblade/molecules";
-import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityInvocationResult } from "../capabilities/router.js";
+import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityDiscoveryInput, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
 import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, FirmwareCapabilityBackend, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
@@ -36,17 +36,34 @@ export class ProofBladeToolRuntime {
     private readonly artifactStore: ArtifactStore,
     private readonly journal: EffectJournal,
     projectRoot = dirname(runsRoot),
+    options: { includeMcp?: boolean } = {},
   ) {
     this.observer = new DeterministicObserver(controlStore);
     this.mcp = McpProjectRegistry.load(projectRoot);
-    const registry = new CapabilityRegistry([...listBundledCapabilities(), ...this.mcp.capabilityManifests()]);
-    const backends = new CapabilityBackendResolver([new RizinCapabilityBackend(), new McpReverseCapabilityBackend(this.mcp), new BinaryCapabilityBackend(), new FirmwareCapabilityBackend(), new BundledCapabilityBackend(), new McpCapabilityBackend(this.mcp)]);
+    const includeMcp = options.includeMcp !== false;
+    const registry = new CapabilityRegistry([...listBundledCapabilities(), ...(includeMcp ? this.mcp.capabilityManifests() : [])]);
+    const backends = new CapabilityBackendResolver([
+      new RizinCapabilityBackend(),
+      ...(includeMcp ? [new McpReverseCapabilityBackend(this.mcp)] : []),
+      new BinaryCapabilityBackend(),
+      new FirmwareCapabilityBackend(),
+      new BundledCapabilityBackend(),
+      ...(includeMcp ? [new McpCapabilityBackend(this.mcp)] : []),
+    ]);
     this.capabilityRouter = new ProofBladeCapabilityRouter(runId, fixture, runsRoot, controlStore, artifactStore, journal, registry, backends);
     this.jobs = new BackgroundJobRunner(runId, controlStore, artifactStore, this.capabilityRouter);
   }
 
   public listCapabilities(): ReturnType<ProofBladeCapabilityRouter["listCapabilities"]> {
     return this.capabilityRouter.listCapabilities();
+  }
+
+  public discoverCapabilities(input: CapabilityDiscoveryInput = {}): ReturnType<ProofBladeCapabilityRouter["discover"]> {
+    return this.capabilityRouter.discover(input);
+  }
+
+  public resolveCapabilityPolicy(input: { capabilityId: string; operation: string; input: Record<string, unknown> }): ReturnType<ProofBladeCapabilityRouter["resolveInvocationPolicy"]> {
+    return this.capabilityRouter.resolveInvocationPolicy(input);
   }
 
   public resourceSnapshot(base: RuntimeResourceSnapshot): RuntimeResourceSnapshot {
@@ -180,10 +197,15 @@ export class ProofBladeToolRuntime {
     const normalized = candidate.trim();
     if (!isCtfCandidate(normalized)) throw new Error("Candidate must be one complete CTF prefix{...} value");
     const snapshot = await this.controlStore.snapshot(this.runId);
+    // When the live platform is the judge, the flag may be platform-provided
+    // (dynamic-flag challenges) or computed off-target (crypto/reverse) and need
+    // not appear verbatim in a captured observation. Keep format check, budget,
+    // and dedup, but soften the observation-anchoring hard gate to advisory.
+    const platformJudged = snapshot.task.verification.kind === "platform_submission";
     const supportingObservations = Object.values(snapshot.observations).filter((item) =>
       item.source.generation === snapshot.generation && item.candidateKinds.includes("flag-shaped-value"),
     );
-    if (supportingObservations.length === 0) throw new Error("Inspect the target and collect flag-shaped evidence before proposing completion");
+    if (!platformJudged && supportingObservations.length === 0) throw new Error("Inspect the target and collect flag-shaped evidence before proposing completion");
     let observed = false;
     for (const observation of supportingObservations) {
       const artifact = snapshot.artifacts[observation.source.artifactId];
@@ -194,10 +216,19 @@ export class ProofBladeToolRuntime {
         break;
       }
     }
-    if (!observed) throw new Error("Candidate does not occur in a successful target observation");
-    if (Object.keys(snapshot.completions).length >= snapshot.task.constraints.max_submissions) throw new Error("Submission budget exhausted");
+    if (!platformJudged && !observed) throw new Error("Candidate does not occur in a successful target observation");
     const candidateHash = sha256(normalized);
-    const existing = Object.values(snapshot.completions).find((item) => item.candidateHash === candidateHash);
+    // Only completions that are actually SUBMITTABLE count against the budget and
+    // are eligible for dedup. `verify_claim` also proposes completions, but its
+    // artifact is a claim-reproduction JSON blob, not the bare flag. Counting those
+    // let a few verify_claim calls exhaust max_submissions with nothing ever sent,
+    // and deduping against one handed it back to IndependentVerifier, which
+    // compared sha256(json blob) to candidateHash and threw "Candidate hash
+    // mismatch" — losing an already-correct flag. The predicate below IS the
+    // verifier's own precondition, so a reused completion always passes it.
+    const submittable = await this.submittableCompletions(snapshot);
+    if (submittable.length >= snapshot.task.constraints.max_submissions) throw new Error("Submission budget exhausted");
+    const existing = submittable.find((item) => item.candidateHash === candidateHash);
     if (existing) return { completionId: existing.id, candidateHash };
     const artifact = await this.artifactStore.putText(this.runId, normalized, {
       filename: `candidate-${candidateHash.slice(0, 12)}.txt`,
@@ -211,6 +242,26 @@ export class ProofBladeToolRuntime {
       lane: "executor",
     });
     return { completionId, candidateHash };
+  }
+
+  /**
+   * Completions whose stored artifact IS the bare candidate, i.e. the ones a
+   * verifier can actually submit. Excludes `verify_claim`'s completions, whose
+   * artifact is a claim-reproduction JSON document.
+   */
+  public async submittableCompletions(snapshot: RunSnapshot): Promise<CompletionProposal[]> {
+    const submittable: CompletionProposal[] = [];
+    for (const item of Object.values(snapshot.completions)) {
+      const artifact = snapshot.artifacts[item.artifactId];
+      if (!artifact) continue;
+      try {
+        const stored = (await this.artifactStore.readText(this.runId, artifact)).trim();
+        if (sha256(stored) === item.candidateHash) submittable.push(item);
+      } catch {
+        // An unreadable artifact cannot be submitted, so it does not count.
+      }
+    }
+    return submittable;
   }
 
   public async status(): Promise<Record<string, unknown>> {

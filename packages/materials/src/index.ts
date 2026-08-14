@@ -58,3 +58,8 @@ export * from "./recovery/run-recovery.js";
 export * from "./storage/jsonl-store.js";
 export * from "./app/demo.js";
 export * from "./app/fixture-task.js";
+export * from "./competition/api.js";
+export * from "./competition/task.js";
+export * from "./competition/sandbox.js";
+export * from "./competition/fleet.js";
+export * from "./competition/solver.js";

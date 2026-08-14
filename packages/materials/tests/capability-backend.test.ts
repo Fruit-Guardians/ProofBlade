@@ -37,6 +37,24 @@ test("capability backend resolution is deterministic and falls back only before 
   assert.throws(() => resolver.resolve({ ...request, backendId: "preferred-unavailable" }), /tool not installed/);
   assert.throws(() => resolver.resolve({ ...request, backendId: "fallback-a", backendVersion: "old" }), /version changed/);
   assert.deepEqual(resolver.statuses().map((status) => status.id), ["preferred-unavailable", "fallback-a", "fallback-b"]);
+  assert.deepEqual(resolver.candidates(request).map((candidate) => ({
+    id: candidate.id,
+    available: candidate.available,
+    selected: candidate.selected,
+    reason: candidate.reason,
+  })), [
+    { id: "preferred-unavailable", available: false, selected: false, reason: "tool not installed" },
+    { id: "fallback-a", available: true, selected: true, reason: undefined },
+    { id: "fallback-b", available: true, selected: false, reason: undefined },
+  ]);
+});
+
+test("capability discovery backend reasons redact host paths", () => {
+  const resolver = new CapabilityBackendResolver([
+    fakeBackend("host-path", 10, false, "probe failed at C:\\Tools\\Rizin\\rz.exe and /opt/rizin/bin/rz"),
+  ]);
+  const [candidate] = resolver.candidates({ capabilityId: "binary.inspect", operation: "identify", input: {} });
+  assert.equal(candidate?.reason, "probe failed at [host-path] and [host-path]");
 });
 
 test("capability backend ids are unique and bound backends must handle the logical operation", () => {

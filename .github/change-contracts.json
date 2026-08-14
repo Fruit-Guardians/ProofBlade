@@ -97,6 +97,20 @@
       ]
     },
     {
+      "id": "capability-discovery",
+      "triggers": [
+        { "path": "packages/materials/src/capabilities/router.ts", "patterns": ["discover", "candidates"] },
+        { "path": "packages/materials/src/capabilities/backend.ts", "patterns": ["candidates", "CapabilityBackendCandidate"] },
+        { "path": "packages/materials/src/runtime/coding-resources.ts", "patterns": ["capabilityTool", "discoverCapabilities"] },
+        { "path": "packages/materials/src/runtime/solver-tools.ts", "patterns": ["discover_capabilities"] }
+      ],
+      "testPaths": ["packages/materials/tests/"],
+      "scenarios": [
+        "contract:capability-discovery-no-effect",
+        "contract:coding-capability-proxy"
+      ]
+    },
+    {
       "id": "evaluation-baseline",
       "triggers": [
         { "path": "packages/materials/src/evaluation/fixture-evaluator.ts" },

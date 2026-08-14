@@ -71,6 +71,16 @@ export interface ResolvedCapabilityBackend {
   version: string;
 }
 
+export interface CapabilityBackendCandidate {
+  id: string;
+  kind: CapabilityBackendKind;
+  version: string;
+  priority: number;
+  available: boolean;
+  selected: boolean;
+  reason?: string;
+}
+
 export class CapabilityBackendResolver {
   private readonly backends: CapabilityBackend[];
 
@@ -85,6 +95,26 @@ export class CapabilityBackendResolver {
 
   public statuses(): CapabilityBackendStatus[] {
     return this.backends.map((backend) => ({ ...backend.status() }));
+  }
+
+  public candidates(request: CapabilityBackendRequest): CapabilityBackendCandidate[] {
+    const matching = this.backends.filter((backend) => backend.handles(request.capabilityId, request.operation));
+    let selected = false;
+    return matching.map((backend) => {
+      const status = backend.status();
+      const availability = backend.availability(request);
+      const isSelected = !selected && availability.available;
+      if (isSelected) selected = true;
+      return {
+        id: backend.id,
+        kind: backend.kind,
+        version: availability.available ? backend.versionFor(request) : status.version,
+        priority: backend.priority,
+        available: availability.available,
+        selected: isSelected,
+        ...(availability.reason ? { reason: publicAvailabilityReason(availability.reason) } : {}),
+      };
+    });
   }
 
   public resolve(request: CapabilityBackendRequest): ResolvedCapabilityBackend {
@@ -104,6 +134,12 @@ export class CapabilityBackendResolver {
     }
     return { backend, version };
   }
+}
+
+function publicAvailabilityReason(reason: string): string {
+  return reason
+    .replace(/[A-Za-z]:[\\/](?:[^\s:;,)]+[\\/])*[^\s:;,)]+/g, "[host-path]")
+    .replace(/(^|[\s(])\/(?:[^\s:;,)]+\/)*[^\s:;,)]+/g, "$1[host-path]");
 }
 
 export class BundledCapabilityBackend implements CapabilityBackend {

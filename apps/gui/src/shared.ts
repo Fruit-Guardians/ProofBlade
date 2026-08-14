@@ -235,6 +235,8 @@ export interface PiSessionDebug {
   toolCalls: ToolCallDebug[];
 }
 
+export type { FleetSnapshot, FleetChallengeStatus, FleetChallengeState, FleetTotals } from "@proofblade/materials";
+
 export type ChatStreamEvent =
   | { type: "started"; runId: string }
   | { type: "stopping"; runId: string }

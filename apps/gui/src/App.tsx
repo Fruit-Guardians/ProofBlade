@@ -7,11 +7,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, startSolve, streamChat, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
-import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
+import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
@@ -63,6 +63,7 @@ export function App() {
   const [runId, setRunId] = useState<string>();
   const [detail, setDetail] = useState<RunDetail>();
   const [tab, setTab] = useState<MainTab>("chat");
+  const [fleetView, setFleetView] = useState(false);
   const [search, setSearch] = useState("");
   const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -128,6 +129,7 @@ export function App() {
   useEffect(() => {
     if (!runId) return;
     localStorage.setItem("proofblade.runId", runId);
+    setFleetView(false);
     setTab("chat");
     setDetail(undefined);
     setRefreshing(true);
@@ -187,6 +189,7 @@ export function App() {
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
       <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button></div>
+      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
       <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
       {runKindFilter === "fixture" && <div className="filter-row">
@@ -213,8 +216,8 @@ export function App() {
       <header className="workspace-header">
         <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
-          <div><h1>{detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run")}</h1>{detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
-          <p>{detail?.snapshot.task.objective ?? ""}</p>
+          <div><h1>{fleetView ? "并行解题 (Fleet)" : (detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run"))}</h1>{!fleetView && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
+          <p>{fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.snapshot.task.objective ?? "")}</p>
         </div>
         <div className="header-actions">
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
@@ -226,19 +229,20 @@ export function App() {
         </div>
       </header>
 
-      {detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
-      <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>
+      {!fleetView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
+      {!fleetView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
-        {!detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
-        {detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
-        {detail && tab === "overview" && <Overview detail={detail} />}
-        {detail && tab === "debugger" && <ToolDebugger detail={detail} />}
-        {detail && tab === "timeline" && <Timeline detail={detail} />}
-        {detail && tab === "evidence" && <EvidenceLedger detail={detail} />}
-        {detail && tab === "artifacts" && <Artifacts detail={detail} />}
+        {fleetView && <FleetView onError={setError} />}
+        {!fleetView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {!fleetView && detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
+        {!fleetView && detail && tab === "overview" && <Overview detail={detail} />}
+        {!fleetView && detail && tab === "debugger" && <ToolDebugger detail={detail} />}
+        {!fleetView && detail && tab === "timeline" && <Timeline detail={detail} />}
+        {!fleetView && detail && tab === "evidence" && <EvidenceLedger detail={detail} />}
+        {!fleetView && detail && tab === "artifacts" && <Artifacts detail={detail} />}
       </div>
       <footer className="status-bar"><span><span className="live-pulse" />{detail?.active?.state === "running" ? "实时执行" : detail?.active?.state === "stopping" || detail?.active?.state === "paused" ? "正在暂停" : "数据已同步"}</span><span>seq {detail?.snapshot.lastSeq ?? 0}</span><span>gen {detail?.snapshot.generation ?? 0}</span><span>{currentProviderName} / {currentModelName}</span><span className="status-spacer" /><span>{detail ? formatDate(detail.updatedAt) : "--"}</span></footer>
     </main>
@@ -1069,6 +1073,71 @@ function Stat({ label, value, icon }: { label: string; value: number; icon: Reac
 function AlertBar({ children, kind, onClose }: { children: ReactNode; kind: "error" | "success"; onClose(): void }) { return <div className={`alert-bar ${kind}`}>{kind === "error" ? <CircleAlert size={15} /> : <CheckCircle2 size={15} />}<span>{children}</span><button className="icon-button" onClick={onClose}><X size={14} /></button></div>; }
 function EmptyPanel({ icon, title }: { icon: ReactNode; title: string }) { return <div className="empty-panel">{icon}<strong>{title}</strong></div>; }
 function LoadingState({ loading, hasRuns }: { loading: boolean; hasRuns: boolean }) { return <div className="loading-state">{loading ? <RefreshCw className="spin" size={22} /> : <Database size={22} />}<strong>{loading ? "正在读取 Control Store" : hasRuns ? "选择一个 Run" : "还没有 Run"}</strong></div>; }
+
+function FleetView({ onError }: { onError(message: string): void }) {
+  const [snapshot, setSnapshot] = useState<FleetSnapshot>();
+  const [busy, setBusy] = useState(false);
+  const [concurrencyInput, setConcurrencyInput] = useState<number>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    streamFleet((next) => setSnapshot(next), controller.signal).catch((caught) => {
+      if (!controller.signal.aborted) onError(message(caught));
+    });
+    return () => controller.abort();
+  }, [onError]);
+
+  const guard = useCallback(async (action: () => Promise<unknown>) => {
+    try { await action(); } catch (caught) { onError(message(caught)); }
+  }, [onError]);
+
+  const totals = snapshot?.totals;
+  const concurrency = concurrencyInput ?? snapshot?.concurrency ?? 3;
+
+  return <div className="fleet-view">
+    <div className="fleet-toolbar">
+      <button className="primary-button" disabled={busy} onClick={() => { setBusy(true); void guard(() => startFleet()).finally(() => setBusy(false)); }}><Play size={14} />开始并行解题</button>
+      <label className="fleet-concurrency"><span>并发</span>
+        <input type="number" min={1} max={32} value={concurrency} onChange={(event) => setConcurrencyInput(Number(event.target.value))} />
+        <button className="command-button" onClick={() => void guard(() => setFleetConcurrency(Math.max(1, Math.min(32, Math.round(concurrency)))))}>应用</button>
+      </label>
+      <div className="fleet-totals">
+        <span className="fleet-stat"><CheckCircle2 size={13} />解出 {totals?.solved ?? 0}</span>
+        <span className="fleet-stat"><RefreshCw size={13} />运行 {totals?.running ?? 0}</span>
+        <span className="fleet-stat"><Clock3 size={13} />等待 {totals?.pending ?? 0}</span>
+        <span className="fleet-stat"><CircleAlert size={13} />失败 {totals?.failed ?? 0}</span>
+        <span className="fleet-stat"><Zap size={13} />得分 {formatNumber(snapshot?.solvedValue ?? 0)}</span>
+      </div>
+    </div>
+    <div className="fleet-table">
+      <div className="fleet-row fleet-head"><span>状态</span><span>题目</span><span>类别</span><span>分值</span><span>模式</span><span>操作</span></div>
+      {snapshot?.challenges.map((challenge) => <FleetRow key={challenge.challengeId} challenge={challenge} onAction={guard} />)}
+      {!snapshot?.challenges.length && <div className="empty-list">正在加载挑战列表</div>}
+    </div>
+  </div>;
+}
+
+function FleetRow({ challenge, onAction }: { challenge: FleetChallengeStatus; onAction(action: () => Promise<unknown>): Promise<void> }) {
+  const active = challenge.state === "pending" || challenge.state === "running";
+  return <div className={`fleet-row state-${challenge.state}`}>
+    <span><span className={`status-badge status-${fleetStateClass(challenge.state)}`}>{fleetStateIcon(challenge.state)}{fleetStateLabel(challenge.state)}</span></span>
+    <span className="fleet-title" title={challenge.reason ?? challenge.title}><strong>{challenge.title}</strong><small>{challenge.challengeId}{challenge.flag ? ` · ${challenge.flag}` : ""}</small></span>
+    <span>{challenge.category}</span>
+    <span className="fleet-value">{challenge.value}{challenge.priority !== challenge.value ? <em title="已调整优先级">↑{challenge.priority}</em> : null}</span>
+    <span className="segmented fleet-mode">
+      <button className={challenge.mode === "auto" ? "active" : ""} disabled={!active} onClick={() => void onAction(() => setFleetChallengeMode(challenge.challengeId, "auto"))}>Auto</button>
+      <button className={challenge.mode === "assist" ? "active" : ""} disabled={!active} onClick={() => void onAction(() => setFleetChallengeMode(challenge.challengeId, "assist"))}>Assist</button>
+    </span>
+    <span className="fleet-actions">
+      <button className="icon-button" title="置顶优先级" disabled={challenge.state !== "pending"} onClick={() => void onAction(() => reprioritizeFleetChallenge(challenge.challengeId, 100000))}><Zap size={14} /></button>
+      <button className="icon-button" title="取消" disabled={!active} onClick={() => void onAction(() => cancelFleetChallenge(challenge.challengeId))}><X size={14} /></button>
+    </span>
+  </div>;
+}
+
+function fleetStateClass(state: string): string { return state === "solved" ? "succeeded" : state === "running" ? "running" : state === "awaiting_approval" ? "awaiting" : state === "failed" ? "failed" : state === "cancelled" ? "cancelled" : state === "skipped" ? "skipped" : "pending"; }
+function fleetStateLabel(state: string): string { return ({ pending: "等待", running: "运行", solved: "解出", awaiting_approval: "待放行", failed: "失败", skipped: "跳过", cancelled: "取消" } as Record<string, string>)[state] ?? state; }
+function fleetStateIcon(state: string): ReactNode { return state === "running" ? <RefreshCw size={11} className="spin" /> : state === "solved" ? <CheckCircle2 size={11} /> : state === "awaiting_approval" ? <CircleAlert size={11} /> : state === "failed" ? <CircleAlert size={11} /> : state === "cancelled" ? <X size={11} /> : <Clock3 size={11} />; }
 
 function inspectorValue(call: ToolCallDebug, source: InspectorSource): unknown {
   if (source === "arguments") return call.arguments;
