@@ -229,7 +229,13 @@ export class HttpCompetitionApi implements CompetitionApi {
       const message = error instanceof Error ? error.message : String(error);
       throw new CompetitionHttpError(method, url, 0, message, sensitiveValues(this.headers, this.token, body));
     }
-    const text = await response.text();
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CompetitionHttpError(method, url, response.status, message, sensitiveValues(this.headers, this.token, body));
+    }
     if (!response.ok) throw new CompetitionHttpError(method, url, response.status, text, sensitiveValues(this.headers, this.token, body));
     if (method === "DELETE" && response.status === 204) return undefined;
     if (!text.trim()) return {};

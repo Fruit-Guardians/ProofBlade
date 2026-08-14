@@ -36,7 +36,7 @@
 - `competition/api.ts` 的 `HttpCompetitionApi` 是平台 HTTP 的唯一实现：端点模板可按赛事覆盖，鉴权通过显式 headers/token 配置，HTTP 错误和不完整响应必须 fail closed，不能回退到演示数据。
 - 平台响应只在通过字段校验后映射为 `CompetitionApi` 类型；挑战详情必须显式返回 `attachments` 数组（无附件也要返回 `[]`），每个附件必须携带严格校验的 base64 内容，提交结果必须携带明确的布尔裁定，HTTP 重定向默认拒绝。
 - live 环境返回 `connectionInfo` 时必须同时返回 `instanceId`，除非显式配置了不依赖句柄的回收端点；否则启动响应 fail closed，避免环境泄漏到过期回收。
-- HTTP transport 抛出的网络/重定向异常也必须经过同一套敏感值脱敏；`CompetitionSandbox.reset()` 必须先释放旧环境，再启动替代实例。
+- HTTP transport 抛出的网络、重定向和响应体读取异常也必须经过同一套敏感值脱敏；`CompetitionSandbox.reset()` 必须先成功释放旧环境，teardown 失败时不得启动替代实例。
 - `CompetitionHttpError` 只保留脱敏后的、最多 512 字符的响应体；请求 token、header 值和提交 flag 不得进入错误 message 或 `responseBody`。
 - 配置字段必须有默认值、解析测试和密钥边界说明。
 - Provider Profile 必须显式选择 `openai-completions`、`openai-responses` 或 `anthropic-messages`；协议选择属于可持久化运行配置，不能从模型名称或中转站品牌猜测。

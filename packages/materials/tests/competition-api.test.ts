@@ -163,6 +163,24 @@ test("HttpCompetitionApi redacts credentials and flags from fetch exceptions", a
   });
 });
 
+test("HttpCompetitionApi redacts credentials and flags from response body read failures", async () => {
+  const api = new HttpCompetitionApi({
+    baseUrl: "https://competition.example/api",
+    token: "top-secret",
+    fetch: async () => ({
+      ok: false,
+      status: 401,
+      text: async () => { throw new Error("body stream failed after Bearer top-secret flag{secret}"); },
+    } as Response),
+  });
+  await assert.rejects(() => api.submitFlag("c-1", "flag{secret}"), (error: unknown) => {
+    assert.ok(error instanceof CompetitionHttpError);
+    assert.doesNotMatch(error.message, /top-secret|flag\{secret\}/);
+    assert.doesNotMatch(error.responseBody, /top-secret|flag\{secret\}/);
+    return true;
+  });
+});
+
 test("HttpCompetitionApi rejects challenge details without an explicit attachments array", async () => {
   await withServer(async (_request, response) => send(response, 200, {
     challenge: { id: "c-1", title: "Missing files", category: "Misc" },
