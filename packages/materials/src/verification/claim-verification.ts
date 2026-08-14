@@ -96,13 +96,22 @@ export class CodingClaimVerifier {
       },
       lane: "verifier",
     });
-    await this.controlStore.dispatch(this.runId, {
-      type: "completion_verified",
-      completionId,
-      accepted: true,
-      evidenceIds: [evidenceId],
-      lane: "verifier",
-    });
+    // When a live platform is the judge, local reproduction is NOT acceptance: only
+    // the platform can accept. Marking the completion ACCEPTED here made a
+    // competition run report SOLVED after the model called verify_claim, with the
+    // platform never contacted. The reproduction evidence is still recorded — it is
+    // good pre-submission validation — but the completion stays PROPOSED until
+    // submit_flag sends it.
+    const platformJudged = snapshot.task.verification.kind === "platform_submission";
+    if (!platformJudged) {
+      await this.controlStore.dispatch(this.runId, {
+        type: "completion_verified",
+        completionId,
+        accepted: true,
+        evidenceIds: [evidenceId],
+        lane: "verifier",
+      });
+    }
     await this.controlStore.dispatch(this.runId, {
       type: "fact",
       fact: {

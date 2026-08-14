@@ -52,6 +52,9 @@ export interface UpdateReasoningTreeInput extends Partial<Omit<CreateReasoningTr
   nodeIds?: string[];
 }
 
+/** Cap on artifact text pulled into a content search, per artifact. */
+const MAX_SEARCHED_ARTIFACT_BYTES = 512_000;
+
 export class CodingEvidenceGraph {
   public constructor(
     private readonly runId: string,
@@ -341,6 +344,22 @@ export class CodingEvidenceGraph {
       ...Object.values(snapshot.artifacts).map((item) => ({ kind: "artifact", id: item.id, name: item.semantic?.name ?? basename(item.path), summary: item.semantic?.summary ?? `${item.mime}, ${item.bytes} bytes`, role: item.semantic?.role ?? "intermediate", relatedIds: item.semantic?.relatedIds ?? [], tags: item.semantic?.tags ?? [], createdSeq: item.semantic?.updatedSeq ?? 0, search: `${item.id} ${item.path} ${item.semantic?.name ?? ""} ${item.semantic?.summary ?? ""} ${(item.semantic?.tags ?? []).join(" ")}`.toLowerCase() })),
       ...Object.values(snapshot.reasoningTrees).map((item) => ({ kind: "reasoning_tree", id: item.id, name: item.name, summary: item.summary, purpose: item.purpose, status: item.status, rootNodeId: item.rootNodeId, nodeIds: item.nodeIds, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.purpose} ${item.tags.join(" ")}`.toLowerCase() })),
     ];
+    // Metadata alone is not enough: a bash artifact is titled `命令输出 · <cmd>`,
+    // so a content query ("sub_08001a10 disasm") matches nothing and the model
+    // concludes the archive is empty and re-runs the tool. Search the stored
+    // text too, so the archive can actually replace a re-run.
+    if (queryTerms.length > 0) {
+      await Promise.all(rows.map(async (row) => {
+        if (row.kind !== "artifact" || queryTerms.every((term) => row.search.includes(term))) return;
+        const artifact = snapshot.artifacts[String(row.id)];
+        if (!artifact || !artifact.mime.startsWith("text/") || artifact.bytes > MAX_SEARCHED_ARTIFACT_BYTES) return;
+        try {
+          row.search += ` ${(await this.artifactStore.readText(this.runId, artifact)).toLowerCase()}`;
+        } catch {
+          // unreadable artifact stays metadata-only
+        }
+      }));
+    }
     return rows
       .map((row) => ({ ...row, score: queryTerms.filter((term) => row.search.includes(term)).length }))
       .filter((row) => queryTerms.length === 0 || row.score > 0)

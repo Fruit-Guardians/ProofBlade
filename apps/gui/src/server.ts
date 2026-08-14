@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
 import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig, providerNativeCapabilities } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
+import { FleetController } from "./fleet.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
@@ -20,6 +21,7 @@ const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
 const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
+const fleet = new FleetController();
 let vite: Awaited<ReturnType<typeof createViteServer>>;
 
 const server = createServer(async (request, response) => {
@@ -53,6 +55,7 @@ const shutdown = (signal: string): Promise<void> => {
   if (shutdownPromise) return shutdownPromise;
   shutdownPromise = (async () => {
     try {
+      await fleet.close();
       await closeGuiResources({
         closeData: () => data.close(),
         closeHttp: () => new Promise<void>((resolve, reject) => {
@@ -212,6 +215,46 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       return sendJson(response, 201, await data.checkpoint(runId, typeof body.reason === "string" ? body.reason : "GUI manual checkpoint"));
     }
     if (method === "POST" && parts[3] === "reconcile") return sendJson(response, 200, await data.recover(runId));
+  }
+  if (parts[0] === "api" && parts[1] === "fleet") {
+    if (method === "GET" && parts[2] === "stream" && parts.length === 3) {
+      response.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
+      });
+      const emit = (snapshot: import("./shared.js").FleetSnapshot): void => {
+        if (!response.writableEnded) response.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+      };
+      const unsubscribe = fleet.subscribe(emit);
+      emit(await fleet.load());
+      request.on("close", () => { unsubscribe(); if (!response.writableEnded) response.end(); });
+      return;
+    }
+    if (method === "POST" && parts[2] === "start" && parts.length === 3) return sendJson(response, 202, await fleet.start());
+    if (method === "POST" && parts[2] === "concurrency" && parts.length === 3) {
+      const body = await readBody(request);
+      const concurrency = Number(body.concurrency);
+      if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new Error("concurrency must be an integer between 1 and 32");
+      return sendJson(response, 200, fleet.setConcurrency(concurrency));
+    }
+    if (parts[2] === "challenges" && parts[3]) {
+      const challengeId = parts[3];
+      if (method === "POST" && parts[4] === "cancel") return sendJson(response, 200, fleet.cancelChallenge(challengeId));
+      if (method === "POST" && parts[4] === "mode") {
+        const body = await readBody(request);
+        const mode = body.mode === "auto" ? "auto" : body.mode === "assist" ? "assist" : undefined;
+        if (!mode) throw new Error("mode must be auto or assist");
+        return sendJson(response, 200, fleet.setChallengeMode(challengeId, mode));
+      }
+      if (method === "POST" && parts[4] === "priority") {
+        const body = await readBody(request);
+        const priority = Number(body.priority);
+        if (!Number.isFinite(priority)) throw new Error("priority must be a number");
+        return sendJson(response, 200, fleet.reprioritize(challengeId, priority));
+      }
+    }
   }
   sendJson(response, 404, { error: "API route not found" });
 }

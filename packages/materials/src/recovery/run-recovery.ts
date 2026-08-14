@@ -2,7 +2,7 @@ import type { ControlStore } from "../control/control-store.js";
 import { LeaseManager } from "../control/lease-manager.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { Lease, TaskContract } from "../domain/types.js";
-import type { FixtureHealth, FixtureRef, LocalFixtureSandbox } from "../sandbox/fixture.js";
+import type { FixtureHealth, FixtureRef, SandboxPort } from "../sandbox/fixture.js";
 
 export interface RunRecoveryResult {
   fixture: FixtureRef;
@@ -17,7 +17,7 @@ export class RunRecoveryService {
   public constructor(
     private readonly controlStore: ControlStore,
     private readonly effectJournal: EffectJournal,
-    private readonly sandbox: LocalFixtureSandbox,
+    private readonly sandbox: SandboxPort,
   ) {}
 
   public async recover(runId: string, task?: TaskContract, now = Date.now()): Promise<RunRecoveryResult> {

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { Client, SdkErrorCode, type ListToolsResult } from "@modelcontextprotocol/client";
+import { Client, SdkErrorCode, StreamableHTTPClientTransport, type ListToolsResult } from "@modelcontextprotocol/client";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
 import type { ToolSensitivityAtom, ToolSideEffectAtom } from "@proofblade/atoms";
 import { withCapabilityHash, type CapabilityManifest } from "@proofblade/molecules";
@@ -8,10 +8,13 @@ import type { RawEffectResult, ReplayPolicy } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 
 export interface McpServerDefinition {
-  command: string;
+  /** stdio launch command. Provide EITHER command OR url, not both. */
+  command?: string;
   args?: string[];
   env?: Record<string, string>;
   cwd?: string;
+  /** Streamable-HTTP endpoint for a long-running MCP server (e.g. idalib-mcp on :8745). */
+  url?: string;
   description?: string;
   requestTimeoutMs?: number;
   includeTools?: string[];
@@ -133,7 +136,7 @@ export const MCP_FAILURE_RETRY_DELAY_MS = 1_000;
 
 interface McpConnection {
   client: Client;
-  transport: StdioClientTransport;
+  transport: StdioClientTransport | StreamableHTTPClientTransport;
   tools?: McpToolSummary[];
 }
 
@@ -432,9 +435,13 @@ export class McpProjectRegistry {
   }
 
   private async connect(entry: McpServerEntry, signal?: AbortSignal): Promise<McpConnection> {
-    const cwd = resolve(this.projectRoot, entry.definition.cwd ?? ".");
-    const env = { ...getDefaultEnvironment(), ...resolveEnvironment(entry.definition.env), ...toolchainEnvironment(entry.definition.toolchain) };
-    const transport = new StdioClientTransport({ command: entry.definition.command, args: entry.definition.args, cwd, env, stderr: "pipe" });
+    const transport: StdioClientTransport | StreamableHTTPClientTransport = entry.definition.url
+      ? new StreamableHTTPClientTransport(new URL(entry.definition.url))
+      : (() => {
+        const cwd = resolve(this.projectRoot, entry.definition.cwd ?? ".");
+        const env = { ...getDefaultEnvironment(), ...resolveEnvironment(entry.definition.env), ...toolchainEnvironment(entry.definition.toolchain) };
+        return new StdioClientTransport({ command: entry.definition.command!, args: entry.definition.args, cwd, env, stderr: "pipe" });
+      })();
     const client = new Client(
       { name: `proofblade-${entry.name}`, version: "0.1.0" },
       { versionNegotiation: entry.definition.protocolVersion === "auto" ? { mode: "auto" } : entry.definition.protocolVersion === "2026-07-28" ? { mode: { pin: "2026-07-28" } } : undefined },
@@ -463,7 +470,16 @@ function isTransportFailure(error: unknown): boolean {
 
 function validateServer(name: string, definition: McpServerDefinition, projectRoot: string): void {
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error(`Invalid MCP server name: ${name}`);
-  if (!definition || typeof definition !== "object" || typeof definition.command !== "string" || definition.command.trim() === "") throw new Error(`MCP server ${name} requires command`);
+  if (!definition || typeof definition !== "object") throw new Error(`MCP server ${name} requires command or url`);
+  const hasCommand = typeof definition.command === "string" && definition.command.trim() !== "";
+  const hasUrl = typeof definition.url === "string" && definition.url.trim() !== "";
+  if (hasCommand && hasUrl) throw new Error(`MCP server ${name} must set command or url, not both`);
+  if (!hasCommand && !hasUrl) throw new Error(`MCP server ${name} requires command or url`);
+  if (hasUrl) {
+    let parsed: URL;
+    try { parsed = new URL(definition.url!); } catch { throw new Error(`MCP server ${name} has an invalid url`); }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`MCP server ${name} url must be http or https`);
+  }
   if (definition.args && (!Array.isArray(definition.args) || definition.args.some((item) => typeof item !== "string"))) throw new Error(`MCP server ${name} has invalid args`);
   if (definition.env && (typeof definition.env !== "object" || Array.isArray(definition.env) || Object.values(definition.env).some((item) => typeof item !== "string"))) throw new Error(`MCP server ${name} has invalid env`);
   validateToolchain(name, definition.toolchain, definition.env);
@@ -712,7 +728,8 @@ function escapedVariants(secret: string): string[] {
 }
 
 function externalId(connection: McpConnection | undefined): string | undefined {
-  const pid = connection?.transport.pid;
+  const transport = connection?.transport;
+  const pid = transport && "pid" in transport ? transport.pid : undefined;
   return pid === null || pid === undefined ? undefined : String(pid);
 }
 

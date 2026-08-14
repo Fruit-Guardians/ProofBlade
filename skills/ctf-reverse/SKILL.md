@@ -21,11 +21,15 @@ the MIT-licensed upstream source listed above.
 - Keep the user's objective and required flag format as the task anchor. Do
   not replace it with an automatic recovery message, a tool error, or a
   guessed intermediate objective.
-- Prefer the stable `list_capabilities` and `invoke_capability` tools. Do not
-  assume that Rizin, Ghidra, an MCP server, a debugger, or an emulator exists.
-- Use only capabilities and coding tools enabled for this Run. Do not install
-  packages, start listeners, or widen workspace/network scope just to make an
-  analysis technique available.
+- A decompiler MCP may be enabled for this Run (e.g. `ida-pro` for native
+  PE/ELF, `jadx` for Android/Java/DEX). When present, PREFER it: call it via
+  `mcp_call` to get pseudocode and named functions instead of hand-reading raw
+  `objdump` disassembly. Check the enabled MCP servers before assuming only
+  `bash`-level tools exist. Do not assume a specific decompiler exists if it is
+  not listed as enabled.
+- Use only capabilities, MCP servers, and coding tools enabled for this Run. Do
+  not install packages, start listeners, or widen workspace/network scope just
+  to make an analysis technique available.
 - Every meaningful conclusion needs a small observation that can be read back
   from its Artifact. A function name, symbol, or xref is a lead, not proof.
 - Bound every high-volume operation. Start with a narrow address, section, or
@@ -79,6 +83,13 @@ reverse Backend:
 For native PE/ELF targets, use the following order unless an observation gives
 a stronger lead:
 
+0. If a decompiler MCP (`ida-pro`, etc.) is enabled, decompile the relevant
+   function to pseudocode FIRST via `mcp_call` and reason from that. It is far
+   faster and more reliable than hand-tracing `objdump` output. The IDA bridge
+   connects to a running IDA instance — open/select the target binary through
+   its tools if it is not already loaded. Fall back to the bundled
+   `invoke_capability` (`proofblade.binary`) / `objdump` route only when no
+   decompiler is available.
 1. Start from the entry point, an exported entry, or the smallest caller of a
    promising string/symbol.
 2. Request `proofblade.binary.functions` with a bounded result count. Select a
@@ -98,6 +109,30 @@ PE and ELF addresses must retain their reported semantic type. In particular,
 do not mix PE RVAs with image-base-adjusted virtual addresses. Use addresses
 returned by a Capability as inputs to the next Capability unless an Artifact
 explicitly establishes a conversion.
+
+## Stop disassembling once you have the data — then solve it in code
+
+The most common failure on this kind of challenge is thrashing: re-reading the
+same disassembly window dozens of times trying to fully understand control flow
+by hand. Avoid it with a hard pivot rule:
+
+- As soon as you have extracted the **data structure** the challenge turns on
+  (a maze grid, a key schedule, a lookup/permutation table, a comparison
+  target, an opcode table), STOP reading disassembly. You do not need to
+  understand every instruction — you need the data plus the rule that consumes
+  it.
+- Reconstruct the logic as a small script (`bash` + Python) and let the machine
+  do the work: BFS/DFS for a maze or state search, a reimplementation of the
+  transform for crypto/encoding, a brute force over a bounded input space.
+  Print the result.
+- Then apply exactly the transform the challenge states and the required flag
+  format. If the task says "path, then one md5 layer, wrapped as `vmc{...}`",
+  compute `vmc{ md5(path) }` — do not stop at the raw path and do not add
+  layers that were not stated.
+- If you have re-read the same address/region three times without a new fact,
+  that is the signal to pivot to code, not to read it a fourth time.
+- Prefer running the target (or a faithful reimplementation) over proving the
+  algorithm by inspection, when the Run scope allows execution.
 
 ## Common reverse leads
 

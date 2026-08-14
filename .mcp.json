@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "idalib-mcp": {
+      "url": "http://127.0.0.1:8745/mcp",
+      "includeTools": [
+        "idalib_open", "idalib_switch", "idalib_current", "idalib_list",
+        "survey_binary", "list_funcs", "lookup_funcs", "func_query",
+        "decompile", "disasm", "analyze_batch", "analyze_function",
+        "imports", "xrefs_to", "xref_query",
+        "get_bytes", "get_string", "read_struct", "search_text", "find"
+      ],
+      "description": "Headless IDA decompiler via idalib (streamable HTTP, no GUI, serves many binaries concurrently). USAGE PROTOCOL: (1) mcp_call describe once to see tools; (2) FIRST bind the target with idalib_open (absolute path to the binary) — analyze/decompile fail with 'No session bound' until you do; (3) then call analyze_batch (include_decompile:true) / decompile / disasm / xrefs to get pseudocode for native PE/ELF. Do not repeat describe. Server must already be running on 127.0.0.1:8745.",
+      "readOnly": true,
+      "sideEffect": "process",
+      "replay": "manual",
+      "sensitivity": "target",
+      "requestTimeoutMs": 120000
+    },
+    "jadx": {
+      "command": "C:/Users/35159/AppData/Local/Programs/Python/Python310/python.exe",
+      "args": ["E:/android/jadx-gui-1.5.5-win/jadx-mcp/server.py"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "description": "JADX Android/Java decompiler bridge (jadx-mcp). Decompile classes/methods, read source, search, inspect the manifest of a loaded APK/DEX.",
+      "readOnly": true,
+      "sideEffect": "process",
+      "replay": "manual",
+      "sensitivity": "target",
+      "requestTimeoutMs": 120000
+    }
+  }
+}

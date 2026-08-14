@@ -356,8 +356,11 @@ README 报告该项目在第二季完成 54/54 题并获第 3 名；这一成绩
 | 稳定 `use_capability` 代理 |  | ✓ |  | 保持工具 schema 稳定，CTF 能力按需发现 |
 | OpenClacky Insert-then-Compress |  | ✓ |  | 摘要格式要加入证据和路线状态 |
 | OpenClacky Skill 演化 |  | ✓ |  | 需要离线评测和人工确认门 |
-| Firefox-Reverse 阶段 SOP | ✓ |  |  | CTF 任务天然适合阶段门 |
+| Firefox-Reverse 自主工具循环 | ✓ |  |  | 默认单 Agent 自主规划，Harness 只限制风险、资源和最终正确性 |
+| Firefox-Reverse 阶段 SOP |  | ✓ |  | 仅作为 Skill/观测标签，不作为默认工具权限门或必经流水线 |
 | Firefox-Reverse 账本/熔断 | ✓ |  |  | 直接降低绕圈和重复探索 |
+| CyberStrikeAI 单 Agent 与扩展治理 |  | ✓ |  | 吸收动态工具发现、模型视角轨迹、摘要和配置层，不照搬整套 Eino 中间件 |
+| CyberStrikeAI Deep/Supervisor/Plan-Execute |  |  | ✓ | 保留为实验 Profile，真实题 A/B 证明收益后再启用 |
 | BreachWeave Manager/Solver/Observer |  | ✓ |  | 固定控制面；Observer 先以确定性检查器实现 |
 | BreachWeave Idea/Memory | ✓ |  |  | 对应项目的 Intent/Fact/Evidence 账本 |
 | Sniper 中间件链 |  | ✓ |  | 第一版收敛为 observe/normalize/context/plan/recover |
@@ -367,6 +370,32 @@ README 报告该项目在第二季完成 54/54 题并获第 3 名；这一成绩
 | 64 个工具的规模 |  |  | ✓ | 工具数量不是第一阶段目标 |
 | 全部模型自由互聊 |  |  | ✓ | 容易重复劳动和污染上下文 |
 | 直接 fork Pi 核心 |  |  | ✓ | 先用 `AgentHarness`/Session/hook 适配验证需求 |
+
+### 2.7 Firefox-Reverse、CyberStrikeAI 与 Cairn 源码复核结论
+
+截至 2026-08-13，对三个参考项目的实际执行入口、上下文、工具路由、持久化、调度和失败恢复代码进行了逐文件核验。三者不是同一种 Agent 架构，适合放在 ProofBlade 的不同层次：
+
+| 项目 | 源码中的真实主路径 | 最值得吸收的机制 | 不应直接照搬的部分 |
+|---|---|---|---|
+| Firefox-Reverse | 单 Agent 连续执行 `LLM tool calls → ToolRouter → 结果回灌 → 继续推理` | 专业原子工具、常驻任务、`progress.md`、Findings Ledger、机械 checkpoint、软恢复护栏 | Firefox 专用进展正则、弱证据约束、重置单轮计数的无限续跑 |
+| CyberStrikeAI | 默认 `eino_single`；Deep、Supervisor、Plan-Execute 为显式可选模式 | Provider/MCP/Skill 配置、动态 Tool Search、模型视角轨迹、完整 tool round 摘要、执行治理 | 深中间件链、双重裁剪、默认扩张多角色和面向 HITL 的流程 |
+| Cairn | 共享 Fact/Intent/Hint 图上的事件触发 `reason` 与并行 `explore` | Intent claim、generation/lease/heartbeat、Worker 健康与冷却、项目级隔离、事件触发 Reason | 默认强 JSON 图协议和过早引入多 Worker 带来的额外成本 |
+
+三者组合后的目标架构是：
+
+```text
+默认执行面：Firefox-Reverse 风格的单 Agent 自主工具循环
+    + 通用工具
+    + 可发现、可选的专业 Capability / MCP / Skill
+    + Durable Progress / Artifact / Context Recovery
+    + Independent Verifier
+
+扩展与治理层：CyberStrikeAI 风格的 Provider / MCP / Skill 配置、轨迹和执行治理
+
+可选并行控制面：Cairn 风格的 Fact / Intent 图、lease、Worker 健康和事件触发 Reason
+```
+
+由此确立 `autonomy-first` 原则：**Harness 限制风险、资源、敏感数据、副作用和最终正确性，不规定模型必须采用哪条推理路径。** Binary/Firmware/MCP/Skill 是可选仪器，不是必经流水线；Planner、多 Worker 和强阶段协议必须以实验 Profile 存在，只有真实 CTF 配对评测证明收益后才能进入默认路径。
 
 ---
 
@@ -808,50 +837,40 @@ Harness 规则：
 
 ---
 
-## 6. CTF 工作流和阶段门
+## 6. CTF 自主工作流、运行状态与软阶段标签
 
-### 6.1 推荐状态机
+### 6.1 Harness 运行状态机
 
 ```text
-INTAKE
-  ↓
-MODEL_TARGET
-  ↓
-PLAN
-  ↓
-RECON
-  ↓
-HYPOTHESIS
-  ↓
-EXPERIMENT
-  ↓
-REPRODUCE
-  ↓
-REPORT
-  ↓
-DONE / BLOCKED / NEED_HUMAN
+CREATED → RUNNING ↔ PAUSED
+              ↓
+          VERIFYING
+              ↓
+  SUCCEEDED / EXHAUSTED / FAILED
 ```
 
-每个阶段都定义：目标、输入、允许能力、输出 schema、完成条件和失败转移。
+这是 Harness 的硬状态机，只负责运行生命周期、并发、预算、恢复和终态原子性。`PAUSED` 不能被迟到的 `finish` 或 `exhaust` 覆盖，只有显式 `resume` 才能恢复；`SUCCEEDED` 必须来自独立 Verifier 或比赛平台确认。
 
-这不是严格单向流水线，而是“**外层 Phase、内层 Intent 图**”：Phase 控制权限、预算和输出要求；Intent 图允许在 RECON/HYPOTHESIS/EXPERIMENT 之间局部回跳。发现目标类型判断错误时允许回到 `MODEL_TARGET`，验证失败时回到 `HYPOTHESIS`，但每次回跳必须写原因、消耗预算并更新已否决路线。
+安全策略、Sandbox、网络边界、成本上限、敏感信息、Effect Journal 和平台提交规则可以限制执行；解题阶段不能默认限制模型可见工具或强迫固定调用顺序。
 
-### 6.2 阶段定义
+### 6.2 解题阶段是软标签，不是必经流水线
 
-| 阶段 | 目标 | 最小输出 | 进入下一阶段的门 |
-|---|---|---|---|
-| Intake | 解析题目和资源 | task contract | 目标、预算、工作区明确 |
-| Model target | 建立目标模型 | 入口、边界、依赖 | 至少一个可操作入口 |
-| Plan | 排序假设和实验 | 计划 DAG | 每个动作有预期证据 |
-| Recon | 获取初始事实 | 资产/符号/请求清单 | 关键入口或候选路径 |
-| Hypothesis | 形成可证伪假设 | H-ID + 证据 | 至少一个低成本实验 |
-| Experiment | 执行实验 | E-ID、输入、结果 | 成功或明确排除 |
-| Reproduce | 稳定复现 | 脚本、命令、输出 | 连续两次复现一致 |
-| Report | 组织结论 | report.json + Markdown | 证据链闭合 |
+`intake / model_target / plan / recon / hypothesis / experiment / reproduce / report` 保留为软标签，用于 UI、遥测、上下文组织、预算统计、Skill 推荐和评测分析。标签可以回跳、并存或跳过，不作为默认权限门。模型可以在发现新入口后直接实验，也可以在验证失败后立即回到静态分析。
 
-阶段门不是额外的“提示词装饰”，而是 Harness 在 `phase_finished` 前检查的结构化条件。模型说“完成了”不等于阶段完成。
+| 软标签 | 典型目标 | 建议保留的状态 |
+|---|---|---|
+| Intake | 解析题目和资源 | task contract、工作区和预算 |
+| Model target | 建立目标模型 | 入口、边界、依赖和环境 hash |
+| Plan | 排序假设和实验 | 候选 Intent 及预期信息增益 |
+| Recon | 获取初始事实 | 资产、符号、路由、样本和 Artifact |
+| Hypothesis | 形成可证伪假设 | H-ID、支持/反对 EvidenceRef |
+| Experiment | 执行实验 | 输入、命令、结果、环境和 E-ID |
+| Reproduce | 稳定复现 | 脚本、命令、输出和重复结果 |
+| Report | 组织结论 | report.json、Markdown 和证据链 |
 
-不同题型复用阶段协议，不共享一份巨型 SOP：
+模型说“完成了”不等于 Run 成功。硬门只放在候选验证、外部提交和 Run 终态；中间标签主要记录进展，不阻断自主探索。
+
+不同题型可以复用这些观测标签，但不共享一份巨型强制 SOP：
 
 | 题型 | Model target 的关键对象 | 典型低成本首检 | Reproduce 的最低门 |
 |---|---|---|---|
@@ -861,14 +880,14 @@ DONE / BLOCKED / NEED_HUMAN
 | Crypto | 原语、随机数、密钥/nonce 生命周期、样本关系 | 已知向量/统计/差分 | 独立脚本对隐藏样本成立 |
 | Misc | 数据格式、编码层、元数据、隐写/协议 | file/magic/metadata | 从原始附件一键生成结果 |
 
-### 6.3 全自动和辅助模式
+### 6.3 全自动和调试辅助模式
 
 参考 Firefox-Reverse，提供两种模式：
 
-- **Auto**：目标清晰时，Harness 自动推进；只在登录态、验证码、题目歧义和预算决策处暂停；
-- **Assist**：每个阶段结束时提交阶段摘要、证据、风险和 2-3 个路线选项，由用户或 director 选择。
+- **Auto**：比赛默认模式，Agent 全程自主推进，只有平台、预算、安全或不可恢复环境问题才能暂停；
+- **Assist**：开发和调试模式，在软阶段变化、断路器或预算节点展示摘要、证据和候选路线，可由开发者干预。
 
-开发阶段优先使用 Assist。它能暴露阶段划分、工具契约和摘要质量问题；稳定后再把相同流程切到 Auto。
+比赛目标是无人参与，因此 Assist 不能成为正确性依赖；任何只在人工选择后才能完成的路径都不能通过 Auto 验收。
 
 ### 6.4 无进展和绕圈护栏
 
@@ -1154,6 +1173,31 @@ Background job 不应只返回一个临时 PID。Job record 包含稳定 `job_id
 插件协议只处理能力发现和调用，不让插件自行修改 Session。所有结果回到 Tool Router，由 Harness 统一记账、截断、归档和评测。
 
 不要把 MCP 当作隔离边界。stdio MCP 是受信任的本地代码，HTTP MCP 是受信任的远程能力；两者仍需通过相同的 Tool Contract、timeout、redaction、resource lease 和 effect journal。服务自报的 `readOnlyHint` 只用于调度提示，Host 仍按本地策略决定权限和并发。
+
+### 8.5 当前题型能力成熟度与补齐方向
+
+截至 ProofBlade `main@cd42609`，底层 Runtime、Control Store、Effect、Artifact/Evidence、上下文恢复、MCP、Provider 调度和 Independent Verifier 为所有题型共享；题型专用能力明显偏向 Binary/Reverse/Firmware。
+
+| 题型 | 当前专用能力 | 当前成熟度 | 主要缺口 |
+|---|---|---|---|
+| Reverse / Firmware | `proofblade.binary`：identify/read_range/sections/symbols/strings/functions/disassemble/xrefs；`proofblade.firmware`：scan/partitions/filesystems/entropy/file_tree/extract；可选 Rizin/MCP Backend；`ctf-reverse` Skill | 当前最成熟，已形成结构化 Capability、可替换 Backend 和定向测试 | IDA/idalib/Ghidra/JADX 跨设备 Profile、动态调试、真实样本成功率和能力发现 |
+| Web / API | 模型可使用通用 read/bash、进程和配置的 MCP | 基础可做，但没有同等级专用 Capability | HTTP 会话/请求重放、路由发现、Cookie/认证隔离、浏览器/代理联动和真实评测 |
+| Pwn | 通用 shell、二进制静态能力和后台任务 | 可辅助分析，尚未形成稳定利用闭环 | checksec、core/crash、寄存器/内存、GDB/pwndbg、偏移/ROP、进程重置和利用复现 |
+| Crypto | 通用 Python/shell 与文件操作 | 主要依赖模型自行写脚本 | 编码/数论/统计原语、Sage/Python 环境探测、已知向量验证和隐藏样本评测 |
+| Misc / Forensics | 通用文件、命令和 Artifact | 可处理简单题，缺少专业发现层 | magic/metadata/archive/stego/audio/QR/PCAP 等按需 Capability、工具链 Profile 和多模态 Artifact |
+
+成熟度不等于模型本身不会解题。GPT、Claude 和 DeepSeek 可以通过通用工具自行编写脚本和调用系统命令；专用 Capability 的价值是稳定结构、环境探测、受控副作用、可追溯 Artifact 和跨模型一致性，而不是替代模型推理。
+
+补齐时保持三层结构：
+
+```text
+模型自由规划
+    ├─ 通用 read / bash / edit / write
+    ├─ 按需发现的题型原子 Capability
+    └─ 可选 Skill / MCP / 专业工具链 Profile
+```
+
+新增题型能力不得成为默认必经步骤。先建立真实题基线，再比较“通用工具”“通用工具 + Capability”“再加 Skill/MCP”的边际收益。
 
 ---
 
@@ -1660,11 +1704,11 @@ Drive Loop 是唯一主动推进 Run 的组件。事件订阅者、模型、工�
 
 验收：反汇编器/浏览器能力按需加载，核心 schema hash 不变；插件超时/崩溃只结束本 effect；Run 结束无非预期后台进程；晋级的 Package 通过权限、故障注入、context delta 和版本重建测试。
 
-### Milestone 5：Planner + Executor
+### Milestone 5：自治能力发现与 Durable Progress
 
-交付：两个独立 `AgentHarness`/Pi Session、deterministic router、Handoff schema、Intent claim、模型 fallback、成本和重复率指标。Manager 是确定性控制器，Planner 只生成/排序 Intent，Executor 消费 Intent。
+交付：Capability search/describe、按需 Schema 暴露、Backend 可用性和缺失依赖说明；从 Control/Knowledge Store 确定性生成 Active Task、Confirmed Facts、Rejected Hypotheses、Artifacts、Completed Actions、Blockers、Candidate Next Actions 和 Remaining Budget；持久化精确 model-facing trace。
 
-验收：至少 20 个 challenge、每题 3 次，与单 Agent baseline 配对比较，并把 `pi-subagents` profile 作为外部对照组；成功率、成本或 p95 延迟至少一项稳定改善，其他项未突破预算；duplicate intent rate 和 parallel waste 在阈值内。
+验收：连续两次压缩和进程重启仍保留真实用户任务及已确认状态；工具数增加不扩大默认 Schema；模型可发现可用 Backend 并避开缺失工具链；真实 payload、ContextManifest、Tool Contract 和 compaction generation 可重放关联。
 
 ### Milestone 6：Independent Verifier 与评测门禁
 
@@ -1672,11 +1716,17 @@ Drive Loop 是唯一主动推进 Run 的组件。事件订阅者、模型、工�
 
 验收：错误提交率下降；Verifier 不读取 Solver 推理仍能复现；每次 Prompt/Tool/Skill/Runtime 改动自动跑 protocol replay 和固定 live 子集。
 
-### Milestone 7：题型 Skill 与多 Worker
+### Milestone 7：题型能力均衡与真实自治评测
 
-交付：Web recon、ELF triage、Pwn crash-to-repro、JS reverse 等 Skill；每个 Skill 带 references/scripts/evals；按 Intent 弹性扩展多个通用 Worker，加入 claim/heartbeat/conclude。
+交付：Web session/replay/recon、Pwn crash-to-repro、Crypto environment/vector、Misc file/metadata 等原子 Capability 和对应 Skill；PE、ELF、固件、Web、Pwn、Crypto、Misc 真实语料；通用工具、Capability、Skill/MCP 三层消融。
 
-验收：Skill 在 holdout 题上减少工具调用或提升通过率/证据完整度；多 Worker 相比双模型 baseline 有稳定收益；Skill 候选未经评测不会进入默认集合。
+验收：每类至少有可重置、隐藏评分且不泄漏答案的开发集与 holdout；Capability/Skill 在 holdout 上提升 verified solve rate、证据完整度或成本效率；无收益能力不进入默认 Profile。
+
+### Milestone 8：实验性 Planner 与多 Worker Profile
+
+交付：事件触发 Reason、两个独立 `AgentHarness`/Pi Session、Handoff schema、Intent generation/claim/lease/heartbeat/conclude、Worker 健康与冷却、模型 fallback，以及单 Agent 一键回退路径。Manager 是确定性控制器；Planner 只生成或排序 Intent，不能直接提交 Fact 和终态。
+
+验收：至少 30-50 个 challenge、每题多次运行，与自治单 Agent baseline 配对比较；只有成功率、成本或 p95 延迟至少一项稳定改善且其他指标未突破预算，实验 Profile 才可按题型启用。默认仍为单 Agent；duplicate intent rate 和 parallel waste 必须在阈值内。
 
 **升级纪律**：Milestone N 的退出条件未通过，不开始 N+1 的模型角色扩张。尤其不要用多 Agent 掩盖工具错误、环境不稳定和上下文丢失。
 
@@ -1991,6 +2041,7 @@ models:
 | Reasonix | `main-v2` | `e73a78d6851a9039571e5879b0a93e95baf7cae4` |
 | OpenClacky | `main` | `90a153126bfcc50e4694246d2584efa322701f4c` |
 | Firefox-Reverse | `main` | `7a77a66ed8361f858cfa0b19fd8239b63b4535f0` |
+| CyberStrikeAI | `main` | `b170f2c4b1974ac4e3c8e86e6a2f36c0d0acd63b` |
 | BreachWeave | `main` | `ceac953dc501fe98f7ddbec2c1eeb0fe2993aff3` |
 | Cairn | `main` | `8f702c5f3f9d3163948bd4089edc73980c9c9484` |
 | Tsec-Hackathon | `main` | `7b264c7f20cf11e790855194692a494aedbdb21c` |
@@ -2036,6 +2087,19 @@ models:
 - [Agent Loop](https://github.com/WhiteNightShadow/firefox-reverse/blob/main/additions/browser/components/agent-sidebar/modules/AgentLoop.sys.mjs)
 - [Ledger Backend](https://github.com/WhiteNightShadow/firefox-reverse/blob/main/additions/browser/components/agent-sidebar/modules/LedgerBackend.sys.mjs)
 - [Tools Registry](https://github.com/WhiteNightShadow/firefox-reverse/blob/main/additions/browser/components/agent-sidebar/modules/Tools.sys.mjs)
+
+### CyberStrikeAI
+
+- [CyberStrikeAI 主仓库](https://github.com/Ed1s0nZ/CyberStrikeAI)
+- [Eino 单 Agent Runner](https://github.com/Ed1s0nZ/CyberStrikeAI/blob/main/internal/multiagent/eino_single_runner.go)
+- [Eino Middleware 与动态 Tool Search](https://github.com/Ed1s0nZ/CyberStrikeAI/blob/main/internal/multiagent/eino_middleware.go)
+- [Summarization 实现](https://github.com/Ed1s0nZ/CyberStrikeAI/blob/main/internal/multiagent/eino_summarize.go)
+- [Markdown Agent 配置](https://github.com/Ed1s0nZ/CyberStrikeAI/blob/main/internal/agents/markdown.go)
+
+### AI Agent 原理补充
+
+- [AI Agent 开发：方法、技巧与实践](https://github.com/bojieli/ai-agent-book)
+- 本地只保留中文 PDF：`D:\project\ai\AI-Agents-in-Depth-zh-CN.pdf`
 
 ### Tsec-Hackathon 第二季前三名
 

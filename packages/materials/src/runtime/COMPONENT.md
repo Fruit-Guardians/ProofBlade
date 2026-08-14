@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.16",
+  "version": "0.10.17",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-12T08:30:00.000Z",
+  "updatedAt": "2026-08-13T04:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 14,
-    "securityAuditCount": 14,
-    "lastBugAuditAt": "2026-08-12T08:30:00.000Z",
-    "lastSecurityAuditAt": "2026-08-12T08:30:00.000Z",
-    "sourceHash": "502937070d7c7074209890d2d9cedb60849074a51ce686edf86afb110785172e",
+    "bugAuditCount": 15,
+    "securityAuditCount": 15,
+    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
+    "sourceHash": "5f9dac409e6001403ee62f26681d74918e506d336613ba0267eb92e77d9daf10",
     "result": "passed"
   }
 }
@@ -27,8 +27,9 @@
 - `coding-lane.ts` 驱动普通对话并在动态尾部注入隐藏 Forest 摘要；`solver-lane.ts` 驱动证据型任务。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
-- `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
-- Coding Provider 始终看到固定 `evidence`、`load_skill` 和 `mcp_call`；启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
+- `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
+- Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
+- Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
 - Coding `bash` 通过 `OutputRewritePort` 包装；RTK 探测和执行复用同一个 Pi `ExecutionEnv`，并在 Session details 中记录 provider/version/hash/字节数/Artifact。
 - Coding `read` 与 `bash` 都为文本结果注册语义化中间 Artifact，并在模型可见结果中返回稳定 `A-*` 锚点；`evidence record` 使用该锚点一次完成命名、提升、Evidence 与可选 Fact。
@@ -48,7 +49,13 @@ Evidence 变更操作返回 `durableProgress` 和基于 Artifact 内容哈希的
 
 `evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 
-Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外层 Tool Schema 外也返回配置允许的嵌套 Tool 策略摘要。
+Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外层 Tool Schema 也返回配置允许的嵌套 Tool 策略摘要。
+
+MCP 调用结果必须解包后再交给模型，不得逐层重新序列化。线缆形状是四层嵌套：Tool 自己的 JSON 是 `result.content[].text` 里的字符串，外面套 `{server, tool, result}` 信封，信封又是 `RawEffectResult.stdout` 里的字符串。直接再 `JSON.stringify` 一次会让模型收到没有真实换行的 `\\\"instruction\\\"` 转义串，从而判断输出被截断并重复发起同一次调用；实测一次 idalib `disasm` 因此从 835 字符膨胀到 10778 字符（12.9 倍）。指令清单（`asm.lines`）扁平化为 `addr  instruction` 行并内联 label 与 ref，`decompiled`/`pseudocode`/`code`/`source` 按原文输出，`null` 与空容器字段丢弃。
+
+`submit_flag` 只在 `verification.kind = "platform_submission"` 时注册，因为它会花掉一次真实提交，GUI 聊天运行没有可提交的对象。它先走 `runtime.submitCandidate`（格式校验、提交预算、候选哈希去重），再由 `IndependentVerifier` 触发 Journal 的 `fixture_score`，那才是真正到达平台的一步。禁止在 lane 里直接调用平台 API：Journal 的 idempotency key 会把重复提交折叠成回放而非第二次调用，事件日志同时是「错误提交次数」和「API 调用效率」两个计分项的账本。assist 模式下候选只记录为 PROPOSED completion 并立即返回，绝不联系平台，由操作者决定是否放行。
+
+Artifact 锚点只在可见输出确实少于原始输出时追加，并写明被截留的字节数。对完整输出宣告 Artifact 会教会模型「有内容被藏起来了」，使它把回合花在取回已经拿到的文本上；`read` 的归档内容等于其可见内容，因此永不追加锚点，Artifact ID 只留在 `details` 里供 GUI 与 Evidence Graph 使用。`evidence search` 在元数据未命中时检索归档正文（单个 Artifact 上限 512 KB），否则内容查询永远落空而模型只能重跑命令。
 
 CTF flag、挑战答案或恢复密钥等确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现候选不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
 

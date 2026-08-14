@@ -1,4 +1,4 @@
-import type { ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetSnapshot, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
 import type { ProviderApi } from "@proofblade/materials";
 
 export async function getBootstrap(): Promise<BootstrapData> {
@@ -103,6 +103,49 @@ export async function streamChat(runId: string, prompt: string, onEvent: (event:
     }
     if (done) break;
   }
+}
+
+export async function streamFleet(onSnapshot: (snapshot: FleetSnapshot) => void, signal?: AbortSignal): Promise<void> {
+  const response = await fetch("/api/fleet/stream", { signal });
+  if (!response.ok || !response.body) {
+    const body = await response.json().catch(() => ({})) as { error?: unknown };
+    throw new Error(body.error ? String(body.error) : response.statusText);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      const data = frame.split(/\r?\n/).filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim()).join("\n");
+      if (data) onSnapshot(JSON.parse(data) as FleetSnapshot);
+    }
+    if (done) break;
+  }
+}
+
+export async function startFleet(): Promise<FleetSnapshot> {
+  return await request("/api/fleet/start", { method: "POST", body: "{}" });
+}
+
+export async function setFleetConcurrency(concurrency: number): Promise<FleetSnapshot> {
+  return await request("/api/fleet/concurrency", { method: "POST", body: JSON.stringify({ concurrency }) });
+}
+
+export async function cancelFleetChallenge(challengeId: string): Promise<FleetSnapshot> {
+  return await request(`/api/fleet/challenges/${encodeURIComponent(challengeId)}/cancel`, { method: "POST", body: "{}" });
+}
+
+export async function setFleetChallengeMode(challengeId: string, mode: "auto" | "assist"): Promise<FleetSnapshot> {
+  return await request(`/api/fleet/challenges/${encodeURIComponent(challengeId)}/mode`, { method: "POST", body: JSON.stringify({ mode }) });
+}
+
+export async function reprioritizeFleetChallenge(challengeId: string, priority: number): Promise<FleetSnapshot> {
+  return await request(`/api/fleet/challenges/${encodeURIComponent(challengeId)}/priority`, { method: "POST", body: JSON.stringify({ priority }) });
 }
 
 export async function pauseRun(runId: string): Promise<ActiveRunInfo> {

@@ -81,6 +81,33 @@ const listCapabilitiesContract: ProofBladeToolContract<typeof listCapabilitiesSc
   },
 };
 
+const discoverCapabilitiesSchema = Type.Object({
+  query: Type.Optional(Type.String({ minLength: 1, maxLength: 200, description: "Space-separated terms matched against capability ids, operation names, and descriptions." })),
+  capabilityId: Type.Optional(Type.String({ minLength: 1, description: "Exact logical capability id." })),
+  operation: Type.Optional(Type.String({ minLength: 1, description: "Exact operation name; requires capabilityId." })),
+  includeSchemas: Type.Optional(Type.Boolean({ description: "Include the complete operation parameter schema only when needed for invocation." })),
+  maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
+}, { additionalProperties: false });
+
+const discoverCapabilitiesContract: ProofBladeToolContract<typeof discoverCapabilitiesSchema, Static<typeof discoverCapabilitiesSchema>, unknown, SolverToolContext> = {
+  name: "discover_capabilities",
+  version: "1.0.0",
+  description: "Search and describe logical capabilities, operation schemas, selected backends, fallbacks, and missing dependencies without executing them.",
+  parameters: discoverCapabilitiesSchema,
+  readOnly: true,
+  sideEffect: "none",
+  timeoutMs: 5_000,
+  replay: "pure",
+  outputPolicy: "summary",
+  resourceKeys: [],
+  sensitivity: "public",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    return context.runtime.discoverCapabilities(input);
+  },
+};
+
 const invokeCapabilitySchema = Type.Object({
   capabilityId: Type.String({ minLength: 1 }),
   operation: Type.String({ minLength: 1 }),
@@ -371,6 +398,7 @@ const reportStatusContract: ProofBladeToolContract<typeof statusSchema, Static<t
 const solverToolContracts: ReadonlyArray<ProofBladeToolContract<any, any, any, SolverToolContext>> = [
   inspectTargetContract,
   listCapabilitiesContract,
+  discoverCapabilitiesContract,
   invokeCapabilityContract,
   runBackgroundContract,
   readJobOutputContract,

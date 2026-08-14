@@ -784,3 +784,36 @@ select { min-width: 0; padding: 0 27px 0 8px; }
   .conversation-inspector .source-tabs button { padding: 0 6px; }
   .script-lab.compact { margin: 5px; }
 }
+
+/* Fleet (parallel solve) view */
+.status-badge.status-pending { border-color: #4a5a52; color: #9fb0a8; background: #1a221e; }
+.status-badge.status-cancelled { border-color: #6a5a3c; color: #d6b877; background: #241f16; }
+.status-badge.status-skipped { border-color: #3f4a45; color: #8f9c95; background: #171d19; }
+/* assist mode derived a flag and is holding it for operator release */
+.status-badge.status-awaiting { border-color: #4a5a7a; color: #9db8e0; background: #161c26; }
+.fleet-entry { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 31px; margin-top: 6px; border: 1px solid #3d4a43; border-radius: var(--radius); color: #aeb9b3; background: #171d19; cursor: pointer; font-size: 10px; }
+.fleet-entry:hover { border-color: #59685f; color: var(--text); background: #1d2520; }
+.fleet-entry.active { border-color: #3da878; color: #70d6a4; background: #14251c; }
+.fleet-view { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px; }
+.fleet-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+.fleet-toolbar .primary-button { min-width: 150px; }
+.fleet-concurrency { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.fleet-concurrency input { width: 58px; min-height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); }
+.fleet-concurrency .command-button { min-height: 30px; }
+.fleet-totals { display: flex; align-items: center; gap: 14px; margin-left: auto; flex-wrap: wrap; }
+.fleet-stat { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.fleet-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.fleet-row { display: grid; grid-template-columns: 92px 1fr 92px 96px 128px 84px; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.fleet-row:last-child { border-bottom: none; }
+.fleet-row.fleet-head { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--panel-2); }
+.fleet-row.state-running { background: rgba(88, 182, 208, 0.06); }
+.fleet-row.state-solved { background: rgba(66, 197, 138, 0.06); }
+.fleet-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fleet-title strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-title small { color: var(--faint); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-value { font-variant-numeric: tabular-nums; }
+.fleet-value em { margin-left: 5px; color: var(--amber); font-style: normal; font-size: 10px; }
+.fleet-mode { display: inline-flex; }
+.fleet-mode button { font-size: 10px; padding: 0 8px; min-height: 26px; }
+.fleet-actions { display: flex; gap: 4px; }
+.fleet-actions .icon-button:disabled { opacity: 0.35; cursor: not-allowed; }

@@ -8,11 +8,13 @@ import {
   codingProviderToolContractSnapshot,
   createCodingToolEffectPolicyResolver,
   createCodingTools,
+  createMcpFirstClassTools,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
+import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
@@ -20,16 +22,26 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
-test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
+/**
+ * Pinned so an accidental schema/description/order change is caught. Update it
+ * ONLY together with a deliberate tool-contract change — the provider prompt
+ * cache prefix depends on this shape.
+ */
+const CODING_TOOL_CONTRACT_HASH = "55d7b63c2bbec7f0b3a6af2d956a738ab9b2da584ff4aeeb2474162f0f4238b1";
+
+test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "mcp_call"]);
-  assert.equal(sha256(canonicalJson(snapshot)), "8137aa765a2ac199f04bba8f281d9e9918b3f3b544d47319aee942afc836766e");
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "mcp_call"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
+  // submit_flag is gated on the run being platform-judged, not on tool selection.
+  assert.equal(withoutResources.includes("submit_flag"), false);
+  assert.ok(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true }).includes("submit_flag"));
 });
 
 test("coding host guidance uses Windows-compatible Python and workspace paths", () => {
@@ -177,10 +189,20 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
     enabledSkills: new Set<string>(),
     enabledMcpServers: new Set(["echo"]),
   } as unknown as CodingResourceContext;
-  const resolveEffect = createCodingToolEffectPolicyResolver(mcp);
+  const runtimePolicy = {
+    resolveCapabilityPolicy(input: { operation: string }) {
+      return input.operation === "identify"
+        ? { readOnly: true, sideEffect: "none" }
+        : { readOnly: false, sideEffect: "process" };
+    },
+  };
+  const resolveEffect = createCodingToolEffectPolicyResolver(mcp, runtimePolicy as never);
 
   assert.deepEqual(resolveEffect("read", { path: "target.bin" }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolveEffect("bash", { command: "objdump -d target.bin" }), { readOnly: false, sideEffect: "process" });
+  assert.deepEqual(resolveEffect("capability", { operation: "search", query: "binary" }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolveEffect("capability", { operation: "invoke", capabilityId: "proofblade.binary", capabilityOperation: "identify", input: { path: "sample.bin" } }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolveEffect("capability", { operation: "invoke", capabilityId: "proofblade.binary", capabilityOperation: "disassemble", input: { path: "sample.bin", address: "0x1000" } }), { readOnly: false, sideEffect: "process" });
   assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_info", arguments: {} }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_eval", arguments: {} }), { readOnly: false, sideEffect: "network" });
   assert.equal(resolveEffect("plugin_write", {}), undefined);
@@ -198,13 +220,85 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   await assert.rejects(() => executeTool("mcp_call", { operation: "delete", server: "echo" }, context), /Unsupported MCP operation/);
 
   const called = await executeTool("mcp_call", { operation: "call", server: "echo", tool: "echo_text", arguments: { text: "hello" } }, context);
-  assert.equal((called.details as { stdout: string }).stdout, "called");
+  assert.equal(called.content.map((part) => part.text ?? "").join(""), "called");
+  assert.equal((called.details as { exitCode: number }).exitCode, 0);
   assert.deepEqual(calls.at(-1), { kind: "execute", value: { capabilityId: "mcp.echo", operation: "call", input: { tool: "echo_text", arguments: { text: "hello" } } } });
 
   await assert.rejects(() => executeTool("load_skill", { name: "triage" }, context), /not enabled/);
   context.enabledSkills.add("triage");
   const loaded = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
   assert.deepEqual(loaded.details, { name: "triage", maxChars: 2_000, content: "loaded" });
+});
+
+test("[contract:coding-capability-proxy] coding capability proxy discovers lazily and invokes through the journaled runtime", async () => {
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-capability-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "CODING-CAPABILITY-TEST";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  await mkdir(join(dir, ".proofblade"), { recursive: true });
+  const binary = Buffer.alloc(64);
+  binary.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1], 0);
+  await writeFile(join(dir, "sample.bin"), binary);
+  await writeFile(join(dir, ".proofblade", "secret.bin"), binary);
+  const runtime = new ProofBladeToolRuntime(
+    runId,
+    { fixtureId: runId, generation: 0, path: dir, privatePath: join(dir, ".proofblade") },
+    services.runsRoot,
+    services.control,
+    services.artifacts,
+    services.journal,
+    dir,
+    { includeMcp: false },
+  );
+  const context = { runtime } as unknown as CodingResourceContext;
+  try {
+    const searched = await executeTool("capability", { operation: "search", query: "binary identify" }, context);
+    const searchDetails = searched.details as { results: Array<{ operation: string; parameters?: unknown }> };
+    assert.equal(searchDetails.results[0]?.operation, "identify");
+    assert.equal(searchDetails.results[0]?.parameters, undefined);
+    assert.equal(Object.keys((await services.control.snapshot(runId)).effects).length, 0, "[contract:capability-discovery-no-effect]");
+
+    const described = await executeTool("capability", {
+      operation: "describe",
+      capabilityId: "proofblade.binary",
+      capabilityOperation: "identify",
+    }, context);
+    const describeDetails = described.details as { results: Array<{ parameters?: { type?: string } }> };
+    assert.equal(describeDetails.results[0]?.parameters?.type, "object");
+
+    const invoked = await executeTool("capability", {
+      operation: "invoke",
+      capabilityId: "proofblade.binary",
+      capabilityOperation: "identify",
+      input: { path: "sample.bin" },
+    }, context);
+    assert.equal((invoked.details as { backendId: string }).backendId, "proofblade-binary");
+    assert.equal(Object.keys((await services.control.snapshot(runId)).effects).length, 1);
+
+    await assert.rejects(() => executeTool("capability", {
+      operation: "invoke",
+      capabilityId: "proofblade.binary",
+      capabilityOperation: "identify",
+      input: { path: ".proofblade/secret.bin" },
+    }, context), /private fixture data/);
+    await assert.rejects(() => executeTool("capability", {
+      operation: "invoke",
+      capabilityId: "proofblade.binary",
+      capabilityOperation: "identify",
+      input: { path: "../outside.bin" },
+    }, context), /fixture|relative path/);
+  } finally {
+    await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("coding bash archives raw output before returning RTK-compressed content", async () => {
@@ -301,7 +395,10 @@ test("coding read creates a searchable source artifact for the evidence graph", 
   try {
     const read = await executeTool("read", { path: "source.txt" }, context);
     const artifactId = String((read.details as Record<string, unknown>).artifactId);
-    assert.match(read.content.map((item) => item.text ?? "").join("\n"), new RegExp(`ProofBlade artifact ${artifactId}`));
+    // The artifact is archived for the evidence graph, but read output is
+    // already complete, so the model must not be told content was withheld.
+    assert.equal(/ProofBlade artifact/.test(read.content.map((item) => item.text ?? "").join("\n")), false);
+    assert.match(artifactId, /^A-/);
     const searched = await executeTool("evidence", { operation: "search", query: "source.txt DID protected" }, context);
     const results = (searched.details as { results: Array<{ id: string }> }).results;
     assert.ok(results.some((item) => item.id === artifactId));
@@ -311,6 +408,163 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     assert.equal(artifact.semantic?.name, "EF01 DID 记录");
     assert.equal(artifact.semantic?.role, "supporting");
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("shell_background returns immediately and shell_job polls then stops the real process", async () => {
+  const dir = await mkdtemp(join(process.cwd(), "shell-bg-test-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  try {
+    const context = { env, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+
+    // A command that runs far longer than the tool call may block for.
+    const started = Date.now();
+    const startResult = await executeTool("shell_background", { command: "for i in $(seq 1 40); do echo tick-$i; sleep 1; done", label: "ticker" }, context);
+    const startElapsed = Date.now() - started;
+    const job = startResult.details as { jobId: string; pid: number; logPath: string; status: string };
+    assert.match(job.jobId, /^sh-/);
+    assert.ok(job.pid > 0, "a real pid must be returned");
+    assert.equal(job.status, "running");
+    assert.ok(startElapsed < 10_000, `starting must not block for the command's duration, took ${startElapsed}ms`);
+
+    // Give it a moment to write some output, then poll.
+    await new Promise<void>((resolve) => setTimeout(resolve, 2_500));
+    const read = await executeTool("shell_job", { operation: "read", jobId: job.jobId }, context);
+    const polled = read.details as { status: string; output: string; totalBytes?: number };
+    assert.equal(polled.status, "running", "the job must still be running while it ticks");
+    assert.match(polled.output, /tick-1/);
+
+    // Stopping must actually kill it: the log stops growing.
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true, "stop must report a killed process");
+    const afterStop = (await executeTool("shell_job", { operation: "read", jobId: job.jobId }, context)).details as { totalBytes?: number };
+    await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+    const later = (await executeTool("shell_job", { operation: "read", jobId: job.jobId }, context)).details as { status: string; totalBytes?: number };
+    assert.equal(later.totalBytes, afterStop.totalBytes, "a stopped job must not keep writing output");
+    assert.equal(later.status, "finished");
+
+    const listed = (await executeTool("shell_job", { operation: "list" }, context)).details as { jobs: string[] };
+    assert.ok(listed.jobs.some((entry) => entry.includes(job.jobId)), "the job log must be listable");
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("polling a background job stays read-only so it cannot mask a stalled agent", () => {
+  const mcp = { summaries: () => [], resolveInvocation: () => ({ readOnly: true, sideEffect: "none" }) } as unknown as McpProjectRegistry;
+  const resolve = createCodingToolEffectPolicyResolver(mcp);
+  assert.deepEqual(resolve("shell_background", { command: "sleep 1" }), { readOnly: false, sideEffect: "process" });
+  assert.deepEqual(resolve("shell_job", { operation: "read", jobId: "sh-1" }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolve("shell_job", { operation: "list" }), { readOnly: true, sideEffect: "none" });
+  assert.deepEqual(resolve("shell_job", { operation: "stop", jobId: "sh-1" }), { readOnly: false, sideEffect: "process" });
+});
+
+test("MCP results reach the model unwrapped instead of quadruple-encoded JSON", async () => {
+  // Exact wire shape observed in run CHAT-1786697151961: the tool's JSON is a
+  // string inside result.content[].text, inside the {server,tool,result}
+  // envelope, inside RawEffectResult.stdout. Re-serializing that gave the model
+  // \\\"instruction\\\" soup with no newlines, so it believed its output was
+  // truncated and re-issued the same disasm 16 times over ~100 turns.
+  const asmPayload = JSON.stringify({
+    addr: "0x1bc",
+    error: null,
+    asm: {
+      name: "_sub_08001a10",
+      start_ea: "0x1bc",
+      segment: ".text.sub_08001a10",
+      lines: [
+        { addr: "1bc", instruction: "PUSH {R4,R5,R7,LR}", label: "_sub_08001a10" },
+        { addr: "1be", instruction: "ADD R7, SP, #8" },
+        ...Array.from({ length: 16 }, (_unused, index) => ({ addr: (0x1c0 + index * 2).toString(16), instruction: `LDRB R0, [R2,#${index}]` })),
+        { addr: "1d6", instruction: "BNE loc_1CC", refs: [{ addr: "0x1cc", name: "loc_1CC" }] },
+      ],
+    },
+    instruction_count: 19,
+  });
+  const stdout = JSON.stringify({
+    server: "idalib-mcp",
+    tool: "disasm",
+    result: { content: [{ type: "text", text: asmPayload }], isError: false },
+  }, null, 2);
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "idalib-mcp",
+      configHash: "ida-hash",
+      tools: [{ name: "disasm", description: "Disassemble", inputSchema: { type: "object", properties: { addr: { type: "string" } } }, readOnlyHint: true }],
+    }),
+    execute: async () => ({ stdout, stderr: "", exitCode: 0, durationMs: 7 }),
+    resolveInvocation: () => ({ readOnly: true, sideEffect: "none" }),
+  } as unknown as McpProjectRegistry;
+  const context = {
+    mcp,
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set(["idalib-mcp"]),
+  } as unknown as CodingResourceContext;
+
+  const tools = await createMcpFirstClassTools(mcp, ["idalib-mcp"]);
+  const disasm = tools.find((tool) => tool.name === "mcp__idalib-mcp__disasm");
+  assert.ok(disasm, "expected a first-class disasm tool");
+  const result = await disasm.execute("call-1", { addr: "0x1bc" }, new AbortController().signal, () => undefined, context);
+  const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+
+  assert.match(text, /_sub_08001a10 · \.text\.sub_08001a10 · 0x1bc/);
+  assert.match(text, /^\s*1bc {2}PUSH \{R4,R5,R7,LR\}$/m);
+  assert.match(text, /1d6 {2}BNE loc_1CC {3}; -> loc_1CC/);
+  assert.match(text, /^_sub_08001a10:$/m);
+  assert.equal(text.includes('\\"'), false, "no escaped quotes may survive into the model-visible text");
+  assert.equal(text.includes("error"), false, "null fields must be dropped rather than shown as noise");
+  assert.match(text, /instruction_count=19/);
+  // This fixture compresses ~2.4x; the real idalib disasm in the failing run
+  // went 10778 -> 835 chars (12.9x), since real payloads carry far more
+  // metadata and longer operands. Assert the floor, not the fixture's ratio.
+  assert.ok(text.length * 2 < stdout.length, `expected a size win, got ${text.length} vs ${stdout.length}`);
+  assert.equal(result.isError, false);
+});
+
+test("bash anchors an artifact only when output was actually withheld", async () => {
+  const dir = await mkdtemp(join(process.cwd(), "anchor-test-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  try {
+    const archived: string[] = [];
+    let savedBytes = 0;
+    const pipeline = {
+      port: {
+        async prepare(request: { toolCallId: string; command: string }) {
+          return { toolCallId: request.toolCallId, command: request.command, provider: "builtin", requestedProvider: "builtin", providerVersion: "1", applied: false, executionEnv: {}, originalCommandHash: "h1", rewrittenCommandHash: "h1" };
+        },
+        async finalize(_ticket: unknown, visible: string) {
+          return { rawOutput: `${visible}${"x".repeat(savedBytes)}`, rawBytes: visible.length + savedBytes, visibleBytes: visible.length, rawTruncated: false, rawCapture: "full" };
+        },
+      } as unknown as OutputRewritePort,
+      artifactStore: {
+        async putText(_runId: string, text: string) {
+          archived.push(text);
+          return { id: `A-${archived.length}`, sha256: "deadbeef" };
+        },
+      },
+      runId: "RUN-anchor",
+    } as unknown as NonNullable<CodingResourceContext["outputRewrite"]>;
+    const context = { env, outputRewrite: pipeline, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+
+    const complete = await executeTool("bash", { command: "echo hello" }, context);
+    const completeText = complete.content.map((part) => part.text ?? "").join("\n");
+    assert.match(completeText, /hello/);
+    assert.equal(/ProofBlade artifact/.test(completeText), false, "complete output must not claim an artifact holds more");
+
+    savedBytes = 4096;
+    const withheld = await executeTool("bash", { command: "echo hello" }, context);
+    const withheldText = withheld.content.map((part) => part.text ?? "").join("\n");
+    assert.match(withheldText, /ProofBlade artifact A-2: 4096 bytes withheld/);
+    assert.match(withheldText, /do not re-run the command/);
+    assert.equal(archived.length, 2);
+  } finally {
+    await env.cleanup();
     await rm(dir, { recursive: true, force: true });
   }
 });
