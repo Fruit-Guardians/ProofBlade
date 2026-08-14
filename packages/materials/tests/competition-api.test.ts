@@ -156,6 +156,41 @@ test("HttpCompetitionApi rejects challenge details without an explicit attachmen
   });
 });
 
+test("HttpCompetitionApi preserves attachments declared beside a data envelope", async () => {
+  await withServer(async (_request, response) => send(response, 200, {
+    data: { challenge: { id: "c-1", title: "Outer files", category: "Misc" } },
+    attachments: [],
+  }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    const result = await api.getChallenge("c-1");
+    assert.deepEqual(result.attachments, []);
+  });
+});
+
+test("HttpCompetitionApi fails closed when a live environment has no teardown handle", async () => {
+  await withServer(async (_request, response) => send(response, 200, {
+    result: { connection_info: "nc 127.0.0.1 9001", expires_at: 1234 },
+  }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    await assert.rejects(() => api.startEnvironment("c-1"), /instanceId for live environment teardown/);
+  });
+});
+
+test("HttpCompetitionApi permits handle-less live responses with an explicit teardown endpoint", async () => {
+  await withServer(async (request, response) => {
+    if (request.method === "POST") {
+      send(response, 200, { result: { connection_info: "https://target.example", expires_at: 1234 } });
+      return;
+    }
+    send(response, 204);
+  }, async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl, endpoints: { stopEnvironment: "/challenges/{challengeId}/environment" } });
+    const environment = await api.startEnvironment("c-1");
+    assert.equal(environment.connectionInfo, "https://target.example");
+    await api.stopEnvironment("c-1");
+  });
+});
+
 test("HttpCompetitionApi rejects redirects before credentials can cross origins", async () => {
   let redirectMode: RequestRedirect | undefined;
   let tokenHeader: string | null = null;

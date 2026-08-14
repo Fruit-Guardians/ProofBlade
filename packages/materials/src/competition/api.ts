@@ -176,7 +176,8 @@ export class HttpCompetitionApi implements CompetitionApi {
     const envelope = asRecord(unwrap(payload, ["data", "result"])) ?? payload;
     const challengePayload = asRecord(firstDefined(envelope, ["challenge", "item"])) ?? envelope;
     const summary = parseChallenge(challengePayload, "getChallenge");
-    const attachmentsPayload = firstDefined(challengePayload, ["attachments", "files", "artifacts"]) ?? firstDefined(envelope, ["attachments", "files", "artifacts"]);
+    const attachmentKeys = ["attachments", "files", "artifacts"];
+    const attachmentsPayload = firstDefined(challengePayload, attachmentKeys) ?? firstDefined(envelope, attachmentKeys) ?? firstDefined(payload, attachmentKeys);
     if (attachmentsPayload === undefined) throw payloadError("getChallenge.attachments", "an explicit attachments array");
     const attachments = parseAttachments(attachmentsPayload);
     return { summary, attachments };
@@ -184,7 +185,11 @@ export class HttpCompetitionApi implements CompetitionApi {
 
   public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
     const payload = await this.request("POST", this.endpoints.startEnvironment, { challengeId });
-    return parseEnvironment(unwrap(payload, ["environment", "instance", "data", "result"]));
+    const environment = parseEnvironment(unwrap(payload, ["environment", "instance", "data", "result"]));
+    if (environment.connectionInfo && !environment.instanceId && this.endpoints.stopEnvironment.includes("{instanceId}")) {
+      throw payloadError("startEnvironment.instanceId", "an instanceId for live environment teardown");
+    }
+    return environment;
   }
 
   public async submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {
