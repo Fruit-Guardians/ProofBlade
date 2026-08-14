@@ -216,13 +216,19 @@ export class HttpCompetitionApi implements CompetitionApi {
     headers.set("Accept", "application/json");
     if (body !== undefined) headers.set("Content-Type", "application/json");
     if (this.token) headers.set(this.tokenHeader, this.tokenHeader.toLowerCase() === "authorization" ? `Bearer ${this.token}` : this.token);
-    const response = await this.requestFetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(this.timeoutMs),
-      redirect: "error",
-    });
+    let response: Response;
+    try {
+      response = await this.requestFetch(url, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
+        redirect: "error",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CompetitionHttpError(method, url, 0, message, sensitiveValues(this.headers, this.token, body));
+    }
     const text = await response.text();
     if (!response.ok) throw new CompetitionHttpError(method, url, response.status, text, sensitiveValues(this.headers, this.token, body));
     if (method === "DELETE" && response.status === 204) return undefined;

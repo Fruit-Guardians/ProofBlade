@@ -72,7 +72,8 @@ export class CompetitionSandbox implements SandboxPort {
   }
 
   public async reset(fixture: FixtureRef): Promise<number> {
-    // Re-provision the platform environment; local attachments are immutable.
+    // Release the current platform instance before provisioning its replacement.
+    await this.stopEnvironment();
     this.environment = await this.init.api.startEnvironment(this.init.challengeId);
     this.stopped = false;
     return fixture.generation + 1;
