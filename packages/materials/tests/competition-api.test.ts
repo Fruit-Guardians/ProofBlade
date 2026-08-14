@@ -128,17 +128,20 @@ test("HttpCompetitionApi fails closed on HTTP and malformed platform responses",
 
 test("HttpCompetitionApi rejects redirects before credentials can cross origins", async () => {
   let redirectMode: RequestRedirect | undefined;
+  let tokenHeader: string | null = null;
   const api = new HttpCompetitionApi({
     baseUrl: "https://competition.example/api",
     token: "top-secret",
     tokenHeader: "X-API-Key",
     fetch: async (_input, init) => {
       redirectMode = init?.redirect;
+      tokenHeader = new Headers(init?.headers).get("X-API-Key");
       return Response.redirect("https://receiver.example/collect", 302);
     },
   });
   await assert.rejects(() => api.listChallenges(), /HTTP 302/);
   assert.equal(redirectMode, "error");
+  assert.equal(tokenHeader, "top-secret");
 });
 
 test("HttpCompetitionApi rejects malformed attachment base64", async () => {
