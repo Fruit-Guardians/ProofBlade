@@ -116,13 +116,14 @@ export class CompetitionHttpError extends Error {
   public readonly url: string;
   public readonly responseBody: string;
 
-  public constructor(method: CompetitionHttpMethod, url: string, status: number, responseBody: string) {
-    super(`Competition API ${method} ${url} failed with HTTP ${status}${responseBody ? `: ${truncate(responseBody)}` : ""}`);
+  public constructor(method: CompetitionHttpMethod, url: string, status: number, responseBody: string, sensitiveValues: readonly string[] = []) {
+    const safeBody = sanitizeResponseBody(responseBody, sensitiveValues);
+    super(`Competition API ${method} ${url} failed with HTTP ${status}${safeBody ? `: ${safeBody}` : ""}`);
     this.name = "CompetitionHttpError";
     this.status = status;
     this.method = method;
     this.url = url;
-    this.responseBody = responseBody;
+    this.responseBody = safeBody;
   }
 }
 
@@ -176,7 +177,8 @@ export class HttpCompetitionApi implements CompetitionApi {
     const challengePayload = asRecord(firstDefined(envelope, ["challenge", "item"])) ?? envelope;
     const summary = parseChallenge(challengePayload, "getChallenge");
     const attachmentsPayload = firstDefined(challengePayload, ["attachments", "files", "artifacts"]) ?? firstDefined(envelope, ["attachments", "files", "artifacts"]);
-    const attachments = attachmentsPayload === undefined ? [] : parseAttachments(attachmentsPayload);
+    if (attachmentsPayload === undefined) throw payloadError("getChallenge.attachments", "an explicit attachments array");
+    const attachments = parseAttachments(attachmentsPayload);
     return { summary, attachments };
   }
 
@@ -189,7 +191,8 @@ export class HttpCompetitionApi implements CompetitionApi {
     const candidate = flag.trim();
     if (!candidate) throw new Error("Competition API submitFlag requires a non-empty flag");
     const payload = await this.request("POST", this.endpoints.submitFlag, { challengeId }, { flag: candidate });
-    return parseSubmitResult(unwrap(payload, ["submission", "result", "data"]));
+    const result = hasExplicitSubmitVerdict(payload) ? payload : unwrap(payload, ["submission", "result", "data"]);
+    return parseSubmitResult(result);
   }
 
   public async stopEnvironment(challengeId: string, instanceId?: string): Promise<void> {
@@ -216,7 +219,7 @@ export class HttpCompetitionApi implements CompetitionApi {
       redirect: "error",
     });
     const text = await response.text();
-    if (!response.ok) throw new CompetitionHttpError(method, url, response.status, text);
+    if (!response.ok) throw new CompetitionHttpError(method, url, response.status, text, sensitiveValues(this.headers, this.token, body));
     if (method === "DELETE" && response.status === 204) return undefined;
     if (!text.trim()) return {};
     try {
@@ -350,6 +353,11 @@ function parseSubmitResult(value: unknown): CompetitionSubmitResult {
   return { correct, ...(message === undefined ? {} : { message }), ...(alreadySolved === undefined ? {} : { alreadySolved }), ...(remainingAttempts === undefined ? {} : { remainingAttempts }), raw: record };
 }
 
+function hasExplicitSubmitVerdict(value: unknown): value is Record<string, unknown> {
+  const record = asRecord(value);
+  return record !== undefined && ["correct", "accepted", "isCorrect"].some((key) => record[key] !== undefined);
+}
+
 function firstDefined(value: unknown, keys: string[]): unknown {
   const record = asRecord(value);
   if (!record) return undefined;
@@ -423,5 +431,32 @@ function payloadError(operation: string, expected: string): Error {
 
 function truncate(value: string, limit = 512): string {
   const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length <= limit ? compact : `${compact.slice(0, limit)}...`;
+  return compact.length <= limit ? compact : `${compact.slice(0, Math.max(0, limit - 3))}...`;
+}
+
+function sanitizeResponseBody(value: string, sensitive: readonly string[]): string {
+  let sanitized = value;
+  for (const secret of sensitive) {
+    if (secret) sanitized = sanitized.split(secret).join("[REDACTED]");
+  }
+  return truncate(sanitized);
+}
+
+function sensitiveValues(headers: Record<string, string>, token: string | undefined, body: unknown): string[] {
+  const values = [...Object.values(headers), token ?? ""];
+  collectStrings(body, values);
+  return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function collectStrings(value: unknown, output: string[]): void {
+  if (typeof value === "string") {
+    output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectStrings(entry, output);
+    return;
+  }
+  const record = asRecord(value);
+  if (record) for (const entry of Object.values(record)) collectStrings(entry, output);
 }

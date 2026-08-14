@@ -124,6 +124,36 @@ test("HttpCompetitionApi fails closed on HTTP and malformed platform responses",
     const api = new HttpCompetitionApi({ baseUrl });
     await assert.rejects(() => api.submitFlag("c-1", "flag{bad}"), /invalid payload/);
   });
+
+  await withServer(async (_request, response) => send(response, 200, { accepted: true, result: "correct" }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    const result = await api.submitFlag("c-1", "flag{ok}");
+    assert.equal(result.correct, true);
+  });
+});
+
+test("HttpCompetitionApi redacts credentials and flags from bounded HTTP errors", async () => {
+  await withServer(async (_request, response) => send(response, 401, {
+    error: `rejected Bearer top-secret flag{secret} ${"x".repeat(2_000)}`,
+  }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl, token: "top-secret" });
+    await assert.rejects(() => api.submitFlag("c-1", "flag{secret}"), (error: unknown) => {
+      assert.ok(error instanceof CompetitionHttpError);
+      assert.ok(error.responseBody.length <= 512);
+      assert.doesNotMatch(error.message, /top-secret|flag\{secret\}/);
+      assert.doesNotMatch(error.responseBody, /top-secret|flag\{secret\}/);
+      return true;
+    });
+  });
+});
+
+test("HttpCompetitionApi rejects challenge details without an explicit attachments array", async () => {
+  await withServer(async (_request, response) => send(response, 200, {
+    challenge: { id: "c-1", title: "Missing files", category: "Misc" },
+  }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    await assert.rejects(() => api.getChallenge("c-1"), /explicit attachments array/);
+  });
 });
 
 test("HttpCompetitionApi rejects redirects before credentials can cross origins", async () => {

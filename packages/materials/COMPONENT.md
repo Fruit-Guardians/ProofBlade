@@ -34,7 +34,8 @@
 - 根目录只放跨领域装配和公共导出；具体行为进入最匹配的子组件。
 - 新增导出时检查依赖漏斗，避免导出 GUI/CLI 类型。
 - `competition/api.ts` 的 `HttpCompetitionApi` 是平台 HTTP 的唯一实现：端点模板可按赛事覆盖，鉴权通过显式 headers/token 配置，HTTP 错误和不完整响应必须 fail closed，不能回退到演示数据。
-- 平台响应只在通过字段校验后映射为 `CompetitionApi` 类型；附件必须携带严格校验的 base64 内容，提交结果必须携带明确的布尔裁定，HTTP 重定向默认拒绝，环境回收对静态题安全幂等。
+- 平台响应只在通过字段校验后映射为 `CompetitionApi` 类型；挑战详情必须显式返回 `attachments` 数组（无附件也要返回 `[]`），每个附件必须携带严格校验的 base64 内容，提交结果必须携带明确的布尔裁定，HTTP 重定向默认拒绝。
+- `CompetitionHttpError` 只保留脱敏后的、最多 512 字符的响应体；请求 token、header 值和提交 flag 不得进入错误 message 或 `responseBody`。
 - 配置字段必须有默认值、解析测试和密钥边界说明。
 - Provider Profile 必须显式选择 `openai-completions`、`openai-responses` 或 `anthropic-messages`；协议选择属于可持久化运行配置，不能从模型名称或中转站品牌猜测。
 - Coding Agent 的 Skill/MCP 通过固定代理契约进入 Provider；会话启用集合必须在执行时再次校验。
