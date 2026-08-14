@@ -119,6 +119,36 @@ test("HttpCompetitionApi fails closed on HTTP and malformed platform responses",
     const api = new HttpCompetitionApi({ baseUrl });
     await assert.rejects(() => api.submitFlag("c-1", "flag{bad}"), /invalid payload/);
   });
+
+  await withServer(async (_request, response) => send(response, 200, { result: { success: true, message: "flag rejected" } }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    await assert.rejects(() => api.submitFlag("c-1", "flag{bad}"), /invalid payload/);
+  });
+});
+
+test("HttpCompetitionApi rejects redirects before credentials can cross origins", async () => {
+  let redirectMode: RequestRedirect | undefined;
+  const api = new HttpCompetitionApi({
+    baseUrl: "https://competition.example/api",
+    token: "top-secret",
+    tokenHeader: "X-API-Key",
+    fetch: async (_input, init) => {
+      redirectMode = init?.redirect;
+      return Response.redirect("https://receiver.example/collect", 302);
+    },
+  });
+  await assert.rejects(() => api.listChallenges(), /HTTP 302/);
+  assert.equal(redirectMode, "error");
+});
+
+test("HttpCompetitionApi rejects malformed attachment base64", async () => {
+  await withServer(async (_request, response) => send(response, 200, {
+    challenge: { id: "c-1", title: "Bad attachment", category: "Misc" },
+    attachments: [{ name: "payload.bin", base64: "%%%not-base64%%%" }],
+  }), async (baseUrl) => {
+    const api = new HttpCompetitionApi({ baseUrl });
+    await assert.rejects(() => api.getChallenge("c-1"), /valid base64 content/);
+  });
 });
 
 test("HttpCompetitionApi skips an instance placeholder when no environment handle exists", async () => {

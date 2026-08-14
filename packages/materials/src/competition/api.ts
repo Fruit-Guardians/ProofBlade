@@ -213,6 +213,7 @@ export class HttpCompetitionApi implements CompetitionApi {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(this.timeoutMs),
+      redirect: "error",
     });
     const text = await response.text();
     if (!response.ok) throw new CompetitionHttpError(method, url, response.status, text);
@@ -323,7 +324,7 @@ function parseAttachments(value: unknown): CompetitionAttachment[] {
     const record = asRecord(entry);
     if (!record) throw payloadError(`attachments[${index}]`, "an attachment object");
     const name = stringField(record, ["name", "filename", "fileName", "path"], `attachments[${index}].name`);
-    const base64 = stringField(record, ["base64", "contentBase64", "data", "content"], `attachments[${index}].base64`);
+    const base64 = base64Field(record, ["base64", "contentBase64", "data", "content"], `attachments[${index}].base64`);
     return { name, base64 };
   });
 }
@@ -341,7 +342,7 @@ function parseEnvironment(value: unknown): CompetitionEnvironment {
 function parseSubmitResult(value: unknown): CompetitionSubmitResult {
   const record = asRecord(value);
   if (!record) throw payloadError("submitFlag", "a submission result object");
-  const correct = booleanField(record, ["correct", "accepted", "success", "isCorrect"]);
+  const correct = booleanField(record, ["correct", "accepted", "isCorrect"]);
   if (correct === undefined) throw payloadError("submitFlag.correct", "a boolean verdict");
   const alreadySolved = booleanField(record, ["alreadySolved", "already_solved", "duplicate"]);
   const remainingAttempts = numberField(record, ["remainingAttempts", "remaining_attempts", "attemptsLeft"]);
@@ -386,6 +387,24 @@ function optionalStringField(record: Record<string, unknown>, keys: string[]): s
     if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
   }
   return undefined;
+}
+
+function base64Field(record: Record<string, unknown>, keys: string[], label: string): string {
+  for (const key of keys) {
+    if (record[key] === undefined) continue;
+    if (typeof record[key] !== "string" || !isBase64(record[key])) throw payloadError(label, "valid base64 content");
+    return record[key];
+  }
+  throw payloadError(label, "a base64 string");
+}
+
+function isBase64(value: string): boolean {
+  if (value.length === 0) return true;
+  if (value.length % 4 === 1) return false;
+  if (value.includes("=") && value.length % 4 !== 0) return false;
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return false;
+  const padded = value.padEnd(value.length + ((4 - (value.length % 4)) % 4), "=");
+  return Buffer.from(padded, "base64").toString("base64") === padded;
 }
 
 function numberField(record: Record<string, unknown>, keys: string[]): number | undefined {
