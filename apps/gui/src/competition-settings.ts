@@ -104,28 +104,92 @@ async function loadFile(path: string): Promise<StoredCompetitionConfig> {
   return validate(parsed);
 }
 
+/**
+ * Parse the config file. A field that is ABSENT is fine (falls through to env
+ * or Demo). A field that is PRESENT but the wrong type is a configuration
+ * mistake and fails closed with a clear message — silently dropping it would
+ * quietly fall back to the Demo backend, whose submitFlag() always returns
+ * success, so a misconfigured operator could believe a real challenge was
+ * solved when nothing ever reached the platform.
+ */
 function validate(value: unknown): StoredCompetitionConfig {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("竞赛平台配置必须是一个 JSON 对象");
+  }
   const input = value as Record<string, unknown>;
   const config: StoredCompetitionConfig = {};
-  if (typeof input.baseUrl === "string" && input.baseUrl.trim()) config.baseUrl = input.baseUrl.trim();
-  if (typeof input.token === "string" && input.token.trim()) config.token = input.token.trim();
-  if (typeof input.tokenHeader === "string" && input.tokenHeader.trim()) config.tokenHeader = input.tokenHeader.trim();
-  if (typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs)) config.timeoutMs = input.timeoutMs;
-  if (input.headers && typeof input.headers === "object" && !Array.isArray(input.headers)) {
+  const present = (key: string): boolean => Object.hasOwn(input, key) && input[key] !== undefined && input[key] !== null;
+
+  if (present("baseUrl")) {
+    if (typeof input.baseUrl !== "string" || !input.baseUrl.trim()) throw fieldError("baseUrl", "一个非空字符串");
+    config.baseUrl = validateBaseUrl(input.baseUrl.trim());
+  }
+  if (present("token")) {
+    if (typeof input.token !== "string" || !input.token.trim()) throw fieldError("token", "一个非空字符串");
+    config.token = input.token.trim();
+  }
+  if (present("tokenHeader")) {
+    if (typeof input.tokenHeader !== "string" || !input.tokenHeader.trim()) throw fieldError("tokenHeader", "一个非空字符串");
+    config.tokenHeader = input.tokenHeader.trim();
+  }
+  if (present("timeoutMs")) {
+    if (typeof input.timeoutMs !== "number" || !Number.isFinite(input.timeoutMs)) throw fieldError("timeoutMs", "一个数字");
+    config.timeoutMs = input.timeoutMs;
+  }
+  if (present("headers")) {
+    if (typeof input.headers !== "object" || Array.isArray(input.headers)) throw fieldError("headers", "一个字符串到字符串的对象");
     const headers: Record<string, string> = {};
-    for (const [key, raw] of Object.entries(input.headers)) if (typeof raw === "string") headers[key] = raw;
+    for (const [key, raw] of Object.entries(input.headers as Record<string, unknown>)) {
+      if (typeof raw !== "string") throw fieldError(`headers.${key}`, "一个字符串");
+      headers[key] = raw;
+    }
     if (Object.keys(headers).length > 0) config.headers = headers;
   }
-  if (input.endpoints && typeof input.endpoints === "object" && !Array.isArray(input.endpoints)) {
+  if (present("endpoints")) {
+    if (typeof input.endpoints !== "object" || Array.isArray(input.endpoints)) throw fieldError("endpoints", "一个对象");
     const endpoints: Partial<CompetitionHttpEndpoints> = {};
     for (const key of ["listChallenges", "getChallenge", "startEnvironment", "submitFlag", "stopEnvironment"] as const) {
       const raw = (input.endpoints as Record<string, unknown>)[key];
-      if (typeof raw === "string" && raw.trim()) endpoints[key] = raw.trim();
+      if (raw === undefined || raw === null) continue;
+      if (typeof raw !== "string" || !raw.trim()) throw fieldError(`endpoints.${key}`, "一个非空字符串");
+      endpoints[key] = raw.trim();
     }
     if (Object.keys(endpoints).length > 0) config.endpoints = endpoints;
   }
   return config;
+}
+
+function fieldError(field: string, expected: string): Error {
+  return new Error(`竞赛平台配置字段 ${field} 类型错误：应为${expected}`);
+}
+
+/**
+ * Reject a baseUrl that carries credentials in userinfo (https://user:pass@host).
+ * Those are sent on every request and are almost always a mistake — the token
+ * belongs in `token`/`tokenHeader`. Rejecting also keeps credentials out of the
+ * startup log. Full http(s)/shape validation stays in HttpCompetitionApi.
+ */
+function validateBaseUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("竞赛平台配置 baseUrl 必须是合法的绝对 URL");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("竞赛平台配置 baseUrl 不得在 URL 中携带凭据（user:pass@），请改用 token / tokenHeader");
+  }
+  return raw;
+}
+
+/** Origin + path only, for logging. Drops any userinfo, query, and fragment. */
+export function sanitizeUrlForLog(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return "<invalid-url>";
+  }
 }
 
 /** Env vars win over the file so a token need not be written to disk. */
@@ -134,7 +198,7 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   const baseUrl = process.env.PROOFBLADE_COMPETITION_BASE_URL?.trim();
   const token = process.env.PROOFBLADE_COMPETITION_TOKEN?.trim();
   const tokenHeader = process.env.PROOFBLADE_COMPETITION_TOKEN_HEADER?.trim();
-  if (baseUrl) merged.baseUrl = baseUrl;
+  if (baseUrl) merged.baseUrl = validateBaseUrl(baseUrl);
   if (token) merged.token = token;
   if (tokenHeader) merged.tokenHeader = tokenHeader;
   return merged;

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { HttpCompetitionApi, type ProofBladeConfig } from "@proofblade/materials";
-import { CompetitionSettingsStore } from "../src/competition-settings.js";
+import { CompetitionSettingsStore, sanitizeUrlForLog } from "../src/competition-settings.js";
 import { DemoCompetitionApi } from "../src/fleet.js";
 
 const config: ProofBladeConfig = {
@@ -101,4 +101,43 @@ test("rejects a malformed config file rather than silently falling back", async 
   const path = join(dir, "competition.json");
   await writeFile(path, "{ not json", "utf8");
   await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), /不是合法 JSON/);
+});
+
+test("fails closed on a present-but-wrong-typed baseUrl instead of falling back to Demo", async () => {
+  clearEnv();
+  const dir = await tempDir("competition-settings-badtype-");
+  const path = join(dir, "competition.json");
+  await writeFile(path, JSON.stringify({ baseUrl: 123 }), "utf8");
+  await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), /baseUrl 类型错误/);
+});
+
+test("fails closed on wrong-typed token, timeoutMs, headers, and endpoints", async () => {
+  clearEnv();
+  const cases: Array<[Record<string, unknown>, RegExp]> = [
+    [{ baseUrl: "https://ctf.example/api", token: 5 }, /token 类型错误/],
+    [{ baseUrl: "https://ctf.example/api", timeoutMs: "30s" }, /timeoutMs 类型错误/],
+    [{ baseUrl: "https://ctf.example/api", headers: { "X-A": 1 } }, /headers\.X-A 类型错误/],
+    [{ baseUrl: "https://ctf.example/api", endpoints: { submitFlag: 42 } }, /endpoints\.submitFlag 类型错误/],
+  ];
+  let i = 0;
+  for (const [cfg, pattern] of cases) {
+    const dir = await tempDir(`competition-settings-badtype-${i++}-`);
+    const path = join(dir, "competition.json");
+    await writeFile(path, JSON.stringify(cfg), "utf8");
+    await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), pattern);
+  }
+});
+
+test("rejects a baseUrl carrying credentials in userinfo", async () => {
+  clearEnv();
+  const dir = await tempDir("competition-settings-creds-");
+  const path = join(dir, "competition.json");
+  await writeFile(path, JSON.stringify({ baseUrl: "https://user:pass@ctf.example/api" }), "utf8");
+  await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), /不得在 URL 中携带凭据/);
+});
+
+test("sanitizeUrlForLog strips userinfo and query so credentials never reach the log", () => {
+  assert.equal(sanitizeUrlForLog("https://user:pass@ctf.example/api?token=secret"), "https://ctf.example/api");
+  assert.equal(sanitizeUrlForLog("https://ctf.example:8443/api/v1?x=1#frag"), "https://ctf.example:8443/api/v1");
+  assert.equal(sanitizeUrlForLog("not a url"), "<invalid-url>");
 });
