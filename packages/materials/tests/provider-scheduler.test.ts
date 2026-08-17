@@ -97,6 +97,85 @@ test("provider scheduler isolates equal model names at separate endpoints", asyn
   assert.equal(scheduler.statuses().length, 2);
 });
 
+test("idle watchdog aborts a stalled stream and frees the slot", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 40 });
+  const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-idle", maxConcurrentRequests: 1 };
+  // A stream that emits nothing and never completes — the pathological stall.
+  const stalled: ProviderStreams = { stream: () => createAssistantMessageEventStream(), streamSimple: () => createAssistantMessageEventStream() };
+  const wrapped = scheduler.wrap(stalled, scope);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "hang", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "error");
+  assert.match(result.errorMessage ?? "", /idle for more than 40ms/);
+  // The permit must have been released, otherwise the slot count stays pinned.
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-idle")?.active ?? 0, 0);
+});
+
+test("idle watchdog fires the terminal observer completion so telemetry does not leak", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20 });
+  let completed = 0;
+  let cancelled = 0;
+  const observer = { queued: () => "R1", started: () => {}, cancelled: () => { cancelled += 1; }, completed: () => { completed += 1; } };
+  const stalled: ProviderStreams = { stream: () => createAssistantMessageEventStream(), streamSimple: () => createAssistantMessageEventStream() };
+  const wrapped = scheduler.wrap(stalled, { provider: model.provider, model: model.id, endpoint: "endpoint-telemetry", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "hang", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "error");
+  assert.equal(completed, 1);   // terminal completion recorded — no leaked in-flight request
+  assert.equal(cancelled, 0);   // the stream had started, so this is a completion, not a queue cancel
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-telemetry")?.active ?? 0, 0);
+});
+
+test("a terminal observer.completed that throws is not retried (no double usage count)", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 200 });
+  let completed = 0;
+  // Mirrors the real observer: it appends model_usage then persists; if persist
+  // throws AFTER the append, retrying would double-count usage against the budget.
+  const observer = { queued: () => "R1", started: () => {}, cancelled: () => {}, completed: () => { completed += 1; throw new Error("persist failed after appending usage"); } };
+  const healthy: ProviderStreams = { stream: () => delayedStream(5), streamSimple: () => delayedStream(5) };
+  const wrapped = scheduler.wrap(healthy, { provider: model.provider, model: model.id, endpoint: "endpoint-once", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "ok", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "stop");   // the real done event still reaches the consumer
+  assert.equal(completed, 1);                // called exactly once despite throwing
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-once")?.active ?? 0, 0);
+});
+
+test("idle watchdog resets on each event and lets a healthy stream finish", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 60 });
+  const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-healthy", maxConcurrentRequests: 1 };
+  // Emit a heartbeat every 30ms (< 60ms idle bound), then complete — must NOT trip.
+  const healthy: ProviderStreams = { stream: () => heartbeatStream(3, 30), streamSimple: () => heartbeatStream(3, 30) };
+  const wrapped = scheduler.wrap(healthy, scope);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "ok", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "stop");
+});
+
+test("a stalled stream does not permanently block the queue behind it", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 40 });
+  const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-queue", maxConcurrentRequests: 1 };
+  let secondStarted = false;
+  const source: ProviderStreams = {
+    stream: (_m, ctx) => String(ctx.messages.at(-1)?.content) === "stall" ? createAssistantMessageEventStream() : (secondStarted = true, delayedStream(5)),
+    streamSimple: () => delayedStream(5),
+  };
+  const wrapped = scheduler.wrap(source, scope);
+  const first = collect(wrapped.stream(model, { messages: [{ role: "user", content: "stall", timestamp: 1 }] }));
+  const second = collect(wrapped.stream(model, { messages: [{ role: "user", content: "healthy", timestamp: 1 }] }));
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(a.stopReason, "error");        // the stalled one timed out
+  assert.equal(b.stopReason, "stop");          // the queued one still ran
+  assert.equal(secondStarted, true);
+});
+
+function heartbeatStream(beats: number, gapMs: number): AssistantMessageEventStream {
+  const output = createAssistantMessageEventStream();
+  let n = 0;
+  const tick = (): void => {
+    if (n < beats) { output.push({ type: "text", text: "." } as never); n += 1; setTimeout(tick, gapMs); }
+    else output.push({ type: "done", reason: "stop", message: message() });
+  };
+  setTimeout(tick, gapMs);
+  return output;
+}
+
 function delayedStream(delayMs: number, onEnd?: () => void, onStart?: () => void): AssistantMessageEventStream {
   const output = createAssistantMessageEventStream();
   onStart?.();

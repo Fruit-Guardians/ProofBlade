@@ -84,6 +84,21 @@ class ProviderRequestQueueAbortedError extends Error {
  */
 export class ProviderRequestScheduler {
   private readonly pools = new Map<string, SchedulerPool>();
+  private readonly idleTimeoutMs: number;
+
+  /**
+   * @param options.idleTimeoutMs Max time to wait BETWEEN provider stream events
+   *   before the stream is treated as stalled. A provider can return HTTP 200 and
+   *   then hang mid-stream (headers received, body never completes); without this
+   *   bound the `for await` below would wait forever, and because `permit.release()`
+   *   sits in `finally` the concurrency slot would be held forever too — enough
+   *   stalls deadlock the whole fleet. 0 disables the watchdog. Default 120s.
+   */
+  public constructor(options: { idleTimeoutMs?: number } = {}) {
+    const idle = options.idleTimeoutMs ?? 120_000;
+    if (!Number.isFinite(idle) || idle < 0) throw new Error("Provider idleTimeoutMs must be a non-negative number");
+    this.idleTimeoutMs = idle;
+  }
 
   public wrap(streams: ProviderStreams, scope: ProviderRequestScope, observer?: ProviderRequestSchedulingObserver): ProviderStreams {
     assertScope(scope);
@@ -124,6 +139,9 @@ export class ProviderRequestScheduler {
     let requestId: string | undefined;
     let permit: ProviderRequestPermit | undefined;
     let sourceCreated = false;
+    // Shared with consume(): set once a terminal completion has been attempted
+    // for a real done/error event, so the catch below never re-invokes it.
+    const terminal = { attempted: false };
     const requestedAt = Date.now();
     let queueDepth = 0;
     try {
@@ -132,14 +150,17 @@ export class ProviderRequestScheduler {
       requestId = await observer?.queued({ ...scope, queueDepth });
       permit = await this.acquire(pool, options?.signal);
       await observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs });
-      const source = start(model, context, observedOptions(options, requestId, observer));
+      // Combine the caller's signal with an internal idle-watchdog signal so a
+      // provider that honors AbortSignal can cancel the underlying fetch when the
+      // stream stalls. The race below is the real guarantee though: even a
+      // provider that ignores the signal cannot keep us (and the permit) hung.
+      const idle = new AbortController();
+      const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
+      const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
       sourceCreated = true;
-      for await (const event of source) {
-        output.push(event);
-        if (event.type === "done") await observer?.completed?.(requestId, event.message);
-        else if (event.type === "error") await observer?.completed?.(requestId, event.error);
-      }
+      await this.consume(source, idle, output, requestId, observer, terminal);
     } catch (error) {
+      const event = errorEvent(model, error);
       if (!sourceCreated) {
         const waitMs = Math.max(0, Date.now() - requestedAt);
         const reason = error instanceof Error ? error.message : String(error);
@@ -149,10 +170,97 @@ export class ProviderRequestScheduler {
           output.push(errorEvent(model, observerError));
           return;
         }
+      } else if (!terminal.attempted) {
+        // The stream started but threw BEFORE any terminal event — the idle
+        // watchdog (or an iterator error) is the main case. Emit the terminal
+        // observer completion with the synthetic error message so telemetry
+        // records a final state and writes the model_usage terminal event;
+        // otherwise the request stays "in flight" forever and a restart recovers
+        // it as unfinished. If consume() already attempted a completion for a
+        // real done/error event (terminal.attempted), we must NOT call it again —
+        // a second call after a partial-success observer would double-count usage
+        // against the budget. Guard so an observer failure never blocks the
+        // terminal error event from reaching the consumer, which would hang.
+        try {
+          await observer?.completed?.(requestId, event.error);
+        } catch {
+          // Best-effort: the error event below is the consumer's terminal signal.
+        }
       }
-      output.push(errorEvent(model, error));
+      output.push(event);
     } finally {
       permit?.release();
+    }
+  }
+
+  /**
+   * Drive the provider stream with an inter-event idle watchdog. Each event
+   * resets the timer; if none arrives within idleTimeoutMs the stream is treated
+   * as stalled: we abort (best-effort cancel of the underlying fetch) and throw,
+   * which unwinds `forward` — producing an error event for the retry path and,
+   * critically, releasing the concurrency permit in its `finally`. Racing the
+   * iterator against the timer means a provider that ignores the abort signal
+   * still cannot keep the slot hung.
+   */
+  private async consume(
+    source: AssistantMessageEventStream,
+    idle: AbortController,
+    output: AssistantMessageEventStream,
+    requestId: string | undefined,
+    observer: ProviderRequestSchedulingObserver | undefined,
+    terminal: { attempted: boolean },
+  ): Promise<void> {
+    // Mark the terminal completion as attempted BEFORE awaiting the observer, so
+    // that a callback which throws after its own side effects (e.g. it appended
+    // model_usage, then failed to persist) is never re-invoked by forward()'s
+    // catch — that double-call would double-count usage against the budget.
+    const complete = async (message: AssistantMessage): Promise<void> => {
+      terminal.attempted = true;
+      await observer?.completed?.(requestId, message);
+    };
+    if (this.idleTimeoutMs <= 0) {
+      for await (const event of source) {
+        output.push(event);
+        if (event.type === "done") await complete(event.message);
+        else if (event.type === "error") await complete(event.error);
+      }
+      return;
+    }
+    const iterator = source[Symbol.asyncIterator]();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // `rearm` is deliberately a local, not an instance field: concurrent streams
+    // each run their own consume() and must not share one timer handle.
+    let rearm: () => void = () => {};
+    const stall = new Promise<never>((_, reject) => {
+      rearm = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
+          idle.abort(reason);
+          reject(reason);
+        }, this.idleTimeoutMs);
+      };
+      rearm();
+    });
+    try {
+      for (;;) {
+        const pending = iterator.next();
+        // If the stall timer wins the race, `pending` is left in flight and may
+        // later reject once the abort tears down the fetch; swallow that so it
+        // never surfaces as an unhandled rejection.
+        pending.catch(() => {});
+        const next = await Promise.race([pending, stall]);
+        if (next.done) break;
+        rearm();
+        const event = next.value;
+        output.push(event);
+        if (event.type === "done") await complete(event.message);
+        else if (event.type === "error") await complete(event.error);
+      }
+    } finally {
+      clearTimeout(timer);
+      // Best-effort close so the abandoned generator can run its own cleanup.
+      void iterator.return?.(undefined).catch(() => {});
     }
   }
 
