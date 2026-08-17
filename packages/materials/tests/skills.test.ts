@@ -106,6 +106,21 @@ test("multi-root load: primary dir shadows the bulk catalog and only SKILL.md fi
   }
 });
 
+test("nested skill roots do not drop a skill discovered under both roots", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-skills-nested-"));
+  try {
+    // `one` lives under skills/one, which is itself a configured root nested
+    // inside the skills/ root. loadSkills recurses both, discovering the same
+    // SKILL.md twice; de-duping by canonical path must keep it, not drop it.
+    await skillAt(root, join("skills", "one"), "one", "Nested skill");
+    const registry = await ProofBladeSkillRegistry.load(root, [join(root, "skills"), join(root, "skills", "one")]);
+    assert.deepEqual(registry.list({ includeDisabled: true }).map((item) => item.name), ["one"]);
+    assert.equal(registry.diagnostics.filter((item) => item.code === "duplicate_name").length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("default load wires the vendored ctf-skills catalog: ctf-web and ctf-pwn are model-invocable", async () => {
   const projectRoot = resolve(import.meta.dirname, "../../..");
   const registry = await ProofBladeSkillRegistry.load(projectRoot);
