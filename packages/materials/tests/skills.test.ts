@@ -76,11 +76,56 @@ test("bundled CTF reverse Skill is discoverable and remains within the model loa
   }
 });
 
+test("multi-root load: primary dir shadows the bulk catalog and only SKILL.md files load from the catalog", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-skills-multi-"));
+  try {
+    // Primary curated dir: a customized ctf-reverse plus a unique skill.
+    await skillAt(root, join("skills", "ctf-reverse"), "ctf-reverse", "Customized reverse routing", "CUSTOM-MARKER body");
+    await skillAt(root, join("skills", "evidence-triage"), "evidence-triage", "Curated triage");
+    // Bulk catalog dir: an upstream ctf-reverse (must be shadowed), a unique
+    // ctf-web (must load), and a loose repo doc that must NOT become a skill.
+    await skillAt(root, join("library", "ctf-reverse"), "ctf-reverse", "Upstream reverse", "UPSTREAM-MARKER body");
+    await skillAt(root, join("library", "ctf-web"), "ctf-web", "Web exploitation routing");
+    await writeFile(join(root, "library", "README.md"), "# Catalog\n\nNot a skill.\n", "utf8");
+
+    const registry = await ProofBladeSkillRegistry.load(root, ["skills", "library"]);
+    const names = registry.list({ includeDisabled: true }).map((item) => item.name).sort();
+    assert.deepEqual(names, ["ctf-reverse", "ctf-web", "evidence-triage"]);
+
+    // The primary dir wins for ctf-reverse.
+    const reverse = registry.loadForModel("ctf-reverse");
+    assert.match(reverse.content, /CUSTOM-MARKER/);
+    assert.doesNotMatch(reverse.content, /UPSTREAM-MARKER/);
+    assert.ok(registry.diagnostics.some((item) => item.code === "duplicate_name" && /shadowed/.test(item.message)));
+
+    // The catalog's unique skill loads; the loose README did not become one.
+    assert.ok(registry.list().some((item) => item.name === "ctf-web"));
+    assert.ok(!names.includes("README"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("default load wires the vendored ctf-skills catalog: ctf-web and ctf-pwn are model-invocable", async () => {
+  const projectRoot = resolve(import.meta.dirname, "../../..");
+  const registry = await ProofBladeSkillRegistry.load(projectRoot);
+  const names = new Set(registry.list().map((item) => item.name));
+  for (const expected of ["ctf-web", "ctf-pwn", "ctf-crypto", "ctf-reverse", "evidence-triage"]) {
+    assert.ok(names.has(expected), `expected skill "${expected}" to be wired into the default registry`);
+  }
+  // ctf-web fits the model load budget; ctf-reverse resolves to the curated copy.
+  assert.equal(registry.loadForModel("ctf-web").truncated, false);
+  assert.match(registry.list().find((item) => item.name === "ctf-reverse")!.path, /^skills\/ctf-reverse/);
+});
+
 async function skill(root: string, name: string, description: string, body: string): Promise<void> {
-  const dir = join(root, "skills", name);
+  await skillAt(root, join("skills", name), name.split(/[\\/]/).at(-1)!, description, body);
+}
+
+async function skillAt(root: string, relDir: string, name: string, description: string, body = "body"): Promise<void> {
+  const dir = join(root, relDir);
   await mkdir(dir, { recursive: true });
-  const leaf = name.split(/[\\/]/).at(-1)!;
-  await writeFile(join(dir, "SKILL.md"), `---\nname: ${leaf}\ndescription: ${description}\n---\n\n${body}\n`, "utf8");
+  await writeFile(join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`, "utf8");
 }
 
 function fixtureTask(runId: string): TaskContract {
