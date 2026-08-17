@@ -124,6 +124,20 @@ test("idle watchdog fires the terminal observer completion so telemetry does not
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-telemetry")?.active ?? 0, 0);
 });
 
+test("a terminal observer.completed that throws is not retried (no double usage count)", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 200 });
+  let completed = 0;
+  // Mirrors the real observer: it appends model_usage then persists; if persist
+  // throws AFTER the append, retrying would double-count usage against the budget.
+  const observer = { queued: () => "R1", started: () => {}, cancelled: () => {}, completed: () => { completed += 1; throw new Error("persist failed after appending usage"); } };
+  const healthy: ProviderStreams = { stream: () => delayedStream(5), streamSimple: () => delayedStream(5) };
+  const wrapped = scheduler.wrap(healthy, { provider: model.provider, model: model.id, endpoint: "endpoint-once", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "ok", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "stop");   // the real done event still reaches the consumer
+  assert.equal(completed, 1);                // called exactly once despite throwing
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-once")?.active ?? 0, 0);
+});
+
 test("idle watchdog resets on each event and lets a healthy stream finish", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 60 });
   const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-healthy", maxConcurrentRequests: 1 };

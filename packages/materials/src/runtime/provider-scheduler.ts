@@ -139,6 +139,9 @@ export class ProviderRequestScheduler {
     let requestId: string | undefined;
     let permit: ProviderRequestPermit | undefined;
     let sourceCreated = false;
+    // Shared with consume(): set once a terminal completion has been attempted
+    // for a real done/error event, so the catch below never re-invokes it.
+    const terminal = { attempted: false };
     const requestedAt = Date.now();
     let queueDepth = 0;
     try {
@@ -155,7 +158,7 @@ export class ProviderRequestScheduler {
       const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
       const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
       sourceCreated = true;
-      await this.consume(source, idle, output, requestId, observer);
+      await this.consume(source, idle, output, requestId, observer, terminal);
     } catch (error) {
       const event = errorEvent(model, error);
       if (!sourceCreated) {
@@ -167,14 +170,17 @@ export class ProviderRequestScheduler {
           output.push(errorEvent(model, observerError));
           return;
         }
-      } else {
-        // The stream had already started when it threw — the idle watchdog is the
-        // main case. Emit the terminal observer completion (with the synthetic
-        // error message) so telemetry records a final state and writes the
-        // model_usage terminal event. Without it the request stays "in flight"
-        // forever and a restart would recover it as an unfinished request.
-        // Guard it so an observer failure never blocks the terminal error event
-        // from reaching the consumer, which would otherwise hang.
+      } else if (!terminal.attempted) {
+        // The stream started but threw BEFORE any terminal event — the idle
+        // watchdog (or an iterator error) is the main case. Emit the terminal
+        // observer completion with the synthetic error message so telemetry
+        // records a final state and writes the model_usage terminal event;
+        // otherwise the request stays "in flight" forever and a restart recovers
+        // it as unfinished. If consume() already attempted a completion for a
+        // real done/error event (terminal.attempted), we must NOT call it again —
+        // a second call after a partial-success observer would double-count usage
+        // against the budget. Guard so an observer failure never blocks the
+        // terminal error event from reaching the consumer, which would hang.
         try {
           await observer?.completed?.(requestId, event.error);
         } catch {
@@ -202,12 +208,21 @@ export class ProviderRequestScheduler {
     output: AssistantMessageEventStream,
     requestId: string | undefined,
     observer: ProviderRequestSchedulingObserver | undefined,
+    terminal: { attempted: boolean },
   ): Promise<void> {
+    // Mark the terminal completion as attempted BEFORE awaiting the observer, so
+    // that a callback which throws after its own side effects (e.g. it appended
+    // model_usage, then failed to persist) is never re-invoked by forward()'s
+    // catch — that double-call would double-count usage against the budget.
+    const complete = async (message: AssistantMessage): Promise<void> => {
+      terminal.attempted = true;
+      await observer?.completed?.(requestId, message);
+    };
     if (this.idleTimeoutMs <= 0) {
       for await (const event of source) {
         output.push(event);
-        if (event.type === "done") await observer?.completed?.(requestId, event.message);
-        else if (event.type === "error") await observer?.completed?.(requestId, event.error);
+        if (event.type === "done") await complete(event.message);
+        else if (event.type === "error") await complete(event.error);
       }
       return;
     }
@@ -239,8 +254,8 @@ export class ProviderRequestScheduler {
         rearm();
         const event = next.value;
         output.push(event);
-        if (event.type === "done") await observer?.completed?.(requestId, event.message);
-        else if (event.type === "error") await observer?.completed?.(requestId, event.error);
+        if (event.type === "done") await complete(event.message);
+        else if (event.type === "error") await complete(event.error);
       }
     } finally {
       clearTimeout(timer);
