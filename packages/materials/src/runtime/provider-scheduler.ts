@@ -157,6 +157,7 @@ export class ProviderRequestScheduler {
       sourceCreated = true;
       await this.consume(source, idle, output, requestId, observer);
     } catch (error) {
+      const event = errorEvent(model, error);
       if (!sourceCreated) {
         const waitMs = Math.max(0, Date.now() - requestedAt);
         const reason = error instanceof Error ? error.message : String(error);
@@ -166,8 +167,21 @@ export class ProviderRequestScheduler {
           output.push(errorEvent(model, observerError));
           return;
         }
+      } else {
+        // The stream had already started when it threw — the idle watchdog is the
+        // main case. Emit the terminal observer completion (with the synthetic
+        // error message) so telemetry records a final state and writes the
+        // model_usage terminal event. Without it the request stays "in flight"
+        // forever and a restart would recover it as an unfinished request.
+        // Guard it so an observer failure never blocks the terminal error event
+        // from reaching the consumer, which would otherwise hang.
+        try {
+          await observer?.completed?.(requestId, event.error);
+        } catch {
+          // Best-effort: the error event below is the consumer's terminal signal.
+        }
       }
-      output.push(errorEvent(model, error));
+      output.push(event);
     } finally {
       permit?.release();
     }

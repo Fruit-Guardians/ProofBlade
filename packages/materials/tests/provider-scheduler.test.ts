@@ -110,6 +110,20 @@ test("idle watchdog aborts a stalled stream and frees the slot", async () => {
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-idle")?.active ?? 0, 0);
 });
 
+test("idle watchdog fires the terminal observer completion so telemetry does not leak", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20 });
+  let completed = 0;
+  let cancelled = 0;
+  const observer = { queued: () => "R1", started: () => {}, cancelled: () => { cancelled += 1; }, completed: () => { completed += 1; } };
+  const stalled: ProviderStreams = { stream: () => createAssistantMessageEventStream(), streamSimple: () => createAssistantMessageEventStream() };
+  const wrapped = scheduler.wrap(stalled, { provider: model.provider, model: model.id, endpoint: "endpoint-telemetry", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "hang", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "error");
+  assert.equal(completed, 1);   // terminal completion recorded — no leaked in-flight request
+  assert.equal(cancelled, 0);   // the stream had started, so this is a completion, not a queue cancel
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-telemetry")?.active ?? 0, 0);
+});
+
 test("idle watchdog resets on each event and lets a healthy stream finish", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 60 });
   const scope = { provider: model.provider, model: model.id, endpoint: "endpoint-healthy", maxConcurrentRequests: 1 };
