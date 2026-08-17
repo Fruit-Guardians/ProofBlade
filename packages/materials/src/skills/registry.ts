@@ -66,10 +66,17 @@ export class ProofBladeSkillRegistry {
     const loaded = await loadSkills(env, roots.map((entry) => entry.requestedDir));
     const diagnostics: ProofBladeSkillDiagnostic[] = loaded.diagnostics.map((item) => ({ ...item }));
     const invalidPaths = new Set(loaded.diagnostics.filter((item) => item.code === "invalid_metadata" || item.code === "parse_failed").map((item) => normalizePath(item.path)));
-    const candidates: Array<{ skill: Skill; precedence: number }> = [];
+    // Keyed by canonical filePath, not array: loadSkills recurses each root, so
+    // when roots nest (e.g. ["skills", "skills/one"]) the SAME SKILL.md is
+    // discovered once per covering root. Without de-duping here, one file yields
+    // two identical-precedence candidates and the name-collision pass below drops
+    // BOTH as duplicates — silently hiding the skill. Owner selection is
+    // deterministic per canonical path, so a repeat insert is idempotent.
+    const candidates = new Map<string, { skill: Skill; precedence: number }>();
 
     for (const skill of loaded.skills.sort((a, b) => a.filePath.localeCompare(b.filePath))) {
       const canonicalPath = await canonicalOrResolved(skill.filePath);
+      if (candidates.has(canonicalPath)) continue;
       // A skill may sit under more than one configured root only if the roots
       // nest; pick the most specific (highest index) owner so precedence is
       // deterministic and the bulk-catalog filter below applies correctly.
@@ -82,14 +89,14 @@ export class ProofBladeSkillRegistry {
       // Bulk-catalog roots (anything after the first) contribute SKILL.md files
       // only, so a vendored repo's top-level docs never become skills.
       if (owner.index > 0 && basename(canonicalPath) !== "SKILL.md") continue;
-      candidates.push({ skill: { ...skill, filePath: canonicalPath }, precedence: owner.index });
+      candidates.set(canonicalPath, { skill: { ...skill, filePath: canonicalPath }, precedence: owner.index });
     }
 
     // First-wins precedence: keep the lowest-precedence entry per name. A true
     // duplicate WITHIN the same root drops both (the original behaviour); a
     // lower-precedence root simply shadows a higher one with a diagnostic.
     const byName = new Map<string, Array<{ skill: Skill; precedence: number }>>();
-    for (const entry of candidates) {
+    for (const entry of candidates.values()) {
       const list = byName.get(entry.skill.name) ?? [];
       list.push(entry);
       byName.set(entry.skill.name, list);
