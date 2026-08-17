@@ -252,6 +252,33 @@ test("abort during retry backoff stops further attempts and yields an aborted te
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-abort")?.active ?? 0, 0);
 });
 
+test("a source that throws synchronously after the permit is acquired yields a terminal error and frees the slot", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  // Mirrors ProviderRequestBudget.start() throwing synchronously once the deadline
+  // is exhausted (the production stack wraps budget inside the scheduler). Without
+  // a catch on the permit-held path this escaped forward() as an unhandled
+  // rejection and the output stream never got a terminal event.
+  const source: ProviderStreams = {
+    stream: () => { throw new Error("Provider deadline exhausted before request"); },
+    streamSimple: () => { throw new Error("Provider deadline exhausted before request"); },
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-throw", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "error");
+  assert.match(result.errorMessage ?? "", /deadline exhausted/);
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-throw")?.active ?? 0, 0);
+});
+
+test("an observer.started that throws still yields a terminal error and frees the slot", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0 });
+  const observer = { queued: () => "R1", started: () => { throw new Error("started hook failed"); }, cancelled: () => {} };
+  const source: ProviderStreams = { stream: () => delayedStream(2), streamSimple: () => delayedStream(2) };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-started-throw", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "error");
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-started-throw")?.active ?? 0, 0);
+});
+
 function heartbeatStream(beats: number, gapMs: number): AssistantMessageEventStream {
   const output = createAssistantMessageEventStream();
   let n = 0;

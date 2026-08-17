@@ -420,6 +420,7 @@ export type EventType =
   | "provider_request_queued"
   | "provider_request_slot_acquired"
   | "provider_request_queue_cancelled"
+  | "provider_request_retried"
   | "provider_response_received"
   | "tool_call_recorded"
   | "tool_result_recorded"

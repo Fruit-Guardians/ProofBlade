@@ -235,6 +235,19 @@ export class ProviderRequestScheduler {
         }
         return;
       }
+    } catch (error) {
+      // We already own the permit here, so a synchronous/async throw from
+      // observer.started(), start() (the production stack wraps ProviderRequestBudget,
+      // whose start() throws synchronously once the deadline is exhausted), an
+      // observedOptions callback, or observer.retried() would otherwise escape this
+      // fire-and-forget forward() as an unhandled rejection AND leave the output
+      // stream without a terminal event — hanging the consumer (or crashing Node).
+      // Emit a terminal error and fire the single completion so the turn ends
+      // cleanly; the permit is still released in finally. drainAttempt handles its
+      // own stream errors, so this path is the pre/post-stream synchronous throws.
+      const event = errorEvent(model, error);
+      await completeSafe(observer, requestId, event.error);
+      output.push(event);
     } finally {
       permit.release();
     }

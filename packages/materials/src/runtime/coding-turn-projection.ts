@@ -141,8 +141,6 @@ export async function finalizeCodingTurn(options: {
   response: AssistantMessage;
   recoveryCount: number;
   recoveryExhausted: boolean;
-  providerRetryCount?: number;
-  providerRetryExhausted?: boolean;
   termination: CodingTurnTermination;
   piEntryId?: string;
   claimVerifier: Pick<CodingClaimVerifier, "project">;
