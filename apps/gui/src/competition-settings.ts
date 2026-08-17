@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   CompetitionChallengeSolver,
+  DasctfCompetitionApi,
   HttpCompetitionApi,
   type ChallengeSolver,
   type CompetitionApi,
@@ -36,6 +37,12 @@ export interface CompetitionBackend {
 }
 
 interface StoredCompetitionConfig {
+  /** Selects the platform adapter. "dasctf" uses the 西湖论剑 platform contract. */
+  platform?: "dasctf" | "http";
+  /** DASCTF: platform origin, e.g. https://gcsis.dasctf.com. */
+  serverHost?: string;
+  /** DASCTF: team Agent AccessKey (env var wins; never written to the log). */
+  accessKey?: string;
   baseUrl?: string;
   token?: string;
   tokenHeader?: string;
@@ -59,9 +66,10 @@ export class CompetitionSettingsStore {
   ): Promise<CompetitionSettingsStore> {
     const fromFile = await loadFile(settingsPath);
     const merged = applyEnvOverrides(fromFile);
-    const source: CompetitionBackend["source"] = merged.baseUrl
-      ? (fromFile.baseUrl ? "config-file" : "env")
-      : "none";
+    const configured = merged.platform === "dasctf" ? Boolean(merged.serverHost && merged.accessKey) : Boolean(merged.baseUrl);
+    // "env" when the decisive live-config value came from an env var, not the file.
+    const fromFileConfigured = fromFile.platform === "dasctf" ? Boolean(fromFile.serverHost && fromFile.accessKey) : Boolean(fromFile.baseUrl);
+    const source: CompetitionBackend["source"] = configured ? (fromFileConfigured ? "config-file" : "env") : "none";
     return new CompetitionSettingsStore(root, config, merged, source);
   }
 
@@ -70,6 +78,20 @@ export class CompetitionSettingsStore {
    * configured this returns the Demo pair so the dashboard still works offline.
    */
   public backend(): CompetitionBackend {
+    if (this.stored.platform === "dasctf") {
+      const serverHost = this.stored.serverHost?.trim();
+      const accessKey = this.stored.accessKey?.trim();
+      if (!serverHost || !accessKey) {
+        return { api: new DemoCompetitionApi(), solver: new DemoChallengeSolver(), kind: "demo", source: "none" };
+      }
+      const api = new DasctfCompetitionApi({
+        serverHost,
+        accessKey,
+        ...(this.stored.timeoutMs !== undefined ? { timeoutMs: this.stored.timeoutMs } : {}),
+      });
+      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
+      return { api, solver, kind: "http", baseUrl: serverHost, source: this.source };
+    }
     const baseUrl = this.stored.baseUrl?.trim();
     if (!baseUrl) {
       return { api: new DemoCompetitionApi(), solver: new DemoChallengeSolver(), kind: "demo", source: "none" };
@@ -120,6 +142,18 @@ function validate(value: unknown): StoredCompetitionConfig {
   const config: StoredCompetitionConfig = {};
   const present = (key: string): boolean => Object.hasOwn(input, key) && input[key] !== undefined && input[key] !== null;
 
+  if (present("platform")) {
+    if (input.platform !== "dasctf" && input.platform !== "http") throw fieldError("platform", '"dasctf" 或 "http"');
+    config.platform = input.platform;
+  }
+  if (present("serverHost")) {
+    if (typeof input.serverHost !== "string" || !input.serverHost.trim()) throw fieldError("serverHost", "一个非空字符串");
+    config.serverHost = validateBaseUrl(input.serverHost.trim());
+  }
+  if (present("accessKey")) {
+    if (typeof input.accessKey !== "string" || !input.accessKey.trim()) throw fieldError("accessKey", "一个非空字符串");
+    config.accessKey = input.accessKey.trim();
+  }
   if (present("baseUrl")) {
     if (typeof input.baseUrl !== "string" || !input.baseUrl.trim()) throw fieldError("baseUrl", "一个非空字符串");
     config.baseUrl = validateBaseUrl(input.baseUrl.trim());
@@ -198,8 +232,14 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   const baseUrl = process.env.PROOFBLADE_COMPETITION_BASE_URL?.trim();
   const token = process.env.PROOFBLADE_COMPETITION_TOKEN?.trim();
   const tokenHeader = process.env.PROOFBLADE_COMPETITION_TOKEN_HEADER?.trim();
+  const serverHost = process.env.PROOFBLADE_COMPETITION_SERVER_HOST?.trim();
+  const accessKey = process.env.PROOFBLADE_COMPETITION_ACCESS_KEY?.trim();
   if (baseUrl) merged.baseUrl = validateBaseUrl(baseUrl);
   if (token) merged.token = token;
   if (tokenHeader) merged.tokenHeader = tokenHeader;
+  // DASCTF: let the AccessKey come from the environment so it need not touch disk.
+  // Setting either DASCTF var also selects the dasctf platform.
+  if (serverHost) { merged.serverHost = validateBaseUrl(serverHost); merged.platform = "dasctf"; }
+  if (accessKey) { merged.accessKey = accessKey; merged.platform = "dasctf"; }
   return merged;
 }
