@@ -14,6 +14,9 @@ const CONFIG = { storage: { runsDir: "runs" } } as unknown as ProofBladeConfig;
 class FakeCompetitionApi implements CompetitionApi {
   public submissions: string[] = [];
   public stopped = 0;
+  public starts = 0;
+  public stoppedInstances: string[] = [];
+  public failStop = false;
   public constructor(private readonly acceptFlag: string) {}
   async listChallenges() {
     return [];
@@ -22,14 +25,17 @@ class FakeCompetitionApi implements CompetitionApi {
     return { summary: {} as CompetitionChallengeSummary, attachments: [] };
   }
   async startEnvironment() {
-    return { instanceId: "inst-1", connectionInfo: "nc host 1337" };
+    this.starts += 1;
+    return { instanceId: `inst-${this.starts}`, connectionInfo: "nc host 1337" };
   }
   async submitFlag(_challengeId: string, flag: string) {
     this.submissions.push(flag);
     return { correct: flag === this.acceptFlag };
   }
-  async stopEnvironment() {
+  async stopEnvironment(_challengeId: string, instanceId?: string) {
     this.stopped += 1;
+    this.stoppedInstances.push(instanceId ?? "none");
+    if (this.failStop) throw new Error("teardown failed");
   }
 }
 
@@ -75,6 +81,50 @@ test("CompetitionSandbox unpacks attachments and writes connection info", async 
     assert.equal((await readFile(join(ref.path, "connection-info.txt"), "utf8")).trim(), "nc host 1337");
     await sandbox.close();
     assert.equal(api.stopped, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CompetitionSandbox reset releases the old environment before replacing it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-comp-"));
+  try {
+    const api = new FakeCompetitionApi("flag{ok}");
+    const sandbox = new CompetitionSandbox({
+      api,
+      challengeId: "CH-1",
+      workspaceRoot: root,
+      attachments: [],
+      environment: { instanceId: "inst-0", connectionInfo: "nc old 1337" },
+    });
+    await sandbox.reset({ fixtureId: "RUN-1", generation: 1, path: root, privatePath: join(root, ".proofblade") });
+    assert.equal(api.starts, 1);
+    assert.deepEqual(api.stoppedInstances, ["inst-0"]);
+    await sandbox.close();
+    assert.deepEqual(api.stoppedInstances, ["inst-0", "inst-1"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CompetitionSandbox reset does not create a replacement after teardown failure", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-comp-"));
+  try {
+    const api = new FakeCompetitionApi("flag{ok}");
+    api.failStop = true;
+    const sandbox = new CompetitionSandbox({
+      api,
+      challengeId: "CH-1",
+      workspaceRoot: root,
+      attachments: [],
+      environment: { instanceId: "inst-0", connectionInfo: "nc old 1337" },
+    });
+    await assert.rejects(
+      () => sandbox.reset({ fixtureId: "RUN-1", generation: 1, path: root, privatePath: join(root, ".proofblade") }),
+      /teardown failed/,
+    );
+    assert.equal(api.starts, 0);
+    assert.deepEqual(api.stoppedInstances, ["inst-0"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

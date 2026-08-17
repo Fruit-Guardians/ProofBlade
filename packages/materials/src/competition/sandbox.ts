@@ -72,7 +72,8 @@ export class CompetitionSandbox implements SandboxPort {
   }
 
   public async reset(fixture: FixtureRef): Promise<number> {
-    // Re-provision the platform environment; local attachments are immutable.
+    // Release the current platform instance before provisioning its replacement.
+    if (!(await this.stopEnvironment())) throw new Error("Cannot reset competition environment: teardown failed");
     this.environment = await this.init.api.startEnvironment(this.init.challengeId);
     this.stopped = false;
     return fixture.generation + 1;
@@ -134,13 +135,15 @@ export class CompetitionSandbox implements SandboxPort {
     };
   }
 
-  private async stopEnvironment(): Promise<void> {
-    if (this.stopped) return;
-    this.stopped = true;
+  private async stopEnvironment(): Promise<boolean> {
+    if (this.stopped) return true;
     try {
       await this.init.api.stopEnvironment(this.init.challengeId, this.environment.instanceId);
+      this.stopped = true;
+      return true;
     } catch {
       // Best-effort teardown; the platform janitor reclaims on expiry.
+      return false;
     }
   }
 }
