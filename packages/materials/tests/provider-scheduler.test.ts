@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createAssistantMessageEventStream, type AssistantMessage, type AssistantMessageEventStream, type Model, type ProviderStreams } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream, type AssistantMessage, type AssistantMessageEvent, type AssistantMessageEventStream, type Model, type ProviderStreams } from "@earendil-works/pi-ai";
 import { ProviderRequestScheduler } from "../src/runtime/provider-scheduler.js";
 
 const model: Model<"openai-completions"> = {
@@ -165,6 +165,93 @@ test("a stalled stream does not permanently block the queue behind it", async ()
   assert.equal(secondStarted, true);
 });
 
+test("a retryable mid-stream error is retried at the stream boundary and the eventual success is delivered", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  let calls = 0;
+  const source: ProviderStreams = {
+    stream: () => (calls += 1) <= 1 ? erroringStream("Provider returned error 503") : delayedStream(2),
+    streamSimple: () => (calls += 1) <= 1 ? erroringStream("503") : delayedStream(2),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-retry", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "stop");   // the retry recovered
+  assert.equal(calls, 2);                     // initial + 1 re-issue of the SAME request
+});
+
+test("retry discards the failed attempt's buffered events — no duplicates downstream", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  let calls = 0;
+  const source: ProviderStreams = {
+    // Attempt 1: emit a text delta THEN a retryable error. Attempt 2: text + done.
+    stream: () => {
+      calls += 1;
+      const out = createAssistantMessageEventStream();
+      setTimeout(() => {
+        out.push({ type: "text", text: "hello" } as never);
+        if (calls <= 1) out.push({ type: "error", reason: "error", error: errorMsg("socket hang up") });
+        else out.push({ type: "done", reason: "stop", message: message() });
+      }, 1);
+      return out;
+    },
+    streamSimple: () => delayedStream(1),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-nodup", maxConcurrentRequests: 1 });
+  const events = await collectAll(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(calls, 2);
+  // The discarded attempt's "hello" must NOT leak: exactly one text delta survives.
+  assert.equal(events.filter((e) => e.type === "text").length, 1);
+  assert.equal(events.filter((e) => e.type === "done").length, 1);
+  assert.equal(events.filter((e) => e.type === "error").length, 0);
+});
+
+test("a persistent retryable error is retried up to the budget then surfaced", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  let calls = 0;
+  const source: ProviderStreams = { stream: () => { calls += 1; return erroringStream("502 bad gateway"); }, streamSimple: () => erroringStream("502") };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-exhaust", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(calls, 3);                     // initial + 2 retries, then give up
+  assert.equal(result.stopReason, "error");
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-exhaust")?.active ?? 0, 0);
+});
+
+test("a non-retryable error (quota/billing) fails fast without retrying", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 2, retryBaseDelayMs: 1 });
+  let calls = 0;
+  const source: ProviderStreams = { stream: () => { calls += 1; return erroringStream("insufficient_quota: monthly billing limit"); }, streamSimple: () => erroringStream("insufficient_quota") };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-quota", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(calls, 1);                     // deterministic error → no retry
+  assert.equal(result.stopReason, "error");
+});
+
+test("the retried observer reports the ACTUAL number of re-issues", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 3, retryBaseDelayMs: 1 });
+  const attempts: number[] = [];
+  const observer = { queued: () => "R1", started: () => {}, cancelled: () => {}, retried: (_id: string | undefined, info: { attempt: number }) => { attempts.push(info.attempt); } };
+  let calls = 0;
+  const source: ProviderStreams = { stream: () => (calls += 1) <= 2 ? erroringStream("503") : delayedStream(2), streamSimple: () => delayedStream(2) };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-count", maxConcurrentRequests: 1 }, observer);
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
+  assert.equal(result.stopReason, "stop");
+  assert.equal(calls, 3);                     // initial + 2 re-issues
+  assert.deepEqual(attempts, [1, 2]);         // retried fired once per actual re-issue, 1-indexed
+});
+
+test("abort during retry backoff stops further attempts and yields an aborted terminal", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0, maxRetries: 3, retryBaseDelayMs: 200 });
+  let calls = 0;
+  const source: ProviderStreams = { stream: () => { calls += 1; return erroringStream("503"); }, streamSimple: () => erroringStream("503") };
+  const controller = new AbortController();
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-abort", maxConcurrentRequests: 1 });
+  const promise = collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }, { signal: controller.signal }));
+  setTimeout(() => controller.abort(), 20);   // abort while the first backoff (200ms) is sleeping
+  const result = await promise;
+  assert.equal(result.stopReason, "aborted");
+  assert.equal(calls, 1);                     // never re-issued after the abort
+  assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-abort")?.active ?? 0, 0);
+});
+
 function heartbeatStream(beats: number, gapMs: number): AssistantMessageEventStream {
   const output = createAssistantMessageEventStream();
   let n = 0;
@@ -187,9 +274,25 @@ function message(): AssistantMessage {
   return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, content: [{ type: "text", text: "ok" }], usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() };
 }
 
+function errorMsg(text: string): AssistantMessage {
+  return { role: "assistant", api: "openai-completions", provider: model.provider, model: model.id, content: [], usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "error", errorMessage: text, timestamp: Date.now() };
+}
+
+function erroringStream(errorText: string, delayMs = 1): AssistantMessageEventStream {
+  const output = createAssistantMessageEventStream();
+  setTimeout(() => { output.push({ type: "error", reason: "error", error: errorMsg(errorText) }); }, delayMs);
+  return output;
+}
+
 async function collect(stream: AssistantMessageEventStream): Promise<AssistantMessage> {
   let result: AssistantMessage | undefined;
   for await (const event of stream) if (event.type === "done" || event.type === "error") result = event.type === "done" ? event.message : event.error;
   assert.ok(result);
   return result;
+}
+
+async function collectAll(stream: AssistantMessageEventStream): Promise<AssistantMessageEvent[]> {
+  const events: AssistantMessageEvent[] = [];
+  for await (const event of stream) events.push(event);
+  return events;
 }

@@ -177,8 +177,6 @@ export async function finalizeCodingTurn(options: {
       claimVerification,
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
-      providerRetryCount: options.providerRetryCount ?? 0,
-      providerRetryExhausted: options.providerRetryExhausted ?? false,
       piEntryId: options.piEntryId,
       termination: confirmed ? options.termination.reason : undefined,
       providerStopReason: confirmed ? options.response.stopReason : undefined,
