@@ -53,6 +53,15 @@ export interface CodingResourceContext extends ExecutionToolContext {
     artifactStore: ArtifactStore;
     runId: string;
   };
+  /**
+   * Per-run count of how many times each file has been read AS AN IMAGE (keyed by
+   * absolute path). A static image gives no new information on re-read, but each
+   * re-read re-injects the full image block; enough copies push the reasoning
+   * history out of context and the model "forgets" it already looked, then loops.
+   * The read wrapper uses this to stop re-injecting after a small budget and
+   * instead nudge the model toward a different tactic.
+   */
+  imagesSeen?: Map<string, number>;
 }
 
 export interface CodingToolCatalogEntry {
@@ -548,6 +557,35 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   ];
 }
 
+/**
+ * How many times a single image file is re-injected into context before the read
+ * wrapper stops sending the pixels and nudges instead. The first two reads give
+ * the model a genuine look (and a second glance is fair); beyond that a static
+ * image yields nothing new, and each ~MB re-inject dilutes the reasoning history
+ * until the model forgets it already looked and loops. Observed live: one run
+ * re-read the same flag.jpg 65 times and never progressed.
+ */
+export const IMAGE_REINJECT_BUDGET = 2;
+
+/**
+ * Deduplicate repeated image reads of the same file within one run. Under budget,
+ * pass the real image through; over budget, drop the image block and return a
+ * short text nudge toward a tactic that can actually make progress (crop+zoom,
+ * or map by position rather than re-reading the whole static image).
+ */
+export function dedupeImageRead(
+  path: string,
+  result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>,
+  imagesSeen: Map<string, number> | undefined,
+): typeof result {
+  if (!imagesSeen) return result;
+  const seen = imagesSeen.get(path) ?? 0;
+  imagesSeen.set(path, seen + 1);
+  if (seen < IMAGE_REINJECT_BUDGET) return result;
+  const text = `You have already loaded this image (${path}) ${seen} time(s) in this run — it is unchanged, so re-reading it adds no new information and only crowds out your earlier reasoning. Do NOT read it again as-is. If a detail is unclear, isolate it: crop and enlarge a region with ImageMagick (\`convert in.jpg -crop WxH+X+Y -resize 400% out.png\`) or Python PIL, then read that smaller piece. If you are matching symbols against a reference table, map by POSITION/INDEX in the table rather than trying to re-recognize each glyph from the full image.`;
+  return { ...result, content: [{ type: "text" as const, text }] };
+}
+
 function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createReadTool<CodingResourceContext>();
   return {
@@ -556,9 +594,12 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       const input = params as { path: string; offset?: number; limit?: number };
       await context.evidenceCurationGate?.assertInvestigationAllowed();
       const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+      if (result.content.some((item) => item.type === "image")) {
+        return dedupeImageRead(input.path, result, context.imagesSeen);
+      }
       const pipeline = context.outputRewrite;
       const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
-      if (!pipeline || !visible || result.content.some((item) => item.type === "image")) return result;
+      if (!pipeline || !visible) return result;
       const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
         filename: `read-${toolCallId}.txt`,
         mime: "text/plain",
