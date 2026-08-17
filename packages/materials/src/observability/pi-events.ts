@@ -6,7 +6,7 @@ import type { ContextManifest, Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
-import type { ProviderRequestCancelInfo, ProviderRequestQueueInfo, ProviderRequestSchedulingObserver, ProviderRequestStartInfo } from "../runtime/provider-scheduler.js";
+import type { ProviderRequestCancelInfo, ProviderRequestQueueInfo, ProviderRequestScope, ProviderRequestSchedulingObserver, ProviderRequestStartInfo } from "../runtime/provider-scheduler.js";
 
 export interface PiObservabilityOptions {
   runId: string;
@@ -52,6 +52,7 @@ export class ProviderSchedulingTelemetry {
     payload: async (requestId, payload) => await this.payload(requestId, payload),
     response: async (requestId, response) => await this.response(requestId, response),
     completed: async (requestId, message) => await this.completed(requestId, message),
+    retried: async (requestId, info) => await this.retried(requestId, info),
   };
 
   public register(pending: PendingProvider): void {
@@ -97,6 +98,20 @@ export class ProviderSchedulingTelemetry {
     if (requestId) this.cancelled.add(requestId);
     await append(this.options, "provider_request_queue_cancelled", "orchestrator", { requestId, provider: info.provider, model: info.model, maxConcurrentRequests: info.maxConcurrentRequests, queueDepth: info.queueDepth, waitMs: info.waitMs, reason: info.reason });
     if (requestId) this.requests.delete(requestId);
+  }
+
+  private async retried(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; maxRetries: number; delayMs: number; reason: string }): Promise<void> {
+    // Persist each ACTUAL re-issue so the solve report (audited against network
+    // traffic) shows how many transient-error retries a turn spent and why.
+    await append(this.options, "provider_request_retried", "orchestrator", {
+      requestId,
+      provider: info.provider,
+      model: info.model,
+      attempt: info.attempt,
+      maxRetries: info.maxRetries,
+      delayMs: info.delayMs,
+      reason: info.reason,
+    });
   }
 
   private async payload(requestId: string | undefined, payload: unknown): Promise<void> {
@@ -288,7 +303,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   };
 }
 
-function append(options: PiObservabilityOptions, type: "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
+function append(options: PiObservabilityOptions, type: "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
   return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]);
 }
 

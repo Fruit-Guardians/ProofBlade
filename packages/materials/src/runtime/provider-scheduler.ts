@@ -1,5 +1,6 @@
 import {
   createAssistantMessageEventStream,
+  isRetryableAssistantError,
   type Api,
   type AssistantMessageEvent,
   type AssistantMessageEventStream,
@@ -42,6 +43,8 @@ export interface ProviderRequestSchedulingObserver {
   payload?(requestId: string | undefined, payload: unknown): Promise<void> | void;
   response?(requestId: string | undefined, response: { status: number; headers: Record<string, string> }): Promise<void> | void;
   completed?(requestId: string | undefined, message: AssistantMessage): Promise<void> | void;
+  /** A transient stream error was classified retryable; a re-issue is scheduled. */
+  retried?(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; maxRetries: number; delayMs: number; reason: string }): Promise<void> | void;
 }
 
 export interface ProviderRequestSchedulerStatus extends ProviderRequestScope {
@@ -85,6 +88,8 @@ class ProviderRequestQueueAbortedError extends Error {
 export class ProviderRequestScheduler {
   private readonly pools = new Map<string, SchedulerPool>();
   private readonly idleTimeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryBaseDelayMs: number;
 
   /**
    * @param options.idleTimeoutMs Max time to wait BETWEEN provider stream events
@@ -93,11 +98,26 @@ export class ProviderRequestScheduler {
    *   bound the `for await` below would wait forever, and because `permit.release()`
    *   sits in `finally` the concurrency slot would be held forever too — enough
    *   stalls deadlock the whole fleet. 0 disables the watchdog. Default 120s.
+   * @param options.maxRetries Bounded retries for a TRANSIENT stream error (e.g.
+   *   HTTP 200 then a mid-body error a token or two in). The retry re-issues the
+   *   SAME provider request at the stream boundary — it never restarts the agent
+   *   turn, so it cannot duplicate the user message or re-run tools. Only errors
+   *   classified retryable by pi-ai (5xx, socket hang up, "provider returned
+   *   error", …) are retried; quota/billing fail fast and an idle stall is NOT
+   *   retried (its synthetic message does not match, bounding a hung endpoint to a
+   *   single idle window). 0 disables retries. Default 2.
+   * @param options.retryBaseDelayMs Base backoff; delay is baseDelayMs * 2^(n-1).
    */
-  public constructor(options: { idleTimeoutMs?: number } = {}) {
+  public constructor(options: { idleTimeoutMs?: number; maxRetries?: number; retryBaseDelayMs?: number } = {}) {
     const idle = options.idleTimeoutMs ?? 120_000;
     if (!Number.isFinite(idle) || idle < 0) throw new Error("Provider idleTimeoutMs must be a non-negative number");
     this.idleTimeoutMs = idle;
+    const retries = options.maxRetries ?? 2;
+    if (!Number.isInteger(retries) || retries < 0 || retries > 8) throw new Error("Provider maxRetries must be an integer in [0, 8]");
+    this.maxRetries = retries;
+    const baseDelay = options.retryBaseDelayMs ?? 500;
+    if (!Number.isFinite(baseDelay) || baseDelay < 0) throw new Error("Provider retryBaseDelayMs must be a non-negative number");
+    this.retryBaseDelayMs = baseDelay;
   }
 
   public wrap(streams: ProviderStreams, scope: ProviderRequestScope, observer?: ProviderRequestSchedulingObserver): ProviderStreams {
@@ -138,10 +158,6 @@ export class ProviderRequestScheduler {
   ): Promise<void> {
     let requestId: string | undefined;
     let permit: ProviderRequestPermit | undefined;
-    let sourceCreated = false;
-    // Shared with consume(): set once a terminal completion has been attempted
-    // for a real done/error event, so the catch below never re-invokes it.
-    const terminal = { attempted: false };
     const requestedAt = Date.now();
     let queueDepth = 0;
     try {
@@ -149,87 +165,122 @@ export class ProviderRequestScheduler {
       queueDepth = pool.queue.length;
       requestId = await observer?.queued({ ...scope, queueDepth });
       permit = await this.acquire(pool, options?.signal);
-      await observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs });
-      // Combine the caller's signal with an internal idle-watchdog signal so a
-      // provider that honors AbortSignal can cancel the underlying fetch when the
-      // stream stalls. The race below is the real guarantee though: even a
-      // provider that ignores the signal cannot keep us (and the permit) hung.
-      const idle = new AbortController();
-      const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
-      const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
-      sourceCreated = true;
-      await this.consume(source, idle, output, requestId, observer, terminal);
     } catch (error) {
-      const event = errorEvent(model, error);
-      if (!sourceCreated) {
-        const waitMs = Math.max(0, Date.now() - requestedAt);
-        const reason = error instanceof Error ? error.message : String(error);
-        try {
-          await observer?.cancelled(requestId, { ...scope, queueDepth, waitMs, reason });
-        } catch (observerError) {
-          output.push(errorEvent(model, observerError));
-          return;
-        }
-      } else if (!terminal.attempted) {
-        // The stream started but threw BEFORE any terminal event — the idle
-        // watchdog (or an iterator error) is the main case. Emit the terminal
-        // observer completion with the synthetic error message so telemetry
-        // records a final state and writes the model_usage terminal event;
-        // otherwise the request stays "in flight" forever and a restart recovers
-        // it as unfinished. If consume() already attempted a completion for a
-        // real done/error event (terminal.attempted), we must NOT call it again —
-        // a second call after a partial-success observer would double-count usage
-        // against the budget. Guard so an observer failure never blocks the
-        // terminal error event from reaching the consumer, which would hang.
-        try {
-          await observer?.completed?.(requestId, event.error);
-        } catch {
-          // Best-effort: the error event below is the consumer's terminal signal.
-        }
+      // Failed BEFORE the provider stream started (queue abort / acquire error).
+      // This is a cancellation, never retried; tell the observer, then emit.
+      const waitMs = Math.max(0, Date.now() - requestedAt);
+      const reason = error instanceof Error ? error.message : String(error);
+      try {
+        await observer?.cancelled(requestId, { ...scope, queueDepth, waitMs, reason });
+      } catch (observerError) {
+        output.push(errorEvent(model, observerError));
+        permit?.release();
+        return;
       }
+      output.push(errorEvent(model, error));
+      permit?.release();
+      return;
+    }
+    try {
+      await observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs });
+      // Bounded retry at the STREAM boundary. Each attempt buffers its events and
+      // is committed to `output` only once it terminates (success or a final,
+      // non-retryable/ budget-exhausted error). A retryable error mid-stream
+      // discards the buffer and re-issues the SAME request — so a partial stream
+      // never leaks duplicate events downstream, and because we re-issue the
+      // provider call (not the agent turn) no user message or tool is repeated.
+      let attempt = 0;
+      for (;;) {
+        // Fresh idle watchdog per attempt; a provider that honors the signal can
+        // cancel its fetch, and the race in drainAttempt guarantees liveness even
+        // if it does not. Fresh observedOptions so payload/response telemetry
+        // fires for each real HTTP request.
+        const idle = new AbortController();
+        const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
+        const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
+        const outcome = await this.drainAttempt(source, idle);
+        // A terminal error this attempt produced (either a real error event or a
+        // synthetic one from an idle stall / iterator throw).
+        const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
+        const retryable = errorMessage !== undefined && attempt < this.maxRetries && !options?.signal?.aborted && isRetryableAssistantError(errorMessage);
+        if (retryable) {
+          attempt += 1;
+          const delayMs = this.retryBaseDelayMs * 2 ** (attempt - 1);
+          await observer?.retried?.(requestId, { ...scope, attempt, maxRetries: this.maxRetries, delayMs, reason: errorMessage!.errorMessage ?? "transient provider error" });
+          const aborted = await backoff(delayMs, options?.signal);
+          if (aborted) {
+            // Cancelled during backoff: emit an aborted terminal so the consumer
+            // (and telemetry) get a final state instead of hanging.
+            const abortedEvent = errorEvent(model, new ProviderRequestQueueAbortedError());
+            await completeSafe(observer, requestId, abortedEvent.error);
+            output.push(abortedEvent);
+            return;
+          }
+          continue; // discard this attempt's buffer, re-issue
+        }
+        // Commit this attempt: flush its buffered events in order, then fire the
+        // single terminal completion for telemetry.
+        for (const event of outcome.events) output.push(event);
+        if (outcome.kind === "success") {
+          await completeSafe(observer, requestId, outcome.message);
+        } else if (outcome.kind === "error") {
+          // The real error event is already in outcome.events (flushed above).
+          await completeSafe(observer, requestId, outcome.event.error);
+        } else {
+          // threw: drainAttempt buffered only non-terminal deltas before the
+          // throw, so synthesize the terminal error event, complete, and push it.
+          const event = errorEvent(model, outcome.error);
+          await completeSafe(observer, requestId, event.error);
+          output.push(event);
+        }
+        return;
+      }
+    } catch (error) {
+      // We already own the permit here, so a synchronous/async throw from
+      // observer.started(), start() (the production stack wraps ProviderRequestBudget,
+      // whose start() throws synchronously once the deadline is exhausted), an
+      // observedOptions callback, or observer.retried() would otherwise escape this
+      // fire-and-forget forward() as an unhandled rejection AND leave the output
+      // stream without a terminal event — hanging the consumer (or crashing Node).
+      // Emit a terminal error and fire the single completion so the turn ends
+      // cleanly; the permit is still released in finally. drainAttempt handles its
+      // own stream errors, so this path is the pre/post-stream synchronous throws.
+      const event = errorEvent(model, error);
+      await completeSafe(observer, requestId, event.error);
       output.push(event);
     } finally {
-      permit?.release();
+      permit.release();
     }
   }
 
   /**
-   * Drive the provider stream with an inter-event idle watchdog. Each event
-   * resets the timer; if none arrives within idleTimeoutMs the stream is treated
-   * as stalled: we abort (best-effort cancel of the underlying fetch) and throw,
-   * which unwinds `forward` — producing an error event for the retry path and,
-   * critically, releasing the concurrency permit in its `finally`. Racing the
-   * iterator against the timer means a provider that ignores the abort signal
-   * still cannot keep the slot hung.
+   * Drive ONE provider-stream attempt with an inter-event idle watchdog,
+   * BUFFERING every event rather than pushing it downstream. Returns an outcome
+   * so `forward` can decide to commit (flush the buffer) or retry (discard it):
+   *   - success: the stream reached a `done` event.
+   *   - error:   the stream reached a real `error` event (buffered, terminal).
+   *   - threw:   the stream stalled (idle watchdog) or the iterator threw before
+   *              any terminal event — a synthetic error is derived by the caller.
+   * Each event resets the idle timer; if none arrives within idleTimeoutMs the
+   * attempt is treated as stalled and unwinds (best-effort aborting the fetch),
+   * so a provider that ignores the abort signal still cannot hang the slot.
+   * Buffering costs live token streaming during a call, which the fleet does not
+   * rely on, in exchange for a retry that never leaks a partial stream.
    */
-  private async consume(
-    source: AssistantMessageEventStream,
-    idle: AbortController,
-    output: AssistantMessageEventStream,
-    requestId: string | undefined,
-    observer: ProviderRequestSchedulingObserver | undefined,
-    terminal: { attempted: boolean },
-  ): Promise<void> {
-    // Mark the terminal completion as attempted BEFORE awaiting the observer, so
-    // that a callback which throws after its own side effects (e.g. it appended
-    // model_usage, then failed to persist) is never re-invoked by forward()'s
-    // catch — that double-call would double-count usage against the budget.
-    const complete = async (message: AssistantMessage): Promise<void> => {
-      terminal.attempted = true;
-      await observer?.completed?.(requestId, message);
-    };
+  private async drainAttempt(source: AssistantMessageEventStream, idle: AbortController): Promise<AttemptOutcome> {
+    const events: AssistantMessageEvent[] = [];
     if (this.idleTimeoutMs <= 0) {
       for await (const event of source) {
-        output.push(event);
-        if (event.type === "done") await complete(event.message);
-        else if (event.type === "error") await complete(event.error);
+        events.push(event);
+        if (event.type === "done") return { kind: "success", events, message: event.message };
+        if (event.type === "error") return { kind: "error", events, event };
       }
-      return;
+      return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event") };
     }
     const iterator = source[Symbol.asyncIterator]();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // `rearm` is deliberately a local, not an instance field: concurrent streams
-    // each run their own consume() and must not share one timer handle.
+    // Local, not an instance field: concurrent streams each run their own attempt
+    // and must not share one timer handle.
     let rearm: () => void = () => {};
     const stall = new Promise<never>((_, reject) => {
       rearm = (): void => {
@@ -250,13 +301,15 @@ export class ProviderRequestScheduler {
         // never surfaces as an unhandled rejection.
         pending.catch(() => {});
         const next = await Promise.race([pending, stall]);
-        if (next.done) break;
+        if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event") };
         rearm();
         const event = next.value;
-        output.push(event);
-        if (event.type === "done") await complete(event.message);
-        else if (event.type === "error") await complete(event.error);
+        events.push(event);
+        if (event.type === "done") return { kind: "success", events, message: event.message };
+        if (event.type === "error") return { kind: "error", events, event };
       }
+    } catch (error) {
+      return { kind: "threw", events, error };
     } finally {
       clearTimeout(timer);
       // Best-effort close so the abandoned generator can run its own cleanup.
@@ -318,6 +371,37 @@ export class ProviderRequestScheduler {
         },
       });
     }
+  }
+}
+
+/** Outcome of one buffered provider-stream attempt (see drainAttempt). */
+type AttemptOutcome =
+  | { kind: "success"; events: AssistantMessageEvent[]; message: AssistantMessage }
+  | { kind: "error"; events: AssistantMessageEvent[]; event: Extract<AssistantMessageEvent, { type: "error" }> }
+  | { kind: "threw"; events: AssistantMessageEvent[]; error: unknown };
+
+/** Abortable backoff sleep. Resolves true if the signal aborted during the wait. */
+function backoff(delayMs: number, signal: AbortSignal | undefined): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(true);
+  if (delayMs <= 0) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    const onAbort = (): void => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(false); }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * Fire the terminal observer completion exactly once, swallowing any throw so an
+ * observer failure never blocks the terminal event from reaching the consumer
+ * (which would hang the turn). The single call site here means the double-count
+ * hazard that PR #51 guarded against cannot recur.
+ */
+async function completeSafe(observer: ProviderRequestSchedulingObserver | undefined, requestId: string | undefined, message: AssistantMessage): Promise<void> {
+  try {
+    await observer?.completed?.(requestId, message);
+  } catch {
+    // Best-effort: the terminal event pushed to output is the consumer's signal.
   }
 }
 

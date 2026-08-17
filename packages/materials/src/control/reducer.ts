@@ -312,6 +312,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "provider_request_queued":
     case "provider_request_slot_acquired":
     case "provider_request_queue_cancelled":
+    case "provider_request_retried":
     case "provider_response_received":
     case "tool_call_recorded":
     case "tool_result_recorded":

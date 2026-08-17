@@ -275,6 +275,11 @@ export class PiCodingLane implements AgentLanePort {
       payload: { promptLength: text.length },
     }]);
     try {
+      // Transient provider-stream errors (HTTP 200 then a mid-body error) are
+      // retried at the provider-stream boundary inside ProviderRequestScheduler,
+      // where re-issuing sends the SAME request without restarting the turn — so
+      // it never duplicates the user message or re-runs tools. Here we only
+      // recover from context overflow, which legitimately changes the prompt.
       const recovered = await promptWithContextLengthRecovery({
         prompt: async (prompt) => await this.harness.prompt(prompt),
         compact: async (reason) => {
