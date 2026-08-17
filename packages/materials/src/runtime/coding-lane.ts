@@ -30,6 +30,7 @@ import type { RunSnapshot } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
+import { promptWithProviderErrorRetry } from "./provider-error-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
 import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
@@ -275,8 +276,20 @@ export class PiCodingLane implements AgentLanePort {
       payload: { promptLength: text.length },
     }]);
     try {
+      // Nesting: the provider-error retry sits INSIDE context-length recovery.
+      // A transient stream error (HTTP 200 then mid-body error) re-issues the
+      // same input a few times to self-heal a flaky gateway; a genuine context
+      // overflow is handled one layer out by compacting and re-prompting. The
+      // two never fight — one re-sends the same prompt, the other changes it.
+      let providerRetryCount = 0;
+      let providerRetryExhausted = false;
       const recovered = await promptWithContextLengthRecovery({
-        prompt: async (prompt) => await this.harness.prompt(prompt),
+        prompt: async (prompt) => {
+          const attempt = await promptWithProviderErrorRetry(() => this.harness.prompt(prompt));
+          providerRetryCount += attempt.retryCount;
+          providerRetryExhausted = attempt.exhausted;
+          return attempt.response;
+        },
         compact: async (reason) => {
           await this.harness.compact(reason);
           this.maintenance.compactRequested = false;
@@ -291,6 +304,8 @@ export class PiCodingLane implements AgentLanePort {
         response,
         recoveryCount: recovered.recoveryCount,
         recoveryExhausted: recovered.exhausted,
+        providerRetryCount,
+        providerRetryExhausted,
         termination: this.termination,
         piEntryId: await this.latestAssistantEntryId(),
         claimVerifier: this.claimVerifier,
