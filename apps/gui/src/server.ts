@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig, providerNativeCapabilities } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
 import { FleetController } from "./fleet.js";
+import { CompetitionSettingsStore, sanitizeUrlForLog } from "./competition-settings.js";
 import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
@@ -21,7 +22,9 @@ const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
 const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
-const fleet = new FleetController();
+const competitionSettings = await CompetitionSettingsStore.create(projectRoot, config);
+const competitionBackend = competitionSettings.backend();
+const fleet = new FleetController(competitionBackend.api, competitionBackend.solver);
 let vite: Awaited<ReturnType<typeof createViteServer>>;
 
 const server = createServer(async (request, response) => {
@@ -48,6 +51,11 @@ server.listen(port, host, () => {
   console.log(`ProofBlade GUI listening on http://${host}:${port}`);
   console.log(`Project root: ${projectRoot}`);
   console.log(`Config: ${configPath}`);
+  console.log(
+    competitionBackend.kind === "http"
+      ? `Competition platform: ${sanitizeUrlForLog(competitionBackend.baseUrl ?? "")} (live, source=${competitionBackend.source})`
+      : "Competition platform: demo (no baseUrl configured — set ~/.proofblade/competition.json or PROOFBLADE_COMPETITION_BASE_URL for live play)",
+  );
 });
 
 let shutdownPromise: Promise<void> | undefined;
@@ -218,6 +226,13 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   }
   if (parts[0] === "api" && parts[1] === "fleet") {
     if (method === "GET" && parts[2] === "stream" && parts.length === 3) {
+      // Load the first snapshot BEFORE committing the 200/SSE headers. If the
+      // live backend is down fleet.load() throws here, while the response is
+      // still uncommitted, so the outer handler can send a clean JSON error.
+      // Doing it after writeHead() would have headers already sent, and the
+      // retry sendJson() would throw ERR_HTTP_HEADERS_SENT — leaving the client
+      // with no error event and a hung connection.
+      const initial = await fleet.load();
       response.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache, no-transform",
@@ -228,7 +243,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
         if (!response.writableEnded) response.write(`data: ${JSON.stringify(snapshot)}\n\n`);
       };
       const unsubscribe = fleet.subscribe(emit);
-      emit(await fleet.load());
+      emit(initial);
       request.on("close", () => { unsubscribe(); if (!response.writableEnded) response.end(); });
       return;
     }

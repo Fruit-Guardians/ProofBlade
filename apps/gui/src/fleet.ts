@@ -18,11 +18,11 @@ import {
  * the whole fleet dashboard — live streaming, priority, cancel, mode, concurrency
  * — be exercised in the browser with no model and no network.
  *
- * `CompetitionChallengeSolver` is now real: it drives the coding lane and submits
- * through `submit_flag`. Only the HTTP `CompetitionApi` is still missing, so swap
- * `DemoCompetitionApi` + `DemoChallengeSolver` for the real client plus
- * `new CompetitionChallengeSolver({ root, config, api })` once the spec is known;
- * the FleetController wiring stays the same.
+ * `CompetitionChallengeSolver` is real (it drives the coding lane and submits
+ * through `submit_flag`) and so is the HTTP `CompetitionApi`. The live pair is
+ * built by CompetitionSettingsStore from ~/.proofblade/competition.json (see
+ * server.ts) and injected into FleetController; with no baseUrl configured the
+ * Demo pair below keeps the dashboard working offline.
  */
 const DEMO_CATEGORIES = ["Web", "Crypto", "Misc", "Reverse", "Script"] as const;
 

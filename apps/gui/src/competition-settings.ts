@@ -1,0 +1,205 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import {
+  CompetitionChallengeSolver,
+  HttpCompetitionApi,
+  type ChallengeSolver,
+  type CompetitionApi,
+  type CompetitionHttpEndpoints,
+  type ProofBladeConfig,
+} from "@proofblade/materials";
+import { DemoChallengeSolver, DemoCompetitionApi } from "./fleet.js";
+
+/**
+ * Live-platform wiring for the fleet.
+ *
+ * The contest exposes only an HTTP API, so real play needs a configured
+ * endpoint. This store reads that config from `~/.proofblade/competition.json`
+ * (env vars win, so a token never has to be written to disk), and hands back the
+ * pair the FleetController needs: the `HttpCompetitionApi` client plus the real
+ * `CompetitionChallengeSolver`. With no baseUrl configured it falls back to the
+ * Demo pair, so the dashboard still runs with no network and no model.
+ *
+ * The token is deliberately kept out of the returned `source` and every log
+ * line; only its presence is reported.
+ */
+export interface CompetitionBackend {
+  api: CompetitionApi;
+  solver: ChallengeSolver;
+  /** "http" when a live endpoint is configured, "demo" otherwise. */
+  kind: "http" | "demo";
+  /** The base URL in use, for a one-line startup log. Never includes the token. */
+  baseUrl?: string;
+  /** Where the config came from, for the startup log. */
+  source: "config-file" | "env" | "none";
+}
+
+interface StoredCompetitionConfig {
+  baseUrl?: string;
+  token?: string;
+  tokenHeader?: string;
+  timeoutMs?: number;
+  headers?: Record<string, string>;
+  endpoints?: Partial<CompetitionHttpEndpoints>;
+}
+
+export class CompetitionSettingsStore {
+  private constructor(
+    private readonly root: string,
+    private readonly config: ProofBladeConfig,
+    private readonly stored: StoredCompetitionConfig,
+    private readonly source: CompetitionBackend["source"],
+  ) {}
+
+  public static async create(
+    root: string,
+    config: ProofBladeConfig,
+    settingsPath = join(homedir(), ".proofblade", "competition.json"),
+  ): Promise<CompetitionSettingsStore> {
+    const fromFile = await loadFile(settingsPath);
+    const merged = applyEnvOverrides(fromFile);
+    const source: CompetitionBackend["source"] = merged.baseUrl
+      ? (fromFile.baseUrl ? "config-file" : "env")
+      : "none";
+    return new CompetitionSettingsStore(root, config, merged, source);
+  }
+
+  /**
+   * Build the api+solver pair for the FleetController. When no baseUrl is
+   * configured this returns the Demo pair so the dashboard still works offline.
+   */
+  public backend(): CompetitionBackend {
+    const baseUrl = this.stored.baseUrl?.trim();
+    if (!baseUrl) {
+      return { api: new DemoCompetitionApi(), solver: new DemoChallengeSolver(), kind: "demo", source: "none" };
+    }
+    const api = new HttpCompetitionApi({
+      baseUrl,
+      ...(this.stored.token ? { token: this.stored.token } : {}),
+      ...(this.stored.tokenHeader ? { tokenHeader: this.stored.tokenHeader } : {}),
+      ...(this.stored.timeoutMs !== undefined ? { timeoutMs: this.stored.timeoutMs } : {}),
+      ...(this.stored.headers ? { headers: this.stored.headers } : {}),
+      ...(this.stored.endpoints ? { endpoints: this.stored.endpoints } : {}),
+    });
+    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
+    return { api, solver, kind: "http", baseUrl, source: this.source };
+  }
+}
+
+async function loadFile(path: string): Promise<StoredCompetitionConfig> {
+  let text: string;
+  try {
+    text = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw new Error(`竞赛平台配置读取失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`竞赛平台配置不是合法 JSON：${error instanceof Error ? error.message : String(error)}`);
+  }
+  return validate(parsed);
+}
+
+/**
+ * Parse the config file. A field that is ABSENT is fine (falls through to env
+ * or Demo). A field that is PRESENT but the wrong type is a configuration
+ * mistake and fails closed with a clear message — silently dropping it would
+ * quietly fall back to the Demo backend, whose submitFlag() always returns
+ * success, so a misconfigured operator could believe a real challenge was
+ * solved when nothing ever reached the platform.
+ */
+function validate(value: unknown): StoredCompetitionConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("竞赛平台配置必须是一个 JSON 对象");
+  }
+  const input = value as Record<string, unknown>;
+  const config: StoredCompetitionConfig = {};
+  const present = (key: string): boolean => Object.hasOwn(input, key) && input[key] !== undefined && input[key] !== null;
+
+  if (present("baseUrl")) {
+    if (typeof input.baseUrl !== "string" || !input.baseUrl.trim()) throw fieldError("baseUrl", "一个非空字符串");
+    config.baseUrl = validateBaseUrl(input.baseUrl.trim());
+  }
+  if (present("token")) {
+    if (typeof input.token !== "string" || !input.token.trim()) throw fieldError("token", "一个非空字符串");
+    config.token = input.token.trim();
+  }
+  if (present("tokenHeader")) {
+    if (typeof input.tokenHeader !== "string" || !input.tokenHeader.trim()) throw fieldError("tokenHeader", "一个非空字符串");
+    config.tokenHeader = input.tokenHeader.trim();
+  }
+  if (present("timeoutMs")) {
+    if (typeof input.timeoutMs !== "number" || !Number.isFinite(input.timeoutMs)) throw fieldError("timeoutMs", "一个数字");
+    config.timeoutMs = input.timeoutMs;
+  }
+  if (present("headers")) {
+    if (typeof input.headers !== "object" || Array.isArray(input.headers)) throw fieldError("headers", "一个字符串到字符串的对象");
+    const headers: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(input.headers as Record<string, unknown>)) {
+      if (typeof raw !== "string") throw fieldError(`headers.${key}`, "一个字符串");
+      headers[key] = raw;
+    }
+    if (Object.keys(headers).length > 0) config.headers = headers;
+  }
+  if (present("endpoints")) {
+    if (typeof input.endpoints !== "object" || Array.isArray(input.endpoints)) throw fieldError("endpoints", "一个对象");
+    const endpoints: Partial<CompetitionHttpEndpoints> = {};
+    for (const key of ["listChallenges", "getChallenge", "startEnvironment", "submitFlag", "stopEnvironment"] as const) {
+      const raw = (input.endpoints as Record<string, unknown>)[key];
+      if (raw === undefined || raw === null) continue;
+      if (typeof raw !== "string" || !raw.trim()) throw fieldError(`endpoints.${key}`, "一个非空字符串");
+      endpoints[key] = raw.trim();
+    }
+    if (Object.keys(endpoints).length > 0) config.endpoints = endpoints;
+  }
+  return config;
+}
+
+function fieldError(field: string, expected: string): Error {
+  return new Error(`竞赛平台配置字段 ${field} 类型错误：应为${expected}`);
+}
+
+/**
+ * Reject a baseUrl that carries credentials in userinfo (https://user:pass@host).
+ * Those are sent on every request and are almost always a mistake — the token
+ * belongs in `token`/`tokenHeader`. Rejecting also keeps credentials out of the
+ * startup log. Full http(s)/shape validation stays in HttpCompetitionApi.
+ */
+function validateBaseUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("竞赛平台配置 baseUrl 必须是合法的绝对 URL");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("竞赛平台配置 baseUrl 不得在 URL 中携带凭据（user:pass@），请改用 token / tokenHeader");
+  }
+  return raw;
+}
+
+/** Origin + path only, for logging. Drops any userinfo, query, and fragment. */
+export function sanitizeUrlForLog(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return "<invalid-url>";
+  }
+}
+
+/** Env vars win over the file so a token need not be written to disk. */
+function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConfig {
+  const merged: StoredCompetitionConfig = { ...base };
+  const baseUrl = process.env.PROOFBLADE_COMPETITION_BASE_URL?.trim();
+  const token = process.env.PROOFBLADE_COMPETITION_TOKEN?.trim();
+  const tokenHeader = process.env.PROOFBLADE_COMPETITION_TOKEN_HEADER?.trim();
+  if (baseUrl) merged.baseUrl = validateBaseUrl(baseUrl);
+  if (token) merged.token = token;
+  if (tokenHeader) merged.tokenHeader = tokenHeader;
+  return merged;
+}
