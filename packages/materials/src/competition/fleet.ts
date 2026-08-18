@@ -106,6 +106,8 @@ export class FleetScheduler {
   private workerCount = 0;
   private running = false;
   private loaded = false;
+  /** Stops workers from spending more model requests after a global Provider failure. */
+  private providerUnavailable = false;
 
   public constructor(init: FleetSchedulerInit) {
     this.api = init.api;
@@ -192,6 +194,10 @@ export class FleetScheduler {
   /** Run every pending challenge through the solver under the live concurrency cap. */
   public async run(): Promise<FleetSnapshot> {
     await this.load();
+    // A later Start may resume the pending queue after the operator repairs the
+    // Provider account/configuration. The previous failed challenge remains an
+    // explicit diagnostic instead of being retried automatically.
+    this.providerUnavailable = false;
     this.running = true;
     this.fillWorkers();
     // Drain: await workers as they settle, re-reading the set so workers added
@@ -214,13 +220,14 @@ export class FleetScheduler {
   }
 
   private hasPending(): boolean {
+    if (this.providerUnavailable) return false;
     for (const status of this.states.values()) if (status.state === "pending") return true;
     return false;
   }
 
   private async worker(): Promise<void> {
     for (;;) {
-      if (this.signal?.aborted) return;
+      if (this.signal?.aborted || this.providerUnavailable) return;
       // Retire this worker if the live concurrency target dropped below the pool
       // size. The check + the finally-decrement run synchronously in this
       // microtask, so concurrent workers cannot all over-retire.
@@ -271,6 +278,10 @@ export class FleetScheduler {
       status.flag = result.flag;
       status.submissions = result.submissions;
       status.reason = result.reason ?? result.status;
+      // Provider credentials, quota and upstream availability are shared by the
+      // whole fleet. Once one challenge exhausts the Provider's own retry policy,
+      // do not pull more pending challenges into the same guaranteed failure.
+      if (result.status === "PROVIDER_ERROR") this.providerUnavailable = true;
     } catch (error) {
       status.state = controller.signal.aborted ? "cancelled" : "failed";
       status.reason = error instanceof Error ? error.message : String(error);

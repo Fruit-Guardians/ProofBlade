@@ -136,3 +136,21 @@ test("onUpdate fires with live snapshots and reprioritize reorders pending", asy
   assert.equal(order[0], "a");
   assert.ok(updates > 0, "onUpdate never fired");
 });
+
+test("a Provider failure trips the fleet circuit and leaves later challenges pending", async () => {
+  const ids = [challenge("first", 30), challenge("second", 20), challenge("third", 10)];
+  const attempted: string[] = [];
+  const solver: ChallengeSolver = {
+    async solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult> {
+      attempted.push(request.challenge.challengeId);
+      return { solved: false, status: "PROVIDER_ERROR", reason: "402 Insufficient Balance" };
+    },
+  };
+  const scheduler = new FleetScheduler({ api: new FakeApi(ids), solver, concurrency: 1 });
+  const snapshot = await scheduler.run();
+
+  assert.deepEqual(attempted, ["first"]);
+  assert.equal(snapshot.totals.failed, 1);
+  assert.equal(snapshot.totals.pending, 2);
+  assert.match(snapshot.challenges.find((item) => item.challengeId === "first")?.reason ?? "", /Insufficient Balance/);
+});

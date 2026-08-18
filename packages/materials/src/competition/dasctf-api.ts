@@ -60,7 +60,7 @@ export interface DasctfCompetitionApiOptions {
    * with at least this gap. Defaults to 350ms.
    */
   minRequestIntervalMs?: number;
-  /** Max retries on a 429/503 before giving up. Defaults to 4. */
+  /** Max retries for safe transient responses before giving up. Defaults to 4. */
   maxRateLimitRetries?: number;
   /** Injectable fetch for tests. */
   fetch?: typeof globalThis.fetch;
@@ -343,9 +343,9 @@ export class DasctfCompetitionApi implements CompetitionApi {
    * Send one platform HTTP request through the serialization gate. Every call
    * chains onto `this.gate`, so requests never overlap (the platform 429s
    * concurrent bursts); each waits at least minRequestIntervalMs since the
-   * previous one started. A 429/503 is retried up to maxRateLimitRetries,
-   * sleeping for Retry-After (or an exponential fallback) — that is the ONLY
-   * retry here; other statuses return their response for the caller to handle.
+   * previous one started. GET retries 429/503 up to maxRateLimitRetries. POST
+   * is non-idempotent and the platform provides no idempotency key, so every
+   * POST response returns immediately and the request is never re-sent.
    */
   private async gatedFetch(method: "GET" | "POST", url: string, body: unknown): Promise<Response> {
     const run = this.gate.then(async () => {
@@ -367,9 +367,10 @@ export class DasctfCompetitionApi implements CompetitionApi {
         } catch (error) {
           throw new Error(`DASCTF API ${method} ${redact(url)} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
-        if ((response.status === 429 || response.status === 503) && attempt < this.maxRateLimitRetries) {
-          const retryAfterMs = parseRetryAfter(response.headers.get("retry-after")) ?? this.minRequestIntervalMs * 2 ** attempt;
-          await this.sleep(retryAfterMs);
+        const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
+        const safeToRetry = method === "GET" && (response.status === 429 || response.status === 503);
+        if (safeToRetry && attempt < this.maxRateLimitRetries) {
+          await this.sleep(retryAfterMs ?? this.minRequestIntervalMs * 2 ** attempt);
           continue;
         }
         return response;
@@ -385,8 +386,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
     const url = `${this.baseUrl}${path}`;
     // Serialize + rate-limit-retry: the platform 429s concurrent bursts (with
     // Retry-After), so every platform call chains through a single gate that
-    // spaces requests, and a 429/503 backs off (honoring Retry-After) instead of
-    // failing the challenge outright. Bounded so a persistent limit still ends.
+    // spaces requests. GET can back off on 429/503; non-idempotent POST is never
+    // retried without a platform-supported idempotency key.
     const response = await this.gatedFetch(method, url, body);
     const text = await response.text();
     if (!response.ok) throw new Error(`DASCTF API ${method} ${redact(url)} failed with HTTP ${response.status}`);

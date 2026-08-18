@@ -4,9 +4,9 @@
 {
   "id": "materials-competition",
   "name": "Competition Play",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "createdAt": "2026-08-13T10:00:00+08:00",
-  "updatedAt": "2026-08-14T18:40:00+08:00",
+  "updatedAt": "2026-08-18T16:00:00+08:00",
   "qualityAudit": {
     "bugAuditCount": 0,
     "securityAuditCount": 0,
@@ -30,6 +30,10 @@
 - `loop.ts` 在 **coding lane** 上驱动单题。不用 solver lane 是因为后者的工具是只读代理，跑不了真实利用、写不了解题脚本、也驱动不了反编译器 MCP。保留有界轮数、deadline、abort 与 assist 模式的「提交前停下」；去掉 phase/planner 编排和 verifier 编排——`submit_flag` 已在同一轮内完成提交并把裁定结果交回模型。
 - `fleet.ts` 是有界 worker 池加控制面（优先级、逐题 auto/assist、取消、实时并发）。没有全局暂停：暂停整支队伍在限时赛里等于送分。
 - `solver.ts` 把上面几件组装成一次完整运行；动态 flag 题在开环境时直接提交，不花一次模型运行。
+
+Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回 `stopReason=error`，竞赛循环必须立即以 `PROVIDER_ERROR` 结束该题并保留 `errorMessage`。Fleet 收到该状态后触发本次运行的 Provider 断路器，不再领取新的 pending 题；修复余额、凭据或上游故障后再次 Start 可继续 pending 队列，已经失败的诊断题不会被静默重试。
+
+DASCTF 的错旗响应采用显式 allowlist：默认仅 `40001`，GUI 后端可由 `competition.json` 的 `wrongFlagCodes` 或 `PROOFBLADE_COMPETITION_WRONG_FLAG_CODES` 覆盖。平台请求串行发送；GET 可对 429/503 做有界重试，非幂等 POST 在平台没有幂等键的前提下禁止自动重试。
 
 ## 开发规则与验证
 

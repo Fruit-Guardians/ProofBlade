@@ -49,6 +49,8 @@ interface StoredCompetitionConfig {
   timeoutMs?: number;
   /** DASCTF: how long to wait for an async env build (ms). Defaults to 300s. */
   envReadyTimeoutMs?: number;
+  /** DASCTF response codes that are confirmed to mean a wrong flag. */
+  wrongFlagCodes?: string[];
   headers?: Record<string, string>;
   endpoints?: Partial<CompetitionHttpEndpoints>;
 }
@@ -91,6 +93,7 @@ export class CompetitionSettingsStore {
         accessKey,
         ...(this.stored.timeoutMs !== undefined ? { timeoutMs: this.stored.timeoutMs } : {}),
         ...(this.stored.envReadyTimeoutMs !== undefined ? { envReadyTimeoutMs: this.stored.envReadyTimeoutMs } : {}),
+        ...(this.stored.wrongFlagCodes !== undefined ? { wrongFlagCodes: this.stored.wrongFlagCodes } : {}),
       });
       const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
       return { api, solver, kind: "http", baseUrl: serverHost, source: this.source };
@@ -177,6 +180,13 @@ function validate(value: unknown): StoredCompetitionConfig {
     if (typeof input.envReadyTimeoutMs !== "number" || !Number.isFinite(input.envReadyTimeoutMs)) throw fieldError("envReadyTimeoutMs", "一个数字");
     config.envReadyTimeoutMs = input.envReadyTimeoutMs;
   }
+  if (present("wrongFlagCodes")) {
+    if (!Array.isArray(input.wrongFlagCodes)) throw fieldError("wrongFlagCodes", "一个字符串数组");
+    config.wrongFlagCodes = input.wrongFlagCodes.map((raw, index) => {
+      if (typeof raw !== "string" || !raw.trim()) throw fieldError(`wrongFlagCodes.${index}`, "一个非空字符串");
+      return raw.trim();
+    });
+  }
   if (present("headers")) {
     if (typeof input.headers !== "object" || Array.isArray(input.headers)) throw fieldError("headers", "一个字符串到字符串的对象");
     const headers: Record<string, string> = {};
@@ -241,6 +251,7 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   const tokenHeader = process.env.PROOFBLADE_COMPETITION_TOKEN_HEADER?.trim();
   const serverHost = process.env.PROOFBLADE_COMPETITION_SERVER_HOST?.trim();
   const accessKey = process.env.PROOFBLADE_COMPETITION_ACCESS_KEY?.trim();
+  const wrongFlagCodes = process.env.PROOFBLADE_COMPETITION_WRONG_FLAG_CODES;
   if (baseUrl) merged.baseUrl = validateBaseUrl(baseUrl);
   if (token) merged.token = token;
   if (tokenHeader) merged.tokenHeader = tokenHeader;
@@ -248,5 +259,9 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   // Setting either DASCTF var also selects the dasctf platform.
   if (serverHost) { merged.serverHost = validateBaseUrl(serverHost); merged.platform = "dasctf"; }
   if (accessKey) { merged.accessKey = accessKey; merged.platform = "dasctf"; }
+  if (wrongFlagCodes !== undefined) {
+    merged.wrongFlagCodes = wrongFlagCodes.split(",").map((code) => code.trim()).filter(Boolean);
+    merged.platform = "dasctf";
+  }
   return merged;
 }

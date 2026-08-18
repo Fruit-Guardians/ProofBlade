@@ -234,6 +234,30 @@ test("a persistent 429 exhausts the retry budget and throws (not treated as a ve
   await assert.rejects(() => client.listChallenges(), /HTTP 429/);
 });
 
+test("a POST returning 503 is never retried because the request may already have been processed", async () => {
+  const { client, calls } = api({
+    "POST /answer-panel/answer": () => ({ status: 503, body: { code: "", message: "temporarily unavailable", data: null } }),
+  });
+  await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /HTTP 503/);
+  assert.equal(calls.filter((call) => call.url.includes("answer-panel/answer")).length, 1);
+});
+
+test("a POST 429 is not retried even when Retry-After is present", async () => {
+  const { client, calls } = api({
+    "POST /answer-panel/answer": () => ({ status: 429, body: { code: "", message: "rate limited", data: null }, retryAfter: "1" }),
+  });
+  await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /HTTP 429/);
+  assert.equal(calls.filter((call) => call.url.includes("answer-panel/answer")).length, 1);
+});
+
+test("a POST 429 without Retry-After is not retried", async () => {
+  const { client, calls } = api({
+    "POST /answer-panel/answer": () => ({ status: 429, body: { code: "", message: "rate limited", data: null } }),
+  });
+  await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /HTTP 429/);
+  assert.equal(calls.filter((call) => call.url.includes("answer-panel/answer")).length, 1);
+});
+
 test("a failed request does not wedge the gate for subsequent requests", async () => {
   let first = true;
   const { client } = api({

@@ -114,6 +114,8 @@ function competitionStatus(stopReason: string, solved: boolean): string {
       return "CANCELLED";
     case "deadline":
       return "DEADLINE";
+    case "provider_error":
+      return "PROVIDER_ERROR";
     case "terminated":
       return "TERMINATED";
     default:

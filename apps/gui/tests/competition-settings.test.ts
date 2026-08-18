@@ -27,7 +27,7 @@ const config: ProofBladeConfig = {
   },
 };
 
-const ENV_KEYS = ["PROOFBLADE_COMPETITION_BASE_URL", "PROOFBLADE_COMPETITION_TOKEN", "PROOFBLADE_COMPETITION_TOKEN_HEADER", "PROOFBLADE_COMPETITION_SERVER_HOST", "PROOFBLADE_COMPETITION_ACCESS_KEY"] as const;
+const ENV_KEYS = ["PROOFBLADE_COMPETITION_BASE_URL", "PROOFBLADE_COMPETITION_TOKEN", "PROOFBLADE_COMPETITION_TOKEN_HEADER", "PROOFBLADE_COMPETITION_SERVER_HOST", "PROOFBLADE_COMPETITION_ACCESS_KEY", "PROOFBLADE_COMPETITION_WRONG_FLAG_CODES"] as const;
 
 function clearEnv(): void {
   for (const key of ENV_KEYS) delete process.env[key];
@@ -38,6 +38,10 @@ async function tempDir(prefix: string): Promise<string> {
   const tempRoot = join(root, "tmp");
   await mkdir(tempRoot, { recursive: true });
   return await mkdtemp(join(tempRoot, prefix));
+}
+
+function configuredWrongFlagCodes(api: DasctfCompetitionApi): string[] {
+  return [...(api as unknown as { wrongFlagCodes: Set<string> }).wrongFlagCodes];
 }
 
 test("falls back to the demo backend when no baseUrl is configured", async () => {
@@ -54,13 +58,14 @@ test("builds a live DasctfCompetitionApi when platform=dasctf with serverHost+ac
   clearEnv();
   const dir = await tempDir("competition-settings-dasctf-");
   const path = join(dir, "competition.json");
-  await writeFile(path, JSON.stringify({ platform: "dasctf", serverHost: "https://gcsis.dasctf.com", accessKey: "ak_secret" }), "utf8");
+  await writeFile(path, JSON.stringify({ platform: "dasctf", serverHost: "https://gcsis.dasctf.com", accessKey: "ak_secret", wrongFlagCodes: ["B0001"] }), "utf8");
   const store = await CompetitionSettingsStore.create("/root", config, path);
   const backend = store.backend();
   assert.equal(backend.kind, "http");
   assert.equal(backend.source, "config-file");
   assert.equal(backend.baseUrl, "https://gcsis.dasctf.com");
   assert.ok(backend.api instanceof DasctfCompetitionApi);
+  assert.deepEqual(configuredWrongFlagCodes(backend.api), ["B0001"]);
 });
 
 test("dasctf platform without an accessKey falls back to demo (fail-closed, no false solves)", async () => {
@@ -87,6 +92,21 @@ test("the DASCTF accessKey can come from an env var (kept off disk) and selects 
     assert.equal(backend.kind, "http");
     assert.equal(backend.source, "env");
     assert.ok(backend.api instanceof DasctfCompetitionApi);
+  } finally {
+    clearEnv();
+  }
+});
+
+test("DASCTF wrongFlagCodes can come from a comma-separated env var", async () => {
+  clearEnv();
+  const dir = await tempDir("competition-settings-dasctf-wrong-codes-env-");
+  const path = join(dir, "competition.json");
+  await writeFile(path, JSON.stringify({ platform: "dasctf", serverHost: "https://gcsis.dasctf.com", accessKey: "ak_secret", wrongFlagCodes: ["40001"] }), "utf8");
+  process.env.PROOFBLADE_COMPETITION_WRONG_FLAG_CODES = " B0001, 40001 ";
+  try {
+    const backend = (await CompetitionSettingsStore.create("/root", config, path)).backend();
+    assert.ok(backend.api instanceof DasctfCompetitionApi);
+    assert.deepEqual(configuredWrongFlagCodes(backend.api), ["B0001", "40001"]);
   } finally {
     clearEnv();
   }
@@ -161,11 +181,13 @@ test("fails closed on a present-but-wrong-typed baseUrl instead of falling back 
   await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), /baseUrl 类型错误/);
 });
 
-test("fails closed on wrong-typed token, timeoutMs, headers, and endpoints", async () => {
+test("fails closed on wrong-typed token, timeoutMs, wrongFlagCodes, headers, and endpoints", async () => {
   clearEnv();
   const cases: Array<[Record<string, unknown>, RegExp]> = [
     [{ baseUrl: "https://ctf.example/api", token: 5 }, /token 类型错误/],
     [{ baseUrl: "https://ctf.example/api", timeoutMs: "30s" }, /timeoutMs 类型错误/],
+    [{ platform: "dasctf", wrongFlagCodes: "B0001" }, /wrongFlagCodes 类型错误/],
+    [{ platform: "dasctf", wrongFlagCodes: ["B0001", ""] }, /wrongFlagCodes\.1 类型错误/],
     [{ baseUrl: "https://ctf.example/api", headers: { "X-A": 1 } }, /headers\.X-A 类型错误/],
     [{ baseUrl: "https://ctf.example/api", endpoints: { submitFlag: 42 } }, /endpoints\.submitFlag 类型错误/],
   ];

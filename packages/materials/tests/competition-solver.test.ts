@@ -413,3 +413,37 @@ test("fleet runs the real solver across many challenges in priority order", asyn
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("a terminal Provider error stops a competition challenge after one turn and preserves the cause", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-provider-error-"));
+  try {
+    const api = new FakeApi([{ id: "QUOTA", value: 100, flag: "flag{unused}" }]);
+    let prompts = 0;
+    const providerErrorLane: CompetitionLaneFactory = async () => ({
+      async prompt() {
+        prompts += 1;
+        return {
+          text: "",
+          stopReason: "error",
+          errorMessage: '402: {"message":"Insufficient Balance"}',
+          usage: zeroUsage(),
+        };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 24, createLane: providerErrorLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+
+    assert.equal(prompts, 1, "a terminal Provider failure must not be replayed across competition turns");
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "PROVIDER_ERROR");
+    assert.match(result.reason ?? "", /Insufficient Balance/);
+    assert.deepEqual(api.submitted, []);
+    assert.ok(api.stopped.includes("QUOTA"), "environment must still be released after a Provider failure");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
