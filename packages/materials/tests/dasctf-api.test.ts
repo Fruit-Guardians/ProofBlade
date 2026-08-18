@@ -7,7 +7,7 @@ const KEY = "ak_test_secret";
 
 // A scripted fetch: maps "METHOD path" (path relative to the API prefix, query
 // stripped for env/exercise where noted) to a response factory.
-function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => { status?: number; body: unknown }>) {
+function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => { status?: number; body: unknown; contentLength?: number }>) {
   const calls: Array<{ url: string; method: string; body?: unknown; accessKey?: string }> = [];
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
@@ -20,13 +20,20 @@ function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => {
     // Try exact, then prefix (for query-bearing paths).
     const route = routes[key] ?? Object.entries(routes).find(([k]) => key.startsWith(k))?.[1];
     if (!route) throw new Error(`unmocked route: ${key}`);
-    const { status = 200, body } = route(url, init);
+    const { status = 200, body, contentLength } = route(url, init);
     const isBinary = body instanceof Uint8Array;
+    const headerMap = new Headers();
+    if (contentLength !== undefined) headerMap.set("content-length", String(contentLength));
+    else if (isBinary) headerMap.set("content-length", String((body as Uint8Array).byteLength));
     return {
       ok: status >= 200 && status < 300,
       status,
+      headers: headerMap,
       text: async () => (isBinary ? "" : JSON.stringify(body)),
       arrayBuffer: async () => (isBinary ? (body as Uint8Array).buffer : new TextEncoder().encode(JSON.stringify(body)).buffer),
+      // A one-chunk ReadableStream for the streaming download path; JSON routes
+      // (not downloaded as attachments) keep body null and use arrayBuffer.
+      body: isBinary ? new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(body as Uint8Array); controller.close(); } }) : null,
     } as unknown as Response;
   }) as unknown as typeof globalThis.fetch;
   return { fetchImpl, calls };
@@ -78,6 +85,22 @@ test("getChallenge downloads attachment URLs and encodes them as base64", async 
   assert.equal(attachments[0]!.base64, Buffer.from(bytes).toString("base64"));
 });
 
+test("an oversized attachment is rejected by the byte cap (content-length precheck)", async () => {
+  const big = new Uint8Array(2048);
+  const { client } = api({
+    "GET /ctf/exercise": () => ok({ id: 1001, name: "big", isNeedInit: false, isNeedCheck: false, attachment: { files: [{ name: "big.bin", url: "https://cdn.example/big.bin", ext: "bin" }] } }),
+    "GET https://cdn.example/big.bin": () => ({ body: big, contentLength: 2048 }),
+  }, { maxAttachmentBytes: 1024 });
+  await assert.rejects(() => client.getChallenge("1001"), /exceeds 1024 bytes/);
+});
+
+test("a non-http(s) attachment URL is rejected", async () => {
+  const { client } = api({
+    "GET /ctf/exercise": () => ok({ id: 1001, name: "x", isNeedInit: false, isNeedCheck: false, attachment: { files: [{ name: "f", url: "file:///etc/passwd", ext: "" }] } }),
+  });
+  await assert.rejects(() => client.getChallenge("1001"), /must be http/);
+});
+
 test("submitFlag maps isCorrect true", async () => {
   const { client, calls } = api({ "POST /answer-panel/answer": () => ok({ isCorrect: true }) });
   const result = await client.submitFlag("1001", "flag{x}");
@@ -85,11 +108,37 @@ test("submitFlag maps isCorrect true", async () => {
   assert.deepEqual(calls[0]!.body, { exerciseId: 1001, flag: "flag{x}" });   // exerciseId is in the body
 });
 
-test("a WRONG flag comes back as a non-00000 code and maps to correct:false WITHOUT throwing (does not burn a retry)", async () => {
-  const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "B0001", message: "flag 错误", data: null } }) });
+test("submitFlag maps a 00000 envelope with isCorrect:false to a wrong verdict (not an error)", async () => {
+  const { client } = api({ "POST /answer-panel/answer": () => ok({ isCorrect: false }) });
+  const result = await client.submitFlag("1001", "flag{wrong}");
+  assert.equal(result.correct, false);
+});
+
+test("an ambiguous non-00000 submit code THROWS by default (never silently burns a submission on auth/rate errors)", async () => {
+  const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "A0401", message: "unauthorized", data: null } }) });
+  await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /code A0401/);
+});
+
+test("a non-00000 code IN the configured wrongFlagCodes allowlist maps to correct:false", async () => {
+  const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "B0001", message: "flag 错误", data: null } }) }, { wrongFlagCodes: ["B0001"] });
   const result = await client.submitFlag("1001", "flag{wrong}");
   assert.equal(result.correct, false);
   assert.equal(result.message, "flag 错误");
+});
+
+test("startEnvironment does NOT re-POST build when the challenge is already building (isNeedInit && isNeedCheck both true)", async () => {
+  let detailCalls = 0;
+  const { client, calls } = api({
+    "GET /ctf/exercise": () => {
+      detailCalls += 1;
+      // First read: build already in flight (both flags true) — must only poll.
+      if (detailCalls === 1) return ok({ id: 1001, isNeedInit: true, isNeedCheck: true });
+      return ok({ id: 1001, isNeedInit: true, isNeedCheck: false, endpoints: [{ exposeIps: ["10.0.0.10"], ports: ["80"], isProxy: false }] });
+    },
+    "POST /ctf/build-exercise-env": () => ok({}),
+  });
+  await client.startEnvironment("1001");
+  assert.equal(calls.filter((c) => c.url.includes("build-exercise-env")).length, 0, "must not POST build while one is in flight");
 });
 
 test("startEnvironment posts build then polls the detail until isNeedCheck is false, and builds connectionInfo", async () => {
