@@ -46,10 +46,20 @@ export interface DasctfCompetitionApiOptions {
   wrongFlagCodes?: string[];
   /** Max bytes to download for a single attachment. Defaults to 64 MiB. */
   maxAttachmentBytes?: number;
+  /**
+   * Minimum spacing between platform API calls. The platform rate-limits bursts
+   * (concurrent requests return HTTP 429 Retry-After), so calls are serialized
+   * with at least this gap. Defaults to 350ms.
+   */
+  minRequestIntervalMs?: number;
+  /** Max retries on a 429/503 before giving up. Defaults to 4. */
+  maxRateLimitRetries?: number;
   /** Injectable fetch for tests. */
   fetch?: typeof globalThis.fetch;
   /** Injectable clock sleep for tests. */
   sleep?: (ms: number) => Promise<void>;
+  /** Injectable clock for tests (min-interval spacing). Defaults to Date.now. */
+  now?: () => number;
 }
 
 export class DasctfCompetitionApi implements CompetitionApi {
@@ -60,8 +70,14 @@ export class DasctfCompetitionApi implements CompetitionApi {
   private readonly envPollIntervalMs: number;
   private readonly wrongFlagCodes: Set<string>;
   private readonly maxAttachmentBytes: number;
+  private readonly minRequestIntervalMs: number;
+  private readonly maxRateLimitRetries: number;
   private readonly requestFetch: typeof globalThis.fetch;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly now: () => number;
+  /** Serialization gate: platform requests chain through this so they never burst. */
+  private gate: Promise<void> = Promise.resolve();
+  private lastRequestAt = 0;
 
   public constructor(options: DasctfCompetitionApiOptions) {
     this.baseUrl = normalizeHost(options.serverHost) + API_PREFIX;
@@ -72,9 +88,14 @@ export class DasctfCompetitionApi implements CompetitionApi {
     this.envPollIntervalMs = intOption(options.envPollIntervalMs, 3_000, "envPollIntervalMs");
     this.wrongFlagCodes = new Set((options.wrongFlagCodes ?? []).map((code) => code.trim()).filter(Boolean));
     this.maxAttachmentBytes = byteOption(options.maxAttachmentBytes, 64 * 1024 * 1024, "maxAttachmentBytes");
+    this.minRequestIntervalMs = nonNegIntOption(options.minRequestIntervalMs, 350, "minRequestIntervalMs");
+    const retries = options.maxRateLimitRetries ?? 4;
+    if (!Number.isInteger(retries) || retries < 0 || retries > 10) throw new Error("DasctfCompetitionApi maxRateLimitRetries must be an integer in [0, 10]");
+    this.maxRateLimitRetries = retries;
     this.requestFetch = options.fetch ?? globalThis.fetch;
     if (typeof this.requestFetch !== "function") throw new Error("DasctfCompetitionApi requires a fetch implementation");
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.now = options.now ?? (() => Date.now());
   }
 
   public async listChallenges(): Promise<CompetitionChallengeSummary[]> {
@@ -305,22 +326,55 @@ export class DasctfCompetitionApi implements CompetitionApi {
     return this.requestEnvelope("POST", path, body, { allowNonOk: true });
   }
 
+  /**
+   * Send one platform HTTP request through the serialization gate. Every call
+   * chains onto `this.gate`, so requests never overlap (the platform 429s
+   * concurrent bursts); each waits at least minRequestIntervalMs since the
+   * previous one started. A 429/503 is retried up to maxRateLimitRetries,
+   * sleeping for Retry-After (or an exponential fallback) — that is the ONLY
+   * retry here; other statuses return their response for the caller to handle.
+   */
+  private async gatedFetch(method: "GET" | "POST", url: string, body: unknown): Promise<Response> {
+    const run = this.gate.then(async () => {
+      const wait = Math.max(0, this.minRequestIntervalMs - (this.now() - this.lastRequestAt));
+      if (wait > 0) await this.sleep(wait);
+      for (let attempt = 0; ; attempt += 1) {
+        this.lastRequestAt = this.now();
+        const headers = new Headers({ Accept: "application/json", "X-Agent-AccessKey": this.accessKey });
+        if (body !== undefined) headers.set("Content-Type", "application/json");
+        let response: Response;
+        try {
+          response = await this.requestFetch(url, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: AbortSignal.timeout(this.timeoutMs),
+            redirect: "error",
+          });
+        } catch (error) {
+          throw new Error(`DASCTF API ${method} ${redact(url)} failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        if ((response.status === 429 || response.status === 503) && attempt < this.maxRateLimitRetries) {
+          const retryAfterMs = parseRetryAfter(response.headers.get("retry-after")) ?? this.minRequestIntervalMs * 2 ** attempt;
+          await this.sleep(retryAfterMs);
+          continue;
+        }
+        return response;
+      }
+    });
+    // Keep the gate chained even if this request throws, so a failure does not
+    // wedge every later request; swallow the error on the gate copy only.
+    this.gate = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   private async requestEnvelope(method: "GET" | "POST", path: string, body?: unknown, options: { allowNonOk?: boolean } = {}): Promise<Envelope> {
     const url = `${this.baseUrl}${path}`;
-    const headers = new Headers({ Accept: "application/json", "X-Agent-AccessKey": this.accessKey });
-    if (body !== undefined) headers.set("Content-Type", "application/json");
-    let response: Response;
-    try {
-      response = await this.requestFetch(url, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.timeoutMs),
-        redirect: "error",
-      });
-    } catch (error) {
-      throw new Error(`DASCTF API ${method} ${redact(url)} failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    // Serialize + rate-limit-retry: the platform 429s concurrent bursts (with
+    // Retry-After), so every platform call chains through a single gate that
+    // spaces requests, and a 429/503 backs off (honoring Retry-After) instead of
+    // failing the challenge outright. Bounded so a persistent limit still ends.
+    const response = await this.gatedFetch(method, url, body);
     const text = await response.text();
     if (!response.ok) throw new Error(`DASCTF API ${method} ${redact(url)} failed with HTTP ${response.status}`);
     let parsed: unknown;
@@ -360,6 +414,12 @@ function normalizeHost(value: string): string {
 function intOption(value: number | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback;
   if (!Number.isInteger(value) || value < 100 || value > 600_000) throw new Error(`DasctfCompetitionApi ${name} must be an integer between 100 and 600000`);
+  return value;
+}
+
+function nonNegIntOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < 0 || value > 600_000) throw new Error(`DasctfCompetitionApi ${name} must be an integer between 0 and 600000`);
   return value;
 }
 
@@ -413,6 +473,16 @@ function asArray(value: unknown): unknown[] | undefined {
 
 function payloadError(operation: string, expected: string): Error {
   return new Error(`DASCTF API ${operation} returned an invalid payload; expected ${expected}`);
+}
+
+/** Parse a Retry-After header (delta-seconds or HTTP-date) to ms, capped at 30s. */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Math.min(30_000, Number(trimmed) * 1000);
+  const date = Date.parse(trimmed);
+  if (!Number.isNaN(date)) return Math.min(30_000, Math.max(0, date - Date.now()));
+  return undefined;
 }
 
 /** Strip query (may carry ids) for safe error messages; the accessKey is a header, never in the URL. */
