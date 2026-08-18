@@ -38,6 +38,14 @@ export interface DasctfCompetitionApiOptions {
   envReadyTimeoutMs?: number;
   /** Delay between env-readiness polls. Defaults to 3s. */
   envPollIntervalMs?: number;
+  /**
+   * Platform response codes that mean "wrong flag" (NOT an operational error).
+   * Only these are mapped to correct:false; every other non-"00000" code throws.
+   * Empty by default — set it once the contest's wrong-flag code is observed.
+   */
+  wrongFlagCodes?: string[];
+  /** Max bytes to download for a single attachment. Defaults to 64 MiB. */
+  maxAttachmentBytes?: number;
   /** Injectable fetch for tests. */
   fetch?: typeof globalThis.fetch;
   /** Injectable clock sleep for tests. */
@@ -50,6 +58,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
   private readonly timeoutMs: number;
   private readonly envReadyTimeoutMs: number;
   private readonly envPollIntervalMs: number;
+  private readonly wrongFlagCodes: Set<string>;
+  private readonly maxAttachmentBytes: number;
   private readonly requestFetch: typeof globalThis.fetch;
   private readonly sleep: (ms: number) => Promise<void>;
 
@@ -60,6 +70,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
     this.timeoutMs = intOption(options.timeoutMs, 30_000, "timeoutMs");
     this.envReadyTimeoutMs = intOption(options.envReadyTimeoutMs, 120_000, "envReadyTimeoutMs");
     this.envPollIntervalMs = intOption(options.envPollIntervalMs, 3_000, "envPollIntervalMs");
+    this.wrongFlagCodes = new Set((options.wrongFlagCodes ?? []).map((code) => code.trim()).filter(Boolean));
+    this.maxAttachmentBytes = byteOption(options.maxAttachmentBytes, 64 * 1024 * 1024, "maxAttachmentBytes");
     this.requestFetch = options.fetch ?? globalThis.fetch;
     if (typeof this.requestFetch !== "function") throw new Error("DasctfCompetitionApi requires a fetch implementation");
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
@@ -102,14 +114,18 @@ export class DasctfCompetitionApi implements CompetitionApi {
 
   public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
     let detail = await this.exerciseDetail(challengeId);
-    // Static challenges (attachment-only) need no environment.
-    if (detail.isNeedInit === true) {
+    // Order matters: check isNeedCheck FIRST. A challenge can report
+    // isNeedInit:true AND isNeedCheck:true at once (build already in flight); in
+    // that state we must only poll, never POST build again — a second build can
+    // restart provisioning, create duplicate resources, or error on the platform.
+    if (detail.isNeedCheck === true) {
+      detail = await this.pollUntilReady(challengeId);
+    } else if (detail.isNeedInit === true) {
+      // Needs an environment and none is building yet — start it, then poll.
       await this.post("/ctf/build-exercise-env", { exerciseId: toExerciseId(challengeId) });
       detail = await this.pollUntilReady(challengeId);
-    } else if (detail.isNeedCheck === true) {
-      // Already building from a prior call — just wait for it.
-      detail = await this.pollUntilReady(challengeId);
     }
+    // else: static challenge (attachment-only), no environment to provision.
     return this.parseEnvironment(detail);
   }
 
@@ -118,16 +134,25 @@ export class DasctfCompetitionApi implements CompetitionApi {
     if (!candidate) throw new Error("DasctfCompetitionApi submitFlag requires a non-empty flag");
     if (candidate.length > 256) throw new Error("DASCTF flags are limited to 256 characters");
     const envelope = await this.postEnvelope("/answer-panel/answer", { exerciseId: toExerciseId(challengeId), flag: candidate });
-    // A wrong flag is NOT a transport error: the platform returns a non-"00000"
-    // code with a message. Map that to correct:false so the caller does not treat
-    // it as a crash (and does not waste a retry).
-    if (envelope.code !== OK_CODE) {
+    if (envelope.code === OK_CODE) {
+      // Success envelope: the verdict is the isCorrect boolean.
+      const record = asRecord(envelope.data) ?? {};
+      const correct = booleanField(record, ["isCorrect"]);
+      if (correct === undefined) throw payloadError("answer", "a boolean isCorrect");
+      return { correct, ...(envelope.message ? { message: envelope.message } : {}), raw: envelope.raw };
+    }
+    // A non-"00000" code is AMBIGUOUS: it can be a wrong flag OR an operational
+    // failure (auth A0401, rate limit, service error). Blindly mapping all of
+    // them to correct:false would let an auto-solver treat an auth/rate error as
+    // a wrong answer and keep burning the 50-submission budget. So only codes
+    // KNOWN to mean "wrong flag" become a verdict; everything else throws so the
+    // failure surfaces instead of silently wasting submissions. The known-wrong
+    // set is configurable because the platform's exact wrong-flag code is only
+    // observable at contest time — default empty = fail safe.
+    if (this.wrongFlagCodes.has(envelope.code)) {
       return { correct: false, ...(envelope.message ? { message: envelope.message } : {}), raw: envelope.raw };
     }
-    const record = asRecord(envelope.data) ?? {};
-    const correct = booleanField(record, ["isCorrect"]);
-    if (correct === undefined) throw payloadError("answer", "a boolean isCorrect");
-    return { correct, ...(envelope.message ? { message: envelope.message } : {}), raw: envelope.raw };
+    throw new Error(`DASCTF submitFlag returned code ${envelope.code}${envelope.message ? `: ${envelope.message}` : ""}`);
   }
 
   public async stopEnvironment(challengeId: string, _instanceId?: string): Promise<void> {
@@ -187,15 +212,50 @@ export class DasctfCompetitionApi implements CompetitionApi {
   }
 
   private async downloadBase64(url: string): Promise<string> {
+    // Only follow http(s). The URL comes from the platform payload; refusing
+    // other schemes keeps a download from reaching file:/data: or similar.
+    let parsed: URL;
+    try { parsed = new URL(url); } catch { throw new Error("DASCTF attachment URL is not a valid URL"); }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`DASCTF attachment URL must be http(s), got ${parsed.protocol}`);
     let response: Response;
     try {
-      response = await this.requestFetch(url, { signal: AbortSignal.timeout(this.timeoutMs), redirect: "follow" });
+      // redirect:"error" — do not silently follow a redirect to an unexpected
+      // host; a legitimate attachment CDN returns the bytes directly.
+      response = await this.requestFetch(url, { signal: AbortSignal.timeout(this.timeoutMs), redirect: "error" });
     } catch (error) {
       throw new Error(`DASCTF attachment download failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     if (!response.ok) throw new Error(`DASCTF attachment download failed with HTTP ${response.status}`);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return buffer.toString("base64");
+    // Cheap precheck: reject an oversized attachment by its declared length
+    // before reading a single byte.
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > this.maxAttachmentBytes) {
+      throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes (content-length ${declared})`);
+    }
+    // Stream and accumulate with a hard cap, so a server that lies about (or
+    // omits) content-length still cannot exhaust memory.
+    const body = response.body;
+    if (!body) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.byteLength > this.maxAttachmentBytes) throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
+      return buffer.toString("base64");
+    }
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    const reader = body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > this.maxAttachmentBytes) {
+          await reader.cancel().catch(() => {});
+          throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
+        }
+        chunks.push(value);
+      }
+    }
+    return Buffer.concat(chunks).toString("base64");
   }
 
   private parseEnvironment(detail: Record<string, unknown>): CompetitionEnvironment {
@@ -300,6 +360,12 @@ function normalizeHost(value: string): string {
 function intOption(value: number | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback;
   if (!Number.isInteger(value) || value < 100 || value > 600_000) throw new Error(`DasctfCompetitionApi ${name} must be an integer between 100 and 600000`);
+  return value;
+}
+
+function byteOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < 1 || value > 1024 * 1024 * 1024) throw new Error(`DasctfCompetitionApi ${name} must be an integer between 1 and 1073741824`);
   return value;
 }
 
