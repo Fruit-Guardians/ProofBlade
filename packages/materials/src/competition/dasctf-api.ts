@@ -25,6 +25,13 @@ import { normalizeCategory } from "./api.js";
 
 /** Platform success envelope code. */
 const OK_CODE = "00000";
+// Observed at contest time (西湖论剑 2026 测试赛): the platform returns code
+// "40001" with message "提交flag错误，请重新提交（当前还有N次提交机会）" for a WRONG
+// flag. It is a verdict, not an operational failure, so it must map to
+// correct:false rather than throwing — a throw crashes the verifier
+// (JSON.parse of empty stdout → "Unexpected end of JSON input") and the model
+// then misreads it as a platform outage and retries uselessly.
+const DEFAULT_WRONG_FLAG_CODES = ["40001"];
 const API_PREFIX = "/slab-match/api/v1/agent";
 
 export interface DasctfCompetitionApiOptions {
@@ -41,7 +48,8 @@ export interface DasctfCompetitionApiOptions {
   /**
    * Platform response codes that mean "wrong flag" (NOT an operational error).
    * Only these are mapped to correct:false; every other non-"00000" code throws.
-   * Empty by default — set it once the contest's wrong-flag code is observed.
+   * Defaults to the observed contest wrong-flag code ["40001"]; pass an explicit
+   * array to override (an empty array restores the strict fail-safe behavior).
    */
   wrongFlagCodes?: string[];
   /** Max bytes to download for a single attachment. Defaults to 64 MiB. */
@@ -84,9 +92,14 @@ export class DasctfCompetitionApi implements CompetitionApi {
     this.accessKey = options.accessKey.trim();
     if (!this.accessKey) throw new Error("DasctfCompetitionApi requires a non-empty accessKey");
     this.timeoutMs = intOption(options.timeoutMs, 30_000, "timeoutMs");
-    this.envReadyTimeoutMs = intOption(options.envReadyTimeoutMs, 120_000, "envReadyTimeoutMs");
+    // 300s (not 120s): during a live test match many teams provision envs at
+    // once and Docker-backed web targets can take minutes to come up. All fleet
+    // challenges share ONE api instance + ONE serialization gate, so a slot's
+    // env poll also queues behind other challenges' calls, eating wall-clock.
+    // 120s lost both web challenges (10661/10664) to premature timeout.
+    this.envReadyTimeoutMs = intOption(options.envReadyTimeoutMs, 300_000, "envReadyTimeoutMs");
     this.envPollIntervalMs = intOption(options.envPollIntervalMs, 3_000, "envPollIntervalMs");
-    this.wrongFlagCodes = new Set((options.wrongFlagCodes ?? []).map((code) => code.trim()).filter(Boolean));
+    this.wrongFlagCodes = new Set((options.wrongFlagCodes ?? DEFAULT_WRONG_FLAG_CODES).map((code) => code.trim()).filter(Boolean));
     this.maxAttachmentBytes = byteOption(options.maxAttachmentBytes, 64 * 1024 * 1024, "maxAttachmentBytes");
     this.minRequestIntervalMs = nonNegIntOption(options.minRequestIntervalMs, 350, "minRequestIntervalMs");
     const retries = options.maxRateLimitRetries ?? 4;

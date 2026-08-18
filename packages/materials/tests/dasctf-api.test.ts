@@ -126,6 +126,22 @@ test("an ambiguous non-00000 submit code THROWS by default (never silently burns
   await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /code A0401/);
 });
 
+test("the platform's real wrong-flag code 40001 maps to correct:false BY DEFAULT (no config needed)", async () => {
+  // Contest ground truth: a wrong flag returns code 40001, message like
+  // "提交flag错误，请重新提交（当前还有49次提交机会）". This must be a clean verdict,
+  // never a throw — a throw crashes the verifier and the model misreads it as an
+  // outage and re-sprays. Uses the api() default (no wrongFlagCodes override).
+  const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "40001", message: "提交flag错误，请重新提交（当前还有49次提交机会）", data: null } }) });
+  const result = await client.submitFlag("1001", "flag{wrong}");
+  assert.equal(result.correct, false);
+  assert.match(result.message ?? "", /提交flag错误/);
+});
+
+test("an explicit empty wrongFlagCodes array restores strict fail-safe (40001 then throws)", async () => {
+  const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "40001", message: "提交flag错误", data: null } }) }, { wrongFlagCodes: [] });
+  await assert.rejects(() => client.submitFlag("1001", "flag{x}"), /code 40001/);
+});
+
 test("a non-00000 code IN the configured wrongFlagCodes allowlist maps to correct:false", async () => {
   const { client } = api({ "POST /answer-panel/answer": () => ({ body: { code: "B0001", message: "flag 错误", data: null } }) }, { wrongFlagCodes: ["B0001"] });
   const result = await client.submitFlag("1001", "flag{wrong}");

@@ -47,6 +47,8 @@ interface StoredCompetitionConfig {
   token?: string;
   tokenHeader?: string;
   timeoutMs?: number;
+  /** DASCTF: how long to wait for an async env build (ms). Defaults to 300s. */
+  envReadyTimeoutMs?: number;
   headers?: Record<string, string>;
   endpoints?: Partial<CompetitionHttpEndpoints>;
 }
@@ -88,6 +90,7 @@ export class CompetitionSettingsStore {
         serverHost,
         accessKey,
         ...(this.stored.timeoutMs !== undefined ? { timeoutMs: this.stored.timeoutMs } : {}),
+        ...(this.stored.envReadyTimeoutMs !== undefined ? { envReadyTimeoutMs: this.stored.envReadyTimeoutMs } : {}),
       });
       const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
       return { api, solver, kind: "http", baseUrl: serverHost, source: this.source };
@@ -169,6 +172,10 @@ function validate(value: unknown): StoredCompetitionConfig {
   if (present("timeoutMs")) {
     if (typeof input.timeoutMs !== "number" || !Number.isFinite(input.timeoutMs)) throw fieldError("timeoutMs", "一个数字");
     config.timeoutMs = input.timeoutMs;
+  }
+  if (present("envReadyTimeoutMs")) {
+    if (typeof input.envReadyTimeoutMs !== "number" || !Number.isFinite(input.envReadyTimeoutMs)) throw fieldError("envReadyTimeoutMs", "一个数字");
+    config.envReadyTimeoutMs = input.envReadyTimeoutMs;
   }
   if (present("headers")) {
     if (typeof input.headers !== "object" || Array.isArray(input.headers)) throw fieldError("headers", "一个字符串到字符串的对象");
