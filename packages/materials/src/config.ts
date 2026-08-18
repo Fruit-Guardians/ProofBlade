@@ -31,6 +31,16 @@ export interface ModelProfileConfig {
   modelDiscoveryPath: string;
   apiKeyEnv: string;
   proxyUrl?: string;
+  /**
+   * "exact" declares that `baseUrl` is ALREADY the full operation endpoint (not a
+   * base to append to). Some competition LLM gateways only proxy a whitelisted
+   * full URL (e.g. https://host/v1/chat/completions) and 404 any extra path, but
+   * the OpenAI/Anthropic SDKs always append their operation path
+   * (/chat/completions, /v1/messages, …). When set, the transport strips that
+   * appended path so the request lands on the exact gateway URL. Omit for a
+   * normal base-URL provider.
+   */
+  endpointMode?: "exact";
   contextWindow: number;
   maxTokens: number;
   requestTimeoutMs: number;
@@ -92,6 +102,7 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(profile.api)) throw new Error(`Unsupported provider API: ${String(profile.api)}`);
   if (!profile.provider || !profile.baseUrl || !profile.model) throw new Error(`Config ${path} has an incomplete executor profile`);
   if (profile.proxyUrl !== undefined) validateHttpUrl(profile.proxyUrl, `proxyUrl in ${path}`);
+  if (profile.endpointMode !== undefined && profile.endpointMode !== "exact") throw new Error(`Invalid endpointMode in ${path} (only "exact" is supported)`);
   if (!Number.isFinite(profile.contextWindow) || profile.contextWindow < 1024) throw new Error(`Invalid contextWindow in ${path}`);
   if (!Number.isFinite(profile.maxTokens) || profile.maxTokens < 1) throw new Error(`Invalid maxTokens in ${path}`);
   if (!Number.isInteger(profile.maxRetries) || profile.maxRetries < 0 || profile.maxRetries > 8) throw new Error(`Invalid maxRetries in ${path}`);
