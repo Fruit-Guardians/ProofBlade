@@ -8,6 +8,7 @@ import {
 } from "@earendil-works/pi-agent-core/node";
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
+import { sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -53,6 +54,17 @@ export interface CodingResourceContext extends ExecutionToolContext {
     artifactStore: ArtifactStore;
     runId: string;
   };
+  /**
+   * Per-run count of how many times each distinct image has been read, keyed by
+   * the image CONTENT hash (not path). Identical bytes give no new information on
+   * re-read, but each re-read re-injects the full image block; enough copies push
+   * the reasoning history out of context and the model "forgets" it already
+   * looked, then loops. The read wrapper uses this to stop re-injecting after a
+   * small budget and nudge toward a different tactic — while a changed file
+   * (new bytes → new key) still gets delivered, and path aliases for the same
+   * bytes share one counter. See {@link dedupeImageRead}.
+   */
+  imagesSeen?: Map<string, number>;
 }
 
 export interface CodingToolCatalogEntry {
@@ -548,6 +560,45 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   ];
 }
 
+/**
+ * How many times identical image CONTENT is re-injected into context before the
+ * read wrapper stops sending the pixels and nudges instead. The first two reads
+ * give the model a genuine look (and a second glance is fair); beyond that the
+ * SAME bytes yield nothing new, and each ~MB re-inject dilutes the reasoning
+ * history until the model forgets it already looked and loops. Observed live:
+ * one run re-read the same flag.jpg 65 times and never progressed.
+ */
+export const IMAGE_REINJECT_BUDGET = 2;
+
+/**
+ * Deduplicate repeated image reads within one run, keyed by the image's CONTENT
+ * hash (not its path). Content keying is what makes this correct:
+ *   - If a file is overwritten in place (screenshot refresh, in-place crop,
+ *     re-render), the bytes change → new key → budget resets → the new image is
+ *     delivered. Path-only keying would wrongly keep saying "unchanged".
+ *   - Path aliases for the same bytes (`a.png`, `./a.png`, `../d/a.png`, absolute)
+ *     hash identically → one shared counter, so the budget cannot be bypassed by
+ *     spelling the path differently.
+ * Under budget, pass the real image through; over budget, drop the image block
+ * and return a short nudge toward a tactic that can actually make progress.
+ */
+export function dedupeImageRead(
+  path: string,
+  result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>,
+  imagesSeen: Map<string, number> | undefined,
+): typeof result {
+  if (!imagesSeen) return result;
+  // Hash the concatenated image-block payloads: this is the identity that matters
+  // (same pixels = nothing new to see), independent of how the path was written.
+  const imageData = result.content.filter((item) => item.type === "image").map((item) => (item as { data?: string }).data ?? "").join(" ");
+  const key = sha256(imageData);
+  const seen = imagesSeen.get(key) ?? 0;
+  imagesSeen.set(key, seen + 1);
+  if (seen < IMAGE_REINJECT_BUDGET) return result;
+  const text = `You have already loaded this exact image ${seen} time(s) in this run (last path: ${path}) — the bytes are unchanged, so re-reading adds no new information and only crowds out your earlier reasoning. Do NOT read it again as-is. If a detail is unclear, isolate it, e.g. with Python PIL:\n\`\`\`python\nfrom PIL import Image\nImage.open("in.jpg").crop((x1, y1, x2, y2)).resize((w*4, h*4)).save("out.png")\n\`\`\`\n(or ImageMagick v7 \`magick in.jpg -crop WxH+X+Y -resize 400% out.png\`), then read that smaller piece. If you are matching symbols against a reference table, map by POSITION/INDEX in the table rather than re-recognizing each glyph from the full image.`;
+  return { ...result, content: [{ type: "text" as const, text }] };
+}
+
 function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createReadTool<CodingResourceContext>();
   return {
@@ -556,9 +607,12 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       const input = params as { path: string; offset?: number; limit?: number };
       await context.evidenceCurationGate?.assertInvestigationAllowed();
       const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+      if (result.content.some((item) => item.type === "image")) {
+        return dedupeImageRead(input.path, result, context.imagesSeen);
+      }
       const pipeline = context.outputRewrite;
       const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
-      if (!pipeline || !visible || result.content.some((item) => item.type === "image")) return result;
+      if (!pipeline || !visible) return result;
       const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
         filename: `read-${toolCallId}.txt`,
         mime: "text/plain",

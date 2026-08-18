@@ -179,6 +179,7 @@ export class PiCodingLane implements AgentLanePort {
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
+      imagesSeen: new Map<string, number>(),
     };
     const skillsLibraryPath = join(installRoot, "skills-library", "ctf-skills");
     const stableSystemPrompt = codingSystemPrompt(
