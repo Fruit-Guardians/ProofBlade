@@ -115,7 +115,14 @@ export class ProviderSettingsStore {
     }, this.baseProfile.api);
     const id = existing?.id ?? uniqueId(validated.name, new Set(this.profiles.map((profile) => profile.id)));
     const apiKey = input.clearApiKey ? undefined : input.apiKey?.trim() || existing?.apiKey;
-    const next: LocalProviderProfile = { id, ...validated, ...(apiKey ? { apiKey } : {}) };
+    // Preserve endpointMode across a save. validateInput does not carry it (the
+    // UI form has no field for it), so without this a plain "save"/"refresh
+    // models" on a full-endpoint gateway profile would silently drop
+    // endpointMode:"exact" — the SDK would then append its operation path and
+    // every model call 404s (or, worse, if baseUrl was also edited to the
+    // upstream, escape the competition gateway entirely). Keep the stored value.
+    const endpointMode = existing?.endpointMode;
+    const next: LocalProviderProfile = { id, ...validated, ...(endpointMode ? { endpointMode } : {}), ...(apiKey ? { apiKey } : {}) };
     this.profiles = [...this.profiles.filter((profile) => profile.id !== id), next];
     if (input.setActive || !existing || !this.profiles.some((profile) => profile.id === this.activeProfileId)) this.activeProfileId = id;
     await this.persist();
@@ -140,6 +147,13 @@ export class ProviderSettingsStore {
 
   public async discover(input: { profileId?: string; api?: ProviderApi; baseUrl?: string; proxyUrl?: string; apiKey?: string }): Promise<ModelDiscoveryResult> {
     const profile = input.profileId ? this.requireProfile(input.profileId) : this.requireProfile(this.activeProfileId);
+    // A full-endpoint gateway (endpointMode:exact) only proxies one operation URL
+    // and 404s /models; "refresh models" against it is both futile and dangerous
+    // — it pushes the baseUrl toward the upstream, which can escape the gateway.
+    // Refuse it: an exact profile uses a fixed model name, no discovery needed.
+    if (profile.endpointMode === "exact") {
+      throw new Error("该配置为完整端点网关（endpointMode: exact），不支持刷新模型；请直接手填模型名。");
+    }
     const api = input.api ?? profile.api;
     if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(api)) throw new Error(`不支持的 Provider API：${String(api)}`);
     const baseUrl = normalizeBaseUrl(input.baseUrl ?? profile.baseUrl, api);

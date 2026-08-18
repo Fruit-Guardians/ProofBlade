@@ -103,6 +103,62 @@ test("a stored endpointMode:exact profile threads through to the built modelProf
   }
 });
 
+test("saving/editing a profile PRESERVES its endpointMode:exact (a UI save must not drop it)", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const tempRoot = join(root, "tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const dir = await mkdtemp(join(tempRoot, "provider-settings-preserve-"));
+  const path = join(dir, "gui-provider.json");
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 2,
+    activeProfileId: "gw",
+    profiles: [{
+      id: "gw", name: "gateway", provider: "dasctf", api: "openai-completions",
+      baseUrl: "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE",
+      model: "deepseek-v4-flash", models: ["deepseek-v4-flash"],
+      thinkingLevel: "off", endpointMode: "exact", apiKey: "sk-test",
+    }],
+  }), "utf8");
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    // Simulate a UI save of the same profile (e.g. changing thinkingLevel). The
+    // form carries no endpointMode field, so it must be kept from the stored one.
+    await store.save({ id: "gw", provider: "dasctf", baseUrl: "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE", model: "deepseek-v4-flash", models: ["deepseek-v4-flash"], thinkingLevel: "low" });
+    const reloaded = await ProviderSettingsStore.create(config, path);
+    assert.equal(reloaded.modelProfile("gw").endpointMode, "exact", "endpointMode must survive a save");
+    assert.equal(reloaded.modelProfile("gw").baseUrl, "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE");
+  } finally {
+    delete process.env.PROOFBLADE_GUI_GW_API_KEY;
+    delete process.env.PROOFBLADE_GUI_TEST_KEY;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("refresh-models (discover) is refused for a full-endpoint gateway profile (endpointMode:exact)", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const tempRoot = join(root, "tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const dir = await mkdtemp(join(tempRoot, "provider-settings-nodiscover-"));
+  const path = join(dir, "gui-provider.json");
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 2,
+    activeProfileId: "gw",
+    profiles: [{
+      id: "gw", name: "gateway", provider: "dasctf", api: "openai-completions",
+      baseUrl: "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE",
+      model: "deepseek-v4-flash", models: ["deepseek-v4-flash"],
+      thinkingLevel: "off", endpointMode: "exact", apiKey: "sk-test",
+    }],
+  }), "utf8");
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    await assert.rejects(() => store.discover({ profileId: "gw" }), /完整端点网关|不支持刷新模型/);
+  } finally {
+    delete process.env.PROOFBLADE_GUI_GW_API_KEY;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("a stored profile with an invalid endpointMode is rejected", async () => {
   const root = resolve(import.meta.dirname, "../../..");
   const tempRoot = join(root, "tmp");
