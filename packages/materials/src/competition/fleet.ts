@@ -106,7 +106,7 @@ export class FleetScheduler {
   private workerCount = 0;
   private running = false;
   private loaded = false;
-  /** Stops workers from spending more model requests after a global Provider failure. */
+  /** Stops workers after a shared Provider or competition-platform failure. */
   private providerUnavailable = false;
 
   public constructor(init: FleetSchedulerInit) {
@@ -278,10 +278,10 @@ export class FleetScheduler {
       status.flag = result.flag;
       status.submissions = result.submissions;
       status.reason = result.reason ?? result.status;
-      // Provider credentials, quota and upstream availability are shared by the
-      // whole fleet. Once one challenge exhausts the Provider's own retry policy,
-      // do not pull more pending challenges into the same guaranteed failure.
-      if (result.status === "PROVIDER_ERROR") this.providerUnavailable = true;
+      // Provider credentials/quota and competition-platform auth/availability
+      // are shared by the whole fleet. Once either dependency is known-bad, do
+      // not pull more pending challenges into the same guaranteed failure.
+      if (result.status === "PROVIDER_ERROR" || result.status === "PLATFORM_ERROR") this.providerUnavailable = true;
     } catch (error) {
       status.state = controller.signal.aborted ? "cancelled" : "failed";
       status.reason = error instanceof Error ? error.message : String(error);

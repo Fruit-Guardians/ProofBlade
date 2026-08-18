@@ -32,8 +32,26 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
 
   public async solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult> {
     const challengeId = request.challenge.challengeId;
-    const detail = await this.init.api.getChallenge(challengeId);
-    const environment = await this.init.api.startEnvironment(challengeId);
+    let detail: Awaited<ReturnType<CompetitionApi["getChallenge"]>>;
+    try {
+      detail = await this.init.api.getChallenge(challengeId);
+    } catch (error) {
+      this.throwIfAborted(request.signal, error);
+      return platformFailure("fetch challenge", error);
+    }
+
+    let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>>;
+    try {
+      environment = await this.init.api.startEnvironment(challengeId);
+    } catch (error) {
+      // startEnvironment can fail after the build POST has already succeeded
+      // (for example while polling or parsing readiness). We may not have an
+      // instance handle yet, so use the challenge id for a best-effort,
+      // idempotent cleanup instead of leaking the provisioned environment.
+      await this.stop(challengeId);
+      this.throwIfAborted(request.signal, error);
+      return platformFailure("provision environment", error);
+    }
 
     // Dynamic-flag challenges hand us the flag at provisioning time — submit it
     // directly rather than spending a whole model run to rediscover it.
@@ -48,6 +66,9 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
           submissions: 1,
           reason: verdict.message,
         };
+      } catch (error) {
+        this.throwIfAborted(request.signal, error);
+        return platformFailure("submit dynamic flag", error);
       } finally {
         await this.stop(challengeId, environment.instanceId);
       }
@@ -102,6 +123,16 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       // Best-effort teardown; the platform reclaims environments on expiry.
     }
   }
+
+  private throwIfAborted(signal: AbortSignal, error: unknown): void {
+    if (!signal.aborted) return;
+    throw signal.reason instanceof Error ? signal.reason : error;
+  }
+}
+
+function platformFailure(operation: string, error: unknown): ChallengeSolveResult {
+  const cause = error instanceof Error ? error.message : String(error);
+  return { solved: false, status: "PLATFORM_ERROR", reason: `Platform ${operation} failed: ${cause}` };
 }
 
 /** Map a loop stop reason onto the fleet's status string. */
