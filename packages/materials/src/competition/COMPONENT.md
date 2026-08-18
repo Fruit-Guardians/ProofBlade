@@ -4,7 +4,7 @@
 {
   "id": "materials-competition",
   "name": "Competition Play",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "createdAt": "2026-08-13T10:00:00+08:00",
   "updatedAt": "2026-08-18T16:00:00+08:00",
   "qualityAudit": {
@@ -34,6 +34,8 @@
 Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回 `stopReason=error`，竞赛循环必须立即以 `PROVIDER_ERROR` 结束该题并保留 `errorMessage`。Fleet 收到该状态后触发本次运行的 Provider 断路器，不再领取新的 pending 题；修复余额、凭据或上游故障后再次 Start 可继续 pending 队列，已经失败的诊断题不会被静默重试。
 
 比赛平台的鉴权、限流、服务和环境 provisioning 故障以 `PLATFORM_ERROR` 结束当前题，并触发同一 Fleet 断路器，避免继续消耗所有 pending 题。`startEnvironment()` 抛错时也必须按 challenge id 做一次 best-effort teardown，因为 build POST 可能已经成功而 readiness 轮询随后失败。
+
+可明确归因于单题的 ID、详情 payload 或附件错误使用 `CompetitionChallengeError`，在 Solver 中映射为 `CHALLENGE_ERROR`，只失败当前题而不触发全局熔断。未分类错误保持 fail-safe：仍视为共享平台故障，避免鉴权、限流或网络异常继续扩散到所有 pending 题。
 
 DASCTF 的错旗响应采用显式 allowlist：默认仅 `40001`，GUI 后端可由 `competition.json` 的 `wrongFlagCodes` 或 `PROOFBLADE_COMPETITION_WRONG_FLAG_CODES` 覆盖。平台请求串行发送；GET 可对 429/503 做有界重试，非幂等 POST 在平台没有幂等键的前提下禁止自动重试。
 

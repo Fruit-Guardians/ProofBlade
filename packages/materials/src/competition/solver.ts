@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode } from "../domain/types.js";
-import type { CompetitionApi } from "./api.js";
+import { CompetitionChallengeError, type CompetitionApi } from "./api.js";
 import { competitionTask } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
@@ -37,7 +37,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       detail = await this.init.api.getChallenge(challengeId);
     } catch (error) {
       this.throwIfAborted(request.signal, error);
-      return platformFailure("fetch challenge", error);
+      return competitionFailure("fetch challenge", error);
     }
 
     let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>>;
@@ -50,7 +50,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       // idempotent cleanup instead of leaking the provisioned environment.
       await this.stop(challengeId);
       this.throwIfAborted(request.signal, error);
-      return platformFailure("provision environment", error);
+      return competitionFailure("provision environment", error);
     }
 
     // Dynamic-flag challenges hand us the flag at provisioning time — submit it
@@ -68,7 +68,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         };
       } catch (error) {
         this.throwIfAborted(request.signal, error);
-        return platformFailure("submit dynamic flag", error);
+        return competitionFailure("submit dynamic flag", error);
       } finally {
         await this.stop(challengeId, environment.instanceId);
       }
@@ -130,8 +130,11 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
   }
 }
 
-function platformFailure(operation: string, error: unknown): ChallengeSolveResult {
+function competitionFailure(operation: string, error: unknown): ChallengeSolveResult {
   const cause = error instanceof Error ? error.message : String(error);
+  if (error instanceof CompetitionChallengeError) {
+    return { solved: false, status: "CHALLENGE_ERROR", reason: `Challenge ${operation} failed: ${cause}` };
+  }
   return { solved: false, status: "PLATFORM_ERROR", reason: `Platform ${operation} failed: ${cause}` };
 }
 

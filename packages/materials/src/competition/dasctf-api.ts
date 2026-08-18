@@ -24,7 +24,7 @@ import type {
   CompetitionEnvironment,
   CompetitionSubmitResult,
 } from "./api.js";
-import { normalizeCategory } from "./api.js";
+import { CompetitionChallengeError, normalizeCategory } from "./api.js";
 
 /** Platform success envelope code. */
 const OK_CODE = "00000";
@@ -204,7 +204,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
   private async exerciseDetail(challengeId: string): Promise<Record<string, unknown>> {
     const data = await this.get(`/ctf/exercise?exerciseId=${encodeURIComponent(challengeId)}`);
     const record = asRecord(data);
-    if (!record) throw payloadError("exercise", "a challenge detail object");
+    if (!record) throw new CompetitionChallengeError("DASCTF API exercise returned an invalid payload; expected a challenge detail object");
     return record;
   }
 
@@ -243,7 +243,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
       if (!record) continue;
       const url = optionalString(record, ["url"]);
       const name = optionalString(record, ["name"]) ?? "attachment";
-      if (!url) throw payloadError("attachment.files[].url", "a download URL");
+      if (!url) throw new CompetitionChallengeError("DASCTF API attachment.files[].url returned an invalid payload; expected a download URL");
       const base64 = await this.downloadBase64(url);
       results.push({ name, base64 });
     }
@@ -254,8 +254,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
     // Only follow http(s). The URL comes from the platform payload; refusing
     // other schemes keeps a download from reaching file:/data: or similar.
     let parsed: URL;
-    try { parsed = new URL(url); } catch { throw new Error("DASCTF attachment URL is not a valid URL"); }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`DASCTF attachment URL must be http(s), got ${parsed.protocol}`);
+    try { parsed = new URL(url); } catch { throw new CompetitionChallengeError("DASCTF attachment URL is not a valid URL"); }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new CompetitionChallengeError(`DASCTF attachment URL must be http(s), got ${parsed.protocol}`);
     let response: Response;
     try {
       // redirect:"error" — do not silently follow a redirect to an unexpected
@@ -264,19 +264,27 @@ export class DasctfCompetitionApi implements CompetitionApi {
     } catch (error) {
       throw new Error(`DASCTF attachment download failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    if (!response.ok) throw new Error(`DASCTF attachment download failed with HTTP ${response.status}`);
+    if (!response.ok) {
+      const message = `DASCTF attachment download failed with HTTP ${response.status}`;
+      // A missing/forbidden attachment is confined to this challenge. Service
+      // errors and throttling may affect every challenge and remain shared.
+      if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+        throw new CompetitionChallengeError(message);
+      }
+      throw new Error(message);
+    }
     // Cheap precheck: reject an oversized attachment by its declared length
     // before reading a single byte.
     const declared = Number(response.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > this.maxAttachmentBytes) {
-      throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes (content-length ${declared})`);
+      throw new CompetitionChallengeError(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes (content-length ${declared})`);
     }
     // Stream and accumulate with a hard cap, so a server that lies about (or
     // omits) content-length still cannot exhaust memory.
     const body = response.body;
     if (!body) {
       const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.byteLength > this.maxAttachmentBytes) throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
+      if (buffer.byteLength > this.maxAttachmentBytes) throw new CompetitionChallengeError(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
       return buffer.toString("base64");
     }
     const chunks: Uint8Array[] = [];
@@ -289,7 +297,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
         total += value.byteLength;
         if (total > this.maxAttachmentBytes) {
           await reader.cancel().catch(() => {});
-          throw new Error(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
+          throw new CompetitionChallengeError(`DASCTF attachment exceeds ${this.maxAttachmentBytes} bytes`);
         }
         chunks.push(value);
       }
@@ -451,7 +459,7 @@ function byteOption(value: number | undefined, fallback: number, name: string): 
 /** The platform uses integer exerciseIds; the seam carries them as strings. */
 function toExerciseId(challengeId: string): number {
   const value = Number(challengeId);
-  if (!Number.isInteger(value) || value <= 0) throw new Error(`DASCTF exerciseId must be a positive integer, got ${JSON.stringify(challengeId)}`);
+  if (!Number.isInteger(value) || value <= 0) throw new CompetitionChallengeError(`DASCTF exerciseId must be a positive integer, got ${JSON.stringify(challengeId)}`);
   return value;
 }
 

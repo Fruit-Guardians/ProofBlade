@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DasctfCompetitionApi } from "../src/competition/dasctf-api.js";
+import { CompetitionChallengeError } from "../src/competition/api.js";
 
 const HOST = "https://gcsis.dasctf.com";
 const KEY = "ak_test_secret";
@@ -98,7 +99,11 @@ test("an oversized attachment is rejected by the byte cap (content-length preche
     "GET /ctf/exercise": () => ok({ id: 1001, name: "big", isNeedInit: false, isNeedCheck: false, attachment: { files: [{ name: "big.bin", url: "https://cdn.example/big.bin", ext: "bin" }] } }),
     "GET https://cdn.example/big.bin": () => ({ body: big, contentLength: 2048 }),
   }, { maxAttachmentBytes: 1024 });
-  await assert.rejects(() => client.getChallenge("1001"), /exceeds 1024 bytes/);
+  await assert.rejects(() => client.getChallenge("1001"), (error: unknown) => {
+    assert.ok(error instanceof CompetitionChallengeError);
+    assert.match(error.message, /exceeds 1024 bytes/);
+    return true;
+  });
 });
 
 test("a non-http(s) attachment URL is rejected", async () => {

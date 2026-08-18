@@ -11,6 +11,7 @@ import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
 import type { CompetitionLaneFactory } from "../src/competition/loop.js";
 import {
   CompetitionChallengeSolver,
+  CompetitionChallengeError,
   FleetScheduler,
   normalizeCategory,
   type CompetitionApi,
@@ -115,6 +116,8 @@ interface FakeChallengeSpec {
   startError?: string;
   /** Throw when the platform submission endpoint is called. */
   submitError?: string;
+  /** A typed error confined to this challenge's detail/attachments. */
+  detailError?: Error;
 }
 
 class FakeApi implements CompetitionApi {
@@ -132,6 +135,7 @@ class FakeApi implements CompetitionApi {
   }
   async getChallenge(id: string): Promise<{ summary: CompetitionChallengeSummary; attachments: CompetitionAttachment[] }> {
     const s = this.spec(id);
+    if (s.detailError) throw s.detailError;
     const attachments = s.dynamic ? [] : [{ name: "flag.txt", base64: Buffer.from(`the flag is ${s.attachmentFlag ?? s.flag}`).toString("base64") }];
     return {
       summary: { challengeId: s.id, title: `T-${s.id}`, category: "Misc", normalizedCategory: normalizeCategory("Misc"), value: s.value },
@@ -274,6 +278,26 @@ test("a provisioning failure performs best-effort teardown and returns a platfor
     assert.equal(result.solved, false);
     assert.equal(result.status, "PLATFORM_ERROR");
     assert.match(result.reason ?? "", /readiness poll timed out/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a challenge-local attachment failure does not circuit-break a healthy pending challenge", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-local-error-"));
+  try {
+    const api = new FakeApi([
+      { id: "TOO-BIG", value: 100, flag: "flag{unused}", detailError: new CompetitionChallengeError("attachment exceeds 67108864 bytes") },
+      { id: "HEALTHY", value: 50, flag: "flag{healthy}", dynamic: true },
+    ]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
+
+    assert.deepEqual(api.submitted, [{ id: "HEALTHY", flag: "flag{healthy}" }], "the healthy challenge must still run");
+    assert.equal(snapshot.totals.failed, 1);
+    assert.equal(snapshot.totals.solved, 1);
+    assert.equal(snapshot.totals.pending, 0);
+    assert.match(snapshot.challenges.find((item) => item.challengeId === "TOO-BIG")?.reason ?? "", /Challenge fetch challenge failed/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
