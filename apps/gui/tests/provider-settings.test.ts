@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "@proofblade/materials";
@@ -68,6 +68,55 @@ test("persists provider overrides outside the repository response without exposi
     assert.equal(process.env.PROOFBLADE_GUI_TEST_KEY, "test-secret");
   } finally {
     delete process.env.PROOFBLADE_GUI_TEST_KEY;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a stored endpointMode:exact profile threads through to the built modelProfile", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const tempRoot = join(root, "tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const dir = await mkdtemp(join(tempRoot, "provider-settings-exact-"));
+  const path = join(dir, "gui-provider.json");
+  // A hand-written config like the DASCTF gateway profile: baseUrl is the full
+  // gateway endpoint, endpointMode strips the SDK-appended /chat/completions.
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 2,
+    activeProfileId: "gw",
+    profiles: [{
+      id: "gw", name: "gateway", provider: "dasctf", api: "openai-completions",
+      baseUrl: "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE",
+      model: "deepseek-v4-flash", models: ["deepseek-v4-flash"],
+      thinkingLevel: "off", endpointMode: "exact", apiKey: "sk-test",
+    }],
+  }), "utf8");
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    const profile = store.modelProfile();
+    assert.equal(profile.endpointMode, "exact");
+    assert.equal(profile.baseUrl, "https://llm-gateway.dasctf.com/llm-gateway/proxy/e/CODE");
+    assert.equal(profile.api, "openai-completions");
+  } finally {
+    delete process.env.PROOFBLADE_GUI_GW_API_KEY;
+    delete process.env.PROOFBLADE_GUI_TEST_KEY;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a stored profile with an invalid endpointMode is rejected", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const tempRoot = join(root, "tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const dir = await mkdtemp(join(tempRoot, "provider-settings-badmode-"));
+  const path = join(dir, "gui-provider.json");
+  await writeFile(path, JSON.stringify({
+    schemaVersion: 2,
+    activeProfileId: "gw",
+    profiles: [{ id: "gw", name: "g", provider: "p", api: "openai-completions", baseUrl: "https://x.test", model: "m", models: ["m"], thinkingLevel: "off", endpointMode: "loose" }],
+  }), "utf8");
+  try {
+    await assert.rejects(() => ProviderSettingsStore.create(config, path), /endpointMode/);
+  } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });

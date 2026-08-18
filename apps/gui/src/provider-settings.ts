@@ -16,6 +16,8 @@ interface LocalProviderProfile {
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
   maxConcurrentRequests?: number;
+  /** "exact": baseUrl is the full gateway endpoint; strip the SDK-appended path. */
+  endpointMode?: "exact";
   apiKey?: string;
 }
 
@@ -77,6 +79,7 @@ export class ProviderSettingsStore {
       thinkingLevel: level,
       cacheRetention: profile.cacheRetention ?? this.baseProfile.cacheRetention ?? "short",
       maxConcurrentRequests: profile.maxConcurrentRequests ?? this.baseProfile.maxConcurrentRequests ?? 1,
+      ...(profile.endpointMode ? { endpointMode: profile.endpointMode } : {}),
       apiKeyEnv,
       reasoning: reasoningEnabled || (this.baseProfile.reasoning ?? false),
       supportsReasoningEffort: reasoningEnabled ? true : this.baseProfile.supportsReasoningEffort,
@@ -266,7 +269,8 @@ function validateStoredProfile(value: unknown, fallbackApi: ProviderApi): LocalP
     maxConcurrentRequests: input.maxConcurrentRequests,
   }, fallbackApi);
   const apiKey = typeof input.apiKey === "string" && input.apiKey.trim() ? input.apiKey.trim() : undefined;
-  return { id, ...validated, ...(apiKey ? { apiKey } : {}) };
+  if (input.endpointMode !== undefined && input.endpointMode !== "exact") throw new Error(`不支持的 endpointMode：${String(input.endpointMode)}（仅支持 "exact"）`);
+  return { id, ...validated, ...(input.endpointMode === "exact" ? { endpointMode: "exact" as const } : {}), ...(apiKey ? { apiKey } : {}) };
 }
 
 function validateInput(input: ProviderSettingsInput, fallbackApi: ProviderApi): Omit<LocalProviderProfile, "id" | "apiKey"> {
