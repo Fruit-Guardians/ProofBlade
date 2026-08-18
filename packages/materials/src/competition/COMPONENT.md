@@ -4,7 +4,7 @@
 {
   "id": "materials-competition",
   "name": "Competition Play",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "createdAt": "2026-08-13T10:00:00+08:00",
   "updatedAt": "2026-08-18T16:00:00+08:00",
   "qualityAudit": {
@@ -34,6 +34,8 @@
 Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回 `stopReason=error`，竞赛循环必须立即以 `PROVIDER_ERROR` 结束该题并保留 `errorMessage`。Fleet 收到该状态后触发本次运行的 Provider 断路器，不再领取新的 pending 题；修复余额、凭据或上游故障后再次 Start 可继续 pending 队列，已经失败的诊断题不会被静默重试。
 
 DASCTF 的错旗响应采用显式 allowlist：默认仅 `40001`，GUI 后端可由 `competition.json` 的 `wrongFlagCodes` 或 `PROOFBLADE_COMPETITION_WRONG_FLAG_CODES` 覆盖。平台请求串行发送；GET 可对 429/503 做有界重试，非幂等 POST 在平台没有幂等键的前提下禁止自动重试。
+
+DASCTF 比赛规则要求标准 flag 只提交花括号内的内容。适配器会把完整的 `DASCTF{value}` / `flag{value}` 规范化为 `value`；已是裸答案或题目声明的其他特殊格式保持不变，避免过度改写。
 
 ## 开发规则与验证
 

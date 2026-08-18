@@ -9,8 +9,11 @@
  *  - The challenge list is two-level (category -> corpus[]); we flatten it.
  *  - Attachments are download URLs, not inline base64 — we fetch and encode them
  *    so the existing sandbox (which decodes base64) is unchanged.
- *  - Flag submit is `{exerciseId, flag}` -> `{isCorrect}`; a wrong flag comes
- *    back as a non-"00000" code, which we map to `correct:false` (not an error).
+ *  - Flag submit is `{exerciseId, flag}` -> `{isCorrect}`. Contest rules require
+ *    submitting only the text inside `DASCTF{...}` / `flag{...}`, so those two
+ *    standard wrappers are removed before the request; other formats are kept.
+ *    A wrong flag comes back as a non-"00000" code, which we map to
+ *    `correct:false` (not an error).
  *  - Environment build is async: POST then poll the detail until it is ready.
  */
 
@@ -166,8 +169,10 @@ export class DasctfCompetitionApi implements CompetitionApi {
   public async submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {
     const candidate = flag.trim();
     if (!candidate) throw new Error("DasctfCompetitionApi submitFlag requires a non-empty flag");
-    if (candidate.length > 256) throw new Error("DASCTF flags are limited to 256 characters");
-    const envelope = await this.postEnvelope("/answer-panel/answer", { exerciseId: toExerciseId(challengeId), flag: candidate });
+    const submission = normalizeFlagSubmission(candidate);
+    if (!submission) throw new Error("DASCTF flag wrapper must contain a non-empty value");
+    if (submission.length > 256) throw new Error("DASCTF flags are limited to 256 characters");
+    const envelope = await this.postEnvelope("/answer-panel/answer", { exerciseId: toExerciseId(challengeId), flag: submission });
     if (envelope.code === OK_CODE) {
       // Success envelope: the verdict is the isCorrect boolean.
       const record = asRecord(envelope.data) ?? {};
@@ -448,6 +453,17 @@ function toExerciseId(challengeId: string): number {
   const value = Number(challengeId);
   if (!Number.isInteger(value) || value <= 0) throw new Error(`DASCTF exerciseId must be a positive integer, got ${JSON.stringify(challengeId)}`);
   return value;
+}
+
+/**
+ * The contest-wide rule says standard flags are displayed as DASCTF{...} or
+ * flag{...}, but the answer endpoint accepts only the content inside the braces.
+ * Strip only those two exact, well-formed wrappers so a challenge-specific
+ * format remains untouched.
+ */
+function normalizeFlagSubmission(candidate: string): string {
+  const standard = /^(?:DASCTF|flag)\{([^{}\r\n]*)\}$/.exec(candidate);
+  return standard ? standard[1]! : candidate;
 }
 
 function idField(record: Record<string, unknown>, keys: string[], label: string): string {

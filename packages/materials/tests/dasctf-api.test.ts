@@ -112,7 +112,29 @@ test("submitFlag maps isCorrect true", async () => {
   const { client, calls } = api({ "POST /answer-panel/answer": () => ok({ isCorrect: true }) });
   const result = await client.submitFlag("1001", "flag{x}");
   assert.equal(result.correct, true);
-  assert.deepEqual(calls[0]!.body, { exerciseId: 1001, flag: "flag{x}" });   // exerciseId is in the body
+  assert.deepEqual(calls[0]!.body, { exerciseId: 1001, flag: "x" });   // platform wants only the content inside {}
+});
+
+test("submitFlag strips only the two contest-standard wrappers", async () => {
+  const cases = [
+    ["DASCTF{abc123}", "abc123"],
+    ["flag{lowercase}", "lowercase"],
+    ["raw-answer", "raw-answer"],
+    ["CUSTOM{special-format}", "CUSTOM{special-format}"],
+    ["DASCTF{nested{value}}", "DASCTF{nested{value}}"],
+  ] as const;
+
+  for (const [input, expected] of cases) {
+    const { client, calls } = api({ "POST /answer-panel/answer": () => ok({ isCorrect: true }) });
+    await client.submitFlag("1001", `  ${input}  `);
+    assert.deepEqual(calls[0]!.body, { exerciseId: 1001, flag: expected }, input);
+  }
+});
+
+test("submitFlag rejects an empty standard wrapper without contacting the platform", async () => {
+  const { client, calls } = api({ "POST /answer-panel/answer": () => ok({ isCorrect: false }) });
+  await assert.rejects(() => client.submitFlag("1001", "DASCTF{}"), /wrapper must contain a non-empty value/);
+  assert.equal(calls.length, 0);
 });
 
 test("submitFlag maps a 00000 envelope with isCorrect:false to a wrong verdict (not an error)", async () => {
