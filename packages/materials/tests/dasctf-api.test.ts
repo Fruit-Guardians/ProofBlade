@@ -9,22 +9,29 @@ const KEY = "ak_test_secret";
 // stripped for env/exercise where noted) to a response factory.
 function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => { status?: number; body: unknown; contentLength?: number }>) {
   const calls: Array<{ url: string; method: string; body?: unknown; accessKey?: string }> = [];
+  let inFlight = 0;
+  let peakInFlight = 0;
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+    inFlight += 1; peakInFlight = Math.max(peakInFlight, inFlight);
     const url = String(input);
     const method = (init?.method ?? "GET").toUpperCase();
     const headers = new Headers(init?.headers);
     calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined, accessKey: headers.get("X-Agent-AccessKey") ?? undefined });
+    // Yield a macrotask so overlapping calls (if any) actually co-exist and bump peakInFlight.
+    await new Promise((r) => setTimeout(r, 0));
+    inFlight -= 1;
     // Match by the part after the API prefix (or the raw url for attachment downloads).
     const afterPrefix = url.includes("/slab-match/api/v1/agent") ? url.slice(url.indexOf("/slab-match/api/v1/agent") + "/slab-match/api/v1/agent".length) : url;
     const key = `${method} ${afterPrefix}`;
     // Try exact, then prefix (for query-bearing paths).
     const route = routes[key] ?? Object.entries(routes).find(([k]) => key.startsWith(k))?.[1];
     if (!route) throw new Error(`unmocked route: ${key}`);
-    const { status = 200, body, contentLength } = route(url, init);
+    const { status = 200, body, contentLength, retryAfter } = route(url, init) as { status?: number; body: unknown; contentLength?: number; retryAfter?: string };
     const isBinary = body instanceof Uint8Array;
     const headerMap = new Headers();
     if (contentLength !== undefined) headerMap.set("content-length", String(contentLength));
     else if (isBinary) headerMap.set("content-length", String((body as Uint8Array).byteLength));
+    if (retryAfter !== undefined) headerMap.set("retry-after", retryAfter);
     return {
       ok: status >= 200 && status < 300,
       status,
@@ -36,15 +43,15 @@ function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => {
       body: isBinary ? new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(body as Uint8Array); controller.close(); } }) : null,
     } as unknown as Response;
   }) as unknown as typeof globalThis.fetch;
-  return { fetchImpl, calls };
+  return { fetchImpl, calls, peak: () => peakInFlight };
 }
 
 const ok = (data: unknown) => ({ body: { code: "00000", message: "", data } });
 
 function api(routes: Parameters<typeof makeFetch>[0], overrides: Record<string, unknown> = {}) {
-  const { fetchImpl, calls } = makeFetch(routes);
-  const client = new DasctfCompetitionApi({ serverHost: HOST, accessKey: KEY, fetch: fetchImpl, sleep: async () => {}, envPollIntervalMs: 100, ...overrides });
-  return { client, calls };
+  const { fetchImpl, calls, peak } = makeFetch(routes);
+  const client = new DasctfCompetitionApi({ serverHost: HOST, accessKey: KEY, fetch: fetchImpl, sleep: async () => {}, envPollIntervalMs: 100, minRequestIntervalMs: 0, ...overrides });
+  return { client, calls, peak };
 }
 
 test("listChallenges flattens the two-level category/corpus structure and skips unopened", async () => {
@@ -183,4 +190,43 @@ test("stopEnvironment posts recover with the exerciseId", async () => {
 test("a non-integer challengeId is rejected before any request", async () => {
   const { client } = api({});
   await assert.rejects(() => client.stopEnvironment("not-a-number"), /positive integer/);
+});
+
+test("platform requests are serialized — never more than one in flight (defeats the burst 429)", async () => {
+  const { client, peak } = api({ "GET /ctf/exercise-list": () => ok([]) });
+  // Fire many concurrently; the gate must funnel them one at a time.
+  await Promise.all([client.listChallenges(), client.listChallenges(), client.listChallenges(), client.listChallenges(), client.listChallenges()]);
+  assert.equal(peak(), 1, "at most one platform request may be in flight at once");
+});
+
+test("a 429 is retried (honoring Retry-After) and then succeeds — the challenge is not failed", async () => {
+  let n = 0;
+  const { client, calls } = api({
+    "GET /ctf/exercise-list": () => {
+      n += 1;
+      if (n <= 2) return { status: 429, body: { code: "", message: "rate limited", data: null }, retryAfter: "1" };
+      return ok([]);
+    },
+  });
+  const list = await client.listChallenges();
+  assert.deepEqual(list, []);
+  assert.equal(calls.filter((c) => c.url.includes("exercise-list")).length, 3); // 2×429 + success
+});
+
+test("a persistent 429 exhausts the retry budget and throws (not treated as a verdict)", async () => {
+  const { client } = api({ "GET /ctf/exercise-list": () => ({ status: 429, body: { code: "", message: "rate limited", data: null }, retryAfter: "1" }) }, { maxRateLimitRetries: 2 });
+  await assert.rejects(() => client.listChallenges(), /HTTP 429/);
+});
+
+test("a failed request does not wedge the gate for subsequent requests", async () => {
+  let first = true;
+  const { client } = api({
+    "GET /ctf/exercise-list": () => {
+      if (first) { first = false; return { status: 500, body: { code: "", message: "boom", data: null } }; }
+      return ok([]);
+    },
+  });
+  await assert.rejects(() => client.listChallenges(), /HTTP 500/);
+  // The gate must have chained past the failure — this second call still runs.
+  assert.deepEqual(await client.listChallenges(), []);
 });
