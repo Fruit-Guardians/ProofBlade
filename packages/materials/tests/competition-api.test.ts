@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { once } from "node:events";
 import test from "node:test";
 import {
+  CompetitionChallengeError,
   CompetitionHttpError,
   HttpCompetitionApi,
 } from "../src/competition/api.js";
@@ -249,7 +250,11 @@ test("HttpCompetitionApi rejects malformed attachment base64", async () => {
     attachments: [{ name: "payload.bin", base64: "%%%not-base64%%%" }],
   }), async (baseUrl) => {
     const api = new HttpCompetitionApi({ baseUrl });
-    await assert.rejects(() => api.getChallenge("c-1"), /valid base64 content/);
+    await assert.rejects(() => api.getChallenge("c-1"), (error: unknown) => {
+      assert.ok(error instanceof CompetitionChallengeError);
+      assert.match(error.message, /valid base64 content/);
+      return true;
+    });
   });
 });
 

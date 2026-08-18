@@ -11,6 +11,7 @@ import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
 import type { CompetitionLaneFactory } from "../src/competition/loop.js";
 import {
   CompetitionChallengeSolver,
+  CompetitionChallengeError,
   FleetScheduler,
   normalizeCategory,
   type CompetitionApi,
@@ -111,10 +112,17 @@ interface FakeChallengeSpec {
   dynamic?: boolean;
   /** Put a DIFFERENT flag in the attachment, so the lane derives a wrong answer. */
   attachmentFlag?: string;
+  /** Throw after environment provisioning was attempted. */
+  startError?: string;
+  /** Throw when the platform submission endpoint is called. */
+  submitError?: string;
+  /** A typed error confined to this challenge's detail/attachments. */
+  detailError?: Error;
 }
 
 class FakeApi implements CompetitionApi {
   public submitted: Array<{ id: string; flag: string }> = [];
+  public started: string[] = [];
   public stopped: string[] = [];
   public constructor(private readonly specs: FakeChallengeSpec[]) {}
   private spec(id: string): FakeChallengeSpec {
@@ -127,6 +135,7 @@ class FakeApi implements CompetitionApi {
   }
   async getChallenge(id: string): Promise<{ summary: CompetitionChallengeSummary; attachments: CompetitionAttachment[] }> {
     const s = this.spec(id);
+    if (s.detailError) throw s.detailError;
     const attachments = s.dynamic ? [] : [{ name: "flag.txt", base64: Buffer.from(`the flag is ${s.attachmentFlag ?? s.flag}`).toString("base64") }];
     return {
       summary: { challengeId: s.id, title: `T-${s.id}`, category: "Misc", normalizedCategory: normalizeCategory("Misc"), value: s.value },
@@ -135,11 +144,15 @@ class FakeApi implements CompetitionApi {
   }
   async startEnvironment(id: string): Promise<CompetitionEnvironment> {
     const s = this.spec(id);
+    this.started.push(id);
+    if (s.startError) throw new Error(s.startError);
     return s.dynamic ? { instanceId: `inst-${id}`, teamFlag: s.flag } : { instanceId: `inst-${id}`, connectionInfo: "nc host 1337" };
   }
   async submitFlag(id: string, flag: string) {
     this.submitted.push({ id, flag });
-    return { correct: flag === this.spec(id).flag };
+    const s = this.spec(id);
+    if (s.submitError) throw new Error(s.submitError);
+    return { correct: flag === s.flag };
   }
   async stopEnvironment(id: string): Promise<void> {
     this.stopped.push(id);
@@ -227,6 +240,64 @@ test("dynamic-flag challenge is submitted directly without a model run", async (
     assert.equal(result.status, "SOLVED_DYNAMIC");
     assert.deepEqual(api.submitted, [{ id: "DYN", flag: "flag{dynamic}" }]);
     assert.ok(api.stopped.includes("DYN"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a dynamic-flag platform failure trips the fleet circuit and leaves later challenges pending", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-platform-error-"));
+  try {
+    const api = new FakeApi([
+      { id: "DYN-FAIL", value: 100, flag: "flag{dynamic}", dynamic: true, submitError: "DASCTF API unavailable" },
+      { id: "DYN-PENDING", value: 50, flag: "flag{unused}", dynamic: true },
+    ]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const scheduler = new FleetScheduler({ api, solver, concurrency: 1 });
+    const snapshot = await scheduler.run();
+
+    assert.deepEqual(api.submitted, [{ id: "DYN-FAIL", flag: "flag{dynamic}" }], "the pending challenge must not reach submitFlag");
+    assert.equal(snapshot.totals.failed, 1);
+    assert.equal(snapshot.totals.pending, 1);
+    assert.match(snapshot.challenges.find((item) => item.challengeId === "DYN-FAIL")?.reason ?? "", /Platform submit dynamic flag failed/);
+    assert.ok(api.stopped.includes("DYN-FAIL"), "the failed dynamic environment must still be released");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a provisioning failure performs best-effort teardown and returns a platform terminal status", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-provision-error-"));
+  try {
+    const api = new FakeApi([{ id: "BUILD-FAIL", value: 100, flag: "flag{unused}", startError: "readiness poll timed out" }]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+
+    assert.deepEqual(api.started, ["BUILD-FAIL"]);
+    assert.deepEqual(api.stopped, ["BUILD-FAIL"], "a build that may have started must be recovered even without an instance id");
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "PLATFORM_ERROR");
+    assert.match(result.reason ?? "", /readiness poll timed out/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a challenge-local attachment failure does not circuit-break a healthy pending challenge", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-local-error-"));
+  try {
+    const api = new FakeApi([
+      { id: "TOO-BIG", value: 100, flag: "flag{unused}", detailError: new CompetitionChallengeError("attachment exceeds 67108864 bytes") },
+      { id: "HEALTHY", value: 50, flag: "flag{healthy}", dynamic: true },
+    ]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
+
+    assert.deepEqual(api.submitted, [{ id: "HEALTHY", flag: "flag{healthy}" }], "the healthy challenge must still run");
+    assert.equal(snapshot.totals.failed, 1);
+    assert.equal(snapshot.totals.solved, 1);
+    assert.equal(snapshot.totals.pending, 0);
+    assert.match(snapshot.challenges.find((item) => item.challengeId === "TOO-BIG")?.reason ?? "", /Challenge fetch challenge failed/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -409,6 +480,40 @@ test("fleet runs the real solver across many challenges in priority order", asyn
     assert.equal(snapshot.solvedValue, 60);
     assert.equal(snapshot.totals.failed, 0);
     for (const id of ["A", "B", "C"]) assert.ok(api.stopped.includes(id), `env ${id} not released`);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a terminal Provider error stops a competition challenge after one turn and preserves the cause", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-provider-error-"));
+  try {
+    const api = new FakeApi([{ id: "QUOTA", value: 100, flag: "flag{unused}" }]);
+    let prompts = 0;
+    const providerErrorLane: CompetitionLaneFactory = async () => ({
+      async prompt() {
+        prompts += 1;
+        return {
+          text: "",
+          stopReason: "error",
+          errorMessage: '402: {"message":"Insufficient Balance"}',
+          usage: zeroUsage(),
+        };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 24, createLane: providerErrorLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+
+    assert.equal(prompts, 1, "a terminal Provider failure must not be replayed across competition turns");
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "PROVIDER_ERROR");
+    assert.match(result.reason ?? "", /Insufficient Balance/);
+    assert.deepEqual(api.submitted, []);
+    assert.ok(api.stopped.includes("QUOTA"), "environment must still be released after a Provider failure");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

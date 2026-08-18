@@ -127,6 +127,18 @@ export class CompetitionHttpError extends Error {
   }
 }
 
+/**
+ * A failure confined to one challenge's identifier, metadata, or attachment.
+ * Schedulers may fail that challenge and continue healthy work; all untyped API
+ * failures remain fail-safe shared-platform failures.
+ */
+export class CompetitionChallengeError extends Error {
+  public constructor(message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "CompetitionChallengeError";
+  }
+}
+
 const DEFAULT_HTTP_ENDPOINTS: CompetitionHttpEndpoints = {
   listChallenges: "/challenges",
   getChallenge: "/challenges/{challengeId}",
@@ -173,14 +185,18 @@ export class HttpCompetitionApi implements CompetitionApi {
 
   public async getChallenge(challengeId: string): Promise<{ summary: CompetitionChallengeSummary; attachments: CompetitionAttachment[] }> {
     const payload = await this.request("GET", this.endpoints.getChallenge, { challengeId });
-    const envelope = asRecord(unwrap(payload, ["data", "result"])) ?? payload;
-    const challengePayload = asRecord(firstDefined(envelope, ["challenge", "item"])) ?? envelope;
-    const summary = parseChallenge(challengePayload, "getChallenge");
-    const attachmentKeys = ["attachments", "files", "artifacts"];
-    const attachmentsPayload = firstDefined(challengePayload, attachmentKeys) ?? firstDefined(envelope, attachmentKeys) ?? firstDefined(payload, attachmentKeys);
-    if (attachmentsPayload === undefined) throw payloadError("getChallenge.attachments", "an explicit attachments array");
-    const attachments = parseAttachments(attachmentsPayload);
-    return { summary, attachments };
+    try {
+      const envelope = asRecord(unwrap(payload, ["data", "result"])) ?? payload;
+      const challengePayload = asRecord(firstDefined(envelope, ["challenge", "item"])) ?? envelope;
+      const summary = parseChallenge(challengePayload, "getChallenge");
+      const attachmentKeys = ["attachments", "files", "artifacts"];
+      const attachmentsPayload = firstDefined(challengePayload, attachmentKeys) ?? firstDefined(envelope, attachmentKeys) ?? firstDefined(payload, attachmentKeys);
+      if (attachmentsPayload === undefined) throw payloadError("getChallenge.attachments", "an explicit attachments array");
+      const attachments = parseAttachments(attachmentsPayload);
+      return { summary, attachments };
+    } catch (error) {
+      throw asChallengeError(error);
+    }
   }
 
   public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
@@ -444,6 +460,11 @@ function booleanField(record: Record<string, unknown>, keys: string[]): boolean 
 
 function payloadError(operation: string, expected: string): Error {
   return new Error(`Competition API ${operation} returned an invalid payload; expected ${expected}`);
+}
+
+function asChallengeError(error: unknown): CompetitionChallengeError {
+  if (error instanceof CompetitionChallengeError) return error;
+  return new CompetitionChallengeError(error instanceof Error ? error.message : String(error), error);
 }
 
 function truncate(value: string, limit = 512): string {

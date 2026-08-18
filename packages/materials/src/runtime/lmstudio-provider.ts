@@ -11,7 +11,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import type { ModelProfileConfig, ProviderApi } from "../config.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
-import { createProviderTransport } from "./provider-transport.js";
+import { createProviderTransport, wrapExactEndpointFetch } from "./provider-transport.js";
 import type { ProviderRequestBudget } from "./provider-budget.js";
 import { configuredMaxConcurrentRequests, providerRequestScheduler, type ProviderRequestScheduler, type ProviderRequestSchedulingObserver } from "./provider-scheduler.js";
 
@@ -58,11 +58,17 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   };
   const transport = createProviderTransport(config.proxyUrl);
   const baseApi = providerApi(config.api);
-  const rawApi: ProviderStreams = transport ? {
+  // In "exact" mode the baseUrl is already the full gateway endpoint, so strip
+  // the operation path the SDK appends. Compose over the proxy transport (or the
+  // global fetch) so both features can be on at once.
+  const effectiveFetch = config.endpointMode === "exact"
+    ? wrapExactEndpointFetch(config.baseUrl, transport?.fetch)
+    : transport?.fetch;
+  const rawApi: ProviderStreams = effectiveFetch ? {
     stream: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["stream"]>[1], options?: Parameters<ProviderStreams["stream"]>[2]) =>
-      baseApi.stream(streamModel, context, { ...options, fetch: transport.fetch }),
+      baseApi.stream(streamModel, context, { ...options, fetch: effectiveFetch }),
     streamSimple: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["streamSimple"]>[1], options?: Parameters<ProviderStreams["streamSimple"]>[2]) =>
-      baseApi.streamSimple(streamModel, context, { ...options, fetch: transport.fetch }),
+      baseApi.streamSimple(streamModel, context, { ...options, fetch: effectiveFetch }),
   } : baseApi;
   // Scheduling is deliberately outermost: a waiting request has not yet made
   // a billable reservation, and cannot call the Provider until it owns a slot.

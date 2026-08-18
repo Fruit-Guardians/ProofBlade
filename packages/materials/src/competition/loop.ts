@@ -29,7 +29,7 @@ export interface CompetitionLoopOutcome {
   /** Set when a flag is recorded but awaiting operator approval (assist mode). */
   heldForApproval: boolean;
   submissions: number;
-  stopReason: "solved" | "held_for_approval" | "max_turns" | "deadline" | "aborted" | "terminated";
+  stopReason: "solved" | "held_for_approval" | "max_turns" | "deadline" | "aborted" | "provider_error" | "terminated";
   lastText?: string;
   termination?: string;
 }
@@ -112,6 +112,16 @@ export async function runCompetitionLoop(
       const snapshot = await services.control.snapshot(options.runId);
       if (accepted(snapshot)) {
         stopReason = "solved";
+        break;
+      }
+      // AgentHarness already applies the configured Provider retry policy inside
+      // one prompt. A terminal Provider error (for example 402 balance exhausted
+      // or 401 invalid credentials) therefore cannot make progress on a later
+      // competition turn. Retrying it up to maxTurns previously produced 24
+      // identical paid/failed requests per challenge.
+      if (outcome.stopReason === "error") {
+        termination = outcome.errorMessage?.trim() || "Provider request failed";
+        stopReason = "provider_error";
         break;
       }
       if (mode() === "assist" && Object.keys(snapshot.completions).length > 0) {
