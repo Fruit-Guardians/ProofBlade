@@ -213,8 +213,8 @@ function classifyChallengeFetchError(error: unknown): unknown {
     return new CompetitionChallengeError(`Challenge detail request was rejected: ${error.message}`, error);
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/\battachment\b.*\b(?:exceed\w*|too\s+large|invalid|malformed|unsafe)\b/i.test(message)
-    || /\b(?:invalid|malformed|missing|unavailable)\b.*\b(?:challenge|exercise|attachment|payload)\b/i.test(message)) {
+  if (/\b(?:attachment|challenge|exercise|payload|parameter)\b.*\b(?:exceed\w*|too\s+large|invalid|malformed|unsafe|corrupt\w*|validation|missing)\b/i.test(message)
+    || /\b(?:invalid|malformed|missing|unavailable|corrupt\w*)\b.*\b(?:challenge|exercise|attachment|payload|parameter)\b/i.test(message)) {
     return new CompetitionChallengeError(message, error);
   }
   return error;
