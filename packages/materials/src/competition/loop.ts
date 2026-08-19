@@ -4,6 +4,7 @@ import type { AppServices } from "../app/demo.js";
 import type { ExecutionMode, RunSnapshot, TaskContract } from "../domain/types.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
+import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -19,6 +20,16 @@ export interface CompetitionLoopOptions {
   maxTurns?: number;
   /** Ceiling in seconds on any single blocking `bash` call. Defaults to 180. */
   bashTimeoutSecondsMax?: number;
+  /** Optional Docker-backed process environment for Web/Pwn runs. */
+  executionEnv?: ExecutionEnv;
+  /** Workspace path visible to the execution backend, e.g. /workspace. */
+  workspaceRootForPrompt?: string;
+  /** Skill library path visible to the execution backend, e.g. /opt/proofblade/skills. */
+  skillsLibraryPathForPrompt?: string;
+  /** Platform syntax visible to the execution backend (Docker Web/Pwn is Linux even on Windows hosts). */
+  executionPlatform?: NodeJS.Platform;
+  /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
+  hostWorkspaceRootForMcp?: string;
   signal?: AbortSignal;
 }
 
@@ -87,6 +98,11 @@ export async function runCompetitionLoop(
       // minutes, which in a fleet idles a worker slot for the whole time; long work
       // belongs in shell_background instead.
       bashTimeoutSecondsMax: options.bashTimeoutSecondsMax ?? 180,
+      ...(options.executionEnv ? { executionEnv: options.executionEnv } : {}),
+      ...(options.workspaceRootForPrompt ? { workspaceRootForPrompt: options.workspaceRootForPrompt } : {}),
+      ...(options.skillsLibraryPathForPrompt ? { skillsLibraryPathForPrompt: options.skillsLibraryPathForPrompt } : {}),
+      ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
+      ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
     });
     const activeLane = lane;
     if (options.signal) {
@@ -106,7 +122,7 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
-      const outcome = await activeLane.prompt(turnPrompt(options.task, turns, options.workspaceRoot));
+      const outcome = await activeLane.prompt(turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot));
       lastText = outcome.text || lastText;
       termination = outcome.termination ?? termination;
       const snapshot = await services.control.snapshot(options.runId);

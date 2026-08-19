@@ -64,3 +64,6 @@ export * from "./competition/task.js";
 export * from "./competition/sandbox.js";
 export * from "./competition/fleet.js";
 export * from "./competition/solver.js";
+export * from "./container/contracts.js";
+export * from "./container/docker.js";
+export * from "./container/execution-env.js";

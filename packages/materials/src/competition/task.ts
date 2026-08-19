@@ -1,7 +1,9 @@
 import { join } from "node:path";
+import { isIP } from "node:net";
 import type { ProofBladeConfig } from "../config.js";
 import type { TargetKind, TaskContract } from "../domain/types.js";
 import type { CompetitionChallengeSummary, CompetitionEnvironment } from "./api.js";
+import type { ContainerTarget } from "../container/contracts.js";
 
 /** Map a normalized competition category onto the harness TargetKind. */
 function targetKindForCategory(summary: CompetitionChallengeSummary): TargetKind {
@@ -41,6 +43,7 @@ export function competitionTask(
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
   const objective = objectiveParts.join("\n\n") || `Solve competition challenge ${summary.challengeId}.`;
   const connection = env.connectionInfo?.trim();
+  const targets = parseCompetitionTargets(connection);
 
   return {
     schema_version: 1,
@@ -56,8 +59,8 @@ export function competitionTask(
     ],
     verification: { kind: "platform_submission", required_reproductions: 1 },
     scope: {
-      allowed_hosts: connection ? [connection] : [`CHALLENGE:${summary.challengeId}`],
-      allowed_ports: [],
+      allowed_hosts: targets.length > 0 ? targets.map((target) => target.host) : connection ? [] : [`CHALLENGE:${summary.challengeId}`],
+      allowed_ports: [...new Set(targets.map((target) => target.port))],
       external_network: true,
       allowed_workspace: workspace,
     },
@@ -73,6 +76,24 @@ export function competitionTask(
       max_submissions: 5,
     },
   };
+}
+
+/** Extract concrete remote endpoints from platform connection text. */
+export function parseCompetitionTargets(connectionInfo: string | undefined): ContainerTarget[] {
+  if (!connectionInfo?.trim()) return [];
+  const found = new Map<string, ContainerTarget>();
+  const add = (rawHost: string, rawPort: string | undefined, protocol?: string): void => {
+    const host = rawHost.replace(/^\[|\]$/g, "").toLowerCase();
+    const port = rawPort ? Number(rawPort) : protocol === "https" ? 443 : protocol === "http" ? 80 : undefined;
+    if (!host || (!isIP(host) && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host))) return;
+    if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return;
+    const key = `${host}:${port}`;
+    if (!found.has(key)) found.set(key, { host, port, ...(protocol ? { protocol } : {}) });
+  };
+  for (const match of connectionInfo.matchAll(/\b(https?):\/\/([^/\s:]+|\[[^\]]+\])(?::(\d{1,5}))?/gi)) add(match[2], match[3], match[1].toLowerCase());
+  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat|telnet|socat)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2]);
+  for (const match of connectionInfo.matchAll(/\b((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[1], match[2]);
+  return [...found.values()];
 }
 
 /** Derive a run deadline from the environment expiry, with a sane default. */
