@@ -303,6 +303,26 @@ test("a challenge-local attachment failure does not circuit-break a healthy pend
   }
 });
 
+test("a recognizable raw attachment error does not circuit-break a healthy pending challenge", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-raw-local-error-"));
+  try {
+    const api = new FakeApi([
+      { id: "TOO-BIG-RAW", value: 100, flag: "flag{unused}", detailError: new Error("attachment exceeds 67108864 bytes") },
+      { id: "HEALTHY-RAW", value: 50, flag: "flag{healthy}", dynamic: true },
+    ]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
+
+    assert.deepEqual(api.submitted, [{ id: "HEALTHY-RAW", flag: "flag{healthy}" }]);
+    assert.equal(snapshot.totals.failed, 1);
+    assert.equal(snapshot.totals.solved, 1);
+    assert.equal(snapshot.totals.pending, 0);
+    assert.match(snapshot.challenges.find((item) => item.challengeId === "TOO-BIG-RAW")?.reason ?? "", /Challenge fetch challenge failed/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("verify_claim alone cannot report a challenge as solved", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-verifyclaim-"));
   try {

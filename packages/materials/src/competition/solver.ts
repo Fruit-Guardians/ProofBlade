@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { resolveExecutionConfig, type ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode } from "../domain/types.js";
-import { CompetitionChallengeError, CompetitionContainerError, type CompetitionApi } from "./api.js";
+import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
@@ -41,7 +41,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       detail = await this.init.api.getChallenge(challengeId);
     } catch (error) {
       this.throwIfAborted(request.signal, error);
-      return competitionFailure("fetch challenge", error);
+      return competitionFailure("fetch challenge", classifyChallengeFetchError(error));
     }
 
     const execution = resolveExecutionConfig(this.init.config);
@@ -200,6 +200,24 @@ function competitionFailure(operation: string, error: unknown): ChallengeSolveRe
     return { solved: false, status: "CONTAINER_ERROR", reason: `Container ${operation} failed: ${cause}` };
   }
   return { solved: false, status: "PLATFORM_ERROR", reason: `Platform ${operation} failed: ${cause}` };
+}
+
+/**
+ * Keep failures that identify one malformed/missing challenge local to that
+ * challenge. Authentication, throttling, transport, and service failures must
+ * remain PLATFORM_ERROR so the Fleet circuit still protects the platform.
+ */
+function classifyChallengeFetchError(error: unknown): unknown {
+  if (error instanceof CompetitionChallengeError) return error;
+  if (error instanceof CompetitionHttpError && error.method === "GET" && [400, 404, 410, 422].includes(error.status)) {
+    return new CompetitionChallengeError(`Challenge detail request was rejected: ${error.message}`, error);
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/\battachment\b.*\b(?:exceed\w*|too\s+large|invalid|malformed|unsafe)\b/i.test(message)
+    || /\b(?:invalid|malformed|missing|unavailable)\b.*\b(?:challenge|exercise|attachment|payload)\b/i.test(message)) {
+    return new CompetitionChallengeError(message, error);
+  }
+  return error;
 }
 
 /** Map a loop stop reason onto the fleet's status string. */
