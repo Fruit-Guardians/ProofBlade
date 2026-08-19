@@ -27,7 +27,7 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { RunSnapshot } from "../domain/types.js";
+import type { RunSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
@@ -203,6 +203,8 @@ export class PiCodingLane implements AgentLanePort {
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
+        targetKind: snapshot.task.target_kind,
+        target: snapshot.task.target,
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
@@ -482,7 +484,7 @@ function codingSystemPrompt(
   mcpServers: Array<{ name: string; description: string }>,
   skillsLibraryPath: string,
   workspaceRoot: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -511,7 +513,70 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target);
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+}
+
+/**
+ * Category-specialized guidance for the CTF orchestrator.
+ *
+ * The generic playbook already covers recon and skill-library dispatch, but two
+ * failure modes recur enough to justify hard-coding them at prompt time instead
+ * of hoping the model reads the on-disk guide:
+ *
+ * - Web: gateway is target-only, so external doc lookups WILL fail; the model
+ *   must treat that as expected policy, not a broken tool.
+ * - Pwn: Chinese CTF services frequently send GBK-encoded prompts and menus.
+ *   The model tends to hand-type those bytes back into a script and produce a
+ *   parser that never matches. State the rule once, up-front: capture bytes
+ *   from actual recv output, never transcribe non-ASCII prompt text by hand.
+ */
+export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string): string {
+  if (!kind || kind === "unknown") return "";
+  const remote = typeof target === "string" && target.startsWith("REMOTE:") ? target.slice("REMOTE:".length).trim() : undefined;
+  const remoteBlock = remote ? `\nLive target: ${remote}. The container's egress gateway already permits that host/port; other outbound network is denied by policy, not by a broken tool, so do not retry the same request against a different upstream when it is refused.` : "";
+  if (kind === "pwn") {
+    return [
+      "\n\n## Pwn category specifics",
+      "- `pwntools`, `pwncli`, `gdb`, `gdb-multiarch`, `qemu-user`, `patchelf`, `ropgadget`, and `one_gadget` are already installed. Use `from pwn import *` directly. `context.log_level = 'debug'` when protocol sync is unclear.",
+      "- Always run `file` and `checksec` on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
+      "- Chinese CTF services often speak GBK, not UTF-8. Never hand-type non-ASCII prompt bytes into a script from what you see in a tool-result echo, because that echo has already been round-tripped through a locale that may not match the wire. Instead: (1) do one probe run, save `p.recv(4096)` to a file, (2) inspect the raw bytes with `xxd`, (3) reference those exact bytes in your parser (`recvuntil(b\"\\xc7\\xeb\\xd1\\xa1\\xd4\\xf1...\")` or a stable ASCII substring/suffix that co-occurs with the prompt). If the banner is confusing, decode with `.decode('gbk', errors='replace')` and `.decode('utf-8', errors='replace')` side by side — whichever produces readable Chinese is the wire encoding, and encoding future sends with the same codec is mandatory.",
+      "- Prefer stable synchronization anchors that appear in a single state, not generic suffixes like `b': '` that appear in every prompt. Log the step name, timeout, and last received bytes on every failed recv so a stall is legible.",
+      "- After a suspected shell hijack, send `echo PB_READY_$RANDOM$RANDOM` and wait for that exact marker. EOF, connection reset, or a timeout is NOT shell success.",
+      "- Every retry uses a fresh `remote(...)`. Do not chain destructive heap operations across attempts without first proving the previous step landed via a confirmed leak or marker.",
+      "- Persist every confirmed fact before moving on. An interactive pwn run is NOT reproducible — heap addresses and one-shot protocol state differ on every fresh connection — so recovering a fact you already proved costs turns and budget. Keep a running notes file (e.g. `/workspace/NOTES.md`) and `write` each confirmed fact to it as a line: the menu byte sequence, field offsets, struct size, input length limit, index semantics, and any leaked address delta. Before rewriting an exploit script, `read` the notes back instead of probing again. If a bash result ended with an `A-*` anchor, `evidence record` that id instead for a searchable durable record.",
+      "- Fix the helper, not the whole script. When a protocol helper desyncs or times out, edit that one function and add a log line (step name + last received bytes); do not rewrite the file as a fresh `mapNN.py`. A full rewrite throws away the working parts you already validated and is the biggest single source of lost turns in pwn.",
+      remoteBlock,
+    ].join("\n");
+  }
+  if (kind === "web") {
+    return [
+      "\n\n## Web category specifics",
+      "- `curl`, `python-requests`, `beautifulsoup4`, `sqlmap`, `chromium` (headless), and `playwright` are already installed. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
+      "- Read the initial page and its response headers first: `curl -sSikL <target>` shows the framework fingerprint (Server, X-Powered-By, Set-Cookie shape, error page style) that decides your subsequent playbook branch (SQLi vs SSTI vs SSRF vs auth-bypass vs deserialization).",
+      "- Check `/robots.txt`, `/.git/HEAD`, `/.env`, `/admin`, `/login`, source view (`view-source:` equivalent via `curl`), sitemap, and any JS bundles for endpoints — a large fraction of web CTFs hinge on a route that is not linked from the landing page.",
+      "- Decode any JWT with `python -c 'import jwt,sys;print(jwt.decode(sys.argv[1], options={\"verify_signature\":False}))'` (or manual base64) before treating it as opaque. Note the algorithm — `alg:none` and weak HS256 keys are common CTF traps.",
+      "- Chinese CTF web challenges frequently return GBK-encoded response bodies. If `curl` output looks mojibake, add `--output` and inspect with `file`/`iconv -f gbk -t utf-8`. Do not rely on the terminal echo of Chinese strings for parsing.",
+      "- When you think the vulnerability is SQLi, try `sqlmap -u '<url>' --batch --level=3 --risk=2` in `shell_background` before hand-rolling payloads; when it's SSTI/RCE, jump to `{{7*7}}` and `${{7*7}}` fingerprints across common template engines.",
+      remoteBlock,
+    ].join("\n");
+  }
+  if (kind === "reverse") {
+    return [
+      "\n\n## Reverse category specifics",
+      "- Prefer a decompiler MCP (idalib-mcp / jadx-mcp when available) over hand-reading `objdump -d`. Open the target once, then work from pseudocode.",
+      "- `file`, `strings`, `nm`, `readelf -a`, `checksec` describe the shape; run them first. For packed binaries note the entropy and section layout before decompiling.",
+      "- Once you have identified the transform, reconstruct it in Python instead of stepping through disassembly a fourth time. Search/BFS/bounded brute force is the fifth step of the loop; do not skip it.",
+    ].join("\n");
+  }
+  if (kind === "crypto") {
+    return [
+      "\n\n## Crypto category specifics",
+      "- `pycryptodome`, `gmpy2`, `sagemath`-style scripting via Python, and `openssl` are available. For classic modular-arithmetic tasks reach for `gmpy2.iroot`, Chinese Remainder Theorem, and lattice reduction (`fpylll`) before trying to brute force.",
+      "- Identify the primitive first (RSA / DLP / AES-mode / hash / stream) and the exact operation being requested. A confused primitive check is the top cause of wasted turns in this category.",
+    ].join("\n");
+  }
+  return "";
 }
 
 export function codingHostGuidance(platform: NodeJS.Platform = process.platform): string {
