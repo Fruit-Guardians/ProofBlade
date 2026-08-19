@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { isIP } from "node:net";
 import type { ProofBladeConfig } from "../config.js";
 import type { TargetKind, TaskContract } from "../domain/types.js";
-import type { CompetitionChallengeSummary, CompetitionEnvironment } from "./api.js";
+import { CompetitionChallengeError, type CompetitionChallengeSummary, type CompetitionEnvironment } from "./api.js";
 import type { ContainerTarget, ContainerTargetProtocol } from "../container/contracts.js";
 
 /** Map a normalized competition category onto the harness TargetKind. */
@@ -82,16 +82,18 @@ export function competitionTask(
 export function parseCompetitionTargets(connectionInfo: string | undefined): ContainerTarget[] {
   if (!connectionInfo?.trim()) return [];
   const found = new Map<string, ContainerTarget>();
-  const add = (rawHost: string, rawPort: string | undefined, protocol: ContainerTargetProtocol): void => {
+  const add = (rawHost: string, rawPort: string | undefined, protocol: ContainerTargetProtocol, source: "explicit" | "generic" = "explicit"): void => {
     const host = rawHost.replace(/^\[|\]$/g, "").toLowerCase();
     const port = rawPort ? Number(rawPort) : undefined;
-    if (!host || (!isIP(host) && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host))) return;
+    const ipVersion = isIP(host);
+    if (ipVersion === 6) throw new CompetitionChallengeError(`IPv6 competition targets are not supported by the target-only Docker gateway: ${host}`);
+    if (!host || (!ipVersion && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host))) return;
     if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return;
     const key = `${protocol}:${host}:${port}`;
-    if (protocol === "tcp" && [...found.values()].some((item) => item.host === host && item.port === port && item.protocol === "udp")) return;
+    if (source === "generic" && [...found.values()].some((item) => item.host === host && item.port === port)) return;
     if (!found.has(key)) found.set(key, { host, port, protocol });
   };
-  for (const match of connectionInfo.matchAll(/\b(https?|tcp|udp):\/\/([^/\s:]+|\[[^\]]+\])(?::(\d{1,5}))?/gi)) {
+  for (const match of connectionInfo.matchAll(/\b(https?|tcp|udp):\/\/(\[[^\]]+\]|[^/\s:]+)(?::(\d{1,5}))?/gi)) {
     const protocol = match[1].toLowerCase() === "udp" ? "udp" : "tcp";
     const port = match[3] ?? (match[1].toLowerCase() === "https" ? "443" : match[1].toLowerCase() === "http" ? "80" : undefined);
     add(match[2], port, protocol);
@@ -104,7 +106,7 @@ export function parseCompetitionTargets(connectionInfo: string | undefined): Con
     if (/^(?:tcp|udp)$/i.test(match[1])) continue;
     const prefix = connectionInfo.slice(0, match.index ?? 0);
     if (/(?:^|\s)(?:tcp|udp):[\d.]*$/i.test(prefix)) continue;
-    add(match[1], match[2], "tcp");
+    add(match[1], match[2], "tcp", "generic");
   }
   return [...found.values()];
 }

@@ -20,6 +20,15 @@ test("competition target parser extracts URL and nc endpoints without leaking co
   assert.deepEqual(parseCompetitionTargets("socat - UDP:127.0.0.1:5353"), [
     { host: "127.0.0.1", port: 5353, protocol: "udp" },
   ]);
+  assert.deepEqual(parseCompetitionTargets("udp://127.0.0.1:53 tcp://127.0.0.1:53"), [
+    { host: "127.0.0.1", port: 53, protocol: "udp" },
+    { host: "127.0.0.1", port: 53, protocol: "tcp" },
+  ]);
+  assert.deepEqual(parseCompetitionTargets("tcp://127.0.0.1:53 udp://127.0.0.1:53"), [
+    { host: "127.0.0.1", port: 53, protocol: "tcp" },
+    { host: "127.0.0.1", port: 53, protocol: "udp" },
+  ]);
+  assert.throws(() => parseCompetitionTargets("udp://[2001:db8::1]:53"), /IPv6 competition targets are not supported/);
 });
 
 test("Docker runtime creates a target-only gateway namespace and destroys it idempotently", async () => {
@@ -105,6 +114,45 @@ test("Docker command runner removes abort listeners after a normal close", async
   assert.equal(result.exitCode, 0);
   assert.equal(adds, 1);
   assert.equal(removes, 1);
+});
+
+test("Docker destroy reports cleanup failures after attempting every resource", async () => {
+  const calls: string[][] = [];
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      calls.push(args);
+      if (args[0] === "rm") return processResult("daemon denied", 1);
+      if (args[0] === "network" && args[1] === "rm") return processResult("daemon denied", 1);
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  await assert.rejects(
+    runtime.destroy({ runId: "cleanup-failure", generation: 1, containerId: "solver", gatewayContainerId: "gateway", networkName: "network", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only" }),
+    AggregateError,
+  );
+  assert.deepEqual(calls.filter((args) => args[0] === "rm" || args[0] === "network"), [
+    ["rm", "-f", "solver"],
+    ["rm", "-f", "gateway"],
+    ["network", "rm", "network"],
+  ]);
+});
+
+test("Docker stale reaper does not count a resource when rm is rejected", async () => {
+  const old = new Date(Date.now() - 60_000).toISOString();
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "ps") return processResult("stale-container\n");
+      if (args[0] === "inspect") return processResult(JSON.stringify({ Created: old, State: { Running: false }, Config: { Labels: { "proofblade.run_id": "stale-run" } } }));
+      if (args[0] === "rm") return processResult("permission denied", 1);
+      if (args[0] === "network" && args[1] === "ls") return processResult("");
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  await assert.rejects(runtime.reapStale({ olderThanMs: 100 }), AggregateError);
 });
 
 function processResult(stdout: string, exitCode = 0): DockerProcessResult {

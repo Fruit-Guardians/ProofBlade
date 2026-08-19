@@ -151,9 +151,8 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
       return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
     } catch (error) {
-      if (containerId) await this.removeContainer(containerId);
-      if (gatewayContainerId) await this.removeContainer(gatewayContainerId);
-      if (networkName) await this.removeNetwork(networkName);
+      const cleanupErrors = await this.cleanupResources(containerId, gatewayContainerId, networkName);
+      if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
     }
   }
@@ -188,9 +187,8 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   }
 
   public async destroy(ref: ContainerRef): Promise<void> {
-    await this.removeContainer(ref.containerId);
-    if (ref.gatewayContainerId) await this.removeContainer(ref.gatewayContainerId);
-    if (ref.networkName) await this.removeNetwork(ref.networkName);
+    const failures = await this.cleanupResources(ref.containerId, ref.gatewayContainerId, ref.networkName);
+    if (failures.length > 0) throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
   }
 
   public async reapStale(options: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean } = {}): Promise<number> {
@@ -203,6 +201,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     if (listed.exitCode !== 0) return 0;
     const ids = listed.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     let removed = 0;
+    const failures: Error[] = [];
     for (const id of ids) {
       const details = await this.inspectResource(id);
       if (!details || !isStale(details.created, olderThanMs)) continue;
@@ -212,8 +211,12 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         if (options.includeRunning !== true) continue;
         if (isLiveProcess(details.labels["proofblade.owner_pid"], details.labels["proofblade.owner_started_at"])) continue;
       }
-      await this.removeContainer(id);
-      removed += 1;
+      try {
+        await this.removeContainer(id);
+        removed += 1;
+      } catch (error) {
+        failures.push(toError(error, `container ${id}`));
+      }
     }
     const networks = await this.runner.run(["network", "ls", "-q", ...filters.flatMap((filter) => ["--filter", filter])], { timeoutMs: configTimeout(this.config) });
     if (networks.exitCode === 0) {
@@ -223,9 +226,14 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         const runId = details.labels["proofblade.run_id"];
         if (!runId || protectedRunIds.has(runId)) continue;
         if (details.containerCount > 0) continue;
-        await this.removeNetwork(network);
+        try {
+          await this.removeNetwork(network);
+        } catch (error) {
+          failures.push(toError(error, `network ${network}`));
+        }
       }
     }
+    if (failures.length > 0) throw new AggregateError(failures, "Docker stale-resource cleanup failed");
     return removed;
   }
 
@@ -263,12 +271,37 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async removeContainer(id: string): Promise<void> { await this.runner.run(["rm", "-f", id], { timeoutMs: configTimeout(this.config) }); }
-  private async removeNetwork(name: string): Promise<void> { await this.runner.run(["network", "rm", name], { timeoutMs: configTimeout(this.config) }); }
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string): Promise<Error[]> {
+    const failures: Error[] = [];
+    const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
+      try { await operation(); } catch (error) { failures.push(toError(error, label)); }
+    };
+    if (containerId) await attempt(`solver container ${containerId}`, () => this.removeContainer(containerId));
+    if (gatewayContainerId) await attempt(`gateway container ${gatewayContainerId}`, () => this.removeContainer(gatewayContainerId));
+    if (networkName) await attempt(`network ${networkName}`, () => this.removeNetwork(networkName));
+    return failures;
+  }
+
+  private async removeContainer(id: string): Promise<void> {
+    const result = await this.runner.run(["rm", "-f", id], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    assertCleanupResult(result, `docker rm -f ${id}`);
+  }
+
+  private async removeNetwork(name: string): Promise<void> {
+    const result = await this.runner.run(["network", "rm", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    assertCleanupResult(result, `docker network rm ${name}`);
+  }
 }
 
 function configTimeout(config: ResolvedExecutionConfig): number { return Math.min(config.commandWaitMs, config.commandHardTimeoutMs); }
 function compactError(value: string, fallback: string): string { return value.trim().replace(/\s+/g, " ").slice(0, 500) || fallback; }
+function toError(error: unknown, label: string): Error { return new Error(`${label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+function assertCleanupResult(result: DockerProcessResult, command: string): void {
+  if (result.spawnError) throw new Error(`${command} failed: ${result.spawnError.message}`);
+  if (result.exitCode !== 0 && !/\b(no such|not found)\b/i.test(result.stderr || result.stdout)) {
+    throw new Error(`${command} failed: ${compactError(result.stderr || result.stdout, `exit ${String(result.exitCode)}`)}`);
+  }
+}
 function safeName(value: string): string { return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "run"; }
 function containerCwd(workspace: string, requested?: string): string {
   if (!requested) return "/workspace";

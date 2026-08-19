@@ -105,9 +105,15 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       environment,
     });
     const services = createServices(this.init.root, this.init.config, { sandbox });
-    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
 
     try {
+      let task: ReturnType<typeof competitionTask>;
+      try {
+        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
+      } catch (error) {
+        this.throwIfAborted(request.signal, error);
+        return competitionFailure("parse challenge targets", error);
+      }
       await services.control.createRun(runId, task);
       // Unpack attachments + connection info before the loop, and use the
       // returned fixture path as the lane's working directory so bash, reads, and

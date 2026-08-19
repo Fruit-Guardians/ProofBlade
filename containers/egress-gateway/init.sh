@@ -8,8 +8,19 @@ iptables -F OUTPUT
 iptables -P OUTPUT DROP
 iptables -A OUTPUT -o lo -j ACCEPT
 iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+
+# Permit DNS only to resolvers injected into this container's resolv.conf
+# (normally Docker's embedded 127.0.0.11 resolver), never to arbitrary hosts.
+# Host-side target resolution happens before the gateway is created; this rule
+# exists only for tools that need to resolve a challenge hostname in-container.
+while read -r keyword resolver remainder; do
+  [ "$keyword" = "nameserver" ] || continue
+  case "$resolver" in
+    ""|*[!0-9.]*) continue ;;
+  esac
+  iptables -A OUTPUT -p udp -d "$resolver" --dport 53 -j ACCEPT
+  iptables -A OUTPUT -p tcp -d "$resolver" --dport 53 -j ACCEPT
+done < /etc/resolv.conf
 
 for target in "$@"; do
   case "$target" in
