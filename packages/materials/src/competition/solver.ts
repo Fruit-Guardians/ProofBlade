@@ -209,7 +209,7 @@ function competitionFailure(operation: string, error: unknown): ChallengeSolveRe
  */
 function classifyChallengeFetchError(error: unknown): unknown {
   if (error instanceof CompetitionChallengeError) return error;
-  if (error instanceof CompetitionHttpError && error.method === "GET" && [400, 404, 410, 422].includes(error.status)) {
+  if (error instanceof CompetitionHttpError && error.method === "GET" && isExplicitChallengeHttpError(error)) {
     return new CompetitionChallengeError(`Challenge detail request was rejected: ${error.message}`, error);
   }
   const message = error instanceof Error ? error.message : String(error);
@@ -218,6 +218,17 @@ function classifyChallengeFetchError(error: unknown): unknown {
     return new CompetitionChallengeError(message, error);
   }
   return error;
+}
+
+function isExplicitChallengeHttpError(error: CompetitionHttpError): boolean {
+  const body = error.responseBody;
+  // A route-level 404 (for example "Cannot GET /api/challenges/...") or a
+  // generic proxy error must remain PLATFORM_ERROR. Only an explicit business
+  // response naming a missing/invalid challenge is safe to isolate.
+  if (![400, 404, 410, 422].includes(error.status)) return false;
+  return /\b(?:challenge|exercise|problem)\b.{0,100}\b(?:not\s+found|missing|does\s+not\s+exist|invalid|不存在|缺失)\b/i.test(body)
+    || /\b(?:not\s+found|missing|does\s+not\s+exist|invalid|不存在|缺失)\b.{0,100}\b(?:challenge|exercise|problem)\b/i.test(body)
+    || /\b(?:challenge|exercise|problem)[_.-](?:not[_.-]?found|missing|invalid)\b/i.test(body);
 }
 
 /** Map a loop stop reason onto the fleet's status string. */

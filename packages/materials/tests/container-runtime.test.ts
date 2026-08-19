@@ -89,6 +89,7 @@ test("Docker create removes a gateway by deterministic name when docker run fail
       async run(args): Promise<DockerProcessResult> {
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
         if (args[0] === "run") return processResult("created-but-timeout", 1);
+        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "PARTIAL/1", "proofblade.generation": "1", "proofblade.profile": "pwn", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1" }));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
         return processResult("");
       },
@@ -103,6 +104,29 @@ test("Docker create removes a gateway by deterministic name when docker run fail
   }
 });
 
+test("Docker create does not remove a pre-existing same-name gateway on conflict", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-name-conflict-"));
+  try {
+    const cleanupCalls: string[][] = [];
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "run") return processResult("name conflict", 1);
+        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "another-run", "proofblade.generation": "1", "proofblade.profile": "pwn" }));
+        if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
+    const runtime = new DockerContainerRuntime(config, runner);
+    await assert.rejects(runtime.create({ runId: "CONFLICT/1", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
+    assert.equal(cleanupCalls.some((args) => args[0] === "rm" && args[2] === "proofblade-conflict-1-g1-pwn-gateway"), false);
+    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "proofblade-conflict-1-g1-net"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Docker runtime reaps only stale stopped resources and their empty gateway networks", async () => {
   const old = new Date(Date.now() - 60_000).toISOString();
   const recent = new Date(Date.now() - 1).toISOString();
@@ -112,7 +136,7 @@ test("Docker runtime reaps only stale stopped resources and their empty gateway 
       if (args[0] === "ps") return processResult("old-container\nrecent-container\nrunning-container\n");
       if (args[0] === "inspect" && args[args.length - 1] === "old-container") return processResult(JSON.stringify({ Created: old, State: { Running: false }, Config: { Labels: { "proofblade.run_id": "old-run" } } }));
       if (args[0] === "inspect" && args[args.length - 1] === "recent-container") return processResult(JSON.stringify({ Created: recent, State: { Running: false }, Config: { Labels: { "proofblade.run_id": "recent-run" } } }));
-      if (args[0] === "inspect" && args[args.length - 1] === "running-container") return processResult(JSON.stringify({ Created: old, State: { Running: true }, Config: { Labels: { "proofblade.run_id": "old-run", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1" } } }));
+      if (args[0] === "inspect" && args[args.length - 1] === "running-container") return processResult(JSON.stringify({ Created: old, State: { Running: true }, Config: { Labels: { "proofblade.run_id": "old-run", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": String(Date.now() - Math.floor(process.uptime() * 1_000)) } } }));
       if (args[0] === "network" && args[1] === "ls") return processResult("old-network\nrecent-network\norphan-network\n");
       if (args[0] === "network" && args[1] === "inspect" && args[args.length - 1] === "old-network") return processResult(JSON.stringify({ Created: old, Labels: { "proofblade.run_id": "old-run" }, Containers: {} }));
       if (args[0] === "network" && args[1] === "inspect" && args[args.length - 1] === "recent-network") return processResult(JSON.stringify({ Created: recent, Labels: { "proofblade.run_id": "recent-run" }, Containers: {} }));
@@ -125,6 +149,24 @@ test("Docker runtime reaps only stale stopped resources and their empty gateway 
   const runtime = new DockerContainerRuntime(config, runner);
   assert.equal(await runtime.reapStale({ olderThanMs: 100, includeRunning: true }), 1);
   assert.deepEqual(removed, ["old-container", "old-network", "orphan-network"]);
+});
+
+test("Docker stale reaper does not trust a reused PID with a mismatched start time", async () => {
+  const old = new Date(Date.now() - 60_000).toISOString();
+  const removed: string[] = [];
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "ps") return processResult("pid-reused-container\n");
+      if (args[0] === "inspect") return processResult(JSON.stringify({ Created: old, State: { Running: true }, Config: { Labels: { "proofblade.run_id": "old-run", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1" } } }));
+      if (args[0] === "network" && args[1] === "ls") return processResult("");
+      if (args[0] === "rm") { removed.push(args.at(-1)!); return processResult(""); }
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  assert.equal(await runtime.reapStale({ olderThanMs: 100, includeRunning: true }), 1);
+  assert.deepEqual(removed, ["pid-reused-container"]);
 });
 
 test("Docker command runner removes abort listeners after a normal close", async () => {

@@ -12,6 +12,7 @@ import type { CompetitionLaneFactory } from "../src/competition/loop.js";
 import {
   CompetitionChallengeSolver,
   CompetitionChallengeError,
+  CompetitionHttpError,
   FleetScheduler,
   normalizeCategory,
   type CompetitionApi,
@@ -318,6 +319,24 @@ test("a recognizable raw attachment error does not circuit-break a healthy pendi
     assert.equal(snapshot.totals.solved, 1);
     assert.equal(snapshot.totals.pending, 0);
     assert.match(snapshot.challenges.find((item) => item.challengeId === "TOO-BIG-RAW")?.reason ?? "", /Challenge fetch challenge failed/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a route-level GET 404 remains a platform failure and trips the fleet circuit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-route-404-"));
+  try {
+    const api = new FakeApi([
+      { id: "ROUTE-404", value: 100, flag: "flag{unused}", detailError: new CompetitionHttpError("GET", "https://competition.example/api/challenges/ROUTE-404", 404, "not found") },
+      { id: "HEALTHY-AFTER-404", value: 50, flag: "flag{healthy}", dynamic: true },
+    ]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
+
+    assert.equal(snapshot.challenges.find((item) => item.challengeId === "ROUTE-404")?.reason, "Platform fetch challenge failed: Competition API GET https://competition.example/api/challenges/ROUTE-404 failed with HTTP 404: not found");
+    assert.equal(snapshot.challenges.find((item) => item.challengeId === "HEALTHY-AFTER-404")?.state, "pending");
+    assert.deepEqual(api.submitted, []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -119,7 +119,18 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     await this.ensureImage(request.image);
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
-    const labels = ["--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.generation=${request.generation}`, "--label", `proofblade.profile=${request.profile}`, "--label", `proofblade.owner_pid=${process.pid}`, "--label", `proofblade.owner_started_at=${PROCESS_STARTED_AT}`];
+    const identityLabels = {
+      "proofblade.managed": "true",
+      "proofblade.run_id": request.runId,
+      "proofblade.generation": String(request.generation),
+      "proofblade.profile": request.profile,
+    };
+    const ownerLabels = {
+      ...identityLabels,
+      "proofblade.owner_pid": String(process.pid),
+      "proofblade.owner_started_at": String(PROCESS_STARTED_AT),
+    };
+    const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
     let networkName: string | undefined;
     let gatewayContainerId: string | undefined;
@@ -162,6 +173,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         networkName,
         solverCreateAttempted ? name : undefined,
         gatewayCreateAttempted ? `${name}-gateway` : undefined,
+        identityLabels,
       );
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
@@ -198,7 +210,14 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   }
 
   public async destroy(ref: ContainerRef): Promise<void> {
-    const failures = await this.cleanupResources(ref.containerId, ref.gatewayContainerId, ref.networkName, ref.name, ref.networkName ? `${ref.name}-gateway` : undefined);
+    const failures = await this.cleanupResources(
+      ref.containerId,
+      ref.gatewayContainerId,
+      ref.networkName,
+      ref.name,
+      ref.networkName ? `${ref.name}-gateway` : undefined,
+      { "proofblade.managed": "true", "proofblade.run_id": ref.runId, "proofblade.generation": String(ref.generation), "proofblade.profile": ref.profile },
+    );
     if (failures.length > 0) throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
   }
 
@@ -220,7 +239,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       if (!runId || protectedRunIds.has(runId)) continue;
       if (details.running) {
         if (options.includeRunning !== true) continue;
-        if (isLiveProcess(details.labels["proofblade.owner_pid"], details.labels["proofblade.owner_started_at"])) continue;
+        if (await isLiveProcess(details.labels["proofblade.owner_pid"], details.labels["proofblade.owner_started_at"])) continue;
       }
       try {
         await this.removeContainer(id);
@@ -282,13 +301,13 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string, solverName?: string, gatewayName?: string): Promise<Error[]> {
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>): Promise<Error[]> {
     const failures: Error[] = [];
     const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
       try { await operation(); } catch (error) { failures.push(toError(error, label)); }
     };
-    const solverTarget = containerId ?? solverName;
-    const gatewayTarget = gatewayContainerId ?? gatewayName;
+    const solverTarget = containerId ?? await this.ownedContainerName(solverName, expectedLabels);
+    const gatewayTarget = gatewayContainerId ?? await this.ownedContainerName(gatewayName, expectedLabels);
     if (solverTarget) await attempt(`solver container ${solverTarget}`, () => this.removeContainer(solverTarget));
     if (gatewayTarget) await attempt(`gateway container ${gatewayTarget}`, () => this.removeContainer(gatewayTarget));
     if (networkName) await attempt(`network ${networkName}`, () => this.removeNetwork(networkName));
@@ -303,6 +322,19 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   private async removeNetwork(name: string): Promise<void> {
     const result = await this.runner.run(["network", "rm", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
     assertCleanupResult(result, `docker network rm ${name}`);
+  }
+
+  /** Resolve a deterministic fallback name only after proving ownership. */
+  private async ownedContainerName(name: string | undefined, expectedLabels: Record<string, string> | undefined): Promise<string | undefined> {
+    if (!name || !expectedLabels) return undefined;
+    const result = await this.runner.run(["inspect", "--format", "{{json .Config.Labels}}", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.spawnError || result.exitCode !== 0) return undefined;
+    try {
+      const labels = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
+      return Object.entries(expectedLabels).every(([key, value]) => labels[key] === value) ? name : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -339,15 +371,64 @@ function isStale(created: string, olderThanMs: number): boolean {
   return Number.isFinite(timestamp) && Date.now() - timestamp >= olderThanMs;
 }
 
-function isLiveProcess(rawPid: string | undefined, rawStartedAt: string | undefined): boolean {
+async function isLiveProcess(rawPid: string | undefined, rawStartedAt: string | undefined): Promise<boolean> {
   const pid = Number(rawPid);
   if (!Number.isInteger(pid) || pid <= 0) return false;
-  if (pid === process.pid && Number(rawStartedAt) === PROCESS_STARTED_AT) return true;
+  // The current process has an exact startup marker; avoid an external
+  // process query when a stale container claims this PID with another time.
+  if (pid === process.pid) {
+    const marker = Number(rawStartedAt);
+    return Number.isFinite(marker) && Math.abs(marker - PROCESS_STARTED_AT) <= 2_000;
+  }
+  const expectedStartedAt = Number(rawStartedAt);
+  const actualStartedAt = await processStartTimeMs(pid);
+  if (actualStartedAt !== undefined && Number.isFinite(expectedStartedAt)) {
+    return Math.abs(actualStartedAt - expectedStartedAt) <= 2_000;
+  }
   try { process.kill(pid, 0); return true; } catch (error) {
     // EPERM means the process exists but is not signalable by this user; keep
     // the resource rather than risking deletion of another active run.
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
+}
+
+/** Read a process creation time where the host exposes one, preventing PID reuse from protecting stale runs. */
+async function processStartTimeMs(pid: number): Promise<number | undefined> {
+  if (process.platform === "linux") {
+    try {
+      const [stat, uptimeText] = await Promise.all([
+        fs.readFile(`/proc/${pid}/stat`, "utf8"),
+        fs.readFile("/proc/uptime", "utf8"),
+      ]);
+      const closingParen = stat.lastIndexOf(")");
+      const fields = closingParen >= 0 ? stat.slice(closingParen + 1).trim().split(/\s+/) : [];
+      const startTicks = Number(fields[19]); // field 22, after the comm field
+      const uptimeSeconds = Number(uptimeText.trim().split(/\s+/)[0]);
+      if (!Number.isFinite(startTicks) || !Number.isFinite(uptimeSeconds)) return undefined;
+      return Date.now() - uptimeSeconds * 1_000 + startTicks * 10;
+    } catch {
+      return undefined;
+    }
+  }
+  if (process.platform === "win32") {
+    return await windowsProcessStartTimeMs(pid);
+  }
+  return undefined;
+}
+
+async function windowsProcessStartTimeMs(pid: number): Promise<number | undefined> {
+  return await new Promise((resolve) => {
+    const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `try { ([DateTimeOffset](Get-Process -Id ${pid}).StartTime).ToUnixTimeMilliseconds() } catch { exit 1 }`], { shell: false, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    let stdout = "";
+    const timer = setTimeout(() => { child.kill(); resolve(undefined); }, 10_000);
+    child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); });
+    child.once("error", () => { clearTimeout(timer); resolve(undefined); });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      const value = Number(stdout.trim());
+      resolve(code === 0 && Number.isFinite(value) ? value : undefined);
+    });
+  });
 }
 
 async function prepareWorkspace(workspace: string): Promise<string> {

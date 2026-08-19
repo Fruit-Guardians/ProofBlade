@@ -35,7 +35,7 @@ Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回
 
 比赛平台的鉴权、限流、服务和环境 provisioning 故障以 `PLATFORM_ERROR` 结束当前题，并触发同一 Fleet 断路器，避免继续消耗所有 pending 题。`startEnvironment()` 抛错时也必须按 challenge id 做一次 best-effort teardown，因为 build POST 可能已经成功而 readiness 轮询随后失败。
 
-可明确归因于单题的 ID、详情 payload 或附件错误使用 `CompetitionChallengeError`，在 Solver 中映射为 `CHALLENGE_ERROR`，只失败当前题而不触发全局熔断；对旧适配器抛出的可识别附件/详情错误，以及 GET 详情的 400/404/410/422，也会在 Solver 边界归类为单题错误。未分类错误保持 fail-safe：仍视为共享平台故障，避免鉴权、限流或网络异常继续扩散到所有 pending 题。
+可明确归因于单题的 ID、详情 payload 或附件错误使用 `CompetitionChallengeError`，在 Solver 中映射为 `CHALLENGE_ERROR`，只失败当前题而不触发全局熔断；对旧适配器抛出的可识别附件/详情错误，以及响应正文明确写出题目不存在/无效的 GET 详情 400/404/410/422，也会在 Solver 边界归类为单题错误。路由不存在、统一错误页和未指明题目的 404 保持 `PLATFORM_ERROR`，避免鉴权、配置或共享服务故障扩散到所有 pending 题。
 
 DASCTF 的错旗响应采用显式 allowlist：默认仅 `40001`，GUI 后端可由 `competition.json` 的 `wrongFlagCodes` 或 `PROOFBLADE_COMPETITION_WRONG_FLAG_CODES` 覆盖。平台请求串行发送；GET 可对 429/503 做有界重试，非幂等 POST 在平台没有幂等键的前提下禁止自动重试。
 
