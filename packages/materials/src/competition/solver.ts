@@ -47,17 +47,6 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     const execution = resolveExecutionConfig(this.init.config);
     const profile = profileForCategory(request.challenge.normalizedCategory);
     const needsContainer = execution.backend === "docker" && profile !== undefined && execution.requireFor?.includes(request.challenge.normalizedCategory as never);
-    const containerRuntime = needsContainer ? (this.init.containerRuntime ?? new DockerContainerRuntime(execution)) : undefined;
-    if (containerRuntime) {
-      try {
-        await containerRuntime.prewarm([profile!]);
-        const doctor = await containerRuntime.doctor(profile!);
-        if (!doctor.daemon || doctor.image?.available === false) throw new Error(doctor.reason ?? `Docker image unavailable: ${doctor.image?.name ?? "unknown"}`);
-      } catch (error) {
-        this.throwIfAborted(request.signal, error);
-        return competitionFailure("prepare Docker execution", new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
-      }
-    }
 
     let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>>;
     try {
@@ -90,6 +79,23 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         return competitionFailure("submit dynamic flag", error);
       } finally {
         await this.stop(challengeId, environment.instanceId);
+      }
+    }
+
+    // Dynamic-flag challenges never execute code in a local container. Delay
+    // Docker preflight until after startEnvironment has told us that this run
+    // actually has a model-solvable target; otherwise a local Docker outage
+    // would incorrectly block a platform-only flag submission.
+    const containerRuntime = needsContainer ? (this.init.containerRuntime ?? new DockerContainerRuntime(execution)) : undefined;
+    if (containerRuntime) {
+      try {
+        await containerRuntime.prewarm([profile!]);
+        const doctor = await containerRuntime.doctor(profile!);
+        if (!doctor.daemon || doctor.image?.available === false) throw new Error(doctor.reason ?? `Docker image unavailable: ${doctor.image?.name ?? "unknown"}`);
+      } catch (error) {
+        await this.stop(challengeId, environment.instanceId);
+        this.throwIfAborted(request.signal, error);
+        return competitionFailure("prepare Docker execution", new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
       }
     }
 

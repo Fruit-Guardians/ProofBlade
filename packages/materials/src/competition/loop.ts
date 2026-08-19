@@ -136,7 +136,6 @@ export async function runCompetitionLoop(
       replanReason = undefined;
       const outcome = await activeLane.prompt(prompt);
       lastText = outcome.text || lastText;
-      termination = outcome.termination ?? termination;
       const snapshot = await services.control.snapshot(options.runId);
       if (accepted(snapshot)) {
         // A prior recoverable guard may have caused a replan, but the run is
@@ -160,6 +159,7 @@ export async function runCompetitionLoop(
         break;
       }
       if (outcome.termination === "budget_exhausted" || outcome.termination === "deadline_exhausted") {
+        termination = outcome.termination;
         stopReason = "deadline";
         break;
       }
@@ -173,6 +173,7 @@ export async function runCompetitionLoop(
           replanReason = outcome.termination;
           continue;
         }
+        termination = outcome.termination;
         stopReason = "terminated";
         break;
       }

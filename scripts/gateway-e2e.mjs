@@ -1,7 +1,8 @@
 /**
- * End-to-end proof that endpointMode:"exact" makes a full-endpoint gateway work
- * through the real pi-ai stack (not just a raw fetch). Builds the configured
- * model via createConfiguredModels and streams ONE trivial completion.
+ * End-to-end proof that a configured gateway works through the real pi-ai stack
+ * (not just a raw fetch). A full .../chat/completions URL opts into
+ * endpointMode:"exact"; a normal .../v1 URL uses standard SDK concatenation.
+ * Builds the configured model via createConfiguredModels and streams ONE trivial completion.
  * Key from env, never printed.
  *
  * Usage:
@@ -14,6 +15,7 @@ const key = process.env.DEEPSEEK_API_KEY?.trim();
 const baseUrl = process.env.GATEWAY_BASE_URL?.trim();
 const model = (process.env.MODEL ?? "deepseek-v4-flash").trim();
 if (!key || !baseUrl) { console.error("set DEEPSEEK_API_KEY and GATEWAY_BASE_URL"); process.exit(2); }
+const endpointMode = /\/chat\/completions$/i.test(baseUrl.replace(/\/+$/, "")) ? "exact" : undefined;
 
 process.env.DASCTF_MODEL_KEY = key;
 
@@ -25,7 +27,7 @@ const config = {
   modelId: model,
   modelDiscoveryPath: "/models",
   apiKeyEnv: "DASCTF_MODEL_KEY",
-  endpointMode: "exact",
+  ...(endpointMode ? { endpointMode } : {}),
   contextWindow: 65536,
   maxTokens: 64,
   requestTimeoutMs: 30000,
@@ -33,7 +35,7 @@ const config = {
   input: ["text"],
 };
 
-console.log(`baseUrl : ${baseUrl}  (endpointMode: exact)`);
+console.log(`baseUrl : ${baseUrl}  (${endpointMode ? "endpointMode: exact" : "standard base URL"})`);
 console.log(`model   : ${model}\n`);
 
 const { models, model: built, closeTransport } = createConfiguredModels(config);
@@ -47,7 +49,7 @@ try {
   }
   console.log(`✔ stopReason: ${stopReason}`);
   console.log(`✔ reply     : ${JSON.stringify(text)}`);
-  console.log("\nRESULT: OK — the exact-endpoint shim routes pi-ai through the gateway to DeepSeek.");
+  console.log(`\nRESULT: OK — pi-ai routes through the gateway (${endpointMode ? "exact endpoint shim" : "standard base URL"}).`);
 } catch (error) {
   console.error(`✖ ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);

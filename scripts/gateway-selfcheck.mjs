@@ -22,7 +22,8 @@ const model = (process.env.MODEL ?? "deepseek-chat").trim();
 if (!key) { console.error("✖ DEEPSEEK_API_KEY is not set (the key is never printed)."); process.exit(2); }
 if (!baseUrl) { console.error("✖ GATEWAY_BASE_URL is not set."); process.exit(2); }
 
-const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+const normalizedBase = baseUrl.replace(/\/+$/, "");
+const url = /\/chat\/completions$/i.test(normalizedBase) ? normalizedBase : `${normalizedBase}/chat/completions`;
 console.log(`gateway url : ${url}`);
 console.log(`model       : ${model}`);
 console.log(`api key     : set (${key.length} chars, value hidden)`);
