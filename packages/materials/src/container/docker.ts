@@ -133,14 +133,22 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
     let networkName: string | undefined;
+    let networkCandidate: string | undefined;
+    let networkPreexisted = false;
     let gatewayContainerId: string | undefined;
     let containerId: string | undefined;
     let gatewayCreateAttempted = false;
     let solverCreateAttempted = false;
     try {
       if (request.networkPolicy === "target-only") {
-        networkName = `proofblade-${slug}-g${request.generation}-net`;
-        await this.runChecked(["network", "create", "--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.owner_pid=${process.pid}`, "--label", `proofblade.owner_started_at=${PROCESS_STARTED_AT}`, "--ipv6=false", networkName]);
+        networkCandidate = `proofblade-${slug}-g${request.generation}-net`;
+        // A name conflict must never turn cleanup into a delete of a network
+        // that existed before this attempt. Remember matching ownership before
+        // create; if create fails, only a newly observed, owned network may be
+        // used as a partial-create fallback.
+        networkPreexisted = (await this.ownedNetworkName(networkCandidate, ownerLabels)) !== undefined;
+        await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkCandidate]);
+        networkName = networkCandidate;
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
         const gatewayName = `${name}-gateway`;
@@ -167,10 +175,13 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
       return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
     } catch (error) {
+      const cleanupNetworkName = networkName ?? (!networkPreexisted && networkCandidate
+        ? await this.ownedNetworkName(networkCandidate, ownerLabels)
+        : undefined);
       const cleanupErrors = await this.cleanupResources(
         containerId,
         gatewayContainerId,
-        networkName,
+        cleanupNetworkName,
         solverCreateAttempted ? name : undefined,
         gatewayCreateAttempted ? `${name}-gateway` : undefined,
         identityLabels,
@@ -330,7 +341,24 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const result = await this.runner.run(["inspect", "--format", "{{json .Config.Labels}}", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
     if (result.spawnError || result.exitCode !== 0) return undefined;
     try {
-      const labels = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(result.stdout.trim());
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+      const labels = parsed as Record<string, unknown>;
+      return Object.entries(expectedLabels).every(([key, value]) => labels[key] === value) ? name : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Resolve a deterministic network name only after proving ownership. */
+  private async ownedNetworkName(name: string | undefined, expectedLabels: Record<string, string> | undefined): Promise<string | undefined> {
+    if (!name || !expectedLabels) return undefined;
+    const result = await this.runner.run(["network", "inspect", "--format", "{{json .Labels}}", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.spawnError || result.exitCode !== 0) return undefined;
+    try {
+      const parsed: unknown = JSON.parse(result.stdout.trim());
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+      const labels = parsed as Record<string, unknown>;
       return Object.entries(expectedLabels).every(([key, value]) => labels[key] === value) ? name : undefined;
     } catch {
       return undefined;

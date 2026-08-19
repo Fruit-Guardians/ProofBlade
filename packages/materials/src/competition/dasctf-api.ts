@@ -37,6 +37,17 @@ const OK_CODE = "00000";
 const DEFAULT_WRONG_FLAG_CODES = ["40001"];
 const API_PREFIX = "/slab-match/api/v1/agent";
 
+class DasctfRateLimitError extends Error {
+  public readonly status = 429;
+  public readonly retryAfterMs?: number;
+
+  public constructor(public readonly method: "GET" | "POST", public readonly url: string, retryAfterMs?: number) {
+    super(`DASCTF API ${method} ${redact(url)} failed with HTTP 429`);
+    this.name = "DasctfRateLimitError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 export interface DasctfCompetitionApiOptions {
   /** Platform origin, e.g. "https://gcsis.dasctf.com". */
   serverHost: string;
@@ -65,6 +76,8 @@ export interface DasctfCompetitionApiOptions {
   minRequestIntervalMs?: number;
   /** Max retries for safe transient responses before giving up. Defaults to 4. */
   maxRateLimitRetries?: number;
+  /** Max recovery attempts for a rate-limited environment-build POST. Defaults to 3. */
+  maxEnvironmentBuildRetries?: number;
   /** Injectable fetch for tests. */
   fetch?: typeof globalThis.fetch;
   /** Injectable clock sleep for tests. */
@@ -83,11 +96,14 @@ export class DasctfCompetitionApi implements CompetitionApi {
   private readonly maxAttachmentBytes: number;
   private readonly minRequestIntervalMs: number;
   private readonly maxRateLimitRetries: number;
+  private readonly maxEnvironmentBuildRetries: number;
   private readonly requestFetch: typeof globalThis.fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
   /** Serialization gate: platform requests chain through this so they never burst. */
   private gate: Promise<void> = Promise.resolve();
+  /** Serialize the initial environment check/build decision across Fleet lanes. */
+  private environmentBuildGate: Promise<void> = Promise.resolve();
   private lastRequestAt = 0;
 
   public constructor(options: DasctfCompetitionApiOptions) {
@@ -108,6 +124,9 @@ export class DasctfCompetitionApi implements CompetitionApi {
     const retries = options.maxRateLimitRetries ?? 4;
     if (!Number.isInteger(retries) || retries < 0 || retries > 10) throw new Error("DasctfCompetitionApi maxRateLimitRetries must be an integer in [0, 10]");
     this.maxRateLimitRetries = retries;
+    const buildRetries = options.maxEnvironmentBuildRetries ?? 3;
+    if (!Number.isInteger(buildRetries) || buildRetries < 0 || buildRetries > 10) throw new Error("DasctfCompetitionApi maxEnvironmentBuildRetries must be an integer in [0, 10]");
+    this.maxEnvironmentBuildRetries = buildRetries;
     this.requestFetch = options.fetch ?? globalThis.fetch;
     if (typeof this.requestFetch !== "function") throw new Error("DasctfCompetitionApi requires a fetch implementation");
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
@@ -150,18 +169,19 @@ export class DasctfCompetitionApi implements CompetitionApi {
   }
 
   public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
-    let detail = await this.exerciseDetail(challengeId);
-    // Order matters: check isNeedCheck FIRST. A challenge can report
-    // isNeedInit:true AND isNeedCheck:true at once (build already in flight); in
-    // that state we must only poll, never POST build again — a second build can
-    // restart provisioning, create duplicate resources, or error on the platform.
-    if (detail.isNeedCheck === true) {
-      detail = await this.pollUntilReady(challengeId);
-    } else if (detail.isNeedInit === true) {
-      // Needs an environment and none is building yet — start it, then poll.
-      await this.post("/ctf/build-exercise-env", { exerciseId: toExerciseId(challengeId) });
-      detail = await this.pollUntilReady(challengeId);
-    }
+    // The platform permits only one build decision at a time. Without this
+    // gate, two Fleet lanes can both observe isNeedInit=true/isNeedCheck=false
+    // before either POST is processed; the second POST is then rejected with
+    // HTTP 429 and the Web lane never reaches the model loop.
+    let detail = await this.withEnvironmentBuildGate(async () => {
+      const initial = await this.exerciseDetail(challengeId);
+      // Order matters: check isNeedCheck FIRST. A challenge can report
+      // isNeedInit:true AND isNeedCheck:true at once (build already in flight); in
+      // that state we must only poll, never POST build again.
+      if (initial.isNeedCheck === true || initial.isNeedInit !== true) return initial;
+      return await this.postEnvironmentBuildWithRecovery(challengeId, initial);
+    });
+    if (detail.isNeedCheck === true) detail = await this.pollUntilReady(challengeId);
     // else: static challenge (attachment-only), no environment to provision.
     return this.parseEnvironment(detail);
   }
@@ -216,6 +236,34 @@ export class DasctfCompetitionApi implements CompetitionApi {
       if (Date.now() >= deadline) throw new Error(`DASCTF environment for exercise ${challengeId} was not ready within ${this.envReadyTimeoutMs}ms`);
       await this.sleep(this.envPollIntervalMs);
     }
+  }
+
+  /**
+   * Start one environment build, recovering from a 429 without blindly
+   * repeating a potentially processed POST. After waiting, re-read the
+   * challenge: if it is already building/ready, only polling is required;
+   * otherwise the POST can be attempted again within the bounded budget.
+   */
+  private async postEnvironmentBuildWithRecovery(challengeId: string, initial: Record<string, unknown>): Promise<Record<string, unknown>> {
+    let observed = initial;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await this.post("/ctf/build-exercise-env", { exerciseId: toExerciseId(challengeId) });
+        return { ...observed, isNeedCheck: true };
+      } catch (error) {
+        if (!(error instanceof DasctfRateLimitError) || attempt >= this.maxEnvironmentBuildRetries) throw error;
+        const backoffMs = Math.max(1_000, this.minRequestIntervalMs * 2 ** attempt);
+        await this.sleep(error.retryAfterMs ?? backoffMs);
+        observed = await this.exerciseDetail(challengeId);
+        if (observed.isNeedCheck === true || observed.isNeedInit !== true) return observed;
+      }
+    }
+  }
+
+  private async withEnvironmentBuildGate<T>(operation: () => Promise<T>): Promise<T> {
+    const run = this.environmentBuildGate.then(operation);
+    this.environmentBuildGate = run.then(() => undefined, () => undefined);
+    return await run;
   }
 
   private parseSummary(detail: Record<string, unknown>, challengeId: string): CompetitionChallengeSummary {
@@ -403,7 +451,10 @@ export class DasctfCompetitionApi implements CompetitionApi {
     // retried without a platform-supported idempotency key.
     const response = await this.gatedFetch(method, url, body);
     const text = await response.text();
-    if (!response.ok) throw new Error(`DASCTF API ${method} ${redact(url)} failed with HTTP ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 429) throw new DasctfRateLimitError(method, url, parseRetryAfter(response.headers.get("retry-after")));
+      throw new Error(`DASCTF API ${method} ${redact(url)} failed with HTTP ${response.status}`);
+    }
     let parsed: unknown;
     try {
       parsed = text.trim() ? JSON.parse(text) : {};

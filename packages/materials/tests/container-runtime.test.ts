@@ -127,6 +127,30 @@ test("Docker create does not remove a pre-existing same-name gateway on conflict
   }
 });
 
+test("Docker create does not remove a pre-existing same-name network on conflict", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-network-conflict-"));
+  try {
+    const cleanupCalls: string[][] = [];
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "network" && args[1] === "create") return processResult("network name already exists", 1);
+        if (args[0] === "network" && args[1] === "inspect" && args.includes("--format")) {
+          return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "another-run", "proofblade.generation": "1", "proofblade.owner_pid": "999", "proofblade.owner_started_at": "1" }));
+        }
+        if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
+    const runtime = new DockerContainerRuntime(config, runner);
+    await assert.rejects(runtime.create({ runId: "NETWORK/CONFLICT", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
+    assert.equal(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Docker runtime reaps only stale stopped resources and their empty gateway networks", async () => {
   const old = new Date(Date.now() - 60_000).toISOString();
   const recent = new Date(Date.now() - 1).toISOString();
