@@ -3,9 +3,9 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
-export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm";
+export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget";
 
 export interface CodingTurnTermination {
   message?: string;
@@ -34,6 +34,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   termination: CodingTurnTermination,
   resolveEffectPolicy?: ToolEffectPolicyResolver,
   failureStormBreaker?: ToolFailureStormBreaker,
+  experimentBudgetBreaker?: ExperimentBudgetBreaker,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -58,6 +59,18 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         details: event.details,
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
+      const experiment = experimentBudgetBreaker?.observe(observation);
+      if (experiment?.terminate) {
+        termination.message = experimentBudgetMessage(experiment);
+        termination.reason = "experiment_budget";
+        termination.requested = true;
+        return {
+          content: [{ type: "text" as const, text: termination.message }],
+          details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+          isError: false,
+          terminate: true,
+        };
+      }
       failureStormBreaker?.observe(observation);
       if (progressBreaker?.isProgress(observation, termination.noProgressWindow) && termination.reason === "no_progress") {
         delete termination.message;
@@ -98,6 +111,18 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       details: event.details,
       effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
     };
+    const experiment = experimentBudgetBreaker?.observe(observation);
+    if (experiment?.terminate) {
+      termination.message = experimentBudgetMessage(experiment);
+      termination.reason = "experiment_budget";
+      termination.requested = true;
+      return {
+        content: [{ type: "text" as const, text: termination.message }],
+        details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+        isError: true,
+        terminate: true,
+      };
+    }
     const storm = failureStormBreaker?.observe(observation);
     const decision = repeatBreaker.observe(observation);
     if (storm?.terminate && !decision.terminate) {
@@ -150,9 +175,13 @@ export async function finalizeCodingTurn(options: {
     .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
     .map((item) => item.text)
     .join("\n");
+  // A guard can interrupt a provider response after the model has emitted a
+  // short explanation alongside its tool call. The explanation remains visible
+  // below, but the loop must still receive the guard reason and schedule the
+  // evidence-first replan; requiring an empty text response would silently lose
+  // that signal.
   const confirmed = options.termination.requested === true
     && options.termination.reason !== undefined
-    && rawOutput.trim().length === 0
     && (options.response.stopReason === "toolUse" || options.response.stopReason === "error");
   options.termination.confirmed = confirmed;
   const output = projectCodingAssistantText(rawOutput, options.termination);

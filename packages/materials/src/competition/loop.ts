@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AppServices } from "../app/demo.js";
-import type { ExecutionMode, RunSnapshot, TaskContract } from "../domain/types.js";
+import type { ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -80,6 +80,9 @@ export async function runCompetitionLoop(
   let lastText: string | undefined;
   let termination: string | undefined;
   let stopReason: CompetitionLoopOutcome["stopReason"] = "max_turns";
+  let forceReplan = false;
+  let replanReason: string | undefined;
+  let guardReplans = 0;
 
   try {
     lane = await createLane({
@@ -122,11 +125,22 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
-      const outcome = await activeLane.prompt(turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot));
+      const preTurnSnapshot = await services.control.snapshot(options.runId);
+      const submissionsSoFar = countSubmissions(preTurnSnapshot);
+      const prompt = turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot, {
+        submissionsSoFar,
+        forceReplan,
+        previousTermination: replanReason,
+      });
+      forceReplan = false;
+      replanReason = undefined;
+      const outcome = await activeLane.prompt(prompt);
       lastText = outcome.text || lastText;
-      termination = outcome.termination ?? termination;
       const snapshot = await services.control.snapshot(options.runId);
       if (accepted(snapshot)) {
+        // A prior recoverable guard may have caused a replan, but the run is
+        // solved now; do not report that intermediate guard as the final stop.
+        termination = undefined;
         stopReason = "solved";
         break;
       }
@@ -145,10 +159,21 @@ export async function runCompetitionLoop(
         break;
       }
       if (outcome.termination === "budget_exhausted" || outcome.termination === "deadline_exhausted") {
+        termination = outcome.termination;
         stopReason = "deadline";
         break;
       }
       if (outcome.termination) {
+        if (isRecoverableTurnGuard(outcome.termination) && guardReplans < MAX_GUARD_REPLANS) {
+          // A guard only stopped the current provider turn. Keep the same lane
+          // and durable session, but make the next prompt an explicit evidence-
+          // summary/replan instead of the generic "continue" nudge.
+          guardReplans += 1;
+          forceReplan = true;
+          replanReason = outcome.termination;
+          continue;
+        }
+        termination = outcome.termination;
         stopReason = "terminated";
         break;
       }
@@ -192,14 +217,38 @@ function accepted(snapshot: RunSnapshot): boolean {
   return submitted;
 }
 
+function countSubmissions(snapshot: RunSnapshot): number {
+  return Object.values(snapshot.effects).filter((effect) => effect.operation === "fixture_score").length;
+}
+
+/**
+ * Number of turns without a single submission after which the loop injects a
+ * hard replan directive. In the failed CH-10662 run the model spent dozens of
+ * tool calls inside one provider turn rewriting the same broken parser without
+ * ever calling submit_flag or reconsidering its hypothesis. A single mid-run
+ * kick that the model cannot miss is much cheaper than waiting for every outer
+ * turn-level stall breaker.
+ */
+const REPLAN_NUDGE_AFTER_TURNS = 12;
+const MAX_GUARD_REPLANS = 2;
+
 /**
  * The turn prompt. Turn 1 states the challenge; later turns are a short nudge,
  * because the lane keeps the full conversation and restating the task every turn
  * would both waste the cached prefix and invite the model to restart its
  * analysis from scratch.
+ *
+ * After REPLAN_NUDGE_AFTER_TURNS turns without any submission attempt, the
+ * regular continue-nudge is replaced by an explicit stop-and-replan directive.
+ * That is the ONE place we override the caching-friendly short nudge, because
+ * a model that has run twelve turns of the same failing approach won't
+ * self-correct from a generic "continue".
  */
-function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string): string {
+export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string } = { submissionsSoFar: 0 }): string {
   if (turn > 1) {
+    if (progress.forceReplan || (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS)) {
+      return replanNudge(task.target_kind, turn, progress.previousTermination);
+    }
     return "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag.";
   }
   const lines = [task.objective.trim()];
@@ -208,4 +257,32 @@ function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string): st
   }
   lines.push(`\nChallenge files are in ${workspaceRoot.replace(/\\/g, "/")}. Solve it and submit the flag with submit_flag.`);
   return lines.join("\n");
+}
+
+function replanNudge(kind: TargetKind, turn: number, previousTermination?: string): string {
+  const lines = [
+    `[ProofBlade replan checkpoint — turn ${turn}${previousTermination ? ` after ${previousTermination}` : " without a submit_flag call"}]`,
+    "The current strategy has consumed many turns without producing a flag. Stop iterating on the same exploit or parser: it is either wrong or blocked on a hypothesis you have not questioned.",
+    "In THIS turn:",
+    "1. Write ONE short paragraph naming the strongest evidence you have and the assumption your current approach depends on.",
+    "2. State the alternative hypothesis you have been avoiding.",
+    "3. Take a single concrete action against that alternative (a new probe, a new decode, a different tool) — do not resume the previous strategy.",
+    "Rules of thumb:",
+    "- If a parser has silently produced empty results twice, distrust the string constants first, not the transport. Save raw recv bytes to a file and `xxd` them before writing another regex.",
+    "- Chinese/CJK banners on the wire are usually GBK, not UTF-8. Reconstruct anchors from actual bytes, not from how the tool echo looks in your view.",
+    "- If external network probes keep failing but the target host works, that is the egress gateway enforcing target-only policy, not a broken tool.",
+    "- Have you been re-deriving facts you already proved? That means you did not persist them. Write confirmed findings to a notes file (`/workspace/NOTES.md`) and read it back instead of re-probing; for a durable searchable record use `evidence record` on an `A-*` anchor.",
+  ];
+  if (kind === "pwn") {
+    lines.push("- For pwn: re-run `checksec`, `file`, and (if remote-only) capture 4KB of the banner into a file before touching the exploit script again.");
+  } else if (kind === "web") {
+    lines.push("- For web: re-issue `curl -sSikL` against the root and check Server/X-Powered-By/Set-Cookie headers before adding another payload variant.");
+  } else if (kind === "reverse") {
+    lines.push("- For reverse: open the target in the decompiler MCP if you have not, and work from pseudocode instead of another objdump pass.");
+  }
+  return lines.join("\n");
+}
+
+function isRecoverableTurnGuard(reason: string): boolean {
+  return reason === "experiment_budget" || reason === "no_progress" || reason === "repeated_tool_failure" || reason === "tool_failure_storm";
 }

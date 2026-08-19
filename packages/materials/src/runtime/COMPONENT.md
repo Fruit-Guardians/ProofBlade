@@ -34,6 +34,7 @@
 - Coding `bash` 通过 `OutputRewritePort` 包装；RTK 探测和执行复用同一个 Pi `ExecutionEnv`，并在 Session details 中记录 provider/version/hash/字节数/Artifact。
 - Coding `read` 与 `bash` 都为文本结果注册语义化中间 Artifact，并在模型可见结果中返回稳定 `A-*` 锚点；`evidence record` 使用该锚点一次完成命名、提升、Evidence 与可选 Fact。
 - Coding `read/bash` 接入 Evidence Curation Gate：4 个未审阅产物触发检查点，8 个触发硬门；Agent 必须 `record` 有价值发现或 `annotate` 已审阅的普通输出后才能继续侦察。
+- Coding 回合还对 `bash`/`shell_background` 的进程与网络实验做单回合预算（总调用、长任务、超时和归一化实验族）；触发后先持久化证据，再由 Competition Loop 发起一次替代假设重规划，最多恢复两次，不把题目级停滞误报为 Provider 故障。
 
 ## 开发规则与验证
 

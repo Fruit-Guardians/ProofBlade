@@ -9,6 +9,7 @@ import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
 import type { CompetitionLaneFactory } from "../src/competition/loop.js";
+import type { ContainerRuntimePort } from "../src/container/contracts.js";
 import {
   CompetitionChallengeSolver,
   CompetitionChallengeError,
@@ -241,6 +242,86 @@ test("dynamic-flag challenge is submitted directly without a model run", async (
     assert.equal(result.status, "SOLVED_DYNAMIC");
     assert.deepEqual(api.submitted, [{ id: "DYN", flag: "flag{dynamic}" }]);
     assert.ok(api.stopped.includes("DYN"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a recoverable inner-turn guard triggers an evidence-first replan before the next solve attempt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-replan-"));
+  try {
+    const api = new FakeApi([{ id: "REPLAN", value: 100, flag: "flag{replanned}" }]);
+    let prompts = 0;
+    const replanLane: CompetitionLaneFactory = async (options) => {
+      const inner = await flagLane(options);
+      return {
+        ...inner,
+        async prompt(text: string) {
+          prompts += 1;
+          if (prompts === 1) return { text: "experiment budget stopped this provider turn", stopReason: "stop", termination: "experiment_budget" as const, usage: zeroUsage() };
+          assert.match(text, /evidence record|replan checkpoint/i);
+          return await inner.prompt(text);
+        },
+      };
+    };
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 3, createLane: replanLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+    assert.equal(prompts, 2);
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.deepEqual(api.submitted, [{ id: "REPLAN", flag: "flag{replanned}" }]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dynamic flag submission skips Docker preflight when the daemon is unavailable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-dynamic-no-docker-"));
+  try {
+    const api = new FakeApi([{ id: "DYN-DOCKER", value: 100, flag: "flag{dynamic_docker_skip}", dynamic: true }]);
+    let prewarmCalls = 0;
+    let doctorCalls = 0;
+    const unavailableRuntime = {
+      async prewarm() { prewarmCalls += 1; throw new Error("docker unavailable"); },
+      async doctor() { doctorCalls += 1; throw new Error("docker unavailable"); },
+    } as unknown as ContainerRuntimePort;
+    const dockerConfig: ProofBladeConfig = { ...CONFIG, execution: { backend: "docker", requireFor: ["pwn"] } };
+    const challenge = { ...(await api.listChallenges())[0]!, normalizedCategory: "pwn" as const };
+    const solver = new CompetitionChallengeSolver({ root, config: dockerConfig, api, containerRuntime: unavailableRuntime });
+    const result = await solver.solve({ challenge, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.equal(result.status, "SOLVED_DYNAMIC");
+    assert.equal(prewarmCalls, 0);
+    assert.equal(doctorCalls, 0);
+    assert.deepEqual(api.submitted, [{ id: "DYN-DOCKER", flag: "flag{dynamic_docker_skip}" }]);
+    assert.deepEqual(api.stopped, ["DYN-DOCKER"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a recovered guard does not remain the final reason when the next turns simply exhaust", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-replan-exhausted-"));
+  try {
+    const api = new FakeApi([{ id: "REPLAN-EXHAUST", value: 100, flag: "flag{unused}" }]);
+    let prompts = 0;
+    const stalledLane: CompetitionLaneFactory = async () => ({
+      async prompt() {
+        prompts += 1;
+        return prompts === 1
+          ? { text: "guard", stopReason: "stop", termination: "experiment_budget" as const, usage: zeroUsage() }
+          : { text: "no candidate yet", stopReason: "stop", usage: zeroUsage() };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 2, createLane: stalledLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+    assert.equal(prompts, 2);
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "UNSOLVED");
+    assert.equal(result.reason, "max_turns");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

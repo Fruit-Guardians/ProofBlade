@@ -9,7 +9,7 @@ import { Type } from "typebox";
 import { ControlStore } from "../src/control/control-store.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
 const readOnlyEffect = { readOnly: true, sideEffect: "none" as const };
@@ -144,6 +144,37 @@ test("[contract:tool-failure-storm] varied failures stop after a bounded budget 
   assert.match(toolFailureStormMessage(decision.count), /changing invalid arguments/i);
   breaker.observe({ toolName: "write", input: { path: "solve.py" }, isError: false, content: [{ type: "text", text: "written" }], effectPolicy: workspaceEffect });
   assert.equal(breaker.observe(failed({ operation: "record", artifactId: "A-3" })).count, 1);
+});
+
+test("[contract:experiment-budget] varied successful probes stop inside one provider turn", () => {
+  const breaker = new ExperimentBudgetBreaker({ maxExperimentCalls: 20, maxLongRunning: 20, maxTimeouts: 2, maxFamily: 4 });
+  const observeProbe = (index: number) => breaker.observe({
+    toolName: "bash",
+    input: { command: `python3 probe${index}.py` },
+    isError: false,
+    content: [{ type: "text", text: `probe ${index} completed` }],
+    effectPolicy: { readOnly: false, sideEffect: "process" },
+  });
+  assert.equal(observeProbe(1).terminate, false);
+  assert.equal(observeProbe(2).terminate, false);
+  assert.equal(observeProbe(3).terminate, false);
+  const decision = observeProbe(4);
+  assert.equal(decision.terminate, true);
+  assert.equal(decision.reason, "experiment_family");
+  assert.match(experimentBudgetMessage(decision), /evidence record/i);
+
+  breaker.reset();
+  assert.equal(observeProbe(1).terminate, false);
+  const durable = breaker.observe({
+    toolName: "evidence",
+    input: { operation: "record", summary: "confirmed heap layout" },
+    isError: false,
+    content: [{ type: "text", text: "recorded" }],
+    details: { durableProgress: true },
+    effectPolicy: workspaceEffect,
+  });
+  assert.equal(durable.terminate, false);
+  assert.equal(observeProbe(2).terminate, false);
 });
 
 test("repeated bash output cannot stop durable workspace changes", async () => {
@@ -682,6 +713,50 @@ test("read-window termination cannot replace an earlier declared no-progress sto
     assert.equal(termination.reason, "no_progress");
     assert.equal(termination.noProgressWindow, "declared_no_progress");
     assert.match(termination.message ?? "", /evidence/);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:experiment-budget-visible] inner provider probe budget produces a visible termination", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-visible-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-experiment-budget-visible" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe1.py" }, { id: "probe-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe2.py" }, { id: "probe-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe3.py" }, { id: "probe-3" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe4.py" }, { id: "probe-4" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not reach a fifth probe"),
+    ]);
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "bounded process probe", parameters: Type.Object({ command: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "probe completed" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "experiment-budget-visible", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      new NoProgressToolBreaker(),
+      termination,
+      () => ({ readOnly: false, sideEffect: "process" }),
+      new ToolFailureStormBreaker(),
+      new ExperimentBudgetBreaker({ maxExperimentCalls: 20, maxLongRunning: 20, maxTimeouts: 2, maxFamily: 3 }),
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(faux.state.callCount, 3);
+    assert.ok(response.stopReason === "toolUse" || response.stopReason === "error");
+    assert.equal(termination.requested, true);
+    assert.equal(termination.reason, "experiment_budget");
+    assert.match(termination.message ?? "", /per-turn limit/i);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
