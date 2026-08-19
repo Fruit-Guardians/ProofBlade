@@ -151,6 +151,68 @@ test("Docker create does not remove a pre-existing same-name network on conflict
   }
 });
 
+test("Docker create does not remove a concurrently-created same-name network", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-network-race-"));
+  try {
+    let createCalls = 0;
+    let networkInspectCalls = 0;
+    let winningNetworkLabels: Record<string, string> | undefined;
+    let secondCreateEntered!: () => void;
+    const secondCreate = new Promise<void>((resolve) => { secondCreateEntered = resolve; });
+    let networkRemovals = 0;
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "network" && args[1] === "inspect") {
+          // Before either create wins, the deterministic name is absent. Once
+          // the first create has won, expose that invocation's full label set.
+          networkInspectCalls += 1;
+          return processResult(networkInspectCalls <= 2 || !winningNetworkLabels ? "{}" : JSON.stringify(winningNetworkLabels));
+        }
+        if (args[0] === "network" && args[1] === "create") {
+          createCalls += 1;
+          if (createCalls === 1) {
+            winningNetworkLabels = {};
+            for (let index = 0; index < args.length; index += 1) {
+              const label = args[index] === "--label" ? args[index + 1] : undefined;
+              if (!label?.startsWith("proofblade.")) continue;
+              const separator = label.indexOf("=");
+              if (separator > 0) winningNetworkLabels[label.slice(0, separator)] = label.slice(separator + 1);
+            }
+            await secondCreate;
+            return processResult("network-id\n");
+          }
+          secondCreateEntered();
+          return processResult("network name already exists", 1);
+        }
+        if (args[0] === "network" && args[1] === "rm") { networkRemovals += 1; return processResult(""); }
+        if (args[0] === "run" && args.includes("-d")) {
+          const name = args[args.indexOf("--name") + 1];
+          return processResult(name?.endsWith("-gateway") ? "gateway-id\n" : "solver-id\n");
+        }
+        if (args[0] === "exec") return processResult("");
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
+    const runtime = new DockerContainerRuntime(config, runner);
+    const request = { runId: "SAME/RUN", generation: 1, profile: "pwn" as const, image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" as const }], networkPolicy: "target-only" as const };
+    const first = runtime.create(request);
+    const second = runtime.create(request);
+    const outcomes = Promise.allSettled([first, second]);
+    await new Promise<void>((resolve) => {
+      const poll = (): void => createCalls >= 2 ? resolve() : setTimeout(poll, 0);
+      poll();
+    });
+    const results = await outcomes;
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+    assert.equal(networkRemovals, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Docker runtime reaps only stale stopped resources and their empty gateway networks", async () => {
   const old = new Date(Date.now() - 60_000).toISOString();
   const recent = new Date(Date.now() - 1).toISOString();

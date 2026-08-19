@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { lookup } from "node:dns/promises";
@@ -129,6 +130,10 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       ...identityLabels,
       "proofblade.owner_pid": String(process.pid),
       "proofblade.owner_started_at": String(PROCESS_STARTED_AT),
+      // PID/start-time identify the process, not this individual create()
+      // attempt.  A unique token prevents a losing concurrent creator from
+      // claiming the winner's deterministically named network.
+      "proofblade.owner_token": createOwnerToken(),
     };
     const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
@@ -376,6 +381,7 @@ function assertCleanupResult(result: DockerProcessResult, command: string): void
   }
 }
 function safeName(value: string): string { return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "run"; }
+function createOwnerToken(): string { return `${process.pid}-${Date.now()}-${randomUUID()}`; }
 function containerCwd(workspace: string, requested?: string): string {
   if (!requested) return "/workspace";
   const rel = relative(workspace, isAbsolute(requested) ? requested : resolve(workspace, requested));
