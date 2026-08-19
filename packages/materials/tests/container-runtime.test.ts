@@ -85,11 +85,21 @@ test("Docker create removes a gateway by deterministic name when docker run fail
   const root = await mkdtemp(join(tmpdir(), "proofblade-partial-create-"));
   try {
     const cleanupCalls: string[][] = [];
+    let gatewayLabels: Record<string, string> = {};
     const runner: DockerCommandRunner = {
       async run(args): Promise<DockerProcessResult> {
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
-        if (args[0] === "run") return processResult("created-but-timeout", 1);
-        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "PARTIAL/1", "proofblade.generation": "1", "proofblade.profile": "pwn", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1" }));
+        if (args[0] === "run") {
+          gatewayLabels = {};
+          for (let index = 0; index < args.length; index += 1) {
+            const label = args[index] === "--label" ? args[index + 1] : undefined;
+            if (!label?.startsWith("proofblade.")) continue;
+            const separator = label.indexOf("=");
+            if (separator > 0) gatewayLabels[label.slice(0, separator)] = label.slice(separator + 1);
+          }
+          return processResult("created-but-timeout", 1);
+        }
+        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify(gatewayLabels));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
         return processResult("");
       },
@@ -112,7 +122,7 @@ test("Docker create does not remove a pre-existing same-name gateway on conflict
       async run(args): Promise<DockerProcessResult> {
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
         if (args[0] === "run") return processResult("name conflict", 1);
-        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "another-run", "proofblade.generation": "1", "proofblade.profile": "pwn" }));
+        if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "CONFLICT/1", "proofblade.generation": "1", "proofblade.profile": "pwn", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1", "proofblade.owner_token": "different-create-attempt" }));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
         return processResult("");
       },

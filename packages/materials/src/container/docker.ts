@@ -189,7 +189,11 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         cleanupNetworkName,
         solverCreateAttempted ? name : undefined,
         gatewayCreateAttempted ? `${name}-gateway` : undefined,
-        identityLabels,
+        // The deterministic fallback names are shared by attempts with the
+        // same run identity.  Keep the per-create owner token in this check;
+        // identityLabels alone would let a name-conflicting attempt delete a
+        // gateway created by a different attempt.
+        ownerLabels,
       );
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
