@@ -127,7 +127,10 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         const gateway = await this.runChecked(["run", "-d", "--name", `${name}-gateway`, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
         gatewayContainerId = gateway.stdout.trim();
         const targets = await resolveTargets(request.targets);
-        await this.runChecked(["exec", gatewayContainerId, "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.address}:${target.port}`)]);
+        // Invoke through /bin/sh instead of relying on the script's shebang;
+        // this remains robust if a host checkout rewrites executable bits or
+        // line endings before the image build.
+        await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.address}:${target.port}`)]);
       }
       const limits = request.limits;
       const args = ["run", "-d", "--name", name, ...labels, "--user", "1001:1001", "--workdir", "/workspace", "--mount", `type=bind,source=${request.workspaceHostPath},destination=/workspace`, ...(request.skillLibraryHostPath ? ["--mount", `type=bind,source=${request.skillLibraryHostPath},destination=/opt/proofblade/skills,readonly`] : []), "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=1g", "--tmpfs", "/run:rw,noexec,nosuid,size=64m", "--pids-limit", String(limits?.pids ?? 512), "--cpus", limits?.cpus ?? "2", "--memory", limits?.memory ?? "4g", "--shm-size", limits?.shmSize ?? "1g", "--ulimit", "nofile=4096:4096", "--ulimit", "fsize=1073741824:1073741824", "--security-opt", "no-new-privileges", "--cap-drop", "ALL"];
