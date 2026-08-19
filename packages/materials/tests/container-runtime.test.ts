@@ -8,11 +8,12 @@ import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRun
 import { parseCompetitionTargets } from "../src/competition/task.js";
 
 test("competition target parser extracts URL and nc endpoints without leaking connection text into scope", () => {
-  const targets = parseCompetitionTargets("nc 1.14.76.59 20996; nc -u 1.14.76.60 5353; web: http://example.test:8080/path");
+  const targets = parseCompetitionTargets("nc 1.14.76.59 20996; nc -v -u 1.14.76.60 5353; nc -w 3 -u 1.14.76.61 5354; web: http://example.test:8080/path");
   assert.deepEqual(targets, [
     { host: "example.test", port: 8080, protocol: "tcp" },
-    { host: "1.14.76.60", port: 5353, protocol: "udp" },
     { host: "1.14.76.59", port: 20996, protocol: "tcp" },
+    { host: "1.14.76.60", port: 5353, protocol: "udp" },
+    { host: "1.14.76.61", port: 5354, protocol: "udp" },
   ]);
   assert.deepEqual(parseCompetitionTargets("udp://127.0.0.1:9000"), [
     { host: "127.0.0.1", port: 9000, protocol: "udp" },
@@ -27,6 +28,9 @@ test("competition target parser extracts URL and nc endpoints without leaking co
   assert.deepEqual(parseCompetitionTargets("tcp://127.0.0.1:53 udp://127.0.0.1:53"), [
     { host: "127.0.0.1", port: 53, protocol: "tcp" },
     { host: "127.0.0.1", port: 53, protocol: "udp" },
+  ]);
+  assert.deepEqual(parseCompetitionTargets("udp 1.14.76.59:20996 (proxy of :20996)"), [
+    { host: "1.14.76.59", port: 20996, protocol: "udp" },
   ]);
   assert.throws(() => parseCompetitionTargets("udp://[2001:db8::1]:53"), /IPv6 competition targets are not supported/);
 });
@@ -72,6 +76,28 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     await runtime.destroy(ref);
     await runtime.destroy(ref);
     assert.ok(calls.filter((args) => args[0] === "rm").length >= 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Docker create removes a gateway by deterministic name when docker run fails after creation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-partial-create-"));
+  try {
+    const cleanupCalls: string[][] = [];
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "run") return processResult("created-but-timeout", 1);
+        if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
+    const runtime = new DockerContainerRuntime(config, runner);
+    await assert.rejects(runtime.create({ runId: "PARTIAL/1", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
+    assert.ok(cleanupCalls.some((args) => args[0] === "rm" && args[2] === "proofblade-partial-1-g1-pwn-gateway"));
+    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "proofblade-partial-1-g1-net"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

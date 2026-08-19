@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
-import { McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig, providerNativeCapabilities, resolveExecutionConfig } from "@proofblade/materials";
+import { DockerContainerRuntime, McpProjectRegistry, ProofBladeSkillRegistry, codingToolCatalog, loadConfig, providerNativeCapabilities, resolveExecutionConfig } from "@proofblade/materials";
 import { DebugDataService } from "./debug-data.js";
 import { FleetController } from "./fleet.js";
 import { CompetitionSettingsStore, sanitizeUrlForLog } from "./competition-settings.js";
@@ -24,10 +24,13 @@ const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
 const competitionSettings = await CompetitionSettingsStore.create(projectRoot, config);
 const competitionBackend = competitionSettings.backend();
-if (competitionBackend.containerRuntime) {
+const executionConfig = resolveExecutionConfig(config);
+const cleanupRuntime = competitionBackend.containerRuntime
+  ?? (executionConfig.backend === "docker" ? new DockerContainerRuntime(executionConfig) : undefined);
+if (cleanupRuntime) {
   try {
-    const recovered = await competitionBackend.containerRuntime.reapStale({
-      olderThanMs: resolveExecutionConfig(config).staleContainerTtlMs,
+    const recovered = await cleanupRuntime.reapStale({
+      olderThanMs: executionConfig.staleContainerTtlMs,
       includeRunning: true,
     });
     if (recovered > 0) console.log(`Recovered ${recovered} stale ProofBlade container${recovered === 1 ? "" : "s"}.`);

@@ -98,8 +98,23 @@ export function parseCompetitionTargets(connectionInfo: string | undefined): Con
     const port = match[3] ?? (match[1].toLowerCase() === "https" ? "443" : match[1].toLowerCase() === "http" ? "80" : undefined);
     add(match[2], port, protocol);
   }
-  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\s+(?:(?:-[a-z]*u[a-z]*|--udp)\s+)+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "udp");
-  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\s+(?!-u\b|--udp\b)((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "tcp");
+  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\b([^\r\n;|&]*)/gi)) {
+    const tokens = match[1].trim().split(/\s+/).filter(Boolean);
+    let index = 0;
+    let protocol: ContainerTargetProtocol = "tcp";
+    while (index < tokens.length) {
+      const token = tokens[index]!;
+      if (token === "--") { index += 1; break; }
+      if (!token.startsWith("-")) break;
+      if (token === "--udp" || (token.startsWith("-") && !token.startsWith("--") && token.slice(1).includes("u"))) protocol = "udp";
+      if (/^-(?:w|p|s|b|I|T)$/.test(token)) index += 1;
+      index += 1;
+    }
+    const host = tokens[index];
+    const port = tokens[index + 1];
+    if (host && port) add(host, port, protocol);
+  }
+  for (const match of connectionInfo.matchAll(/\b(udp|tcp)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[2], match[3], match[1].toLowerCase() === "udp" ? "udp" : "tcp");
   for (const match of connectionInfo.matchAll(/\b(?:socat)\s+(?:[^\s]+\s+)*(TCP|UDP):((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[2], match[3], match[1].toLowerCase() === "udp" ? "udp" : "tcp");
   for (const match of connectionInfo.matchAll(/\b(?:telnet|socat)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "tcp");
   for (const match of connectionInfo.matchAll(/\b((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) {

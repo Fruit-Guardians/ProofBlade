@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { resolveExecutionConfig, type ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode } from "../domain/types.js";
-import { CompetitionChallengeError, type CompetitionApi } from "./api.js";
+import { CompetitionChallengeError, CompetitionContainerError, type CompetitionApi } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
@@ -55,7 +55,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         if (!doctor.daemon || doctor.image?.available === false) throw new Error(doctor.reason ?? `Docker image unavailable: ${doctor.image?.name ?? "unknown"}`);
       } catch (error) {
         this.throwIfAborted(request.signal, error);
-        return competitionFailure("prepare Docker execution", error);
+        return competitionFailure("prepare Docker execution", new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
       }
     }
 
@@ -134,7 +134,9 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         }) : undefined;
       } catch (error) {
         this.throwIfAborted(request.signal, error);
-        return competitionFailure("create Docker execution", error);
+        return competitionFailure("create Docker execution", error instanceof CompetitionChallengeError
+          ? error
+          : new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
       }
       try {
         const outcome = await runCompetitionLoop(this.init.root, this.init.config, services, {
@@ -193,6 +195,9 @@ function competitionFailure(operation: string, error: unknown): ChallengeSolveRe
   const cause = error instanceof Error ? error.message : String(error);
   if (error instanceof CompetitionChallengeError) {
     return { solved: false, status: "CHALLENGE_ERROR", reason: `Challenge ${operation} failed: ${cause}` };
+  }
+  if (error instanceof CompetitionContainerError) {
+    return { solved: false, status: "CONTAINER_ERROR", reason: `Container ${operation} failed: ${cause}` };
   }
   return { solved: false, status: "PLATFORM_ERROR", reason: `Platform ${operation} failed: ${cause}` };
 }

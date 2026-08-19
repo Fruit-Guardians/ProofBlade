@@ -124,13 +124,17 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     let networkName: string | undefined;
     let gatewayContainerId: string | undefined;
     let containerId: string | undefined;
+    let gatewayCreateAttempted = false;
+    let solverCreateAttempted = false;
     try {
       if (request.networkPolicy === "target-only") {
         networkName = `proofblade-${slug}-g${request.generation}-net`;
         await this.runChecked(["network", "create", "--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.owner_pid=${process.pid}`, "--label", `proofblade.owner_started_at=${PROCESS_STARTED_AT}`, "--ipv6=false", networkName]);
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
-        const gateway = await this.runChecked(["run", "-d", "--name", `${name}-gateway`, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
+        const gatewayName = `${name}-gateway`;
+        gatewayCreateAttempted = true;
+        const gateway = await this.runChecked(["run", "-d", "--name", gatewayName, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
         gatewayContainerId = gateway.stdout.trim();
         const targets = await resolveTargets(request.targets);
         // Invoke through /bin/sh instead of relying on the script's shebang;
@@ -145,13 +149,20 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       else if (request.networkPolicy === "bridge") args.push("--network", "bridge");
       else if (gatewayContainerId) args.push("--network", `container:${gatewayContainerId}`);
       args.push(request.image, "sleep", "infinity");
+      solverCreateAttempted = true;
       const created = await this.runChecked(args);
       containerId = created.stdout.trim();
       await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
       return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
     } catch (error) {
-      const cleanupErrors = await this.cleanupResources(containerId, gatewayContainerId, networkName);
+      const cleanupErrors = await this.cleanupResources(
+        containerId,
+        gatewayContainerId,
+        networkName,
+        solverCreateAttempted ? name : undefined,
+        gatewayCreateAttempted ? `${name}-gateway` : undefined,
+      );
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
     }
@@ -187,7 +198,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   }
 
   public async destroy(ref: ContainerRef): Promise<void> {
-    const failures = await this.cleanupResources(ref.containerId, ref.gatewayContainerId, ref.networkName);
+    const failures = await this.cleanupResources(ref.containerId, ref.gatewayContainerId, ref.networkName, ref.name, ref.networkName ? `${ref.name}-gateway` : undefined);
     if (failures.length > 0) throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
   }
 
@@ -271,13 +282,15 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string): Promise<Error[]> {
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string, solverName?: string, gatewayName?: string): Promise<Error[]> {
     const failures: Error[] = [];
     const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
       try { await operation(); } catch (error) { failures.push(toError(error, label)); }
     };
-    if (containerId) await attempt(`solver container ${containerId}`, () => this.removeContainer(containerId));
-    if (gatewayContainerId) await attempt(`gateway container ${gatewayContainerId}`, () => this.removeContainer(gatewayContainerId));
+    const solverTarget = containerId ?? solverName;
+    const gatewayTarget = gatewayContainerId ?? gatewayName;
+    if (solverTarget) await attempt(`solver container ${solverTarget}`, () => this.removeContainer(solverTarget));
+    if (gatewayTarget) await attempt(`gateway container ${gatewayTarget}`, () => this.removeContainer(gatewayTarget));
     if (networkName) await attempt(`network ${networkName}`, () => this.removeNetwork(networkName));
     return failures;
   }
@@ -342,17 +355,20 @@ async function prepareWorkspace(workspace: string): Promise<string> {
     return `${process.getuid()}:${process.getgid()}`;
   }
   // Root-created Linux bind mounts otherwise appear owned by root inside the
-  // fixed non-root image user. Restrict this chmod to the exact per-run path.
-  if (process.platform !== "win32") await makeWorkspaceWritable(workspace);
+  // fixed non-root image user. Chown the exact per-run tree to that user and
+  // grant only owner/group access; never make challenge credentials world-readable.
+  if (process.platform !== "win32") await makeWorkspaceWritable(workspace, 1001, 1001);
   return "1001:1001";
 }
 
-async function makeWorkspaceWritable(root: string): Promise<void> {
+async function makeWorkspaceWritable(root: string, uid: number, gid: number): Promise<void> {
   const visit = async (path: string): Promise<void> => {
     const stat = await fs.lstat(path);
     if (stat.isSymbolicLink()) return;
     const existingMode = stat.mode & 0o7777;
-    await fs.chmod(path, existingMode | (stat.isDirectory() ? 0o777 : 0o666));
+    await fs.chown(path, uid, gid);
+    const executable = existingMode & 0o111;
+    await fs.chmod(path, stat.isDirectory() ? 0o770 : (0o660 | executable));
     if (!stat.isDirectory()) return;
     for (const entry of await fs.readdir(path, { withFileTypes: true })) await visit(resolve(path, entry.name));
   };

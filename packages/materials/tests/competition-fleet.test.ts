@@ -170,3 +170,21 @@ test("a competition-platform failure trips the same fleet circuit", async () => 
   assert.equal(snapshot.totals.failed, 1);
   assert.equal(snapshot.totals.pending, 1);
 });
+
+test("a container failure is challenge-scoped and does not trip the fleet circuit", async () => {
+  const ids = [challenge("broken-container", 30), challenge("healthy", 20)];
+  const attempted: string[] = [];
+  const solver: ChallengeSolver = {
+    async solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult> {
+      attempted.push(request.challenge.challengeId);
+      return request.challenge.challengeId === "broken-container"
+        ? { solved: false, status: "CONTAINER_ERROR", reason: "workspace write probe failed" }
+        : { solved: true, status: "SOLVED" };
+    },
+  };
+  const snapshot = await new FleetScheduler({ api: new FakeApi(ids), solver, concurrency: 1 }).run();
+  assert.deepEqual(attempted, ["broken-container", "healthy"]);
+  assert.equal(snapshot.totals.failed, 1);
+  assert.equal(snapshot.totals.solved, 1);
+  assert.equal(snapshot.totals.pending, 0);
+});
