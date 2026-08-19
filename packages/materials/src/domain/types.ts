@@ -57,8 +57,12 @@ export interface RunVersionSnapshot {
   skills: Array<{ name: string; contentHash: string }>;
   mcpCatalogHash: string;
   mcpServers: Array<{ name: string; configHash: string; disabled: boolean }>;
+  toolCatalogHash: string;
+  toolCatalog: Array<{ id: string; name: string; kind: ToolKind; path: string; contentHash: string }>;
   hash: string;
 }
+
+export type ToolKind = "tool" | "interpreter" | "toolchain";
 
 export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "misc" | "mixed";
 
@@ -516,6 +520,8 @@ export interface RuntimeResourceSnapshot {
   skills: Array<{ name: string; description: string; contentHash: string }>;
   mcpCatalogHash: string;
   mcpServers: Array<{ name: string; description: string; configHash: string }>;
+  toolCatalogHash: string;
+  toolCatalog: Array<{ id: string; name: string; kind: ToolKind; path: string; description: string }>;
 }
 
 export interface ContextBuildInput {

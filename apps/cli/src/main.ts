@@ -16,6 +16,7 @@ import {
   PlannerCoordinator,
   ProofBladeToolRuntime,
   ProofBladeSkillRegistry,
+  ProofBladeToolCatalogRegistry,
   McpProjectRegistry,
   listBundledCapabilities,
   projectionHash,
@@ -137,6 +138,19 @@ async function main(): Promise<void> {
       if (action === "list") print({ catalogHash: registry.catalogHash(), skills: registry.list(), diagnostics: registry.diagnostics });
       else if (action === "show") print(registry.loadForModel(required(rest[0], "skill name"), rest[1] === undefined ? undefined : Number(rest[1])));
       else throw new Error("skills action must be list or show");
+      break;
+    }
+    case "tools": {
+      const registry = await ProofBladeToolCatalogRegistry.load(root);
+      const action = arg ?? "list";
+      if (action === "list") print({ catalogHash: registry.catalogHash(), tools: registry.list(), diagnostics: registry.diagnostics });
+      else if (action === "probe") print({ catalogHash: registry.catalogHash(), diagnostics: [...registry.diagnostics, ...(await registry.probe())] });
+      else if (action === "show") {
+        const id = required(rest[0], "tool id");
+        const entry = registry.get(id);
+        if (!entry) throw new Error(`Unknown tool id: ${id}`);
+        print({ tool: entry });
+      } else throw new Error("tools action must be list, probe, or show");
       break;
     }
     case "solve": {
@@ -409,6 +423,7 @@ function helpText(): string {
     "  capabilities",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",
+    "  tools [list|probe|show] [tool-id]      Host-local tool catalog (tool-catalog.json)",
     "  skill <run-id> <skill-name> [additional instructions]",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",

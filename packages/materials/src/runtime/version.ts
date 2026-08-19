@@ -4,6 +4,7 @@ import { canonicalJson, sha256 } from "../domain/utils.js";
 import { CONTEXT_COMPILER_VERSION, PROOFBLADE_STANDING_INSTRUCTIONS } from "../context/compiler.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import { solverToolContractHash } from "./solver-tools.js";
 
 export const PROOFBLADE_RUNTIME_VERSION = "0.1.0";
@@ -22,6 +23,7 @@ export const SOLVER_PROTOCOL_INSTRUCTIONS = [
 export async function createRunVersionSnapshot(projectRoot: string, config: ProofBladeConfig): Promise<RunVersionSnapshot> {
   const skills = await ProofBladeSkillRegistry.load(projectRoot);
   const mcp = McpProjectRegistry.load(projectRoot);
+  const toolCatalog = await ProofBladeToolCatalogRegistry.load(projectRoot);
   const mcpServers = mcp.summaries().map(({ name, configHash, disabled }) => ({ name, configHash, disabled }));
   const base = {
     schemaVersion: 1 as const,
@@ -39,6 +41,8 @@ export async function createRunVersionSnapshot(projectRoot: string, config: Proo
     skills: skills.list({ includeDisabled: true }).map(({ name, contentHash }) => ({ name, contentHash })),
     mcpCatalogHash: mcp.catalogHash(),
     mcpServers,
+    toolCatalogHash: toolCatalog.catalogHash(),
+    toolCatalog: toolCatalog.list().map(({ id, name, kind, path, contentHash }) => ({ id, name, kind, path, contentHash })),
   };
   return { ...base, hash: sha256(canonicalJson(base)) };
 }

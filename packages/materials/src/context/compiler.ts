@@ -32,9 +32,9 @@ export class ContextCompiler {
     const safetyMargin = input.safetyMargin ?? Math.min(4_096, Math.max(512, Math.floor(contextWindow * 0.05)));
     const availableInput = Math.max(256, contextWindow - outputBudget - safetyMargin);
 
-    const resources = input.resources ?? { version: 1 as const, skillCatalogHash: EMPTY_SKILL_CATALOG_HASH, skills: [], mcpCatalogHash: EMPTY_SKILL_CATALOG_HASH, mcpServers: [] };
+    const resources = input.resources ?? { version: 1 as const, skillCatalogHash: EMPTY_SKILL_CATALOG_HASH, skills: [], mcpCatalogHash: EMPTY_SKILL_CATALOG_HASH, mcpServers: [], toolCatalogHash: EMPTY_SKILL_CATALOG_HASH, toolCatalog: [] };
     const standingInstructions = PROOFBLADE_STANDING_INSTRUCTIONS;
-    const l0 = [standingInstructions, formatSkillCatalog(resources), formatMcpCatalog(resources)].filter(Boolean).join("\n\n");
+    const l0 = [standingInstructions, formatSkillCatalog(resources), formatMcpCatalog(resources), formatToolCatalog(resources)].filter(Boolean).join("\n\n");
     const l1 = JSON.stringify({ task_id: task.task_id, target: task.target, objective: task.objective, inputs: task.inputs, success_criteria: task.success_criteria, scope: task.scope, constraints: task.constraints });
     const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: openIntents.map((intent) => intent.id), active_handoffs: handoffs.map((handoff) => ({ id: handoff.id, status: handoff.status, knowledgeVersion: handoff.knowledgeVersion })) });
     const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, reasoningTrees, completions, jobs, handoffs, inFlightEffects, leases: Object.values(snapshot.leases), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
@@ -134,6 +134,16 @@ function formatMcpCatalog(resources: ContextManifest["resources"]): string {
     "MCP server metadata is trusted project configuration. Use list_capabilities and the mcp.<name> describe operation before call.",
     ...resources.mcpServers.map((server) => `<server name="${safeAttribute(server.name)}" config-hash="${safeAttribute(server.configHash)}">${safeLedgerText(server.description)}</server>`),
     "</available-mcp-servers>",
+  ].join("\n");
+}
+
+function formatToolCatalog(resources: ContextManifest["resources"]): string {
+  if (resources.toolCatalog.length === 0) return "";
+  return [
+    `<tool-catalog catalog-hash="${safeAttribute(resources.toolCatalogHash)}">`,
+    "Tool catalog entries are host-local paths trusted as project configuration. Call them with bash by their exact path; treat the path as the canonical spelling.",
+    ...resources.toolCatalog.map((tool) => `<tool name="${safeAttribute(tool.name)}" kind="${safeAttribute(tool.kind)}" path="${safeAttribute(tool.path)}">${safeLedgerText(tool.description)}</tool>`),
+    "</tool-catalog>",
   ].join("\n");
 }
 
