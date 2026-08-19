@@ -22,7 +22,6 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 配置模型可用时启用的 Pi JSONL Session 适配器。
 - 带规范哈希的稳定能力目录、经过效果日志的 `invoke_capability` 和可取消、可恢复的后台任务。
 - 项目级 Skill Registry：元数据常驻 ContextManifest，正文通过 `load_skill` 或 Pi 原生 Skill Turn 按需加载。
-- 本机 Tool Catalog（`tool-catalog.json`）：静态手写的本机工具/解释器/工具链清单，元数据常态化注入 Coding 系统提示（稳定前缀），带规范哈希进入版本快照；路径失效仅告警不阻断。
 - 项目级 MCP stdio：`.mcp.json` 配置、延迟发现、固定 `mcp_call` 代理、Capability 映射、效果日志、脱敏和进程回收。
 - 完整 Tool Contract 规范哈希：版本、超时、资源键、敏感度和重放策略均进入快照；失败以结构化错误和 Pi `isError` 返回。
 - Durable 运行观测：Provider/Tool/Effect 指标、成本与缓存 Token 汇总、主失败分类，以及 Prompt/Tool/Skill/MCP/Runtime 版本快照。
@@ -135,7 +134,6 @@ proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
-proofblade tools [list|probe|show] [tool-id]
 proofblade skill <run-id> <skill-name> [additional instructions]
 proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>
@@ -190,7 +188,6 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 - `docs/tool-contract.md`：工具契约、效果、重放和制品规则。
 - `docs/eval-protocol.md`：确定性评测指标和回归门槛。
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。
-- `docs/tool-catalog.md`：本机 Tool Catalog 的 schema、注入与哈希约定。
 - `docs/recovery.md`：六个故障注入窗口、恢复顺序和收敛不变量。
 - `docs/gui.md`：动态调试 GUI、Tool 调试对象、Script Lab 和本地 API。
 - `docs/project/PLAN.md`：当前开发计划和依赖关系。
