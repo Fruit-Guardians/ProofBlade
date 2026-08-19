@@ -80,6 +80,9 @@ export async function runCompetitionLoop(
   let lastText: string | undefined;
   let termination: string | undefined;
   let stopReason: CompetitionLoopOutcome["stopReason"] = "max_turns";
+  let forceReplan = false;
+  let replanReason: string | undefined;
+  let guardReplans = 0;
 
   try {
     lane = await createLane({
@@ -124,11 +127,21 @@ export async function runCompetitionLoop(
       turns += 1;
       const preTurnSnapshot = await services.control.snapshot(options.runId);
       const submissionsSoFar = countSubmissions(preTurnSnapshot);
-      const outcome = await activeLane.prompt(turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot, { submissionsSoFar }));
+      const prompt = turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot, {
+        submissionsSoFar,
+        forceReplan,
+        previousTermination: replanReason,
+      });
+      forceReplan = false;
+      replanReason = undefined;
+      const outcome = await activeLane.prompt(prompt);
       lastText = outcome.text || lastText;
       termination = outcome.termination ?? termination;
       const snapshot = await services.control.snapshot(options.runId);
       if (accepted(snapshot)) {
+        // A prior recoverable guard may have caused a replan, but the run is
+        // solved now; do not report that intermediate guard as the final stop.
+        termination = undefined;
         stopReason = "solved";
         break;
       }
@@ -151,6 +164,15 @@ export async function runCompetitionLoop(
         break;
       }
       if (outcome.termination) {
+        if (isRecoverableTurnGuard(outcome.termination) && guardReplans < MAX_GUARD_REPLANS) {
+          // A guard only stopped the current provider turn. Keep the same lane
+          // and durable session, but make the next prompt an explicit evidence-
+          // summary/replan instead of the generic "continue" nudge.
+          guardReplans += 1;
+          forceReplan = true;
+          replanReason = outcome.termination;
+          continue;
+        }
         stopReason = "terminated";
         break;
       }
@@ -200,12 +222,14 @@ function countSubmissions(snapshot: RunSnapshot): number {
 
 /**
  * Number of turns without a single submission after which the loop injects a
- * hard replan directive. In the failed CH-10662 run the model spent 90 turns
- * rewriting the same broken parser without ever calling submit_flag or
- * reconsidering its hypothesis. A single mid-run kick that the model cannot
- * miss is much cheaper than every prior stall breaker fires being missed.
+ * hard replan directive. In the failed CH-10662 run the model spent dozens of
+ * tool calls inside one provider turn rewriting the same broken parser without
+ * ever calling submit_flag or reconsidering its hypothesis. A single mid-run
+ * kick that the model cannot miss is much cheaper than waiting for every outer
+ * turn-level stall breaker.
  */
 const REPLAN_NUDGE_AFTER_TURNS = 12;
+const MAX_GUARD_REPLANS = 2;
 
 /**
  * The turn prompt. Turn 1 states the challenge; later turns are a short nudge,
@@ -219,10 +243,10 @@ const REPLAN_NUDGE_AFTER_TURNS = 12;
  * a model that has run twelve turns of the same failing approach won't
  * self-correct from a generic "continue".
  */
-export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number } = { submissionsSoFar: 0 }): string {
+export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string } = { submissionsSoFar: 0 }): string {
   if (turn > 1) {
-    if (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS) {
-      return replanNudge(task.target_kind, turn);
+    if (progress.forceReplan || (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS)) {
+      return replanNudge(task.target_kind, turn, progress.previousTermination);
     }
     return "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag.";
   }
@@ -234,9 +258,9 @@ export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: stri
   return lines.join("\n");
 }
 
-function replanNudge(kind: TargetKind, turn: number): string {
+function replanNudge(kind: TargetKind, turn: number, previousTermination?: string): string {
   const lines = [
-    `[ProofBlade replan checkpoint — turn ${turn} without a submit_flag call]`,
+    `[ProofBlade replan checkpoint — turn ${turn}${previousTermination ? ` after ${previousTermination}` : " without a submit_flag call"}]`,
     "The current strategy has consumed many turns without producing a flag. Stop iterating on the same exploit or parser: it is either wrong or blocked on a hypothesis you have not questioned.",
     "In THIS turn:",
     "1. Write ONE short paragraph naming the strongest evidence you have and the assumption your current approach depends on.",
@@ -256,4 +280,8 @@ function replanNudge(kind: TargetKind, turn: number): string {
     lines.push("- For reverse: open the target in the decompiler MCP if you have not, and work from pseudocode instead of another objdump pass.");
   }
   return lines.join("\n");
+}
+
+function isRecoverableTurnGuard(reason: string): boolean {
+  return reason === "experiment_budget" || reason === "no_progress" || reason === "repeated_tool_failure" || reason === "tool_failure_storm";
 }

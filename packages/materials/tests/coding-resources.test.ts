@@ -18,6 +18,7 @@ import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
+import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -157,6 +158,56 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
     assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
     assert.equal(verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`).status, "verified");
     assert.equal(verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042").status, "unverified");
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("coding bash is blocked after the durable evidence curation threshold", async () => {
+  const root = resolve(import.meta.dirname, "../../..", "tmp");
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, "coding-curation-runtime-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(dir, config);
+  const runId = "CODING-CURATION-RUNTIME-TEST";
+  await services.control.createRun(runId, demoTask(runId, dir, config));
+  for (let index = 0; index < 8; index += 1) {
+    await services.artifacts.putText(runId, `probe-${index}`, {
+      filename: `probe-${index}.txt`,
+      semantic: {
+        name: `probe ${index}`,
+        summary: "unreviewed probe output",
+        tags: ["bash", "command-output"],
+        role: "intermediate",
+        relatedIds: [],
+        annotatedBy: "harness",
+      },
+    });
+  }
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const context = {
+    env,
+    skills: {},
+    mcp: {},
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+    claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts),
+    evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
+    evidenceCurationGate: new EvidenceCurationGate(runId, services.control),
+  } as unknown as CodingResourceContext;
+  const bash = createCodingTools().find((tool) => tool.name === "bash");
+  assert.ok(bash);
+  try {
+    await assert.rejects(
+      () => bash.execute("curation-gate-bash", { command: "echo should-not-run" }, new AbortController().signal, undefined, context),
+      /evidence curation required/,
+    );
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });

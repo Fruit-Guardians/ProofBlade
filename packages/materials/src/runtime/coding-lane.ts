@@ -22,6 +22,7 @@ import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/evidence-graph.js";
+import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
@@ -32,14 +33,14 @@ import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
-import { NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
 Respond naturally to ordinary conversation. Use workspace tools only when the user's request benefits from inspecting, running, or editing project files. Explain completed work concisely and preserve the user's existing changes.
 
-Tool output you receive is complete unless it says otherwise. Only when a result ends with a ProofBlade artifact anchor (\`A-*\` id, stating how many bytes were withheld) is there more to fetch — then read that id with the evidence tool rather than re-running the command. No anchor means nothing was withheld, so do not go looking for a fuller copy. Every tool output is archived regardless, and \`evidence search\` matches archived text, so a query can recover something that scrolled out of context. The evidence tools (record, annotate, inspect_forest, inspect_tree, search) are OPTIONAL note-taking aids — use them only if they help you, never as a required step, and never let them interrupt active investigation.
+Tool output you receive is complete unless it says otherwise. Only when a result ends with a ProofBlade artifact anchor (\`A-*\` id, stating how many bytes were withheld) is there more to fetch — then read that id with the evidence tool rather than re-running the command. No anchor means nothing was withheld, so do not go looking for a fuller copy. Every tool output is archived regardless, and \`evidence search\` matches archived text, so a query can recover something that scrolled out of context. The evidence tools (record, annotate, inspect_forest, inspect_tree, search) are optional during an initial pass. If a ProofBlade evidence-curation or experiment-budget message appears, stop probing, preserve the strongest finding with record/annotate, and continue only after the next replan turn; do not bypass the guard by issuing another equivalent bash call.
 
 Anything that will take more than about a minute — a brute force, a wide sweep, a fuzzer, a server you need running — belongs in \`shell_background\`, not \`bash\`. \`bash\` blocks until the command finishes, so a long sweep freezes your whole turn; \`shell_background\` returns a job id immediately and you keep working, then poll with \`shell_job\`. Do not poll in a tight loop: start the job, do other analysis, and check back.
 
@@ -66,6 +67,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
     private readonly progressBreaker: NoProgressToolBreaker,
     private readonly failureStormBreaker: ToolFailureStormBreaker,
+    private readonly experimentBudgetBreaker: ExperimentBudgetBreaker,
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
@@ -136,6 +138,11 @@ export class PiCodingLane implements AgentLanePort {
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
     const claimVerifier = new CodingClaimVerifier(options.runId, options.controlStore, artifactStore);
     const evidenceGraph = new CodingEvidenceGraph(options.runId, options.controlStore, artifactStore);
+    // Wire the curation gate into every coding lane. Without this optional
+    // context being populated, read/bash artifacts are archived but never
+    // force the model to review durable findings, allowing an unbounded probe
+    // loop inside a single provider turn.
+    const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
     const forestContext = { value: formatReasoningForestContext(await evidenceGraph.inspectForest()) };
     const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
     const snapshot = await options.controlStore.snapshot(options.runId);
@@ -188,6 +195,7 @@ export class PiCodingLane implements AgentLanePort {
       enabledMcpServers,
       claimVerifier,
       evidenceGraph,
+      evidenceCurationGate,
       runtime,
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
@@ -212,6 +220,7 @@ export class PiCodingLane implements AgentLanePort {
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
     const failureStormBreaker = new ToolFailureStormBreaker();
+    const experimentBudgetBreaker = new ExperimentBudgetBreaker();
     const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
@@ -225,7 +234,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -264,6 +273,7 @@ export class PiCodingLane implements AgentLanePort {
       repeatBreaker,
       progressBreaker,
       failureStormBreaker,
+      experimentBudgetBreaker,
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
       async () => {
@@ -281,6 +291,7 @@ export class PiCodingLane implements AgentLanePort {
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();
+    this.experimentBudgetBreaker.reset();
     delete this.termination.message;
     delete this.termination.reason;
     this.termination.requested = false;

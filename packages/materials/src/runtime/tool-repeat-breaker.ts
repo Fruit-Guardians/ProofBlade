@@ -26,6 +26,98 @@ export interface ToolFailureDecision {
 
 export type NoProgressWindow = "read" | "declared_no_progress";
 
+export type ExperimentBudgetReason = "tool_calls" | "long_running" | "timeouts" | "experiment_family";
+
+export interface ExperimentBudgetDecision {
+  count: number;
+  terminate: boolean;
+  key: string;
+  reason?: ExperimentBudgetReason;
+  family?: string;
+}
+
+export interface ExperimentBudgetLimits {
+  /** Maximum process/network experiment calls in one provider turn. */
+  maxExperimentCalls?: number;
+  /** Maximum calls that look like long-running probes in one provider turn. */
+  maxLongRunning?: number;
+  /** Maximum timeout/deadline failures before requiring a strategy change. */
+  maxTimeouts?: number;
+  /** Maximum members of one normalized experiment family. */
+  maxFamily?: number;
+}
+
+/**
+ * Bounds successful-but-unproductive probes inside one provider request.
+ *
+ * The outer competition loop can only see a completed `lane.prompt()`. A
+ * coding model may therefore issue dozens of successful bash calls before the
+ * outer turn-level replan nudge runs. This breaker deliberately counts only
+ * process/network experiments (not ordinary reads or edits), and leaves the
+ * durable evidence record as the escape hatch for a genuinely new finding.
+ */
+export class ExperimentBudgetBreaker {
+  private experimentCalls = 0;
+  private longRunning = 0;
+  private timeouts = 0;
+  private readonly families = new Map<string, number>();
+  private readonly limits: Required<ExperimentBudgetLimits>;
+
+  public constructor(limits: ExperimentBudgetLimits = {}) {
+    this.limits = {
+      maxExperimentCalls: limits.maxExperimentCalls ?? 28,
+      maxLongRunning: limits.maxLongRunning ?? 4,
+      maxTimeouts: limits.maxTimeouts ?? 2,
+      maxFamily: limits.maxFamily ?? 6,
+    };
+    for (const [name, value] of Object.entries(this.limits)) {
+      if (!Number.isInteger(value) || value < 1) throw new Error(`Experiment budget ${name} must be a positive integer`);
+    }
+  }
+
+  public observe(observation: ToolFailureObservation): ExperimentBudgetDecision {
+    if (isDurableProgressObservation(observation)) {
+      // A durable note/verification is a real strategy checkpoint. Preserve
+      // the hard total-call ceiling, but let the next hypothesis start with a
+      // fresh long-running/timeout/family budget.
+      this.longRunning = 0;
+      this.timeouts = 0;
+      this.families.clear();
+      return { count: this.experimentCalls, terminate: false, key: "" };
+    }
+    if (!isExperimentObservation(observation)) return { count: this.experimentCalls, terminate: false, key: "" };
+
+    this.experimentCalls += 1;
+    const command = commandText(observation);
+    const long = isLongRunningCommand(command, observation);
+    if (long) this.longRunning += 1;
+    if (isTimeoutObservation(observation, command)) this.timeouts += 1;
+    const family = experimentFamily(observation, command);
+    const familyCount = family ? (this.families.set(family, (this.families.get(family) ?? 0) + 1), this.families.get(family)!) : 0;
+
+    if (this.experimentCalls >= this.limits.maxExperimentCalls) {
+      return { count: this.experimentCalls, terminate: true, key: "experiment-calls", reason: "tool_calls", ...(family ? { family } : {}) };
+    }
+    if (this.longRunning >= this.limits.maxLongRunning) {
+      return { count: this.longRunning, terminate: true, key: "long-running", reason: "long_running", ...(family ? { family } : {}) };
+    }
+    if (this.timeouts >= this.limits.maxTimeouts) {
+      return { count: this.timeouts, terminate: true, key: "timeouts", reason: "timeouts", ...(family ? { family } : {}) };
+    }
+    if (family && familyCount >= this.limits.maxFamily) {
+      return { count: familyCount, terminate: true, key: family, reason: "experiment_family", family };
+    }
+    return { count: this.experimentCalls, terminate: false, key: family ?? "" };
+  }
+
+  public reset(): void {
+    this.experimentCalls = 0;
+    this.longRunning = 0;
+    this.timeouts = 0;
+    this.families.clear();
+  }
+}
+
 /** Stops a lane when the model repeats an identical failing tool call. */
 export class RepeatedToolFailureBreaker {
   private lastKey: string | undefined;
@@ -185,6 +277,21 @@ export function toolFailureStormMessage(count: number): string {
   ].join("\n");
 }
 
+export function experimentBudgetMessage(decision: ExperimentBudgetDecision): string {
+  const label = decision.reason === "experiment_family"
+    ? "the same experiment family"
+    : decision.reason === "long_running"
+      ? "long-running probes"
+      : decision.reason === "timeouts"
+        ? "timed-out probes"
+        : "process/network experiment calls";
+  return [
+    `[ProofBlade experiment budget: ${label} reached the per-turn limit (${decision.count})]`,
+    "The current provider turn was stopped before another probe could repeat the same approach.",
+    "Preserve the strongest observation in an evidence record or annotate an existing artifact, state one alternative hypothesis, then continue in the next turn with one bounded test.",
+  ].join("\n");
+}
+
 function observationKey(observation: ToolFailureObservation): string | undefined {
   const declaredProgressKey = stableString(observation.details, "progressKey");
   if (declaredProgressKey) return sha256(canonicalJson({ toolName: observation.toolName, progressKey: declaredProgressKey }));
@@ -211,6 +318,59 @@ function isDurableEffect(observation: ToolFailureObservation): boolean {
 
 function isNoProgressObservation(observation: ToolFailureObservation): boolean {
   return stableBoolean(observation.details, "durableProgress") === false || isPureReadOnlyObservation(observation);
+}
+
+function isDurableProgressObservation(observation: ToolFailureObservation): boolean {
+  if (observation.isError) return false;
+  const declaredProgress = stableBoolean(observation.details, "durableProgress");
+  if (declaredProgress !== undefined) return declaredProgress;
+  if (observation.toolName === "verify_claim" || observation.toolName === "submit_flag") return true;
+  if (observation.toolName !== "evidence") return false;
+  const operation = isRecord(observation.input) && typeof observation.input.operation === "string"
+    ? observation.input.operation
+    : undefined;
+  return operation === "record" || operation === "annotate";
+}
+
+function isExperimentObservation(observation: ToolFailureObservation): boolean {
+  if (observation.toolName === "shell_background") return true;
+  if (observation.toolName !== "bash") return false;
+  const command = commandText(observation);
+  return /\b(?:python(?:3)?|node|ruby|perl|nc|socat|curl|wget|ffuf|sqlmap|nmap|gdb|qemu|checksec|timeout|fuzz|afl|probe|exploit)\b/i.test(command)
+    || /\b(?:for|while)\b[\s\S]*\b(?:in|do)\b/i.test(command);
+}
+
+function isLongRunningCommand(command: string, observation: ToolFailureObservation): boolean {
+  if (observation.toolName === "shell_background") return true;
+  return /\btimeout\s+\d+|--timeout(?:=|\s+)\d+|\b(?:for|while)\b[\s\S]*\b(?:in|do)\b|\b(?:fuzz|afl|nmap|ffuf|sqlmap)\b/i.test(command);
+}
+
+function isTimeoutObservation(observation: ToolFailureObservation, command: string): boolean {
+  if (!observation.isError) return false;
+  return /timeout|timed out|deadline|killed after/i.test(observation.content.map((item) => item.text ?? "").join("\n"))
+    || /\btimeout\s+\d+|--timeout(?:=|\s+)/i.test(command);
+}
+
+function commandText(observation: ToolFailureObservation): string {
+  if (observation.toolName === "shell_background") {
+    return typeof observation.input.command === "string" ? observation.input.command : JSON.stringify(observation.input);
+  }
+  return typeof observation.input.command === "string" ? observation.input.command : JSON.stringify(observation.input);
+}
+
+function experimentFamily(observation: ToolFailureObservation, command: string): string | undefined {
+  if (observation.toolName !== "bash" && observation.toolName !== "shell_background") return undefined;
+  // Heredoc bodies contain the changing payload; classify by the invocation
+  // prefix so probe1.py/probe2.py remain one family without hashing secrets.
+  const prefix = command.split(/<<\s*['"]?[A-Za-z_][A-Za-z0-9_-]*['"]?/)[0] ?? command;
+  const normalized = prefix
+    .replace(/\b(probe|exploit|attempt|trial|run)\d+\b/gi, "$1#")
+    .replace(/0x[0-9a-f]+/gi, "0x#")
+    .replace(/\b\d+\b/g, "#")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+  return normalized ? sha256(canonicalJson({ toolName: observation.toolName, command: normalized })) : undefined;
 }
 
 function stableArtifactHash(details: unknown): string | undefined {

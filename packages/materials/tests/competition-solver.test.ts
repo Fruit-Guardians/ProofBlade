@@ -246,6 +246,33 @@ test("dynamic-flag challenge is submitted directly without a model run", async (
   }
 });
 
+test("a recoverable inner-turn guard triggers an evidence-first replan before the next solve attempt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-replan-"));
+  try {
+    const api = new FakeApi([{ id: "REPLAN", value: 100, flag: "flag{replanned}" }]);
+    let prompts = 0;
+    const replanLane: CompetitionLaneFactory = async (options) => {
+      const inner = await flagLane(options);
+      return {
+        ...inner,
+        async prompt(text: string) {
+          prompts += 1;
+          if (prompts === 1) return { text: "experiment budget stopped this provider turn", stopReason: "stop", termination: "experiment_budget" as const, usage: zeroUsage() };
+          assert.match(text, /evidence record|replan checkpoint/i);
+          return await inner.prompt(text);
+        },
+      };
+    };
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 3, createLane: replanLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
+    assert.equal(prompts, 2);
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.deepEqual(api.submitted, [{ id: "REPLAN", flag: "flag{replanned}" }]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("a dynamic-flag platform failure trips the fleet circuit and leaves later challenges pending", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-platform-error-"));
   try {

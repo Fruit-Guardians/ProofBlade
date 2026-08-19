@@ -404,6 +404,10 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(toolCallId, params, signal, onUpdate, context) {
     const input = params as { command: string; label?: string };
+    // Starting a new long-running probe is still investigation. Polling an
+    // existing job remains available, but new background work must stop when
+    // the durable evidence backlog reaches the hard curation threshold.
+    await context.evidenceCurationGate?.assertInvestigationAllowed();
     const jobId = `sh-${toolCallId.slice(-8)}`;
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
     const logPath = `.proofblade/jobs/${jobId}-${slug}.log`;
@@ -652,8 +656,10 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
-      if (!pipeline) return await contract.execute(toolCallId, input, signal, onUpdate, context);
+      // Enforce curation even when a test/custom lane omits output rewriting.
+      // Production lanes also pass this check before starting another probe.
       await context.evidenceCurationGate?.assertInvestigationAllowed();
+      if (!pipeline) return await contract.execute(toolCallId, input, signal, onUpdate, context);
       const ticket = await pipeline.port.prepare({ toolCallId, command: input.command, cwd: context.env.cwd }, signal);
       const executor = createBashTool<CodingResourceContext>({
         async prepare(execution) {
