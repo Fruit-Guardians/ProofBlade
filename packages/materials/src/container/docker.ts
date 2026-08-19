@@ -14,6 +14,8 @@ import type {
   ContainerTarget,
 } from "./contracts.js";
 
+const PROCESS_STARTED_AT = Date.now() - Math.floor(process.uptime() * 1000);
+
 export interface DockerProcessResult {
   stdout: string;
   stderr: string;
@@ -40,6 +42,7 @@ export class SpawnDockerCommandRunner implements DockerCommandRunner {
       let truncated = false;
       let settled = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let abortListener: (() => void) | undefined;
       const child = spawn(this.command, args, { shell: false, windowsHide: true, stdio: [options.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] });
       const append = (kind: "stdout" | "stderr", chunk: string): void => {
         if (kind === "stdout") options.onStdout?.(chunk); else options.onStderr?.(chunk);
@@ -53,6 +56,7 @@ export class SpawnDockerCommandRunner implements DockerCommandRunner {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
+        if (abortListener && options.signal) options.signal.removeEventListener("abort", abortListener);
         resolve({ ...result, stdout, stderr, truncated, durationMs: Date.now() - started });
       };
       child.stdout!.on("data", (chunk: Buffer) => append("stdout", chunk.toString("utf8")));
@@ -73,8 +77,9 @@ export class SpawnDockerCommandRunner implements DockerCommandRunner {
         timer = setTimeout(() => { kill(); finish({ exitCode: null, spawnError: new Error("docker command timed out") }); }, options.timeoutMs);
       }
       if (options.signal) {
-        if (options.signal.aborted) { kill(); finish({ exitCode: null, spawnError: new Error("docker command aborted") }); }
-        else options.signal.addEventListener("abort", () => { kill(); finish({ exitCode: null, spawnError: new Error("docker command aborted") }); }, { once: true });
+        abortListener = () => { kill(); finish({ exitCode: null, spawnError: new Error("docker command aborted") }); };
+        if (options.signal.aborted) abortListener();
+        else options.signal.addEventListener("abort", abortListener, { once: true });
       }
     });
   }
@@ -114,14 +119,15 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     await this.ensureImage(request.image);
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
-    const labels = ["--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.generation=${request.generation}`, "--label", `proofblade.profile=${request.profile}`];
+    const labels = ["--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.generation=${request.generation}`, "--label", `proofblade.profile=${request.profile}`, "--label", `proofblade.owner_pid=${process.pid}`, "--label", `proofblade.owner_started_at=${PROCESS_STARTED_AT}`];
+    const containerUser = await prepareWorkspace(request.workspaceHostPath);
     let networkName: string | undefined;
     let gatewayContainerId: string | undefined;
     let containerId: string | undefined;
     try {
       if (request.networkPolicy === "target-only") {
         networkName = `proofblade-${slug}-g${request.generation}-net`;
-        await this.runChecked(["network", "create", "--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--ipv6=false", networkName]);
+        await this.runChecked(["network", "create", "--label", "proofblade.managed=true", "--label", `proofblade.run_id=${request.runId}`, "--label", `proofblade.owner_pid=${process.pid}`, "--label", `proofblade.owner_started_at=${PROCESS_STARTED_AT}`, "--ipv6=false", networkName]);
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
         const gateway = await this.runChecked(["run", "-d", "--name", `${name}-gateway`, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
@@ -130,10 +136,10 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // Invoke through /bin/sh instead of relying on the script's shebang;
         // this remains robust if a host checkout rewrites executable bits or
         // line endings before the image build.
-        await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.address}:${target.port}`)]);
+        await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
       }
       const limits = request.limits;
-      const args = ["run", "-d", "--name", name, ...labels, "--user", "1001:1001", "--workdir", "/workspace", "--mount", `type=bind,source=${request.workspaceHostPath},destination=/workspace`, ...(request.skillLibraryHostPath ? ["--mount", `type=bind,source=${request.skillLibraryHostPath},destination=/opt/proofblade/skills,readonly`] : []), "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=1g", "--tmpfs", "/run:rw,noexec,nosuid,size=64m", "--pids-limit", String(limits?.pids ?? 512), "--cpus", limits?.cpus ?? "2", "--memory", limits?.memory ?? "4g", "--shm-size", limits?.shmSize ?? "1g", "--ulimit", "nofile=4096:4096", "--ulimit", "fsize=1073741824:1073741824", "--security-opt", "no-new-privileges", "--cap-drop", "ALL"];
+      const args = ["run", "-d", "--name", name, ...labels, "--user", containerUser, "--workdir", "/workspace", "--mount", `type=bind,source=${request.workspaceHostPath},destination=/workspace`, ...(request.skillLibraryHostPath ? ["--mount", `type=bind,source=${request.skillLibraryHostPath},destination=/opt/proofblade/skills,readonly`] : []), "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=1g", "--tmpfs", "/run:rw,noexec,nosuid,size=64m", "--pids-limit", String(limits?.pids ?? 512), "--cpus", limits?.cpus ?? "2", "--memory", limits?.memory ?? "4g", "--shm-size", limits?.shmSize ?? "1g", "--ulimit", "nofile=4096:4096", "--ulimit", "fsize=1073741824:1073741824", "--security-opt", "no-new-privileges", "--cap-drop", "ALL"];
       if (request.profile === "pwn" || request.profile === "pwn-kernel") args.push("--cap-add", "SYS_PTRACE");
       if (request.networkPolicy === "none") args.push("--network", "none");
       else if (request.networkPolicy === "bridge") args.push("--network", "bridge");
@@ -141,6 +147,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       args.push(request.image, "sleep", "infinity");
       const created = await this.runChecked(args);
       containerId = created.stdout.trim();
+      await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
       return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
     } catch (error) {
@@ -186,15 +193,58 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     if (ref.networkName) await this.removeNetwork(ref.networkName);
   }
 
-  public async reapStale(options: { olderThanMs?: number; runId?: string } = {}): Promise<number> {
-    // Reaping without an explicit run id is intentionally disabled: a stale
-    // local process must never delete another active user's challenge.
-    if (!options.runId) return 0;
-    const listed = await this.runner.run(["ps", "-aq", "--filter", "label=proofblade.managed=true", "--filter", `label=proofblade.run_id=${options.runId}`], { timeoutMs: configTimeout(this.config) });
+  public async reapStale(options: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean } = {}): Promise<number> {
+    const olderThanMs = options.olderThanMs ?? this.config.staleContainerTtlMs;
+    if (!Number.isFinite(olderThanMs) || olderThanMs < 0) throw new Error("olderThanMs must be a non-negative finite number");
+    const protectedRunIds = new Set(options.protectedRunIds ?? []);
+    const filters = ["label=proofblade.managed=true"];
+    if (options.runId) filters.push(`label=proofblade.run_id=${options.runId}`);
+    const listed = await this.runner.run(["ps", "-aq", ...filters.flatMap((filter) => ["--filter", filter])], { timeoutMs: configTimeout(this.config) });
     if (listed.exitCode !== 0) return 0;
+    const ids = listed.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     let removed = 0;
-    for (const id of listed.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)) { await this.removeContainer(id); removed += 1; }
+    for (const id of ids) {
+      const details = await this.inspectResource(id);
+      if (!details || !isStale(details.created, olderThanMs)) continue;
+      const runId = details.labels["proofblade.run_id"];
+      if (!runId || protectedRunIds.has(runId)) continue;
+      if (details.running) {
+        if (options.includeRunning !== true) continue;
+        if (isLiveProcess(details.labels["proofblade.owner_pid"], details.labels["proofblade.owner_started_at"])) continue;
+      }
+      await this.removeContainer(id);
+      removed += 1;
+    }
+    const networks = await this.runner.run(["network", "ls", "-q", ...filters.flatMap((filter) => ["--filter", filter])], { timeoutMs: configTimeout(this.config) });
+    if (networks.exitCode === 0) {
+      for (const network of networks.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)) {
+        const details = await this.inspectNetwork(network);
+        if (!details || !isStale(details.created, olderThanMs)) continue;
+        const runId = details.labels["proofblade.run_id"];
+        if (!runId || protectedRunIds.has(runId)) continue;
+        if (details.containerCount > 0) continue;
+        await this.removeNetwork(network);
+      }
+    }
     return removed;
+  }
+
+  private async inspectResource(id: string): Promise<{ created: string; running: boolean; labels: Record<string, string> } | undefined> {
+    const result = await this.runner.run(["inspect", "--format", "{{json .}}", id], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.exitCode !== 0) return undefined;
+    try {
+      const value = JSON.parse(result.stdout.trim()) as { Created?: string; State?: { Running?: boolean }; Config?: { Labels?: Record<string, string> } };
+      return { created: value.Created ?? "", running: value.State?.Running === true, labels: value.Config?.Labels ?? {} };
+    } catch { return undefined; }
+  }
+
+  private async inspectNetwork(id: string): Promise<{ created: string; labels: Record<string, string>; containerCount: number } | undefined> {
+    const result = await this.runner.run(["network", "inspect", "--format", "{{json .}}", id], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.exitCode !== 0) return undefined;
+    try {
+      const value = JSON.parse(result.stdout.trim()) as { Created?: string; Labels?: Record<string, string>; Containers?: Record<string, unknown> };
+      return { created: value.Created ?? "", labels: value.Labels ?? {}, containerCount: Object.keys(value.Containers ?? {}).length };
+    } catch { return undefined; }
   }
 
   private imageFor(profile: ContainerRef["profile"]): string { return this.config.images[profile]; }
@@ -228,12 +278,50 @@ function containerCwd(workspace: string, requested?: string): string {
   return `/workspace/${rel.replaceAll("\\", "/")}`;
 }
 
-async function resolveTargets(targets: ContainerTarget[]): Promise<Array<{ address: string; port: number }>> {
-  const result: Array<{ address: string; port: number }> = [];
+async function resolveTargets(targets: ContainerTarget[]): Promise<Array<{ address: string; port: number; protocol: ContainerTarget["protocol"] }>> {
+  const result: Array<{ address: string; port: number; protocol: ContainerTarget["protocol"] }> = [];
   for (const target of targets) {
     const addresses = await lookup(target.host, { all: true });
-    for (const address of addresses) if (address.family === 4) result.push({ address: address.address, port: target.port });
+    for (const address of addresses) if (address.family === 4) result.push({ address: address.address, port: target.port, protocol: target.protocol });
   }
   if (result.length === 0 && targets.length > 0) throw new Error("No IPv4 addresses resolved for target-only container network");
-  return [...new Map(result.map((item) => [`${item.address}:${item.port}`, item])).values()];
+  return [...new Map(result.map((item) => [`${item.protocol}:${item.address}:${item.port}`, item])).values()];
+}
+
+function isStale(created: string, olderThanMs: number): boolean {
+  const timestamp = Date.parse(created);
+  return Number.isFinite(timestamp) && Date.now() - timestamp >= olderThanMs;
+}
+
+function isLiveProcess(rawPid: string | undefined, rawStartedAt: string | undefined): boolean {
+  const pid = Number(rawPid);
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  if (pid === process.pid && Number(rawStartedAt) === PROCESS_STARTED_AT) return true;
+  try { process.kill(pid, 0); return true; } catch (error) {
+    // EPERM means the process exists but is not signalable by this user; keep
+    // the resource rather than risking deletion of another active run.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+async function prepareWorkspace(workspace: string): Promise<string> {
+  if (process.platform !== "win32" && typeof process.getuid === "function" && typeof process.getgid === "function" && process.getuid() !== 0) {
+    return `${process.getuid()}:${process.getgid()}`;
+  }
+  // Root-created Linux bind mounts otherwise appear owned by root inside the
+  // fixed non-root image user. Restrict this chmod to the exact per-run path.
+  if (process.platform !== "win32") await makeWorkspaceWritable(workspace);
+  return "1001:1001";
+}
+
+async function makeWorkspaceWritable(root: string): Promise<void> {
+  const visit = async (path: string): Promise<void> => {
+    const stat = await fs.lstat(path);
+    if (stat.isSymbolicLink()) return;
+    const existingMode = stat.mode & 0o7777;
+    await fs.chmod(path, existingMode | (stat.isDirectory() ? 0o777 : 0o666));
+    if (!stat.isDirectory()) return;
+    for (const entry of await fs.readdir(path, { withFileTypes: true })) await visit(resolve(path, entry.name));
+  };
+  await visit(root);
 }

@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import type { ProofBladeConfig } from "../config.js";
 import type { TargetKind, TaskContract } from "../domain/types.js";
 import type { CompetitionChallengeSummary, CompetitionEnvironment } from "./api.js";
-import type { ContainerTarget } from "../container/contracts.js";
+import type { ContainerTarget, ContainerTargetProtocol } from "../container/contracts.js";
 
 /** Map a normalized competition category onto the harness TargetKind. */
 function targetKindForCategory(summary: CompetitionChallengeSummary): TargetKind {
@@ -82,17 +82,30 @@ export function competitionTask(
 export function parseCompetitionTargets(connectionInfo: string | undefined): ContainerTarget[] {
   if (!connectionInfo?.trim()) return [];
   const found = new Map<string, ContainerTarget>();
-  const add = (rawHost: string, rawPort: string | undefined, protocol?: string): void => {
+  const add = (rawHost: string, rawPort: string | undefined, protocol: ContainerTargetProtocol): void => {
     const host = rawHost.replace(/^\[|\]$/g, "").toLowerCase();
-    const port = rawPort ? Number(rawPort) : protocol === "https" ? 443 : protocol === "http" ? 80 : undefined;
+    const port = rawPort ? Number(rawPort) : undefined;
     if (!host || (!isIP(host) && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host))) return;
     if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return;
-    const key = `${host}:${port}`;
-    if (!found.has(key)) found.set(key, { host, port, ...(protocol ? { protocol } : {}) });
+    const key = `${protocol}:${host}:${port}`;
+    if (protocol === "tcp" && [...found.values()].some((item) => item.host === host && item.port === port && item.protocol === "udp")) return;
+    if (!found.has(key)) found.set(key, { host, port, protocol });
   };
-  for (const match of connectionInfo.matchAll(/\b(https?):\/\/([^/\s:]+|\[[^\]]+\])(?::(\d{1,5}))?/gi)) add(match[2], match[3], match[1].toLowerCase());
-  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat|telnet|socat)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2]);
-  for (const match of connectionInfo.matchAll(/\b((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[1], match[2]);
+  for (const match of connectionInfo.matchAll(/\b(https?|tcp|udp):\/\/([^/\s:]+|\[[^\]]+\])(?::(\d{1,5}))?/gi)) {
+    const protocol = match[1].toLowerCase() === "udp" ? "udp" : "tcp";
+    const port = match[3] ?? (match[1].toLowerCase() === "https" ? "443" : match[1].toLowerCase() === "http" ? "80" : undefined);
+    add(match[2], port, protocol);
+  }
+  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\s+(?:(?:-[a-z]*u[a-z]*|--udp)\s+)+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "udp");
+  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\s+(?!-u\b|--udp\b)((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "tcp");
+  for (const match of connectionInfo.matchAll(/\b(?:socat)\s+(?:[^\s]+\s+)*(TCP|UDP):((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[2], match[3], match[1].toLowerCase() === "udp" ? "udp" : "tcp");
+  for (const match of connectionInfo.matchAll(/\b(?:telnet|socat)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "tcp");
+  for (const match of connectionInfo.matchAll(/\b((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) {
+    if (/^(?:tcp|udp)$/i.test(match[1])) continue;
+    const prefix = connectionInfo.slice(0, match.index ?? 0);
+    if (/(?:^|\s)(?:tcp|udp):[\d.]*$/i.test(prefix)) continue;
+    add(match[1], match[2], "tcp");
+  }
   return [...found.values()];
 }
 

@@ -5,9 +5,12 @@ import {
   CompetitionChallengeSolver,
   DasctfCompetitionApi,
   HttpCompetitionApi,
+  DockerContainerRuntime,
+  resolveExecutionConfig,
   type ChallengeSolver,
   type CompetitionApi,
   type CompetitionHttpEndpoints,
+  type ContainerRuntimePort,
   type ProofBladeConfig,
 } from "@proofblade/materials";
 import { DemoChallengeSolver, DemoCompetitionApi } from "./fleet.js";
@@ -34,6 +37,8 @@ export interface CompetitionBackend {
   baseUrl?: string;
   /** Where the config came from, for the startup log. */
   source: "config-file" | "env" | "none";
+  /** Shared Docker runtime, when live execution is configured for containers. */
+  containerRuntime?: ContainerRuntimePort;
 }
 
 interface StoredCompetitionConfig {
@@ -95,8 +100,10 @@ export class CompetitionSettingsStore {
         ...(this.stored.envReadyTimeoutMs !== undefined ? { envReadyTimeoutMs: this.stored.envReadyTimeoutMs } : {}),
         ...(this.stored.wrongFlagCodes !== undefined ? { wrongFlagCodes: this.stored.wrongFlagCodes } : {}),
       });
-      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
-      return { api, solver, kind: "http", baseUrl: serverHost, source: this.source };
+      const execution = resolveExecutionConfig(this.config);
+      const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
+      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", ...(containerRuntime ? { containerRuntime } : {}) });
+      return { api, solver, kind: "http", baseUrl: serverHost, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
     }
     const baseUrl = this.stored.baseUrl?.trim();
     if (!baseUrl) {
@@ -110,8 +117,10 @@ export class CompetitionSettingsStore {
       ...(this.stored.headers ? { headers: this.stored.headers } : {}),
       ...(this.stored.endpoints ? { endpoints: this.stored.endpoints } : {}),
     });
-    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto" });
-    return { api, solver, kind: "http", baseUrl, source: this.source };
+    const execution = resolveExecutionConfig(this.config);
+    const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
+    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", ...(containerRuntime ? { containerRuntime } : {}) });
+    return { api, solver, kind: "http", baseUrl, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
   }
 }
 

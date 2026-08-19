@@ -3,10 +3,12 @@ import type { ContainerNetworkPolicy } from "../config.js";
 
 export type { ContainerNetworkPolicy };
 
+export type ContainerTargetProtocol = "tcp" | "udp";
+
 export interface ContainerTarget {
   host: string;
   port: number;
-  protocol?: string;
+  protocol: ContainerTargetProtocol;
 }
 
 export interface ContainerLimits {
@@ -82,5 +84,5 @@ export interface ContainerRuntimePort {
   exec(ref: ContainerRef, command: string, options?: ContainerCommandOptions): Promise<ContainerCommandResult>;
   health(ref: ContainerRef): Promise<boolean>;
   destroy(ref: ContainerRef): Promise<void>;
-  reapStale(options?: { olderThanMs?: number; runId?: string }): Promise<number>;
+  reapStale(options?: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean }): Promise<number>;
 }

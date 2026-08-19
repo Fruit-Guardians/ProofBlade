@@ -4,14 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { resolveExecutionConfig, type ResolvedExecutionConfig } from "../src/config.js";
-import { DockerContainerRuntime, type DockerCommandRunner, type DockerProcessResult } from "../src/container/docker.js";
+import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRunner, type DockerProcessResult } from "../src/container/docker.js";
 import { parseCompetitionTargets } from "../src/competition/task.js";
 
 test("competition target parser extracts URL and nc endpoints without leaking connection text into scope", () => {
-  const targets = parseCompetitionTargets("nc 1.14.76.59 20996; web: http://example.test:8080/path");
+  const targets = parseCompetitionTargets("nc 1.14.76.59 20996; nc -u 1.14.76.60 5353; web: http://example.test:8080/path");
   assert.deepEqual(targets, [
-    { host: "example.test", port: 8080, protocol: "http" },
-    { host: "1.14.76.59", port: 20996 },
+    { host: "example.test", port: 8080, protocol: "tcp" },
+    { host: "1.14.76.60", port: 5353, protocol: "udp" },
+    { host: "1.14.76.59", port: 20996, protocol: "tcp" },
+  ]);
+  assert.deepEqual(parseCompetitionTargets("udp://127.0.0.1:9000"), [
+    { host: "127.0.0.1", port: 9000, protocol: "udp" },
+  ]);
+  assert.deepEqual(parseCompetitionTargets("socat - UDP:127.0.0.1:5353"), [
+    { host: "127.0.0.1", port: 5353, protocol: "udp" },
   ]);
 });
 
@@ -22,7 +29,10 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     const runner: DockerCommandRunner = {
       async run(args): Promise<DockerProcessResult> {
         calls.push(args);
-        if (args[0] === "run" && args.includes("-d")) return processResult(args[3]?.endsWith("-gateway") ? "gateway-id\n" : "solver-id\n");
+        if (args[0] === "run" && args.includes("-d")) {
+          const name = args[args.indexOf("--name") + 1];
+          return processResult(name?.endsWith("-gateway") ? "gateway-id\n" : "solver-id\n");
+        }
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
         if (args[0] === "exec") return processResult("");
         if (args[0] === "inspect") return processResult("true\n");
@@ -36,12 +46,14 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
       networkPolicy: "target-only",
     };
     const runtime = new DockerContainerRuntime(config, runner);
-    const ref = await runtime.create({ runId: "RUN/42", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, skillLibraryHostPath: root, targets: [{ host: "127.0.0.1", port: 31337 }], networkPolicy: "target-only" });
+    const ref = await runtime.create({ runId: "RUN/42", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, skillLibraryHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" });
     assert.equal(ref.containerId, "solver-id");
     assert.ok(ref.gatewayContainerId);
     assert.ok(calls.some((args) => args.includes("--network") && args.includes("container:gateway-id")));
     assert.ok(calls.some((args) => args.some((arg) => arg.includes("destination=/opt/proofblade/skills,readonly"))));
     assert.ok(calls.some((args) => args[0] === "exec" && args.some((arg) => arg.includes("pb-egress-init"))));
+    const gatewayInit = calls.find((args) => args[0] === "exec" && args.some((arg) => arg.includes("pb-egress-init")));
+    assert.ok(gatewayInit?.includes("tcp:127.0.0.1:31337"));
     const command = await runtime.exec(ref, "python3 -c 'print(42)'", { cwd: root, timeoutMs: 2000 });
     assert.equal(command.exitCode, 0);
     const execCall = calls.find((args) => args[0] === "exec" && args.includes("python3 -c 'print(42)'"));
@@ -54,6 +66,45 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("Docker runtime reaps only stale stopped resources and their empty gateway networks", async () => {
+  const old = new Date(Date.now() - 60_000).toISOString();
+  const recent = new Date(Date.now() - 1).toISOString();
+  const removed: string[] = [];
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "ps") return processResult("old-container\nrecent-container\nrunning-container\n");
+      if (args[0] === "inspect" && args[args.length - 1] === "old-container") return processResult(JSON.stringify({ Created: old, State: { Running: false }, Config: { Labels: { "proofblade.run_id": "old-run" } } }));
+      if (args[0] === "inspect" && args[args.length - 1] === "recent-container") return processResult(JSON.stringify({ Created: recent, State: { Running: false }, Config: { Labels: { "proofblade.run_id": "recent-run" } } }));
+      if (args[0] === "inspect" && args[args.length - 1] === "running-container") return processResult(JSON.stringify({ Created: old, State: { Running: true }, Config: { Labels: { "proofblade.run_id": "old-run", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1" } } }));
+      if (args[0] === "network" && args[1] === "ls") return processResult("old-network\nrecent-network\norphan-network\n");
+      if (args[0] === "network" && args[1] === "inspect" && args[args.length - 1] === "old-network") return processResult(JSON.stringify({ Created: old, Labels: { "proofblade.run_id": "old-run" }, Containers: {} }));
+      if (args[0] === "network" && args[1] === "inspect" && args[args.length - 1] === "recent-network") return processResult(JSON.stringify({ Created: recent, Labels: { "proofblade.run_id": "recent-run" }, Containers: {} }));
+      if (args[0] === "network" && args[1] === "inspect" && args[args.length - 1] === "orphan-network") return processResult(JSON.stringify({ Created: old, Labels: { "proofblade.run_id": "orphan-run" }, Containers: {} }));
+      if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { removed.push(args.at(-1)!); return processResult(""); }
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  assert.equal(await runtime.reapStale({ olderThanMs: 100, includeRunning: true }), 1);
+  assert.deepEqual(removed, ["old-container", "old-network", "orphan-network"]);
+});
+
+test("Docker command runner removes abort listeners after a normal close", async () => {
+  let adds = 0;
+  let removes = 0;
+  const signal = {
+    aborted: false,
+    addEventListener: () => { adds += 1; },
+    removeEventListener: () => { removes += 1; },
+  } as unknown as AbortSignal;
+  const runner = new SpawnDockerCommandRunner(process.execPath);
+  const result = await runner.run(["-e", "process.stdout.write('ok')"], { signal });
+  assert.equal(result.exitCode, 0);
+  assert.equal(adds, 1);
+  assert.equal(removes, 1);
 });
 
 function processResult(stdout: string, exitCode = 0): DockerProcessResult {
