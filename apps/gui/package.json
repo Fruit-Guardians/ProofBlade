@@ -11,7 +11,7 @@
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.83.0",
+    "@earendil-works/pi-agent-core": "0.84.2",
     "@proofblade/materials": "0.1.0",
     "lucide-react": "1.28.0",
     "react": "19.1.1",
