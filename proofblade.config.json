@@ -7,6 +7,23 @@
     "runsDir": "runs",
     "fixturesDir": "fixtures/runtime"
   },
+  "execution": {
+    "backend": "docker",
+    "requireFor": ["web", "pwn"],
+    "dockerCommand": "docker",
+    "networkPolicy": "target-only",
+    "pullPolicy": "if-missing",
+    "images": {
+      "web": "proofblade/ctf-web:latest",
+      "pwn": "proofblade/ctf-pwn:latest",
+      "pwn-kernel": "proofblade/ctf-pwn-kernel:latest",
+      "gateway": "proofblade/ctf-egress-gateway:latest"
+    },
+    "commandWaitMs": 30000,
+    "commandHardTimeoutMs": 600000,
+    "outputPreviewBytes": 50000,
+    "staleContainerTtlMs": 3600000
+  },
   "tools": {
     "outputRewrite": {
       "provider": "rtk",

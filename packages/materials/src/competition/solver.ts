@@ -1,12 +1,14 @@
 import { join } from "node:path";
-import type { ProofBladeConfig } from "../config.js";
+import { resolveExecutionConfig, type ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode } from "../domain/types.js";
-import { CompetitionChallengeError, type CompetitionApi } from "./api.js";
-import { competitionTask } from "./task.js";
+import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi } from "./api.js";
+import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
 import type { ChallengeSolveRequest, ChallengeSolveResult, ChallengeSolver } from "./fleet.js";
+import { DockerContainerRuntime } from "../container/docker.js";
+import type { ContainerRef, ContainerRuntimePort } from "../container/contracts.js";
 
 export interface CompetitionChallengeSolverInit {
   root: string;
@@ -19,6 +21,8 @@ export interface CompetitionChallengeSolverInit {
   createLane?: CompetitionLaneFactory;
   /** Prefix for generated run ids. */
   runIdPrefix?: string;
+  /** Injectable container runtime; production defaults to Docker when enabled. */
+  containerRuntime?: ContainerRuntimePort;
 }
 
 /**
@@ -37,7 +41,22 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       detail = await this.init.api.getChallenge(challengeId);
     } catch (error) {
       this.throwIfAborted(request.signal, error);
-      return competitionFailure("fetch challenge", error);
+      return competitionFailure("fetch challenge", classifyChallengeFetchError(error));
+    }
+
+    const execution = resolveExecutionConfig(this.init.config);
+    const profile = profileForCategory(request.challenge.normalizedCategory);
+    const needsContainer = execution.backend === "docker" && profile !== undefined && execution.requireFor?.includes(request.challenge.normalizedCategory as never);
+    const containerRuntime = needsContainer ? (this.init.containerRuntime ?? new DockerContainerRuntime(execution)) : undefined;
+    if (containerRuntime) {
+      try {
+        await containerRuntime.prewarm([profile!]);
+        const doctor = await containerRuntime.doctor(profile!);
+        if (!doctor.daemon || doctor.image?.available === false) throw new Error(doctor.reason ?? `Docker image unavailable: ${doctor.image?.name ?? "unknown"}`);
+      } catch (error) {
+        this.throwIfAborted(request.signal, error);
+        return competitionFailure("prepare Docker execution", new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
+      }
     }
 
     let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>>;
@@ -86,31 +105,67 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       environment,
     });
     const services = createServices(this.init.root, this.init.config, { sandbox });
-    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
 
     try {
+      let task: ReturnType<typeof competitionTask>;
+      try {
+        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
+      } catch (error) {
+        this.throwIfAborted(request.signal, error);
+        return competitionFailure("parse challenge targets", error);
+      }
       await services.control.createRun(runId, task);
       // Unpack attachments + connection info before the loop, and use the
       // returned fixture path as the lane's working directory so bash, reads, and
       // relative paths all land on the challenge files.
       const fixture = await sandbox.build(task);
-      const outcome = await runCompetitionLoop(this.init.root, this.init.config, services, {
-        runId,
-        task,
-        workspaceRoot: fixture.path,
-        installRoot: this.init.root,
-        // A live per-challenge mode getter (from the fleet control plane) wins;
-        // otherwise the solver's configured mode, defaulting to autonomous play.
-        mode: request.mode ?? this.init.mode ?? "auto",
-        ...(this.init.maxTurns === undefined ? {} : { maxTurns: this.init.maxTurns }),
-        ...(request.signal ? { signal: request.signal } : {}),
-      }, this.init.createLane);
-      return {
-        solved: outcome.solved,
-        status: competitionStatus(outcome.stopReason, outcome.solved),
-        submissions: outcome.submissions,
-        ...(outcome.solved ? {} : { reason: outcome.termination ?? outcome.stopReason }),
-      };
+      let container;
+      try {
+        container = containerRuntime ? await containerRuntime.create({
+          runId,
+          generation: 1,
+          profile: profile!,
+          image: execution.images[profile!],
+          workspaceHostPath: fixture.path,
+          skillLibraryHostPath: join(this.init.root, "skills-library", "ctf-skills"),
+          targets: parseCompetitionTargets(environment.connectionInfo),
+          networkPolicy: execution.networkPolicy,
+          gatewayImage: execution.images.gateway,
+        }) : undefined;
+      } catch (error) {
+        this.throwIfAborted(request.signal, error);
+        return competitionFailure("create Docker execution", error instanceof CompetitionChallengeError
+          ? error
+          : new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
+      }
+      try {
+        const outcome = await runCompetitionLoop(this.init.root, this.init.config, services, {
+          runId,
+          task,
+          workspaceRoot: fixture.path,
+          installRoot: this.init.root,
+          ...(container && containerRuntime ? {
+            executionEnv: containerRuntime.executionEnv(container),
+            workspaceRootForPrompt: "/workspace",
+            skillsLibraryPathForPrompt: "/opt/proofblade/skills",
+            executionPlatform: "linux",
+            hostWorkspaceRootForMcp: fixture.path,
+          } : {}),
+          // A live per-challenge mode getter (from the fleet control plane) wins;
+          // otherwise the solver's configured mode, defaulting to autonomous play.
+          mode: request.mode ?? this.init.mode ?? "auto",
+          ...(this.init.maxTurns === undefined ? {} : { maxTurns: this.init.maxTurns }),
+          ...(request.signal ? { signal: request.signal } : {}),
+        }, this.init.createLane);
+        return {
+          solved: outcome.solved,
+          status: competitionStatus(outcome.stopReason, outcome.solved),
+          submissions: outcome.submissions,
+          ...(outcome.solved ? {} : { reason: outcome.termination ?? outcome.stopReason }),
+        };
+      } finally {
+        if (container && containerRuntime) await containerRuntime.destroy(container);
+      }
     } finally {
       await this.stop(challengeId, environment.instanceId);
     }
@@ -130,12 +185,50 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
   }
 }
 
+function profileForCategory(category: string): ContainerRef["profile"] | undefined {
+  if (category === "web") return "web";
+  if (category === "pwn") return "pwn";
+  return undefined;
+}
+
 function competitionFailure(operation: string, error: unknown): ChallengeSolveResult {
   const cause = error instanceof Error ? error.message : String(error);
   if (error instanceof CompetitionChallengeError) {
     return { solved: false, status: "CHALLENGE_ERROR", reason: `Challenge ${operation} failed: ${cause}` };
   }
+  if (error instanceof CompetitionContainerError) {
+    return { solved: false, status: "CONTAINER_ERROR", reason: `Container ${operation} failed: ${cause}` };
+  }
   return { solved: false, status: "PLATFORM_ERROR", reason: `Platform ${operation} failed: ${cause}` };
+}
+
+/**
+ * Keep failures that identify one malformed/missing challenge local to that
+ * challenge. Authentication, throttling, transport, and service failures must
+ * remain PLATFORM_ERROR so the Fleet circuit still protects the platform.
+ */
+function classifyChallengeFetchError(error: unknown): unknown {
+  if (error instanceof CompetitionChallengeError) return error;
+  if (error instanceof CompetitionHttpError && error.method === "GET" && isExplicitChallengeHttpError(error)) {
+    return new CompetitionChallengeError(`Challenge detail request was rejected: ${error.message}`, error);
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/\b(?:attachment|challenge|exercise|payload|parameter)\b.*\b(?:exceed\w*|too\s+large|invalid|malformed|unsafe|corrupt\w*|validation|missing)\b/i.test(message)
+    || /\b(?:invalid|malformed|missing|unavailable|corrupt\w*)\b.*\b(?:challenge|exercise|attachment|payload|parameter)\b/i.test(message)) {
+    return new CompetitionChallengeError(message, error);
+  }
+  return error;
+}
+
+function isExplicitChallengeHttpError(error: CompetitionHttpError): boolean {
+  const body = error.responseBody;
+  // A route-level 404 (for example "Cannot GET /api/challenges/...") or a
+  // generic proxy error must remain PLATFORM_ERROR. Only an explicit business
+  // response naming a missing/invalid challenge is safe to isolate.
+  if (![400, 404, 410, 422].includes(error.status)) return false;
+  return /\b(?:challenge|exercise|problem)\b.{0,100}\b(?:not\s+found|missing|does\s+not\s+exist|invalid|不存在|缺失)\b/i.test(body)
+    || /\b(?:not\s+found|missing|does\s+not\s+exist|invalid|不存在|缺失)\b.{0,100}\b(?:challenge|exercise|problem)\b/i.test(body)
+    || /\b(?:challenge|exercise|problem)[_.-](?:not[_.-]?found|missing|invalid)\b/i.test(body);
 }
 
 /** Map a loop stop reason onto the fleet's status string. */

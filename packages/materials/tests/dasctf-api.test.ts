@@ -209,6 +209,53 @@ test("startEnvironment posts build then polls the detail until isNeedCheck is fa
   assert.equal(env.expiresAt, 1780000000000);
 });
 
+test("parallel environment starts serialize the build decision and avoid a duplicate POST", async () => {
+  let buildStarted = false;
+  let buildCalls = 0;
+  const detailReads = new Map<string, number>();
+  const { client } = api({
+    "GET /ctf/exercise": (url) => {
+      const id = new URL(url).searchParams.get("exerciseId");
+      const reads = (detailReads.get(id ?? "") ?? 0) + 1;
+      detailReads.set(id ?? "", reads);
+      if (buildStarted && id === "1002" && reads === 1) return ok({ id, isNeedInit: true, isNeedCheck: true });
+      if (buildStarted && id === "1001") return ok({ id, isNeedInit: true, isNeedCheck: false, endpoints: [{ exposeIps: ["10.0.0.10"], ports: ["80"], isProxy: false }] });
+      if (buildStarted && id === "1002") return ok({ id, isNeedInit: true, isNeedCheck: false, endpoints: [{ exposeIps: ["10.0.0.11"], ports: ["81"], isProxy: false }] });
+      return ok({ id, isNeedInit: true, isNeedCheck: false });
+    },
+    "POST /ctf/build-exercise-env": () => {
+      buildCalls += 1;
+      buildStarted = true;
+      return ok({});
+    },
+  });
+  await Promise.all([client.startEnvironment("1001"), client.startEnvironment("1002")]);
+  assert.equal(buildCalls, 1, "only one lane may POST while the platform reports a build in flight");
+});
+
+test("a rate-limited environment build is rechecked before retrying the non-idempotent POST", async () => {
+  let buildCalls = 0;
+  let accepted = false;
+  let pollCalls = 0;
+  const { client } = api({
+    "GET /ctf/exercise": () => {
+      if (accepted && pollCalls++ > 0) return ok({ id: 1001, isNeedInit: true, isNeedCheck: false, endpoints: [{ exposeIps: ["10.0.0.10"], ports: ["80"], isProxy: false }] });
+      if (accepted) return ok({ id: 1001, isNeedInit: true, isNeedCheck: true });
+      return ok({ id: 1001, isNeedInit: true, isNeedCheck: false });
+    },
+    "POST /ctf/build-exercise-env": () => {
+      buildCalls += 1;
+      // Simulate a request accepted by the platform whose response was
+      // rate-limited. The recovery path must not send a second POST.
+      accepted = true;
+      return { status: 429, body: { code: "", message: "rate limited", data: null }, retryAfter: "1" };
+    },
+  }, { maxEnvironmentBuildRetries: 2 });
+  const env = await client.startEnvironment("1001");
+  assert.equal(buildCalls, 1);
+  assert.match(env.connectionInfo ?? "", /10\.0\.0\.10:80/);
+});
+
 test("startEnvironment is a no-op for a static (isNeedInit:false) challenge", async () => {
   const { client, calls } = api({ "GET /ctf/exercise": () => ok({ id: 1001, isNeedInit: false, isNeedCheck: false }) });
   const env = await client.startEnvironment("1001");

@@ -179,7 +179,41 @@ Leak libc via `puts@PLT(puts@GOT)`, return to vuln, stage 2 with `system("/bin/s
 
 **stub_execveat as execve alternative:** When no `pop rax; ret` exists, use `stub_execveat` (syscall 322/0x142) instead of `execve` -- send exactly 0x142 bytes so `read()` return value sets rax. See [rop-and-shellcode.md](rop-and-shellcode.md#stub_execveat-syscall-as-execve-alternative-asis-ctf-2018).
 
-**Shell interaction:** After `execve`, `sleep(1)` then `sendline(b'cat /flag*')`. See [rop-and-shellcode.md](rop-and-shellcode.md).
+**Shell interaction:** After `execve`, do not treat EOF or a reset as proof of code execution. Keep the tube alive, wait briefly, send a unique marker (for example `echo PB_READY`), and require `recvuntil(b"PB_READY")` before reading `/flag*`.
+
+**Prompt-synchronized menu I/O:** For menu-driven services, synchronize on the
+complete prompt for the current state (`student_ID (0-127): `, `Name (max 23
+chars): `, `Style (1-3): `, and the complete menu marker). Avoid generic
+`recvuntil(b": ")` helpers: they can consume a stale suffix and make a failed
+sequence look successful. Each step should record its label and the last raw
+bytes on timeout; retry from a fresh connection only after identifying the
+failed step. Run exploit scripts with `PYTHONUTF8=1` and
+`PYTHONIOENCODING=utf-8` so UTF-8 service output cannot hide the diagnostic.
+
+Minimal pattern:
+
+```python
+from pwn import *
+context.log_level = "info"
+MENU = b"---------------------\n> "
+
+def menu(io, choice):
+    io.recvuntil(MENU, timeout=5)
+    io.sendline(str(choice).encode())
+
+def person(io, sid, name, age, professional, comprehensive):
+    menu(io, 1)
+    io.sendlineafter(b"student_ID (0-127): ", str(sid).encode())
+    io.sendlineafter(b"Name (max 23 chars): ", name)
+    io.sendlineafter(b"Age: ", str(age).encode())
+    io.sendlineafter(b"professional_socre Number: ", str(professional).encode())
+    io.sendlineafter(b"comprehensive_score Number: ", str(comprehensive).encode())
+    io.recvuntil(MENU, timeout=5)
+```
+
+Keep the helper inside the challenge workspace, and include the step name in
+every exception. Do not add a retry loop until one complete interaction has
+been captured and validated.
 
 ## Format String Through Input Transformation
 

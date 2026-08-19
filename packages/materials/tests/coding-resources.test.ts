@@ -18,6 +18,7 @@ import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
@@ -50,6 +51,14 @@ test("coding host guidance uses Windows-compatible Python and workspace paths", 
   assert.match(guidance, /never python3/);
   assert.match(guidance, /workspace-relative/);
   assert.match(guidance, /\/tmp/);
+  assert.doesNotMatch(codingHostGuidance("linux"), /never python3/);
+});
+
+test("coding prompt carries strict interactive Pwn synchronization guidance", () => {
+  const source = readFileSync(resolve(import.meta.dirname, "../src/runtime/coding-lane.ts"), "utf8");
+  assert.match(source, /generic suffix/);
+  assert.match(source, /PB_READY/);
+  assert.match(source, /PYTHONIOENCODING=utf-8/);
 });
 
 test("coding provider tools use object-root schemas accepted by strict OpenAI-compatible providers", () => {

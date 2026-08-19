@@ -6,6 +6,7 @@ import {
   NodeExecutionEnv,
   type AgentMessage,
   type AgentHarnessEvent,
+  type ExecutionEnv,
 } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
@@ -55,7 +56,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly runId: string,
     private readonly controlStore: ControlStore,
     private readonly harness: AgentHarness<CodingResourceContext>,
-    private readonly env: NodeExecutionEnv,
+    private readonly env: ExecutionEnv,
+    private readonly sessionEnv: ExecutionEnv,
     private readonly closeTransport: () => Promise<void>,
     private readonly mcp: McpProjectRegistry,
     private readonly runtime: ProofBladeToolRuntime,
@@ -81,6 +83,16 @@ export class PiCodingLane implements AgentLanePort {
     artifactStore: ArtifactStore;
     journal: EffectJournal;
     config: ProofBladeConfig;
+    /** Optional process backend. Files remain on the host; bash/exec runs here. */
+    executionEnv?: ExecutionEnv;
+    /** Path visible to commands inside the execution backend (normally /workspace). */
+    workspaceRootForPrompt?: string;
+    /** Skill library path visible to commands inside the execution backend. */
+    skillsLibraryPathForPrompt?: string;
+    /** Platform syntax visible to the execution backend (Docker is Linux on every host). */
+    executionPlatform?: NodeJS.Platform;
+    /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
+    hostWorkspaceRootForMcp?: string;
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] };
     /** Live execution mode for a platform-judged run. "assist" records a flag for
      * operator approval instead of submitting it. Defaults to autonomous play. */
@@ -89,8 +101,9 @@ export class PiCodingLane implements AgentLanePort {
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
   }): Promise<PiCodingLane> {
-    const env = new NodeExecutionEnv({ cwd: options.projectRoot });
-    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(options.runDir, "pi-sessions") });
+    const sessionEnv = new NodeExecutionEnv({ cwd: options.projectRoot });
+    const env: ExecutionEnv = options.executionEnv ?? new NodeExecutionEnv({ cwd: options.projectRoot });
+    const repo = new JsonlSessionRepo({ fs: sessionEnv, sessionsRoot: join(options.runDir, "pi-sessions") });
     const sessionId = `${options.runId}-chat`;
     const known = await repo.list({ cwd: options.projectRoot });
     const metadata = known.find((item) => item.id === sessionId);
@@ -185,9 +198,14 @@ export class PiCodingLane implements AgentLanePort {
     const stableSystemPrompt = codingSystemPrompt(
       resources,
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
-      skillsLibraryPath,
-      options.projectRoot,
-      { platformJudged, maxSubmissions: snapshot.task.constraints.max_submissions },
+      options.skillsLibraryPathForPrompt ?? skillsLibraryPath,
+      options.workspaceRootForPrompt ?? options.projectRoot,
+      {
+        platformJudged,
+        maxSubmissions: snapshot.task.constraints.max_submissions,
+        ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
+        ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
+      },
     );
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
@@ -235,6 +253,7 @@ export class PiCodingLane implements AgentLanePort {
       options.controlStore,
       harness,
       env,
+      sessionEnv,
       closeTransport,
       mcp,
       runtime,
@@ -327,12 +346,16 @@ export class PiCodingLane implements AgentLanePort {
         await this.env.cleanup();
       } finally {
         try {
-          await this.closeTransport();
+          await this.sessionEnv.cleanup();
         } finally {
           try {
-            await this.mcp.close();
+            await this.closeTransport();
           } finally {
-            await this.runtime.close();
+            try {
+              await this.mcp.close();
+            } finally {
+              await this.runtime.close();
+            }
           }
         }
       }
@@ -459,7 +482,7 @@ function codingSystemPrompt(
   mcpServers: Array<{ name: string; description: string }>,
   skillsLibraryPath: string,
   workspaceRoot: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -472,12 +495,15 @@ function codingSystemPrompt(
   // The deep per-category techniques live on disk and are read on demand, so
   // switching challenge type just reads a different file — nothing here changes.
   const lib = skillsLibraryPath.replace(/\\/g, "/");
-  const orchestrator = `\n\n## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.`;
+  const orchestrator = `\n\n## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
   const nativeSkills = skills.length > 0
     ? `\n\nAlso available via load_skill (optional): ${skills.map((s) => s.name).join(", ")}.`
     : "";
   const mcpBlock = mcpServers.length > 0
     ? `\n\nEnabled MCP servers — their tools are available DIRECTLY as first-class tools named \`mcp__<server>__<tool>\` (call them like any other tool; no mcp_call/describe needed):\n${mcpServers.map((server) => `- ${server.name}: ${server.description}`).join("\n")}\nFor reverse-engineering or binary analysis, PREFER a decompiler MCP to get pseudocode over hand-reading objdump/strings — reach for it early. Follow each server's stated usage protocol (some require opening/binding the target first).`
+    : "";
+  const mcpPathBlock = options.hostWorkspaceRootForMcp
+    ? `\n\nMCP path boundary: shell/read/edit/write operate on the container workspace at \`${workspaceRoot}\`. Host-side MCP tools (for example IDA/JADX) cannot see that virtual path; when an MCP tool asks for a file path, pass the host workspace path \`${options.hostWorkspaceRootForMcp}\` plus the workspace-relative suffix. Never use that host path in bash.`
     : "";
   // Competition runs only. A wrong submission is scored against us (it is an
   // explicit tiebreaker), so the budget and the cost of guessing must be stated
@@ -485,7 +511,7 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance()}${workspaceBlock}${orchestrator}${submissionBlock}${nativeSkills}${mcpBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 export function codingHostGuidance(platform: NodeJS.Platform = process.platform): string {

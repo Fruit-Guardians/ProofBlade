@@ -4,6 +4,9 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
 export type CacheRetention = "none" | "short" | "long";
 export type OutputRewriteProvider = "builtin" | "rtk";
+export type ExecutionBackend = "host" | "docker";
+export type ContainerProfile = "web" | "pwn" | "pwn-kernel";
+export type ContainerNetworkPolicy = "none" | "bridge" | "target-only";
 /** Provider protocols that ProofBlade can send through Pi's audited tool loop. */
 export type ProviderApi = "openai-completions" | "openai-responses" | "anthropic-messages";
 
@@ -67,11 +70,40 @@ export interface ModelPricingConfig {
   cacheWriteUsdPerMillion: number;
 }
 
+export interface ExecutionConfig {
+  /** Keep host as the backwards-compatible default; competition profiles can opt into Docker. */
+  backend?: ExecutionBackend;
+  /** Challenge kinds that must execute inside a per-run container. */
+  requireFor?: Array<"web" | "pwn" | "reverse" | "crypto" | "script" | "forensics" | "misc" | "osint" | "malware" | "ai-ml" | "unknown">;
+  dockerCommand?: string;
+  networkPolicy?: ContainerNetworkPolicy;
+  pullPolicy?: "if-missing" | "never" | "always";
+  images?: Partial<Record<ContainerProfile | "gateway", string>>;
+  commandWaitMs?: number;
+  commandHardTimeoutMs?: number;
+  outputPreviewBytes?: number;
+  staleContainerTtlMs?: number;
+}
+
+export interface ResolvedExecutionConfig {
+  backend: ExecutionBackend;
+  requireFor: ExecutionConfig["requireFor"];
+  dockerCommand: string;
+  networkPolicy: ContainerNetworkPolicy;
+  pullPolicy: NonNullable<ExecutionConfig["pullPolicy"]>;
+  images: Record<ContainerProfile | "gateway", string>;
+  commandWaitMs: number;
+  commandHardTimeoutMs: number;
+  outputPreviewBytes: number;
+  staleContainerTtlMs: number;
+}
+
 export interface ProofBladeConfig {
   schemaVersion: 1;
   runtime: { piVersion: string };
   storage: { runsDir: string; fixturesDir: string };
   tools?: { outputRewrite?: OutputRewriteConfig };
+  execution?: ExecutionConfig;
   modelProfiles: { executor: ModelProfileConfig };
 }
 
@@ -83,6 +115,24 @@ const DEFAULT_OUTPUT_REWRITE: ResolvedOutputRewriteConfig = {
   maxRawBytes: 1_048_576,
 };
 
+const DEFAULT_EXECUTION: ResolvedExecutionConfig = {
+  backend: "host",
+  requireFor: [],
+  dockerCommand: "docker",
+  networkPolicy: "target-only",
+  pullPolicy: "if-missing",
+  images: {
+    web: "proofblade/ctf-web:latest",
+    pwn: "proofblade/ctf-pwn:latest",
+    "pwn-kernel": "proofblade/ctf-pwn-kernel:latest",
+    gateway: "proofblade/ctf-egress-gateway:latest",
+  },
+  commandWaitMs: 30_000,
+  commandHardTimeoutMs: 600_000,
+  outputPreviewBytes: 50_000,
+  staleContainerTtlMs: 3_600_000,
+};
+
 export async function loadConfig(root: string, configPath = "proofblade.config.json"): Promise<ProofBladeConfig> {
   const path = isAbsolute(configPath) ? configPath : resolve(root, configPath);
   const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<ProofBladeConfig>;
@@ -92,6 +142,18 @@ export async function loadConfig(root: string, configPath = "proofblade.config.j
 
 export function resolveOutputRewriteConfig(config: ProofBladeConfig): ResolvedOutputRewriteConfig {
   return { ...DEFAULT_OUTPUT_REWRITE, ...config.tools?.outputRewrite };
+}
+
+export function resolveExecutionConfig(config: ProofBladeConfig): ResolvedExecutionConfig {
+  const input = config.execution ?? {};
+  const backend = input.backend ?? DEFAULT_EXECUTION.backend;
+  return {
+    ...DEFAULT_EXECUTION,
+    ...input,
+    backend,
+    requireFor: input.requireFor ?? (backend === "docker" ? ["web", "pwn"] : []),
+    images: { ...DEFAULT_EXECUTION.images, ...input.images },
+  };
 }
 
 function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
@@ -119,6 +181,23 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
     if (rewrite.fallback !== undefined && rewrite.fallback !== "builtin" && rewrite.fallback !== "fail") throw new Error(`Invalid outputRewrite fallback in ${path}`);
     if (rewrite.rewriteTimeoutMs !== undefined && (!Number.isInteger(rewrite.rewriteTimeoutMs) || rewrite.rewriteTimeoutMs < 100 || rewrite.rewriteTimeoutMs > 30_000)) throw new Error(`Invalid outputRewrite rewriteTimeoutMs in ${path}`);
     if (rewrite.maxRawBytes !== undefined && (!Number.isInteger(rewrite.maxRawBytes) || rewrite.maxRawBytes < 512 || rewrite.maxRawBytes > 16_777_216)) throw new Error(`Invalid outputRewrite maxRawBytes in ${path}`);
+  }
+  const execution = config.execution;
+  if (execution !== undefined) {
+    if (execution.backend !== undefined && execution.backend !== "host" && execution.backend !== "docker") throw new Error(`Invalid execution.backend in ${path}`);
+    if (execution.networkPolicy !== undefined && !["none", "bridge", "target-only"].includes(execution.networkPolicy)) throw new Error(`Invalid execution.networkPolicy in ${path}`);
+    if (execution.pullPolicy !== undefined && !["if-missing", "never", "always"].includes(execution.pullPolicy)) throw new Error(`Invalid execution.pullPolicy in ${path}`);
+    if (execution.dockerCommand !== undefined && execution.dockerCommand.trim().length === 0) throw new Error(`Invalid execution.dockerCommand in ${path}`);
+    if (execution.requireFor !== undefined && execution.requireFor.some((kind) => !["web", "pwn", "reverse", "crypto", "script", "forensics", "misc", "osint", "malware", "ai-ml", "unknown"].includes(kind))) throw new Error(`Invalid execution.requireFor in ${path}`);
+    if (execution.commandWaitMs !== undefined && (!Number.isInteger(execution.commandWaitMs) || execution.commandWaitMs < 100 || execution.commandWaitMs > 300_000)) throw new Error(`Invalid execution.commandWaitMs in ${path}`);
+    if (execution.commandHardTimeoutMs !== undefined && (!Number.isInteger(execution.commandHardTimeoutMs) || execution.commandHardTimeoutMs < 1_000 || execution.commandHardTimeoutMs > 3_600_000)) throw new Error(`Invalid execution.commandHardTimeoutMs in ${path}`);
+    if (execution.outputPreviewBytes !== undefined && (!Number.isInteger(execution.outputPreviewBytes) || execution.outputPreviewBytes < 512 || execution.outputPreviewBytes > 16_777_216)) throw new Error(`Invalid execution.outputPreviewBytes in ${path}`);
+    if (execution.staleContainerTtlMs !== undefined && (!Number.isInteger(execution.staleContainerTtlMs) || execution.staleContainerTtlMs < 60_000)) throw new Error(`Invalid execution.staleContainerTtlMs in ${path}`);
+    if (execution.images !== undefined) {
+      for (const [profile, image] of Object.entries(execution.images)) {
+        if (!["web", "pwn", "pwn-kernel", "gateway"].includes(profile) || typeof image !== "string" || image.trim().length === 0) throw new Error(`Invalid execution.images.${profile} in ${path}`);
+      }
+    }
   }
 }
 

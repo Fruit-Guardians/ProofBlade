@@ -139,6 +139,14 @@ export class CompetitionChallengeError extends Error {
   }
 }
 
+/** A local Docker/runtime failure confined to one challenge execution. */
+export class CompetitionContainerError extends Error {
+  public constructor(message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "CompetitionContainerError";
+  }
+}
+
 const DEFAULT_HTTP_ENDPOINTS: CompetitionHttpEndpoints = {
   listChallenges: "/challenges",
   getChallenge: "/challenges/{challengeId}",

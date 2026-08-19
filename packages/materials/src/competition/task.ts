@@ -1,7 +1,9 @@
 import { join } from "node:path";
+import { isIP } from "node:net";
 import type { ProofBladeConfig } from "../config.js";
 import type { TargetKind, TaskContract } from "../domain/types.js";
-import type { CompetitionChallengeSummary, CompetitionEnvironment } from "./api.js";
+import { CompetitionChallengeError, type CompetitionChallengeSummary, type CompetitionEnvironment } from "./api.js";
+import type { ContainerTarget, ContainerTargetProtocol } from "../container/contracts.js";
 
 /** Map a normalized competition category onto the harness TargetKind. */
 function targetKindForCategory(summary: CompetitionChallengeSummary): TargetKind {
@@ -41,6 +43,7 @@ export function competitionTask(
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
   const objective = objectiveParts.join("\n\n") || `Solve competition challenge ${summary.challengeId}.`;
   const connection = env.connectionInfo?.trim();
+  const targets = parseCompetitionTargets(connection);
 
   return {
     schema_version: 1,
@@ -56,8 +59,8 @@ export function competitionTask(
     ],
     verification: { kind: "platform_submission", required_reproductions: 1 },
     scope: {
-      allowed_hosts: connection ? [connection] : [`CHALLENGE:${summary.challengeId}`],
-      allowed_ports: [],
+      allowed_hosts: targets.length > 0 ? targets.map((target) => target.host) : connection ? [] : [`CHALLENGE:${summary.challengeId}`],
+      allowed_ports: [...new Set(targets.map((target) => target.port))],
       external_network: true,
       allowed_workspace: workspace,
     },
@@ -73,6 +76,54 @@ export function competitionTask(
       max_submissions: 5,
     },
   };
+}
+
+/** Extract concrete remote endpoints from platform connection text. */
+export function parseCompetitionTargets(connectionInfo: string | undefined): ContainerTarget[] {
+  if (!connectionInfo?.trim()) return [];
+  const found = new Map<string, ContainerTarget>();
+  const add = (rawHost: string, rawPort: string | undefined, protocol: ContainerTargetProtocol, source: "explicit" | "generic" = "explicit"): void => {
+    const host = rawHost.replace(/^\[|\]$/g, "").toLowerCase();
+    const port = rawPort ? Number(rawPort) : undefined;
+    const ipVersion = isIP(host);
+    if (ipVersion === 6) throw new CompetitionChallengeError(`IPv6 competition targets are not supported by the target-only Docker gateway: ${host}`);
+    if (!host || (!ipVersion && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host))) return;
+    if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return;
+    const key = `${protocol}:${host}:${port}`;
+    if (source === "generic" && [...found.values()].some((item) => item.host === host && item.port === port)) return;
+    if (!found.has(key)) found.set(key, { host, port, protocol });
+  };
+  for (const match of connectionInfo.matchAll(/\b(https?|tcp|udp):\/\/(\[[^\]]+\]|[^/\s:]+)(?::(\d{1,5}))?/gi)) {
+    const protocol = match[1].toLowerCase() === "udp" ? "udp" : "tcp";
+    const port = match[3] ?? (match[1].toLowerCase() === "https" ? "443" : match[1].toLowerCase() === "http" ? "80" : undefined);
+    add(match[2], port, protocol);
+  }
+  for (const match of connectionInfo.matchAll(/\b(?:nc|ncat)\b([^\r\n;|&]*)/gi)) {
+    const tokens = match[1].trim().split(/\s+/).filter(Boolean);
+    let index = 0;
+    let protocol: ContainerTargetProtocol = "tcp";
+    while (index < tokens.length) {
+      const token = tokens[index]!;
+      if (token === "--") { index += 1; break; }
+      if (!token.startsWith("-")) break;
+      if (token === "--udp" || (token.startsWith("-") && !token.startsWith("--") && token.slice(1).includes("u"))) protocol = "udp";
+      if (/^-(?:w|p|s|b|I|T)$/.test(token)) index += 1;
+      index += 1;
+    }
+    const host = tokens[index];
+    const port = tokens[index + 1];
+    if (host && port) add(host, port, protocol);
+  }
+  for (const match of connectionInfo.matchAll(/\b(udp|tcp)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[2], match[3], match[1].toLowerCase() === "udp" ? "udp" : "tcp");
+  for (const match of connectionInfo.matchAll(/\b(?:socat)\s+(?:[^\s]+\s+)*(TCP|UDP):((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) add(match[2], match[3], match[1].toLowerCase() === "udp" ? "udp" : "tcp");
+  for (const match of connectionInfo.matchAll(/\b(?:telnet|socat)\s+((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)\s+(\d{1,5})\b/gi)) add(match[1], match[2], "tcp");
+  for (const match of connectionInfo.matchAll(/\b((?:\d{1,3}\.){3}\d{1,3}|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?):(\d{1,5})\b/gi)) {
+    if (/^(?:tcp|udp)$/i.test(match[1])) continue;
+    const prefix = connectionInfo.slice(0, match.index ?? 0);
+    if (/(?:^|\s)(?:tcp|udp):[\d.]*$/i.test(prefix)) continue;
+    add(match[1], match[2], "tcp", "generic");
+  }
+  return [...found.values()];
 }
 
 /** Derive a run deadline from the environment expiry, with a sane default. */
