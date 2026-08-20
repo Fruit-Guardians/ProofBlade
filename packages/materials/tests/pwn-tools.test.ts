@@ -43,7 +43,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   public async sessionWrite(handle: ContainerSessionHandle, data: string | Uint8Array): Promise<ContainerSessionResult> {
     const text = String(data);
     const echo = /^echo (.+)\n$/.exec(text);
-    const cat = /^cat (.+)\n$/.exec(text);
+    const cat = /^cat '?([^'\n]+)'?\n$/.exec(text);
     const out = echo ? `${echo[1]}\n` : cat ? (cat[1]!.trim() === this.flagPath ? `${this.flag}\n` : "nope\n") : text;
     this.pending.set(handle.sessionId, (this.pending.get(handle.sessionId) ?? "") + out);
     return this.drain(handle.sessionId);

@@ -230,7 +230,7 @@ export async function runCompetitionLoop(
  * owned by this lane is reused so a normal multi-turn conversation does not
  * create duplicate work nodes.
  */
-async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
+export async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
   let snapshot = await control.snapshot(runId);
   const active = Object.values(snapshot.workItems)
     .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && item.lease && Date.parse(item.lease.expiresAt) > Date.now())
@@ -240,6 +240,17 @@ async function claimCompetitionWorkItem(control: AppServices["control"], runId: 
   let candidate: RunSnapshot["workItems"][string] | undefined = Object.values(snapshot.workItems)
     .filter((item) => item.status === "READY")
     .sort((a, b) => a.createdSeq - b.createdSeq)[0];
+  if (!candidate) {
+    // A RUNNING item whose lease expired belongs to a crashed/killed prior
+    // owner. The control store allows re-claiming it; reuse it instead of
+    // leaving an orphaned RUNNING node and spawning a duplicate that re-runs the
+    // same target. The re-claim below increments attempt, so maxAttempts still
+    // bounds retries. Only recover the executor's own expired items.
+    const expiredRunning = Object.values(snapshot.workItems)
+      .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && (!item.lease || Date.parse(item.lease.expiresAt) <= Date.now()))
+      .sort((a, b) => a.updatedSeq - b.updatedSeq)[0];
+    if (expiredRunning) candidate = expiredRunning;
+  }
   if (!candidate) {
     const planned = Object.values(snapshot.workItems)
       .filter((item) => item.status === "PLANNED")

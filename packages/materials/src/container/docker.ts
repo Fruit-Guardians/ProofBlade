@@ -21,20 +21,31 @@ import type {
 
 const PROCESS_STARTED_AT = Date.now() - Math.floor(process.uptime() * 1000);
 
-/** In-memory scrollback ceiling. The model only ever sees a bounded viewport. */
-const SESSION_BUFFER_MAX = 256 * 1024;
+/**
+ * Ceiling on the UNREAD accumulator. New output is buffered here until the next
+ * read drains it; if the model never reads and a process floods, we drop the
+ * OLDEST unread bytes (prompts/anchors are usually near the tail) and flag it.
+ * This is intentionally NOT a scrollback cursor: the delta returned to a read is
+ * exactly the bytes accumulated since the previous read, so a session that has
+ * already produced >256 KiB still delivers each new byte instead of returning
+ * empty forever (the bug where buffer.length stopped changing after truncation).
+ */
+const SESSION_UNREAD_MAX = 1024 * 1024;
 const SESSION_POLL_MS = 40;
 
 interface LiveSession {
   sessionId: string;
   ref: ContainerRef;
   child: ChildProcessWithoutNullStreams;
-  buffer: string;
+  /** Bytes produced since the last read; drained (cleared) by each drainSession. */
+  unread: string;
   dropped: boolean;
   exited: boolean;
   exitCode: number | null;
   idleSilenceMs: number;
   waitTimeoutMs: number;
+  /** In-container path holding the target process PID for precise signalling. */
+  pidfile: string;
 }
 
 export interface DockerProcessResult {
@@ -282,34 +293,42 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   public async openSession(ref: ContainerRef, options: ContainerSessionOpenOptions): Promise<ContainerSessionHandle> {
     const cwd = containerCwd(ref.workspaceHostPath, options.cwd);
     const env = { LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", ...options.env };
+    const sessionId = `dxs-${randomUUID()}`;
+    // Record THIS session's target pid so a later signal hits only it, never the
+    // whole container. `exec "$@"` replaces the shell so $$ (written first) is the
+    // real target pid. The pidfile path is registry-minted (no model input), and
+    // the argv is passed positionally to `sh -c` so the command cannot inject.
+    const pidfile = `/tmp/.pb-session-${sessionId}.pid`;
     const args = ["exec", "-i", "--workdir", cwd];
     for (const [key, value] of Object.entries(env)) args.push("--env", `${key}=${value}`);
-    args.push(ref.containerId, ...options.command);
+    args.push(ref.containerId, "/bin/sh", "-c", 'echo $$ > "$1"; shift 2; exec "$@"', "pb-session", pidfile, "--", ...options.command);
     // A live session must keep stdin open and stream stdout incrementally, which
     // SpawnDockerCommandRunner intentionally does not (it resolves on close). So
     // this path spawns the docker CLI directly and holds the child handle.
     const child = this.sessionSpawner(this.config.dockerCommand, args);
-    const sessionId = `dxs-${randomUUID()}`;
     const session: LiveSession = {
       sessionId,
       ref,
       child,
-      buffer: "",
+      unread: "",
       dropped: false,
       exited: false,
       exitCode: null,
       idleSilenceMs: options.idleSilenceMs ?? 800,
       waitTimeoutMs: options.waitTimeoutMs ?? 30_000,
+      pidfile,
     };
     const append = (chunk: Buffer): void => {
-      session.buffer += chunk.toString("utf8");
-      if (session.buffer.length > SESSION_BUFFER_MAX) {
-        session.buffer = session.buffer.slice(session.buffer.length - SESSION_BUFFER_MAX);
+      session.unread += chunk.toString("utf8");
+      if (session.unread.length > SESSION_UNREAD_MAX) {
+        // Drop the OLDEST unread bytes, not the newest: a prompt/anchor a reader
+        // waits for is almost always at the tail.
+        session.unread = session.unread.slice(session.unread.length - SESSION_UNREAD_MAX);
         session.dropped = true;
       }
     };
     child.stdout.on("data", append);
-    // pwntools/gdb write progress to stderr; keep a single unified scrollback so
+    // pwntools/gdb write progress to stderr; keep a single unified stream so
     // interaction transcripts stay in send/recv order.
     child.stderr.on("data", append);
     child.once("exit", (code) => { session.exited = true; session.exitCode = code; });
@@ -331,10 +350,15 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   public async sessionSignal(handle: ContainerSessionHandle, signal: NodeJS.Signals): Promise<boolean> {
     const session = this.requireSession(handle);
     if (session.exited) return false;
-    // The docker exec child lives on the host; reach the in-container foreground
-    // process group through `docker exec kill` so SIGINT hits the pwn/gdb target.
-    await this.runner.run(["exec", session.ref.containerId, "/bin/sh", "-lc", `kill -${signalName(signal)} -1 2>/dev/null || true`], { timeoutMs: configTimeout(this.config) });
-    return true;
+    // Signal ONLY this session's recorded pid, never `kill -1` (which would hit
+    // every process the container user can reach — sibling sessions, the target,
+    // and under root far more). The pidfile was written by this session's own
+    // wrapper. Report the real result instead of swallowing failure: a missing
+    // pidfile or a kill error must surface as false, not a fake success.
+    const number = signalNumber(signal);
+    const script = 'p=$(cat "$1" 2>/dev/null) || exit 3; [ -n "$p" ] || exit 3; kill -"$2" "$p"';
+    const result = await this.runner.run(["exec", session.ref.containerId, "/bin/sh", "-c", script, "pb-signal", session.pidfile, String(number)], { timeoutMs: configTimeout(this.config) });
+    return !result.spawnError && result.exitCode === 0;
   }
 
   public async closeSession(handle: ContainerSessionHandle): Promise<{ exitCode: number | null }> {
@@ -352,29 +376,37 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return session;
   }
 
-  /** Wait for a readiness signal: idle silence, absolute timeout, or process exit. */
+  /**
+   * Wait for a readiness signal (idle silence / timeout / exit) and return the
+   * bytes accumulated in `unread` since the previous read, then clear it.  The
+   * delta is the unread accumulator, NOT a slice of a bounded scrollback, so a
+   * session that already produced megabytes still delivers each new byte.
+   */
   private async drainSession(session: LiveSession, options: ContainerSessionReadOptions): Promise<ContainerSessionResult> {
     const start = Date.now();
     const idleMs = options.idleSilenceMs ?? session.idleSilenceMs;
     const hardMs = options.waitTimeoutMs ?? session.waitTimeoutMs;
-    const before = session.buffer.length;
-    let lastLen = before;
+    let lastLen = session.unread.length;
     let lastChange = Date.now();
     let waitReason: ContainerSessionResult["waitReason"] = "idle";
     for (;;) {
       if (options.signal?.aborted) { waitReason = "timeout"; break; }
       if (session.exited) { waitReason = "exit"; break; }
       if (Date.now() - start >= hardMs) { waitReason = "timeout"; break; }
-      if (session.buffer.length !== lastLen) { lastLen = session.buffer.length; lastChange = Date.now(); }
-      else if (Date.now() - lastChange >= idleMs && session.buffer.length > before) { waitReason = "idle"; break; }
+      if (session.unread.length !== lastLen) { lastLen = session.unread.length; lastChange = Date.now(); }
+      else if (Date.now() - lastChange >= idleMs && session.unread.length > 0) { waitReason = "idle"; break; }
       await new Promise((resolve) => setTimeout(resolve, SESSION_POLL_MS));
     }
+    const delta = session.unread;
+    session.unread = "";
+    const truncated = session.dropped;
+    session.dropped = false;
     return {
-      delta: session.buffer.slice(before),
+      delta,
       waitReason,
       exited: session.exited,
       exitCode: session.exitCode,
-      truncated: session.dropped,
+      truncated,
     };
   }
 
@@ -558,7 +590,7 @@ function killChild(child: ChildProcessWithoutNullStreams): void {
   }
 }
 const SIGNAL_NUMBERS: Record<string, number> = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15, SIGUSR1: 10, SIGUSR2: 12, SIGSTOP: 19, SIGCONT: 18 };
-function signalName(signal: NodeJS.Signals): number { return SIGNAL_NUMBERS[signal] ?? 15; }
+function signalNumber(signal: NodeJS.Signals): number { return SIGNAL_NUMBERS[signal] ?? 15; }
 function safeName(value: string): string { return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "run"; }
 function createOwnerToken(): string { return `${process.pid}-${Date.now()}-${randomUUID()}`; }
 function containerCwd(workspace: string, requested?: string): string {

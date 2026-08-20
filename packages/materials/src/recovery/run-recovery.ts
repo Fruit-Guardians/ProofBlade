@@ -3,6 +3,7 @@ import { LeaseManager } from "../control/lease-manager.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { Lease, TaskContract } from "../domain/types.js";
 import type { FixtureHealth, FixtureRef, SandboxPort } from "../sandbox/fixture.js";
+import type { SessionRegistry } from "../container/session-registry.js";
 
 export interface RunRecoveryResult {
   fixture: FixtureRef;
@@ -11,6 +12,7 @@ export interface RunRecoveryResult {
   expiredLeases: Lease[];
   reconciledEffects: string[];
   reconciledJobs: string[];
+  supersededSessions: number;
 }
 
 export class RunRecoveryService {
@@ -18,11 +20,20 @@ export class RunRecoveryService {
     private readonly controlStore: ControlStore,
     private readonly effectJournal: EffectJournal,
     private readonly sandbox: SandboxPort,
+    /**
+     * Optional: a fresh SessionRegistry for this process.  A persistent session's
+     * docker-exec child dies with the process that spawned it, so on restart any
+     * durably-OPEN session is an orphan.  A fresh registry's live map is empty,
+     * so supersedeOrphans marks all of them SUPERSEDED — the dead sockets are not
+     * revived; a fresh reproduce re-establishes the connection.
+     */
+    private readonly sessionRegistry?: SessionRegistry,
   ) {}
 
   public async recover(runId: string, task?: TaskContract, now = Date.now()): Promise<RunRecoveryResult> {
     let snapshot = await this.controlStore.snapshot(runId);
     const expiredLeases = await new LeaseManager(this.controlStore).reapExpired(runId, now);
+    const supersededSessions = this.sessionRegistry ? await this.sessionRegistry.supersedeOrphans() : 0;
     const fixtureResult = await this.sandbox.reconcileFixture(task ?? snapshot.task, snapshot.generation);
     const reconciledJobs: string[] = [];
     if (fixtureResult.action === "reset") {
@@ -47,6 +58,7 @@ export class RunRecoveryService {
       expiredLeases,
       reconciledEffects,
       reconciledJobs,
+      supersededSessions,
     };
   }
 }

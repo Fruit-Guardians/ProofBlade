@@ -172,6 +172,35 @@ test("supersedeStale marks old-generation sessions superseded without reviving t
   }
 });
 
+test("supersedeOrphans marks same-generation OPEN sessions dead after a process restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-session-orphan-"));
+  try {
+    const runId = "SES-ORPHAN";
+    const control = await makeControl(root, runId);
+    const runtime = new FakeRuntime() as unknown as ContainerRuntimePort;
+    // First "process": opens a session at generation 1 and then the process dies
+    // (we simply drop this registry without closing).
+    const first = new SessionRegistry(runId, runtime, control);
+    const opened = await first.open({ ref: refAt(1), kind: "pwn-remote", ownerLane: "executor", command: ["tube"] });
+    assert.equal((await control.snapshot(runId)).sessions[opened.id]?.status, "OPEN");
+
+    // Second "process": a fresh registry recovers the SAME run at the SAME
+    // generation. Its live map is empty, so the durable OPEN session is an
+    // orphan whose docker-exec child is gone.
+    const second = new SessionRegistry(runId, runtime, control);
+    const superseded = await second.supersedeOrphans();
+    assert.equal(superseded, 1);
+    assert.equal((await control.snapshot(runId)).sessions[opened.id]?.status, "SUPERSEDED");
+
+    // A session the fresh registry actually owns is NOT superseded.
+    const live = await second.open({ ref: refAt(1), kind: "pwn-local", ownerLane: "executor", command: ["sh"] });
+    assert.equal(await second.supersedeOrphans(), 0);
+    assert.equal((await control.snapshot(runId)).sessions[live.id]?.status, "OPEN");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("failed durable open rolls back the runtime process", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-session-rollback-"));
   try {

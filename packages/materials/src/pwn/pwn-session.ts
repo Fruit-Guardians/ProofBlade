@@ -125,8 +125,13 @@ export class PwnSession {
 
   /** Read the flag from the live session (never from a script literal). */
   public async readFlag(path: string, pattern: RegExp): Promise<{ flag?: string }> {
+    // flagPath comes from a model-supplied recipe. Without this guard a value
+    // like `/flag; echo flag{fake}` would run a second command whose literal
+    // echo the pattern then "matches", forging a reproduction. Reject shell
+    // metacharacters and single-quote the path so `cat` reads exactly one file.
+    const safePath = assertSafeFlagPath(path);
     const start = this.transcript.length;
-    const written = await this.registry.write(this.ownerLane, this.record.id, `cat ${path}\n`);
+    const written = await this.registry.write(this.ownerLane, this.record.id, `cat '${safePath}'\n`);
     this.transcript += written.delta;
     let match = pattern.exec(this.transcript.slice(start));
     for (let attempt = 0; attempt < 8 && !match && !written.exited; attempt += 1) {
@@ -141,4 +146,20 @@ export class PwnSession {
   public async close(reason?: string): Promise<void> {
     await this.registry.close(this.ownerLane, this.record.id, reason);
   }
+}
+
+/**
+ * Accept only a plain absolute/relative file path. Rejects shell metacharacters
+ * (; & | $ ` \ newline quotes wildcards etc.) so a recipe flagPath cannot inject
+ * a second command whose echoed literal would forge a reproduction.
+ */
+export function assertSafeFlagPath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) throw new Error("flagPath must be a non-empty path");
+  if (trimmed.length > 512) throw new Error("flagPath is too long");
+  if (!/^[A-Za-z0-9_./-]+$/.test(trimmed)) {
+    throw new Error(`flagPath contains disallowed characters: ${path}`);
+  }
+  if (trimmed.includes("..")) throw new Error("flagPath must not contain ..");
+  return trimmed;
 }

@@ -66,7 +66,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
     }
     let out: string;
     const echo = /^echo (.+)\n$/.exec(text);
-    const cat = /^cat (.+)\n$/.exec(text);
+    const cat = /^cat '?([^'\n]+)'?\n$/.exec(text);
     if (echo) out = `${echo[1]}\n`;
     else if (cat) out = cat[1]!.trim() === this.flagPath ? `${this.flag}\n` : "No such file\n";
     else out = text;
@@ -148,6 +148,29 @@ test("PwnReproducer produces a candidate only when shell marker AND flag both su
     assert.equal(outcome.flag, "flag{repro-ok}");
     const snap = await control.snapshot(runId);
     assert.equal(snap.evidence[outcome.evidenceId]?.kind, "reproduction");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("readFlag rejects an injecting flagPath so a fake echoed flag is not accepted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-inject-"));
+  try {
+    const runId = "PWN-INJECT";
+    const control = await makeControl(root, runId);
+    // The tube echoes whatever is written; a `cat X; echo flag{fake}` would echo
+    // the literal and the pattern would "match" — unless the path is rejected.
+    const runtime = new EchoTubeRuntime("flag{real-only-here}", "/flag") as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const session = await PwnSession.openRemote(registry, { ref: REF, ownerLane: "executor", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await assert.rejects(
+      session.readFlag("/flag; echo flag{fake}", /flag\{[^}]+\}/),
+      /disallowed characters/,
+    );
+    // A clean path still works.
+    const ok = await session.readFlag("/flag", /flag\{[^}]+\}/);
+    assert.equal(ok.flag, "flag{real-only-here}");
+    await session.close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

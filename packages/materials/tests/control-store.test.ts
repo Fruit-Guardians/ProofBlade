@@ -7,6 +7,7 @@ import { ControlStore } from "../src/control/control-store.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { demoTask } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
+import { claimCompetitionWorkItem } from "../src/competition/loop.js";
 import type { ProofBladeConfig } from "../src/config.js";
 
 const config: ProofBladeConfig = {
@@ -162,6 +163,37 @@ test("work graph lifecycle is durable, lease-gated, and replayable", async () =>
     assert.equal(snapshot.workItems["WI-REPLAN"]?.attempt, 1);
     assert.equal(projectionHash(snapshot), projectionHash((await events.loadProjection(runId))!));
     assert.ok((await control.events(runId)).some((event) => event.type === "work_item_blocked"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a crashed executor's expired RUNNING work item is reclaimed, not orphaned", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-expired-claim-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "EXPIRED-CLAIM-001";
+    const task = demoTask(runId, root, config);
+    await control.createRun(runId, task);
+    // A prior owner claimed WI-CRASH with a lease that has already expired, then
+    // the process died leaving it RUNNING.
+    await control.dispatch(runId, {
+      type: "work_item_created",
+      workItem: { id: "WI-CRASH", runId, title: "Investigate", objective: task.objective, role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 3 },
+      lane: "planner",
+    });
+    await control.dispatch(runId, { type: "work_item_claimed", workItemId: "WI-CRASH", ownerLane: "executor", leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(), lane: "executor" });
+    const before = await control.snapshot(runId);
+    assert.equal(before.workItems["WI-CRASH"]?.status, "RUNNING");
+    assert.equal(before.workItems["WI-CRASH"]?.attempt, 1);
+
+    // Recovery: the next turn must reuse the same item, not spawn a duplicate.
+    const claimedId = await claimCompetitionWorkItem(control, runId, task, 2);
+    assert.equal(claimedId, "WI-CRASH", "must reclaim the orphaned RUNNING item");
+    const after = await control.snapshot(runId);
+    assert.equal(Object.keys(after.workItems).length, 1, "no duplicate work item created");
+    assert.equal(after.workItems["WI-CRASH"]?.status, "RUNNING");
+    assert.equal(after.workItems["WI-CRASH"]?.attempt, 2, "re-claim increments attempt so maxAttempts still bounds retries");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

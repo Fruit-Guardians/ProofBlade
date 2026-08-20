@@ -452,14 +452,66 @@ test("session read hits the absolute timeout on a silent long-running process", 
   }
 });
 
-test("session marks scrollback truncated once output exceeds the buffer ceiling", async () => {
-  // Emit ~400 KiB, above the 256 KiB in-memory ceiling, then idle.
-  const runtime = sessionRuntime(localNodeSpawner("process.stdout.write('A'.repeat(400*1024));process.stdin.resume();"));
+test("session marks output truncated once the unread accumulator exceeds its ceiling", async () => {
+  // Emit ~1.3 MiB in one burst, above the 1 MiB unread ceiling, then idle.
+  const runtime = sessionRuntime(localNodeSpawner("process.stdout.write('A'.repeat(1300*1024));process.stdin.resume();"));
   const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/sh"], idleSilenceMs: 150, waitTimeoutMs: 4000 });
   try {
     const result = await runtime.sessionRead(handle, { idleSilenceMs: 150, waitTimeoutMs: 4000 });
     assert.equal(result.truncated, true);
-    assert.ok(result.delta.length <= 256 * 1024);
+    assert.ok(result.delta.length <= 1024 * 1024);
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("session keeps delivering new output after it has already produced a lot (no dead cursor)", async () => {
+  // Regression for the bug where, once buffer.length hit the ceiling, every
+  // later read returned "" because the delta was a slice at buffer.length.
+  // Emit a chunk, read it, emit MORE on a later stdin line, read again.
+  const script = "process.stdin.on('data',(d)=>{const n=parseInt(String(d),10)||1;process.stdout.write('B'.repeat(n)+'\\n');});";
+  const runtime = sessionRuntime(localNodeSpawner(script));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/sh"], idleSilenceMs: 120, waitTimeoutMs: 4000 });
+  try {
+    const first = await runtime.sessionWrite(handle, "500000\n", { idleSilenceMs: 200, waitTimeoutMs: 4000 });
+    assert.ok(first.delta.length >= 500000, `first delta ${first.delta.length}`);
+    // A second, small burst must come back in full — not swallowed as "".
+    const second = await runtime.sessionWrite(handle, "7\n", { idleSilenceMs: 200, waitTimeoutMs: 4000 });
+    assert.match(second.delta, /BBBBBBB/);
+    assert.ok(second.delta.length >= 7 && second.delta.length < 1000, `second delta ${second.delta.length}`);
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("sessionSignal targets the session's own pid, not kill -1, and reports the real result", async () => {
+  const calls: string[][] = [];
+  let killExit = 0;
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      calls.push(args);
+      // The signal path runs `sh -c <script> pb-signal <pidfile> <signum>`.
+      if (args[0] === "exec" && args.includes("pb-signal")) return processResult("", killExit);
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner, localNodeSpawner("process.stdin.resume();"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/cat"] });
+  try {
+    const ok = await runtime.sessionSignal(handle, "SIGINT");
+    assert.equal(ok, true);
+    const signalCall = calls.find((args) => args.includes("pb-signal"));
+    assert.ok(signalCall, "expected a pb-signal exec");
+    // Must reference this session's pidfile and must NOT broadcast with kill -1.
+    assert.ok(signalCall!.some((arg) => arg.includes(".pb-session-") && arg.endsWith(".pid")));
+    // The signal number and pid are passed positionally to the script; the args
+    // must never contain a literal broadcast target like "-1".
+    assert.equal(signalCall!.includes("-1"), false);
+    assert.equal(signalCall!.some((arg) => /(^|\s)-1(\s|$)/.test(arg)), false);
+    // A non-zero kill (e.g. empty pidfile) must surface as false, not fake true.
+    killExit = 3;
+    assert.equal(await runtime.sessionSignal(handle, "SIGINT"), false);
   } finally {
     await runtime.closeSession(handle);
   }

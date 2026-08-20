@@ -137,6 +137,26 @@ export class SessionRegistry {
     return superseded;
   }
 
+  /**
+   * Recovery entry point for a process restart at the SAME generation.  A
+   * session's docker-exec child dies with the ProofBlade process that spawned
+   * it, so any session that is durably OPEN but not tracked in THIS registry's
+   * live map is an orphan whose host process is gone — supersede it instead of
+   * leaving it OPEN forever.  Sessions this fresh registry actually owns (just
+   * opened) are in `live` and are left untouched.  Generation-based drift is
+   * still handled by {@link supersedeStale}.
+   */
+  public async supersedeOrphans(reason = "process restart orphaned the session"): Promise<number> {
+    const snapshot = await this.control.snapshot(this.runId);
+    let superseded = 0;
+    for (const session of Object.values(snapshot.sessions)) {
+      if (session.status !== "OPEN" || this.live.has(session.id)) continue;
+      await this.control.dispatch(this.runId, { type: "session_superseded", sessionId: session.id, reason, lane: session.ownerLane });
+      superseded += 1;
+    }
+    return superseded;
+  }
+
   /** Best-effort teardown of every live session; called on lane shutdown. */
   public async disposeAll(reason = "lane shutdown"): Promise<void> {
     for (const [sessionId, entry] of [...this.live]) {
