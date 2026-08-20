@@ -18,9 +18,12 @@ import type { CodingClaimVerifier } from "../verification/claim-verification.js"
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import type { RawEffectResult } from "../domain/types.js";
+import type { PwnToolHandler } from "../pwn/pwn-tools.js";
+import { createPwnCodingTools } from "./pwn-coding-tools.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
 
 /** Verdict returned by a real platform submission. */
 export interface CodingFlagSubmission {
@@ -49,6 +52,12 @@ export interface CodingResourceContext extends ExecutionToolContext {
   submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
+  /**
+   * Present only when a Docker-backed pwn/pwn-kernel container is available.
+   * Absent for GUI chat and no-container runs, in which case the pwn_* tools
+   * fail closed with a clear message instead of pretending to have a tube.
+   */
+  pwnTools?: PwnToolHandler;
   outputRewrite?: {
     port: OutputRewritePort;
     artifactStore: ArtifactStore;
@@ -91,6 +100,7 @@ export function createCodingTools(options: { platformJudged?: boolean } = {}): A
     mcpCallTool,
     shellBackgroundTool,
     shellJobTool,
+    ...createPwnCodingTools(),
     // Registered only for platform-judged runs: it spends a real submission, and
     // a GUI chat run has no platform to submit to.
     ...(options.platformJudged ? [submitFlagTool] : []),
@@ -539,10 +549,13 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
+  // Only expose the tube tools when a Docker-backed pwn container is attached,
+  // so a GUI chat run does not advertise seven tools that would fail closed.
+  if (input.pwnEnabled) active.push(...CODING_PWN_TOOL_NAMES);
   if (input.platformJudged) active.push(submitFlagTool.name);
   return active;
 }

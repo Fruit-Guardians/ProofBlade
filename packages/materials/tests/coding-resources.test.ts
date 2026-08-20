@@ -29,11 +29,11 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "55d7b63c2bbec7f0b3a6af2d956a738ab9b2da584ff4aeeb2474162f0f4238b1";
+const CODING_TOOL_CONTRACT_HASH = "e05ed6048e392822ba8adb2ea919b6f68856fa801188415db12b47b5005360d0";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
