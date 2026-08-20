@@ -2,6 +2,7 @@ import type { ControlStore } from "../control/control-store.js";
 import type { Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
+import type { ExperimentGate } from "../competition/experiment-gate.js";
 
 export interface HttpSessionResponse {
   status: number;
@@ -19,6 +20,7 @@ export interface HttpSessionOptions {
   artifactStore: ArtifactStore;
   fetchImpl?: typeof fetch;
   allowedHosts?: string[];
+  experimentGate?: ExperimentGate;
 }
 
 /** Per-run HTTP session with a bounded cookie jar and CSRF token reuse. */
@@ -51,12 +53,21 @@ export class HttpSessionBackend {
     const url = new URL(path, this.base);
     if (url.origin !== this.base.origin) throw new Error(`HTTP session request crosses origin: ${url.origin}`);
     const method = (init.method ?? "GET").toUpperCase();
+    const action = `http:${method}`;
+    const gateInput = { path, method, body: init.body ?? "", headers: init.headers ?? {} };
+    await this.options.experimentGate?.assertAllowed({ runId: this.options.runId, action, input: gateInput });
     if (!/^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(method)) throw new Error(`Unsupported HTTP method: ${method}`);
     if ((init.body?.length ?? 0) > 1_048_576) throw new Error("HTTP session request body exceeds 1 MiB");
     const headers = new Headers(init.headers);
     if (this.cookies.size > 0) headers.set("cookie", [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; "));
     if (this.csrfToken && !headers.has("x-csrf-token")) headers.set("x-csrf-token", this.csrfToken);
-    const response = await (this.options.fetchImpl ?? fetch)(url, { method, headers, body: init.body, redirect: "manual", signal });
+    let response: Response;
+    try {
+      response = await (this.options.fetchImpl ?? fetch)(url, { method, headers, body: init.body, redirect: "manual", signal });
+    } catch (error) {
+      await this.options.experimentGate?.record({ runId: this.options.runId, action, input: gateInput, outcome: /timed out|timeout/i.test(String(error)) ? "timeout" : "failure", summary: String(error).slice(0, 1_000) });
+      throw error;
+    }
     this.captureCookies(response.headers);
     const body = (await response.text()).slice(0, 1_048_576);
     this.csrfToken = extractCsrfToken(response.headers, body) ?? this.csrfToken;
@@ -68,6 +79,7 @@ export class HttpSessionBackend {
     });
     const stateHash = this.stateHash();
     await this.options.controlStore.dispatch(this.options.runId, { type: "session_interacted", sessionId: this.sessionId, transcriptArtifactId: artifact.id, stateHash, waitReason: "idle", lane: this.options.ownerLane });
+    await this.options.experimentGate?.record({ runId: this.options.runId, action, input: gateInput, outcome: response.status >= 500 ? "failure" : "success", summary: `HTTP ${response.status} response.` });
     return { status: response.status, headers: Object.fromEntries(response.headers.entries()), body, artifactId: artifact.id, stateHash };
   }
 

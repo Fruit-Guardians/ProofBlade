@@ -31,7 +31,9 @@ test("HTTP session reuses Cookie/CSRF within one run and WebReproducer uses a cl
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const services = createServices(root, config);
     const runId = "WEB-SESSION";
-    await services.control.createRun(runId, demoTask(runId, root, config));
+    const task = demoTask(runId, root, config);
+    task.verification.web = { flag_pattern: "flag\\{[^}]+\\}" };
+    await services.control.createRun(runId, task);
     const session = await HttpSessionBackend.open({ runId, baseUrl, ownerLane: "executor", controlStore: services.control, artifactStore: services.artifacts, allowedHosts: ["127.0.0.1"] });
     await session.request("/login");
     const flag = await session.request("/flag");
@@ -46,12 +48,32 @@ test("HTTP session reuses Cookie/CSRF within one run and WebReproducer uses a cl
     await isolated.close();
 
     const reproducer = new WebReproducer(services.control);
-    const result = await reproducer.reproduce(runId, { steps: [{ path: "/login", expectStatus: 200 }, { path: "/flag", expectStatus: 200 }], flagPattern: "flag\\{[^}]+\\}" }, async () => await HttpSessionBackend.open({ runId, baseUrl, ownerLane: "verifier", controlStore: services.control, artifactStore: services.artifacts }));
+    const result = await reproducer.reproduce(runId, { steps: [{ path: "/login", expectStatus: 200 }, { path: "/flag", expectStatus: 200 }] }, async () => await HttpSessionBackend.open({ runId, baseUrl, ownerLane: "verifier", controlStore: services.control, artifactStore: services.artifacts }));
     assert.equal(result.reproduced, true);
     assert.equal(result.flag, "flag{web-clean}");
     const snapshot = await services.control.replay(runId);
     assert.equal(snapshot.evidence[result.evidenceId]?.kind, "reproduction");
     assert.ok(Object.values(snapshot.sessions).some((item) => item.kind === "http" && item.stateHash));
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("web reproducer rejects caller-supplied wildcard policy and ordinary pages", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-policy-"));
+  const server = createServer((_request, response) => response.end("ordinary page"));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("server did not bind");
+    const services = createServices(root, config);
+    const runId = "WEB-POLICY";
+    const task = demoTask(runId, root, config);
+    task.verification.web = { flag_pattern: ".*" };
+    await services.control.createRun(runId, task);
+    const reproducer = new WebReproducer(services.control);
+    await assert.rejects(() => reproducer.reproduce(runId, { steps: [{ path: "/" }] }, async () => await HttpSessionBackend.open({ runId, baseUrl: `http://127.0.0.1:${address.port}`, ownerLane: "verifier", controlStore: services.control, artifactStore: services.artifacts })), /Unsafe web flag pattern/);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(root, { recursive: true, force: true });

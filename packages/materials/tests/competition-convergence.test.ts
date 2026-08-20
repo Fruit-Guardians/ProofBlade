@@ -48,3 +48,18 @@ test("experiment repeat keys include canonical input but not object key order", 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("concurrent failed experiments are serialized by the durable gate", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-concurrent-gate-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "CONCURRENT-GATE";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const gate = new ExperimentGate(services.control);
+    const results = await Promise.all(Array.from({ length: 4 }, () => gate.record({ runId, action: "same", input: { x: 1 }, outcome: "failure", summary: "failed" })));
+    assert.equal(results.filter((result) => result.allowed).length, 2);
+    assert.equal(Object.values((await services.control.snapshot(runId)).experiments).length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

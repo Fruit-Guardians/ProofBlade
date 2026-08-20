@@ -24,47 +24,35 @@ export class ExperimentGate {
   public constructor(private readonly controlStore: ControlStore) {}
 
   public async record(input: ExperimentGateInput): Promise<ExperimentGateResult> {
-    const snapshot = await this.controlStore.snapshot(input.runId);
-    const domainPhase = input.domainPhase ?? snapshot.domainPhase;
-    const inputHash = sha256(canonicalJson(clearCallArguments(input.input)));
-    const repeatKey = sha256(canonicalJson({
-      domainPhase,
-      generation: snapshot.generation,
-      hypothesisId: input.hypothesisId ?? "",
-      action: normalizeAction(input.action),
-      inputHash,
-    }));
-    const previousFailures = Object.values(snapshot.experiments).filter((item) => item.repeatKey === repeatKey && item.outcome !== "success").length;
-    if (previousFailures >= 2 && input.outcome !== "success") return { allowed: false, repeatKey, previousFailures };
-    const experiment: Omit<ExperimentRecord, "createdSeq"> = {
-      id: id("EXP"),
-      runId: input.runId,
-      generation: snapshot.generation,
-      domainPhase,
-      hypothesisId: input.hypothesisId,
-      repeatKey,
-      action: normalizeAction(input.action),
-      inputHash,
-      outcome: input.outcome,
-      summary: input.summary.trim(),
-    };
-    await this.controlStore.dispatch(input.runId, { type: "experiment", experiment, lane: "executor" });
-    return { allowed: true, repeatKey, previousFailures, record: (await this.controlStore.snapshot(input.runId)).experiments[experiment.id] };
+    return await this.controlStore.dispatchTransaction<ExperimentGateResult>(input.runId, (snapshot) => {
+      const domainPhase = input.domainPhase ?? snapshot.domainPhase;
+      const inputHash = sha256(canonicalJson(clearCallArguments(input.input)));
+      const repeatKey = repeatKeyFor({ domainPhase, generation: snapshot.generation, hypothesisId: input.hypothesisId, action: input.action, inputHash });
+      const previousFailures = Object.values(snapshot.experiments).filter((item) => item.repeatKey === repeatKey && item.outcome !== "success").length;
+      if (previousFailures >= 2 && input.outcome !== "success") return { commands: [], project: () => ({ allowed: false, repeatKey, previousFailures }) };
+      const experiment: Omit<ExperimentRecord, "createdSeq"> = {
+        id: id("EXP"), runId: input.runId, generation: snapshot.generation, domainPhase,
+        hypothesisId: input.hypothesisId, repeatKey, action: normalizeAction(input.action), inputHash,
+        outcome: input.outcome, summary: input.summary.trim(),
+      };
+      return {
+        commands: [{ type: "experiment", experiment, lane: "executor" }],
+        project: (after) => ({ allowed: true, repeatKey, previousFailures, record: after.experiments[experiment.id] }),
+      };
+    });
   }
 
   public async assertAllowed(input: Omit<ExperimentGateInput, "outcome" | "summary">): Promise<{ repeatKey: string; previousFailures: number }> {
     const snapshot = await this.controlStore.snapshot(input.runId);
-    const repeatKey = sha256(canonicalJson({
-      domainPhase: input.domainPhase ?? snapshot.domainPhase,
-      generation: snapshot.generation,
-      hypothesisId: input.hypothesisId ?? "",
-      action: normalizeAction(input.action),
-      inputHash: sha256(canonicalJson(clearCallArguments(input.input))),
-    }));
+    const repeatKey = repeatKeyFor({ domainPhase: input.domainPhase ?? snapshot.domainPhase, generation: snapshot.generation, hypothesisId: input.hypothesisId, action: input.action, inputHash: sha256(canonicalJson(clearCallArguments(input.input))) });
     const previousFailures = Object.values(snapshot.experiments).filter((item) => item.repeatKey === repeatKey && item.outcome !== "success").length;
     if (previousFailures >= 2) throw new Error(`Experiment repeat gate blocked action after ${previousFailures} failed attempts: ${repeatKey}`);
     return { repeatKey, previousFailures };
   }
+}
+
+function repeatKeyFor(input: { domainPhase: DomainPhase; generation: number; hypothesisId?: string; action: string; inputHash: string }): string {
+  return sha256(canonicalJson({ domainPhase: input.domainPhase, generation: input.generation, hypothesisId: input.hypothesisId ?? "", action: normalizeAction(input.action), inputHash: input.inputHash }));
 }
 
 function normalizeAction(action: string): string {

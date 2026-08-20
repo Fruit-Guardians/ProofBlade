@@ -95,6 +95,10 @@ export interface PwnReproductionContract {
   flag_pattern: string;
 }
 
+export interface WebReproductionContract {
+  flag_pattern: string;
+}
+
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
@@ -110,6 +114,8 @@ export interface TaskContract {
     required_reproductions: number;
     /** Task-owned inputs for barrier-gated pwn reproduction. */
     pwn?: PwnReproductionContract;
+    /** Task-owned inputs for barrier-gated web reproduction. */
+    web?: WebReproductionContract;
   };
   scope: {
     allowed_hosts: string[];

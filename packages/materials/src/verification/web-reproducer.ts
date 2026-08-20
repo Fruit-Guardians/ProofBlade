@@ -13,7 +13,6 @@ export interface WebExploitStep {
 
 export interface WebExploitRecipe {
   steps: WebExploitStep[];
-  flagPattern: string;
 }
 
 export class WebReproducer {
@@ -21,7 +20,9 @@ export class WebReproducer {
 
   public async reproduce(runId: string, recipe: WebExploitRecipe, createCleanSession: () => Promise<HttpSessionBackend>, signal?: AbortSignal): Promise<{ reproduced: boolean; flag?: string; evidenceId: string; artifactId?: string }> {
     if (recipe.steps.length < 1 || recipe.steps.length > 64) throw new Error("Web reproduction requires 1-64 steps");
-    const flagPattern = compileFlagPattern(recipe.flagPattern);
+    const policy = (await this.controlStore.snapshot(runId)).task.verification.web;
+    if (!policy?.flag_pattern) throw new Error("Web reproduction requires an immutable task verification policy");
+    const flagPattern = compileFlagPattern(policy.flag_pattern);
     const session = await createCleanSession();
     let last: Awaited<ReturnType<HttpSessionBackend["request"]>> | undefined;
     try {
@@ -50,6 +51,6 @@ function compileFlagPattern(pattern: string): RegExp {
 }
 
 function compileBoundedPattern(pattern: string, label: string): RegExp {
-  if (!pattern || pattern.length > 256 || /\([^)]*[+*][^)]*\)[+*]|\((?:[^|()]|\([^)]*\))*\|(?:[^|()]|\([^)]*\))*\)[+*]/.test(pattern)) throw new Error(`Unsafe web ${label} pattern`);
+  if (!pattern || pattern.length > 256 || /^\.\*\$?$/.test(pattern.trim()) || /^\^\.\*\$?$/.test(pattern.trim()) || !/[A-Za-z0-9]/.test(pattern) || /\([^)]*[+*][^)]*\)[+*]|\((?:[^|()]|\([^)]*\))*\|(?:[^|()]|\([^)]*\))*\)[+*]/.test(pattern)) throw new Error(`Unsafe web ${label} pattern`);
   return new RegExp(pattern);
 }

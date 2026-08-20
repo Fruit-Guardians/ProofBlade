@@ -52,3 +52,10 @@
 - `npm run test:ci-gates`：8/8 通过。
 - roadmap 相关定向回归：42/42 通过。
 - `npm test`：业务测试通过；Windows 上已有的 `coding-resources` 两个时序/目录锁定用例仍存在环境抖动（`shell_background` 进程在轮询前结束、临时目录 `EBUSY`），隔离重跑可分别观察到同类现象，未涉及本轮新增代码路径。
+
+## PR #69 复审修复
+
+- ExperimentGate 已通过 `dispatchTransaction` 原子接入 coding lane 的 Bash、capability、Pwn tube、HTTP/Browser session 入口；并发失败实验最多只允许两次持久记录。
+- WebReproducer 不再接受调用方 `flagPattern`，只读取 `TaskContract.verification.web.flag_pattern`；拒绝 `.*`、`^.*$` 等无约束模式，并注册 `web_reproduce` active tool（仅 immutable web policy 存在时启用）。
+- 新增并发 Gate、wildcard policy、Web tool 路径回归测试。
+- 复审回归：`npm run build`、定向 13/13、competition/capability 23/23、`check:change-contracts` 均通过。

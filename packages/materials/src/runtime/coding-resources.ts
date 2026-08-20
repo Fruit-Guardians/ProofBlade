@@ -20,9 +20,12 @@ import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import type { RawEffectResult } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
+import type { ExperimentGate } from "../competition/experiment-gate.js";
+import type { WebExploitStep } from "../verification/web-reproducer.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
 
 /** Verdict returned by a real platform submission. */
@@ -48,6 +51,9 @@ export interface CodingResourceContext extends ExecutionToolContext {
   evidenceGraph: CodingEvidenceGraph;
   evidenceCurationGate?: EvidenceCurationGate;
   runtime: ProofBladeToolRuntime;
+  /** Durable per-run gate for repeated process/network experiments. */
+  experimentGate?: ExperimentGate;
+  webReproduce?: (steps: WebExploitStep[], signal?: AbortSignal) => Promise<unknown>;
   /** Present only when the run is judged by a live competition platform. */
   submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
@@ -90,7 +96,7 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
   }));
 }
 
-export function createCodingTools(options: { platformJudged?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
+export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyClaimTool,
@@ -101,6 +107,7 @@ export function createCodingTools(options: { platformJudged?: boolean } = {}): A
     shellBackgroundTool,
     shellJobTool,
     ...createPwnCodingTools(),
+    ...(options.webReproductionEnabled ? [webReproduceTool] : []),
     // Registered only for platform-judged runs: it spends a real submission, and
     // a GUI chat run has no platform to submit to.
     ...(options.platformJudged ? [submitFlagTool] : []),
@@ -414,6 +421,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(toolCallId, params, signal, onUpdate, context) {
     const input = params as { command: string; label?: string };
+    await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label } });
     // Starting a new long-running probe is still investigation. Polling an
     // existing job remains available, but new background work must stop when
     // the durable evidence backlog reaches the hard curation threshold.
@@ -432,9 +440,16 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
       `echo $! > ${pidPath(jobId)}`,
       `echo "pid=$!"`,
     ].join("\n");
-    const started = await runShell(launcher, signal, onUpdate, context);
+    let started: string;
+    try {
+      started = await runShell(launcher, signal, onUpdate, context);
+    } catch (error) {
+      await context.experimentGate?.record({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label }, outcome: /timed out|timeout/i.test(String(error)) ? "timeout" : "failure", summary: String(error).slice(0, 1_000) });
+      throw error;
+    }
     const pid = /pid=(\d+)/.exec(started)?.[1];
     if (!pid) throw new Error(`Could not start background job: ${started.slice(0, 400)}`);
+    await context.experimentGate?.record({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label }, outcome: "success", summary: "Background shell process started." });
     return toolResult({
       jobId,
       pid: Number(pid),
@@ -549,7 +564,29 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean }): string[] {
+const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "web_reproduce",
+  label: "web_reproduce",
+  description: "Replay bounded HTTP exploit steps in a clean session. The immutable task verifier supplies the flag format; callers cannot provide a flag pattern.",
+  parameters: Type.Object({
+    steps: Type.Array(Type.Object({
+      path: Type.String({ minLength: 1, maxLength: 2_048 }),
+      method: Type.Optional(Type.String({ maxLength: 12 })),
+      headers: Type.Optional(Type.Record(Type.String(), Type.String({ maxLength: 4_096 }))),
+      body: Type.Optional(Type.String({ maxLength: 1_048_576 })),
+      expectStatus: Type.Optional(Type.Integer({ minimum: 100, maximum: 599 })),
+      expectPattern: Type.Optional(Type.String({ maxLength: 256 })),
+    }, { additionalProperties: false }), { minItems: 1, maxItems: 64 }),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
+    if (!context.webReproduce) throw new Error("web_reproduce is unavailable because this task has no immutable web verifier");
+    const input = params as { steps: WebExploitStep[] };
+    return toolResult(await context.webReproduce(input.steps, signal));
+  },
+};
+
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
@@ -558,6 +595,7 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   if (input.pwnEnabled) {
     active.push(...CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce" || input.pwnReproductionEnabled));
   }
+  if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
   if (input.platformJudged) active.push(submitFlagTool.name);
   return active;
 }
@@ -698,10 +736,15 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
       const preflightHint = interactiveCommandHint(input.command, Boolean(context.pwnTools));
       if (preflightHint) throw new Error(preflightHint);
+      await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout } });
       // Enforce curation even when a test/custom lane omits output rewriting.
       // Production lanes also pass this check before starting another probe.
       await context.evidenceCurationGate?.assertInvestigationAllowed();
-      if (!pipeline) return await contract.execute(toolCallId, input, signal, onUpdate, context);
+      if (!pipeline) {
+        const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+        await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
+        return result;
+      }
       const ticket = await pipeline.port.prepare({ toolCallId, command: input.command, cwd: context.env.cwd }, signal);
       const executor = createBashTool<CodingResourceContext>({
         async prepare(execution) {
@@ -725,6 +768,7 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       const notice = await context.evidenceCurationGate?.checkpointNotice();
+      await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
         content: [...result.content, ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
@@ -863,11 +907,15 @@ const capabilityTool: AgentHarnessTool<CodingResourceContext> = {
     }
     assertAbsent(input, ["query", "maxResults"], "capability invoke");
     if (!isRecord(input.input)) throw new Error("Capability invoke requires an input object");
-    const result = await context.runtime.invokeCapability({
-      capabilityId: input.capabilityId,
-      operation: input.capabilityOperation,
-      input: input.input,
-    }, signal);
+    await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: `capability:${input.capabilityId}.${input.capabilityOperation}`, input: input.input });
+    let result: Awaited<ReturnType<ProofBladeToolRuntime["invokeCapability"]>>;
+    try {
+      result = await context.runtime.invokeCapability({ capabilityId: input.capabilityId, operation: input.capabilityOperation, input: input.input }, signal);
+    } catch (error) {
+      await context.experimentGate?.record({ runId: context.runtime.runId, action: `capability:${input.capabilityId}.${input.capabilityOperation}`, input: input.input, outcome: /timed out|timeout/i.test(String(error)) ? "timeout" : "failure", summary: String(error).slice(0, 1_000) });
+      throw error;
+    }
+    await context.experimentGate?.record({ runId: context.runtime.runId, action: `capability:${input.capabilityId}.${input.capabilityOperation}`, input: input.input, outcome: result ? "success" : "unknown", summary: "Capability invocation completed." });
     return toolResult(result);
   },
 };

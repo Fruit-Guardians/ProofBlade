@@ -4,6 +4,7 @@ import type { SessionRegistry } from "../container/session-registry.js";
 import { PwnSession } from "./pwn-session.js";
 import { appendByte } from "./bytes.js";
 import type { PwnReproducer, ExploitRecipe, ExploitStage, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
+import type { ExperimentGate } from "../competition/experiment-gate.js";
 
 /**
  * Model-facing bridge for pwn interaction.  The model tracks a durable session
@@ -65,9 +66,11 @@ export class PwnToolHandler {
     /** Task scope; when set, a remote endpoint outside it is rejected at the app layer. */
     private readonly scope?: PwnScope,
     private readonly reproductionPolicy?: PwnReproductionPolicy,
+    private readonly experimentGate?: ExperimentGate,
   ) {}
 
   public async open(input: PwnOpenInput): Promise<{ sessionId: string; kind: string; endpoint?: string }> {
+    await this.experimentGate?.assertAllowed({ runId: this.runId, action: "pwn_open", input });
     const ref = this.refProvider();
     if (input.kind === "remote") this.assertEndpointAllowed(input.endpoint);
     const session = input.kind === "remote"
@@ -75,10 +78,12 @@ export class PwnToolHandler {
       : await PwnSession.openLocal(this.registry, { ref, ownerLane: this.ownerLane, command: input.command, ...opt(input) });
     this.sessions.set(session.sessionId, session);
     this.closed.delete(session.sessionId);
+    await this.experimentGate?.record({ runId: this.runId, action: "pwn_open", input, outcome: "success", summary: "Pwn session opened." });
     return { sessionId: session.sessionId, kind: input.kind, ...(input.endpoint ? { endpoint: input.endpoint } : {}) };
   }
 
   public async send(sessionId: string, data: string | Uint8Array, line = false): Promise<PwnViewport> {
+    await this.experimentGate?.assertAllowed({ runId: this.runId, action: "pwn_send", input: { sessionId, data: typeof data === "string" ? data : Buffer.from(data).toString("base64"), line } });
     const session = this.require(sessionId);
     // Preserve exact bytes: for binary payloads append the newline as a byte so
     // sendLine's string path cannot corrupt 0x00/0xff via UTF-8 round-tripping.
@@ -89,13 +94,18 @@ export class PwnToolHandler {
       const payload = line ? appendByte(data, 0x0a) : data;
       result = await session.send(payload);
     }
-    return this.viewport(sessionId, result.data, result.exited, result.matched);
+    const viewport = this.viewport(sessionId, result.data, result.exited, result.matched);
+    await this.experimentGate?.record({ runId: this.runId, action: "pwn_send", input: { sessionId, data: typeof data === "string" ? data : Buffer.from(data).toString("base64"), line }, outcome: "success", summary: "Pwn payload sent." });
+    return viewport;
   }
 
   public async recv(sessionId: string, until: string, maxReads?: number): Promise<PwnViewport> {
+    await this.experimentGate?.assertAllowed({ runId: this.runId, action: "pwn_recv", input: { sessionId, until, maxReads } });
     const session = this.require(sessionId);
     const result = await session.recvUntil(until, maxReads ? { maxReads } : {});
-    return this.viewport(sessionId, result.data, result.exited, result.matched);
+    const viewport = this.viewport(sessionId, result.data, result.exited, result.matched);
+    await this.experimentGate?.record({ runId: this.runId, action: "pwn_recv", input: { sessionId, until, maxReads }, outcome: result.exited ? "failure" : "success", summary: "Pwn response received." });
+    return viewport;
   }
 
   public async signal(sessionId: string, signal: NodeJS.Signals): Promise<{ delivered: boolean }> {
