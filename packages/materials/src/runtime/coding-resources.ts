@@ -673,6 +673,15 @@ export function interactiveTimeoutHint(errorMessage: string, command: string, pw
     : "[hint] This command blocked on an interactive connection and was killed at the timeout. Do NOT rewrite the whole script. Run the interactive exploit under `shell_background` and poll with `shell_job` so a stall costs one bounded poll, not the whole command budget; keep foreground bash for short computation and single bounded probes only.";
 }
 
+/** Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget. */
+export function interactiveCommandHint(command: string, pwnToolsAvailable: boolean): string | undefined {
+  const interactive = /(recvuntil|recvline|recvall|interactive\(|\.recv\(|sendlineafter|sendafter|remote\(|process\(|pwn import|\bnc\s|\bncat\s|\bsocat\b)/i.test(command);
+  if (!interactive) return undefined;
+  return pwnToolsAvailable
+    ? "[guard] Foreground bash contains an interactive connection. Use pwn_open/pwn_send/pwn_recv/pwn_reproduce for bounded tube steps; reserve bash for payload computation."
+    : "[guard] Foreground bash contains an interactive connection. Use shell_background and shell_job, or split the probe into bounded commands.";
+}
+
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createBashTool<CodingResourceContext>();
   return {
@@ -687,6 +696,8 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
+      const preflightHint = interactiveCommandHint(input.command, Boolean(context.pwnTools));
+      if (preflightHint) throw new Error(preflightHint);
       // Enforce curation even when a test/custom lane omits output rewriting.
       // Production lanes also pass this check before starting another probe.
       await context.evidenceCurationGate?.assertInvestigationAllowed();

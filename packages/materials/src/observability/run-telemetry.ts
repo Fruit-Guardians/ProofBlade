@@ -25,6 +25,7 @@ export interface RunTelemetryReport {
   runId: string;
   status: RunSnapshot["status"];
   phase: RunSnapshot["phase"];
+  domainPhase: RunSnapshot["domainPhase"];
   durationMs: number;
   versionSnapshot: RunSnapshot["versionSnapshot"];
   provider: {
@@ -75,6 +76,14 @@ export interface RunTelemetryReport {
     count: number;
     firstEvidenceMs?: number;
   };
+  convergence: {
+    experimentCount: number;
+    failedExperimentCount: number;
+    distinctRepeatKeys: number;
+    repeatedFailedActionCount: number;
+    foregroundBashTimeouts: number;
+    firstCandidateMs?: number;
+  };
   failure?: { primary: PrimaryFailureCategory; reason?: string };
   reportHash: string;
 }
@@ -89,12 +98,14 @@ export class RunTelemetry {
     const startedMs = snapshot.startedAt ? Date.parse(snapshot.startedAt) : Date.parse(events[0]?.ts ?? new Date(0).toISOString());
     const endedMs = snapshot.finishedAt ? Date.parse(snapshot.finishedAt) : Date.parse(events.at(-1)?.ts ?? snapshot.startedAt ?? new Date(0).toISOString());
     const firstEvidence = events.find((event) => event.type === "evidence_added");
+    const firstCandidate = events.find((event) => event.type === "completion_proposed");
     const failureCategory = snapshot.failureCategory ?? inferFailure(snapshot, tools);
     const base = {
       schemaVersion: 1 as const,
       runId,
       status: snapshot.status,
       phase: snapshot.phase,
+      domainPhase: snapshot.domainPhase,
       durationMs: Math.max(0, endedMs - startedMs),
       versionSnapshot: snapshot.versionSnapshot,
       provider,
@@ -108,10 +119,29 @@ export class RunTelemetry {
         count: Object.keys(snapshot.evidence).length,
         ...(firstEvidence ? { firstEvidenceMs: Math.max(0, Date.parse(firstEvidence.ts) - startedMs) } : {}),
       },
+      convergence: convergenceReport(snapshot, events, startedMs, firstCandidate),
       ...(failureCategory ? { failure: { primary: failureCategory, reason: snapshot.terminalReason } } : {}),
     };
     return { ...base, reportHash: sha256(canonicalJson(base)) };
   }
+}
+
+function convergenceReport(snapshot: RunSnapshot, events: HarnessEvent[], startedMs: number, firstCandidate: HarnessEvent | undefined): RunTelemetryReport["convergence"] {
+  const experiments = Object.values(snapshot.experiments);
+  const failureCounts = new Map<string, number>();
+  for (const experiment of experiments) if (experiment.outcome !== "success") failureCounts.set(experiment.repeatKey, (failureCounts.get(experiment.repeatKey) ?? 0) + 1);
+  const foregroundBashTimeouts = events.filter((event) => event.type === "tool_result_recorded"
+    && event.payload?.toolName === "bash"
+    && event.payload?.isError === true
+    && /timed out|timeout/i.test(String(event.payload?.errorMessage ?? event.payload?.output ?? ""))).length;
+  return {
+    experimentCount: experiments.length,
+    failedExperimentCount: experiments.filter((item) => item.outcome !== "success").length,
+    distinctRepeatKeys: new Set(experiments.map((item) => item.repeatKey)).size,
+    repeatedFailedActionCount: [...failureCounts.values()].filter((count) => count >= 2).length,
+    foregroundBashTimeouts,
+    ...(firstCandidate ? { firstCandidateMs: Math.max(0, Date.parse(firstCandidate.ts) - startedMs) } : {}),
+  };
 }
 
 function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] {

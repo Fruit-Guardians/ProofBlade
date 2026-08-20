@@ -22,6 +22,8 @@ export interface LeakRecord {
   symbol?: string;
   /** Confidence in [0,1]; a single unverified leak should not be treated as fact. */
   confidence: number;
+  /** Optional replayable derivation, e.g. libc_base = puts_leak - puts_offset. */
+  derivation?: { expression: string; sourceLeakIds: string[] };
 }
 
 const WIDTH: Record<LeakFormat, number> = { le64: 8, le32: 4, be64: 8, be32: 4 };
@@ -62,6 +64,21 @@ export function deriveBase(leaked: bigint, knownOffset: bigint): bigint {
   const base = leaked - knownOffset;
   if (base < 0n) throw new Error(`Derived base is negative: leak=${toHex(leaked)} offset=${toHex(knownOffset)}`);
   return base;
+}
+
+export function deriveBaseRecord(source: LeakRecord, options: { id: string; knownOffset: bigint; label?: string; confidence?: number }): LeakRecord {
+  const base = deriveBase(BigInt(source.value), options.knownOffset);
+  const label = options.label?.trim() || `${source.addressKind}_base`;
+  return {
+    id: options.id,
+    sourceHex: source.sourceHex,
+    format: source.format,
+    value: toHex(base),
+    addressKind: source.addressKind,
+    symbol: label,
+    confidence: options.confidence ?? source.confidence,
+    derivation: { expression: `${label} = ${source.id}(${source.value}) - ${toHex(options.knownOffset)}`, sourceLeakIds: [source.id] },
+  };
 }
 
 /** A page-aligned base is a strong sanity signal for libc/PIE leaks. */

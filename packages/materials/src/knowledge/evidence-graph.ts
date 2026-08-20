@@ -622,7 +622,7 @@ function leakReasoningNode(
   const symbol = leak.symbol ? displayText(leak.symbol, 160) : undefined;
   const summary = requiredText(
     displayText(
-      `Pwn leak ${leakId}: ${leak.addressKind} ${symbol ? `${symbol} ` : ""}= ${value}; format=${leak.format}; source=${sourceHex}; confidence=${leak.confidence.toFixed(3)}`,
+      `Pwn leak ${leakId}: ${leak.addressKind} ${symbol ? `${symbol} ` : ""}= ${value}; format=${leak.format}; source=${sourceHex}; confidence=${leak.confidence.toFixed(3)}${leak.derivation ? `; formula=${displayText(leak.derivation.expression, 320)}` : ""}`,
       1_000,
     ),
     "Leak summary",

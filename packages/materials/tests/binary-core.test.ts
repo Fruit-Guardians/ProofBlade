@@ -35,12 +35,23 @@ test("Binary Core v1 analyzes ELF structure and bounded content", async () => {
     assert.equal(range.hex, "7f454c46");
     const extracted = await invoke("strings", { path: "sample.elf", minLength: 5 });
     assert.ok((extracted.strings as Array<Record<string, unknown>>).some((item) => item.value === "HELLO"));
+    const elf = await invoke("inspect_elf", { path: "sample.elf" });
+    assert.equal((elf.identity as { architecture: string }).architecture, "x86_64");
+    assert.deepEqual(elf.checksec, { pie: false, nx: null, relro: false, canary: false });
     assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "identify", input: { path: ".proofblade/secret" } }, {
       name: "identify", description: "identify", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure", outputPolicy: "summary", executionMode: "sequential",
     }, context), /private fixture/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("gdb_batch accepts bounded analysis commands and rejects shell escape commands", () => {
+  const backend = new BinaryCapabilityBackend();
+  const context = { runId: "GDB-BATCH", fixture: { fixtureId: "fixture", generation: 1, path: ".", privatePath: ".proofblade" }, runsRoot: ".", artifacts: {} };
+  const operation = { name: "gdb_batch", description: "gdb", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "process" as const, replay: "idempotent" as const, outputPolicy: "artifact" as const, executionMode: "sequential" as const };
+  assert.doesNotThrow(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "gdb_batch", input: { path: "sample.elf", commands: ["break main", "run", "info registers", "x/8gx $rsp"] } }, operation, context));
+  assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "gdb_batch", input: { path: "sample.elf", commands: ["shell cat /etc/passwd"] } }, operation, context), /non-shell commands/);
 });
 
 test("Binary Core v1 identifies PE32 sections", async () => {

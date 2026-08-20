@@ -174,9 +174,10 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
     assert.ok(api.stopped.includes("CH1"), "environment must be released");
     const runIds = await readdir(join(root, "runs"));
     const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
-      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string });
+      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } });
     assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
     assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
+    assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "SUBMIT"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

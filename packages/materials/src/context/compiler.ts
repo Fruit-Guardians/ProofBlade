@@ -197,7 +197,7 @@ function buildLedger(input: LedgerBuildInput): string {
     "Planner handoffs:",
     ...input.handoffs.map((item) => [
       `<planner-handoff id="${safeAttribute(item.id)}" status="${item.status}" hash="${safeAttribute(item.hash)}">`,
-      `- phase=${item.phase} knowledge=${item.knowledgeVersion}`,
+      `- phase=${item.phase} domainPhase=${item.domainPhase} knowledge=${item.knowledgeVersion}`,
       ...item.nextActions.map((action) => `- action ${action.id}: ${safeLedgerText(action.title)}; expected=${action.expectedEvidence.join(",")}`),
       ...item.prohibitedRepeats.map((repeat) => `- prohibited_repeat: ${safeLedgerText(repeat)}`),
       "</planner-handoff>",

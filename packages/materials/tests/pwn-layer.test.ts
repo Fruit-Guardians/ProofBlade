@@ -11,7 +11,7 @@ import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnSession } from "../src/pwn/pwn-session.js";
 import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-reproducer.js";
-import { parseLeakAddress, parseLeakHex, deriveBase, toHex, isPageAligned } from "../src/pwn/leak.js";
+import { parseLeakAddress, parseLeakHex, deriveBase, deriveBaseRecord, toHex, isPageAligned } from "../src/pwn/leak.js";
 import { compileSafeFlagPattern, matchFlagBounded } from "../src/pwn/pattern.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type {
@@ -134,6 +134,10 @@ test("recordLeak persists an idempotent reasoning node and makes it searchable",
     assert.equal(first.node.status, "CONFIRMED");
     assert.match(first.node.summary, /0x7ffff7e1f430/);
     assert.ok(first.node.tags.includes("base-formula"));
+
+    const base = deriveBaseRecord(leak, { id: "LEAK-LIBC-BASE", knownOffset: 0x84420n, label: "libc_base" });
+    const baseNode = await graph.recordLeak({ leak: base, tags: ["base-formula"] });
+    assert.match(baseNode.node.summary, /formula=libc_base = LEAK-LIBC-1/);
 
     const second = await graph.recordLeak({ leak, tags: ["base-formula"], explanation: "same observation" });
     assert.equal(second.reused, true);

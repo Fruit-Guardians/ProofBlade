@@ -8,6 +8,7 @@ import { createServices } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { ContextCompiler, contextText } from "../src/context/compiler.js";
 import { PlannerCoordinator } from "../src/orchestration/planner.js";
+import { RefinerCoordinator, applyHandoffDelta } from "../src/orchestration/refiner.js";
 import { handoffKnowledgeVersion } from "../src/domain/handoff.js";
 
 const config: ProofBladeConfig = {
@@ -84,6 +85,36 @@ test("planner handoffs are lane-gated, versioned, and context-visible", async ()
     assert.equal(second.knowledgeVersion, handoffKnowledgeVersion(await services.control.snapshot(runId)));
     const replayed = await services.control.replay(runId);
     assert.equal(replayed.handoffs[second.id]?.hash, (await services.control.snapshot(runId)).handoffs[second.id]?.hash);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("refiner applies add/modify/remove/reorder deltas and supersedes the old handoff", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-refiner-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "REFINER-001";
+    await services.control.createRun(runId, fixtureTask(runId, "web-source-1", root, config));
+    const first = await new PlannerCoordinator(services.control).prepare(runId);
+    const rootAction = first.nextActions[0]!;
+    const added = { id: "ACTION-ALT", title: "Try alternate primitive", description: "Use a different evidenced route.", expectedEvidence: ["artifact"], resourceKeys: ["target"], estimatedToolCalls: 2 };
+    const preview = applyHandoffDelta(first.nextActions, [
+      { op: "add", action: added, afterId: rootAction.id },
+      { op: "modify", id: rootAction.id, patch: { estimatedToolCalls: 3 } },
+      { op: "reorder", id: "ACTION-ALT" },
+    ]);
+    assert.equal(preview[0]?.id, "ACTION-ALT");
+    assert.equal(preview.find((item) => item.id === rootAction.id)?.estimatedToolCalls, 3);
+    const refined = await new RefinerCoordinator(services.control).refine(runId, [
+      { op: "add", action: added, afterId: rootAction.id },
+      { op: "modify", id: rootAction.id, patch: { description: "Changed after negative evidence." } },
+    ], rootAction.id);
+    assert.equal(refined.status, "ACCEPTED");
+    assert.ok(refined.nextActions.some((item) => item.id === "ACTION-ALT"));
+    assert.ok(refined.prohibitedRepeats.includes(rootAction.id));
+    assert.equal((await services.control.snapshot(runId)).handoffs[first.id]?.status, "SUPERSEDED");
+    assert.throws(() => applyHandoffDelta([rootAction], [{ op: "remove", id: rootAction.id }]), /requires 1-16/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

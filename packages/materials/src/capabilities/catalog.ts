@@ -42,6 +42,17 @@ const binaryStringsParameters = {
   additionalProperties: false,
 } as const;
 
+const gdbBatchParameters = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "Visible fixture-relative ELF path" },
+    commands: { type: "array", minItems: 1, maxItems: 32, items: { type: "string", minLength: 1, maxLength: 256 }, description: "Non-interactive GDB commands such as break, run, info registers, x, and assertions." },
+    timeoutMs: { type: "integer", minimum: 100, maximum: 120_000 },
+  },
+  required: ["path", "commands"],
+  additionalProperties: false,
+} as const;
+
 const reverseFunctionsParameters = {
   type: "object",
   properties: {
@@ -200,7 +211,7 @@ const manifests: CapabilityManifest[] = [
   }),
   withCapabilityHash({
     id: "proofblade.binary",
-    version: "1.1.0",
+    version: "1.2.0",
     description: "Read-only structural and deep analysis of visible PE and ELF binaries.",
     trust: "bundled",
     operations: [
@@ -252,6 +263,26 @@ const manifests: CapabilityManifest[] = [
         sideEffect: "none",
         replay: "pure",
         outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "inspect_elf",
+        description: "Return ELF identity, checksec signals, sections, and symbols in one structured result.",
+        parameters: binaryPathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "gdb_batch",
+        description: "Run bounded, non-interactive GDB commands for breakpoints, registers, memory, and assertions.",
+        parameters: gdbBatchParameters,
+        readOnly: true,
+        sideEffect: "process",
+        replay: "idempotent",
+        outputPolicy: "artifact",
         executionMode: "sequential",
       },
       {
