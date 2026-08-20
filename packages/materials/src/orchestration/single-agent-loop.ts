@@ -20,7 +20,8 @@ export interface SolverLaneCreateInput {
   runId: string;
   runDir: string;
   runtime: ProofBladeToolRuntime;
-  services: AppServices;
+  /** Deliberately excludes verifier and fixture lifecycle capabilities. */
+  services: Pick<AppServices, "control" | "artifacts">;
   config: ProofBladeConfig;
 }
 
@@ -79,6 +80,7 @@ export class SingleAgentCtfLoop {
       this.services.control,
       this.services.journal,
       this.services.sandbox,
+      this.services.fixtureControl,
       SessionRegistry.forRecovery(options.runId, this.services.control),
     ).recover(options.runId, snapshot.task);
     throwIfAborted(options.signal);
@@ -87,7 +89,7 @@ export class SingleAgentCtfLoop {
     throwIfAborted(options.signal);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     await this.ensureIntent(options.runId);
-    const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
+    const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.verifierJournal, this.services.runsRoot, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
     const refiner = new RefinerCoordinator(this.services.control);
@@ -113,7 +115,14 @@ export class SingleAgentCtfLoop {
     let verification: VerificationOutcome | undefined;
     try {
       throwIfAborted(options.signal);
-      lane = await this.createLane({ projectRoot: this.root, runId: options.runId, runDir, runtime, services: this.services, config: this.config });
+      lane = await this.createLane({
+        projectRoot: this.root,
+        runId: options.runId,
+        runDir,
+        runtime,
+        services: Object.freeze({ control: this.services.control, artifacts: this.services.artifacts }),
+        config: this.config,
+      });
       const activeLane = lane;
       const onAbort = () => {
         abortPromise = activeLane.abort(options.signal?.reason ?? "GUI shutting down");
@@ -246,14 +255,17 @@ export class SingleAgentCtfLoop {
     await this.ensureVerifierActive(runId, signal);
     await this.moveTo(runId, "report");
     await this.ensureVerifierActive(runId, signal);
+    const verifiedSnapshot = await this.services.control.snapshot(runId);
+    const acceptedCompletion = verifiedSnapshot.completions[verified.completionId];
+    if (!acceptedCompletion || acceptedCompletion.status !== "ACCEPTED") throw new Error(`Verified completion is not accepted: ${verified.completionId}`);
     const report = [
       "# ProofBlade verification report",
       "",
       `Run: ${runId}`,
       `Completion: ${verified.completionId}`,
       `Candidate: ${verified.candidate}`,
-      `Candidate SHA-256: ${verified.candidateHash}`,
-      `Evidence: ${verified.evidenceIds.join(", ")}`,
+      `Candidate SHA-256: ${acceptedCompletion.candidateHash}`,
+      `Evidence: ${acceptedCompletion.evidenceIds.join(", ")}`,
       `Fact: ${verified.factId ?? "none"}`,
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
     ].join("\n");
@@ -263,7 +275,7 @@ export class SingleAgentCtfLoop {
       await this.services.control.dispatch(runId, { type: "intent", intent: { ...intent, status: "DONE" }, lane: "executor" });
     }
     await this.ensureVerifierActive(runId, signal);
-    await this.services.control.dispatch(runId, { type: "finish", verified: true, evidenceIds: verified.evidenceIds, reason: "Hidden scorer reproduced the candidate.", lane: "verifier" });
+    await this.services.verifier.finish(runId, { completionId: acceptedCompletion.id, reason: "Hidden scorer reproduced the candidate." });
     return verified;
   }
 
@@ -310,8 +322,23 @@ function turnPrompt(snapshot: RunSnapshot, turn: number): string {
 
 function outcome(snapshot: RunSnapshot, mode: ExecutionMode | (() => ExecutionMode), turns: number, verification?: VerificationOutcome): SingleAgentRunOutcome {
   const resolvedMode = typeof mode === "function" ? mode() : mode;
-  const completion = verification ? snapshot.completions[verification.completionId] : Object.values(snapshot.completions).sort((a, b) => b.createdSeq - a.createdSeq)[0];
-  return { runId: snapshot.runId, mode: resolvedMode, status: snapshot.status, phase: snapshot.phase, turns, completionId: completion?.id, evidenceIds: completion?.evidenceIds ?? [] };
+  const finalResult = snapshot.finalResult;
+  const completion = finalResult
+    ? snapshot.completions[finalResult.completionId]
+    : verification
+      ? snapshot.completions[verification.completionId]
+      : Object.values(snapshot.completions)
+        .filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation)
+        .sort((a, b) => b.createdSeq - a.createdSeq)[0];
+  return {
+    runId: snapshot.runId,
+    mode: resolvedMode,
+    status: snapshot.status,
+    phase: snapshot.phase,
+    turns,
+    completionId: finalResult?.completionId ?? completion?.id,
+    evidenceIds: finalResult ? [...finalResult.evidenceIds] : completion?.evidenceIds ?? [],
+  };
 }
 
 async function exists(path: string): Promise<boolean> {

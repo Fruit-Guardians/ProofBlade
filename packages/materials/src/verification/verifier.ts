@@ -1,9 +1,9 @@
 import { join } from "node:path";
-import type { ControlStore } from "../control/control-store.js";
+import type { ControlStore, VerifierControlPort } from "../control/control-store.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
-import type { EffectJournal } from "../effects/effect-journal.js";
+import type { VerifierEffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import { id, sha256 } from "../domain/utils.js";
+import { canonicalJson, id, sha256 } from "../domain/utils.js";
 
 export interface VerificationOutcome {
   completionId: string;
@@ -18,8 +18,9 @@ export class IndependentVerifier {
   public constructor(
     private readonly controlStore: ControlStore,
     private readonly artifactStore: ArtifactStore,
-    private readonly journal: EffectJournal,
+    private readonly journal: VerifierEffectJournal,
     private readonly runsRoot: string,
+    private readonly verifierControl: VerifierControlPort,
   ) {}
 
   public async verify(runId: string, fixture: FixtureRef, completionId?: string, signal?: AbortSignal): Promise<VerificationOutcome> {
@@ -36,13 +37,30 @@ export class IndependentVerifier {
     if (sha256(candidate) !== completion.candidateHash) throw new Error(`Candidate hash mismatch: ${completion.id}`);
     const candidatePath = join(this.runsRoot, runId, artifact.path);
     const evidenceIds: string[] = [];
+    const evidenceCommands: Array<Parameters<VerifierControlPort["dispatch"]>[1]> = [];
     const accepted: boolean[] = [];
-    for (let attempt = 1; attempt <= snapshot.task.verification.required_reproductions; attempt += 1) {
+    const attemptCount = Math.max(1, snapshot.task.verification.required_reproductions);
+    for (let attempt = 1; attempt <= attemptCount; attempt += 1) {
+      const attemptId = sha256(`${runId}:${completion.id}:${snapshot.generation}:fixture-score:${attempt}`);
       const scored = await this.journal.execute(runId, {
         operation: "fixture_score",
-        args: { candidatePath, candidateArtifactId: artifact.id, generation: snapshot.generation, attempt },
+        args: {
+          runId,
+          taskId: snapshot.task.task_id,
+          generation: snapshot.generation,
+          completionId: completion.id,
+          candidateHash: completion.candidateHash,
+          candidateArtifactId: artifact.id,
+          taskHash: sha256(canonicalJson(snapshot.task)),
+          targetHash: sha256(snapshot.task.target),
+          verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
+          candidatePath,
+          attempt,
+          attemptId,
+        },
         replayPolicy: "pure",
         cwd: fixture.path,
+        sessionId: `${runId}:fixture-score:${completion.id}:${attempt}`,
       }, signal);
       await ensureVerifierActive(this.controlStore, runId, signal);
       const result = JSON.parse(scored.result.stdout) as { accepted?: boolean; candidateHash?: string };
@@ -50,7 +68,7 @@ export class IndependentVerifier {
       accepted.push(acceptedAttempt);
       const evidenceId = id("EV");
       evidenceIds.push(evidenceId);
-      await this.controlStore.dispatch(runId, {
+      evidenceCommands.push({
         type: "evidence",
         evidence: {
           id: evidenceId,
@@ -61,25 +79,28 @@ export class IndependentVerifier {
           supports: acceptedAttempt ? [completion.id] : [],
           refutes: acceptedAttempt ? [] : [completion.id],
         },
-        lane: "verifier",
       });
-      await ensureVerifierActive(this.controlStore, runId, signal);
     }
     const verified = accepted.length > 0 && accepted.every(Boolean);
+    const completionEvidenceIds = verified
+      ? [...evidenceIds]
+      : accepted.flatMap((acceptedAttempt, index) => acceptedAttempt ? [] : [evidenceIds[index]!]);
     await ensureVerifierActive(this.controlStore, runId, signal);
-    await this.controlStore.dispatch(runId, { type: "completion_verified", completionId: completion.id, accepted: verified, evidenceIds, lane: "verifier" });
+    await this.verifierControl.dispatchBatch(runId, [
+      ...evidenceCommands,
+      { type: "completion_verified", completionId: completion.id, accepted: verified, evidenceIds: completionEvidenceIds },
+    ]);
     await ensureVerifierActive(this.controlStore, runId, signal);
     let factId: string | undefined;
     if (verified) {
       factId = id("F");
-      await this.controlStore.dispatch(runId, {
+      await this.verifierControl.dispatch(runId, {
         type: "fact",
         fact: { id: factId, statement: `Hidden scorer verified candidate sha256=${completion.candidateHash}`, status: "CONFIRMED", evidenceIds },
-        lane: "verifier",
       });
       await ensureVerifierActive(this.controlStore, runId, signal);
     }
-    return { completionId: completion.id, accepted: verified, candidate, candidateHash: completion.candidateHash, evidenceIds, factId };
+    return { completionId: completion.id, accepted: verified, candidate, candidateHash: completion.candidateHash, evidenceIds: completionEvidenceIds, factId };
   }
 }
 

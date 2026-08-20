@@ -4,11 +4,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
+import type { RunSnapshot } from "../src/domain/types.js";
 import { readdir, readFile } from "node:fs/promises";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
-import type { CompetitionLaneFactory } from "../src/competition/loop.js";
+import { hasAcceptedPlatformSubmission, type CompetitionLaneFactory } from "../src/competition/loop.js";
 import type { ContainerRuntimePort } from "../src/container/contracts.js";
 import {
   CompetitionChallengeSolver,
@@ -68,9 +69,8 @@ const flagLane: CompetitionLaneFactory = async (options) => {
     runtime,
     fixture,
     controlStore: options.controlStore,
+    verifier: options.platformVerifier!,
     artifactStore: options.artifactStore,
-    journal: options.journal,
-    runsRoot: join(options.runDir, ".."),
     ...(options.mode ? { mode: options.mode } : {}),
   });
   return {
@@ -178,6 +178,30 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
     assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
     assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
     assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "SUBMIT"]);
+    const runId = (await readdir(join(root, "runs")))[0]!;
+    const projection = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"), "utf8")) as RunSnapshot;
+    assert.equal(hasAcceptedPlatformSubmission(projection), true);
+    assert.equal(projection.status, "SUCCEEDED", "a platform solve must commit a durable terminal result");
+    assert.equal(projection.finalResult?.completionId, Object.values(projection.completions).find((item) => item.status === "ACCEPTED")?.id);
+    assert.deepEqual(projection.finalResult?.evidenceIds, Object.values(projection.completions).find((item) => item.status === "ACCEPTED")?.evidenceIds);
+
+    const unrelatedAccepted = structuredClone(projection);
+    const acceptedCompletion = Object.values(unrelatedAccepted.completions).find((item) => item.status === "ACCEPTED")!;
+    acceptedCompletion.purpose = "claim_reproduction";
+    assert.equal(hasAcceptedPlatformSubmission(unrelatedAccepted), false, "a non-submission completion cannot combine with an unrelated scorer Effect");
+
+    const mismatchedVerdict = structuredClone(projection);
+    const submittedCompletion = Object.values(mismatchedVerdict.completions).find((item) => item.status === "ACCEPTED")!;
+    const evidence = mismatchedVerdict.evidence[submittedCompletion.evidenceIds[0]!]!;
+    const sourceEffectId = evidence.provenance.effect!.id;
+    const sourceEffect = mismatchedVerdict.effects[sourceEffectId]!;
+    mismatchedVerdict.effects["EF-UNRELATED-REJECTION"] = {
+      ...sourceEffect,
+      id: "EF-UNRELATED-REJECTION",
+      verification: { ...sourceEffect.verification!, accepted: false, completionId: "C-UNRELATED" },
+    };
+    evidence.provenance.effect!.id = "EF-UNRELATED-REJECTION";
+    assert.equal(hasAcceptedPlatformSubmission(mismatchedVerdict), false, "an accepted Completion must bind its own accepted scorer verdict");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -440,7 +464,7 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
     const api = new FakeApi([{ id: "VC", value: 100, flag: "flag{needs_submit}" }]);
     const verifyOnlyLane: CompetitionLaneFactory = async (options) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         async prompt() {
           const text = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
@@ -449,8 +473,8 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
             candidate,
             command: `grep -o 'flag{[^}]*}' flag.txt`,
             cwd: options.projectRoot,
-            output: candidate,
             toolCallId: `vc-${snapshot.generation}`,
+            execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
           });
           return { text: "verified locally", stopReason: "stop", usage: zeroUsage() };
         },
@@ -475,8 +499,13 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload: Record<string, unknown> });
     const verified = events.filter((event) => event.type === "completion_verified");
     const proposed = events.filter((event) => event.type === "completion_proposed");
+    const claimEffect = events.find((event) => event.type === "effect_proposed" && (event.payload.effect as { operation?: string } | undefined)?.operation === "claim_observation");
+    const claimEvidence = events.find((event) => event.type === "evidence_added")?.payload.evidence as { kind?: string; provenance?: { recordedBy?: string } } | undefined;
     assert.equal(proposed.length, 1, "verify_claim must still record its candidate as a proposal");
     assert.deepEqual(verified, [], "verify_claim must not mark a completion ACCEPTED when the platform is the judge");
+    assert.equal((claimEffect?.payload.effect as { producerLane?: string } | undefined)?.producerLane, "executor", "a model-selected command must not run as a verifier Effect");
+    assert.equal(claimEvidence?.kind, "observation");
+    assert.equal(claimEvidence?.provenance?.recordedBy, "agent", "a model-selected command must not receive verifier provenance");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -495,7 +524,7 @@ test("verify_claim then submit_flag on the same flag still reaches the platform"
     const bothLane: CompetitionLaneFactory = async (options) => {
       const inner = await flagLane(options);
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         ...inner,
         async prompt(text: string) {
@@ -506,8 +535,8 @@ test("verify_claim then submit_flag on the same flag still reaches the platform"
             candidate,
             command: `grep -o 'flag{[^}]*}' flag.txt`,
             cwd: options.projectRoot,
-            output: candidate,
             toolCallId: `vc-${snapshot.generation}`,
+            execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
           });
           // 2) then the real submission
           return await inner.prompt(text);
@@ -533,7 +562,7 @@ test("verify_claim calls cannot exhaust the platform submission budget", async (
     const api = new FakeApi([{ id: "BUD", value: 100, flag: "flag{budget}" }]);
     const exhaustThenSubmitLane: CompetitionLaneFactory = async (options) => {
       const inner = await flagLane(options);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         ...inner,
         async prompt(text: string) {
@@ -545,8 +574,8 @@ test("verify_claim calls cannot exhaust the platform submission budget", async (
               candidate,
               command: `echo attempt-${i}`,
               cwd: options.projectRoot,
-              output: candidate,
               toolCallId: `vc-${i}`,
+              execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
             });
           }
           return await inner.prompt(text);

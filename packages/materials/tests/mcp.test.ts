@@ -51,7 +51,7 @@ test("MCP stdio is lazy, filtered, journaled, redacted, observed, and closed", a
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal, root);
 
     const catalog = runtime.listCapabilities();

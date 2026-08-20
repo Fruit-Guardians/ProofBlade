@@ -1,4 +1,4 @@
-import type { ControlStore } from "../control/control-store.js";
+import type { ControlStore, FixtureControlPort } from "../control/control-store.js";
 import { LeaseManager } from "../control/lease-manager.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { Lease, TaskContract } from "../domain/types.js";
@@ -20,6 +20,7 @@ export class RunRecoveryService {
     private readonly controlStore: ControlStore,
     private readonly effectJournal: EffectJournal,
     private readonly sandbox: SandboxPort,
+    private readonly fixtureControl: FixtureControlPort,
     /**
      * Optional: a fresh SessionRegistry for this process.  A persistent session's
      * docker-exec child dies with the process that spawned it, so on restart any
@@ -34,10 +35,14 @@ export class RunRecoveryService {
     let snapshot = await this.controlStore.snapshot(runId);
     const expiredLeases = await new LeaseManager(this.controlStore).reapExpired(runId, now);
     const supersededSessions = this.sessionRegistry ? await this.sessionRegistry.supersedeOrphans() : 0;
-    const fixtureResult = await this.sandbox.reconcileFixture(task ?? snapshot.task, snapshot.generation);
+    const fixtureResult = await this.sandbox.reconcileFixture(
+      task ?? snapshot.task,
+      snapshot.generation,
+      async () => await this.fixtureControl.assertResetAllowed(runId),
+    );
     const reconciledJobs: string[] = [];
     if (fixtureResult.action === "reset") {
-      await this.controlStore.dispatch(runId, { type: "fixture_reset", generation: fixtureResult.generation, lane: "main" });
+      await this.fixtureControl.reset(runId, fixtureResult.generation);
       snapshot = await this.controlStore.snapshot(runId);
       for (const job of Object.values(snapshot.jobs)) {
         if (job.status !== "QUEUED" && job.status !== "RUNNING") continue;

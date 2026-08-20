@@ -32,7 +32,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "8077fffb57183c7d7c44e6174ea58b16a152a5e287b6a92ec2119b42c75b7f79";
+const CODING_TOOL_CONTRACT_HASH = "47a0e4aa63eaa57cb7b544850d5f7915bb2e2f33f739f5cd7b1a36cdb71f30f2";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -138,13 +138,17 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
   } as unknown as ProofBladeConfig;
   const services = createServices(dir, config);
   const runId = "CODING-CLAIM-TEST";
-  await services.control.createRun(runId, demoTask(runId, dir, config));
+  const claimTask = demoTask(runId, dir, config);
+  claimTask.scope.allowed_workspace = dir;
+  claimTask.verification.required_reproductions = 1;
+  claimTask.verification.command = "node solve.mjs";
+  await services.control.createRun(runId, claimTask);
   const candidate = "flag{3d02c696a47d9e524d37241e33098bd0}";
   await writeFile(join(dir, "decoy.txt"), "LCTF2026EV-ARM-GW-042\n", "utf8");
   await writeFile(join(dir, "protected.bin"), Buffer.from(candidate, "utf8").map((byte) => byte ^ 0x5a));
   await writeFile(join(dir, "solve.mjs"), "import { readFileSync } from 'node:fs';\nconst data = readFileSync('protected.bin');\nprocess.stdout.write(Buffer.from(data.map((byte) => byte ^ 0x5a)).toString('utf8'));\n", "utf8");
   const env = new NodeExecutionEnv({ cwd: dir });
-  const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts);
+  const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
   const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
   const context = {
     env,
@@ -201,8 +205,8 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.name, "EF01 受保护记录");
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.role, "supporting");
     assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
-    assert.equal(verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`).status, "verified");
-    assert.equal(verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042").status, "unverified");
+    assert.equal((await verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`)).status, "verified");
+    assert.equal((await verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042")).status, "unverified");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });
@@ -242,7 +246,7 @@ test("coding bash is blocked after the durable evidence curation threshold", asy
     mcp: {},
     enabledSkills: new Set<string>(),
     enabledMcpServers: new Set<string>(),
-    claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts),
+    claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier),
     evidenceGraph: new CodingEvidenceGraph(runId, services.control, services.artifacts),
     evidenceCurationGate: new EvidenceCurationGate(runId, services.control),
   } as unknown as CodingResourceContext;

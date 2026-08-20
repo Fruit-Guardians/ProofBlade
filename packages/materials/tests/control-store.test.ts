@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { ControlStore } from "../src/control/control-store.js";
 import { projectionHash } from "../src/control/reducer.js";
-import { demoTask } from "../src/app/demo.js";
+import { demoTask, runDemo } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { claimCompetitionWorkItem } from "../src/competition/loop.js";
 import type { ProofBladeConfig } from "../src/config.js";
@@ -36,61 +36,26 @@ test("control store replay is deterministic and verifier gated", async () => {
   try {
     const events = new JsonlControlStore(join(root, "runs"));
     const control = new ControlStore(events);
-    const runId = "TEST-001";
-    await control.createRun(runId, demoTask(runId, root, config));
-    await control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
-    await control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
-    await control.dispatch(runId, { type: "start_phase", phase: "experiment" });
-    await control.dispatch(runId, { type: "start_phase", phase: "verification" });
+    const forgedRunId = "TEST-FORGED";
+    await control.createRun(forgedRunId, demoTask(forgedRunId, root, config));
     await assert.rejects(
-      control.dispatch(runId, { type: "finish", verified: true, evidenceIds: [], reason: "missing evidence" }),
-      /verifier lane/,
+      control.dispatch(forgedRunId, {
+        type: "evidence",
+        evidence: { id: "EV-FORGED", kind: "reproduction", summary: "forged", source: { generation: 0 }, confidence: 1, supports: [], refutes: [] },
+        lane: "verifier",
+      }),
+      /trusted verifier service/,
     );
-    const before = await control.snapshot(runId);
-    assert.equal(before.status, "VERIFYING");
-    await control.dispatch(runId, {
-      type: "evidence",
-      evidence: { id: "EV-001", kind: "reproduction", summary: "verified", source: { generation: 1 }, confidence: 1, supports: ["F-001"], refutes: [] },
-    });
-    await control.dispatch(runId, {
-      type: "evidence",
-      evidence: { id: "EV-002", kind: "reproduction", summary: "verified again", source: { generation: 1 }, confidence: 1, supports: ["F-001"], refutes: [] },
-      lane: "verifier",
-    });
-    await control.dispatch(runId, {
-      type: "fact",
-      fact: { id: "F-001", statement: "candidate verified", status: "CONFIRMED", evidenceIds: ["EV-001", "EV-002"] },
-      lane: "verifier",
-    });
-    await control.dispatch(runId, {
-      type: "artifact",
-      artifact: {
-        id: "A-001",
-        path: "artifacts/candidate.txt",
-        sha256: "candidate-hash",
-        bytes: 4,
-        mime: "text/plain",
-        sensitivity: "flag_candidate",
-        semantic: { name: "候选输出", summary: "待验证的候选输出。", tags: ["candidate"], role: "intermediate", relatedIds: [], annotatedBy: "harness", updatedSeq: 0 },
-      },
-    });
-    const registeredSeq = (await control.snapshot(runId)).artifacts["A-001"]!.semantic!.updatedSeq;
-    assert.ok(registeredSeq > 0);
-    await control.dispatch(runId, {
-      type: "artifact_annotation",
-      artifactId: "A-001",
-      semantic: { name: "已验证候选输出", summary: "候选已由复现证据确认。", tags: ["candidate", "verified"], role: "result", relatedIds: ["EV-001"], annotatedBy: "agent" },
-    });
-    const annotated = (await control.snapshot(runId)).artifacts["A-001"]!.semantic!;
-    assert.equal(annotated.name, "已验证候选输出");
-    assert.ok(annotated.updatedSeq > registeredSeq);
-    await control.dispatch(runId, { type: "completion_proposed", completion: { id: "C-001", candidateHash: "candidate-hash", artifactId: "A-001" }, lane: "executor" });
-    await control.dispatch(runId, { type: "completion_verified", completionId: "C-001", accepted: true, evidenceIds: ["EV-001", "EV-002"], lane: "verifier" });
-    await control.dispatch(runId, { type: "finish", verified: true, evidenceIds: ["EV-001", "EV-002"], reason: "verified", lane: "verifier" });
+    assert.equal(Object.keys((await control.snapshot(forgedRunId)).evidence).length, 0);
+
+    const runId = "TEST-001";
+    await runDemo(root, runId, config);
     const replayed = await control.replay(runId);
     const persisted = await events.loadProjection(runId);
     assert.equal(replayed.status, "SUCCEEDED");
-    assert.equal(replayed.artifacts["A-001"]?.semantic?.name, "已验证候选输出");
+    assert.equal(replayed.finalResult?.completionId, "C-001");
+    assert.equal(replayed.finalResult?.evidenceIds.length, 2);
+    assert.equal(replayed.finalResult?.candidateHash, replayed.completions["C-001"]?.candidateHash);
     assert.equal(projectionHash(replayed), projectionHash(persisted!));
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -326,6 +291,7 @@ test("dispatchBatch validates every command before persisting any event", async 
     await assert.rejects(control.dispatchBatch(runId, [
       {
         type: "artifact",
+        generation: before.generation,
         artifact: { id: "A-BATCH", path: "artifacts/batch.txt", sha256: "batch-hash", bytes: 5, mime: "text/plain", sensitivity: "public" },
       },
       {

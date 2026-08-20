@@ -96,7 +96,7 @@ export class PwnReproducer {
           ? `Independent pwn reproduce succeeded: shell marker + flag extracted from a fresh session.`
           : `Independent pwn reproduce failed at ${firstFailure(stages)}.`,
         tags: ["pwn", "reproduce"],
-        source: { tool: "pwn_reproduce" },
+        source: { tool: "pwn_reproduce", generation: (await this.control.snapshot(runId)).generation },
         confidence: 1,
         supports: [],
         refutes: [],

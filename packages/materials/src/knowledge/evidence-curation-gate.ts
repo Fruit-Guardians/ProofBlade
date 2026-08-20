@@ -4,7 +4,11 @@ import type { ArtifactRef } from "../domain/types.js";
 export interface EvidenceCurationStatus {
   stage: "clear" | "checkpoint" | "required";
   pendingCount: number;
-  pendingArtifacts: Array<{ id: string; name: string; role: string }>;
+  viewedCount: number;
+  reviewedCount: number;
+  promotedCount: number;
+  unviewedCount: number;
+  pendingArtifacts: Array<{ id: string; name: string; role: string; curationState: "viewed" | "unviewed" }>;
 }
 
 export interface EvidenceCurationPolicy {
@@ -32,24 +36,35 @@ export class EvidenceCurationGate {
   }
 
   public async inspect(): Promise<EvidenceCurationStatus> {
-    const snapshot = await this.controlStore.snapshot(this.runId);
-    const promoted = new Set(Object.values(snapshot.evidence).flatMap((evidence) => [
+    const [snapshot, events] = await Promise.all([this.controlStore.snapshot(this.runId), this.controlStore.events(this.runId)]);
+    const currentEvidence = Object.values(snapshot.evidence).filter((evidence) => evidence.provenance?.runId === snapshot.runId && evidence.provenance.generation === snapshot.generation);
+    const currentArtifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation);
+    const promoted = new Set(currentEvidence.flatMap((evidence) => [
       ...(evidence.source.artifactIds ?? []),
       ...(evidence.source.artifactId ? [evidence.source.artifactId] : []),
     ]));
-    const reviewedHashes = new Set(Object.values(snapshot.artifacts)
-      .filter((artifact) => promoted.has(artifact.id) || artifact.semantic?.annotatedBy === "agent")
-      .map((artifact) => artifact.sha256));
-    const pendingHashes = new Set<string>();
-    const pending = Object.values(snapshot.artifacts)
-      .filter(isInvestigationArtifact)
-      .filter((artifact) => !reviewedHashes.has(artifact.sha256) && artifact.semantic?.annotatedBy !== "agent")
-      .sort((left, right) => (left.semantic?.updatedSeq ?? 0) - (right.semantic?.updatedSeq ?? 0))
-      .filter((artifact) => {
-        if (pendingHashes.has(artifact.sha256)) return false;
-        pendingHashes.add(artifact.sha256);
-        return true;
-      });
+    const promotedHashes = new Set([...promoted].flatMap((artifactId) => snapshot.artifacts[artifactId]?.sha256 ? [snapshot.artifacts[artifactId]!.sha256] : []));
+    // Registration metadata is not a review. Only an explicit trusted
+    // artifact_annotated event from the harness/user can move bytes to reviewed.
+    const reviewedArtifactIds = new Set(events.flatMap((event) => {
+      if (event.type !== "artifact_annotated") return [];
+      const payload = event.payload ?? {};
+      const semantic = payload.semantic as { annotatedBy?: string } | undefined;
+      return semantic?.annotatedBy === "harness" || semantic?.annotatedBy === "user" ? [String(payload.artifactId)] : [];
+    }));
+    const reviewedHashes = new Set([...reviewedArtifactIds].flatMap((artifactId) => snapshot.artifacts[artifactId]?.sha256 ? [snapshot.artifacts[artifactId]!.sha256] : []));
+    const viewedHashes = new Set(currentArtifacts.filter((artifact) => artifact.semantic?.annotatedBy === "agent").map((artifact) => artifact.sha256));
+    const byHash = new Map<string, ArtifactRef>();
+    for (const artifact of currentArtifacts.filter(isInvestigationArtifact).sort((left, right) => (left.semantic?.updatedSeq ?? 0) - (right.semantic?.updatedSeq ?? 0))) {
+      if (!byHash.has(artifact.sha256)) byHash.set(artifact.sha256, artifact);
+    }
+    const classified = [...byHash.entries()].map(([hash, artifact]) => ({
+      artifact,
+      state: promotedHashes.has(hash) ? "promoted" as const : reviewedHashes.has(hash) ? "reviewed" as const : viewedHashes.has(hash) ? "viewed" as const : "unviewed" as const,
+    }));
+    const pending = classified.flatMap((item) => item.state === "viewed" || item.state === "unviewed"
+      ? [{ artifact: item.artifact, state: item.state }]
+      : []);
     return {
       stage: pending.length >= this.policy.requiredArtifacts
         ? "required"
@@ -57,10 +72,15 @@ export class EvidenceCurationGate {
           ? "checkpoint"
           : "clear",
       pendingCount: pending.length,
-      pendingArtifacts: pending.slice(0, this.policy.listedArtifacts).map((artifact) => ({
+      viewedCount: classified.filter((item) => item.state === "viewed").length,
+      reviewedCount: classified.filter((item) => item.state === "reviewed").length,
+      promotedCount: classified.filter((item) => item.state === "promoted").length,
+      unviewedCount: classified.filter((item) => item.state === "unviewed").length,
+      pendingArtifacts: pending.slice(0, this.policy.listedArtifacts).map(({ artifact, state }) => ({
         id: artifact.id,
         name: artifact.semantic?.name ?? artifact.path,
         role: artifact.semantic?.role ?? "intermediate",
+        curationState: state,
       })),
     };
   }
@@ -77,17 +97,19 @@ export class EvidenceCurationGate {
   }
 
   private format(status: EvidenceCurationStatus, required: boolean): string {
-    const artifacts = status.pendingArtifacts.map((artifact) => `${artifact.id} (${artifact.name})`).join(", ");
+    const artifacts = status.pendingArtifacts.map((artifact) => `${artifact.id} (${artifact.name}; ${artifact.curationState})`).join(", ");
     return [
       `[ProofBlade evidence curation ${required ? "required" : "checkpoint"}: ${status.pendingCount} unreviewed investigation artifacts]`,
-      `Review: ${artifacts || "use evidence search"}.`,
-      "Use evidence record for findings that advance or refute a hypothesis. Use evidence annotate for reviewed routine/debug output that should stay outside Evidence.",
+      `Curate: ${artifacts || "use evidence search"}. Viewed=${status.viewedCount}; reviewed=${status.reviewedCount}; promoted=${status.promotedCount}; unviewed=${status.unviewedCount}.`,
+      "Use evidence record to promote findings that advance or refute a hypothesis. Agent annotation marks an artifact viewed but does not clear this gate; routine/noise output requires trusted user/harness review.",
       required ? "Further read/bash calls are paused until at least one pending artifact is curated." : "Curate these artifacts before the exploration backlog reaches the hard limit.",
     ].join("\n");
   }
 }
 
 function isInvestigationArtifact(artifact: ArtifactRef): boolean {
-  const tags = new Set(artifact.semantic?.tags ?? []);
-  return tags.has("read") || tags.has("bash") || tags.has("command-output") || tags.has("file-content");
+  const tags = new Set(artifact.origin.tags);
+  const operation = artifact.origin.operation ?? "";
+  return tags.has("read") || tags.has("bash") || tags.has("command-output") || tags.has("file-content")
+    || operation === "artifact_read" || operation === "coding_read" || operation === "coding_bash";
 }

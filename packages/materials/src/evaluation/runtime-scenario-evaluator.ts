@@ -189,7 +189,8 @@ function evaluateContextPrefixStability(context: RuntimeScenarioContext): Record
     id: "EV-DYNAMIC",
     kind: "observation",
     summary: "A dynamic observation entered the working context.",
-    source: { tool: "scenario" },
+    source: { tool: "scenario", generation: 0 },
+    provenance: { schemaVersion: 1, runId, generation: 0, recordedBy: "agent", artifactIds: [] },
     confidence: 0.5,
     supports: [],
     refutes: [],
@@ -379,7 +380,7 @@ async function evaluateVerifierAuthority(context: RuntimeScenarioContext): Promi
   const candidate = await services.artifacts.putText(runId, "candidate", { filename: "candidate.txt", sensitivity: "flag_candidate" });
   await services.control.dispatch(runId, {
     type: "completion_proposed",
-    completion: { id: "C-SCENARIO", candidateHash: sha256("candidate"), artifactId: candidate.id },
+    completion: { id: "C-SCENARIO", purpose: "harness_verification", candidateHash: sha256("candidate"), artifactId: candidate.id },
     lane: "executor",
   });
   const rejected = await rejects(async () => await services.control.dispatch(runId, {
@@ -388,7 +389,7 @@ async function evaluateVerifierAuthority(context: RuntimeScenarioContext): Promi
     accepted: true,
     evidenceIds: [],
     lane: "executor",
-  }), /verifier lane/);
+  }), /trusted verifier service/);
   requireCondition(rejected, "executor accepted its own completion proposal");
   requireCondition((await services.control.snapshot(runId)).completions["C-SCENARIO"]?.status === "PROPOSED", "rejected verification mutated durable state");
   return { executorRejected: true, completionStatus: "PROPOSED" };

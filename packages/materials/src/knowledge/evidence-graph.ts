@@ -79,6 +79,7 @@ export class CodingEvidenceGraph {
     return await this.controlStore.dispatchTransaction(this.runId, (snapshot) => {
       const artifact = snapshot.artifacts[input.artifactId];
       if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
+      if (artifact.runId !== snapshot.runId || artifact.generation !== snapshot.generation) throw new Error(`Artifact is from generation ${artifact.generation}`);
       const semantic = semanticInput({
         name: input.name,
         summary: input.summary,
@@ -90,7 +91,9 @@ export class CodingEvidenceGraph {
       const progressKey = sha256(canonicalJson({ operation: "annotate", contentKey: artifact.sha256 }));
       const reused = Boolean(artifact.semantic && sameSemantic(artifact.semantic, semantic));
       const contentAlreadyReviewed = Object.values(snapshot.artifacts).some((candidate) =>
-        candidate.sha256 === artifact.sha256
+        candidate.runId === snapshot.runId
+        && candidate.generation === snapshot.generation
+        && candidate.sha256 === artifact.sha256
         && candidate.semantic?.annotatedBy === "agent");
       return {
         commands: reused ? [] : [{ type: "artifact_annotation", artifactId: input.artifactId, semantic, lane: "main" }],
@@ -110,8 +113,10 @@ export class CodingEvidenceGraph {
       const artifactIds = unique(input.artifactIds);
       if (artifactIds.length === 0 || artifactIds.length > 16) throw new Error("record evidence requires 1-16 artifact ids");
       assertKnown(artifactIds, snapshot.artifacts, "artifacts");
+      if (artifactIds.some((artifactId) => snapshot.artifacts[artifactId]!.runId !== snapshot.runId || snapshot.artifacts[artifactId]!.generation !== snapshot.generation)) throw new Error("record evidence requires current-generation artifacts");
       const dependsOn = unique(input.dependsOn ?? []);
       assertKnown(dependsOn, snapshot.evidence, "evidence");
+      if (dependsOn.some((evidenceId) => snapshot.evidence[evidenceId]!.provenance?.runId !== snapshot.runId || snapshot.evidence[evidenceId]!.provenance.generation !== snapshot.generation)) throw new Error("record evidence dependencies must be from the current generation");
       const name = requiredText(input.name, "Evidence name", 160);
       const summary = requiredText(input.summary, "Evidence summary", 1_000);
       const tags = normalizedTags(input.tags);
@@ -119,7 +124,8 @@ export class CodingEvidenceGraph {
       const contentKeys = artifactContentKeys(snapshot, artifactIds);
       const progressKey = evidenceProgressKey({ contentKeys, claim, dependsOn });
       const identityKey = evidenceIdentityKey({ contentKeys, summary, claim, dependsOn });
-      const existingEvidence = Object.values(snapshot.evidence).find((candidate) => {
+      const currentEvidence = Object.values(snapshot.evidence).filter((candidate) => candidate.provenance?.runId === snapshot.runId && candidate.provenance.generation === snapshot.generation);
+      const existingEvidence = currentEvidence.find((candidate) => {
         const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
         return evidenceIdentityKey({
           contentKeys: artifactContentKeys(snapshot, evidenceArtifactIds(candidate)),
@@ -131,7 +137,7 @@ export class CodingEvidenceGraph {
       if (existingEvidence) {
         const existingFactId = existingEvidence.supports.find((factId) => snapshot.facts[factId]);
         const existingTree = existingFactId
-          ? Object.values(snapshot.reasoningTrees).find((tree) => tree.rootNodeId === existingFactId && tree.nodeIds.includes(existingEvidence.id))
+          ? Object.values(snapshot.reasoningTrees).find((tree) => tree.generation === snapshot.generation && tree.rootNodeId === existingFactId && tree.nodeIds.includes(existingEvidence.id))
           : undefined;
         return {
           commands: [],
@@ -146,7 +152,7 @@ export class CodingEvidenceGraph {
           }),
         };
       }
-      const repeatsKnownContent = Object.values(snapshot.evidence).some((candidate) => {
+      const repeatsKnownContent = currentEvidence.some((candidate) => {
         const candidateClaim = candidate.supports.map((factId) => snapshot.facts[factId]?.statement).find(Boolean);
         return evidenceProgressKey({
           contentKeys: artifactContentKeys(snapshot, evidenceArtifactIds(candidate)),
@@ -156,7 +162,7 @@ export class CodingEvidenceGraph {
       });
     const factId = claim ? id("F") : undefined;
     const evidenceId = id("EV");
-    const evidence: Omit<Evidence, "createdSeq"> = {
+    const evidence: Omit<Evidence, "createdSeq" | "provenance"> = {
       id: evidenceId,
       kind: "observation",
       name,
@@ -221,7 +227,7 @@ export class CodingEvidenceGraph {
     if (factId && claim) {
       commands.push({ type: "reasoning_node", node: factReasoningNode(factId, claim, snapshot.generation), lane: "main" });
       commands.push({ type: "reasoning_edge", edge: reasoningEdge(evidenceId, factId, "supports", "该 Evidence 支撑此主张。", 0.8, snapshot.generation), lane: "main" });
-      const relatedTreeIds = Object.values(snapshot.reasoningTrees).filter((tree) => dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
+      const relatedTreeIds = Object.values(snapshot.reasoningTrees).filter((tree) => tree.generation === snapshot.generation && dependsOn.some((id) => tree.nodeIds.includes(id))).map((tree) => tree.id);
       treeId = id("TREE");
       commands.push({ type: "reasoning_tree", tree: {
         id: treeId,
@@ -350,6 +356,7 @@ export class CodingEvidenceGraph {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const tree = snapshot.reasoningTrees[treeId];
     if (!tree) throw new Error(`Unknown reasoning tree: ${treeId}`);
+    if (tree.generation !== snapshot.generation) throw new Error(`Reasoning tree is from generation ${tree.generation}`);
     const nodeIds = new Set(tree.nodeIds);
     const usage = nodeTreeUsage(snapshot);
     return {
@@ -367,11 +374,11 @@ export class CodingEvidenceGraph {
     const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
     const normalizedTagSet = new Set(normalizedTags(tags).map((tag) => tag.toLowerCase()));
     const rows: Array<Record<string, unknown> & { search: string; tags: string[]; createdSeq: number }> = [
-      ...Object.values(snapshot.facts).map((item) => ({ kind: "fact", id: item.id, name: item.statement, summary: item.statement, status: item.status, evidenceIds: item.evidenceIds, tags: [], createdSeq: item.createdSeq, search: `${item.id} ${item.statement}`.toLowerCase() })),
-      ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, name: item.name ?? item.summary, summary: item.summary, artifactIds: evidenceArtifactIds(item), dependsOn: item.dependsOn ?? [], supports: item.supports, refutes: item.refutes, tags: item.tags ?? [], createdSeq: item.createdSeq, search: `${item.id} ${item.name ?? ""} ${item.summary} ${(item.tags ?? []).join(" ")}`.toLowerCase() })),
-      ...Object.values(snapshot.artifacts).map((item) => ({ kind: "artifact", id: item.id, name: item.semantic?.name ?? basename(item.path), summary: item.semantic?.summary ?? `${item.mime}, ${item.bytes} bytes`, role: item.semantic?.role ?? "intermediate", relatedIds: item.semantic?.relatedIds ?? [], tags: item.semantic?.tags ?? [], createdSeq: item.semantic?.updatedSeq ?? 0, search: `${item.id} ${item.path} ${item.semantic?.name ?? ""} ${item.semantic?.summary ?? ""} ${(item.semantic?.tags ?? []).join(" ")}`.toLowerCase() })),
-      ...Object.values(snapshot.reasoningTrees).map((item) => ({ kind: "reasoning_tree", id: item.id, name: item.name, summary: item.summary, purpose: item.purpose, status: item.status, rootNodeId: item.rootNodeId, nodeIds: item.nodeIds, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.purpose} ${item.tags.join(" ")}`.toLowerCase() })),
-      ...Object.values(snapshot.reasoningNodes).map((item) => ({ kind: "reasoning_node", id: item.id, name: item.name, summary: item.summary, status: item.status, reference: item.reference, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.explanation} ${item.tags.join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.facts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).map((item) => ({ kind: "fact", id: item.id, name: item.statement, summary: item.statement, status: item.status, evidenceIds: item.evidenceIds, tags: [], createdSeq: item.createdSeq, search: `${item.id} ${item.statement}`.toLowerCase() })),
+      ...Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation).map((item) => ({ kind: "evidence", id: item.id, name: item.name ?? item.summary, summary: item.summary, artifactIds: evidenceArtifactIds(item), dependsOn: item.dependsOn ?? [], supports: item.supports, refutes: item.refutes, tags: item.tags ?? [], createdSeq: item.createdSeq, search: `${item.id} ${item.name ?? ""} ${item.summary} ${(item.tags ?? []).join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.artifacts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).map((item) => ({ kind: "artifact", id: item.id, name: item.semantic?.name ?? basename(item.path), summary: item.semantic?.summary ?? `${item.mime}, ${item.bytes} bytes`, role: item.semantic?.role ?? "intermediate", relatedIds: item.semantic?.relatedIds ?? [], tags: item.semantic?.tags ?? [], createdSeq: item.semantic?.updatedSeq ?? 0, search: `${item.id} ${item.path} ${item.semantic?.name ?? ""} ${item.semantic?.summary ?? ""} ${(item.semantic?.tags ?? []).join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.reasoningTrees).filter((item) => item.generation === snapshot.generation).map((item) => ({ kind: "reasoning_tree", id: item.id, name: item.name, summary: item.summary, purpose: item.purpose, status: item.status, rootNodeId: item.rootNodeId, nodeIds: item.nodeIds, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.purpose} ${item.tags.join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.reasoningNodes).filter((item) => item.generation === snapshot.generation).map((item) => ({ kind: "reasoning_node", id: item.id, name: item.name, summary: item.summary, status: item.status, reference: item.reference, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.explanation} ${item.tags.join(" ")}`.toLowerCase() })),
     ];
     // Metadata alone is not enough: a bash artifact is titled `命令输出 · <cmd>`,
     // so a content query ("sub_08001a10 disasm") matches nothing and the model
@@ -434,8 +441,9 @@ export class CodingEvidenceGraph {
 
 export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestIndex {
   const usage = nodeTreeUsage(snapshot);
-  const edges = Object.values(snapshot.reasoningEdges);
+  const edges = Object.values(snapshot.reasoningEdges).filter((edge) => edge.generation === snapshot.generation);
   const trees = Object.values(snapshot.reasoningTrees)
+    .filter((tree) => tree.generation === snapshot.generation)
     .sort((a, b) => b.updatedSeq - a.updatedSeq || a.id.localeCompare(b.id))
     .map((tree) => {
       const nodeIds = new Set(tree.nodeIds);
@@ -457,9 +465,9 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
         updatedSeq: tree.updatedSeq,
       };
     });
-  const treeNodeIds = new Set(Object.values(snapshot.reasoningTrees).flatMap((tree) => tree.nodeIds));
+  const treeNodeIds = new Set(Object.values(snapshot.reasoningTrees).filter((tree) => tree.generation === snapshot.generation).flatMap((tree) => tree.nodeIds));
   const allOrphanNodes = Object.values(snapshot.reasoningNodes)
-    .filter((node) => !treeNodeIds.has(node.id))
+    .filter((node) => node.generation === snapshot.generation && !treeNodeIds.has(node.id))
     .sort((a, b) => b.updatedSeq - a.updatedSeq || a.id.localeCompare(b.id));
   const orphanNodes = allOrphanNodes.slice(0, 24)
     .map((node) => ({ id: node.id, name: node.name, summary: node.summary, kind: node.kind, updatedSeq: node.updatedSeq }));
@@ -491,7 +499,7 @@ export function formatReasoningForestContext(index: ReasoningForestIndex): strin
 
 function nodeTreeUsage(snapshot: RunSnapshot): Map<string, string[]> {
   const usage = new Map<string, string[]>();
-  for (const tree of Object.values(snapshot.reasoningTrees)) {
+  for (const tree of Object.values(snapshot.reasoningTrees).filter((item) => item.generation === snapshot.generation)) {
     for (const nodeId of tree.nodeIds) usage.set(nodeId, [...(usage.get(nodeId) ?? []), tree.id]);
   }
   return usage;
@@ -502,7 +510,7 @@ function relatedTreeIds(snapshot: RunSnapshot, treeId: string): string[] {
   if (!tree) return [];
   return unique([
     ...tree.relatedTreeIds,
-    ...Object.values(snapshot.reasoningTrees).filter((item) => item.relatedTreeIds.includes(treeId)).map((item) => item.id),
+    ...Object.values(snapshot.reasoningTrees).filter((item) => item.generation === snapshot.generation && item.relatedTreeIds.includes(treeId)).map((item) => item.id),
   ]);
 }
 
@@ -511,7 +519,7 @@ function upstreamClosure(snapshot: RunSnapshot, requestedNodeIds: string[]): str
   const pending = [...requestedNodeIds];
   while (pending.length > 0) {
     const target = pending.pop()!;
-    for (const edge of Object.values(snapshot.reasoningEdges)) {
+    for (const edge of Object.values(snapshot.reasoningEdges).filter((item) => item.generation === snapshot.generation)) {
       if (edge.to !== target || included.has(edge.from)) continue;
       included.add(edge.from);
       pending.push(edge.from);
@@ -577,7 +585,7 @@ function artifactReasoningNode(
   };
 }
 
-function evidenceReasoningNode(evidence: Omit<Evidence, "createdSeq">, generation: number): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
+function evidenceReasoningNode(evidence: Omit<Evidence, "createdSeq" | "provenance">, generation: number): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
   return {
     id: evidence.id,
     kind: evidence.kind === "reproduction" ? "reproduction" : "evidence",

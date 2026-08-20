@@ -6,6 +6,8 @@ import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { id } from "../domain/utils.js";
+import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { IndependentVerifier } from "../verification/verifier.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -87,6 +89,8 @@ export async function runCompetitionLoop(
   let workItemId: string | undefined;
 
   try {
+    const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const platformVerifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
     lane = await createLane({
       runId: options.runId,
       projectRoot: options.workspaceRoot,
@@ -95,6 +99,8 @@ export async function runCompetitionLoop(
       controlStore: services.control,
       artifactStore: services.artifacts,
       journal: services.journal,
+      claimVerifier,
+      platformVerifier,
       config,
       // The fleet's per-challenge toggle is read on every submission, so flipping
       // auto/assist mid-run takes effect without rebuilding the lane.
@@ -147,7 +153,14 @@ export async function runCompetitionLoop(
       }
       lastText = outcome.text || lastText;
       const snapshot = await services.control.snapshot(options.runId);
-      if (accepted(snapshot)) {
+      const acceptedCompletion = acceptedPlatformCompletion(snapshot);
+      if (acceptedCompletion) {
+        if (snapshot.status !== "SUCCEEDED") {
+          await services.verifier.finish(options.runId, {
+            completionId: acceptedCompletion.id,
+            reason: "The platform scorer accepted this exact submission Completion.",
+          });
+        }
         // A prior recoverable guard may have caused a replan, but the run is
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
@@ -167,7 +180,8 @@ export async function runCompetitionLoop(
         await failCompetitionWorkItem(services.control, options.runId, workItemId, "Provider request failed");
         break;
       }
-      if (mode() === "assist" && Object.keys(snapshot.completions).length > 0) {
+      if (mode() === "assist" && Object.values(snapshot.completions).some((completion) => completion.purpose === "submission"
+        && completion.runId === snapshot.runId && completion.generation === snapshot.generation)) {
         await ensureCompetitionDomainPhase(services.control, options.runId, "REPRODUCE");
         stopReason = "held_for_approval";
         await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
@@ -215,7 +229,7 @@ export async function runCompetitionLoop(
   return {
     runId: options.runId,
     turns,
-    solved: accepted(finalSnapshot),
+    solved: hasAcceptedPlatformSubmission(finalSnapshot),
     heldForApproval: stopReason === "held_for_approval",
     // Count real platform submissions, not every completion: `verify_claim` also
     // proposes completions and never contacts the platform, so counting those
@@ -364,10 +378,32 @@ async function blockAndQueueCompetitionWorkItem(control: AppServices["control"],
  * produces completions, and before this check a local reproduction could report a
  * challenge as solved with the platform never contacted.
  */
-function accepted(snapshot: RunSnapshot): boolean {
-  if (!Object.values(snapshot.completions).some((completion) => completion.status === "ACCEPTED")) return false;
-  const submitted = Object.values(snapshot.effects).some((effect) => effect.operation === "fixture_score");
-  return submitted;
+export function hasAcceptedPlatformSubmission(snapshot: RunSnapshot): boolean {
+  return acceptedPlatformCompletion(snapshot) !== undefined;
+}
+
+function acceptedPlatformCompletion(snapshot: RunSnapshot): RunSnapshot["completions"][string] | undefined {
+  if (["FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) return undefined;
+  return Object.values(snapshot.completions).find((completion) => {
+    if (completion.purpose !== "submission" || completion.status !== "ACCEPTED"
+      || completion.runId !== snapshot.runId || completion.generation !== snapshot.generation
+      || completion.evidenceIds.length === 0) return false;
+    return completion.evidenceIds.every((evidenceId) => {
+      const evidence = snapshot.evidence[evidenceId];
+      const effect = evidence?.provenance.effect ? snapshot.effects[evidence.provenance.effect.id] : undefined;
+      const verdict = effect?.verification;
+      return evidence?.kind === "reproduction"
+        && evidence.provenance.recordedBy === "verifier"
+        && evidence.supports.includes(completion.id)
+        && effect?.operation === "fixture_score"
+        && verdict?.valid === true
+        && verdict.accepted === true
+        && verdict.completionId === completion.id
+        && verdict.candidateHash === completion.candidateHash
+        && verdict.candidateArtifactId === completion.artifactId
+        && verdict.generation === completion.generation;
+    });
+  });
 }
 
 function countSubmissions(snapshot: RunSnapshot): number {

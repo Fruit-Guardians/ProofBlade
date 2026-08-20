@@ -8,6 +8,7 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { LocalFixtureSandbox } from "../src/sandbox/fixture.js";
 import type { EffectFaultPoint } from "../src/effects/effect-journal.js";
+import { createEffectInput } from "../src/control/control-store.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -57,16 +58,17 @@ test("pure in-flight effect is rerun under the same effect id", async () => {
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     const effectId = "EF-RECOVER";
+    const effectArgs = { path: "challenge.txt" };
     await services.control.dispatch(runId, {
       type: "effect_proposed",
       effect: {
         id: effectId,
-        idempotencyKey: "recover-key",
+        idempotencyKey: createEffectInput(runId, "fixture_read", effectArgs, "pure", generation).idempotencyKey,
         replayPolicy: "pure",
         operation: "fixture_read",
-        args: { path: "challenge.txt" },
+        args: effectArgs,
         command: process.platform === "win32" ? "type challenge.txt" : "cat challenge.txt",
         cwd: fixture.path,
         status: "PROPOSED",
@@ -128,7 +130,7 @@ for (const faultPoint of ["after_proposed", "after_started", "after_execute", "a
       await services.control.createRun(runId, task);
       const fixture = await services.sandbox.build(task);
       const generation = await services.sandbox.reset(fixture);
-      await services.control.dispatch(runId, { type: "fixture_reset", generation });
+      await services.fixtureControl.reset(runId, generation);
       await assert.rejects(services.journal.execute(runId, {
         operation: "fixture_read",
         args: { path: "challenge.txt", faultPoint },

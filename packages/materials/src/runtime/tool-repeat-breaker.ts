@@ -257,7 +257,7 @@ export function repeatedToolFailureMessage(toolName: string, count: number): str
   return [
     `[ProofBlade repeated tool failure: ${toolName} failed identically ${count} times]`,
     "The current agent turn was stopped to prevent an infinite loop.",
-    "Change the operation or arguments, then retry; for evidence curation use evidence record or evidence annotate to resolve pending artifacts.",
+    "Change the operation or arguments, then retry; for evidence curation use evidence record to promote a finding. Evidence annotate only marks an artifact viewed and does not clear the gate.",
   ].join("\n");
 }
 
