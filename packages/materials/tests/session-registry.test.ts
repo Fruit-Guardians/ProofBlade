@@ -172,6 +172,32 @@ test("supersedeStale marks old-generation sessions superseded without reviving t
   }
 });
 
+test("disposeAll closes every live session's runtime process and marks it CLOSED (lane shutdown)", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-session-dispose-"));
+  try {
+    const runId = "SES-DISPOSE";
+    const control = await makeControl(root, runId);
+    const runtime = new FakeRuntime();
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
+    const a = await registry.open({ ref: refAt(1), kind: "pwn-remote", ownerLane: "executor", command: ["tube"] });
+    const b = await registry.open({ ref: refAt(1), kind: "pwn-local", ownerLane: "executor", command: ["sh"] });
+
+    await registry.disposeAll("lane shutdown");
+
+    // Both runtime children were closed (no orphaned docker-exec host process).
+    assert.equal(runtime.closed.length, 2);
+    // Both durable sessions are CLOSED, not left OPEN.
+    const snap = await control.snapshot(runId);
+    assert.equal(snap.sessions[a.id]?.status, "CLOSED");
+    assert.equal(snap.sessions[b.id]?.status, "CLOSED");
+    // Idempotent: a second disposeAll is a no-op (nothing live left).
+    await registry.disposeAll("lane shutdown");
+    assert.equal(runtime.closed.length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("supersedeOrphans marks same-generation OPEN sessions dead after a process restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-session-orphan-"));
   try {

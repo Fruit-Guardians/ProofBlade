@@ -1,6 +1,8 @@
 import type { ControlStore } from "../control/control-store.js";
 import { id } from "../domain/utils.js";
 import type { PwnSession } from "../pwn/pwn-session.js";
+import { decodeBase64Strict, appendByte } from "../pwn/bytes.js";
+import { compileSafeFlagPattern } from "../pwn/pattern.js";
 
 /**
  * A structured exploit recipe.  The reproducer accepts this, NOT a natural-
@@ -12,8 +14,12 @@ import type { PwnSession } from "../pwn/pwn-session.js";
  */
 export interface ExploitStage {
   name: string;
-  /** Bytes to send. A string is sent as-is; use `line: true` to append LF. */
+  /** Bytes to send. In utf8 (default) `send` is the literal text; in base64 it
+   * is base64 of the exact bytes, so a stage can replay 0x00/0xff/packed
+   * addresses/ROP chains — otherwise a fresh-session reproduce could not send
+   * the same payload pwn_send delivered and would falsely fail. */
   send?: string;
+  encoding?: "utf8" | "base64";
   line?: boolean;
   /** Anchor that must appear after this stage; absence fails the stage. */
   expect?: string;
@@ -53,7 +59,7 @@ export class PwnReproducer {
     recipe: ExploitRecipe,
     openSession: () => Promise<PwnSession>,
   ): Promise<PwnReproduceOutcome> {
-    const flagPattern = compilePattern(recipe.flagPattern);
+    const flagPattern = compileSafeFlagPattern(recipe.flagPattern);
     const stages: StageResult[] = [];
     let shellConfirmed = false;
     let flag: string | undefined;
@@ -104,9 +110,16 @@ export class PwnReproducer {
 
 async function runStage(session: PwnSession, stage: ExploitStage): Promise<StageResult> {
   try {
-    let sent: Awaited<ReturnType<PwnSession["sendLine"]>> | undefined;
+    let sent: Awaited<ReturnType<PwnSession["send"]>> | undefined;
     if (stage.send !== undefined) {
-      sent = stage.line ? await session.sendLine(stage.send) : await session.send(stage.send);
+      if (stage.encoding === "base64") {
+        // Replay the exact bytes; append LF as a byte in line mode so 0x00/0xff
+        // survive rather than being corrupted by a string newline round-trip.
+        const bytes = decodeBase64Strict(stage.send);
+        sent = await session.send(stage.line ? appendByte(bytes, 0x0a) : bytes);
+      } else {
+        sent = stage.line ? await session.sendLine(stage.send) : await session.send(stage.send);
+      }
     }
     if (stage.expect !== undefined) {
       // The send above may already carry the anchor in its own echo delta; only
@@ -131,10 +144,3 @@ function firstFailure(stages: StageResult[]): string {
   return failed ? `${failed.name}${failed.detail ? ` (${failed.detail})` : ""}` : "an unknown stage";
 }
 
-function compilePattern(pattern: string): RegExp {
-  try {
-    return new RegExp(pattern);
-  } catch (error) {
-    throw new Error(`Invalid flag pattern: ${pattern}: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}

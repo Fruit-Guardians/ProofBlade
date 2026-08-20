@@ -2,6 +2,7 @@ import type { Lane } from "../domain/types.js";
 import type { ContainerRef } from "../container/contracts.js";
 import type { SessionRegistry } from "../container/session-registry.js";
 import { PwnSession } from "./pwn-session.js";
+import { appendByte } from "./bytes.js";
 import type { PwnReproducer, ExploitRecipe, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
 
 /**
@@ -27,6 +28,12 @@ export type PwnReproduceTarget =
   | { kind: "local"; command: string[] }
   | { kind: "remote"; command: string[]; endpoint: string };
 
+/** The task's target boundary, used to reject a model-supplied remote endpoint outside scope. */
+export interface PwnScope {
+  allowedHosts: string[];
+  allowedPorts: number[];
+}
+
 export interface PwnViewport {
   sessionId: string;
   viewport: string;
@@ -46,10 +53,13 @@ export class PwnToolHandler {
     private readonly reproducer: PwnReproducer,
     private readonly refProvider: () => ContainerRef,
     private readonly ownerLane: Lane = "executor",
+    /** Task scope; when set, a remote endpoint outside it is rejected at the app layer. */
+    private readonly scope?: PwnScope,
   ) {}
 
   public async open(input: PwnOpenInput): Promise<{ sessionId: string; kind: string; endpoint?: string }> {
     const ref = this.refProvider();
+    if (input.kind === "remote") this.assertEndpointAllowed(input.endpoint);
     const session = input.kind === "remote"
       ? await PwnSession.openRemote(this.registry, { ref, ownerLane: this.ownerLane, command: input.command, endpoint: input.endpoint ?? "", ...opt(input) })
       : await PwnSession.openLocal(this.registry, { ref, ownerLane: this.ownerLane, command: input.command, ...opt(input) });
@@ -65,7 +75,7 @@ export class PwnToolHandler {
     if (typeof data === "string") {
       result = line ? await session.sendLine(data) : await session.send(data);
     } else {
-      const payload = line ? concatByte(data, 0x0a) : data;
+      const payload = line ? appendByte(data, 0x0a) : data;
       result = await session.send(payload);
     }
     return this.viewport(sessionId, result.data, result.exited, result.matched);
@@ -105,12 +115,34 @@ export class PwnToolHandler {
    * mirroring the design's local→remote clean-reproduce requirement.
    */
   public async reproduce(recipe: ExploitRecipe, target: PwnReproduceTarget): Promise<PwnReproduceOutcome> {
+    if (target.kind === "remote") this.assertEndpointAllowed(target.endpoint);
     return await this.reproducer.reproduce(this.runId, recipe, async () => {
       const ref = this.refProvider();
       return target.kind === "local"
         ? await PwnSession.openLocal(this.registry, { ref, ownerLane: this.ownerLane, command: target.command })
         : await PwnSession.openRemote(this.registry, { ref, ownerLane: this.ownerLane, command: target.command, endpoint: target.endpoint });
     });
+  }
+
+  /**
+   * Reject a remote endpoint outside the task scope BEFORE any connection. The
+   * Docker egress gateway is the real boundary, but a same-network deployment or
+   * a bridge/none policy has no gateway enforcement, so validate at the app layer
+   * too: parse host:port, require the host in allowed_hosts and the port in
+   * allowed_ports (empty lists / no scope = unrestricted, e.g. GUI chat).
+   */
+  private assertEndpointAllowed(endpoint: string | undefined): void {
+    if (!endpoint) throw new Error("pwn remote requires an endpoint (host:port)");
+    const parsed = parseEndpoint(endpoint);
+    if (!parsed) throw new Error(`pwn endpoint is not a valid host:port: ${endpoint}`);
+    if (!this.scope) return;
+    const { allowedHosts, allowedPorts } = this.scope;
+    if (allowedHosts.length > 0 && !allowedHosts.some((pattern) => hostMatches(parsed.host, pattern))) {
+      throw new Error(`pwn endpoint host ${parsed.host} is outside the task scope`);
+    }
+    if (allowedPorts.length > 0 && !allowedPorts.includes(parsed.port)) {
+      throw new Error(`pwn endpoint port ${parsed.port} is outside the task scope`);
+    }
   }
 
   private viewport(sessionId: string, data: string, exited: boolean, matched?: boolean): PwnViewport {
@@ -126,11 +158,22 @@ export class PwnToolHandler {
   }
 }
 
-function concatByte(data: Uint8Array, byte: number): Uint8Array {
-  const out = new Uint8Array(data.length + 1);
-  out.set(data, 0);
-  out[data.length] = byte;
-  return out;
+/** Parse "host:port" (rejecting IPv6/garbage) for scope checks. */
+export function parseEndpoint(endpoint: string): { host: string; port: number } | undefined {
+  const trimmed = endpoint.trim();
+  const m = /^([a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?):(\d{1,5})$/.exec(trimmed);
+  if (!m) return undefined;
+  const port = Number(m[2]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined;
+  return { host: m[1]!.toLowerCase(), port };
+}
+
+/** Host allow-match: exact, "*" wildcard-all, or "*.suffix" subdomain wildcard. */
+export function hostMatches(host: string, pattern: string): boolean {
+  const p = pattern.trim().toLowerCase();
+  if (p === "*") return true;
+  if (p.startsWith("*.")) { const suffix = p.slice(1); return host === p.slice(2) || host.endsWith(suffix); }
+  return host === p;
 }
 
 function opt(input: PwnOpenInput): { cwd?: string; idleSilenceMs?: number; waitTimeoutMs?: number } {

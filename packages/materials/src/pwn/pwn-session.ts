@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Lane, SessionRecord } from "../domain/types.js";
 import type { ContainerRef } from "../container/contracts.js";
 import type { SessionRegistry } from "../container/session-registry.js";
+import { matchFlagBounded } from "./pattern.js";
 
 /**
  * Pwn-facing view over a persistent session.  The registry primitive returns
@@ -133,11 +134,13 @@ export class PwnSession {
     const start = this.transcript.length;
     const written = await this.registry.write(this.ownerLane, this.record.id, `cat '${safePath}'\n`);
     this.transcript += written.delta;
-    let match = pattern.exec(this.transcript.slice(start));
+    // Bounded match window: the model-supplied pattern must never run against an
+    // unbounded transcript (ReDoS amplification). A cat'd flag is at the tail.
+    let match = matchFlagBounded(pattern, this.transcript.slice(start));
     for (let attempt = 0; attempt < 8 && !match && !written.exited; attempt += 1) {
       const result = await this.registry.read(this.ownerLane, this.record.id);
       this.transcript += result.delta;
-      match = pattern.exec(this.transcript.slice(start));
+      match = matchFlagBounded(pattern, this.transcript.slice(start));
       if (result.exited || (result.delta.length === 0 && result.waitReason !== "idle")) break;
     }
     return match ? { flag: match[0] } : {};
@@ -153,6 +156,9 @@ export class PwnSession {
  * (; & | $ ` \ newline quotes wildcards etc.) so a recipe flagPath cannot inject
  * a second command whose echoed literal would forge a reproduction.
  */
+// re-exported so callers importing from pwn-session get the bounded matcher too
+export { matchFlagBounded } from "./pattern.js";
+
 export function assertSafeFlagPath(path: string): string {
   const trimmed = path.trim();
   if (!trimmed) throw new Error("flagPath must be a non-empty path");

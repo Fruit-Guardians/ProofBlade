@@ -76,6 +76,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
+    /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
+    private readonly pwnRegistry?: SessionRegistry,
   ) {}
 
   public static async create(options: {
@@ -189,13 +191,19 @@ export class PiCodingLane implements AgentLanePort {
     // and a PwnToolHandler bound to this run. Without a container (GUI chat /
     // NodeExecutionEnv) pwnTools stays undefined and the pwn_* tools are neither
     // active nor callable.
-    const pwnTools = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
+    const pwnRegistry = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
+      ? new SessionRegistry(options.runId, env.containerRuntime, options.controlStore)
+      : undefined;
+    const pwnTools = pwnRegistry
       ? new PwnToolHandler(
         options.runId,
-        new SessionRegistry(options.runId, env.containerRuntime, options.controlStore),
+        pwnRegistry,
         new PwnReproducer(options.controlStore),
         () => (env as ContainerExecutionEnv).containerRef,
         "main",
+        // Enforce the task's target boundary at the app layer too, not just the
+        // Docker egress gateway (a bridge/none policy has no gateway).
+        { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
       )
       : undefined;
     const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
@@ -321,6 +329,7 @@ export class PiCodingLane implements AgentLanePort {
         }
         return undefined;
       },
+      pwnRegistry,
     );
   }
 
@@ -393,6 +402,11 @@ export class PiCodingLane implements AgentLanePort {
       await this.harness.waitForIdle();
     } finally {
       try {
+        // Tear down live pwn tube sessions first: their docker-exec children are
+        // host processes that would otherwise outlive the lane, and the durable
+        // sessions would stay OPEN until the container is destroyed. Best-effort
+        // so a session cleanup failure never blocks the rest of teardown.
+        if (this.pwnRegistry) await this.pwnRegistry.disposeAll("lane shutdown").catch(() => undefined);
         await this.env.cleanup();
       } finally {
         try {

@@ -10,6 +10,7 @@ import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnSession } from "../src/pwn/pwn-session.js";
 import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-reproducer.js";
 import { parseLeakAddress, parseLeakHex, deriveBase, toHex, isPageAligned } from "../src/pwn/leak.js";
+import { compileSafeFlagPattern, matchFlagBounded } from "../src/pwn/pattern.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type {
   ContainerRef,
@@ -151,6 +152,24 @@ test("PwnReproducer produces a candidate only when shell marker AND flag both su
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("flag pattern compiler rejects ReDoS shapes and bounds the match window", () => {
+  // A normal anchored flag pattern compiles and matches.
+  const ok = compileSafeFlagPattern("flag\\{[^}]+\\}");
+  assert.ok(matchFlagBounded(ok, "noise flag{good} tail"));
+
+  // Classic catastrophic-backtracking shapes are rejected before compilation.
+  assert.throws(() => compileSafeFlagPattern("(a+)+$"), /catastrophic backtracking/);
+  assert.throws(() => compileSafeFlagPattern("(a|aa)+"), /catastrophic backtracking/);
+  // Over-long patterns are rejected.
+  assert.throws(() => compileSafeFlagPattern("a".repeat(300)), /at most/);
+
+  // The match window is bounded: a match far from the tail of a huge transcript
+  // is not scanned (flag is always at the tail after a cat), but a tail match is.
+  const huge = "X".repeat(200_000);
+  assert.equal(matchFlagBounded(ok, "flag{early}" + huge), null, "beyond the window is not matched");
+  assert.ok(matchFlagBounded(ok, huge + "flag{late}"), "a tail match still works");
 });
 
 test("readFlag rejects an injecting flagPath so a fake echoed flag is not accepted", async () => {

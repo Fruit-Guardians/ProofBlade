@@ -4,6 +4,7 @@ import { snipText } from "@proofblade/molecules";
 import type { CodingResourceContext } from "./coding-resources.js";
 import type { PwnToolHandler, PwnReproduceTarget } from "../pwn/pwn-tools.js";
 import type { ExploitRecipe } from "../verification/pwn-reproducer.js";
+import { decodeBase64Strict } from "../pwn/bytes.js";
 
 /**
  * Model-facing pwn interaction tools.  They all route to `context.pwnTools`,
@@ -71,19 +72,6 @@ const pwnSendTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-/** Decode base64 to bytes, rejecting malformed input rather than silently mangling a payload. */
-function decodeBase64Strict(value: string): Uint8Array {
-  const normalized = value.trim();
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) throw new Error("pwn_send base64 data contains non-base64 characters");
-  const buffer = Buffer.from(normalized, "base64");
-  // Buffer.from is lenient; verify the round-trip so a truncated/invalid payload
-  // is rejected instead of sending fewer bytes than the model intended.
-  if (buffer.toString("base64").replace(/=+$/, "") !== normalized.replace(/=+$/, "")) {
-    throw new Error("pwn_send base64 data is malformed");
-  }
-  return new Uint8Array(buffer);
-}
-
 const pwnRecvTool: AgentHarnessTool<CodingResourceContext> = {
   name: "pwn_recv",
   label: "pwn_recv",
@@ -145,13 +133,14 @@ const pwnReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   parameters: Type.Object({
     stages: Type.Array(Type.Object({
       name: Type.String({ minLength: 1 }),
-      send: Type.Optional(Type.String()),
+      send: Type.Optional(Type.String({ description: "utf8 mode: literal text. base64 mode: base64 of exact bytes (for 0x00/0xff/packed addresses/ROP)." })),
+      encoding: Type.Optional(Type.String({ enum: ["utf8", "base64"], description: "How `send` is interpreted. Default utf8. Use base64 to replay a binary payload." })),
       line: Type.Optional(Type.Boolean()),
       expect: Type.Optional(Type.String()),
       maxReads: Type.Optional(Type.Number({ minimum: 1, maximum: 64 })),
     }, { additionalProperties: false }), { minItems: 1, maxItems: 64 }),
     flagPath: Type.String({ minLength: 1, description: "Path read in the live shell, e.g. /flag." }),
-    flagPattern: Type.String({ minLength: 1, description: "Regex the extracted flag must match, e.g. flag\\{[^}]+\\}." }),
+    flagPattern: Type.String({ minLength: 1, maxLength: 200, description: "Regex the extracted flag must match, e.g. flag\\{[^}]+\\}. Keep it simple and anchored; pathological patterns are rejected." }),
     target: Type.Object({
       kind: Type.String({ enum: ["local", "remote"], description: "Where to run the clean reproduce." }),
       command: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
