@@ -136,6 +136,8 @@ export class ProofBladeSkillRegistry {
       skills: this.list().map(({ name, description, contentHash }) => ({ name, description, contentHash })),
       mcpCatalogHash: sha256(canonicalJson([])),
       mcpServers: [],
+      toolCatalogHash: sha256(canonicalJson([])),
+      toolCatalog: [],
     };
   }
 

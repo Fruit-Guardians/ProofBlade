@@ -19,6 +19,8 @@ import { estimateTokens } from "../domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
+import { ContainerExecutionEnv } from "../container/execution-env.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/evidence-graph.js";
@@ -125,6 +127,15 @@ export class PiCodingLane implements AgentLanePort {
     const installRoot = options.installRoot ?? dirname(dirname(options.runDir));
     const skills = await ProofBladeSkillRegistry.load(installRoot);
     const mcp = McpProjectRegistry.load(installRoot);
+    // Host-local tool catalog: metadata stays resident in the system prompt, the
+    // same way skill/MCP metadata do. A missing or broken manifest degrades to an
+    // empty catalog (the registry surfaces a warning), never a hard failure. When
+    // the lane's bash runs inside a container (executionEnv is a
+    // ContainerExecutionEnv), the host-local catalog is suppressed entirely: the
+    // host paths do not exist in the container, so injecting them would send the
+    // model chasing ENOENTs.
+    const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
+    const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
     const enabledSkills = new Set(options.capabilities?.enabledSkills ?? skills.list().map((skill) => skill.name));
     const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
@@ -208,6 +219,7 @@ export class PiCodingLane implements AgentLanePort {
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
       options.skillsLibraryPathForPrompt ?? skillsLibraryPath,
       options.workspaceRootForPrompt ?? options.projectRoot,
+      toolCatalog.promptBlock(),
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
@@ -495,6 +507,7 @@ function codingSystemPrompt(
   mcpServers: Array<{ name: string; description: string }>,
   skillsLibraryPath: string,
   workspaceRoot: string,
+  toolCatalogBlock: string,
   options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
@@ -525,7 +538,7 @@ function codingSystemPrompt(
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
   const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 /**

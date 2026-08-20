@@ -16,6 +16,7 @@ import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { assertProviderBudgetPricing, ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
 import { planContextMaintenance } from "@proofblade/molecules";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
+import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { RuntimeResourceSnapshot } from "../domain/types.js";
 import { SOLVER_PROTOCOL_INSTRUCTIONS } from "./version.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
@@ -74,7 +75,8 @@ export class PiSolverLane implements AgentLanePort {
       initialSpentUsd,
     });
     const skills = await ProofBladeSkillRegistry.load(options.projectRoot);
-    const resourceSnapshot = options.runtime.resourceSnapshot(skills.contextSnapshot());
+    const toolCatalog = await ProofBladeToolCatalogRegistry.load(options.projectRoot);
+    const resourceSnapshot = options.runtime.resourceSnapshot({ ...skills.contextSnapshot(), ...toolCatalog.contextSnapshot() });
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "executor", controlStore: options.controlStore });
     const { models, model, closeTransport } = createConfiguredModels(profile, providerBudget, { observer: scheduling.observer });
     const tools = createSolverTools();

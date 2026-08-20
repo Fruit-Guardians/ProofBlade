@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "id": "python311",
+      "name": "python311",
+      "kind": "interpreter",
+      "path": "C:/Users/chriz/.pyenv/versions/3.11.9/python.exe",
+      "description": "固定 Python 3.11；自带 requests/pycryptodome，独立于系统 python 的 pip 环境",
+      "category": "multi"
+    },
+    {
+      "id": "go-toolchain",
+      "name": "go",
+      "kind": "toolchain",
+      "path": "C:/Program Files/Go/bin/go.exe",
+      "description": "Go 工具链，用于重实现变换或有界爆破（编译产物写在 workspace 相对目录）",
+      "category": "reverse"
+    },
+    {
+      "id": "s2-045-exec",
+      "name": "s2-045-exec",
+      "kind": "tool",
+      "path": "C:/tools/exploit/exec.py",
+      "description": "Struts2 S2-045 通用 RCE 模板：Content-Type 头 OGNL 注入 + 命令回显",
+      "doc": "C:/tools/exploit/README.md",
+      "category": "web"
+    },
+    {
+      "id": "ghidra-headless",
+      "name": "ghidra-headless",
+      "kind": "tool",
+      "path": "C:/tools/ghidra/support/analyzeHeadless.bat",
+      "description": "Ghidra 无头反编译（headless analyzer），输出反编译伪代码与函数列表",
+      "doc": "C:/tools/ghidra/README.md",
+      "category": "reverse"
+    }
+  ]
+}

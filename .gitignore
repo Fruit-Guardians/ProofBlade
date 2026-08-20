@@ -11,3 +11,5 @@ tmp/
 .env
 .env.*
 !.env.example
+tool-catalog.json
+!tool-catalog.example.json
