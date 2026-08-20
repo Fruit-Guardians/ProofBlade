@@ -6,6 +6,8 @@ import test from "node:test";
 import { ControlStore } from "../src/control/control-store.js";
 import { demoTask } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
+import { ArtifactStore } from "../src/effects/artifact-store.js";
+import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnSession } from "../src/pwn/pwn-session.js";
 import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-reproducer.js";
@@ -108,6 +110,45 @@ test("leak parsing handles little/big-endian 32/64-bit and base derivation", () 
   assert.equal(isPageAligned(base), false);
   assert.throws(() => parseLeakAddress(new Uint8Array([1, 2]), "le64"), /needs 8 bytes/);
   assert.throws(() => deriveBase(0x1000n, 0x2000n), /negative/);
+});
+
+test("recordLeak persists an idempotent reasoning node and makes it searchable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-leak-graph-"));
+  try {
+    const runId = "PWN-LEAK-GRAPH";
+    const control = await makeControl(root, runId);
+    const graph = new CodingEvidenceGraph(runId, control, new ArtifactStore(root, control));
+    const leak = {
+      id: "LEAK-LIBC-1",
+      sourceHex: "30f4e1f7ff7f0000",
+      format: "le64" as const,
+      value: "0x7ffff7e1f430",
+      addressKind: "libc" as const,
+      symbol: "puts@GLIBC",
+      confidence: 0.95,
+    };
+    const first = await graph.recordLeak({ leak, tags: ["base-formula"], explanation: "puts leak is consistent with the libc image." });
+    assert.equal(first.reused, false);
+    assert.equal(first.node.id, leak.id);
+    assert.equal(first.node.kind, "inference");
+    assert.equal(first.node.status, "CONFIRMED");
+    assert.match(first.node.summary, /0x7ffff7e1f430/);
+    assert.ok(first.node.tags.includes("base-formula"));
+
+    const second = await graph.recordLeak({ leak, tags: ["base-formula"], explanation: "same observation" });
+    assert.equal(second.reused, true);
+    assert.equal(second.node.createdSeq, first.node.createdSeq);
+
+    const results = await graph.search("puts 0x7ffff7e1f430");
+    assert.ok(results.some((item) => item.id === leak.id && item.kind === "reasoning_node"));
+
+    await assert.rejects(
+      graph.recordLeak({ leak: { ...leak, value: "0x41414141" }, tags: ["base-formula"] }),
+      /different contents/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("PwnSession recvUntil accumulates across reads and shellProbe confirms a live marker", async () => {
