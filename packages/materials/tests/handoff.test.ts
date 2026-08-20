@@ -46,6 +46,9 @@ test("planner handoffs are lane-gated, versioned, and context-visible", async ()
     assert.equal(first.status, "ACCEPTED");
     assert.equal(first.knowledgeVersion, handoffKnowledgeVersion(await services.control.snapshot(runId)));
     assert.ok(first.nextActions.length > 0);
+    assert.ok(first.nextActions.some((action) => action.workItemId));
+    const plannedWorkItem = Object.values((await services.control.snapshot(runId)).workItems)[0];
+    assert.equal(plannedWorkItem?.status, "READY");
     assert.ok(first.hash.length === 64);
     assert.match(contextText(new ContextCompiler().build({
       runId,

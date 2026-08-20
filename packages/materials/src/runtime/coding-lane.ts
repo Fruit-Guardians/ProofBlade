@@ -15,7 +15,7 @@ import { prepareContextMaintenance } from "../context/maintenance-coordinator.js
 import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
-import { estimateTokens } from "../domain/utils.js";
+import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -268,6 +268,12 @@ export class PiCodingLane implements AgentLanePort {
       runId: options.runId,
       lane: "main",
       controlStore: options.controlStore,
+      requestContext: {
+        contextWindow: profile.contextWindow,
+        systemPromptHash: sha256(stableSystemPrompt),
+        toolCatalogHash: sha256(canonicalJson(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
+        toolNames: activeToolNames,
+      },
       scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);

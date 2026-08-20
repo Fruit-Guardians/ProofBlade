@@ -132,6 +132,102 @@ test("paused runs reject every terminal command until explicitly resumed", async
   }
 });
 
+test("work graph lifecycle is durable, lease-gated, and replayable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-work-graph-"));
+  try {
+    const events = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(events);
+    const runId = "WORK-GRAPH-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    await control.dispatch(runId, {
+      type: "work_item_created",
+      workItem: { id: "WI-ROOT", runId, title: "Capture target", objective: "Collect one bounded target observation.", role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 3 },
+      lane: "planner",
+    });
+    await control.dispatch(runId, { type: "work_item_claimed", workItemId: "WI-ROOT", ownerLane: "executor", leaseExpiresAt: expiresAt, lane: "executor" });
+    await assert.rejects(
+      control.dispatch(runId, { type: "work_item_claimed", workItemId: "WI-ROOT", ownerLane: "verifier", leaseExpiresAt: expiresAt, lane: "verifier" }),
+      /lease is still active|ownership mismatch/,
+    );
+    await control.dispatchBatch(runId, [
+      { type: "work_item_blocked", workItemId: "WI-ROOT", reason: "The first probe made no progress.", lane: "executor" },
+      { type: "work_item_created", workItem: { id: "WI-REPLAN", runId, parentId: "WI-ROOT", title: "Try an alternative probe", objective: "Use a different bounded observation.", role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 2 }, lane: "executor" },
+    ]);
+    await control.dispatch(runId, { type: "work_item_claimed", workItemId: "WI-REPLAN", ownerLane: "executor", leaseExpiresAt: expiresAt, lane: "executor" });
+    await control.dispatch(runId, { type: "work_item_completed", workItemId: "WI-REPLAN", lane: "executor" });
+    const snapshot = await control.replay(runId);
+    assert.equal(snapshot.workItems["WI-ROOT"]?.status, "BLOCKED");
+    assert.equal(snapshot.workItems["WI-REPLAN"]?.status, "SUCCEEDED");
+    assert.equal(snapshot.workItems["WI-REPLAN"]?.attempt, 1);
+    assert.equal(projectionHash(snapshot), projectionHash((await events.loadProjection(runId))!));
+    assert.ok((await control.events(runId)).some((event) => event.type === "work_item_blocked"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("request epochs bind provider events and replay their context hashes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-request-epoch-"));
+  try {
+    const events = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(events);
+    const runId = "REQUEST-EPOCH-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    await control.dispatch(runId, {
+      type: "request_epoch_started",
+      epoch: {
+        id: "RE-001",
+        requestId: "PR-001",
+        runId,
+        lane: "executor",
+        provider: "test-provider",
+        model: "test-model",
+        adapter: "openai-completions",
+        contextWindow: 16_384,
+        toolCatalogHash: "tools-v1",
+        toolNames: ["inspect_target", "submit_candidate"],
+        contextManifestHash: "context-v1",
+        status: "STARTED",
+        createdAt: new Date().toISOString(),
+      },
+      lane: "executor",
+    });
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: "provider-epoch",
+      actor: "model",
+      type: "request_epoch_context",
+      payload: { requestEpochId: "RE-001", fields: { requestBodyHash: "body-v1", stablePrefixHash: "prefix-v1" } },
+    }, {
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: "provider-epoch",
+      actor: "model",
+      type: "provider_response_received",
+      payload: { requestId: "PR-001", epochId: "RE-001", status: 200 },
+    }, {
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: "provider-epoch",
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "PR-001", epochId: "RE-001", finishReason: "stop" },
+    }]);
+    const snapshot = await control.replay(runId);
+    const epoch = snapshot.requestEpochs["RE-001"]!;
+    assert.equal(epoch.status, "COMPLETED");
+    assert.equal(epoch.requestBodyHash, "body-v1");
+    assert.equal(epoch.stablePrefixHash, "prefix-v1");
+    assert.ok(epoch.createdSeq > 0);
+    assert.ok(epoch.updatedSeq > epoch.createdSeq);
+    assert.equal(projectionHash(snapshot), projectionHash((await events.loadProjection(runId))!));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("dispatchBatch validates every command before persisting any event", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-atomic-batch-"));
   try {

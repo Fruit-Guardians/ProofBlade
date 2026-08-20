@@ -121,9 +121,30 @@ test("provider scheduling telemetry preserves request correlation when responses
     const services = createServices(root, config);
     const runId = "OBSERVE-CONCURRENT-001";
     await services.control.createRun(runId, demoTask(runId, root, config));
+    await services.control.append(runId, ["first", "second"].map((suffix) => ({
+      schemaVersion: 1 as const,
+      lane: "executor" as const,
+      correlationId: `epoch-${suffix}`,
+      actor: "model" as const,
+      type: "request_epoch_started" as const,
+      payload: {
+        epoch: {
+          id: `RE-${suffix}`,
+          requestId: `PR-${suffix}`,
+          runId,
+          lane: "executor",
+          provider: "local",
+          model: "fixture-model",
+          adapter: "openai-completions",
+          toolNames: ["read"],
+          status: "STARTED",
+          createdAt: new Date().toISOString(),
+        },
+      },
+    })));
     const scheduling = createProviderSchedulingTelemetry({ runId, lane: "executor", controlStore: services.control });
-    scheduling.register({ requestId: "PR-first", startedAt: 1, phase: "intake", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
-    scheduling.register({ requestId: "PR-second", startedAt: 2, phase: "plan", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
+    scheduling.register({ requestId: "PR-first", epochId: "RE-first", startedAt: 1, phase: "intake", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
+    scheduling.register({ requestId: "PR-second", epochId: "RE-second", startedAt: 2, phase: "plan", provider: "local", model: "fixture-model", api: "openai-completions", retryLimit: 0, cacheRetention: "short" });
     const first = await scheduling.observer.queued({ provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 0 });
     const second = await scheduling.observer.queued({ provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 1 });
     await scheduling.observer.started(first, { provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 0, waitMs: 0 });
@@ -141,6 +162,9 @@ test("provider scheduling telemetry preserves request correlation when responses
       { requestId: "PR-second", httpStatus: 202, phase: "plan" },
       { requestId: "PR-first", httpStatus: 201, phase: "intake" },
     ]);
+    const epochs = (await services.control.snapshot(runId)).requestEpochs;
+    assert.equal(epochs["RE-first"]?.status, "COMPLETED");
+    assert.equal(epochs["RE-second"]?.status, "COMPLETED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

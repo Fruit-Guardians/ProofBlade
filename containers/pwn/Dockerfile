@@ -6,7 +6,11 @@ FROM proofblade/ctf-base:latest
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONUTF8=1 \
-    PYTHONIOENCODING=utf-8
+    PYTHONIOENCODING=utf-8 \
+    HOME=/home/ctf \
+    XDG_CACHE_HOME=/home/ctf/.cache \
+    XDG_DATA_HOME=/home/ctf/.local/share \
+    PWNLIB_NOTERM=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     clang cmake gcc gcc-multilib gdb gdb-multiarch libc6-dbg nasm patchelf qemu-system-x86 qemu-user qemu-user-static \

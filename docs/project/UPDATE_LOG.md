@@ -1,12 +1,14 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-12T16:30:00+08:00
+> 状态更新时间：2026-08-20T12:15:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260820-002 | 2026-08-20T12:15:00+08:00 | PLAN-220, PLAN-120 | codex/request-epoch-audit | 本条记录所在提交 |
+| UPDATE-20260820-001 | 2026-08-20T11:30:00+08:00 | PLAN-220, PLAN-110, PLAN-210 | codex/work-graph-vertical-slice | 本条记录所在提交 |
 | UPDATE-20260812-002 | 2026-08-12T16:30:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
 | UPDATE-20260812-001 | 2026-08-12T16:05:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
 | UPDATE-20260810-004 | 2026-08-10T19:42:54+08:00 | PLAN-100 | codex/deep-reverse-v1 | 本条记录所在提交 |
@@ -36,6 +38,46 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260820-002
+
+时间：2026-08-20T12:15:00+08:00
+
+摘要：为 Provider 请求建立可重放 RequestEpoch 审计骨架，并绑定现有调度与上下文哈希。
+
+### 变更
+
+- RunSnapshot 新增 requestEpochs Projection，记录 provider/model/adapter、工具目录、上下文、stable prefix 和 request body 哈希
+- 新增 request_epoch_started/request_epoch_context 事件，Provider queue/slot/response/usage/cancel 事件携带 epochId
+- Reducer 根据响应、完成、失败和取消推进 Epoch 状态，并保持旧版无 epoch 事件兼容
+- Solver/Coding lane 向观测层提供 contextWindow、system prompt、tool catalog 和 active tool names 哈希输入
+- 增加 RequestEpoch replay、上下文哈希、乱序调度完成状态回归测试
+
+### 验证
+
+- [x] npm run build：通过
+- [x] Materials 全量测试：298/298 passed
+- [x] project report check、CI gates：通过
+
+## UPDATE-20260820-001
+
+时间：2026-08-20T11:30:00+08:00
+
+摘要：吸收 DeepSeek Harness 与 PentAGI 的可复用经验，实施 ProofBlade 的 Work Graph 第一条纵向切片。
+
+### 变更
+
+- 在现有 Control Store/JSONL Projection 中增加 WorkItem 状态、依赖、租约、尝试次数和证据引用，不引入第二套任务真相
+- 新增 work_item_created/ready/claimed/blocked/completed/failed/cancelled/superseded 事件及状态、所有权和依赖校验
+- Planner 首次准备时建立可恢复执行项，Handoff action 绑定 workItemId，知识版本哈希包含工作图
+- Competition Loop 每个 Provider turn 认领执行项，护栏触发时原子地阻塞旧项并创建重规划项，成功/失败/审批等待均持久化
+- 补充 Work Graph replay、lease gate、重规划和 Handoff 绑定回归测试
+
+### 验证
+
+- [x] npm run build --workspace=@proofblade/materials
+- [x] control-store.test.ts 与 handoff.test.ts：6/6 passed
+- [x] competition-solver.test.ts、control-store.test.ts、handoff.test.ts：24/24 passed
 
 ## UPDATE-20260812-002
 

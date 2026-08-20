@@ -172,6 +172,11 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
     assert.equal(result.submissions, 1, "exactly one submission may be spent on a first-try solve");
     assert.ok(api.submitted.some((s) => s.id === "CH1" && s.flag === "flag{solver_ok}"));
     assert.ok(api.stopped.includes("CH1"), "environment must be released");
+    const runIds = await readdir(join(root, "runs"));
+    const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
+      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string });
+    assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
+    assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -194,6 +199,7 @@ test("assist mode records the flag for approval without contacting the platform"
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string });
     assert.equal(events.filter((event) => event.type === "completion_proposed").length, 1, "the candidate must still be recorded for approval");
     assert.equal(events.filter((event) => event.type === "completion_verified").length, 0);
+    assert.equal(events.filter((event) => event.type === "work_item_blocked").length, 1, "approval wait must remain resumable in the work graph");
     assert.ok(api.stopped.includes("CH2"), "environment must be released");
   } finally {
     await rm(root, { recursive: true, force: true });

@@ -10,7 +10,7 @@ import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator, type CompactionFaultInjector } from "../context/durable-compaction.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
-import { createSolverTools, type SolverToolContext } from "./solver-tools.js";
+import { createSolverTools, solverToolContractHash, type SolverToolContext } from "./solver-tools.js";
 import { configuredModelCost, createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { assertProviderBudgetPricing, ProviderBudgetExceededError, ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
@@ -20,6 +20,7 @@ import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { RuntimeResourceSnapshot } from "../domain/types.js";
 import { SOLVER_PROTOCOL_INSTRUCTIONS } from "./version.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import { sha256 } from "../domain/utils.js";
 
 export class PiSolverLane implements AgentLanePort {
   private busy = false;
@@ -158,6 +159,12 @@ export class PiSolverLane implements AgentLanePort {
       runId: options.runId,
       lane: "executor",
       controlStore: options.controlStore,
+      requestContext: {
+        contextWindow: profile.contextWindow,
+        systemPromptHash: sha256(SOLVER_PROTOCOL_INSTRUCTIONS.join("\n\n")),
+        toolCatalogHash: solverToolContractHash(),
+        toolNames: tools.map((tool) => String(tool.name)),
+      },
       estimateContextTokens: async () => {
         const current = await options.controlStore.snapshot(options.runId);
         return new ContextCompiler().build({ runId: options.runId, lane: "executor", phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow, outputBudget: profile.maxTokens, resources: resourceSnapshot }).estimatedTokens;

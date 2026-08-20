@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { resolveExecutionConfig, type ResolvedExecutionConfig } from "../src/config.js";
-import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRunner, type DockerProcessResult } from "../src/container/docker.js";
+import { spawn } from "node:child_process";
+import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRunner, type DockerProcessResult, type SessionProcessSpawner } from "../src/container/docker.js";
+import type { ContainerRef } from "../src/container/contracts.js";
 import { parseCompetitionTargets } from "../src/competition/task.js";
 
 test("competition target parser extracts URL and nc endpoints without leaking connection text into scope", () => {
@@ -76,6 +78,65 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     await runtime.destroy(ref);
     await runtime.destroy(ref);
     assert.ok(calls.filter((args) => args[0] === "rm").length >= 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Docker create gives pwn a writable exec home and scratch while web stays noexec", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-fs-profile-"));
+  try {
+    const runArgsByProfile = new Map<string, string[]>();
+    let currentProfile: "web" | "pwn" | "pwn-kernel" = "pwn";
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "run" && args.includes("-d")) {
+          const name = args[args.indexOf("--name") + 1] ?? "";
+          if (!name.endsWith("-gateway")) runArgsByProfile.set(currentProfile, args);
+          return processResult(name.endsWith("-gateway") ? "gateway-id\n" : "solver-id\n");
+        }
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "exec") return processResult("");
+        if (args[0] === "inspect") return processResult("true\n");
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "none" };
+    const runtime = new DockerContainerRuntime(config, runner);
+
+    currentProfile = "pwn";
+    await runtime.create({ runId: "FS/PWN", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [], networkPolicy: "none" });
+    currentProfile = "web";
+    await runtime.create({ runId: "FS/WEB", generation: 1, profile: "web", image: config.images.web, workspaceHostPath: root, targets: [], networkPolicy: "none" });
+
+    const pwn = runArgsByProfile.get("pwn");
+    const web = runArgsByProfile.get("web");
+    assert.ok(pwn && web);
+
+    const tmpfsValues = (args: string[]): string[] => args.filter((_, index) => args[index - 1] === "--tmpfs");
+    const pwnTmpfs = tmpfsValues(pwn);
+    const webTmpfs = tmpfsValues(web);
+
+    // Pwn: /tmp, HOME and scratch must opt back into exec (Docker forces noexec
+    // on --tmpfs by default) with a writable non-root uid/gid.
+    assert.ok(pwnTmpfs.some((value) => value.startsWith("/tmp:") && value.includes("exec") && !value.includes("noexec")));
+    assert.ok(pwnTmpfs.some((value) => value.startsWith("/home/ctf:") && value.includes("exec") && !value.includes("noexec") && value.includes("uid=1001") && value.includes("gid=1001")));
+    assert.ok(pwnTmpfs.some((value) => value.startsWith("/opt/pwn:") && value.includes("exec") && !value.includes("noexec") && value.includes("uid=1001")));
+
+    // Web: keeps the tighter noexec /tmp and gets no HOME/scratch tmpfs.
+    assert.ok(webTmpfs.some((value) => value.startsWith("/tmp:") && value.includes("noexec")));
+    assert.equal(webTmpfs.some((value) => value.startsWith("/home/ctf:")), false);
+    assert.equal(webTmpfs.some((value) => value.startsWith("/opt/pwn:")), false);
+
+    // Security baseline is unchanged for both, and only pwn adds SYS_PTRACE.
+    for (const args of [pwn, web]) {
+      assert.ok(args.includes("--read-only"));
+      assert.ok(args.includes("--cap-drop") && args.includes("ALL"));
+      const noNewPrivIndex = args.indexOf("no-new-privileges");
+      assert.ok(noNewPrivIndex > 0 && args[noNewPrivIndex - 1] === "--security-opt");
+    }
+    assert.ok(pwn.includes("--cap-add") && pwn.includes("SYS_PTRACE"));
+    assert.equal(web.some((value, index) => value === "SYS_PTRACE" && web[index - 1] === "--cap-add"), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -317,6 +378,101 @@ test("Docker stale reaper does not count a resource when rm is rejected", async 
   const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
   const runtime = new DockerContainerRuntime(config, runner);
   await assert.rejects(runtime.reapStale({ olderThanMs: 100 }), AggregateError);
+});
+
+const SESSION_REF: ContainerRef = {
+  runId: "SESSION/1", generation: 1, containerId: "session-container", name: "session-container",
+  profile: "pwn", image: "proofblade/ctf-pwn:latest", imageDigest: "sha256:test",
+  workspaceHostPath: process.cwd(), workspaceContainerPath: "/workspace", networkPolicy: "none",
+};
+
+/** A spawner that ignores the docker args and runs a controlled local node script. */
+function localNodeSpawner(script: string, scriptArgs: string[] = []): SessionProcessSpawner {
+  return () => spawn(process.execPath, ["-e", script, "--", ...scriptArgs], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+}
+
+function sessionRuntime(spawner: SessionProcessSpawner): DockerContainerRuntime {
+  const runner: DockerCommandRunner = { async run(): Promise<DockerProcessResult> { return processResult(""); } };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  return new DockerContainerRuntime(config, runner, spawner);
+}
+
+test("session echoes stdin back as bounded incremental output and reports idle", async () => {
+  // A cat-like echo loop: every stdin line is written straight back to stdout.
+  const runtime = sessionRuntime(localNodeSpawner("process.stdin.on('data',d=>process.stdout.write(d));"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/cat"], idleSilenceMs: 120, waitTimeoutMs: 4000 });
+  try {
+    const first = await runtime.sessionWrite(handle, "hello\n");
+    assert.match(first.delta, /hello/);
+    assert.equal(first.waitReason, "idle");
+    assert.equal(first.exited, false);
+    // A read without input returns no new bytes and still resolves via timeout.
+    const idle = await runtime.sessionRead(handle, { idleSilenceMs: 60, waitTimeoutMs: 300 });
+    assert.equal(idle.delta, "");
+    assert.equal(idle.waitReason, "timeout");
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("session close is idempotent and returns the exit code", async () => {
+  const runtime = sessionRuntime(localNodeSpawner("process.stdin.resume();"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/cat"] });
+  const first = await runtime.closeSession(handle);
+  const second = await runtime.closeSession(handle);
+  assert.doesNotThrow(() => second);
+  assert.equal(second.exitCode, null);
+  void first;
+});
+
+test("session reports exit with the process exit code", async () => {
+  const runtime = sessionRuntime(localNodeSpawner("process.stdout.write('done\\n');process.exit(7);"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/sh"], idleSilenceMs: 5000, waitTimeoutMs: 4000 });
+  try {
+    const result = await runtime.sessionRead(handle, { waitTimeoutMs: 4000 });
+    assert.equal(result.exited, true);
+    assert.equal(result.exitCode, 7);
+    assert.equal(result.waitReason, "exit");
+    assert.match(result.delta, /done/);
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("session read hits the absolute timeout on a silent long-running process", async () => {
+  const runtime = sessionRuntime(localNodeSpawner("process.stdin.resume();setTimeout(()=>{},60000);"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/sleep", "60"] });
+  try {
+    const result = await runtime.sessionRead(handle, { idleSilenceMs: 5000, waitTimeoutMs: 200 });
+    assert.equal(result.waitReason, "timeout");
+    assert.equal(result.exited, false);
+    assert.equal(result.delta, "");
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("session marks scrollback truncated once output exceeds the buffer ceiling", async () => {
+  // Emit ~400 KiB, above the 256 KiB in-memory ceiling, then idle.
+  const runtime = sessionRuntime(localNodeSpawner("process.stdout.write('A'.repeat(400*1024));process.stdin.resume();"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/sh"], idleSilenceMs: 150, waitTimeoutMs: 4000 });
+  try {
+    const result = await runtime.sessionRead(handle, { idleSilenceMs: 150, waitTimeoutMs: 4000 });
+    assert.equal(result.truncated, true);
+    assert.ok(result.delta.length <= 256 * 1024);
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("destroy closes live sessions for the container without orphaning children", async () => {
+  const runner: DockerCommandRunner = { async run(): Promise<DockerProcessResult> { return processResult(""); } };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner, localNodeSpawner("process.stdin.resume();"));
+  const handle = await runtime.openSession(SESSION_REF, { command: ["/bin/cat"] });
+  await runtime.destroy(SESSION_REF);
+  // The session is gone: a subsequent read must reject as unknown.
+  await assert.rejects(runtime.sessionRead(handle), /Unknown container session/);
 });
 
 function processResult(stdout: string, exitCode = 0): DockerProcessResult {

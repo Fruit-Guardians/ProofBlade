@@ -5,6 +5,7 @@ import type { ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../do
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { id } from "../domain/utils.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -83,6 +84,7 @@ export async function runCompetitionLoop(
   let forceReplan = false;
   let replanReason: string | undefined;
   let guardReplans = 0;
+  let workItemId: string | undefined;
 
   try {
     lane = await createLane({
@@ -125,6 +127,7 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
+      workItemId = await claimCompetitionWorkItem(services.control, options.runId, options.task, turns);
       const preTurnSnapshot = await services.control.snapshot(options.runId);
       const submissionsSoFar = countSubmissions(preTurnSnapshot);
       const prompt = turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot, {
@@ -134,7 +137,13 @@ export async function runCompetitionLoop(
       });
       forceReplan = false;
       replanReason = undefined;
-      const outcome = await activeLane.prompt(prompt);
+      let outcome: Awaited<ReturnType<AgentLanePort["prompt"]>>;
+      try {
+        outcome = await activeLane.prompt(prompt);
+      } catch (error) {
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, "Coding lane threw before returning a turn outcome.");
+        throw error;
+      }
       lastText = outcome.text || lastText;
       const snapshot = await services.control.snapshot(options.runId);
       if (accepted(snapshot)) {
@@ -142,6 +151,7 @@ export async function runCompetitionLoop(
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
         stopReason = "solved";
+        await completeCompetitionWorkItem(services.control, workItemId, snapshot);
         break;
       }
       // AgentHarness already applies the configured Provider retry policy inside
@@ -152,15 +162,18 @@ export async function runCompetitionLoop(
       if (outcome.stopReason === "error") {
         termination = outcome.errorMessage?.trim() || "Provider request failed";
         stopReason = "provider_error";
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, "Provider request failed");
         break;
       }
       if (mode() === "assist" && Object.keys(snapshot.completions).length > 0) {
         stopReason = "held_for_approval";
+        await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
         break;
       }
       if (outcome.termination === "budget_exhausted" || outcome.termination === "deadline_exhausted") {
         termination = outcome.termination;
         stopReason = "deadline";
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, outcome.termination);
         break;
       }
       if (outcome.termination) {
@@ -171,12 +184,18 @@ export async function runCompetitionLoop(
           guardReplans += 1;
           forceReplan = true;
           replanReason = outcome.termination;
+          await blockAndQueueCompetitionWorkItem(services.control, options.runId, options.task, workItemId, outcome.termination, turns);
+          workItemId = undefined;
           continue;
         }
         termination = outcome.termination;
         stopReason = "terminated";
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, outcome.termination);
         break;
       }
+    }
+    if (stopReason === "max_turns" && workItemId) {
+      await failCompetitionWorkItem(services.control, options.runId, workItemId, `No verified completion after ${maxTurns} model turns.`);
     }
   } finally {
     removeAbortListener?.();
@@ -203,6 +222,107 @@ export async function runCompetitionLoop(
     ...(lastText ? { lastText } : {}),
     ...(termination ? { termination } : {}),
   };
+}
+
+/**
+ * Claim a durable executor work item before each provider turn.  A lease that
+ * survived a process restart can be reclaimed after expiry; an active lease
+ * owned by this lane is reused so a normal multi-turn conversation does not
+ * create duplicate work nodes.
+ */
+async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
+  let snapshot = await control.snapshot(runId);
+  const active = Object.values(snapshot.workItems)
+    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && item.lease && Date.parse(item.lease.expiresAt) > Date.now())
+    .sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
+  if (active) return active.id;
+
+  let candidate: RunSnapshot["workItems"][string] | undefined = Object.values(snapshot.workItems)
+    .filter((item) => item.status === "READY")
+    .sort((a, b) => a.createdSeq - b.createdSeq)[0];
+  if (!candidate) {
+    const planned = Object.values(snapshot.workItems)
+      .filter((item) => item.status === "PLANNED")
+      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
+    if (planned) {
+      await control.dispatch(runId, { type: "work_item_ready", workItemId: planned.id, lane: "executor" });
+      candidate = (await control.snapshot(runId)).workItems[planned.id];
+    }
+  }
+  if (!candidate) {
+    const previous = Object.values(snapshot.workItems).sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
+    const created = {
+      id: id("WI"),
+      runId,
+      ...(previous && (previous.status === "BLOCKED" || previous.status === "FAILED") ? { parentId: previous.id } : {}),
+      title: `Advance target investigation (turn ${turn})`,
+      objective: task.objective,
+      role: "executor" as const,
+      status: "READY" as const,
+      dependsOn: [],
+      evidenceIds: [],
+      artifactIds: [],
+      attempt: 0,
+      maxAttempts: 3,
+    };
+    await control.dispatch(runId, { type: "work_item_created", workItem: created, lane: "executor" });
+    candidate = (await control.snapshot(runId)).workItems[created.id];
+  }
+  const leaseExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+  await control.dispatch(runId, { type: "work_item_claimed", workItemId: candidate.id, ownerLane: "executor", leaseExpiresAt, lane: "executor" });
+  snapshot = await control.snapshot(runId);
+  return snapshot.workItems[candidate.id]?.id ?? candidate.id;
+}
+
+async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
+  if (!workItemId || snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+  const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
+  await control.dispatch(snapshot.runId, {
+    type: "work_item_completed",
+    workItemId,
+    evidenceIds: completion?.evidenceIds ?? [],
+    artifactIds: completion?.artifactId ? [completion.artifactId] : [],
+    lane: "executor",
+  });
+}
+
+async function failCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
+  if (!workItemId) return;
+  const snapshot = await control.snapshot(runId);
+  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+  await control.dispatch(runId, { type: "work_item_failed", workItemId, reason, lane: "executor" });
+}
+
+async function blockCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
+  if (!workItemId) return;
+  const snapshot = await control.snapshot(runId);
+  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+  await control.dispatch(runId, { type: "work_item_blocked", workItemId, reason, lane: "executor" });
+}
+
+async function blockAndQueueCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, workItemId: string | undefined, reason: string, turn: number): Promise<void> {
+  if (!workItemId) return;
+  const snapshot = await control.snapshot(runId);
+  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+  const created = {
+    id: id("WI"),
+    runId,
+    parentId: workItemId,
+    title: `Replan after ${reason}`,
+    objective: task.objective,
+    role: "executor" as const,
+    status: "READY" as const,
+    dependsOn: [],
+    evidenceIds: [],
+    artifactIds: [],
+    attempt: 0,
+    maxAttempts: 3,
+  };
+  await control.dispatchBatch(runId, [
+    { type: "work_item_blocked", workItemId, reason, lane: "executor" },
+    { type: "work_item_created", workItem: created, lane: "executor" },
+  ]);
+  void turn;
 }
 
 /**

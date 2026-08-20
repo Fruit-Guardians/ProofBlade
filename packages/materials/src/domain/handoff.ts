@@ -23,6 +23,7 @@ export function handoffKnowledgeVersion(snapshot: RunSnapshot): string {
     completions: Object.values(snapshot.completions).sort(byId).map(({ id, candidateHash, status, evidenceIds }) => ({ id, candidateHash, status, evidenceIds })),
     jobs: Object.values(snapshot.jobs).sort(byId).map(({ id, capabilityId, operation, status, generation, artifactId, outputTier }) => ({ id, capabilityId, operation, status, generation, artifactId, outputTier })),
     artifacts: Object.values(snapshot.artifacts).sort(byId).map(({ id, path, sha256, bytes, sensitivity, sourceEffectId }) => ({ id, path, sha256, bytes, sensitivity, sourceEffectId })),
+    workItems: Object.values(snapshot.workItems).sort(byId).map(({ id, parentId, title, objective, role, status, dependsOn, evidenceIds, artifactIds, attempt, maxAttempts, ownerLane, blockReason, failureReason }) => ({ id, parentId, title, objective, role, status, dependsOn, evidenceIds, artifactIds, attempt, maxAttempts, ownerLane, blockReason, failureReason })),
   }));
 }
 
@@ -37,14 +38,27 @@ export function buildHandoffDraft(snapshot: RunSnapshot, handoffId: string): Han
     .sort((a, b) => b.priority - a.priority || a.createdSeq - b.createdSeq)
     .slice(0, 3);
   const observations = Object.values(snapshot.observations).sort(bySeq);
-  const actions: HandoffAction[] = openIntents.map((intent) => ({
+  const workItems = Object.values(snapshot.workItems)
+    .filter((item) => item.status === "PLANNED" || item.status === "READY" || item.status === "BLOCKED")
+    .sort((a, b) => a.createdSeq - b.createdSeq)
+    .slice(0, 4);
+  const actions: HandoffAction[] = workItems.map((item) => ({
+    id: `ACTION-${item.id}`,
+    workItemId: item.id,
+    title: item.title,
+    description: item.objective,
+    expectedEvidence: ["observation", "artifact"],
+    resourceKeys: ["target:" + snapshot.task.task_id],
+    estimatedToolCalls: 1,
+  }));
+  actions.push(...openIntents.slice(0, Math.max(0, 3 - actions.length)).map((intent) => ({
     id: `ACTION-${intent.id}`,
     title: intent.title,
     description: intent.description,
     expectedEvidence: ["observation", "artifact"],
     resourceKeys: ["target:" + snapshot.task.task_id],
     estimatedToolCalls: 1,
-  }));
+  })));
   if (actions.length === 0) {
     actions.push({
       id: "ACTION-INSPECT",
