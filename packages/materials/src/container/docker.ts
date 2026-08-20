@@ -301,7 +301,14 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const pidfile = `/tmp/.pb-session-${sessionId}.pid`;
     const args = ["exec", "-i", "--workdir", cwd];
     for (const [key, value] of Object.entries(env)) args.push("--env", `${key}=${value}`);
-    args.push(ref.containerId, "/bin/sh", "-c", 'echo $$ > "$1"; shift 2; exec "$@"', "pb-session", pidfile, "--", ...options.command);
+    // `setsid -w` runs the command as a NEW session/process-group leader (so its
+    // pid == pgid) and waits, keeping the docker-exec pipe alive. The inner shell
+    // records that leader pid ($$) before exec, so a later signal can target the
+    // whole GROUP (kill -SIG -pgid) and reach forked children — a bare pid signal
+    // would leave a fork()ed pwn/gdb child alive holding stdin. Pipe stdio has no
+    // controlling terminal, so the setsid detach is harmless. Args are positional
+    // so the command cannot inject into the wrapper.
+    args.push(ref.containerId, "setsid", "-w", "/bin/sh", "-c", 'echo $$ > "$1"; shift 2; exec "$@"', "pb-session", pidfile, "--", ...options.command);
     // A live session must keep stdin open and stream stdout incrementally, which
     // SpawnDockerCommandRunner intentionally does not (it resolves on close). So
     // this path spawns the docker CLI directly and holds the child handle.
@@ -356,7 +363,11 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     // wrapper. Report the real result instead of swallowing failure: a missing
     // pidfile or a kill error must surface as false, not a fake success.
     const number = signalNumber(signal);
-    const script = 'p=$(cat "$1" 2>/dev/null) || exit 3; [ -n "$p" ] || exit 3; kill -"$2" "$p"';
+    // Signal the whole process GROUP (leader pid == pgid, see openSession) with
+    // `kill -SIG -- -pgid` so forked children of the target receive it too, not
+    // just the session leader. Fall back to the bare pid if the group send fails
+    // (e.g. leader already reaped). Report the real result; never fake success.
+    const script = 'p=$(cat "$1" 2>/dev/null) || exit 3; [ -n "$p" ] || exit 3; kill -"$2" -- -"$p" 2>/dev/null || kill -"$2" "$p"';
     const result = await this.runner.run(["exec", session.ref.containerId, "/bin/sh", "-c", script, "pb-signal", session.pidfile, String(number)], { timeoutMs: configTimeout(this.config) });
     return !result.spawnError && result.exitCode === 0;
   }
@@ -590,7 +601,14 @@ function killChild(child: ChildProcessWithoutNullStreams): void {
   }
 }
 const SIGNAL_NUMBERS: Record<string, number> = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15, SIGUSR1: 10, SIGUSR2: 12, SIGSTOP: 19, SIGCONT: 18 };
-function signalNumber(signal: NodeJS.Signals): number { return SIGNAL_NUMBERS[signal] ?? 15; }
+export const SUPPORTED_SIGNALS = Object.keys(SIGNAL_NUMBERS) as NodeJS.Signals[];
+// Reject an unknown signal rather than silently defaulting to SIGTERM: a model
+// that typos SIGINT as SIGIN must not accidentally terminate the target.
+function signalNumber(signal: NodeJS.Signals): number {
+  const number = SIGNAL_NUMBERS[signal];
+  if (number === undefined) throw new Error(`Unsupported signal: ${signal}. Supported: ${SUPPORTED_SIGNALS.join(", ")}`);
+  return number;
+}
 function safeName(value: string): string { return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "run"; }
 function createOwnerToken(): string { return `${process.pid}-${Date.now()}-${randomUUID()}`; }
 function containerCwd(workspace: string, requested?: string): string {

@@ -36,6 +36,7 @@ const REF: ContainerRef = {
 class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private pending = new Map<string, string>();
   private count = 0;
+  public lastWriteBytes: Uint8Array | undefined;
   public constructor(private readonly flag: string, private readonly flagPath: string) {}
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
@@ -43,6 +44,9 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
     return { sessionId, ref };
   }
   public async sessionWrite(handle: ContainerSessionHandle, data: string | Uint8Array): Promise<ContainerSessionResult> {
+    // Capture the exact bytes so a binary-payload test can assert nothing was
+    // mangled by UTF-8 round-tripping.
+    this.lastWriteBytes = typeof data === "string" ? new TextEncoder().encode(data) : Uint8Array.from(data);
     const text = String(data);
     const echo = /^echo (.+)\n$/.exec(text);
     const cat = /^cat '?([^'\n]+)'?\n$/.exec(text);
@@ -90,6 +94,42 @@ test("pwn tools fail closed with a clear message when no container is attached",
     open.execute!("t1", { kind: "remote", command: ["tube"], endpoint: "1.2.3.4:1337" }, new AbortController().signal, () => {}, contextWith(undefined)),
     /no Docker-backed pwn container|unavailable/,
   );
+});
+
+test("pwn_send base64 delivers exact binary bytes (0x00/0xff), not a mangled literal", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-ct-bin-"));
+  try {
+    const runId = "PWN-CT-BIN";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, demoTask(runId, root, config));
+    const runtime = new EchoTubeRuntime("flag{x}", "/flag");
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "main");
+    const context = contextWith(handler);
+    const opened = await toolByName("pwn_open").execute!("t1", { kind: "remote", command: ["tube"], endpoint: "1.2.3.4:1337" }, new AbortController().signal, () => {}, context);
+    const sessionId = (opened.details as { sessionId: string }).sessionId;
+
+    // 0x00 0xff 0x41 0x0a as base64 = "AP9BCg==". With line=true a trailing LF byte is appended.
+    const payloadB64 = Buffer.from([0x00, 0xff, 0x41]).toString("base64");
+    await toolByName("pwn_send").execute!("t2", { sessionId, data: payloadB64, encoding: "base64", line: true }, new AbortController().signal, () => {}, context);
+    assert.deepEqual(Array.from(runtime.lastWriteBytes!), [0x00, 0xff, 0x41, 0x0a], "exact bytes + LF must reach stdin");
+
+    // A malformed base64 payload is rejected, not silently shortened.
+    await assert.rejects(
+      toolByName("pwn_send").execute!("t3", { sessionId, data: "not base64!!", encoding: "base64" }, new AbortController().signal, () => {}, context),
+      /base64/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("pwn_signal rejects an unknown signal name at the schema boundary", () => {
+  const signalTool = toolByName("pwn_signal");
+  const schema = signalTool.parameters as { properties: { signal: { enum?: string[] } } };
+  assert.ok(Array.isArray(schema.properties.signal.enum), "signal must be a fixed enum, not a free string");
+  assert.ok(schema.properties.signal.enum!.includes("SIGINT"));
+  assert.equal(schema.properties.signal.enum!.includes("SIGIN"), false, "a typo like SIGIN must not be a valid value");
 });
 
 test("pwn_open then pwn_send route through the real handler and durable registry", async () => {

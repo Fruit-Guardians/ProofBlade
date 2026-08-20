@@ -57,9 +57,17 @@ export class PwnToolHandler {
     return { sessionId: session.sessionId, kind: input.kind, ...(input.endpoint ? { endpoint: input.endpoint } : {}) };
   }
 
-  public async send(sessionId: string, data: string, line = false): Promise<PwnViewport> {
+  public async send(sessionId: string, data: string | Uint8Array, line = false): Promise<PwnViewport> {
     const session = this.require(sessionId);
-    const result = line ? await session.sendLine(data) : await session.send(data);
+    // Preserve exact bytes: for binary payloads append the newline as a byte so
+    // sendLine's string path cannot corrupt 0x00/0xff via UTF-8 round-tripping.
+    let result: Awaited<ReturnType<PwnSession["send"]>>;
+    if (typeof data === "string") {
+      result = line ? await session.sendLine(data) : await session.send(data);
+    } else {
+      const payload = line ? concatByte(data, 0x0a) : data;
+      result = await session.send(payload);
+    }
     return this.viewport(sessionId, result.data, result.exited, result.matched);
   }
 
@@ -116,6 +124,13 @@ export class PwnToolHandler {
     if (!session) throw new Error(`Unknown pwn session: ${sessionId}`);
     return session;
   }
+}
+
+function concatByte(data: Uint8Array, byte: number): Uint8Array {
+  const out = new Uint8Array(data.length + 1);
+  out.set(data, 0);
+  out[data.length] = byte;
+  return out;
 }
 
 function opt(input: PwnOpenInput): { cwd?: string; idleSilenceMs?: number; waitTimeoutMs?: number } {

@@ -199,6 +199,61 @@ test("a crashed executor's expired RUNNING work item is reclaimed, not orphaned"
   }
 });
 
+test("an expired RUNNING item is reclaimed before a READY item, so it is never starved", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-expired-priority-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "EXPIRED-PRIORITY-001";
+    const task = demoTask(runId, root, config);
+    await control.createRun(runId, task);
+    // WI-OLD: RUNNING with an expired lease (crashed owner). WI-NEW: READY.
+    await control.dispatchBatch(runId, [
+      { type: "work_item_created", workItem: { id: "WI-OLD", runId, title: "Old", objective: task.objective, role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 3 }, lane: "planner" },
+      { type: "work_item_created", workItem: { id: "WI-NEW", runId, title: "New", objective: task.objective, role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 3 }, lane: "planner" },
+    ]);
+    await control.dispatch(runId, { type: "work_item_claimed", workItemId: "WI-OLD", ownerLane: "executor", leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(), lane: "executor" });
+
+    // With both an expired RUNNING and a READY present, the expired one wins —
+    // otherwise READY would be claimed and become active, permanently starving
+    // WI-OLD (the active branch only ever returns valid-lease items).
+    const claimed = await claimCompetitionWorkItem(control, runId, task, 2);
+    assert.equal(claimed, "WI-OLD");
+    const snap = await control.snapshot(runId);
+    assert.equal(snap.workItems["WI-OLD"]?.status, "RUNNING");
+    assert.equal(snap.workItems["WI-OLD"]?.attempt, 2);
+    assert.equal(snap.workItems["WI-NEW"]?.status, "READY", "the READY item waits its turn, it is not lost");
+    assert.equal(Object.keys(snap.workItems).length, 2, "no duplicate item created");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("multiple expired RUNNING items are recovered oldest-first across turns", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-expired-multi-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "EXPIRED-MULTI-001";
+    const task = demoTask(runId, root, config);
+    await control.createRun(runId, task);
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    for (const wid of ["WI-A", "WI-B"]) {
+      await control.dispatch(runId, { type: "work_item_created", workItem: { id: wid, runId, title: wid, objective: task.objective, role: "executor", status: "READY", dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 3 }, lane: "planner" });
+      await control.dispatch(runId, { type: "work_item_claimed", workItemId: wid, ownerLane: "executor", leaseExpiresAt: expired, lane: "executor" });
+    }
+    // WI-A was claimed first (lower updatedSeq), so it is recovered first.
+    const first = await claimCompetitionWorkItem(control, runId, task, 2);
+    assert.equal(first, "WI-A");
+    // Once WI-A finishes, the next turn must recover the other orphan, WI-B —
+    // proving neither expired item is left stranded.
+    await control.dispatch(runId, { type: "work_item_completed", workItemId: "WI-A", lane: "executor" });
+    const second = await claimCompetitionWorkItem(control, runId, task, 3);
+    assert.equal(second, "WI-B", "the second orphan is recovered, never stranded");
+    assert.equal(Object.keys((await control.snapshot(runId)).workItems).length, 2, "no duplicates spawned");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("request epochs bind provider events and replay their context hashes", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-request-epoch-"));
   try {

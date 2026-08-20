@@ -61,6 +61,20 @@ export class SessionRegistry {
     private readonly control: ControlStore,
   ) {}
 
+  /**
+   * Build a registry for the RECOVERY path, where no container runtime exists
+   * (a restart has no live handles). Its live map is empty, so supersedeOrphans
+   * correctly treats every durably-OPEN session as an orphan. The runtime stub
+   * throws if any session I/O is attempted — recovery only reads the snapshot
+   * and dispatches supersede events, so it is never called.
+   */
+  public static forRecovery(runId: string, control: ControlStore): SessionRegistry {
+    const stub = new Proxy({} as ContainerRuntimePort, {
+      get() { throw new Error("SessionRegistry.forRecovery has no container runtime; only supersede/dispose are valid"); },
+    });
+    return new SessionRegistry(runId, stub, control);
+  }
+
   public async open(input: OpenSessionInput): Promise<SessionRecord> {
     const handle = await this.runtime.openSession(input.ref, {
       command: input.command,
@@ -108,7 +122,10 @@ export class SessionRegistry {
   public async signal(ownerLane: Lane, sessionId: string, signal: NodeJS.Signals): Promise<boolean> {
     const entry = this.requireOwned(ownerLane, sessionId);
     const delivered = await this.runtime.sessionSignal(entry.handle, signal);
-    await this.control.dispatch(this.runId, { type: "session_signaled", sessionId, signal, lane: ownerLane });
+    // Record the ACTUAL delivery result so the durable event distinguishes "we
+    // asked to send" from "the signal reached a live process". A false here means
+    // the target pid was already gone / the kill failed.
+    await this.control.dispatch(this.runId, { type: "session_signaled", sessionId, signal, delivered, lane: ownerLane });
     return delivered;
   }
 

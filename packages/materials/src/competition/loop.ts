@@ -237,19 +237,19 @@ export async function claimCompetitionWorkItem(control: AppServices["control"], 
     .sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
   if (active) return active.id;
 
+  // Recover a crashed/killed prior owner's orphaned RUNNING item BEFORE picking
+  // a READY item. If READY won, the reclaimed item would be starved: the active
+  // branch above only returns valid-lease items, so an expired RUNNING that is
+  // never re-selected stays RUNNING forever while newer READY work advances. The
+  // re-claim increments attempt, so maxAttempts still bounds retries; the oldest
+  // expired item goes first and the rest are recovered on later turns.
   let candidate: RunSnapshot["workItems"][string] | undefined = Object.values(snapshot.workItems)
-    .filter((item) => item.status === "READY")
-    .sort((a, b) => a.createdSeq - b.createdSeq)[0];
+    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && (!item.lease || Date.parse(item.lease.expiresAt) <= Date.now()))
+    .sort((a, b) => a.updatedSeq - b.updatedSeq)[0];
   if (!candidate) {
-    // A RUNNING item whose lease expired belongs to a crashed/killed prior
-    // owner. The control store allows re-claiming it; reuse it instead of
-    // leaving an orphaned RUNNING node and spawning a duplicate that re-runs the
-    // same target. The re-claim below increments attempt, so maxAttempts still
-    // bounds retries. Only recover the executor's own expired items.
-    const expiredRunning = Object.values(snapshot.workItems)
-      .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && (!item.lease || Date.parse(item.lease.expiresAt) <= Date.now()))
-      .sort((a, b) => a.updatedSeq - b.updatedSeq)[0];
-    if (expiredRunning) candidate = expiredRunning;
+    candidate = Object.values(snapshot.workItems)
+      .filter((item) => item.status === "READY")
+      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
   }
   if (!candidate) {
     const planned = Object.values(snapshot.workItems)

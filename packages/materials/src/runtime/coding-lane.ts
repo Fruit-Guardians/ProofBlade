@@ -37,6 +37,10 @@ import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
+import { ContainerExecutionEnv } from "../container/execution-env.js";
+import { SessionRegistry } from "../container/session-registry.js";
+import { PwnReproducer } from "../verification/pwn-reproducer.js";
+import { PwnToolHandler } from "../pwn/pwn-tools.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -181,9 +185,23 @@ export class PiCodingLane implements AgentLanePort {
       // objdump-level static analysis. The mcp_call proxy is already enabled.
       { includeMcp: true },
     );
+    // When the process backend is a Docker pwn/pwn-kernel container, wire the
+    // persistent tube tools: build a SessionRegistry over that container runtime
+    // and a PwnToolHandler bound to this run. Without a container (GUI chat /
+    // NodeExecutionEnv) pwnTools stays undefined and the pwn_* tools are neither
+    // active nor callable.
+    const pwnTools = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
+      ? new PwnToolHandler(
+        options.runId,
+        new SessionRegistry(options.runId, env.containerRuntime, options.controlStore),
+        new PwnReproducer(options.controlStore),
+        () => (env as ContainerExecutionEnv).containerRef,
+        "main",
+      )
+      : undefined;
     const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
     const activeToolNames = [
-      ...codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers], platformJudged }),
+      ...codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers], platformJudged, pwnEnabled: Boolean(pwnTools) }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
     const submitFlag = platformJudged
@@ -208,6 +226,7 @@ export class PiCodingLane implements AgentLanePort {
       evidenceGraph,
       evidenceCurationGate,
       runtime,
+      ...(pwnTools ? { pwnTools } : {}),
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },

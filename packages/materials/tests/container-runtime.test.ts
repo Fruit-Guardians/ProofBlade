@@ -509,9 +509,36 @@ test("sessionSignal targets the session's own pid, not kill -1, and reports the 
     // must never contain a literal broadcast target like "-1".
     assert.equal(signalCall!.includes("-1"), false);
     assert.equal(signalCall!.some((arg) => /(^|\s)-1(\s|$)/.test(arg)), false);
+    // The kill script must target the process GROUP (kill ... -- -"$p") so a
+    // forked child of the target receives the signal too, not just the leader.
+    assert.ok(signalCall!.some((arg) => arg.includes('-- -"$p"')), "must signal the process group");
     // A non-zero kill (e.g. empty pidfile) must surface as false, not fake true.
     killExit = 3;
     assert.equal(await runtime.sessionSignal(handle, "SIGINT"), false);
+    // An unknown signal name must throw, not silently downgrade to SIGTERM.
+    await assert.rejects(runtime.sessionSignal(handle, "SIGIN" as NodeJS.Signals), /Unsupported signal/);
+  } finally {
+    await runtime.closeSession(handle);
+  }
+});
+
+test("openSession wraps the target in setsid so it leads its own process group", async () => {
+  const spawnedArgs: string[][] = [];
+  const spawner: SessionProcessSpawner = (command, args) => {
+    spawnedArgs.push([command, ...args]);
+    return spawn(process.execPath, ["-e", "process.stdin.resume();"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  };
+  const runner: DockerCommandRunner = { async run(): Promise<DockerProcessResult> { return processResult(""); } };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner, spawner);
+  const handle = await runtime.openSession(SESSION_REF, { command: ["./chall"] });
+  try {
+    const args = spawnedArgs[0]!;
+    // setsid -w makes the target a new session/group leader (pid==pgid) and waits.
+    assert.ok(args.includes("setsid"));
+    assert.ok(args.includes("-w"));
+    // The real target command is still exec'd at the tail.
+    assert.ok(args.includes("./chall"));
   } finally {
     await runtime.closeSession(handle);
   }

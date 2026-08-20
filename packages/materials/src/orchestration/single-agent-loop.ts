@@ -12,6 +12,7 @@ import { IndependentVerifier, type VerificationOutcome } from "../verification/v
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 import { RunRecoveryService } from "../recovery/run-recovery.js";
+import { SessionRegistry } from "../container/session-registry.js";
 
 export interface SolverLaneCreateInput {
   projectRoot: string;
@@ -70,8 +71,15 @@ export class SingleAgentCtfLoop {
       await this.services.control.dispatch(options.runId, { type: "resume" });
       snapshot = await this.services.control.snapshot(options.runId);
     }
-    const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox)
-      .recover(options.runId, snapshot.task);
+    // A fresh registry for recovery: any session still durably OPEN belongs to a
+    // dead prior process (its docker-exec child died with it), so it is an orphan
+    // to supersede rather than revive.
+    const recovery = await new RunRecoveryService(
+      this.services.control,
+      this.services.journal,
+      this.services.sandbox,
+      SessionRegistry.forRecovery(options.runId, this.services.control),
+    ).recover(options.runId, snapshot.task);
     throwIfAborted(options.signal);
     const fixture = recovery.fixture;
     snapshot = await this.services.control.snapshot(options.runId);

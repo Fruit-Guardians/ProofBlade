@@ -29,7 +29,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "e05ed6048e392822ba8adb2ea919b6f68856fa801188415db12b47b5005360d0";
+const CODING_TOOL_CONTRACT_HASH = "86718000c240fce29ac61c73fe402db37320517b8f13f12a6482599554b4d6cc";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();

@@ -82,7 +82,7 @@ export type DomainCommand =
   | { type: "request_epoch_started"; epoch: Omit<RequestEpoch, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "session_opened"; session: Omit<SessionRecord, "createdSeq" | "updatedSeq" | "status" | "interactions"> & { interactions?: number }; lane?: Lane }
   | { type: "session_interacted"; sessionId: string; waitReason?: SessionRecord["lastWaitReason"]; transcriptArtifactId?: string; stateHash?: string; exited?: boolean; exitCode?: number | null; lane?: Lane }
-  | { type: "session_signaled"; sessionId: string; signal: string; lane?: Lane }
+  | { type: "session_signaled"; sessionId: string; signal: string; delivered?: boolean; lane?: Lane }
   | { type: "session_closed"; sessionId: string; reason?: string; exitCode?: number | null; lane?: Lane }
   | { type: "session_superseded"; sessionId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
@@ -305,7 +305,7 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "request_epoch_started": return { epoch: { ...command.epoch, createdSeq: seq, updatedSeq: seq } };
     case "session_opened": return { session: { ...command.session, status: "OPEN", interactions: command.session.interactions ?? 0, createdSeq: seq, updatedSeq: seq } };
     case "session_interacted": return { sessionId: command.sessionId, waitReason: command.waitReason, transcriptArtifactId: command.transcriptArtifactId, stateHash: command.stateHash, exited: command.exited, exitCode: command.exitCode };
-    case "session_signaled": return { sessionId: command.sessionId, signal: command.signal };
+    case "session_signaled": return { sessionId: command.sessionId, signal: command.signal, delivered: command.delivered ?? false };
     case "session_closed": return { sessionId: command.sessionId, reason: command.reason, exitCode: command.exitCode };
     case "session_superseded": return { sessionId: command.sessionId, reason: command.reason };
     case "context_recovery": return { checkpointId: command.checkpointId };

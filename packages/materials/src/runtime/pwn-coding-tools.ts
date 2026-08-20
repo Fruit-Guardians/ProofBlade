@@ -54,18 +54,35 @@ const pwnOpenTool: AgentHarnessTool<CodingResourceContext> = {
 const pwnSendTool: AgentHarnessTool<CodingResourceContext> = {
   name: "pwn_send",
   label: "pwn_send",
-  description: "Write bytes to a pwn session's stdin and drain one readiness window. Set line=true to append a newline (sendline). Returns a bounded viewport of new output; exited=true means the process ended.",
+  description: "Write to a pwn session's stdin and drain one readiness window. For exploit payloads with non-UTF-8 bytes (0x00, 0xff, ROP chains, addresses) set encoding=base64 and pass base64-encoded bytes; the default utf8 mode is for text protocols only. Set line=true to append a newline (LF byte in base64 mode). Returns a bounded viewport; exited=true means the process ended.",
   parameters: Type.Object({
     sessionId: Type.String({ minLength: 1 }),
-    data: Type.String({ description: "Bytes to send. Use \\xNN escapes handled by your own encoding; this is sent verbatim." }),
+    data: Type.String({ description: "Payload. In utf8 mode: the literal text. In base64 mode: base64 of the exact bytes to send (this is how you send 0x00/0xff and packed addresses)." }),
+    encoding: Type.Optional(Type.String({ enum: ["utf8", "base64"], description: "How `data` is interpreted. Default utf8. Use base64 for binary exploit payloads." })),
     line: Type.Optional(Type.Boolean()),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_id, params, _signal, _onUpdate, context) {
-    const input = params as { sessionId: string; data: string; line?: boolean };
-    return pwnResult(await requireHandler(context).send(input.sessionId, input.data, input.line ?? false));
+    const input = params as { sessionId: string; data: string; encoding?: "utf8" | "base64"; line?: boolean };
+    // base64 decodes to exact bytes so a payload like AAD/ (0x00 0x00 0xff)
+    // reaches stdin verbatim, not as the 8 UTF-8 chars of a "\x00\xff" literal.
+    const payload: string | Uint8Array = input.encoding === "base64" ? decodeBase64Strict(input.data) : input.data;
+    return pwnResult(await requireHandler(context).send(input.sessionId, payload, input.line ?? false));
   },
 };
+
+/** Decode base64 to bytes, rejecting malformed input rather than silently mangling a payload. */
+function decodeBase64Strict(value: string): Uint8Array {
+  const normalized = value.trim();
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) throw new Error("pwn_send base64 data contains non-base64 characters");
+  const buffer = Buffer.from(normalized, "base64");
+  // Buffer.from is lenient; verify the round-trip so a truncated/invalid payload
+  // is rejected instead of sending fewer bytes than the model intended.
+  if (buffer.toString("base64").replace(/=+$/, "") !== normalized.replace(/=+$/, "")) {
+    throw new Error("pwn_send base64 data is malformed");
+  }
+  return new Uint8Array(buffer);
+}
 
 const pwnRecvTool: AgentHarnessTool<CodingResourceContext> = {
   name: "pwn_recv",
@@ -86,10 +103,10 @@ const pwnRecvTool: AgentHarnessTool<CodingResourceContext> = {
 const pwnSignalTool: AgentHarnessTool<CodingResourceContext> = {
   name: "pwn_signal",
   label: "pwn_signal",
-  description: "Send a POSIX signal (e.g. SIGINT) to the session's foreground process group.",
+  description: "Send a POSIX signal to the session's process group (the target and its forked children). An unknown signal name is rejected, not silently downgraded.",
   parameters: Type.Object({
     sessionId: Type.String({ minLength: 1 }),
-    signal: Type.String({ minLength: 3, description: "Signal name, e.g. SIGINT, SIGTERM." }),
+    signal: Type.String({ enum: ["SIGHUP", "SIGINT", "SIGQUIT", "SIGKILL", "SIGTERM", "SIGUSR1", "SIGUSR2", "SIGSTOP", "SIGCONT"], description: "Signal name from the supported set, e.g. SIGINT, SIGTERM, SIGKILL." }),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_id, params, _signal, _onUpdate, context) {
