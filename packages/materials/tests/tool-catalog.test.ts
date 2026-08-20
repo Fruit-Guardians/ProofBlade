@@ -75,33 +75,33 @@ test("catalog hash is order-insensitive and sensitive to content changes", async
   }
 });
 
-test("catalog hash excludes the file location: path/doc/category changes do not churn it", async () => {
-  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-path-stable-"));
+test("catalog hash covers the injected path/doc but excludes the unused category", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-path-covered-"));
   try {
     const base = { id: "py", name: "py", kind: "interpreter", description: "fixed python" };
     const manifest = (tool: Record<string, unknown>) => MANIFEST([tool]);
-    // identity + description fixed; vary only path
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/one/python.exe" }));
     const hPath1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    // changing path IS injected into the prompt, so the hash must change
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe" }));
     const hPath2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
-    assert.equal(hPath1, hPath2, "changing path alone must not change catalogHash");
-    // vary only doc
+    assert.notEqual(hPath1, hPath2, "changing path (which the prompt injects) must change catalogHash");
+    // changing doc is injected into the coding prompt, so it must change too
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", doc: "C:/doc/a.md" }));
     const hDoc1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", doc: "C:/doc/b.md" }));
     const hDoc2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
-    assert.equal(hDoc1, hDoc2, "changing doc alone must not change catalogHash");
-    // vary only category
+    assert.notEqual(hDoc1, hDoc2, "changing doc (injected into the coding prompt) must change catalogHash");
+    // category is never injected into any prompt, so it must NOT churn the hash
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", category: "web" }));
     const hCat1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", category: "crypto" }));
     const hCat2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
-    assert.equal(hCat1, hCat2, "changing category alone must not change catalogHash");
-    // changing the description (content the model sees) MUST still change it
+    assert.equal(hCat1, hCat2, "changing the unused category must not change catalogHash");
+    // description change still changes the hash
     await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", description: "different python" }));
     const hDesc = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
-    assert.notEqual(hPath1, hDesc, "description change must still change catalogHash");
+    assert.notEqual(hPath1, hDesc);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

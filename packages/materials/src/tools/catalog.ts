@@ -168,7 +168,7 @@ export class ProofBladeToolCatalogRegistry {
         description,
         ...(doc === undefined ? {} : { doc }),
         ...(category === undefined ? {} : { category }),
-        contentHash: entryContentHash({ id, name, kind, description }),
+        contentHash: entryContentHash({ id, name, kind, path: normalized, description, doc }),
       });
     }
     entries.sort((a, b) => a.id.localeCompare(b.id));
@@ -195,17 +195,20 @@ export class ProofBladeToolCatalogRegistry {
     return this.disabled;
   }
 
-  /** Hash of the sorted identity + description fields. Deliberately EXCLUDES the
-   * file location (`path`, `doc`) and the unused category so that moving a tool
-   * or upgrading its path does not churn the stable prompt prefix or the run
-   * version snapshot. See docs/tool-catalog.md. */
+  /** Hash of the sorted fields that the injected prompt block renders: identity,
+   * description, and the path/doc the model sees. Path/doc changes (which are
+   * injected into the system prompt) therefore legitimately churn this hash and
+   * its prompt prefix — that is intentional, because the model sees the new path.
+   * The unused category stays excluded. See docs/tool-catalog.md. */
   public catalogHash(): string {
     if (this.disabled) return sha256(canonicalJson([]));
-    return sha256(canonicalJson(this.entries.map(({ id, name, kind, description }) => ({
+    return sha256(canonicalJson(this.entries.map(({ id, name, kind, path, description, doc }) => ({
       id,
       name,
       kind,
+      path,
       description,
+      ...(doc === undefined ? {} : { doc }),
     }))));
   }
 
@@ -264,10 +267,10 @@ export class ProofBladeToolCatalogRegistry {
   }
 }
 
-function entryContentHash(fields: { id: string; name: string; kind: ToolKind; description: string }): string {
-  // Identity + description only; excludes path/doc/category (see catalogHash).
-  const { id, name, kind, description } = fields;
-  return sha256(canonicalJson({ id, name, kind, description }));
+function entryContentHash(fields: { id: string; name: string; kind: ToolKind; path: string; description: string; doc?: string }): string {
+  // Mirrors catalogHash: identity + description + path/doc, category excluded.
+  const { id, name, kind, path, description, doc } = fields;
+  return sha256(canonicalJson({ id, name, kind, path, description, ...(doc === undefined ? {} : { doc }) }));
 }
 
 function asNonEmptyString(value: unknown, label: string): string | undefined {

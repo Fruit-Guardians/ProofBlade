@@ -40,7 +40,7 @@
 ## 注入与哈希
 
 - 注入：`pi-coding-lane` 的 `codingSystemPrompt()` 渲染 `<tool-catalog catalog-hash="…">` 块，按 `kind` 分组，拼进稳定系统提示（L0/L1 前缀）。缓存友好——清单不变则前缀 hash 不变。
-- 哈希：`catalogHash()` 由排序后的工具身份 + 描述计算，**不含文档内容、不含文件位置**，因此移动 manifest 或路径失效不会抖动稳定前缀。
+- 哈希：`catalogHash()` 由排序后的工具身份 + 描述 + 路径/文档（会被注入系统提示的字面量）计算；路径或文档变化会使稳定前缀与运行版本快照对应变化——这是有意为之，因为模型看到的新路径确属提示内容。未使用的 `category` 字段不参与哈希。
 - 版本快照：`toolCatalogHash` 与 `toolCatalog` 写入 `RunVersionSnapshot` 和 `RuntimeResourceSnapshot`（ContextManifest resources），与 `skillCatalogHash`/`mcpCatalogHash` 平行。
 - 失效处理：路径不存在只产生 `probe` 诊断（警告），**不阻断、不影响 hash**；manifest 缺失或非法降级为空目录。
 
