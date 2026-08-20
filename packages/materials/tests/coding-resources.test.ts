@@ -9,8 +9,10 @@ import {
   createCodingToolEffectPolicyResolver,
   createCodingTools,
   createMcpFirstClassTools,
+  interactiveTimeoutHint,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
+import { codingCtfCategoryGuidance } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -29,11 +31,11 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "55d7b63c2bbec7f0b3a6af2d956a738ab9b2da584ff4aeeb2474162f0f4238b1";
+const CODING_TOOL_CONTRACT_HASH = "8077fffb57183c7d7c44e6174ea58b16a152a5e287b6a92ec2119b42c75b7f79";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
@@ -60,6 +62,42 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /generic suffix/);
   assert.match(source, /PB_READY/);
   assert.match(source, /PYTHONIOENCODING=utf-8/);
+});
+
+test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
+  const withTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true);
+  // Tube path: point at pwn_open/send/recv/reproduce, not a blocking bash script.
+  assert.match(withTube, /pwn_open/);
+  assert.match(withTube, /pwn_recv/);
+  assert.match(withTube, /pwn_reproduce/);
+  // The old "Use `from pwn import *` directly" nudge that produced monolithic
+  // blocking scripts must be gone.
+  assert.doesNotMatch(withTube, /Use `from pwn import \*` directly/);
+
+  const noTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", false);
+  // No-tube path: forbid blocking a foreground bash; use shell_background.
+  assert.match(noTube, /shell_background/);
+  assert.match(noTube, /shell_job/);
+  assert.doesNotMatch(noTube, /pwn_open/);
+
+  const noVerifier = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true, false);
+  assert.match(noVerifier, /immutable task verifier is not configured/);
+  assert.doesNotMatch(noVerifier, /Confirm a solve with `pwn_reproduce`/);
+});
+
+test("a timed-out interactive bash command yields a targeted remediation hint", () => {
+  // Tube available -> steer to pwn_open; a recv-loop command that timed out.
+  const tubeHint = interactiveTimeoutHint("Command timed out after 180s", "python3 -c 'from pwn import *; p=remote(\"h\",1); p.recvuntil(b\"> \")'", true);
+  assert.ok(tubeHint && /pwn_open/.test(tubeHint));
+
+  // No tube -> steer to shell_background.
+  const bgHint = interactiveTimeoutHint("bash: command timed out", "python3 solve.py  # calls p.interactive()", false);
+  assert.ok(bgHint && /shell_background/.test(bgHint));
+
+  // Not a timeout -> no hint.
+  assert.equal(interactiveTimeoutHint("exit code 1", "python3 -c 'remote(1)'", true), undefined);
+  // A timeout on a NON-interactive command (pure compute) -> no hint.
+  assert.equal(interactiveTimeoutHint("timed out", "python3 -c 'print(2**900000)'", true), undefined);
 });
 
 test("coding provider tools use object-root schemas accepted by strict OpenAI-compatible providers", () => {

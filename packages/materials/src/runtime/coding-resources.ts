@@ -18,9 +18,12 @@ import type { CodingClaimVerifier } from "../verification/claim-verification.js"
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import type { RawEffectResult } from "../domain/types.js";
+import type { PwnToolHandler } from "../pwn/pwn-tools.js";
+import { createPwnCodingTools } from "./pwn-coding-tools.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
 
 /** Verdict returned by a real platform submission. */
 export interface CodingFlagSubmission {
@@ -49,6 +52,12 @@ export interface CodingResourceContext extends ExecutionToolContext {
   submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
+  /**
+   * Present only when a Docker-backed pwn/pwn-kernel container is available.
+   * Absent for GUI chat and no-container runs, in which case the pwn_* tools
+   * fail closed with a clear message instead of pretending to have a tube.
+   */
+  pwnTools?: PwnToolHandler;
   outputRewrite?: {
     port: OutputRewritePort;
     artifactStore: ArtifactStore;
@@ -91,6 +100,7 @@ export function createCodingTools(options: { platformJudged?: boolean } = {}): A
     mcpCallTool,
     shellBackgroundTool,
     shellJobTool,
+    ...createPwnCodingTools(),
     // Registered only for platform-judged runs: it spends a real submission, and
     // a GUI chat run has no platform to submit to.
     ...(options.platformJudged ? [submitFlagTool] : []),
@@ -539,10 +549,15 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
+  // Only expose the tube tools when a Docker-backed pwn container is attached,
+  // so a GUI chat run does not advertise seven tools that would fail closed.
+  if (input.pwnEnabled) {
+    active.push(...CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce" || input.pwnReproductionEnabled));
+  }
   if (input.platformJudged) active.push(submitFlagTool.name);
   return active;
 }
@@ -642,6 +657,22 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
   };
 }
 
+/**
+ * When a bash command TIMED OUT and the command looks like it was holding a
+ * live interactive connection (pwntools tube, recv loop, nc/socat), return a
+ * targeted remediation instead of letting the model read a bare "timed out" and
+ * rewrite the whole script. The blocking foreground connection is the cause, so
+ * point at the persistent tube (if wired) or shell_background (otherwise).
+ */
+export function interactiveTimeoutHint(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined {
+  if (!/timed out|timeout/i.test(errorMessage)) return undefined;
+  const interactive = /(recvuntil|recvline|recvall|interactive\(|\.recv\(|sendlineafter|sendafter|remote\(|process\(|pwn import|\bnc\s|\bncat\s|\bsocat\b)/i.test(command);
+  if (!interactive) return undefined;
+  return pwnToolsAvailable
+    ? "[hint] This command blocked on an interactive connection and was killed at the timeout. Do NOT rewrite the whole script. Open the target once with `pwn_open` and drive it with `pwn_send`/`pwn_recv` turn-by-turn (each call is bounded), then confirm with `pwn_reproduce`. Use bash only to compute payload bytes."
+    : "[hint] This command blocked on an interactive connection and was killed at the timeout. Do NOT rewrite the whole script. Run the interactive exploit under `shell_background` and poll with `shell_job` so a stall costs one bounded poll, not the whole command budget; keep foreground bash for short computation and single bounded probes only.";
+}
+
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createBashTool<CodingResourceContext>();
   return {
@@ -674,7 +705,11 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const notice = await context.evidenceCurationGate?.checkpointNotice();
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
-        throw new Error([visible, ...anchor, ...(notice ? [notice] : [])].join("\n\n"), { cause: error });
+        // A timeout on an interactive exploit is the #1 pwn stall: the command
+        // blocked on recv and was killed at the ceiling. Instead of a bare
+        // "timed out" that invites a full script rewrite, name the fix directly.
+        const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
+        throw new Error([visible, ...(hint ? [hint] : []), ...anchor, ...(notice ? [notice] : [])].join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");

@@ -20,6 +20,9 @@ import type {
   ReasoningEdge,
   ReasoningNode,
   ReasoningTree,
+  WorkItem,
+  RequestEpoch,
+  SessionRecord,
 } from "../domain/types.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
@@ -68,7 +71,23 @@ export type DomainCommand =
   | { type: "handoff_accepted"; handoffId: string; lane?: Lane }
   | { type: "handoff_superseded"; handoffId: string; reason: string; lane?: Lane }
   | { type: "handoff_rejected"; handoffId: string; reason: string; lane?: Lane }
+  | { type: "work_item_created"; workItem: Omit<WorkItem, "createdSeq" | "updatedSeq">; lane?: Lane }
+  | { type: "work_item_ready"; workItemId: string; lane?: Lane }
+  | { type: "work_item_claimed"; workItemId: string; ownerLane: Lane; leaseExpiresAt: string; lane?: Lane }
+  | { type: "work_item_blocked"; workItemId: string; reason: string; lane?: Lane }
+  | { type: "work_item_completed"; workItemId: string; evidenceIds?: string[]; artifactIds?: string[]; lane?: Lane }
+  | { type: "work_item_failed"; workItemId: string; reason: string; lane?: Lane }
+  | { type: "work_item_cancelled"; workItemId: string; reason: string; lane?: Lane }
+  | { type: "work_item_superseded"; workItemId: string; reason: string; lane?: Lane }
+  | { type: "request_epoch_started"; epoch: Omit<RequestEpoch, "createdSeq" | "updatedSeq">; lane?: Lane }
+  | { type: "session_opened"; session: Omit<SessionRecord, "createdSeq" | "updatedSeq" | "status" | "interactions"> & { interactions?: number }; lane?: Lane }
+  | { type: "session_interacted"; sessionId: string; waitReason?: SessionRecord["lastWaitReason"]; transcriptArtifactId?: string; stateHash?: string; exited?: boolean; exitCode?: number | null; lane?: Lane }
+  | { type: "session_signaled"; sessionId: string; signal: string; delivered?: boolean; lane?: Lane }
+  | { type: "session_closed"; sessionId: string; reason?: string; exitCode?: number | null; lane?: Lane }
+  | { type: "session_superseded"; sessionId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
+
+type WorkItemCommand = Extract<DomainCommand, { type: `work_item_${string}` }>;
 
 export class ControlStore {
   private readonly operations = new KeyedOperationQueue();
@@ -209,6 +228,20 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "handoff_accepted": return "handoff_accepted";
     case "handoff_superseded": return "handoff_superseded";
     case "handoff_rejected": return "handoff_rejected";
+    case "work_item_created": return "work_item_created";
+    case "work_item_ready": return "work_item_ready";
+    case "work_item_claimed": return "work_item_claimed";
+    case "work_item_blocked": return "work_item_blocked";
+    case "work_item_completed": return "work_item_completed";
+    case "work_item_failed": return "work_item_failed";
+    case "work_item_cancelled": return "work_item_cancelled";
+    case "work_item_superseded": return "work_item_superseded";
+    case "request_epoch_started": return "request_epoch_started";
+    case "session_opened": return "session_opened";
+    case "session_interacted": return "session_interacted";
+    case "session_signaled": return "session_signaled";
+    case "session_closed": return "session_closed";
+    case "session_superseded": return "session_superseded";
     case "context_recovery": return "context_overflow_recovered";
   }
 }
@@ -261,6 +294,20 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "handoff_accepted": return { handoffId: command.handoffId };
     case "handoff_superseded": return { handoffId: command.handoffId, reason: command.reason };
     case "handoff_rejected": return { handoffId: command.handoffId, reason: command.reason };
+    case "work_item_created": return { workItem: { ...command.workItem, createdSeq: seq, updatedSeq: seq } };
+    case "work_item_ready": return { workItemId: command.workItemId };
+    case "work_item_claimed": return { workItemId: command.workItemId, ownerLane: command.ownerLane, leaseExpiresAt: command.leaseExpiresAt, acquiredAt: new Date().toISOString() };
+    case "work_item_blocked": return { workItemId: command.workItemId, reason: command.reason };
+    case "work_item_completed": return { workItemId: command.workItemId, evidenceIds: command.evidenceIds ?? [], artifactIds: command.artifactIds ?? [] };
+    case "work_item_failed": return { workItemId: command.workItemId, reason: command.reason };
+    case "work_item_cancelled": return { workItemId: command.workItemId, reason: command.reason };
+    case "work_item_superseded": return { workItemId: command.workItemId, reason: command.reason };
+    case "request_epoch_started": return { epoch: { ...command.epoch, createdSeq: seq, updatedSeq: seq } };
+    case "session_opened": return { session: { ...command.session, status: "OPEN", interactions: command.session.interactions ?? 0, createdSeq: seq, updatedSeq: seq } };
+    case "session_interacted": return { sessionId: command.sessionId, waitReason: command.waitReason, transcriptArtifactId: command.transcriptArtifactId, stateHash: command.stateHash, exited: command.exited, exitCode: command.exitCode };
+    case "session_signaled": return { sessionId: command.sessionId, signal: command.signal, delivered: command.delivered ?? false };
+    case "session_closed": return { sessionId: command.sessionId, reason: command.reason, exitCode: command.exitCode };
+    case "session_superseded": return { sessionId: command.sessionId, reason: command.reason };
     case "context_recovery": return { checkpointId: command.checkpointId };
   }
 }
@@ -284,6 +331,8 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
   if (command.type === "reasoning_node") validateReasoningNode(snapshot, command.node);
   if (command.type === "reasoning_edge") validateReasoningEdge(snapshot, command.edge);
   if (command.type === "reasoning_tree") validateReasoningTree(snapshot, command.tree);
+  if (command.type.startsWith("work_item_")) validateWorkItemCommand(snapshot, command as WorkItemCommand);
+  if (command.type === "request_epoch_started") validateRequestEpochCommand(snapshot, command);
   if ((command.type === "job_queued" || command.type === "job_queued_legacy") && snapshot.status !== "CREATED" && ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
     throw new Error(`Cannot queue a job for terminal run ${snapshot.status}`);
   }
@@ -357,6 +406,83 @@ function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<Artifact
   ]);
   const missing = semantic.relatedIds.filter((id) => !known.has(id));
   if (missing.length > 0) throw new Error(`Unknown related ids: ${missing.join(", ")}`);
+}
+
+function validateWorkItemCommand(snapshot: RunSnapshot, command: WorkItemCommand): void {
+  if (isTerminal(snapshot.status)) throw new Error(`Cannot mutate work graph for terminal run ${snapshot.status}`);
+  if (command.type === "work_item_created") {
+    const item = command.workItem;
+    if (snapshot.workItems[item.id]) throw new Error(`Work item already exists: ${item.id}`);
+    if (item.runId !== snapshot.runId) throw new Error(`Work item run identity mismatch: ${item.id}`);
+    if (!item.title.trim() || !item.objective.trim()) throw new Error("Work item title and objective are required");
+    if (!(["planner", "researcher", "coder", "executor", "verifier"] as string[]).includes(item.role)) throw new Error(`Unknown work item role: ${String(item.role)}`);
+    if (!["PLANNED", "READY"].includes(item.status)) throw new Error(`New work item must be PLANNED or READY, got ${item.status}`);
+    if (!Number.isInteger(item.attempt) || item.attempt < 0 || !Number.isInteger(item.maxAttempts) || item.maxAttempts < 1 || item.attempt > item.maxAttempts) throw new Error("Invalid work item attempt budget");
+    if (item.parentId !== undefined && !snapshot.workItems[item.parentId]) throw new Error(`Unknown parent work item ${item.parentId}`);
+    if (item.dependsOn.includes(item.id)) throw new Error(`Work item cannot depend on itself: ${item.id}`);
+    for (const dependency of item.dependsOn) {
+      if (!snapshot.workItems[dependency]) throw new Error(`Unknown work item dependency ${dependency}`);
+      if (reachesWorkItem(snapshot, dependency, item.id, new Set())) throw new Error(`Work item dependency cycle involving ${item.id}`);
+    }
+    for (const evidenceId of item.evidenceIds) if (!snapshot.evidence[evidenceId]) throw new Error(`Unknown work item evidence ${evidenceId}`);
+    for (const artifactId of item.artifactIds) if (!snapshot.artifacts[artifactId]) throw new Error(`Unknown work item artifact ${artifactId}`);
+    if (item.status === "READY" && !dependenciesSucceeded(snapshot, item.dependsOn)) throw new Error(`Work item dependencies are not complete: ${item.id}`);
+    return;
+  }
+
+  const item = snapshot.workItems[command.workItemId];
+  if (!item) throw new Error(`Unknown work item ${command.workItemId}`);
+  const lane = command.lane ?? "main";
+  if (command.type === "work_item_ready") {
+    if (item.status !== "PLANNED" && item.status !== "BLOCKED") throw new Error(`Cannot ready work item in ${item.status}`);
+    if (item.attempt >= item.maxAttempts) throw new Error(`Work item attempt budget exhausted: ${item.id}`);
+    if (!dependenciesSucceeded(snapshot, item.dependsOn)) throw new Error(`Work item dependencies are not complete: ${item.id}`);
+    return;
+  }
+  if (command.type === "work_item_claimed") {
+    if (lane !== command.ownerLane) throw new Error("Work item claim lane must match ownerLane");
+    const expired = !item.lease || Date.parse(item.lease.expiresAt) <= Date.now();
+    if (item.status === "RUNNING" && !expired) throw new Error(`Work item lease is still active: ${item.id}`);
+    if (item.status !== "READY" && !(item.status === "RUNNING" && expired)) throw new Error(`Cannot claim work item in ${item.status}`);
+    if (item.attempt >= item.maxAttempts) throw new Error(`Work item attempt budget exhausted: ${item.id}`);
+    if (!Number.isFinite(Date.parse(command.leaseExpiresAt))) throw new Error("Work item lease expiry must be an ISO timestamp");
+    return;
+  }
+  if (command.type === "work_item_blocked" || command.type === "work_item_completed" || command.type === "work_item_failed") {
+    if (item.status !== "RUNNING") throw new Error(`Cannot transition work item in ${item.status}`);
+    if (item.ownerLane !== lane) throw new Error(`Work item ownership mismatch: ${item.id}`);
+  }
+  if (command.type === "work_item_completed") {
+    for (const evidenceId of command.evidenceIds ?? []) if (!snapshot.evidence[evidenceId]) throw new Error(`Unknown work item evidence ${evidenceId}`);
+    for (const artifactId of command.artifactIds ?? []) if (!snapshot.artifacts[artifactId]) throw new Error(`Unknown work item artifact ${artifactId}`);
+  }
+  if (command.type === "work_item_cancelled" || command.type === "work_item_superseded") {
+    if (["SUCCEEDED", "FAILED", "CANCELLED", "SUPERSEDED"].includes(item.status)) throw new Error(`Cannot transition work item in ${item.status}`);
+    if (item.status === "RUNNING" && item.ownerLane !== lane && lane !== "main") throw new Error(`Work item ownership mismatch: ${item.id}`);
+  }
+}
+
+function validateRequestEpochCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "request_epoch_started" }>): void {
+  if (isTerminal(snapshot.status)) throw new Error(`Cannot start a request epoch for terminal run ${snapshot.status}`);
+  const epoch = command.epoch;
+  if (snapshot.requestEpochs[epoch.id]) throw new Error(`Request epoch already exists: ${epoch.id}`);
+  if (epoch.runId !== snapshot.runId) throw new Error(`Request epoch run identity mismatch: ${epoch.id}`);
+  if (!epoch.requestId.trim() || !epoch.provider.trim() || !epoch.model.trim() || !epoch.adapter.trim()) throw new Error("Request epoch identity fields are required");
+  if (epoch.status !== "STARTED") throw new Error(`New request epoch must be STARTED, got ${epoch.status}`);
+  if (!Number.isFinite(Date.parse(epoch.createdAt))) throw new Error("Request epoch createdAt must be an ISO timestamp");
+  if (epoch.parentEpochId !== undefined && !snapshot.requestEpochs[epoch.parentEpochId]) throw new Error(`Unknown parent request epoch ${epoch.parentEpochId}`);
+  if (new Set(epoch.toolNames).size !== epoch.toolNames.length) throw new Error("Request epoch toolNames must be unique");
+}
+
+function dependenciesSucceeded(snapshot: RunSnapshot, dependencies: string[]): boolean {
+  return dependencies.every((dependency) => snapshot.workItems[dependency]?.status === "SUCCEEDED");
+}
+
+function reachesWorkItem(snapshot: RunSnapshot, fromId: string, targetId: string, seen: Set<string>): boolean {
+  if (fromId === targetId) return true;
+  if (seen.has(fromId)) return false;
+  seen.add(fromId);
+  return (snapshot.workItems[fromId]?.dependsOn ?? []).some((dependency) => reachesWorkItem(snapshot, dependency, targetId, seen));
 }
 
 export function createEffectInput(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string } {

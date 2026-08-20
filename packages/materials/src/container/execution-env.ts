@@ -26,6 +26,16 @@ export class ContainerExecutionEnv extends NodeExecutionEnv implements Execution
     super({ cwd: hostCwd });
   }
 
+  /** The container runtime backing this env — used to build a pwn SessionRegistry. */
+  public get containerRuntime(): ContainerRuntimePort {
+    return this.runtime;
+  }
+
+  /** The container this env executes in — provides the generation for sessions. */
+  public get containerRef(): ContainerRef {
+    return this.ref;
+  }
+
   public override async exec(command: string, options: ShellExecOptions = {}): Promise<Result<{ stdout: string; stderr: string; exitCode: number }, ExecutionError>> {
     try {
       const result = await this.runtime.exec(this.ref, command, {

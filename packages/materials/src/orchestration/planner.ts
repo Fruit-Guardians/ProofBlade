@@ -12,7 +12,28 @@ export class PlannerCoordinator {
   public constructor(private readonly controlStore: ControlStore) {}
 
   public async prepare(runId: string): Promise<HandoffRecord> {
-    const snapshot = await this.controlStore.snapshot(runId);
+    let snapshot = await this.controlStore.snapshot(runId);
+    const hasActiveWork = Object.values(snapshot.workItems).some((item) => ["PLANNED", "READY", "RUNNING", "BLOCKED"].includes(item.status));
+    if (!hasActiveWork) {
+      await this.controlStore.dispatch(runId, {
+        type: "work_item_created",
+        workItem: {
+          id: id("WI"),
+          runId,
+          title: "Advance the current target investigation",
+          objective: snapshot.task.objective,
+          role: "executor",
+          status: "READY",
+          dependsOn: [],
+          evidenceIds: [],
+          artifactIds: [],
+          attempt: 0,
+          maxAttempts: 3,
+        },
+        lane: "planner",
+      });
+      snapshot = await this.controlStore.snapshot(runId);
+    }
     const currentVersion = handoffKnowledgeVersion(snapshot);
     const active = Object.values(snapshot.handoffs)
       .filter((handoff) => handoff.status === "PROPOSED" || handoff.status === "ACCEPTED")

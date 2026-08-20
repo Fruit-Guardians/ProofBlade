@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-12T16:30:00+08:00",
+  "updatedAt": "2026-08-20T12:15:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -175,6 +175,33 @@
       ]
     },
     {
+      "id": "PLAN-220",
+      "title": "可重放 Work Graph 与 CTF 编排纵向切片",
+      "status": "in_progress",
+      "priority": "P0",
+      "milestone": "Milestone 2 / 5",
+      "owner": "unassigned",
+      "progress": 45,
+      "updatedAt": "2026-08-20T12:15:00+08:00",
+      "objective": "把 Planner、Coding/Web/Pwn 执行和验证之间的工作边界落到现有 Control Store，使并行解题可认领、可阻塞、可重规划、可恢复且不重复跑偏。",
+      "deliverables": [
+        "WorkItem 状态机、依赖校验和可重放租约事件",
+        "Planner Handoff 携带 WorkItem，并将工作图纳入知识版本哈希",
+        "Competition/Coding Loop 的 claim、replan block、complete/fail 生命周期",
+        "RequestEpoch、领域阶段和 Web/Pwn 结构化工具的后续接入契约"
+      ],
+      "acceptance": [
+        "同一 Run 的 WorkItem 事件重放后 projection hash 稳定",
+        "活动租约阻止重复 claim，过期租约可被恢复流程重新认领",
+        "工作图变化会使旧 Handoff 失效并生成新的结构化动作",
+        "Competition Loop 在成功、阻塞、Provider 失败和耗尽路径都留下明确 WorkItem 终态"
+      ],
+      "dependencies": [
+        "PLAN-110",
+        "PLAN-120"
+      ]
+    },
+    {
       "id": "PLAN-210",
       "title": "Planner 与 Executor 双模型会话",
       "status": "blocked",
@@ -204,6 +231,53 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260820-002",
+      "occurredAt": "2026-08-20T12:15:00+08:00",
+      "summary": "为 Provider 请求建立可重放 RequestEpoch 审计骨架，并绑定现有调度与上下文哈希。",
+      "branch": "codex/request-epoch-audit",
+      "commit": "self",
+      "planIds": [
+        "PLAN-220",
+        "PLAN-120"
+      ],
+      "changes": [
+        "RunSnapshot 新增 requestEpochs Projection，记录 provider/model/adapter、工具目录、上下文、stable prefix 和 request body 哈希",
+        "新增 request_epoch_started/request_epoch_context 事件，Provider queue/slot/response/usage/cancel 事件携带 epochId",
+        "Reducer 根据响应、完成、失败和取消推进 Epoch 状态，并保持旧版无 epoch 事件兼容",
+        "Solver/Coding lane 向观测层提供 contextWindow、system prompt、tool catalog 和 active tool names 哈希输入",
+        "增加 RequestEpoch replay、上下文哈希、乱序调度完成状态回归测试"
+      ],
+      "validation": [
+        "npm run build：通过",
+        "Materials 全量测试：298/298 passed",
+        "project report check、CI gates：通过"
+      ]
+    },
+    {
+      "id": "UPDATE-20260820-001",
+      "occurredAt": "2026-08-20T11:30:00+08:00",
+      "summary": "吸收 DeepSeek Harness 与 PentAGI 的可复用经验，实施 ProofBlade 的 Work Graph 第一条纵向切片。",
+      "branch": "codex/work-graph-vertical-slice",
+      "commit": "self",
+      "planIds": [
+        "PLAN-220",
+        "PLAN-110",
+        "PLAN-210"
+      ],
+      "changes": [
+        "在现有 Control Store/JSONL Projection 中增加 WorkItem 状态、依赖、租约、尝试次数和证据引用，不引入第二套任务真相",
+        "新增 work_item_created/ready/claimed/blocked/completed/failed/cancelled/superseded 事件及状态、所有权和依赖校验",
+        "Planner 首次准备时建立可恢复执行项，Handoff action 绑定 workItemId，知识版本哈希包含工作图",
+        "Competition Loop 每个 Provider turn 认领执行项，护栏触发时原子地阻塞旧项并创建重规划项，成功/失败/审批等待均持久化",
+        "补充 Work Graph replay、lease gate、重规划和 Handoff 绑定回归测试"
+      ],
+      "validation": [
+        "npm run build --workspace=@proofblade/materials",
+        "control-store.test.ts 与 handoff.test.ts：6/6 passed",
+        "competition-solver.test.ts、control-store.test.ts、handoff.test.ts：24/24 passed"
+      ]
+    },
     {
       "id": "UPDATE-20260810-006",
       "occurredAt": "2026-08-10T18:00:00+08:00",

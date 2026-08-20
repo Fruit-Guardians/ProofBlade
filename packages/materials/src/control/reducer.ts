@@ -22,6 +22,9 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     checkpoints: {},
     jobs: {},
     handoffs: {},
+    workItems: {},
+    sessions: {},
+    requestEpochs: {},
     contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
@@ -303,21 +306,178 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       handoff.reason = typeof p.reason === "string" ? p.reason : handoff.reason;
       break;
     }
+    case "work_item_created": {
+      const item = p.workItem as RunSnapshot["workItems"][string];
+      if (!item?.id) throw new Error("work_item_created requires workItem");
+      if (next.workItems[item.id]) throw new Error(`Work item already exists: ${item.id}`);
+      next.workItems[item.id] = item;
+      break;
+    }
+    case "work_item_ready": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "READY";
+      item.ownerLane = undefined;
+      item.lease = undefined;
+      item.blockReason = undefined;
+      item.failureReason = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_claimed": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "RUNNING";
+      item.attempt += 1;
+      item.ownerLane = p.ownerLane as RunSnapshot["activeLanes"][number];
+      item.lease = {
+        ownerLane: item.ownerLane,
+        acquiredAt: String(p.acquiredAt),
+        expiresAt: String(p.leaseExpiresAt),
+        heartbeatAt: String(p.acquiredAt),
+      };
+      item.blockReason = undefined;
+      item.failureReason = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_blocked": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "BLOCKED";
+      item.blockReason = String(p.reason ?? "blocked");
+      item.lease = undefined;
+      item.ownerLane = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_completed": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "SUCCEEDED";
+      item.evidenceIds = mergeIds(item.evidenceIds, p.evidenceIds);
+      item.artifactIds = mergeIds(item.artifactIds, p.artifactIds);
+      item.lease = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_failed": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "FAILED";
+      item.failureReason = String(p.reason ?? "failed");
+      item.lease = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_cancelled": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "CANCELLED";
+      item.failureReason = String(p.reason ?? "cancelled");
+      item.lease = undefined;
+      item.ownerLane = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "work_item_superseded": {
+      const item = getWorkItem(next, String(p.workItemId));
+      item.status = "SUPERSEDED";
+      item.failureReason = String(p.reason ?? "superseded");
+      item.lease = undefined;
+      item.ownerLane = undefined;
+      item.updatedSeq = event.seq;
+      break;
+    }
+    case "session_opened": {
+      const session = p.session as RunSnapshot["sessions"][string];
+      if (!session?.id) throw new Error("session_opened requires session");
+      if (next.sessions[session.id]) throw new Error(`Session already exists: ${session.id}`);
+      next.sessions[session.id] = {
+        ...session,
+        status: "OPEN",
+        interactions: Number.isInteger(session.interactions) && session.interactions > 0 ? session.interactions : 0,
+        createdSeq: Number.isInteger(session.createdSeq) && session.createdSeq > 0 ? session.createdSeq : event.seq,
+        updatedSeq: event.seq,
+      };
+      break;
+    }
+    case "session_interacted": {
+      const session = getSession(next, String(p.sessionId));
+      if (session.status !== "OPEN") throw new Error(`Session ${session.id} is not OPEN`);
+      session.interactions += 1;
+      if (p.waitReason !== undefined) session.lastWaitReason = p.waitReason as RunSnapshot["sessions"][string]["lastWaitReason"];
+      if (p.transcriptArtifactId !== undefined) session.transcriptArtifactId = String(p.transcriptArtifactId);
+      if (p.stateHash !== undefined) session.stateHash = String(p.stateHash);
+      if (p.exited === true) {
+        session.status = "EXITED";
+        session.exitCode = p.exitCode === undefined ? null : (p.exitCode as number | null);
+      }
+      session.updatedSeq = event.seq;
+      break;
+    }
+    case "session_signaled": {
+      const session = getSession(next, String(p.sessionId));
+      if (session.status !== "OPEN") throw new Error(`Session ${session.id} is not OPEN`);
+      session.updatedSeq = event.seq;
+      break;
+    }
+    case "session_closed": {
+      const session = getSession(next, String(p.sessionId));
+      // Closing an already-exited session is legal (the process died first);
+      // only refuse to reopen a superseded session as closeable.
+      if (session.status === "SUPERSEDED") throw new Error(`Session ${session.id} was superseded`);
+      session.status = "CLOSED";
+      session.closeReason = p.reason === undefined ? undefined : String(p.reason);
+      if (p.exitCode !== undefined) session.exitCode = p.exitCode as number | null;
+      session.updatedSeq = event.seq;
+      break;
+    }
+    case "session_superseded": {
+      const session = getSession(next, String(p.sessionId));
+      session.status = "SUPERSEDED";
+      session.closeReason = String(p.reason ?? "superseded");
+      session.updatedSeq = event.seq;
+      break;
+    }
+    case "request_epoch_started": {
+      const epoch = p.epoch as RunSnapshot["requestEpochs"][string];
+      if (!epoch?.id) throw new Error("request_epoch_started requires epoch");
+      if (next.requestEpochs[epoch.id]) throw new Error(`Request epoch already exists: ${epoch.id}`);
+      next.requestEpochs[epoch.id] = {
+        ...epoch,
+        createdSeq: Number.isInteger(epoch.createdSeq) && epoch.createdSeq > 0 ? epoch.createdSeq : event.seq,
+        updatedSeq: Number.isInteger(epoch.updatedSeq) && epoch.updatedSeq > 0 ? epoch.updatedSeq : event.seq,
+      };
+      break;
+    }
+    case "request_epoch_context": {
+      const epoch = next.requestEpochs[String(p.requestEpochId)];
+      if (!epoch) break;
+      const fields = p.fields && typeof p.fields === "object" ? p.fields as Record<string, unknown> : {};
+      for (const key of ["requestBodyHash", "stablePrefixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash"] as const) {
+        if (typeof fields[key] === "string") epoch[key] = fields[key];
+      }
+      epoch.updatedSeq = event.seq;
+      break;
+    }
     case "context_overflow_recovered":
       next.contextOverflowRecoveries += 1;
       break;
     case "turn_started":
     case "assistant_message":
     case "provider_request_started":
+      updateEpochStatus(next, p, "STARTED", event.seq);
+      break;
     case "provider_request_queued":
     case "provider_request_slot_acquired":
-    case "provider_request_queue_cancelled":
     case "provider_request_retried":
-    case "provider_response_received":
     case "tool_call_recorded":
     case "tool_result_recorded":
     case "compaction_recorded":
+      break;
+    case "provider_request_queue_cancelled":
+      updateEpochStatus(next, p, "CANCELLED", event.seq);
+      break;
+    case "provider_response_received":
+      updateEpochStatus(next, p, Number(p.status) >= 400 ? "FAILED" : "RESPONSE_RECEIVED", event.seq);
+      break;
     case "model_usage":
+      updateEpochStatus(next, p, "COMPLETED", event.seq);
       break;
     default:
       throw new Error(`Unhandled event ${(event as HarnessEvent).type}`);
@@ -346,6 +506,33 @@ function getHandoff(snapshot: RunSnapshot, handoffId: string) {
   const handoff = snapshot.handoffs[handoffId];
   if (!handoff) throw new Error(`Unknown handoff ${handoffId}`);
   return handoff;
+}
+
+function getWorkItem(snapshot: RunSnapshot, workItemId: string) {
+  const item = snapshot.workItems[workItemId];
+  if (!item) throw new Error(`Unknown work item ${workItemId}`);
+  return item;
+}
+
+function getSession(snapshot: RunSnapshot, sessionId: string) {
+  const session = snapshot.sessions[sessionId];
+  if (!session) throw new Error(`Unknown session ${sessionId}`);
+  return session;
+}
+
+function updateEpochStatus(snapshot: RunSnapshot, payload: Record<string, unknown>, status: RunSnapshot["requestEpochs"][string]["status"], seq: number): void {
+  const epochId = typeof payload.epochId === "string" ? payload.epochId : undefined;
+  if (!epochId) return;
+  const epoch = snapshot.requestEpochs[epochId];
+  if (epoch) {
+    epoch.status = status;
+    epoch.updatedSeq = seq;
+  }
+}
+
+function mergeIds(existing: string[], value: unknown): string[] {
+  const additions = Array.isArray(value) ? value.map(String) : [];
+  return [...new Set([...existing, ...additions])];
 }
 
 export function projectionHash(snapshot: RunSnapshot): string {

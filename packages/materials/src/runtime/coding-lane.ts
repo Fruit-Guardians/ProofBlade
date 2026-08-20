@@ -15,7 +15,7 @@ import { prepareContextMaintenance } from "../context/maintenance-coordinator.js
 import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
-import { estimateTokens } from "../domain/utils.js";
+import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -30,13 +30,16 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { RunSnapshot, TaskContract } from "../domain/types.js";
+import type { PwnReproductionContract, RunSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
+import { SessionRegistry } from "../container/session-registry.js";
+import { PwnReproducer } from "../verification/pwn-reproducer.js";
+import { PwnToolHandler, type PwnReproductionPolicy } from "../pwn/pwn-tools.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -73,6 +76,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
+    /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
+    private readonly pwnRegistry?: SessionRegistry,
   ) {}
 
   public static async create(options: {
@@ -181,9 +186,38 @@ export class PiCodingLane implements AgentLanePort {
       // objdump-level static analysis. The mcp_call proxy is already enabled.
       { includeMcp: true },
     );
+    // When the process backend is a Docker pwn/pwn-kernel container, wire the
+    // persistent tube tools: build a SessionRegistry over that container runtime
+    // and a PwnToolHandler bound to this run. Without a container (GUI chat /
+    // NodeExecutionEnv) pwnTools stays undefined and the pwn_* tools are neither
+    // active nor callable.
+    const pwnRegistry = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
+      ? new SessionRegistry(options.runId, env.containerRuntime, options.controlStore)
+      : undefined;
+    const pwnReproductionPolicy = pwnReproductionPolicyFor(snapshot.task.verification.pwn);
+    const pwnTools = pwnRegistry
+      ? new PwnToolHandler(
+        options.runId,
+        pwnRegistry,
+        new PwnReproducer(options.controlStore),
+        () => (env as ContainerExecutionEnv).containerRef,
+        "main",
+        // Enforce the task's target boundary at the app layer too, not just the
+        // Docker egress gateway (a bridge/none policy has no gateway).
+        { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
+        pwnReproductionPolicy,
+      )
+      : undefined;
     const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
     const activeToolNames = [
-      ...codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers], platformJudged }),
+      ...codingActiveToolNames({
+        tools: enabledTools,
+        skills: [...enabledSkills],
+        mcpServers: [...enabledMcpServers],
+        platformJudged,
+        pwnEnabled: Boolean(pwnTools),
+        pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
+      }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
     const submitFlag = platformJudged
@@ -208,6 +242,7 @@ export class PiCodingLane implements AgentLanePort {
       evidenceGraph,
       evidenceCurationGate,
       runtime,
+      ...(pwnTools ? { pwnTools } : {}),
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
@@ -225,6 +260,8 @@ export class PiCodingLane implements AgentLanePort {
         maxSubmissions: snapshot.task.constraints.max_submissions,
         targetKind: snapshot.task.target_kind,
         target: snapshot.task.target,
+        pwnToolsAvailable: Boolean(pwnTools),
+        pwnReproductionAvailable: Boolean(pwnTools && pwnReproductionPolicy),
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
@@ -268,6 +305,12 @@ export class PiCodingLane implements AgentLanePort {
       runId: options.runId,
       lane: "main",
       controlStore: options.controlStore,
+      requestContext: {
+        contextWindow: profile.contextWindow,
+        systemPromptHash: sha256(stableSystemPrompt),
+        toolCatalogHash: sha256(canonicalJson(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
+        toolNames: activeToolNames,
+      },
       scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
@@ -296,6 +339,7 @@ export class PiCodingLane implements AgentLanePort {
         }
         return undefined;
       },
+      pwnRegistry,
     );
   }
 
@@ -368,6 +412,11 @@ export class PiCodingLane implements AgentLanePort {
       await this.harness.waitForIdle();
     } finally {
       try {
+        // Tear down live pwn tube sessions first: their docker-exec children are
+        // host processes that would otherwise outlive the lane, and the durable
+        // sessions would stay OPEN until the container is destroyed. Best-effort
+        // so a session cleanup failure never blocks the rest of teardown.
+        if (this.pwnRegistry) await this.pwnRegistry.disposeAll("lane shutdown").catch(() => undefined);
         await this.env.cleanup();
       } finally {
         try {
@@ -502,13 +551,28 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
   return output;
 }
 
+function pwnReproductionPolicyFor(contract: PwnReproductionContract | undefined): PwnReproductionPolicy | undefined {
+  if (!contract || contract.target.command.length === 0 || !contract.flag_path || !contract.flag_pattern) return undefined;
+  const target = contract.target.kind === "remote"
+    ? contract.target.endpoint
+      ? { kind: "remote" as const, command: [...contract.target.command], endpoint: contract.target.endpoint }
+      : undefined
+    : { kind: "local" as const, command: [...contract.target.command] };
+  if (!target) return undefined;
+  return {
+    target,
+    flagPath: contract.flag_path,
+    flagPattern: contract.flag_pattern,
+  };
+}
+
 function codingSystemPrompt(
   skills: Array<{ name: string; description: string; content: string }>,
   mcpServers: Array<{ name: string; description: string }>,
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -537,7 +601,7 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target);
+  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
   return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
@@ -555,14 +619,23 @@ function codingSystemPrompt(
  *   parser that never matches. State the rule once, up-front: capture bytes
  *   from actual recv output, never transcribe non-ASCII prompt text by hand.
  */
-export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string): string {
+export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable = pwnToolsAvailable): string {
   if (!kind || kind === "unknown") return "";
   const remote = typeof target === "string" && target.startsWith("REMOTE:") ? target.slice("REMOTE:".length).trim() : undefined;
   const remoteBlock = remote ? `\nLive target: ${remote}. The container's egress gateway already permits that host/port; other outbound network is denied by policy, not by a broken tool, so do not retry the same request against a different upstream when it is refused.` : "";
   if (kind === "pwn") {
+    // The single biggest source of lost pwn turns is running an interactive
+    // exploit as ONE foreground `bash` call: recvuntil/interactive blocks, the
+    // command hits the hard timeout, is killed, and the model rewrites the whole
+    // script and blocks again. State the interaction model up front so the
+    // exploit is driven turn-by-turn, not one monolithic blocking script.
+    const interactionRule = pwnToolsAvailable
+      ? `- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with \`pwn_open\` (kind=remote, endpoint=host:port for an \`nc\` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with \`pwn_send\` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and \`pwn_recv\` (until=<anchor>). This is how you avoid the #1 pwn failure: a full \`from pwn import *\` script run in one \`bash\` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection.${pwnReproductionAvailable ? " Confirm a solve with \`pwn_reproduce\` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell." : " The immutable task verifier is not configured for \`pwn_reproduce\`; validate the exploit through the live session and submit through the platform workflow."}`
+      : "- INTERACTION MODEL — never hold a live interactive connection inside one foreground `bash` call: an exploit that calls `recvuntil`/`interactive`/`p.recv()` will block until the command timeout kills it, and rewriting the whole script and re-running it is the #1 way pwn turns are lost. Run any long or interactive exploit under `shell_background` and poll with `shell_job`, so a stall costs one bounded poll instead of the whole command budget. Keep each foreground `bash` short: compute offsets/gadgets/payloads, do a single bounded probe (`timeout 20 python solve.py`), inspect, iterate — do not launch the full interactive solve in the foreground.";
     return [
       "\n\n## Pwn category specifics",
-      "- `pwntools`, `pwncli`, `gdb`, `gdb-multiarch`, `qemu-user`, `patchelf`, `ropgadget`, and `one_gadget` are already installed. Use `from pwn import *` directly. `context.log_level = 'debug'` when protocol sync is unclear.",
+      "- `pwntools`, `pwncli`, `gdb`, `gdb-multiarch`, `qemu-user`, `patchelf`, `ropgadget`, and `one_gadget` are already installed. `context.log_level = 'debug'` when protocol sync is unclear.",
+      interactionRule,
       "- Always run `file` and `checksec` on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
       "- Chinese CTF services often speak GBK, not UTF-8. Never hand-type non-ASCII prompt bytes into a script from what you see in a tool-result echo, because that echo has already been round-tripped through a locale that may not match the wire. Instead: (1) do one probe run, save `p.recv(4096)` to a file, (2) inspect the raw bytes with `xxd`, (3) reference those exact bytes in your parser (`recvuntil(b\"\\xc7\\xeb\\xd1\\xa1\\xd4\\xf1...\")` or a stable ASCII substring/suffix that co-occurs with the prompt). If the banner is confusing, decode with `.decode('gbk', errors='replace')` and `.decode('utf-8', errors='replace')` side by side — whichever produces readable Chinese is the wire encoding, and encoding future sends with the same codec is mandatory.",
       "- Prefer stable synchronization anchors that appear in a single state, not generic suffixes like `b': '` that appear in every prompt. Log the step name, timeout, and last received bytes on every failed recv so a stall is legible.",

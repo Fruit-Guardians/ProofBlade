@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -12,10 +12,41 @@ import type {
   ContainerDoctorReport,
   ContainerRef,
   ContainerRuntimePort,
+  ContainerSessionHandle,
+  ContainerSessionOpenOptions,
+  ContainerSessionReadOptions,
+  ContainerSessionResult,
   ContainerTarget,
 } from "./contracts.js";
 
 const PROCESS_STARTED_AT = Date.now() - Math.floor(process.uptime() * 1000);
+
+/**
+ * Ceiling on the UNREAD accumulator. New output is buffered here until the next
+ * read drains it; if the model never reads and a process floods, we drop the
+ * OLDEST unread bytes (prompts/anchors are usually near the tail) and flag it.
+ * This is intentionally NOT a scrollback cursor: the delta returned to a read is
+ * exactly the bytes accumulated since the previous read, so a session that has
+ * already produced >256 KiB still delivers each new byte instead of returning
+ * empty forever (the bug where buffer.length stopped changing after truncation).
+ */
+const SESSION_UNREAD_MAX = 1024 * 1024;
+const SESSION_POLL_MS = 40;
+
+interface LiveSession {
+  sessionId: string;
+  ref: ContainerRef;
+  child: ChildProcessWithoutNullStreams;
+  /** Bytes produced since the last read; drained (cleared) by each drainSession. */
+  unread: string;
+  dropped: boolean;
+  exited: boolean;
+  exitCode: number | null;
+  idleSilenceMs: number;
+  waitTimeoutMs: number;
+  /** In-container path holding the target process PID for precise signalling. */
+  pidfile: string;
+}
 
 export interface DockerProcessResult {
   stdout: string;
@@ -29,6 +60,15 @@ export interface DockerProcessResult {
 export interface DockerCommandRunner {
   run(args: string[], options?: { timeoutMs?: number; signal?: AbortSignal; maxOutputBytes?: number; stdin?: string | Uint8Array; onStdout?: (chunk: string) => void; onStderr?: (chunk: string) => void }): Promise<DockerProcessResult>;
 }
+
+/**
+ * Spawns the long-lived child for a persistent session. Injectable so tests can
+ * drive the session state machine with a real local process instead of a live
+ * `docker exec`.
+ */
+export type SessionProcessSpawner = (command: string, args: string[]) => ChildProcessWithoutNullStreams;
+
+const defaultSessionSpawner: SessionProcessSpawner = (command, args) => spawn(command, args, { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
 
 /** Direct-spawn Docker CLI runner. It never invokes a host shell and never forwards process.env. */
 export class SpawnDockerCommandRunner implements DockerCommandRunner {
@@ -88,9 +128,12 @@ export class SpawnDockerCommandRunner implements DockerCommandRunner {
 
 export class DockerContainerRuntime implements ContainerRuntimePort {
   private readonly runner: DockerCommandRunner;
+  private readonly sessions = new Map<string, LiveSession>();
+  private readonly sessionSpawner: SessionProcessSpawner;
 
-  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner) {
+  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner, sessionSpawner?: SessionProcessSpawner) {
     this.runner = runner ?? new SpawnDockerCommandRunner(config.dockerCommand);
+    this.sessionSpawner = sessionSpawner ?? defaultSessionSpawner;
   }
 
   public async doctor(profile?: ContainerRef["profile"]): Promise<ContainerDoctorReport> {
@@ -167,8 +210,31 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
       }
       const limits = request.limits;
-      const args = ["run", "-d", "--name", name, ...labels, "--user", containerUser, "--workdir", "/workspace", "--mount", `type=bind,source=${request.workspaceHostPath},destination=/workspace`, ...(request.skillLibraryHostPath ? ["--mount", `type=bind,source=${request.skillLibraryHostPath},destination=/opt/proofblade/skills,readonly`] : []), "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=1g", "--tmpfs", "/run:rw,noexec,nosuid,size=64m", "--pids-limit", String(limits?.pids ?? 512), "--cpus", limits?.cpus ?? "2", "--memory", limits?.memory ?? "4g", "--shm-size", limits?.shmSize ?? "1g", "--ulimit", "nofile=4096:4096", "--ulimit", "fsize=1073741824:1073741824", "--security-opt", "no-new-privileges", "--cap-drop", "ALL"];
-      if (request.profile === "pwn" || request.profile === "pwn-kernel") args.push("--cap-add", "SYS_PTRACE");
+      const isPwn = request.profile === "pwn" || request.profile === "pwn-kernel";
+      // Pwn tooling (pwntools cache, one_gadget cache, gdb history, and
+      // gdb.debug() exec wrappers) writes under HOME and needs an exec-capable
+      // scratch directory. A read-only rootfs otherwise makes these tools fail
+      // or silently degrade, which shows up as flaky interactive debugging. Give
+      // pwn a writable tmpfs HOME plus an exec scratch mount and drop noexec on
+      // /tmp; web keeps the tighter noexec default. The uid/gid/mode keep the
+      // mounts writable for the fixed non-root user without world access, so a
+      // challenge credential dropped there is never world-readable.
+      // Docker forces `noexec` on --tmpfs unless `exec` is passed explicitly, so
+      // pwn scratch mounts must opt back in or patched binaries and gdb.debug()
+      // exec wrappers fail with EACCES even though the file is +x.
+      const tmpfsArgs = isPwn
+        ? [
+            "--tmpfs", "/tmp:rw,exec,nosuid,size=1g",
+            "--tmpfs", "/home/ctf:rw,exec,nosuid,uid=1001,gid=1001,mode=0770,size=512m",
+            "--tmpfs", "/opt/pwn:rw,exec,nosuid,uid=1001,gid=1001,mode=0770,size=512m",
+            "--tmpfs", "/run:rw,noexec,nosuid,size=64m",
+          ]
+        : [
+            "--tmpfs", "/tmp:rw,noexec,nosuid,size=1g",
+            "--tmpfs", "/run:rw,noexec,nosuid,size=64m",
+          ];
+      const args = ["run", "-d", "--name", name, ...labels, "--user", containerUser, "--workdir", "/workspace", "--mount", `type=bind,source=${request.workspaceHostPath},destination=/workspace`, ...(request.skillLibraryHostPath ? ["--mount", `type=bind,source=${request.skillLibraryHostPath},destination=/opt/proofblade/skills,readonly`] : []), "--read-only", ...tmpfsArgs, "--pids-limit", String(limits?.pids ?? 512), "--cpus", limits?.cpus ?? "2", "--memory", limits?.memory ?? "4g", "--shm-size", limits?.shmSize ?? "1g", "--ulimit", "nofile=4096:4096", "--ulimit", "fsize=1073741824:1073741824", "--security-opt", "no-new-privileges", "--cap-drop", "ALL"];
+      if (isPwn) args.push("--cap-add", "SYS_PTRACE");
       if (request.networkPolicy === "none") args.push("--network", "none");
       else if (request.networkPolicy === "bridge") args.push("--network", "bridge");
       else if (gatewayContainerId) args.push("--network", `container:${gatewayContainerId}`);
@@ -224,12 +290,155 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode, truncated: result.truncated, durationMs: result.durationMs };
   }
 
+  public async openSession(ref: ContainerRef, options: ContainerSessionOpenOptions): Promise<ContainerSessionHandle> {
+    const cwd = containerCwd(ref.workspaceHostPath, options.cwd);
+    const env = { LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", ...options.env };
+    const sessionId = `dxs-${randomUUID()}`;
+    // Record THIS session's target pid so a later signal hits only it, never the
+    // whole container. `exec "$@"` replaces the shell so $$ (written first) is the
+    // real target pid. The pidfile path is registry-minted (no model input), and
+    // the argv is passed positionally to `sh -c` so the command cannot inject.
+    const pidfile = `/tmp/.pb-session-${sessionId}.pid`;
+    const args = ["exec", "-i", "--workdir", cwd];
+    for (const [key, value] of Object.entries(env)) args.push("--env", `${key}=${value}`);
+    // `setsid -w` runs the command as a NEW session/process-group leader (so its
+    // pid == pgid) and waits, keeping the docker-exec pipe alive. The inner shell
+    // records that leader pid ($$) before exec, so a later signal can target the
+    // whole GROUP (kill -SIG -pgid) and reach forked children — a bare pid signal
+    // would leave a fork()ed pwn/gdb child alive holding stdin. Pipe stdio has no
+    // controlling terminal, so the setsid detach is harmless. Args are positional
+    // so the command cannot inject into the wrapper.
+    args.push(ref.containerId, "setsid", "-w", "/bin/sh", "-c", 'echo $$ > "$1"; shift 2; exec "$@"', "pb-session", pidfile, "--", ...options.command);
+    // A live session must keep stdin open and stream stdout incrementally, which
+    // SpawnDockerCommandRunner intentionally does not (it resolves on close). So
+    // this path spawns the docker CLI directly and holds the child handle.
+    const child = this.sessionSpawner(this.config.dockerCommand, args);
+    const session: LiveSession = {
+      sessionId,
+      ref,
+      child,
+      unread: "",
+      dropped: false,
+      exited: false,
+      exitCode: null,
+      idleSilenceMs: options.idleSilenceMs ?? 800,
+      waitTimeoutMs: options.waitTimeoutMs ?? 30_000,
+      pidfile,
+    };
+    const append = (chunk: Buffer): void => {
+      session.unread += chunk.toString("utf8");
+      if (session.unread.length > SESSION_UNREAD_MAX) {
+        // Drop the OLDEST unread bytes, not the newest: a prompt/anchor a reader
+        // waits for is almost always at the tail.
+        session.unread = session.unread.slice(session.unread.length - SESSION_UNREAD_MAX);
+        session.dropped = true;
+      }
+    };
+    child.stdout.on("data", append);
+    // pwntools/gdb write progress to stderr; keep a single unified stream so
+    // interaction transcripts stay in send/recv order.
+    child.stderr.on("data", append);
+    child.once("exit", (code) => { session.exited = true; session.exitCode = code; });
+    child.once("error", () => { session.exited = true; });
+    this.sessions.set(sessionId, session);
+    return { sessionId, ref };
+  }
+
+  public async sessionWrite(handle: ContainerSessionHandle, data: string | Uint8Array, options: ContainerSessionReadOptions = {}): Promise<ContainerSessionResult> {
+    const session = this.requireSession(handle);
+    if (!session.exited && session.child.stdin.writable) session.child.stdin.write(data);
+    return await this.drainSession(session, options);
+  }
+
+  public async sessionRead(handle: ContainerSessionHandle, options: ContainerSessionReadOptions = {}): Promise<ContainerSessionResult> {
+    return await this.drainSession(this.requireSession(handle), options);
+  }
+
+  public async sessionSignal(handle: ContainerSessionHandle, signal: NodeJS.Signals): Promise<boolean> {
+    const session = this.requireSession(handle);
+    if (session.exited) return false;
+    // Signal ONLY this session's recorded pid, never `kill -1` (which would hit
+    // every process the container user can reach — sibling sessions, the target,
+    // and under root far more). The pidfile was written by this session's own
+    // wrapper. Report the real result instead of swallowing failure: a missing
+    // pidfile or a kill error must surface as false, not a fake success.
+    const number = signalNumber(signal);
+    // Signal the whole process GROUP (leader pid == pgid, see openSession) with
+    // `kill -SIG -- -pgid` so forked children of the target receive it too, not
+    // just the session leader. Fall back to the bare pid if the group send fails
+    // (e.g. leader already reaped). Report the real result; never fake success.
+    const script = 'p=$(cat "$1" 2>/dev/null) || exit 3; [ -n "$p" ] || exit 3; kill -"$2" -- -"$p" 2>/dev/null || kill -"$2" "$p"';
+    const result = await this.runner.run(["exec", session.ref.containerId, "/bin/sh", "-c", script, "pb-signal", session.pidfile, String(number)], { timeoutMs: configTimeout(this.config) });
+    return !result.spawnError && result.exitCode === 0;
+  }
+
+  public async closeSession(handle: ContainerSessionHandle): Promise<{ exitCode: number | null }> {
+    const session = this.sessions.get(handle.sessionId);
+    if (!session) return { exitCode: null };
+    try { session.child.stdin.end(); } catch { /* stdin already closed */ }
+    if (!session.exited) killChild(session.child);
+    this.sessions.delete(handle.sessionId);
+    return { exitCode: session.exitCode };
+  }
+
+  private requireSession(handle: ContainerSessionHandle): LiveSession {
+    const session = this.sessions.get(handle.sessionId);
+    if (!session) throw new Error(`Unknown container session: ${handle.sessionId}`);
+    return session;
+  }
+
+  /**
+   * Wait for a readiness signal (idle silence / timeout / exit) and return the
+   * bytes accumulated in `unread` since the previous read, then clear it.  The
+   * delta is the unread accumulator, NOT a slice of a bounded scrollback, so a
+   * session that already produced megabytes still delivers each new byte.
+   */
+  private async drainSession(session: LiveSession, options: ContainerSessionReadOptions): Promise<ContainerSessionResult> {
+    const start = Date.now();
+    const idleMs = options.idleSilenceMs ?? session.idleSilenceMs;
+    const hardMs = options.waitTimeoutMs ?? session.waitTimeoutMs;
+    let lastLen = session.unread.length;
+    let lastChange = Date.now();
+    let waitReason: ContainerSessionResult["waitReason"] = "idle";
+    for (;;) {
+      if (options.signal?.aborted) { waitReason = "timeout"; break; }
+      if (session.exited) { waitReason = "exit"; break; }
+      if (Date.now() - start >= hardMs) { waitReason = "timeout"; break; }
+      if (session.unread.length !== lastLen) { lastLen = session.unread.length; lastChange = Date.now(); }
+      else if (Date.now() - lastChange >= idleMs && session.unread.length > 0) { waitReason = "idle"; break; }
+      await new Promise((resolve) => setTimeout(resolve, SESSION_POLL_MS));
+    }
+    const delta = session.unread;
+    session.unread = "";
+    const truncated = session.dropped;
+    session.dropped = false;
+    return {
+      delta,
+      waitReason,
+      exited: session.exited,
+      exitCode: session.exitCode,
+      truncated,
+    };
+  }
+
+  private closeSessionsForContainer(containerId: string): void {
+    for (const [id, session] of this.sessions) {
+      if (session.ref.containerId !== containerId) continue;
+      try { session.child.stdin.end(); } catch { /* stdin already closed */ }
+      if (!session.exited) killChild(session.child);
+      this.sessions.delete(id);
+    }
+  }
+
   public async health(ref: ContainerRef): Promise<boolean> {
     const result = await this.runner.run(["inspect", "--format", "{{.State.Running}}", ref.containerId], { timeoutMs: configTimeout(this.config) });
     return result.exitCode === 0 && result.stdout.trim() === "true";
   }
 
   public async destroy(ref: ContainerRef): Promise<void> {
+    // Kill any live docker-exec session children first so destroying the
+    // container never leaves an orphaned host process holding a pipe.
+    this.closeSessionsForContainer(ref.containerId);
     const failures = await this.cleanupResources(
       ref.containerId,
       ref.gatewayContainerId,
@@ -383,6 +592,22 @@ function assertCleanupResult(result: DockerProcessResult, command: string): void
   if (result.exitCode !== 0 && !/\b(no such|not found)\b/i.test(result.stderr || result.stdout)) {
     throw new Error(`${command} failed: ${compactError(result.stderr || result.stdout, `exit ${String(result.exitCode)}`)}`);
   }
+}
+function killChild(child: ChildProcessWithoutNullStreams): void {
+  if (process.platform === "win32" && child.pid) {
+    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true, stdio: "ignore" });
+  } else {
+    child.kill("SIGKILL");
+  }
+}
+const SIGNAL_NUMBERS: Record<string, number> = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15, SIGUSR1: 10, SIGUSR2: 12, SIGSTOP: 19, SIGCONT: 18 };
+export const SUPPORTED_SIGNALS = Object.keys(SIGNAL_NUMBERS) as NodeJS.Signals[];
+// Reject an unknown signal rather than silently defaulting to SIGTERM: a model
+// that typos SIGINT as SIGIN must not accidentally terminate the target.
+function signalNumber(signal: NodeJS.Signals): number {
+  const number = SIGNAL_NUMBERS[signal];
+  if (number === undefined) throw new Error(`Unsupported signal: ${signal}. Supported: ${SUPPORTED_SIGNALS.join(", ")}`);
+  return number;
 }
 function safeName(value: string): string { return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "run"; }
 function createOwnerToken(): string { return `${process.pid}-${Date.now()}-${randomUUID()}`; }

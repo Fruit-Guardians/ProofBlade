@@ -16,6 +16,7 @@ import { AUTOMATIC_CONTEXT_RECOVERY_PROMPT } from "../src/context/user-task-anch
 import { repairAgentMessages, toolPairViolations } from "../src/context/agent-pruner.js";
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { RunRecoveryService } from "../src/recovery/run-recovery.js";
+import { SessionRegistry } from "../src/container/session-registry.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -324,6 +325,40 @@ test("interruption 6: expired heartbeat and missing target reset lifecycle state
     assert.deepEqual(second.reconciledEffects, []);
     assert.deepEqual(second.reconciledJobs, []);
     assert.equal((await services.control.snapshot(runId)).projectionHash, stableHash);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("interruption 7: RunRecoveryService supersedes an orphaned OPEN session on restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-interrupt-session-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INTERRUPT-SESSION";
+    const task = fixtureTask(runId, "reverse-branch-2", root, config);
+    await services.control.createRun(runId, task);
+    // Simulate a prior process that opened a durable session and then died: emit
+    // session_opened directly, leaving it OPEN with no live host process.
+    await services.control.dispatch(runId, {
+      type: "session_opened",
+      session: { id: "SES-ORPH", runId, kind: "pwn-remote", ownerLane: "main", generation: 0, externalId: "dxs-dead" },
+      lane: "main",
+    });
+    assert.equal((await services.control.snapshot(runId)).sessions["SES-ORPH"]?.status, "OPEN");
+
+    // Production recovery path: a fresh registry (empty live map) is passed in, so
+    // the durably-OPEN session is recognized as an orphan and superseded.
+    const recovery = new RunRecoveryService(
+      services.control, services.journal, services.sandbox,
+      SessionRegistry.forRecovery(runId, services.control),
+    );
+    const result = await recovery.recover(runId, task);
+    assert.equal(result.supersededSessions, 1);
+    assert.equal((await services.control.snapshot(runId)).sessions["SES-ORPH"]?.status, "SUPERSEDED");
+
+    // Idempotent: a second recovery finds no orphan and supersedes nothing.
+    const again = await recovery.recover(runId, task);
+    assert.equal(again.supersededSessions, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

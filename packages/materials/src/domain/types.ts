@@ -66,6 +66,16 @@ export type ToolKind = "tool" | "interpreter" | "toolchain";
 
 export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "misc" | "mixed";
 
+export interface PwnReproductionContract {
+  target: {
+    kind: "local" | "remote";
+    command: string[];
+    endpoint?: string;
+  };
+  flag_path: string;
+  flag_pattern: string;
+}
+
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
@@ -79,6 +89,8 @@ export interface TaskContract {
     kind: "platform_submission" | "hidden_scorer" | "reproduction";
     command?: string;
     required_reproductions: number;
+    /** Task-owned inputs for barrier-gated pwn reproduction. */
+    pwn?: PwnReproductionContract;
   };
   scope: {
     allowed_hosts: string[];
@@ -224,6 +236,82 @@ export interface Intent {
   createdSeq: number;
 }
 
+/**
+ * Durable unit of work in the run's work graph.  WorkItems intentionally live
+ * in the Control Store next to intents, evidence, and effects; they are not a
+ * second scheduler database.  A lease is embedded here for the first vertical
+ * slice so claim/recovery can be replayed without consulting process memory.
+ */
+export type WorkItemStatus =
+  | "PLANNED"
+  | "READY"
+  | "RUNNING"
+  | "BLOCKED"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "CANCELLED"
+  | "SUPERSEDED";
+
+export type WorkItemRole = "planner" | "researcher" | "coder" | "executor" | "verifier";
+
+export interface WorkItem {
+  id: string;
+  runId: string;
+  parentId?: string;
+  title: string;
+  objective: string;
+  role: WorkItemRole;
+  status: WorkItemStatus;
+  dependsOn: string[];
+  evidenceIds: string[];
+  artifactIds: string[];
+  attempt: number;
+  maxAttempts: number;
+  ownerLane?: Lane;
+  lease?: {
+    ownerLane: Lane;
+    acquiredAt: string;
+    expiresAt: string;
+    heartbeatAt: string;
+  };
+  blockReason?: string;
+  failureReason?: string;
+  createdSeq: number;
+  updatedSeq: number;
+}
+
+/**
+ * A replayable description of one model request.  The request body and
+ * context are represented by hashes only; raw prompts remain in the provider
+ * boundary and are never copied into the durable control projection.
+ */
+export type RequestEpochStatus = "STARTED" | "RESPONSE_RECEIVED" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface RequestEpoch {
+  id: string;
+  requestId: string;
+  runId: string;
+  turnId?: string;
+  stepId?: string;
+  lane: Lane;
+  provider: string;
+  model: string;
+  adapter: string;
+  contextWindow?: number;
+  systemPromptHash?: string;
+  toolCatalogHash?: string;
+  toolNames: string[];
+  capabilityCatalogHash?: string;
+  contextManifestHash?: string;
+  stablePrefixHash?: string;
+  requestBodyHash?: string;
+  parentEpochId?: string;
+  status: RequestEpochStatus;
+  createdAt: string;
+  createdSeq: number;
+  updatedSeq: number;
+}
+
 export interface CompletionProposal {
   id: string;
   candidateHash: string;
@@ -268,10 +356,50 @@ export interface JobRecord {
   outputTier?: "small" | "medium" | "large";
 }
 
+/**
+ * A persistent interaction session (pwn tube / web session) modeled as durable
+ * control state.  The raw byte transcript lives in an Artifact; the model only
+ * ever sees a bounded viewport plus the artifact id.  A session is owned by a
+ * single lane and bound to a generation, so recovery can supersede sessions
+ * whose underlying host process cannot survive a restart rather than pretend to
+ * revive a dead socket.
+ */
+export type SessionKind = "pwn-local" | "pwn-remote" | "http" | "browser";
+
+export type SessionStatus = "OPEN" | "CLOSED" | "EXITED" | "ERROR" | "SUPERSEDED";
+
+export type SessionWaitReason = "idle" | "timeout" | "exit";
+
+export interface SessionRecord {
+  id: string;
+  runId: string;
+  kind: SessionKind;
+  ownerLane: Lane;
+  generation: number;
+  status: SessionStatus;
+  /** remote: host:port; http: baseUrl; browser: start URL. */
+  endpoint?: string;
+  /** Runtime handle id (e.g. the docker-exec session id) reused as JobRecord.externalId. */
+  externalId?: string;
+  /** Full transcript accumulates here; the model reads a bounded window only. */
+  transcriptArtifactId?: string;
+  /** cookie/storage/session state hash used for clean-reproduce comparison. */
+  stateHash?: string;
+  lastWaitReason?: SessionWaitReason;
+  /** Number of send/recv interactions recorded against this session. */
+  interactions: number;
+  exitCode?: number | null;
+  closeReason?: string;
+  createdSeq: number;
+  updatedSeq: number;
+}
+
 export type HandoffStatus = "PROPOSED" | "ACCEPTED" | "SUPERSEDED" | "REJECTED";
 
 export interface HandoffAction {
   id: string;
+  /** The durable WorkItem this action advances, when one exists. */
+  workItemId?: string;
   title: string;
   description: string;
   expectedEvidence: string[];
@@ -372,6 +500,9 @@ export interface RunSnapshot {
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;
   handoffs: Record<string, HandoffRecord>;
+  workItems: Record<string, WorkItem>;
+  sessions: Record<string, SessionRecord>;
+  requestEpochs: Record<string, RequestEpoch>;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
@@ -417,6 +548,21 @@ export type EventType =
   | "handoff_accepted"
   | "handoff_superseded"
   | "handoff_rejected"
+  | "work_item_created"
+  | "work_item_ready"
+  | "work_item_claimed"
+  | "work_item_blocked"
+  | "work_item_completed"
+  | "work_item_failed"
+  | "work_item_cancelled"
+  | "work_item_superseded"
+  | "session_opened"
+  | "session_interacted"
+  | "session_signaled"
+  | "session_closed"
+  | "session_superseded"
+  | "request_epoch_started"
+  | "request_epoch_context"
   | "context_overflow_recovered"
   | "completion_proposed"
   | "completion_verified"
