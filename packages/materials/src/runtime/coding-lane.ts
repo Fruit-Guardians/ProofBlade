@@ -210,7 +210,14 @@ export class PiCodingLane implements AgentLanePort {
       : undefined;
     const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
     const activeToolNames = [
-      ...codingActiveToolNames({ tools: enabledTools, skills: [...enabledSkills], mcpServers: [...enabledMcpServers], platformJudged, pwnEnabled: Boolean(pwnTools) }),
+      ...codingActiveToolNames({
+        tools: enabledTools,
+        skills: [...enabledSkills],
+        mcpServers: [...enabledMcpServers],
+        platformJudged,
+        pwnEnabled: Boolean(pwnTools),
+        pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
+      }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
     const submitFlag = platformJudged
@@ -254,6 +261,7 @@ export class PiCodingLane implements AgentLanePort {
         targetKind: snapshot.task.target_kind,
         target: snapshot.task.target,
         pwnToolsAvailable: Boolean(pwnTools),
+        pwnReproductionAvailable: Boolean(pwnTools && pwnReproductionPolicy),
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
@@ -564,7 +572,7 @@ function codingSystemPrompt(
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -593,7 +601,7 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable);
+  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
   return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
@@ -611,7 +619,7 @@ function codingSystemPrompt(
  *   parser that never matches. State the rule once, up-front: capture bytes
  *   from actual recv output, never transcribe non-ASCII prompt text by hand.
  */
-export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean): string {
+export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable = pwnToolsAvailable): string {
   if (!kind || kind === "unknown") return "";
   const remote = typeof target === "string" && target.startsWith("REMOTE:") ? target.slice("REMOTE:".length).trim() : undefined;
   const remoteBlock = remote ? `\nLive target: ${remote}. The container's egress gateway already permits that host/port; other outbound network is denied by policy, not by a broken tool, so do not retry the same request against a different upstream when it is refused.` : "";
@@ -622,7 +630,7 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
     // script and blocks again. State the interaction model up front so the
     // exploit is driven turn-by-turn, not one monolithic blocking script.
     const interactionRule = pwnToolsAvailable
-      ? "- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with `pwn_open` (kind=remote, endpoint=host:port for an `nc` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with `pwn_send` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and `pwn_recv` (until=<anchor>). This is how you avoid the #1 pwn failure: a full `from pwn import *` script run in one `bash` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection. Confirm a solve with `pwn_reproduce` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell."
+      ? `- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with \`pwn_open\` (kind=remote, endpoint=host:port for an \`nc\` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with \`pwn_send\` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and \`pwn_recv\` (until=<anchor>). This is how you avoid the #1 pwn failure: a full \`from pwn import *\` script run in one \`bash\` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection.${pwnReproductionAvailable ? " Confirm a solve with \`pwn_reproduce\` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell." : " The immutable task verifier is not configured for \`pwn_reproduce\`; validate the exploit through the live session and submit through the platform workflow."}`
       : "- INTERACTION MODEL — never hold a live interactive connection inside one foreground `bash` call: an exploit that calls `recvuntil`/`interactive`/`p.recv()` will block until the command timeout kills it, and rewriting the whole script and re-running it is the #1 way pwn turns are lost. Run any long or interactive exploit under `shell_background` and poll with `shell_job`, so a stall costs one bounded poll instead of the whole command budget. Keep each foreground `bash` short: compute offsets/gadgets/payloads, do a single bounded probe (`timeout 20 python solve.py`), inspect, iterate — do not launch the full interactive solve in the foreground.";
     return [
       "\n\n## Pwn category specifics",

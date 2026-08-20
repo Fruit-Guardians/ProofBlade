@@ -549,13 +549,15 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
   // Only expose the tube tools when a Docker-backed pwn container is attached,
   // so a GUI chat run does not advertise seven tools that would fail closed.
-  if (input.pwnEnabled) active.push(...CODING_PWN_TOOL_NAMES);
+  if (input.pwnEnabled) {
+    active.push(...CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce" || input.pwnReproductionEnabled));
+  }
   if (input.platformJudged) active.push(submitFlagTool.name);
   return active;
 }

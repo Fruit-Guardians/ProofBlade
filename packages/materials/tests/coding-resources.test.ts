@@ -79,6 +79,10 @@ test("pwn guidance steers interactive work to the tube when available, backgroun
   assert.match(noTube, /shell_background/);
   assert.match(noTube, /shell_job/);
   assert.doesNotMatch(noTube, /pwn_open/);
+
+  const noVerifier = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true, false);
+  assert.match(noVerifier, /immutable task verifier is not configured/);
+  assert.doesNotMatch(noVerifier, /Confirm a solve with `pwn_reproduce`/);
 });
 
 test("a timed-out interactive bash command yields a targeted remediation hint", () => {

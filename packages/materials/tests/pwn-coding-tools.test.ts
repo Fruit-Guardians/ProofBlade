@@ -88,8 +88,11 @@ test("pwn coding tools expose a stable, complete tool set", () => {
 test("pwn tools are active only when a container-backed handler is present", () => {
   const base = { tools: ["bash"], skills: [], mcpServers: [] };
   assert.equal(codingActiveToolNames(base).some((n) => n.startsWith("pwn_")), false);
-  const enabled = codingActiveToolNames({ ...base, pwnEnabled: true });
+  const enabled = codingActiveToolNames({ ...base, pwnEnabled: true, pwnReproductionEnabled: true });
   for (const name of CODING_PWN_TOOL_NAMES) assert.ok(enabled.includes(name), `expected ${name} active`);
+  const withoutVerifier = codingActiveToolNames({ ...base, pwnEnabled: true });
+  for (const name of CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce")) assert.ok(withoutVerifier.includes(name), `expected ${name} active without verifier`);
+  assert.equal(withoutVerifier.includes("pwn_reproduce"), false);
 });
 
 test("pwn tools fail closed with a clear message when no container is attached", async () => {
