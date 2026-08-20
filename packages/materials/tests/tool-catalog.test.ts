@@ -75,6 +75,38 @@ test("catalog hash is order-insensitive and sensitive to content changes", async
   }
 });
 
+test("catalog hash excludes the file location: path/doc/category changes do not churn it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-path-stable-"));
+  try {
+    const base = { id: "py", name: "py", kind: "interpreter", description: "fixed python" };
+    const manifest = (tool: Record<string, unknown>) => MANIFEST([tool]);
+    // identity + description fixed; vary only path
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/one/python.exe" }));
+    const hPath1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe" }));
+    const hPath2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    assert.equal(hPath1, hPath2, "changing path alone must not change catalogHash");
+    // vary only doc
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", doc: "C:/doc/a.md" }));
+    const hDoc1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", doc: "C:/doc/b.md" }));
+    const hDoc2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    assert.equal(hDoc1, hDoc2, "changing doc alone must not change catalogHash");
+    // vary only category
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", category: "web" }));
+    const hCat1 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", category: "crypto" }));
+    const hCat2 = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    assert.equal(hCat1, hCat2, "changing category alone must not change catalogHash");
+    // changing the description (content the model sees) MUST still change it
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), manifest({ ...base, path: "C:/two/python.exe", description: "different python" }));
+    const hDesc = (await ProofBladeToolCatalogRegistry.load(root)).catalogHash();
+    assert.notEqual(hPath1, hDesc, "description change must still change catalogHash");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("promptBlock groups by kind, escapes content, and is empty for an empty catalog", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-render-"));
   try {
@@ -157,6 +189,32 @@ test("contextSnapshot returns the catalog fields for RuntimeResourceSnapshot mer
     const snapshot = registry.contextSnapshot();
     assert.equal(snapshot.toolCatalogHash, registry.catalogHash());
     assert.deepEqual(snapshot.toolCatalog, [{ id: "py", name: "py", kind: "interpreter", path: "C:/py/python.exe", description: "python" }]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("container mode suppresses the host-local catalog entirely", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-container-"));
+  try {
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), MANIFEST([
+      { id: "php", name: "php", kind: "interpreter", path: "C:/Web/php/php.exe", description: "host php" },
+    ]), "utf8");
+    const disabled = await ProofBladeToolCatalogRegistry.load(root, { container: true });
+    const emptyHash = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"; // sha256("[]")
+    assert.equal(disabled.isDisabled, true);
+    assert.equal(disabled.size, 0);
+    assert.deepEqual(disabled.list(), []);
+    assert.equal(disabled.get("php"), undefined);
+    assert.equal(disabled.promptBlock(), "");
+    assert.equal(disabled.catalogHash(), emptyHash);
+    assert.deepEqual(disabled.contextSnapshot(), { toolCatalogHash: emptyHash, toolCatalog: [] });
+    assert.deepEqual(await disabled.probe(), []);
+    // The same root WITHOUT the container flag still loads the entries.
+    const enabled = await ProofBladeToolCatalogRegistry.load(root);
+    assert.equal(enabled.isDisabled, false);
+    assert.equal(enabled.size, 1);
+    assert.notEqual(enabled.catalogHash(), emptyHash);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

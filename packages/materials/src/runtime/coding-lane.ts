@@ -20,6 +20,7 @@ import { attachPiObservability, createProviderSchedulingTelemetry } from "../obs
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
+import { ContainerExecutionEnv } from "../container/execution-env.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/evidence-graph.js";
@@ -128,8 +129,13 @@ export class PiCodingLane implements AgentLanePort {
     const mcp = McpProjectRegistry.load(installRoot);
     // Host-local tool catalog: metadata stays resident in the system prompt, the
     // same way skill/MCP metadata do. A missing or broken manifest degrades to an
-    // empty catalog (the registry surfaces a warning), never a hard failure.
-    const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot);
+    // empty catalog (the registry surfaces a warning), never a hard failure. When
+    // the lane's bash runs inside a container (executionEnv is a
+    // ContainerExecutionEnv), the host-local catalog is suppressed entirely: the
+    // host paths do not exist in the container, so injecting them would send the
+    // model chasing ENOENTs.
+    const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
+    const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
     const enabledSkills = new Set(options.capabilities?.enabledSkills ?? skills.list().map((skill) => skill.name));
     const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));

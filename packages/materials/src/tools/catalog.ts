@@ -69,14 +69,32 @@ interface RawToolEntry {
   category?: unknown;
 }
 
+export interface ToolCatalogLoadOptions {
+  /**
+   * True when the catalog is loaded for an execution environment that cannot
+   * reach the host filesystem (e.g. the competition Docker container). The
+   * catalog is host-local by definition, so in a container it must be suppressed
+   * entirely: an empty list, an empty prompt block, and the empty-catalog hash.
+   */
+  container?: boolean;
+}
+
 export class ProofBladeToolCatalogRegistry {
   private constructor(
     private readonly entries: ToolCatalogEntry[],
     public readonly diagnostics: ToolCatalogDiagnostic[],
+    /** True suppresses all host-local entries; see ToolCatalogLoadOptions.container. */
+    private readonly disabled = false,
   ) {}
 
   /** Load `tool-catalog.json` from `root`. Missing/invalid manifests degrade to empty. */
-  public static async load(root: string): Promise<ProofBladeToolCatalogRegistry> {
+  public static async load(root: string, options: ToolCatalogLoadOptions = {}): Promise<ProofBladeToolCatalogRegistry> {
+    // A container execution env cannot reach the host filesystem, so the
+    // host-local catalog is suppressed: it must never leak host paths into the
+    // system prompt of a model whose bash runs inside the container.
+    if (options.container) {
+      return new ProofBladeToolCatalogRegistry([], [], true);
+    }
     const manifestPath = join(root, TOOL_CATALOG_MANIFEST);
     const diagnostics: ToolCatalogDiagnostic[] = [];
     let parsed: { tools?: unknown } | undefined;
@@ -150,7 +168,7 @@ export class ProofBladeToolCatalogRegistry {
         description,
         ...(doc === undefined ? {} : { doc }),
         ...(category === undefined ? {} : { category }),
-        contentHash: entryContentHash({ id, name, kind, path: normalized, description, doc, category }),
+        contentHash: entryContentHash({ id, name, kind, description }),
       });
     }
     entries.sort((a, b) => a.id.localeCompare(b.id));
@@ -159,10 +177,12 @@ export class ProofBladeToolCatalogRegistry {
   }
 
   public list(): ToolCatalogEntry[] {
+    if (this.disabled) return [];
     return [...this.entries];
   }
 
   public get(id: string): ToolCatalogEntry | undefined {
+    if (this.disabled) return undefined;
     return this.entries.find((entry) => entry.id === id);
   }
 
@@ -170,22 +190,28 @@ export class ProofBladeToolCatalogRegistry {
     return this.entries.length;
   }
 
-  /** Hash of the sorted list of normative entry fields. Stable across file moves. */
+  /** True when the catalog is loaded for a container execution env and suppressed. */
+  public get isDisabled(): boolean {
+    return this.disabled;
+  }
+
+  /** Hash of the sorted identity + description fields. Deliberately EXCLUDES the
+   * file location (`path`, `doc`) and the unused category so that moving a tool
+   * or upgrading its path does not churn the stable prompt prefix or the run
+   * version snapshot. See docs/tool-catalog.md. */
   public catalogHash(): string {
-    return sha256(canonicalJson(this.entries.map(({ id, name, kind, path, description, doc, category }) => ({
+    if (this.disabled) return sha256(canonicalJson([]));
+    return sha256(canonicalJson(this.entries.map(({ id, name, kind, description }) => ({
       id,
       name,
       kind,
-      path,
       description,
-      ...(doc === undefined ? {} : { doc }),
-      ...(category === undefined ? {} : { category }),
     }))));
   }
 
   /** The stable `<tool-catalog>` block injected into the coding system prompt. */
   public promptBlock(): string {
-    if (this.entries.length === 0) return "";
+    if (this.disabled || this.entries.length === 0) return "";
     const sections = new Map<string, ToolCatalogEntry[]>();
     for (const entry of this.entries) {
       const list = sections.get(entry.kind) ?? [];
@@ -212,6 +238,7 @@ export class ProofBladeToolCatalogRegistry {
 
   /** The tool fields merged into a RuntimeResourceSnapshot (ContextManifest resources). */
   public contextSnapshot(): Pick<RuntimeResourceSnapshot, "toolCatalogHash" | "toolCatalog"> {
+    if (this.disabled) return { toolCatalogHash: sha256(canonicalJson([])), toolCatalog: [] };
     return {
       toolCatalogHash: this.catalogHash(),
       toolCatalog: this.entries.map(({ id, name, kind, path, description }) => ({ id, name, kind, path, description })),
@@ -224,6 +251,7 @@ export class ProofBladeToolCatalogRegistry {
    * the stable prompt prefix. Diagnostics-only.
    */
   public async probe(): Promise<ToolCatalogDiagnostic[]> {
+    if (this.disabled) return [];
     const missing: ToolCatalogDiagnostic[] = [];
     for (const entry of this.entries) {
       try {
@@ -236,8 +264,10 @@ export class ProofBladeToolCatalogRegistry {
   }
 }
 
-function entryContentHash(fields: { id: string; name: string; kind: ToolKind; path: string; description: string; doc?: string; category?: string }): string {
-  return sha256(canonicalJson(fields));
+function entryContentHash(fields: { id: string; name: string; kind: ToolKind; description: string }): string {
+  // Identity + description only; excludes path/doc/category (see catalogHash).
+  const { id, name, kind, description } = fields;
+  return sha256(canonicalJson({ id, name, kind, description }));
 }
 
 function asNonEmptyString(value: unknown, label: string): string | undefined {
