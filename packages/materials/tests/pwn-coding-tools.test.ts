@@ -15,6 +15,12 @@ import type { CodingResourceContext } from "../src/runtime/coding-resources.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle, ContainerSessionResult } from "../src/container/contracts.js";
 
+const REPRODUCTION_POLICY = {
+  target: { kind: "remote" as const, command: ["tube"], endpoint: "1.2.3.4:1337" },
+  flagPath: "/flag",
+  flagPattern: "flag\\{[^}]+\\}",
+};
+
 const config: ProofBladeConfig = {
   schemaVersion: 1,
   runtime: { piVersion: "0.83.0" },
@@ -140,7 +146,7 @@ test("pwn_open then pwn_send route through the real handler and durable registry
     await control.createRun(runId, demoTask(runId, root, config));
     const runtime = new EchoTubeRuntime("flag{ct}", "/flag") as unknown as ContainerRuntimePort;
     const registry = new SessionRegistry(runId, runtime, control);
-    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
     const context = contextWith(handler);
 
     const opened = await toolByName("pwn_open").execute!("t1", { kind: "remote", command: ["tube"], endpoint: "1.2.3.4:1337" }, new AbortController().signal, () => {}, context);
@@ -166,12 +172,9 @@ test("pwn_reproduce routes to the barrier-gated verifier", async () => {
     await control.createRun(runId, demoTask(runId, root, config));
     const runtime = new EchoTubeRuntime("flag{ct-repro}", "/flag") as unknown as ContainerRuntimePort;
     const registry = new SessionRegistry(runId, runtime, control);
-    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
     const result = await toolByName("pwn_reproduce").execute!("t1", {
       stages: [{ name: "trigger", send: "payload", line: true, expect: "payload" }],
-      flagPath: "/flag",
-      flagPattern: "flag\\{[^}]+\\}",
-      target: { kind: "remote", command: ["tube"], endpoint: "1.2.3.4:1337" },
     }, new AbortController().signal, () => {}, contextWith(handler));
     assert.equal(result.isError, false);
     assert.equal((result.details as { reproduced: boolean; flag?: string }).reproduced, true);
@@ -179,4 +182,9 @@ test("pwn_reproduce routes to the barrier-gated verifier", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("pwn_reproduce schema exposes stages only", () => {
+  const schema = toolByName("pwn_reproduce").parameters as { properties: Record<string, unknown> };
+  assert.deepEqual(Object.keys(schema.properties), ["stages"]);
 });

@@ -66,6 +66,16 @@ export type ToolKind = "tool" | "interpreter" | "toolchain";
 
 export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "misc" | "mixed";
 
+export interface PwnReproductionContract {
+  target: {
+    kind: "local" | "remote";
+    command: string[];
+    endpoint?: string;
+  };
+  flag_path: string;
+  flag_pattern: string;
+}
+
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
@@ -79,6 +89,8 @@ export interface TaskContract {
     kind: "platform_submission" | "hidden_scorer" | "reproduction";
     command?: string;
     required_reproductions: number;
+    /** Task-owned inputs for barrier-gated pwn reproduction. */
+    pwn?: PwnReproductionContract;
   };
   scope: {
     allowed_hosts: string[];

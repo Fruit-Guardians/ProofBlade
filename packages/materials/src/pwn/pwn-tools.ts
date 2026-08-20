@@ -3,7 +3,7 @@ import type { ContainerRef } from "../container/contracts.js";
 import type { SessionRegistry } from "../container/session-registry.js";
 import { PwnSession } from "./pwn-session.js";
 import { appendByte } from "./bytes.js";
-import type { PwnReproducer, ExploitRecipe, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
+import type { PwnReproducer, ExploitRecipe, ExploitStage, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
 
 /**
  * Model-facing bridge for pwn interaction.  The model tracks a durable session
@@ -27,6 +27,13 @@ export interface PwnOpenInput {
 export type PwnReproduceTarget =
   | { kind: "local"; command: string[] }
   | { kind: "remote"; command: string[]; endpoint: string };
+
+/** Immutable verifier inputs supplied by the task/runtime, never by the model. */
+export interface PwnReproductionPolicy {
+  target: PwnReproduceTarget;
+  flagPath: string;
+  flagPattern: string;
+}
 
 /** The task's target boundary, used to reject a model-supplied remote endpoint outside scope. */
 export interface PwnScope {
@@ -55,6 +62,7 @@ export class PwnToolHandler {
     private readonly ownerLane: Lane = "executor",
     /** Task scope; when set, a remote endpoint outside it is rejected at the app layer. */
     private readonly scope?: PwnScope,
+    private readonly reproductionPolicy?: PwnReproductionPolicy,
   ) {}
 
   public async open(input: PwnOpenInput): Promise<{ sessionId: string; kind: string; endpoint?: string }> {
@@ -111,11 +119,14 @@ export class PwnToolHandler {
 
   /**
    * Open a FRESH session and run the barrier-gated reproduce; the ONLY success
-   * path.  `reproduce.target` decides whether the clean run is local or remote,
-   * mirroring the design's local→remote clean-reproduce requirement.
+   * path. The task/runtime, rather than the model, owns the clean target and
+   * flag extraction contract.
    */
-  public async reproduce(recipe: ExploitRecipe, target: PwnReproduceTarget): Promise<PwnReproduceOutcome> {
+  public async reproduce(stages: ExploitStage[]): Promise<PwnReproduceOutcome> {
+    if (!this.reproductionPolicy) throw new Error("pwn reproduction is unavailable because this task has no immutable target and flag verifier configuration");
+    const { target, flagPath, flagPattern } = this.reproductionPolicy;
     if (target.kind === "remote") this.assertEndpointAllowed(target.endpoint);
+    const recipe: ExploitRecipe = { stages, flagPath, flagPattern };
     return await this.reproducer.reproduce(this.runId, recipe, async () => {
       const ref = this.refProvider();
       return target.kind === "local"
@@ -146,6 +157,7 @@ export class PwnToolHandler {
   }
 
   private viewport(sessionId: string, data: string, exited: boolean, matched?: boolean): PwnViewport {
+    if (exited) this.sessions.delete(sessionId);
     const truncated = data.length > VIEWPORT_MAX;
     const viewport = truncated ? `…${data.slice(-VIEWPORT_MAX)}` : data;
     return { sessionId, viewport, ...(matched !== undefined ? { matched } : {}), exited, truncated };

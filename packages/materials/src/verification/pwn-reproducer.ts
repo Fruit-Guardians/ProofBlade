@@ -143,4 +143,3 @@ function firstFailure(stages: StageResult[]): string {
   const failed = stages.find((stage) => !stage.ok);
   return failed ? `${failed.name}${failed.detail ? ` (${failed.detail})` : ""}` : "an unknown stage";
 }
-

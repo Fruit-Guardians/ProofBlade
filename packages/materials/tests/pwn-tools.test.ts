@@ -12,6 +12,12 @@ import { PwnToolHandler } from "../src/pwn/pwn-tools.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle, ContainerSessionResult } from "../src/container/contracts.js";
 
+const REPRODUCTION_POLICY = {
+  target: { kind: "remote" as const, command: ["tube"], endpoint: "10.0.0.9:1337" },
+  flagPath: "/flag",
+  flagPattern: "flag\\{[^}]+\\}",
+};
+
 const config: ProofBladeConfig = {
   schemaVersion: 1,
   runtime: { piVersion: "0.83.0" },
@@ -35,7 +41,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private pending = new Map<string, string>();
   private count = 0;
   public lastWriteBytes: Uint8Array | undefined;
-  public constructor(private readonly flag: string, private readonly flagPath: string) {}
+  public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false) {}
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
     this.pending.set(sessionId, "");
@@ -56,7 +62,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private drain(sessionId: string): ContainerSessionResult {
     const buffered = this.pending.get(sessionId) ?? "";
     this.pending.set(sessionId, "");
-    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited: false, exitCode: null, truncated: false };
+    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited: this.exitOnWrite, exitCode: this.exitOnWrite ? 0 : null, truncated: false };
   }
 }
 
@@ -65,7 +71,7 @@ async function makeHandler(root: string, runId: string, flag = "flag{tool}"): Pr
   await control.createRun(runId, demoTask(runId, root, config));
   const runtime = new EchoTubeRuntime(flag, "/flag") as unknown as ContainerRuntimePort;
   const registry = new SessionRegistry(runId, runtime, control);
-  const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+  const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
   return { handler, control };
 }
 
@@ -130,7 +136,7 @@ test("handler.reproduce runs the barrier-gated verifier on a fresh remote sessio
       flagPath: "/flag",
       flagPattern: "flag\\{[^}]+\\}",
     };
-    const outcome = await handler.reproduce(recipe, { kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const outcome = await handler.reproduce(recipe.stages);
     assert.equal(outcome.reproduced, true);
     assert.equal(outcome.flag, "flag{tool-repro}");
     const snap = await control.snapshot("PWN-TOOL-REPRO");
@@ -148,14 +154,14 @@ test("reproduce stage replays exact binary bytes via base64 (0x00/0xff)", async 
     await control.createRun(runId, demoTask(runId, root, config));
     const runtime = new EchoTubeRuntime("flag{bin}", "/flag");
     const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
-    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
     const payloadB64 = Buffer.from([0x00, 0xff, 0x41]).toString("base64");
     const recipe: ExploitRecipe = {
       stages: [{ name: "overflow", send: payloadB64, encoding: "base64", line: true }],
       flagPath: "/flag",
       flagPattern: "flag\\{[^}]+\\}",
     };
-    await handler.reproduce(recipe, { kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await handler.reproduce(recipe.stages);
     // The last write before the shell-probe/flag stages was the base64 stage: exact bytes + LF.
     // (Later echo/cat writes overwrite lastWriteBytes, so assert the byte path worked via no throw + reproduced path.)
     assert.ok(runtime.lastWriteBytes, "a write reached the tube");
@@ -173,7 +179,10 @@ test("remote endpoint outside task scope is rejected before connecting", async (
     const runtime = new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort;
     const registry = new SessionRegistry(runId, runtime, control);
     // Scope: only 1.14.76.59 on port 23984 is allowed.
-    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", { allowedHosts: ["1.14.76.59"], allowedPorts: [23984] });
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", { allowedHosts: ["1.14.76.59"], allowedPorts: [23984] }, {
+      ...REPRODUCTION_POLICY,
+      target: { kind: "remote", command: ["tube"], endpoint: "8.8.8.8:23984" },
+    });
 
     // In-scope endpoint works.
     const ok = await handler.open({ kind: "remote", command: ["tube"], endpoint: "1.14.76.59:23984" });
@@ -184,9 +193,44 @@ test("remote endpoint outside task scope is rejected before connecting", async (
     await assert.rejects(handler.open({ kind: "remote", command: ["tube"], endpoint: "1.14.76.59:9999" }), /outside the task scope/);
     // Reproduce is gated too.
     await assert.rejects(
-      handler.reproduce({ stages: [{ name: "s", send: "x" }], flagPath: "/flag", flagPattern: "flag\\{[^}]+\\}" }, { kind: "remote", command: ["tube"], endpoint: "8.8.8.8:23984" }),
+      handler.reproduce([{ name: "s", send: "x" }]),
       /outside the task scope/,
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("reproduction refuses model-supplied verifier inputs when the task has no immutable policy", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-no-policy-"));
+  try {
+    const runId = "PWN-TOOL-NO-POLICY";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, demoTask(runId, root, config));
+    const runtime = new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+    await assert.rejects(handler.reproduce([{ name: "trigger", send: "payload" }]), /immutable target and flag verifier configuration/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("an exited tube is removed from both handler and durable live state", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-exit-"));
+  try {
+    const runId = "PWN-TOOL-EXIT";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, demoTask(runId, root, config));
+    const runtime = new EchoTubeRuntime("flag{x}", "/flag", true) as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
+    const opened = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const result = await handler.send(opened.sessionId, "exit", true);
+    assert.equal(result.exited, true);
+    assert.deepEqual(handler.list(), []);
+    await assert.rejects(handler.send(opened.sessionId, "again", true), /Unknown pwn session/);
+    assert.equal((await control.snapshot(runId)).sessions[opened.sessionId]?.status, "EXITED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

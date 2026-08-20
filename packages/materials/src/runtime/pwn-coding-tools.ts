@@ -2,7 +2,7 @@ import { Type } from "typebox";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
 import { snipText } from "@proofblade/molecules";
 import type { CodingResourceContext } from "./coding-resources.js";
-import type { PwnToolHandler, PwnReproduceTarget } from "../pwn/pwn-tools.js";
+import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import type { ExploitRecipe } from "../verification/pwn-reproducer.js";
 import { decodeBase64Strict } from "../pwn/bytes.js";
 
@@ -129,7 +129,7 @@ const pwnListTool: AgentHarnessTool<CodingResourceContext> = {
 const pwnReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "pwn_reproduce",
   label: "pwn_reproduce",
-  description: "Independently reproduce an exploit in a FRESH session. Provide the exploit as ordered stages plus the flag path and pattern. Succeeds only when a real shell echoes a unique marker AND the flag is read from that live session. This is the only way to confirm a pwn solve; proposing a recipe is not claiming a shell.",
+  description: "Independently reproduce an exploit in a FRESH session. Provide only ordered exploit stages; the target, flag path, and flag format come from immutable task configuration. Succeeds only when a real shell echoes a unique marker AND the configured flag is read from that live session.",
   parameters: Type.Object({
     stages: Type.Array(Type.Object({
       name: Type.String({ minLength: 1 }),
@@ -139,22 +139,10 @@ const pwnReproduceTool: AgentHarnessTool<CodingResourceContext> = {
       expect: Type.Optional(Type.String()),
       maxReads: Type.Optional(Type.Number({ minimum: 1, maximum: 64 })),
     }, { additionalProperties: false }), { minItems: 1, maxItems: 64 }),
-    flagPath: Type.String({ minLength: 1, description: "Path read in the live shell, e.g. /flag." }),
-    flagPattern: Type.String({ minLength: 1, maxLength: 200, description: "Regex the extracted flag must match, e.g. flag\\{[^}]+\\}. Keep it simple and anchored; pathological patterns are rejected." }),
-    target: Type.Object({
-      kind: Type.String({ enum: ["local", "remote"], description: "Where to run the clean reproduce." }),
-      command: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
-      endpoint: Type.Optional(Type.String()),
-    }, { additionalProperties: false }),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_id, params, _signal, _onUpdate, context) {
-    const input = params as { stages: ExploitRecipe["stages"]; flagPath: string; flagPattern: string; target: { kind: "local" | "remote"; command: string[]; endpoint?: string } };
-    if (input.target.kind === "remote" && !input.target.endpoint) throw new Error("pwn_reproduce remote target requires an endpoint");
-    const recipe: ExploitRecipe = { stages: input.stages, flagPath: input.flagPath, flagPattern: input.flagPattern };
-    const target: PwnReproduceTarget = input.target.kind === "remote"
-      ? { kind: "remote", command: input.target.command, endpoint: input.target.endpoint! }
-      : { kind: "local", command: input.target.command };
-    return pwnResult(await requireHandler(context).reproduce(recipe, target));
+    const input = params as { stages: ExploitRecipe["stages"] };
+    return pwnResult(await requireHandler(context).reproduce(input.stages));
   },
 };

@@ -191,6 +191,7 @@ export class SessionRegistry {
       ...(result.exited ? { exited: true, exitCode: result.exitCode ?? null } : {}),
       lane: ownerLane,
     });
+    if (result.exited) this.live.delete(sessionId);
   }
 
   private requireOwned(ownerLane: Lane, sessionId: string): LiveEntry {

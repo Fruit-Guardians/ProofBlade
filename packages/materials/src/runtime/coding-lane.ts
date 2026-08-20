@@ -30,7 +30,7 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { RunSnapshot, TaskContract } from "../domain/types.js";
+import type { PwnReproductionContract, RunSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
@@ -39,7 +39,7 @@ import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBrea
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
 import { PwnReproducer } from "../verification/pwn-reproducer.js";
-import { PwnToolHandler } from "../pwn/pwn-tools.js";
+import { PwnToolHandler, type PwnReproductionPolicy } from "../pwn/pwn-tools.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -194,6 +194,7 @@ export class PiCodingLane implements AgentLanePort {
     const pwnRegistry = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
       ? new SessionRegistry(options.runId, env.containerRuntime, options.controlStore)
       : undefined;
+    const pwnReproductionPolicy = pwnReproductionPolicyFor(snapshot.task.verification.pwn);
     const pwnTools = pwnRegistry
       ? new PwnToolHandler(
         options.runId,
@@ -204,6 +205,7 @@ export class PiCodingLane implements AgentLanePort {
         // Enforce the task's target boundary at the app layer too, not just the
         // Docker egress gateway (a bridge/none policy has no gateway).
         { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
+        pwnReproductionPolicy,
       )
       : undefined;
     const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
@@ -539,6 +541,21 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
     new Date(0).toISOString(),
   ));
   return output;
+}
+
+function pwnReproductionPolicyFor(contract: PwnReproductionContract | undefined): PwnReproductionPolicy | undefined {
+  if (!contract || contract.target.command.length === 0 || !contract.flag_path || !contract.flag_pattern) return undefined;
+  const target = contract.target.kind === "remote"
+    ? contract.target.endpoint
+      ? { kind: "remote" as const, command: [...contract.target.command], endpoint: contract.target.endpoint }
+      : undefined
+    : { kind: "local" as const, command: [...contract.target.command] };
+  if (!target) return undefined;
+  return {
+    target,
+    flagPath: contract.flag_path,
+    flagPattern: contract.flag_pattern,
+  };
 }
 
 function codingSystemPrompt(
