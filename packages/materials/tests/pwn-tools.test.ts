@@ -41,6 +41,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private pending = new Map<string, string>();
   private count = 0;
   public lastWriteBytes: Uint8Array | undefined;
+  public closed: string[] = [];
   public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false) {}
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
@@ -58,7 +59,10 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   }
   public async sessionRead(handle: ContainerSessionHandle): Promise<ContainerSessionResult> { return this.drain(handle.sessionId); }
   public async sessionSignal(): Promise<boolean> { return true; }
-  public async closeSession(): Promise<{ exitCode: number | null }> { return { exitCode: 0 }; }
+  public async closeSession(handle: ContainerSessionHandle): Promise<{ exitCode: number | null }> {
+    this.closed.push(handle.sessionId);
+    return { exitCode: 0 };
+  }
   private drain(sessionId: string): ContainerSessionResult {
     const buffered = this.pending.get(sessionId) ?? "";
     this.pending.set(sessionId, "");
@@ -222,15 +226,18 @@ test("an exited tube is removed from both handler and durable live state", async
     const runId = "PWN-TOOL-EXIT";
     const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
     await control.createRun(runId, demoTask(runId, root, config));
-    const runtime = new EchoTubeRuntime("flag{x}", "/flag", true) as unknown as ContainerRuntimePort;
-    const registry = new SessionRegistry(runId, runtime, control);
+    const runtime = new EchoTubeRuntime("flag{x}", "/flag", true);
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
     const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor");
     const opened = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
     const result = await handler.send(opened.sessionId, "exit", true);
     assert.equal(result.exited, true);
     assert.deepEqual(handler.list(), []);
-    await assert.rejects(handler.send(opened.sessionId, "again", true), /Unknown pwn session/);
-    assert.equal((await control.snapshot(runId)).sessions[opened.sessionId]?.status, "EXITED");
+    await assert.rejects(handler.send(opened.sessionId, "again", true), /has exited/);
+    await handler.close(opened.sessionId);
+    assert.deepEqual(runtime.closed, ["dxs-1"]);
+    assert.deepEqual(await handler.close(opened.sessionId), { exitCode: null });
+    assert.equal((await control.snapshot(runId)).sessions[opened.sessionId]?.status, "CLOSED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

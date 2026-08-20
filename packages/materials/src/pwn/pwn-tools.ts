@@ -53,6 +53,8 @@ const VIEWPORT_MAX = 4_000;
 
 export class PwnToolHandler {
   private readonly sessions = new Map<string, PwnSession>();
+  private readonly exited = new Set<string>();
+  private readonly closed = new Set<string>();
 
   public constructor(
     private readonly runId: string,
@@ -72,6 +74,7 @@ export class PwnToolHandler {
       ? await PwnSession.openRemote(this.registry, { ref, ownerLane: this.ownerLane, command: input.command, endpoint: input.endpoint ?? "", ...opt(input) })
       : await PwnSession.openLocal(this.registry, { ref, ownerLane: this.ownerLane, command: input.command, ...opt(input) });
     this.sessions.set(session.sessionId, session);
+    this.closed.delete(session.sessionId);
     return { sessionId: session.sessionId, kind: input.kind, ...(input.endpoint ? { endpoint: input.endpoint } : {}) };
   }
 
@@ -106,15 +109,20 @@ export class PwnToolHandler {
   }
 
   public async close(sessionId: string): Promise<{ exitCode: number | null }> {
-    const session = this.require(sessionId);
+    if (this.closed.has(sessionId)) return { exitCode: null };
+    const session = this.require(sessionId, true);
     const outcome = await this.registry.close(this.ownerLane, sessionId, "closed by model");
     void session;
     this.sessions.delete(sessionId);
+    this.exited.delete(sessionId);
+    this.closed.add(sessionId);
     return outcome;
   }
 
   public list(): Array<{ sessionId: string; kind: string }> {
-    return [...this.sessions.values()].map((session) => ({ sessionId: session.sessionId, kind: session.record.kind }));
+    return [...this.sessions.values()]
+      .filter((session) => !this.exited.has(session.sessionId))
+      .map((session) => ({ sessionId: session.sessionId, kind: session.record.kind }));
   }
 
   /**
@@ -157,15 +165,16 @@ export class PwnToolHandler {
   }
 
   private viewport(sessionId: string, data: string, exited: boolean, matched?: boolean): PwnViewport {
-    if (exited) this.sessions.delete(sessionId);
+    if (exited) this.exited.add(sessionId);
     const truncated = data.length > VIEWPORT_MAX;
     const viewport = truncated ? `…${data.slice(-VIEWPORT_MAX)}` : data;
     return { sessionId, viewport, ...(matched !== undefined ? { matched } : {}), exited, truncated };
   }
 
-  private require(sessionId: string): PwnSession {
+  private require(sessionId: string, allowExited = false): PwnSession {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Unknown pwn session: ${sessionId}`);
+    if (!allowExited && this.exited.has(sessionId)) throw new Error(`Pwn session has exited: ${sessionId}; only pwn_close is allowed`);
     return session;
   }
 }

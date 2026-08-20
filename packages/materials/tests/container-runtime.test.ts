@@ -434,6 +434,8 @@ test("session reports exit with the process exit code", async () => {
     assert.equal(result.exitCode, 7);
     assert.equal(result.waitReason, "exit");
     assert.match(result.delta, /done/);
+    await runtime.closeSession(handle);
+    await assert.rejects(runtime.sessionRead(handle), /Unknown container session/);
   } finally {
     await runtime.closeSession(handle);
   }

@@ -54,6 +54,8 @@ interface LiveEntry {
  */
 export class SessionRegistry {
   private readonly live = new Map<string, LiveEntry>();
+  /** Handles for processes that exited during interaction but still need close cleanup. */
+  private readonly exited = new Map<string, LiveEntry>();
 
   public constructor(
     private readonly runId: string,
@@ -130,9 +132,10 @@ export class SessionRegistry {
   }
 
   public async close(ownerLane: Lane, sessionId: string, reason?: string): Promise<{ exitCode: number | null }> {
-    const entry = this.requireOwned(ownerLane, sessionId);
+    const entry = this.requireOwned(ownerLane, sessionId, true);
     const outcome = await this.runtime.closeSession(entry.handle);
     this.live.delete(sessionId);
+    this.exited.delete(sessionId);
     await this.control.dispatch(this.runId, { type: "session_closed", sessionId, reason, exitCode: outcome.exitCode, lane: ownerLane });
     return outcome;
   }
@@ -176,9 +179,10 @@ export class SessionRegistry {
 
   /** Best-effort teardown of every live session; called on lane shutdown. */
   public async disposeAll(reason = "lane shutdown"): Promise<void> {
-    for (const [sessionId, entry] of [...this.live]) {
+    for (const [sessionId, entry] of [...this.live, ...this.exited]) {
       await this.runtime.closeSession(entry.handle).catch(() => undefined);
       this.live.delete(sessionId);
+      this.exited.delete(sessionId);
       await this.control.dispatch(this.runId, { type: "session_closed", sessionId, reason, lane: entry.ownerLane }).catch(() => undefined);
     }
   }
@@ -191,12 +195,21 @@ export class SessionRegistry {
       ...(result.exited ? { exited: true, exitCode: result.exitCode ?? null } : {}),
       lane: ownerLane,
     });
-    if (result.exited) this.live.delete(sessionId);
+    if (result.exited) {
+      const entry = this.live.get(sessionId);
+      if (entry) {
+        this.live.delete(sessionId);
+        this.exited.set(sessionId, entry);
+      }
+    }
   }
 
-  private requireOwned(ownerLane: Lane, sessionId: string): LiveEntry {
-    const entry = this.live.get(sessionId);
-    if (!entry) throw new SessionRegistryError("NO_SESSION", `Unknown session: ${sessionId}`);
+  private requireOwned(ownerLane: Lane, sessionId: string, allowExited = false): LiveEntry {
+    const entry = this.live.get(sessionId) ?? (allowExited ? this.exited.get(sessionId) : undefined);
+    if (!entry) {
+      if (this.exited.has(sessionId)) throw new SessionRegistryError("NOT_OPEN", `Session ${sessionId} has exited; only close is allowed`);
+      throw new SessionRegistryError("NO_SESSION", `Unknown session: ${sessionId}`);
+    }
     if (entry.ownerLane !== ownerLane) throw new SessionRegistryError("FOREIGN_SESSION", `Session ${sessionId} is owned by ${entry.ownerLane}, not ${ownerLane}`);
     return entry;
   }

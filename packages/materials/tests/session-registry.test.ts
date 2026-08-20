@@ -77,8 +77,8 @@ test("session registry records open/interact/close as replayable durable events"
   try {
     const runId = "SES-REPLAY";
     const control = await makeControl(root, runId);
-    const runtime = new FakeRuntime() as unknown as ContainerRuntimePort;
-    const registry = new SessionRegistry(runId, runtime, control);
+    const runtime = new FakeRuntime();
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
 
     const opened = await registry.open({ ref: refAt(1), kind: "pwn-remote", ownerLane: "executor", command: ["/bin/cat"], endpoint: "10.0.0.1:1337" });
     assert.equal(opened.status, "OPEN");
@@ -135,14 +135,21 @@ test("session marked exited when the runtime reports process exit", async () => 
   try {
     const runId = "SES-EXIT";
     const control = await makeControl(root, runId);
-    const runtime = new FakeRuntime() as unknown as ContainerRuntimePort;
-    const registry = new SessionRegistry(runId, runtime, control);
+    const runtime = new FakeRuntime();
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
     const opened = await registry.open({ ref: refAt(1), kind: "pwn-local", ownerLane: "executor", command: ["/bin/sh"] });
     (runtime as unknown as FakeRuntime).setResult({ delta: "bye\n", waitReason: "exit", exited: true, exitCode: 3 });
     await registry.read("executor", opened.id);
     const snap = await control.snapshot(runId);
     assert.equal(snap.sessions[opened.id]?.status, "EXITED");
     assert.equal(snap.sessions[opened.id]?.exitCode, 3);
+    await assert.rejects(
+      registry.write("executor", opened.id, "after-exit\n"),
+      (error: unknown) => error instanceof SessionRegistryError && error.code === "NOT_OPEN",
+    );
+    await registry.close("executor", opened.id, "cleanup exited session");
+    assert.deepEqual(runtime.closed, ["dxs-1"]);
+    assert.equal((await control.snapshot(runId)).sessions[opened.id]?.status, "CLOSED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -181,6 +188,8 @@ test("disposeAll closes every live session's runtime process and marks it CLOSED
     const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
     const a = await registry.open({ ref: refAt(1), kind: "pwn-remote", ownerLane: "executor", command: ["tube"] });
     const b = await registry.open({ ref: refAt(1), kind: "pwn-local", ownerLane: "executor", command: ["sh"] });
+    runtime.setResult({ exited: true, waitReason: "exit", exitCode: 0 });
+    await registry.read("executor", a.id);
 
     await registry.disposeAll("lane shutdown");
 
@@ -190,7 +199,7 @@ test("disposeAll closes every live session's runtime process and marks it CLOSED
     const snap = await control.snapshot(runId);
     assert.equal(snap.sessions[a.id]?.status, "CLOSED");
     assert.equal(snap.sessions[b.id]?.status, "CLOSED");
-    // Idempotent: a second disposeAll is a no-op (nothing live left).
+    // Idempotent: a second disposeAll is a no-op (nothing live or exited left).
     await registry.disposeAll("lane shutdown");
     assert.equal(runtime.closed.length, 2);
   } finally {
