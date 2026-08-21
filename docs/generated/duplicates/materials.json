@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "exact": [],
+  "candidates": [
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::BinaryCapabilityBackend.availability",
+          "package": "@proofblade/materials",
+          "name": "BinaryCapabilityBackend.availability",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
+          "module": "src/capabilities/backend.ts",
+          "line": 192,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::BundledCapabilityBackend.availability",
+          "package": "@proofblade/materials",
+          "name": "BundledCapabilityBackend.availability",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
+          "module": "src/capabilities/backend.ts",
+          "line": 160,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::FirmwareCapabilityBackend.availability",
+          "package": "@proofblade/materials",
+          "name": "FirmwareCapabilityBackend.availability",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
+          "module": "src/capabilities/backend.ts",
+          "line": 233,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::BinaryCapabilityBackend.status",
+          "package": "@proofblade/materials",
+          "name": "BinaryCapabilityBackend.status",
+          "kind": "method",
+          "signature": "(): CapabilityBackendStatus",
+          "module": "src/capabilities/backend.ts",
+          "line": 184,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::BundledCapabilityBackend.status",
+          "package": "@proofblade/materials",
+          "name": "BundledCapabilityBackend.status",
+          "kind": "method",
+          "signature": "(): CapabilityBackendStatus",
+          "module": "src/capabilities/backend.ts",
+          "line": 151,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::FirmwareCapabilityBackend.status",
+          "package": "@proofblade/materials",
+          "name": "FirmwareCapabilityBackend.status",
+          "kind": "method",
+          "signature": "(): CapabilityBackendStatus",
+          "module": "src/capabilities/backend.ts",
+          "line": 225,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::BinaryCapabilityBackend.versionFor",
+          "package": "@proofblade/materials",
+          "name": "BinaryCapabilityBackend.versionFor",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): string",
+          "module": "src/capabilities/backend.ts",
+          "line": 196,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::BundledCapabilityBackend.versionFor",
+          "package": "@proofblade/materials",
+          "name": "BundledCapabilityBackend.versionFor",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): string",
+          "module": "src/capabilities/backend.ts",
+          "line": 164,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::FirmwareCapabilityBackend.versionFor",
+          "package": "@proofblade/materials",
+          "name": "FirmwareCapabilityBackend.versionFor",
+          "kind": "method",
+          "signature": "(_request: CapabilityBackendRequest): string",
+          "module": "src/capabilities/backend.ts",
+          "line": 237,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::CompetitionSandbox.close",
+          "package": "@proofblade/materials",
+          "name": "CompetitionSandbox.close",
+          "kind": "method",
+          "signature": "(): Promise<void>",
+          "module": "src/competition/sandbox.ts",
+          "line": 114,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::CompetitionSandbox.destroy",
+          "package": "@proofblade/materials",
+          "name": "CompetitionSandbox.destroy",
+          "kind": "method",
+          "signature": "(_fixture: FixtureRef): Promise<void>",
+          "module": "src/competition/sandbox.ts",
+          "line": 110,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::ControlStore.replay",
+          "package": "@proofblade/materials",
+          "name": "ControlStore.replay",
+          "kind": "method",
+          "signature": "(runId: string): Promise<RunSnapshot>",
+          "module": "src/control/control-store.ts",
+          "line": 117,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::ControlStore.snapshot",
+          "package": "@proofblade/materials",
+          "name": "ControlStore.snapshot",
+          "kind": "method",
+          "signature": "(runId: string): Promise<RunSnapshot>",
+          "module": "src/control/control-store.ts",
+          "line": 113,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::PiCodingLane.abort",
+          "package": "@proofblade/materials",
+          "name": "PiCodingLane.abort",
+          "kind": "method",
+          "signature": "(_reason: string): Promise<void>",
+          "module": "src/runtime/coding-lane.ts",
+          "line": 411,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::PiAgentLane.abort",
+          "package": "@proofblade/materials",
+          "name": "PiAgentLane.abort",
+          "kind": "method",
+          "signature": "(_reason: string): Promise<void>",
+          "module": "src/runtime/pi-adapter.ts",
+          "line": 130,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::PiSolverLane.abort",
+          "package": "@proofblade/materials",
+          "name": "PiSolverLane.abort",
+          "kind": "method",
+          "signature": "(_reason: string): Promise<void>",
+          "module": "src/runtime/solver-lane.ts",
+          "line": 230,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::PiCodingLane.compact",
+          "package": "@proofblade/materials",
+          "name": "PiCodingLane.compact",
+          "kind": "method",
+          "signature": "(reason: string): Promise<void>",
+          "module": "src/runtime/coding-lane.ts",
+          "line": 415,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::PiAgentLane.compact",
+          "package": "@proofblade/materials",
+          "name": "PiAgentLane.compact",
+          "kind": "method",
+          "signature": "(reason: string): Promise<void>",
+          "module": "src/runtime/pi-adapter.ts",
+          "line": 134,
+          "summary": ""
+        },
+        {
+          "id": "@proofblade/materials::method::PiSolverLane.compact",
+          "package": "@proofblade/materials",
+          "name": "PiSolverLane.compact",
+          "kind": "method",
+          "signature": "(reason: string): Promise<void>",
+          "module": "src/runtime/solver-lane.ts",
+          "line": 234,
+          "summary": ""
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    }
+  ],
+  "counts": {
+    "exact": 0,
+    "candidates": 7
+  }
+}

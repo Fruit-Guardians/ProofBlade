@@ -4,15 +4,15 @@
 {
   "id": "atoms",
   "name": "Atoms 原子层",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-21T15:59:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "0e9076d0f255428ccbd5cb0258fad5e96a5dec27341754e4f4908f9229798768",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-21T15:59:00.000Z",
+    "lastSecurityAuditAt": "2026-08-21T15:59:00.000Z",
+    "sourceHash": "20461aae299ce74634fb95baf7186283b97a6a45ed1cb1919e2a6530f1423baf",
     "result": "passed"
   }
 }
@@ -38,4 +38,10 @@
 
 ```powershell
 npm run test:atoms
+npm run api:index:atoms
+npm run api:index:check:atoms
 ```
+
+## API 索引
+
+`plugins/proofblade-api-index` 根据 `src/index.ts` 的实际公共导出生成函数、类、方法、类型和常量索引。新增公共原语前先运行 `npm run api:search -- <keywords>`，修改后运行 `npm run api:index:atoms` 和 `npm run api:duplicates -- --package atoms`。`docs/generated/api/atoms.*`、`docs/generated/agent/atoms-context.json` 和 `docs/generated/duplicates/atoms.json` 都是生成文件，不要手工编辑。

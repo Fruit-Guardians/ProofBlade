@@ -1,0 +1,18 @@
+{
+  "name": "proofblade-api-index",
+  "version": "0.1.0",
+  "description": "Deterministic ProofBlade API indexing, AI symbol lookup, and duplicate implementation detection.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Proofblade Api Index",
+    "shortDescription": "Search shared APIs before adding helpers.",
+    "longDescription": "Generates deterministic API indexes and duplicate candidates for ProofBlade packages, with an AI-focused lookup workflow.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Before changing shared code, search the ProofBlade API index and check duplicate candidates."
+  }
+}
