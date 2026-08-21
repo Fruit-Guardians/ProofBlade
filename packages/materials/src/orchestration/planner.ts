@@ -38,7 +38,7 @@ export class PlannerCoordinator {
     const active = Object.values(snapshot.handoffs)
       .filter((handoff) => handoff.status === "PROPOSED" || handoff.status === "ACCEPTED")
       .sort((a, b) => b.createdSeq - a.createdSeq)[0];
-    if (active && active.knowledgeVersion === currentVersion && active.phase === snapshot.phase) {
+    if (active && active.knowledgeVersion === currentVersion && active.phase === snapshot.phase && active.domainPhase === snapshot.domainPhase) {
       if (active.status === "PROPOSED") await this.accept(runId, active.id);
       return (await this.controlStore.snapshot(runId)).handoffs[active.id]!;
     }

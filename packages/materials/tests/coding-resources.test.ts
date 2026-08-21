@@ -10,6 +10,7 @@ import {
   createCodingTools,
   createMcpFirstClassTools,
   interactiveTimeoutHint,
+  interactiveCommandHint,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
 import { codingCtfCategoryGuidance } from "../src/runtime/coding-lane.js";
@@ -98,6 +99,12 @@ test("a timed-out interactive bash command yields a targeted remediation hint", 
   assert.equal(interactiveTimeoutHint("exit code 1", "python3 -c 'remote(1)'", true), undefined);
   // A timeout on a NON-interactive command (pure compute) -> no hint.
   assert.equal(interactiveTimeoutHint("timed out", "python3 -c 'print(2**900000)'", true), undefined);
+});
+
+test("interactive bash is rejected before execution with a bounded remediation", () => {
+  assert.match(interactiveCommandHint("python -c 'from pwn import *; remote(\"h\",1).recvuntil(b\"> \")'", true) ?? "", /pwn_open/);
+  assert.match(interactiveCommandHint("nc host 31337", false) ?? "", /shell_background/);
+  assert.equal(interactiveCommandHint("python -c 'print(2 + 2)'", true), undefined);
 });
 
 test("coding provider tools use object-root schemas accepted by strict OpenAI-compatible providers", () => {

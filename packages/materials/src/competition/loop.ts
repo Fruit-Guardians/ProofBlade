@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AppServices } from "../app/demo.js";
-import type { ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
+import type { DomainPhase, ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -127,6 +127,7 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
+      await ensureCompetitionDomainPhase(services.control, options.runId, competitionPhaseForTurn(turns));
       workItemId = await claimCompetitionWorkItem(services.control, options.runId, options.task, turns);
       const preTurnSnapshot = await services.control.snapshot(options.runId);
       const submissionsSoFar = countSubmissions(preTurnSnapshot);
@@ -151,6 +152,7 @@ export async function runCompetitionLoop(
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
         stopReason = "solved";
+        await ensureCompetitionDomainPhase(services.control, options.runId, "SUBMIT");
         await completeCompetitionWorkItem(services.control, workItemId, snapshot);
         break;
       }
@@ -166,6 +168,7 @@ export async function runCompetitionLoop(
         break;
       }
       if (mode() === "assist" && Object.keys(snapshot.completions).length > 0) {
+        await ensureCompetitionDomainPhase(services.control, options.runId, "REPRODUCE");
         stopReason = "held_for_approval";
         await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
         break;
@@ -222,6 +225,25 @@ export async function runCompetitionLoop(
     ...(lastText ? { lastText } : {}),
     ...(termination ? { termination } : {}),
   };
+}
+
+async function ensureCompetitionDomainPhase(control: AppServices["control"], runId: string, phase: DomainPhase): Promise<void> {
+  const snapshot = await control.snapshot(runId);
+  if (snapshot.domainPhase === phase) return;
+  try {
+    await control.dispatch(runId, { type: "set_domain_phase", domainPhase: phase, lane: "executor" });
+  } catch (error) {
+    // A replan may race a phase transition; keep the durable state authoritative.
+    const current = await control.snapshot(runId);
+    if (current.domainPhase !== phase) throw error;
+  }
+}
+
+function competitionPhaseForTurn(turn: number): DomainPhase {
+  if (turn <= 1) return "RECON";
+  if (turn === 2) return "TARGET_MODEL";
+  if (turn === 3) return "HYPOTHESIS";
+  return "EXPERIMENT";
 }
 
 /**

@@ -3,7 +3,7 @@ import type { ArtifactRef, RawEffectResult, ReplayPolicy } from "../domain/types
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
 import type { McpProjectRegistry } from "../mcp/registry.js";
-import { executeBinaryCapability, validateBinaryInput, type BinaryCapabilityInput } from "./binary.js";
+import { executeBinaryCapability, executeGdbBatchCapability, validateBinaryInput, type BinaryCapabilityInput, type GdbBatchCapabilityInput } from "./binary.js";
 import { executeFirmwareCapability, validateFirmwareInput, type FirmwareCapabilityInput } from "./firmware.js";
 import { createRizinAvailability, executeRizinCapability, normalizeFunctions, normalizeInstructions, normalizeXrefs, reverseOperation, validateReverseInput, withStagedVisibleBinary, type ReverseCapabilityInput, type ReverseOperation, type RizinCapabilityOptions } from "./reverse.js";
 import type { McpBinaryReverseOperation, McpReverseOutput } from "../mcp/registry.js";
@@ -179,14 +179,14 @@ export class BinaryCapabilityBackend implements CapabilityBackend {
   public readonly id = "proofblade-binary";
   public readonly kind = "bundled" as const;
   public readonly priority = 90;
-  private readonly version = "1.0.0";
+  private readonly version = "1.2.0";
 
   public status(): CapabilityBackendStatus {
     return { id: this.id, kind: this.kind, version: this.version, priority: this.priority, available: true };
   }
 
   public handles(capabilityId: string, operation: string): boolean {
-    return capabilityId === "proofblade.binary" && ["identify", "read_range", "sections", "symbols", "strings"].includes(operation);
+    return capabilityId === "proofblade.binary" && ["identify", "read_range", "sections", "symbols", "strings", "inspect_elf", "gdb_batch"].includes(operation);
   }
 
   public availability(_request: CapabilityBackendRequest): CapabilityBackendAvailability {
@@ -209,7 +209,9 @@ export class BinaryCapabilityBackend implements CapabilityBackend {
       args: structuredClone(request.input),
       replayPolicy: operation.replay,
       cwd: context.fixture.path,
-      execute: async (signal) => await executeBinaryCapability(request.operation, request.input as unknown as BinaryCapabilityInput, context.fixture.path, signal),
+      execute: async (signal) => request.operation === "gdb_batch"
+        ? await executeGdbBatchCapability(request.input as unknown as GdbBatchCapabilityInput, context.fixture.path, signal)
+        : await executeBinaryCapability(request.operation, request.input as unknown as BinaryCapabilityInput, context.fixture.path, signal),
     };
   }
 }

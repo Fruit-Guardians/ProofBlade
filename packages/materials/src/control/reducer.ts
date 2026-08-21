@@ -8,6 +8,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     task,
     status: "CREATED",
     phase: "intake",
+    domainPhase: "INTAKE",
     generation: 0,
     lastSeq: 0,
     facts: {},
@@ -25,6 +26,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     workItems: {},
     sessions: {},
     requestEpochs: {},
+    experiments: {},
     contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
@@ -60,6 +62,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "phase_finished":
       if (p.phase) next.phase = p.phase as RunSnapshot["phase"];
       break;
+    case "domain_phase_changed": {
+      const phase = p.domainPhase as RunSnapshot["domainPhase"];
+      if (!["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "SUBMIT"].includes(phase)) throw new Error(`Unknown domain phase: ${String(phase)}`);
+      next.domainPhase = phase;
+      break;
+    }
     case "fixture_reset":
       next.generation = Number(p.generation);
       if (!Number.isInteger(next.generation) || next.generation < 1) throw new Error("fixture_reset requires a positive generation");
@@ -109,6 +117,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const evidence = p.evidence as RunSnapshot["evidence"][string];
       if (!evidence?.id) throw new Error("evidence_added requires evidence");
       next.evidence[evidence.id] = evidence;
+      break;
+    }
+    case "experiment_recorded": {
+      const experiment = p.experiment as RunSnapshot["experiments"][string];
+      if (!experiment?.id) throw new Error("experiment_recorded requires experiment");
+      if (next.experiments[experiment.id]) throw new Error(`Experiment already exists: ${experiment.id}`);
+      next.experiments[experiment.id] = experiment;
       break;
     }
     case "reasoning_node_upserted": {

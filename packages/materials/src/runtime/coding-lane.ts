@@ -40,6 +40,9 @@ import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
 import { PwnReproducer } from "../verification/pwn-reproducer.js";
 import { PwnToolHandler, type PwnReproductionPolicy } from "../pwn/pwn-tools.js";
+import { ExperimentGate } from "../competition/experiment-gate.js";
+import { HttpSessionBackend } from "../web/http-session.js";
+import { WebReproducer, type WebExploitStep } from "../verification/web-reproducer.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -194,6 +197,7 @@ export class PiCodingLane implements AgentLanePort {
     const pwnRegistry = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
       ? new SessionRegistry(options.runId, env.containerRuntime, options.controlStore)
       : undefined;
+    const experimentGate = new ExperimentGate(options.controlStore);
     const pwnReproductionPolicy = pwnReproductionPolicyFor(snapshot.task.verification.pwn);
     const pwnTools = pwnRegistry
       ? new PwnToolHandler(
@@ -206,9 +210,13 @@ export class PiCodingLane implements AgentLanePort {
         // Docker egress gateway (a bridge/none policy has no gateway).
         { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
         pwnReproductionPolicy,
+        experimentGate,
       )
       : undefined;
-    const tools = [...createCodingTools({ platformJudged }), ...mcpFirstClassTools];
+    const webPolicy = snapshot.task.verification.web;
+    const webBaseUrl = webBaseUrlFromTarget(snapshot.task.target);
+    const webReproducer = webPolicy && webBaseUrl ? new WebReproducer(options.controlStore) : undefined;
+    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer) }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -217,6 +225,7 @@ export class PiCodingLane implements AgentLanePort {
         platformJudged,
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
+        webReproductionEnabled: Boolean(webReproducer),
       }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
@@ -242,6 +251,10 @@ export class PiCodingLane implements AgentLanePort {
       evidenceGraph,
       evidenceCurationGate,
       runtime,
+      experimentGate,
+      ...(webReproducer ? {
+        webReproduce: async (steps: WebExploitStep[], signal?: AbortSignal) => await webReproducer.reproduce(options.runId, { steps }, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl!, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, experimentGate }), signal),
+      } : {}),
       ...(pwnTools ? { pwnTools } : {}),
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
@@ -685,4 +698,15 @@ export function codingHostGuidance(platform: NodeJS.Platform = process.platform)
     "Keep generated intermediate files in workspace-relative paths such as work/.",
     "Do not write analysis files to /tmp and then ask the Windows read tool to open them.",
   ].join(" ");
+}
+
+function webBaseUrlFromTarget(target: string): string | undefined {
+  const match = /^REMOTE:https?:\/\/([^\s]+)$/i.exec(target.trim());
+  const value = match
+    ? match[0].slice("REMOTE:".length)
+    : /^REMOTE:http\s+([^\s:]+):(\d+)$/i.test(target.trim())
+      ? `http://${/^REMOTE:http\s+([^\s:]+):(\d+)$/i.exec(target.trim())![1]}:${/^REMOTE:http\s+([^\s:]+):(\d+)$/i.exec(target.trim())![2]}`
+      : undefined;
+  if (!value) return undefined;
+  try { return new URL(value).toString().replace(/\/$/, ""); } catch { return undefined; }
 }

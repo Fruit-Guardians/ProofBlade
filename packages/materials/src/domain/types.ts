@@ -12,6 +12,25 @@ export type Phase =
   | "verification"
   | "report";
 
+/** Competition-specific phase that survives the generic harness phase machine. */
+export type DomainPhase = "INTAKE" | "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE" | "SUBMIT";
+
+export type ExperimentOutcome = "success" | "failure" | "timeout" | "blocked" | "unknown";
+
+export interface ExperimentRecord {
+  id: string;
+  runId: string;
+  generation: number;
+  domainPhase: DomainPhase;
+  hypothesisId?: string;
+  repeatKey: string;
+  action: string;
+  inputHash: string;
+  outcome: ExperimentOutcome;
+  summary: string;
+  createdSeq: number;
+}
+
 export type RunStatus =
   | "CREATED"
   | "READY"
@@ -76,6 +95,10 @@ export interface PwnReproductionContract {
   flag_pattern: string;
 }
 
+export interface WebReproductionContract {
+  flag_pattern: string;
+}
+
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
@@ -91,6 +114,8 @@ export interface TaskContract {
     required_reproductions: number;
     /** Task-owned inputs for barrier-gated pwn reproduction. */
     pwn?: PwnReproductionContract;
+    /** Task-owned inputs for barrier-gated web reproduction. */
+    web?: WebReproductionContract;
   };
   scope: {
     allowed_hosts: string[];
@@ -416,6 +441,7 @@ export interface HandoffRecord {
   targetLane: "executor";
   knowledgeVersion: string;
   phase: Phase;
+  domainPhase: DomainPhase;
   objective: string;
   confirmedFacts: Array<{ id: string; summary: string; evidenceIds: string[] }>;
   hypotheses: Array<{ id: string; statement: string; evidenceIds: string[] }>;
@@ -484,6 +510,7 @@ export interface RunSnapshot {
   task: TaskContract;
   status: RunStatus;
   phase: Phase;
+  domainPhase: DomainPhase;
   generation: number;
   lastSeq: number;
   startedAt?: string;
@@ -503,6 +530,7 @@ export interface RunSnapshot {
   workItems: Record<string, WorkItem>;
   sessions: Record<string, SessionRecord>;
   requestEpochs: Record<string, RequestEpoch>;
+  experiments: Record<string, ExperimentRecord>;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
@@ -518,6 +546,7 @@ export type EventType =
   | "run_started"
   | "phase_started"
   | "phase_finished"
+  | "domain_phase_changed"
   | "fixture_reset"
   | "turn_started"
   | "assistant_message"
@@ -574,6 +603,7 @@ export type EventType =
   | "provider_response_received"
   | "tool_call_recorded"
   | "tool_result_recorded"
+  | "experiment_recorded"
   | "compaction_recorded"
   | "model_usage"
   | "run_paused"

@@ -11,6 +11,7 @@ import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
+import { RefinerCoordinator } from "./refiner.js";
 import { RunRecoveryService } from "../recovery/run-recovery.js";
 import { SessionRegistry } from "../container/session-registry.js";
 
@@ -89,6 +90,7 @@ export class SingleAgentCtfLoop {
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.journal, this.services.runsRoot);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
+    const refiner = new RefinerCoordinator(this.services.control);
     const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
     if (pendingAtStart) {
       throwIfAborted(options.signal);
@@ -164,6 +166,7 @@ export class SingleAgentCtfLoop {
           throwIfAborted(options.signal);
           verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, options.signal);
           if (verification.accepted) break;
+          await refiner.refineAfterFailure(options.runId, "candidate verification failed");
           await this.moveTo(options.runId, "experiment");
           continue;
         }

@@ -23,6 +23,8 @@ import type {
   WorkItem,
   RequestEpoch,
   SessionRecord,
+  DomainPhase,
+  ExperimentRecord,
 } from "../domain/types.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
@@ -35,6 +37,7 @@ import { assertPhaseTransition } from "./phase-machine.js";
 export type DomainCommand =
   | { type: "start_phase"; phase: Phase; lane?: Lane }
   | { type: "finish_phase"; phase: Phase; lane?: Lane }
+  | { type: "set_domain_phase"; domainPhase: DomainPhase; lane?: Lane }
   | { type: "fixture_reset"; generation: number; lane?: Lane }
   | { type: "pause"; reason: string; lane?: Lane }
   | { type: "resume"; lane?: Lane }
@@ -44,6 +47,7 @@ export type DomainCommand =
   | { type: "fact"; fact: Omit<Fact, "createdSeq">; lane?: Lane }
   | { type: "observation"; observation: Omit<Observation, "createdSeq">; lane?: Lane }
   | { type: "evidence"; evidence: Omit<Evidence, "createdSeq">; lane?: Lane }
+  | { type: "experiment"; experiment: Omit<ExperimentRecord, "createdSeq">; lane?: Lane }
   | { type: "reasoning_node"; node: Omit<ReasoningNode, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "reasoning_edge"; edge: Omit<ReasoningEdge, "createdSeq">; lane?: Lane }
   | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
@@ -192,6 +196,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
   switch (command.type) {
     case "start_phase": return "phase_started";
     case "finish_phase": return "phase_finished";
+    case "set_domain_phase": return "domain_phase_changed";
     case "fixture_reset": return "fixture_reset";
     case "pause": return "run_paused";
     case "resume": return "run_resumed";
@@ -201,6 +206,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "fact": return "fact_added";
     case "observation": return "observation_added";
     case "evidence": return "evidence_added";
+    case "experiment": return "experiment_recorded";
     case "reasoning_node": return "reasoning_node_upserted";
     case "reasoning_edge": return "reasoning_edge_added";
     case "reasoning_tree": return "reasoning_tree_upserted";
@@ -254,6 +260,7 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
   switch (command.type) {
     case "start_phase": return { phase: command.phase };
     case "finish_phase": return { phase: command.phase };
+    case "set_domain_phase": return { domainPhase: command.domainPhase };
     case "fixture_reset": return { generation: command.generation };
     case "pause": return { reason: command.reason };
     case "resume": return {};
@@ -263,6 +270,7 @@ function payloadFor(command: DomainCommand, seq: number): Record<string, unknown
     case "fact": return { fact: { ...command.fact, createdSeq: seq } };
     case "observation": return { observation: { ...command.observation, createdSeq: seq } };
     case "evidence": return { evidence: { ...command.evidence, createdSeq: seq } };
+    case "experiment": return { experiment: { ...command.experiment, createdSeq: seq } };
     case "reasoning_node": return { node: command.node };
     case "reasoning_edge": return { edge: command.edge };
     case "reasoning_tree": return { tree: command.tree };
@@ -366,6 +374,8 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
     if (command.type === "handoff_superseded" && handoff.status === "REJECTED") throw new Error("A rejected handoff cannot be superseded");
   }
   if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
+  if (command.type === "set_domain_phase") validateDomainPhaseTransition(snapshot, command.domainPhase);
+  if (command.type === "experiment") validateExperimentCommand(snapshot, command);
   if (command.type === "completion_verified" && command.lane !== "verifier") {
     throw new Error("Completion verification is restricted to the verifier lane");
   }
@@ -385,6 +395,26 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand): void {
   if (!command.evidenceIds.every((id) => completion.evidenceIds.includes(id))) {
     throw new Error("Completion verification does not cover every final evidence id");
   }
+}
+
+function validateDomainPhaseTransition(snapshot: RunSnapshot, next: DomainPhase): void {
+  const order: DomainPhase[] = ["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "SUBMIT"];
+  const allowedBacktracks: Partial<Record<DomainPhase, DomainPhase[]>> = { HYPOTHESIS: ["RECON"], EXPERIMENT: ["HYPOTHESIS", "RECON"], REPRODUCE: ["EXPERIMENT"] };
+  if (next === snapshot.domainPhase) return;
+  if (order.indexOf(next) > order.indexOf(snapshot.domainPhase)) return;
+  if (!allowedBacktracks[snapshot.domainPhase]?.includes(next)) throw new Error(`Invalid domain phase transition: ${snapshot.domainPhase} -> ${next}`);
+}
+
+function validateExperimentCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "experiment" }>): void {
+  const experiment = command.experiment;
+  if (snapshot.experiments[experiment.id]) throw new Error(`Experiment already exists: ${experiment.id}`);
+  if (experiment.runId !== snapshot.runId) throw new Error(`Experiment run identity mismatch: ${experiment.id}`);
+  if (experiment.generation !== snapshot.generation) throw new Error(`Experiment generation mismatch: ${experiment.id}`);
+  if (!experiment.repeatKey.trim() || experiment.repeatKey.length > 256) throw new Error("Experiment repeatKey must contain 1-256 characters");
+  if (!experiment.action.trim() || experiment.action.length > 1_000) throw new Error("Experiment action must contain 1-1000 characters");
+  if (!experiment.inputHash.trim() || experiment.inputHash.length > 256) throw new Error("Experiment inputHash must contain 1-256 characters");
+  if (!experiment.summary.trim() || experiment.summary.length > 1_000) throw new Error("Experiment summary must contain 1-1000 characters");
+  if (experiment.hypothesisId && !snapshot.hypotheses[experiment.hypothesisId]) throw new Error(`Unknown experiment hypothesis: ${experiment.hypothesisId}`);
 }
 
 function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<ArtifactSemanticMetadata, "updatedSeq"> | ArtifactSemanticMetadata): void {

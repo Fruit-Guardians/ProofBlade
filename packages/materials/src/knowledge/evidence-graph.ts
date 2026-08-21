@@ -14,6 +14,7 @@ import type {
 } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
+import type { LeakRecord } from "../pwn/leak.js";
 
 export interface RecordCodingEvidenceInput {
   name: string;
@@ -32,6 +33,11 @@ export interface RecordCodingEvidenceResult {
   reused: boolean;
   durableProgress: boolean;
   progressKey: string;
+}
+
+export interface RecordLeakResult {
+  node: ReasoningNode;
+  reused: boolean;
 }
 
 export interface CreateReasoningTreeInput {
@@ -239,6 +245,28 @@ export class CodingEvidenceGraph {
     });
   }
 
+  /** Persist a parsed pwn leak as a replayable reasoning node for later replans. */
+  public async recordLeak(input: {
+    leak: LeakRecord;
+    tags?: string[];
+    explanation?: string;
+  }): Promise<RecordLeakResult> {
+    return await this.controlStore.dispatchTransaction<RecordLeakResult>(this.runId, (snapshot) => {
+      const node = leakReasoningNode(input.leak, snapshot.generation, input.tags, input.explanation);
+      const existing = snapshot.reasoningNodes[node.id];
+      if (existing) {
+        if (existing.kind !== "inference" || existing.summary !== node.summary || existing.tags.join("\u0000") !== node.tags.join("\u0000")) {
+          throw new Error(`Leak node already exists with different contents: ${node.id}`);
+        }
+        return { commands: [], project: () => ({ node: existing, reused: true }) };
+      }
+      return {
+        commands: [{ type: "reasoning_node", node, lane: "main" }],
+        project: (after) => ({ node: after.reasoningNodes[node.id]!, reused: false }),
+      };
+    });
+  }
+
   public async linkNodes(input: {
     from: string;
     to: string;
@@ -343,6 +371,7 @@ export class CodingEvidenceGraph {
       ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, name: item.name ?? item.summary, summary: item.summary, artifactIds: evidenceArtifactIds(item), dependsOn: item.dependsOn ?? [], supports: item.supports, refutes: item.refutes, tags: item.tags ?? [], createdSeq: item.createdSeq, search: `${item.id} ${item.name ?? ""} ${item.summary} ${(item.tags ?? []).join(" ")}`.toLowerCase() })),
       ...Object.values(snapshot.artifacts).map((item) => ({ kind: "artifact", id: item.id, name: item.semantic?.name ?? basename(item.path), summary: item.semantic?.summary ?? `${item.mime}, ${item.bytes} bytes`, role: item.semantic?.role ?? "intermediate", relatedIds: item.semantic?.relatedIds ?? [], tags: item.semantic?.tags ?? [], createdSeq: item.semantic?.updatedSeq ?? 0, search: `${item.id} ${item.path} ${item.semantic?.name ?? ""} ${item.semantic?.summary ?? ""} ${(item.semantic?.tags ?? []).join(" ")}`.toLowerCase() })),
       ...Object.values(snapshot.reasoningTrees).map((item) => ({ kind: "reasoning_tree", id: item.id, name: item.name, summary: item.summary, purpose: item.purpose, status: item.status, rootNodeId: item.rootNodeId, nodeIds: item.nodeIds, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.purpose} ${item.tags.join(" ")}`.toLowerCase() })),
+      ...Object.values(snapshot.reasoningNodes).map((item) => ({ kind: "reasoning_node", id: item.id, name: item.name, summary: item.summary, status: item.status, reference: item.reference, tags: item.tags, createdSeq: item.updatedSeq, search: `${item.id} ${item.name} ${item.summary} ${item.explanation} ${item.tags.join(" ")}`.toLowerCase() })),
     ];
     // Metadata alone is not enough: a bash artifact is titled `命令输出 · <cmd>`,
     // so a content query ("sub_08001a10 disasm") matches nothing and the model
@@ -575,6 +604,40 @@ function factReasoningNode(factId: string, claim: string, generation: number): O
     reference: { kind: "fact", id: factId },
     generation,
     explainedBy: "curator",
+  };
+}
+
+function leakReasoningNode(
+  leak: LeakRecord,
+  generation: number,
+  extraTags?: string[],
+  explanation?: string,
+): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
+  if (!Number.isFinite(leak.confidence) || leak.confidence < 0 || leak.confidence > 1) {
+    throw new Error(`Leak confidence must be between 0 and 1: ${leak.id}`);
+  }
+  const leakId = requiredText(leak.id, "Leak id", 160);
+  const sourceHex = requiredText(displayText(leak.sourceHex, 256), "Leak source", 256);
+  const value = requiredText(leak.value, "Leak value", 256);
+  const symbol = leak.symbol ? displayText(leak.symbol, 160) : undefined;
+  const summary = requiredText(
+    displayText(
+      `Pwn leak ${leakId}: ${leak.addressKind} ${symbol ? `${symbol} ` : ""}= ${value}; format=${leak.format}; source=${sourceHex}; confidence=${leak.confidence.toFixed(3)}${leak.derivation ? `; formula=${displayText(leak.derivation.expression, 320)}` : ""}`,
+      1_000,
+    ),
+    "Leak summary",
+    1_000,
+  );
+  return {
+    id: leakId,
+    kind: "inference",
+    name: displayText(`Leak ${leakId} (${leak.addressKind})`, 160),
+    summary,
+    tags: normalizedTags(["pwn", "leak", `address:${leak.addressKind}`, `format:${leak.format}`, ...(extraTags ?? [])]),
+    status: leak.confidence >= 0.9 ? "CONFIRMED" : leak.confidence > 0 ? "SUPPORTED" : "OPEN",
+    explanation: optionalText(explanation, "Leak explanation", 2_000) ?? "由 Pwn tube 输出解析得到的地址记录；后续 payload 应引用此节点而不是硬编码绝对地址。",
+    generation,
+    explainedBy: "harness",
   };
 }
 

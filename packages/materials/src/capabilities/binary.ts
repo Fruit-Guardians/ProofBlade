@@ -1,4 +1,5 @@
 import { open, realpath } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { RawEffectResult } from "../domain/types.js";
 
@@ -12,6 +13,12 @@ export interface BinaryCapabilityInput {
   length?: number;
   minLength?: number;
   maxResults?: number;
+}
+
+export interface GdbBatchCapabilityInput {
+  path: string;
+  commands: string[];
+  timeoutMs?: number;
 }
 
 export interface BinaryIdentity {
@@ -60,7 +67,8 @@ export async function executeBinaryCapability(operation: string, input: BinaryCa
       : operation === "read_range" ? readRange(bytes, input)
         : operation === "sections" ? sections(bytes)
           : operation === "symbols" ? symbols(bytes)
-            : operation === "strings" ? strings(bytes, input)
+      : operation === "strings" ? strings(bytes, input)
+        : operation === "inspect_elf" ? inspectElf(bytes)
               : (() => { throw new Error(`Unsupported binary operation: ${operation}`); })();
     throwIfAborted(signal);
     return { stdout: JSON.stringify(value, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started };
@@ -79,6 +87,30 @@ export function validateBinaryInput(operation: string, input: Record<string, unk
   if (operation === "strings") {
     if (input.minLength !== undefined) assertInteger(input.minLength, "minLength", 3, 64);
     if (input.maxResults !== undefined) assertInteger(input.maxResults, "maxResults", 1, 10_000);
+  }
+  if (operation === "gdb_batch") validateGdbBatchInput(input);
+}
+
+export function validateGdbBatchInput(input: Record<string, unknown>): asserts input is Record<string, unknown> & GdbBatchCapabilityInput {
+  if (typeof input.path !== "string" || input.path.length === 0 || isAbsolute(input.path)) throw new Error("gdb_batch path must be a non-empty relative path");
+  if (!Array.isArray(input.commands) || input.commands.length < 1 || input.commands.length > 32 || input.commands.some((item) => typeof item !== "string" || item.length === 0 || item.length > 256 || /[\r\n;]|\b(?:shell|source|python|define|document)\b/i.test(item))) {
+    throw new Error("gdb_batch commands must be 1-32 bounded non-shell commands");
+  }
+  if (input.timeoutMs !== undefined && (!Number.isInteger(input.timeoutMs) || Number(input.timeoutMs) < 100 || Number(input.timeoutMs) > 120_000)) throw new Error("gdb_batch timeoutMs must be 100-120000");
+  validateBinaryInput("identify", { path: input.path });
+}
+
+export async function executeGdbBatchCapability(input: GdbBatchCapabilityInput, cwd: string, signal: AbortSignal): Promise<RawEffectResult> {
+  const started = Date.now();
+  try {
+    validateGdbBatchInput(input as unknown as Record<string, unknown>);
+    const path = await resolveBinaryPath(cwd, input.path);
+    const executable = process.env.PROOFBLADE_GDB ?? "gdb";
+    const args = ["--batch", "--nx", "--quiet", "--args", path, ...input.commands.flatMap((command) => ["-ex", command])];
+    const output = await runBoundedProcess(executable, args, cwd, input.timeoutMs ?? 30_000, signal);
+    return { stdout: output.stdout, stderr: output.stderr, exitCode: output.exitCode, durationMs: Date.now() - started };
+  } catch (error) {
+    return { stdout: "", stderr: error instanceof Error ? error.message : String(error), exitCode: signal.aborted ? null : 1, durationMs: Date.now() - started };
   }
 }
 
@@ -173,6 +205,60 @@ function strings(bytes: Buffer, input: BinaryCapabilityInput): Record<string, un
   if (found.length < maxResults) scanUtf16(bytes, minLength, maxResults, found);
   found.sort((left, right) => left.offset - right.offset || left.encoding.localeCompare(right.encoding));
   return { count: found.length, strings: found.slice(0, maxResults) };
+}
+
+function inspectElf(bytes: Buffer): Record<string, unknown> {
+  const identity = identify(bytes);
+  if (identity.format !== "elf") throw new Error("inspect_elf requires an ELF binary");
+  const sectionInfo = elfSections(bytes) ?? [];
+  const symbolInfo = elfSymbols(bytes) ?? [];
+  const type = read16(bytes, 16, identity.endian ?? "little");
+  const programSecurity = elfProgramSecurity(bytes, identity.bits!, identity.endian!);
+  return {
+    format: "elf",
+    identity,
+    checksec: {
+      pie: type === 3,
+      nx: programSecurity.nx,
+      relro: programSecurity.relro,
+      canary: symbolInfo.some((symbol) => /stack_chk_fail/.test(symbol.name)),
+    },
+    sections: sectionInfo,
+    symbols: symbolInfo.slice(0, 4_000),
+  };
+}
+
+function elfProgramSecurity(bytes: Buffer, bits: 32 | 64, endian: "little" | "big"): { nx: boolean | null; relro: boolean } {
+  const tableOffset = Number(readWord(bytes, bits === 32 ? 28 : 32, bits, endian));
+  const entrySize = read16(bytes, bits === 32 ? 42 : 54, endian);
+  const count = read16(bytes, bits === 32 ? 44 : 56, endian);
+  let nx: boolean | null = null;
+  let relro = false;
+  for (let index = 0; index < count; index += 1) {
+    const base = tableOffset + index * entrySize;
+    if (entrySize < (bits === 32 ? 32 : 56) || base < 0 || base + entrySize > bytes.length) break;
+    const type = read32(bytes, base, endian);
+    const flags = read32(bytes, base + (bits === 32 ? 24 : 4), endian);
+    if (type === 0x6474e551) nx = (flags & 1) === 0; // PT_GNU_STACK, PF_X
+    if (type === 0x6474e552) relro = true; // PT_GNU_RELRO
+  }
+  return { nx, relro };
+}
+
+async function runBoundedProcess(executable: string, args: string[], cwd: string, timeoutMs: number, signal: AbortSignal): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(executable, args, { cwd, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => { child.kill(); reject(new Error(`gdb_batch timed out after ${timeoutMs}ms`)); }, timeoutMs);
+    const abort = () => { child.kill(); clearTimeout(timer); reject(new Error("gdb_batch aborted")); };
+    if (signal.aborted) return abort();
+    signal.addEventListener("abort", abort, { once: true });
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); if (stdout.length > 262_144) child.kill(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8"); if (stderr.length > 262_144) child.kill(); });
+    child.once("error", (error) => { clearTimeout(timer); signal.removeEventListener("abort", abort); reject(error); });
+    child.once("close", (exitCode) => { clearTimeout(timer); signal.removeEventListener("abort", abort); resolve({ stdout: stdout.slice(0, 262_144), stderr: stderr.slice(0, 262_144), exitCode }); });
+  });
 }
 
 function scanAscii(bytes: Buffer, minLength: number, maxResults: number, output: Array<{ offset: number; value: string; encoding: "ascii" | "utf16le" }>): void {
