@@ -2,6 +2,10 @@ import { mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
+/**
+ * Write content through a synced temporary file followed by an atomic rename.
+ * @invariant This provides one-file replacement, not a multi-file transaction.
+ */
 export async function atomicWriteFile(path: string, content: string | Uint8Array): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
@@ -19,6 +23,10 @@ export async function atomicWriteFile(path: string, content: string | Uint8Array
   }
 }
 
+/**
+ * Append UTF-8 content and sync the file before returning.
+ * @invariant Append ordering across independent processes is outside this helper's contract.
+ */
 export async function durableAppendFile(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const handle = await open(path, "a");

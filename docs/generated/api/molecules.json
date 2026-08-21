@@ -1,0 +1,723 @@
+{
+  "schemaVersion": 1,
+  "package": "@proofblade/molecules",
+  "packageId": "molecules",
+  "sourceRoot": "packages/molecules",
+  "moduleHashes": {
+    "src/agent-tool.ts": "185d4b7cd5ec45fe4f2d97625f4cce59e096990b3b64b2838926dc3c058dde5f",
+    "src/cache-metrics.ts": "07e7b6fa47789a3ed6d5e25aca80cc89f5dded23335df2780f8f1bd5d4385f29",
+    "src/capability.ts": "48fcfe343437540f14f3748cdca10a1f4a1114f7f1d17095a58dc5d65149cecc",
+    "src/context-maintenance.ts": "dcbe802524125a104cb01af6471012b5c660f79d9c10e34f9e29755cf053e56a",
+    "src/event-projector.ts": "47257d67085114905203f7acf8151fbcb9bb77c64265d89c2840bc6692c04842",
+    "src/file-artifact.ts": "4ccf418dce850f90db499c0d941128a94ec457458eae14afd57db5ceaa1db6e9",
+    "src/index.ts": "a1c1275a8d02fdc5aabba23932965611654930917a3e1b8f5c75e88f7a3141ee",
+    "src/layered-context.ts": "2c53870b27b56c275f6ecd743cd37095ccb19aaa480b403eb295b844f2bfe4cc",
+    "src/output-rewrite.ts": "41ad548a6df035ad589a9b23a712d38469fbacd875ba22b8a750d15b9ac2b5be",
+    "src/prompt-cache.ts": "7f54789bd8b58e64e1a1200f9acdfbd35921d6b05f7f38779ef155392cf569b5",
+    "src/provider-prefix.ts": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+    "src/text-window.ts": "0f61e31ffb7e73d6ee6f3b43b2fb703e80679539495cd5fa1dc27333c529b5f1"
+  },
+  "symbols": [
+    {
+      "id": "@proofblade/molecules::class::EventProjector",
+      "name": "EventProjector",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/event-projector.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 7,
+      "signature": "EventProjector<TState, TEvent>",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/molecules::class::FileArtifactRepository",
+      "name": "FileArtifactRepository",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/file-artifact.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 5,
+      "signature": "FileArtifactRepository",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::constant::DEFAULT_CONTEXT_MAINTENANCE_POLICY",
+      "name": "DEFAULT_CONTEXT_MAINTENANCE_POLICY",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/context-maintenance.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 23,
+      "signature": "Readonly<ContextMaintenancePolicy>",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::function::cacheHitRate",
+      "name": "cacheHitRate",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/cache-metrics.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 11,
+      "signature": "(usage: PromptCacheUsage): number",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "a408a2d0089326103431cb6e2a9ff59eb1552ad2bd8056a6dab4763a10915603"
+    },
+    {
+      "id": "@proofblade/molecules::function::cacheInputTokens",
+      "name": "cacheInputTokens",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/cache-metrics.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 7,
+      "signature": "(usage: PromptCacheUsage): number",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": [],
+      "structureHash": "8b49e11d202b6a1b44dabaab4115a86760b33bbc665d4a830b2b6132a12d6e06"
+    },
+    {
+      "id": "@proofblade/molecules::function::cacheWriteRate",
+      "name": "cacheWriteRate",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/cache-metrics.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 16,
+      "signature": "(usage: PromptCacheUsage): number",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": [],
+      "structureHash": "0f84b21672d07bc7fb917d5d72a23ef0e004735e853d5ced15c57d372b28e3ab"
+    },
+    {
+      "id": "@proofblade/molecules::function::capabilityCatalogHash",
+      "name": "capabilityCatalogHash",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 44,
+      "signature": "(manifests: readonly CapabilityManifest[]): string",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "38e37c4bbfea9b9c347b1ca407a313e2a92297c43cb11bd2e39432922fdad570"
+    },
+    {
+      "id": "@proofblade/molecules::function::capabilityManifestHash",
+      "name": "capabilityManifestHash",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 30,
+      "signature": "(manifest: CapabilityManifestAtom): string",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [],
+      "structureHash": "39790e9515959fdcb3dbb997ed6b3ba459ccdf27bcee001a55f0cb3bbf808b5a"
+    },
+    {
+      "id": "@proofblade/molecules::function::withCapabilityHash",
+      "name": "withCapabilityHash",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 40,
+      "signature": "(manifest: CapabilityManifestAtom): CapabilityManifest",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "8978ddc2f7f227a61d9f3fa6bb3dd1c6509deb4ef01ed12037d0575f1d9b3af5"
+    },
+    {
+      "id": "@proofblade/molecules::function::planContextMaintenance",
+      "name": "planContextMaintenance",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/context-maintenance.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 32,
+      "signature": "(usedTokens: number, availableTokens: number, policy?: ContextMaintenancePolicy): ContextMaintenancePlan",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "590e33a6fb7a48790bad51833eb087f951352b2fdcd7976eb7faad1fdf7a77fa"
+    },
+    {
+      "id": "@proofblade/molecules::function::compileContextLayers",
+      "name": "compileContextLayers",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/layered-context.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 16,
+      "signature": "(layers: readonly ContextLayer[]): LayeredContext",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "243bfe151229ca059f264cfae8c29b5c890bf680e1d2e1cf2b8c9bc69f8a2b08"
+    },
+    {
+      "id": "@proofblade/molecules::function::buildPromptCacheMetadata",
+      "name": "buildPromptCacheMetadata",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/prompt-cache.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 24,
+      "signature": "(layers: readonly PromptCacheLayer[]): PromptCacheMetadata",
+      "summary": "Fingerprint the provider-facing prompt as a stable prefix plus a changing tail.",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "5796f3d5c781fdf2016f3ca407f6ac8d91f5f080ccab7d1c51f3ecf3deece81e"
+    },
+    {
+      "id": "@proofblade/molecules::function::captureProviderPrefixShape",
+      "name": "captureProviderPrefixShape",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/provider-prefix.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 24,
+      "signature": "(payload: unknown, rewriteVersion?: number): ProviderPrefixShape",
+      "summary": "Capture only the provider-visible stable prefix. Conversation messages are",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/provider-prefix.test.ts"
+      ],
+      "structureHash": "d1bda3f7b072af957afc190d62325191415b93d009c8c6052f5a03301e840dfe"
+    },
+    {
+      "id": "@proofblade/molecules::function::compareProviderPrefixShapes",
+      "name": "compareProviderPrefixShapes",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/provider-prefix.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 47,
+      "signature": "(previous: ProviderPrefixShape, current: ProviderPrefixShape): ProviderPrefixComparison",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/provider-prefix.test.ts"
+      ],
+      "structureHash": "d31c7c422d46491ff20a08ce0aa4f16a60c073e8a42cc54a58cb447400ced382"
+    },
+    {
+      "id": "@proofblade/molecules::function::snipText",
+      "name": "snipText",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/text-window.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 8,
+      "signature": "(value: string, maxChars: number): SnippedText",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "668d4e54976e5af7e1d7029b9786ba382ede57f9cc131262dcbf44e47c2938cc"
+    },
+    {
+      "id": "@proofblade/molecules::interface::AgentTool",
+      "name": "AgentTool",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/agent-tool.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "AgentTool<TParameters, TInput, TResult, TContext>",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/molecules::interface::ToolDefinition",
+      "name": "ToolDefinition",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/agent-tool.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 8,
+      "signature": "ToolDefinition<TParameters, TInput, TResult, TContext>",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::PromptCacheUsage",
+      "name": "PromptCacheUsage",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/cache-metrics.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 1,
+      "signature": "PromptCacheUsage",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::CapabilityManifest",
+      "name": "CapabilityManifest",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 26,
+      "signature": "CapabilityManifest",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::CapabilityManifestAtom",
+      "name": "CapabilityManifestAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 18,
+      "signature": "CapabilityManifestAtom",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::CapabilityOperationAtom",
+      "name": "CapabilityOperationAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 7,
+      "signature": "CapabilityOperationAtom",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::ContextMaintenancePlan",
+      "name": "ContextMaintenancePlan",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context-maintenance.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 12,
+      "signature": "ContextMaintenancePlan",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::ContextMaintenancePolicy",
+      "name": "ContextMaintenancePolicy",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context-maintenance.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "ContextMaintenancePolicy",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::ProjectableEvent",
+      "name": "ProjectableEvent",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/event-projector.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "ProjectableEvent",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::ContextLayer",
+      "name": "ContextLayer",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/layered-context.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "ContextLayer",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/molecules::interface::LayeredContext",
+      "name": "LayeredContext",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/layered-context.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 9,
+      "signature": "LayeredContext",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::OutputRewritePort",
+      "name": "OutputRewritePort",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/output-rewrite.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 30,
+      "signature": "OutputRewritePort",
+      "summary": "Generic boundary between a Tool executor and a command-aware output reducer.",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::OutputRewriteRequest",
+      "name": "OutputRewriteRequest",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/output-rewrite.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 1,
+      "signature": "OutputRewriteRequest",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::OutputRewriteResult",
+      "name": "OutputRewriteResult",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/output-rewrite.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 20,
+      "signature": "OutputRewriteResult",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::OutputRewriteTicket",
+      "name": "OutputRewriteTicket",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/output-rewrite.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 7,
+      "signature": "OutputRewriteTicket",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::PromptCacheLayer",
+      "name": "PromptCacheLayer",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/prompt-cache.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "PromptCacheLayer",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::PromptCacheMetadata",
+      "name": "PromptCacheMetadata",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/prompt-cache.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 9,
+      "signature": "PromptCacheMetadata",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/molecules::interface::ProviderPrefixComparison",
+      "name": "ProviderPrefixComparison",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/provider-prefix.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 15,
+      "signature": "ProviderPrefixComparison",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::interface::ProviderPrefixShape",
+      "name": "ProviderPrefixShape",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/provider-prefix.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "ProviderPrefixShape",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/provider-prefix.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/molecules::interface::SnippedText",
+      "name": "SnippedText",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/text-window.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 1,
+      "signature": "SnippedText",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::method::EventProjector.replay",
+      "name": "EventProjector.replay",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/event-projector.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 13,
+      "signature": "(events: readonly TEvent[]): TState",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "279745d002ad7f87683908eedd36a4864599f33c0b97d62949dbb006396b1e96",
+      "parentId": "@proofblade/molecules::class::EventProjector"
+    },
+    {
+      "id": "@proofblade/molecules::method::FileArtifactRepository.put",
+      "name": "FileArtifactRepository.put",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/file-artifact.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 12,
+      "signature": "(relativePath: string, content: string | Uint8Array, mime: string): Promise<ArtifactAtom>",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "f3ff8a95cdf0591a8e64b79f34967e615a8b38cb644c7f8e929e97fbaef96dba",
+      "parentId": "@proofblade/molecules::class::FileArtifactRepository"
+    },
+    {
+      "id": "@proofblade/molecules::method::FileArtifactRepository.read",
+      "name": "FileArtifactRepository.read",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/file-artifact.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 19,
+      "signature": "(artifact: ArtifactAtom): Promise<Uint8Array>",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts",
+        "packages/molecules/tests/provider-prefix.test.ts"
+      ],
+      "structureHash": "ef6d5d98eaeaaa5b6d0ed080844139c49145c6700f9a8994834a1337a821022c",
+      "parentId": "@proofblade/molecules::class::FileArtifactRepository"
+    },
+    {
+      "id": "@proofblade/molecules::type::CapabilityOutputPolicy",
+      "name": "CapabilityOutputPolicy",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 4,
+      "signature": "ToolOutputPolicyAtom",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::type::CapabilityReplayPolicy",
+      "name": "CapabilityReplayPolicy",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 5,
+      "signature": "CapabilityReplayPolicy",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::type::CapabilitySideEffect",
+      "name": "CapabilitySideEffect",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/capability.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 3,
+      "signature": "ToolSideEffectAtom",
+      "summary": "",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/molecules::type::ContextMaintenanceStage",
+      "name": "ContextMaintenanceStage",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context-maintenance.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 1,
+      "signature": "ContextMaintenanceStage",
+      "summary": "",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    }
+  ]
+}
