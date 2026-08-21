@@ -21,6 +21,7 @@
       "line": 2,
       "signature": "KeyedOperationQueue",
       "summary": "Serialize asynchronous operations by key while allowing different keys to progress independently.",
+      "summarySource": "tsdoc",
       "tags": [],
       "imports": [],
       "testRefs": [
@@ -37,6 +38,7 @@
       "line": 9,
       "signature": "(path: string, content: string | Uint8Array): Promise<void>",
       "summary": "Write content through a synced temporary file followed by an atomic rename.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -61,6 +63,7 @@
       "line": 30,
       "signature": "(path: string, content: string): Promise<void>",
       "summary": "Append UTF-8 content and sync the file before returning.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -85,6 +88,7 @@
       "line": 23,
       "signature": "(value: unknown): string",
       "summary": "Serialize a value deterministically by recursively sorting object keys.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -109,6 +113,7 @@
       "line": 7,
       "signature": "(prefix: string): string",
       "summary": "Create a unique identifier with a caller-supplied display prefix.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -130,6 +135,7 @@
       "line": 43,
       "signature": "(value: string): number",
       "summary": "Estimate token count with a bounded character-based approximation.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -152,6 +158,7 @@
       "line": 15,
       "signature": "(value: string | Uint8Array): string",
       "summary": "Compute a lowercase SHA-256 digest for text or bytes.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -175,7 +182,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 72,
       "signature": "AppendOnlyLogAtom<TEvent>",
-      "summary": "",
+      "summary": "Inferred summary: append only log atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -189,7 +197,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 56,
       "signature": "ArtifactAtom",
-      "summary": "",
+      "summary": "Inferred summary: artifact atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -203,7 +212,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 63,
       "signature": "EffectAtom<TPolicy, TArgs>",
-      "summary": "",
+      "summary": "Inferred summary: effect atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -217,7 +227,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 33,
       "signature": "EventAtom<TType, TPayload>",
-      "summary": "",
+      "summary": "Inferred summary: event atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -231,7 +242,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 28,
       "signature": "MessageAtom<TRole, TContent>",
-      "summary": "",
+      "summary": "Inferred summary: message atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -245,7 +257,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 38,
       "signature": "SequencedEventAtom<TType, TPayload, TLane, TActor>",
-      "summary": "",
+      "summary": "Inferred summary: sequenced event atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -259,7 +272,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 1,
       "signature": "ToolAtom<TParameters>",
-      "summary": "",
+      "summary": "Inferred summary: tool atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [
@@ -275,7 +289,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 13,
       "signature": "ToolErrorAtom<TArtifactRef>",
-      "summary": "",
+      "summary": "Inferred summary: tool error atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -289,7 +304,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 23,
       "signature": "ToolFailureAtom<TArtifactRef>",
-      "summary": "",
+      "summary": "Inferred summary: tool failure atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -304,6 +320,7 @@
       "line": 9,
       "signature": "<T>(key: string, operation: () => Promise<T>): Promise<T>",
       "summary": "Run one operation after the previous operation for the same key settles.",
+      "summarySource": "tsdoc",
       "tags": [
         {
           "name": "invariant",
@@ -326,7 +343,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 70,
       "signature": "ReducerAtom<TState, TEvent>",
-      "summary": "",
+      "summary": "Inferred summary: reducer atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -340,7 +358,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 54,
       "signature": "ReplayPolicyAtom",
-      "summary": "",
+      "summary": "Inferred summary: replay policy atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -354,7 +373,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 11,
       "signature": "ToolErrorPhaseAtom",
-      "summary": "",
+      "summary": "Inferred summary: tool error phase atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -368,7 +388,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 9,
       "signature": "ToolExecutionModeAtom",
-      "summary": "",
+      "summary": "Inferred summary: tool execution mode atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -382,7 +403,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 8,
       "signature": "ToolOutputPolicyAtom",
-      "summary": "",
+      "summary": "Inferred summary: tool output policy atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -396,7 +418,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 10,
       "signature": "ToolSensitivityAtom",
-      "summary": "",
+      "summary": "Inferred summary: tool sensitivity atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -410,7 +433,8 @@
       "exportPath": "@proofblade/atoms",
       "line": 7,
       "signature": "ToolSideEffectAtom",
-      "summary": "",
+      "summary": "Inferred summary: tool side effect atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []

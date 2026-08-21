@@ -55,6 +55,7 @@ function describeSymbol(symbol, declaration, checker, packageRoot, packageName, 
   const docs = documentation(symbol, checker);
   const signature = signatureOf(symbol, declaration, checker);
   const module = normalize(relative(packageRoot, sourceFile.fileName));
+  const summary = docs.summary || inferSummary(name, kind, declaration);
   return {
     id: `${packageName}::${kind}::${name}`,
     name,
@@ -64,7 +65,8 @@ function describeSymbol(symbol, declaration, checker, packageRoot, packageName, 
     exportPath: packageName,
     line: position.line + 1,
     signature,
-    summary: docs.summary,
+    summary,
+    summarySource: docs.summary ? "tsdoc" : "inferred",
     tags: docs.tags,
     imports: importsOf(sourceFile),
     testRefs: testFiles.filter((file) => file.text.includes(name)).map((file) => file.path),
@@ -82,6 +84,7 @@ function describeMethods(classSymbol, classDeclaration, checker, packageRoot, pa
     const sourceFile = member.getSourceFile();
     const position = sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile));
     const docs = documentation(methodSymbol, checker);
+    const summary = docs.summary || inferSummary(name, "method", member);
     methods.push({
       id: `${packageName}::method::${name}`,
       name,
@@ -91,7 +94,8 @@ function describeMethods(classSymbol, classDeclaration, checker, packageRoot, pa
       exportPath: packageName,
       line: position.line + 1,
       signature: signatureOf(methodSymbol, member, checker),
-      summary: docs.summary,
+      summary,
+      summarySource: docs.summary ? "tsdoc" : "inferred",
       tags: docs.tags,
       imports: importsOf(sourceFile),
       testRefs: testFiles.filter((file) => file.text.includes(member.name.getText())).map((file) => file.path),
@@ -132,6 +136,23 @@ function documentation(symbol, checker) {
   const summary = ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim().split(/\r?\n/)[0] ?? "";
   const tags = symbol.getJsDocTags(checker).map((tag) => ({ name: tag.name, text: typeof tag.text === "string" ? tag.text : ts.displayPartsToString(tag.text ?? []) }));
   return { summary, tags };
+}
+
+function inferSummary(name, kind, declaration) {
+  const leaf = name.split(".").at(-1) ?? name;
+  const words = leaf.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase().trim();
+  const body = declaration.body?.getText() ?? "";
+  const behavior = /dispatch|append|write|save|persist|create|insert|add/i.test(body)
+    ? "perform a durable write"
+    : /read|load|snapshot|replay|search|list|find/i.test(body)
+      ? "read or inspect state"
+      : /validate|assert|check|verify/i.test(body)
+        ? "validate input or state"
+        : /hash|digest|canonical|serialize/i.test(`${name} ${body}`)
+          ? "produce a deterministic value"
+          : "provide a reusable operation";
+  const subject = kind === "class" ? "class" : kind === "interface" || kind === "type" ? "type contract" : kind === "constant" ? "constant" : "operation";
+  return `Inferred summary: ${words || name} ${subject} used to ${behavior}.`;
 }
 
 function importsOf(sourceFile) {

@@ -27,7 +27,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 7,
       "signature": "EventProjector<TState, TEvent>",
-      "summary": "",
+      "summary": "Inferred summary: event projector class used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -45,7 +46,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 5,
       "signature": "FileArtifactRepository",
-      "summary": "",
+      "summary": "Inferred summary: file artifact repository class used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms",
@@ -63,7 +65,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 23,
       "signature": "Readonly<ContextMaintenancePolicy>",
-      "summary": "",
+      "summary": "Inferred summary: default context maintenance policy constant used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -77,7 +80,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 11,
       "signature": "(usage: PromptCacheUsage): number",
-      "summary": "",
+      "summary": "Inferred summary: cache hit rate operation used to read or inspect state.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [
@@ -94,7 +98,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 7,
       "signature": "(usage: PromptCacheUsage): number",
-      "summary": "",
+      "summary": "Inferred summary: cache input tokens operation used to read or inspect state.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [],
@@ -109,7 +114,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 16,
       "signature": "(usage: PromptCacheUsage): number",
-      "summary": "",
+      "summary": "Inferred summary: cache write rate operation used to perform a durable write.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [],
@@ -124,7 +130,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 44,
       "signature": "(manifests: readonly CapabilityManifest[]): string",
-      "summary": "",
+      "summary": "Inferred summary: capability catalog hash operation used to produce a deterministic value.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -143,7 +150,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 30,
       "signature": "(manifest: CapabilityManifestAtom): string",
-      "summary": "",
+      "summary": "Inferred summary: capability manifest hash operation used to produce a deterministic value.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -160,7 +168,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 40,
       "signature": "(manifest: CapabilityManifestAtom): CapabilityManifest",
-      "summary": "",
+      "summary": "Inferred summary: with capability hash operation used to produce a deterministic value.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -179,7 +188,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 32,
       "signature": "(usedTokens: number, availableTokens: number, policy?: ContextMaintenancePolicy): ContextMaintenancePlan",
-      "summary": "",
+      "summary": "Inferred summary: plan context maintenance operation used to validate input or state.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [
@@ -196,7 +206,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 16,
       "signature": "(layers: readonly ContextLayer[]): LayeredContext",
-      "summary": "",
+      "summary": "Inferred summary: compile context layers operation used to produce a deterministic value.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -216,6 +227,7 @@
       "line": 24,
       "signature": "(layers: readonly PromptCacheLayer[]): PromptCacheMetadata",
       "summary": "Fingerprint the provider-facing prompt as a stable prefix plus a changing tail.",
+      "summarySource": "tsdoc",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -235,6 +247,7 @@
       "line": 24,
       "signature": "(payload: unknown, rewriteVersion?: number): ProviderPrefixShape",
       "summary": "Capture only the provider-visible stable prefix. Conversation messages are",
+      "summarySource": "tsdoc",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -253,7 +266,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 47,
       "signature": "(previous: ProviderPrefixShape, current: ProviderPrefixShape): ProviderPrefixComparison",
-      "summary": "",
+      "summary": "Inferred summary: compare provider prefix shapes operation used to perform a durable write.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -272,7 +286,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 8,
       "signature": "(value: string, maxChars: number): SnippedText",
-      "summary": "",
+      "summary": "Inferred summary: snip text operation used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": [
@@ -289,7 +304,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "AgentTool<TParameters, TInput, TResult, TContext>",
-      "summary": "",
+      "summary": "Inferred summary: agent tool type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -307,7 +323,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 8,
       "signature": "ToolDefinition<TParameters, TInput, TResult, TContext>",
-      "summary": "",
+      "summary": "Inferred summary: tool definition type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -323,7 +340,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 1,
       "signature": "PromptCacheUsage",
-      "summary": "",
+      "summary": "Inferred summary: prompt cache usage type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -337,7 +355,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 26,
       "signature": "CapabilityManifest",
-      "summary": "",
+      "summary": "Inferred summary: capability manifest type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -353,7 +372,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 18,
       "signature": "CapabilityManifestAtom",
-      "summary": "",
+      "summary": "Inferred summary: capability manifest atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -369,7 +389,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 7,
       "signature": "CapabilityOperationAtom",
-      "summary": "",
+      "summary": "Inferred summary: capability operation atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -385,7 +406,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 12,
       "signature": "ContextMaintenancePlan",
-      "summary": "",
+      "summary": "Inferred summary: context maintenance plan type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -399,7 +421,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "ContextMaintenancePolicy",
-      "summary": "",
+      "summary": "Inferred summary: context maintenance policy type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -413,7 +436,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "ProjectableEvent",
-      "summary": "",
+      "summary": "Inferred summary: projectable event type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -429,7 +453,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "ContextLayer",
-      "summary": "",
+      "summary": "Inferred summary: context layer type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -447,7 +472,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 9,
       "signature": "LayeredContext",
-      "summary": "",
+      "summary": "Inferred summary: layered context type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -464,6 +490,7 @@
       "line": 30,
       "signature": "OutputRewritePort",
       "summary": "Generic boundary between a Tool executor and a command-aware output reducer.",
+      "summarySource": "tsdoc",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -477,7 +504,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 1,
       "signature": "OutputRewriteRequest",
-      "summary": "",
+      "summary": "Inferred summary: output rewrite request type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -491,7 +519,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 20,
       "signature": "OutputRewriteResult",
-      "summary": "",
+      "summary": "Inferred summary: output rewrite result type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -505,7 +534,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 7,
       "signature": "OutputRewriteTicket",
-      "summary": "",
+      "summary": "Inferred summary: output rewrite ticket type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -519,7 +549,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "PromptCacheLayer",
-      "summary": "",
+      "summary": "Inferred summary: prompt cache layer type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -535,7 +566,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 9,
       "signature": "PromptCacheMetadata",
-      "summary": "",
+      "summary": "Inferred summary: prompt cache metadata type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -553,7 +585,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 15,
       "signature": "ProviderPrefixComparison",
-      "summary": "",
+      "summary": "Inferred summary: provider prefix comparison type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -569,7 +602,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "ProviderPrefixShape",
-      "summary": "",
+      "summary": "Inferred summary: provider prefix shape type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -587,7 +621,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 1,
       "signature": "SnippedText",
-      "summary": "",
+      "summary": "Inferred summary: snipped text type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
@@ -601,7 +636,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 13,
       "signature": "(events: readonly TEvent[]): TState",
-      "summary": "",
+      "summary": "Inferred summary: replay operation used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -621,7 +657,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 12,
       "signature": "(relativePath: string, content: string | Uint8Array, mime: string): Promise<ArtifactAtom>",
-      "summary": "",
+      "summary": "Inferred summary: put operation used to perform a durable write.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms",
@@ -643,7 +680,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 19,
       "signature": "(artifact: ArtifactAtom): Promise<Uint8Array>",
-      "summary": "",
+      "summary": "Inferred summary: read operation used to read or inspect state.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms",
@@ -666,7 +704,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 4,
       "signature": "ToolOutputPolicyAtom",
-      "summary": "",
+      "summary": "Inferred summary: capability output policy type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -682,7 +721,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 5,
       "signature": "CapabilityReplayPolicy",
-      "summary": "",
+      "summary": "Inferred summary: capability replay policy type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -698,7 +738,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 3,
       "signature": "ToolSideEffectAtom",
-      "summary": "",
+      "summary": "Inferred summary: capability side effect type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [
         "@proofblade/atoms"
@@ -714,7 +755,8 @@
       "exportPath": "@proofblade/molecules",
       "line": 1,
       "signature": "ContextMaintenanceStage",
-      "summary": "",
+      "summary": "Inferred summary: context maintenance stage type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
       "tags": [],
       "imports": [],
       "testRefs": []
