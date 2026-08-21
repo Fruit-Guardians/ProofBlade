@@ -283,15 +283,28 @@ export class DasctfCompetitionApi implements CompetitionApi {
 
   private async downloadAttachments(detail: Record<string, unknown>): Promise<CompetitionAttachment[]> {
     const attachment = asRecord(detail.attachment);
-    const files = attachment ? asArray(attachment.files) : undefined;
-    if (!files || files.length === 0) return [];
+    if (!attachment) return [];
+    // The platform serves attachments in one of two shapes:
+    //  - a `files[]` array of {url,name} records (multi-file), or
+    //  - the download fields inlined directly on `attachment` ({url,name,...}),
+    //    with `files` absent or empty (observed on 西湖论剑 2026, e.g. CRYPTO-01
+    //    whose zip url/name sit on `attachment` while `attachment.files` is []).
+    // Reading only `files[]` silently dropped the inline case, so the challenge
+    // workspace came up empty and the model found nothing to solve. Handle both.
+    const files = asArray(attachment.files) ?? [];
+    const entries = files.length > 0 ? files : [attachment];
     const results: CompetitionAttachment[] = [];
-    for (const entry of files) {
+    for (const entry of entries) {
       const record = asRecord(entry);
       if (!record) continue;
       const url = optionalString(record, ["url"]);
       const name = optionalString(record, ["name"]) ?? "attachment";
-      if (!url) throw new CompetitionChallengeError("DASCTF API attachment.files[].url returned an invalid payload; expected a download URL");
+      // Inline shape with no url means there is genuinely no attachment; only the
+      // explicit files[] shape treats a missing url as a malformed payload.
+      if (!url) {
+        if (files.length > 0) throw new CompetitionChallengeError("DASCTF API attachment.files[].url returned an invalid payload; expected a download URL");
+        continue;
+      }
       const base64 = await this.downloadBase64(url);
       results.push({ name, base64 });
     }
