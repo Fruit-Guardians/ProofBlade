@@ -12,7 +12,8 @@ export function renderMarkdown(index) {
     const sourcePath = `../../../${index.sourceRoot}/${symbol.module}`;
     lines.push(`- Source: [${symbol.module}:${symbol.line}](${sourcePath}:${symbol.line})`);
     lines.push(`- Export: \`${symbol.exportPath}\``);
-    lines.push(`- Summary: ${symbol.summary || "[missing TSDoc summary]"}`);
+    lines.push(`- Summary: ${symbol.summary}`);
+    lines.push(`- Summary source: \`${symbol.summarySource}\``);
     if (symbol.tags.length > 0) lines.push(`- Tags: ${symbol.tags.map((tag) => `\`${tag.name}\``).join(", ")}`);
     if (symbol.testRefs.length > 0) lines.push(`- Tests: ${symbol.testRefs.map((path) => `\`${path}\``).join(", ")}`);
     lines.push("");
@@ -37,6 +38,7 @@ export function renderAgentContext(index) {
       kind: symbol.kind,
       signature: symbol.signature,
       summary: symbol.summary,
+      summarySource: symbol.summarySource,
       tags: symbol.tags,
       exportPath: symbol.exportPath,
       module: symbol.module,

@@ -42,6 +42,7 @@ npm run api:index:check
 - Treat duplicate reports as evidence. Confirm behavior, invariants, error handling, serialization, and dependency direction before reusing code.
 - Exact duplicate public exports require correction or an explicit `@duplicate-justification` TSDoc tag.
 - Add a concise TSDoc summary to every new public symbol. Document `@invariant`, `@throws`, and `@example` when they affect safe reuse.
+- Treat `summarySource=inferred` as a generated hint, not a substitute for adding TSDoc to new public code.
 - Never hand-edit `docs/generated/api`, `docs/generated/agent`, or `docs/generated/duplicates`.
 
 ## AI response format

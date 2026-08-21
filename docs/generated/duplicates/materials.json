@@ -13,7 +13,7 @@
           "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
           "module": "src/capabilities/backend.ts",
           "line": 192,
-          "summary": ""
+          "summary": "Inferred summary: availability operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::BundledCapabilityBackend.availability",
@@ -23,7 +23,7 @@
           "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
           "module": "src/capabilities/backend.ts",
           "line": 160,
-          "summary": ""
+          "summary": "Inferred summary: availability operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::FirmwareCapabilityBackend.availability",
@@ -33,7 +33,7 @@
           "signature": "(_request: CapabilityBackendRequest): CapabilityBackendAvailability",
           "module": "src/capabilities/backend.ts",
           "line": 233,
-          "summary": ""
+          "summary": "Inferred summary: availability operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -52,7 +52,7 @@
           "signature": "(): CapabilityBackendStatus",
           "module": "src/capabilities/backend.ts",
           "line": 184,
-          "summary": ""
+          "summary": "Inferred summary: status operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::BundledCapabilityBackend.status",
@@ -62,7 +62,7 @@
           "signature": "(): CapabilityBackendStatus",
           "module": "src/capabilities/backend.ts",
           "line": 151,
-          "summary": ""
+          "summary": "Inferred summary: status operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::FirmwareCapabilityBackend.status",
@@ -72,7 +72,7 @@
           "signature": "(): CapabilityBackendStatus",
           "module": "src/capabilities/backend.ts",
           "line": 225,
-          "summary": ""
+          "summary": "Inferred summary: status operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -91,7 +91,7 @@
           "signature": "(_request: CapabilityBackendRequest): string",
           "module": "src/capabilities/backend.ts",
           "line": 196,
-          "summary": ""
+          "summary": "Inferred summary: version for operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::BundledCapabilityBackend.versionFor",
@@ -101,7 +101,7 @@
           "signature": "(_request: CapabilityBackendRequest): string",
           "module": "src/capabilities/backend.ts",
           "line": 164,
-          "summary": ""
+          "summary": "Inferred summary: version for operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::FirmwareCapabilityBackend.versionFor",
@@ -111,7 +111,7 @@
           "signature": "(_request: CapabilityBackendRequest): string",
           "module": "src/capabilities/backend.ts",
           "line": 237,
-          "summary": ""
+          "summary": "Inferred summary: version for operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -130,7 +130,7 @@
           "signature": "(): Promise<void>",
           "module": "src/competition/sandbox.ts",
           "line": 114,
-          "summary": ""
+          "summary": "Inferred summary: close operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::CompetitionSandbox.destroy",
@@ -140,7 +140,7 @@
           "signature": "(_fixture: FixtureRef): Promise<void>",
           "module": "src/competition/sandbox.ts",
           "line": 110,
-          "summary": ""
+          "summary": "Inferred summary: destroy operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -159,7 +159,7 @@
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
           "line": 117,
-          "summary": ""
+          "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
           "id": "@proofblade/materials::method::ControlStore.snapshot",
@@ -169,7 +169,7 @@
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
           "line": 113,
-          "summary": ""
+          "summary": "Inferred summary: snapshot operation used to read or inspect state."
         }
       ],
       "signals": [
@@ -188,7 +188,7 @@
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
           "line": 411,
-          "summary": ""
+          "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::PiAgentLane.abort",
@@ -198,7 +198,7 @@
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
           "line": 130,
-          "summary": ""
+          "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::PiSolverLane.abort",
@@ -208,7 +208,7 @@
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/solver-lane.ts",
           "line": 230,
-          "summary": ""
+          "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -227,7 +227,7 @@
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
           "line": 415,
-          "summary": ""
+          "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::PiAgentLane.compact",
@@ -237,7 +237,7 @@
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
           "line": 134,
-          "summary": ""
+          "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
           "id": "@proofblade/materials::method::PiSolverLane.compact",
@@ -247,7 +247,7 @@
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/solver-lane.ts",
           "line": 234,
-          "summary": ""
+          "summary": "Inferred summary: compact operation used to provide a reusable operation."
         }
       ],
       "signals": [

@@ -16,9 +16,14 @@ test("collects deterministic atoms exports with signatures, comments, tests, and
   const canonical = index.symbols.find((symbol) => symbol.name === "canonicalJson");
   assert.ok(canonical);
   assert.match(canonical.summary, /deterministically/);
+  assert.equal(canonical.summarySource, "tsdoc");
   assert.ok(canonical.testRefs.some((path) => path.endsWith("packages/atoms/tests/atoms.test.ts")));
   assert.ok(index.symbols.every((symbol) => !/[A-Za-z]:\\|^\//.test(symbol.module)));
   assert.ok(index.symbols.some((symbol) => symbol.name === "KeyedOperationQueue.run" && symbol.kind === "method"));
+  const inferred = index.symbols.find((symbol) => symbol.name === "ReducerAtom");
+  assert.ok(inferred);
+  assert.equal(inferred.summarySource, "inferred");
+  assert.match(inferred.summary, /Inferred summary/);
 });
 
 test("renderers are deterministic and contain the generated marker", () => {
