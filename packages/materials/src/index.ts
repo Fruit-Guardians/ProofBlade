@@ -23,6 +23,7 @@ export * from "./verification/pwn-reproducer.js";
 export * from "./verification/web-reproducer.js";
 export * from "./web/http-session.js";
 export * from "./web/browser-session.js";
+export * from "./web/web-tools.js";
 export * from "./pwn/leak.js";
 export * from "./pwn/pwn-session.js";
 export * from "./pwn/pwn-tools.js";

@@ -43,6 +43,7 @@ import { PwnToolHandler, type PwnReproductionPolicy } from "../pwn/pwn-tools.js"
 import { ExperimentGate } from "../competition/experiment-gate.js";
 import { HttpSessionBackend } from "../web/http-session.js";
 import { WebReproducer, type WebExploitStep } from "../verification/web-reproducer.js";
+import { WebToolHandler } from "../web/web-tools.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -216,7 +217,21 @@ export class PiCodingLane implements AgentLanePort {
     const webPolicy = snapshot.task.verification.web;
     const webBaseUrl = webBaseUrlFromTarget(snapshot.task.target);
     const webReproducer = webPolicy && webBaseUrl ? new WebReproducer(options.controlStore) : undefined;
-    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer) }), ...mcpFirstClassTools];
+    // Interactive web session tools: available whenever the task has a resolvable
+    // web target (host-side fetch, origin-locked — no container needed). This is
+    // the exploration counterpart to the verifier-only web_reproduce; it lets the
+    // model keep cookies/CSRF across calls instead of losing them between curls.
+    const webSession = webBaseUrl
+      ? new WebToolHandler({
+        runId: options.runId,
+        controlStore: options.controlStore,
+        artifactStore,
+        ownerLane: "main",
+        scope: { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
+        ...(experimentGate ? { experimentGate } : {}),
+      })
+      : undefined;
+    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -226,6 +241,7 @@ export class PiCodingLane implements AgentLanePort {
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
         webReproductionEnabled: Boolean(webReproducer),
+        webSessionEnabled: Boolean(webSession),
       }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
@@ -256,6 +272,7 @@ export class PiCodingLane implements AgentLanePort {
         webReproduce: async (steps: WebExploitStep[], signal?: AbortSignal) => await webReproducer.reproduce(options.runId, { steps }, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl!, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, experimentGate }), signal),
       } : {}),
       ...(pwnTools ? { pwnTools } : {}),
+      ...(webSession ? { webSession } : {}),
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
@@ -275,6 +292,7 @@ export class PiCodingLane implements AgentLanePort {
         target: snapshot.task.target,
         pwnToolsAvailable: Boolean(pwnTools),
         pwnReproductionAvailable: Boolean(pwnTools && pwnReproductionPolicy),
+        webToolsAvailable: Boolean(webSession),
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
@@ -585,7 +603,7 @@ function codingSystemPrompt(
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -614,7 +632,7 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
+  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
   return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
@@ -632,7 +650,7 @@ function codingSystemPrompt(
  *   parser that never matches. State the rule once, up-front: capture bytes
  *   from actual recv output, never transcribe non-ASCII prompt text by hand.
  */
-export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable = pwnToolsAvailable): string {
+export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable = pwnToolsAvailable, webToolsAvailable?: boolean): string {
   if (!kind || kind === "unknown") return "";
   const remote = typeof target === "string" && target.startsWith("REMOTE:") ? target.slice("REMOTE:".length).trim() : undefined;
   const remoteBlock = remote ? `\nLive target: ${remote}. The container's egress gateway already permits that host/port; other outbound network is denied by policy, not by a broken tool, so do not retry the same request against a different upstream when it is refused.` : "";
@@ -660,8 +678,15 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
     ].join("\n");
   }
   if (kind === "web") {
+    // When the interactive web session tools are wired, steer stateful work onto
+    // them: a durable session keeps the cookie jar / CSRF across calls, so the
+    // model does not re-establish `requests.Session()` state on every bash call.
+    const webInteractionRule = webToolsAvailable
+      ? "- INTERACTION MODEL — for anything stateful use the persistent web session, not repeated one-shot curls. Open the target once with `web_open` (baseUrl=the target URL) and keep the returned sessionId; drive it with `web_request` (path/method/headers/body) so cookies, CSRF tokens, and redirects persist across the whole chain. Use `web_replay` to check whether a request still works in a clean cookie jar. `curl`/`sqlmap`/`python-requests` remain available for one-shot probes."
+      : "- For stateful flows (login then act, CSRF token reuse) use Python `requests.Session()` in a single script; a chain of separate `curl` calls drops the cookie jar between calls.";
     return [
       "\n\n## Web category specifics",
+      webInteractionRule,
       "- `curl`, `python-requests`, `beautifulsoup4`, `sqlmap`, `chromium` (headless), and `playwright` are already installed. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
       "- Read the initial page and its response headers first: `curl -sSikL <target>` shows the framework fingerprint (Server, X-Powered-By, Set-Cookie shape, error page style) that decides your subsequent playbook branch (SQLi vs SSTI vs SSRF vs auth-bypass vs deserialization).",
       "- Check `/robots.txt`, `/.git/HEAD`, `/.env`, `/admin`, `/login`, source view (`view-source:` equivalent via `curl`), sitemap, and any JS bundles for endpoints — a large fraction of web CTFs hinge on a route that is not linked from the landing page.",
