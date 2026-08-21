@@ -31,11 +31,11 @@ import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } f
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
+import { resolveControlAuthority } from "../storage/control-authority.js";
 import { reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
 import { assertPhaseTransition } from "./phase-machine.js";
 import { isAbsolute, relative, resolve } from "node:path";
-import { randomBytes } from "node:crypto";
 
 type WithoutLane<T> = T extends unknown ? Omit<T, "lane"> : never;
 type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "fixture";
@@ -76,11 +76,13 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "turn_started",
   "assistant_message",
   "provider_request_started",
+  "request_epoch_started",
   "provider_request_queued",
   "provider_request_slot_acquired",
   "provider_request_queue_cancelled",
   "provider_request_retried",
   "provider_response_received",
+  "request_epoch_context",
   "tool_call_recorded",
   "tool_result_recorded",
   "compaction_recorded",
@@ -176,7 +178,7 @@ export class ControlStore {
     if (authoritySecret !== undefined && authoritySecret.length < 32) {
       throw new Error("Control authority secret must contain at least 32 characters");
     }
-    this.#authoritySecret = authoritySecret ?? randomBytes(32).toString("hex");
+    this.#authoritySecret = authoritySecret ?? resolveControlAuthority();
     this.#authorityHash = sha256(this.#authoritySecret);
   }
 
@@ -190,11 +192,23 @@ export class ControlStore {
   }
 
   public async snapshot(runId: string): Promise<RunSnapshot> {
+    await this.#migrateLegacyRunBestEffort(runId);
     return await this.eventStore.replay(runId);
   }
 
   public async replay(runId: string): Promise<RunSnapshot> {
+    await this.#migrateLegacyRunBestEffort(runId);
     return await this.eventStore.replay(runId);
+  }
+
+  async #migrateLegacyRunBestEffort(runId: string): Promise<void> {
+    try {
+      await this.eventStore.migrateLegacyRun(runId, this.#authorityHash);
+    } catch {
+      // Migration is an availability enhancement, never a replay prerequisite.
+      // replay() below still validates the full stream and exposes a legacy Run
+      // as read-only when backup/append cannot be completed.
+    }
   }
 
   public async events(runId: string): Promise<HarnessEvent[]> {

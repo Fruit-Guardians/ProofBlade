@@ -9,6 +9,7 @@ import { LocalFixtureSandbox, type SandboxPort } from "../sandbox/fixture.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createRunVersionSnapshot } from "../runtime/version.js";
 import { IndependentVerifier } from "../verification/verifier.js";
+import { resolveControlAuthority } from "../storage/control-authority.js";
 
 export interface AppServices {
   projectRoot: string;
@@ -33,6 +34,8 @@ export interface CreateServicesOptions {
   sandbox?: SandboxPort;
   /** Stable harness-owned credential for explicit trusted cross-process reopen. */
   authoritySecret?: string;
+  /** Test/deployment override for the host-owned authority credential directory. */
+  authorityStateDirectory?: string;
 }
 
 export function createServices(root: string, config: ProofBladeConfig, options: CreateServicesOptions | import("../effects/effect-journal.js").EffectFaultInjector = {}): AppServices {
@@ -49,10 +52,11 @@ function createServicePlane(root: string, config: ProofBladeConfig, options: Cre
   // Back-compat: a bare EffectFaultInjector (a function) may still be passed positionally.
   const resolved: CreateServicesOptions = typeof options === "function" ? { effectFault: options } : options;
   const runsRoot = join(root, config.storage.runsDir);
+  const authoritySecret = resolveControlAuthority(resolved.authoritySecret, resolved.authorityStateDirectory);
   const { control, verifier, verifierEffects, fixtureControl } = ControlStore.create(
     new JsonlControlStore(runsRoot),
     async () => await createRunVersionSnapshot(root, config),
-    resolved.authoritySecret,
+    authoritySecret,
   );
   const artifacts = new ArtifactStore(runsRoot, control);
   const sandbox = resolved.sandbox ?? new LocalFixtureSandbox(join(root, config.storage.fixturesDir));

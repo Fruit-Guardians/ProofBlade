@@ -41,7 +41,7 @@ export class WebReproducer {
   private async record(runId: string, reproduced: boolean, artifactId: string | undefined, summary: string, flag?: string): Promise<{ reproduced: boolean; flag?: string; evidenceId: string; artifactId?: string }> {
     const snapshot = await this.controlStore.snapshot(runId);
     const evidenceId = id("EV");
-    await this.controlStore.dispatch(runId, { type: "evidence", evidence: { id: evidenceId, kind: reproduced ? "reproduction" : "negative", summary, tags: ["web", "reproduction"], source: { tool: "web_reproduce", artifactId, generation: snapshot.generation }, confidence: reproduced ? 1 : 0.8, supports: [], refutes: [] }, lane: "verifier" });
+    await this.controlStore.dispatch(runId, { type: "evidence", evidence: { id: evidenceId, kind: "observation", summary, tags: ["web", "reproduction", reproduced ? "locally-observed" : "local-failure"], source: { tool: "web_reproduce", artifactId, generation: snapshot.generation }, confidence: reproduced ? 0.8 : 0.6, supports: [], refutes: [] }, lane: "executor" });
     return { reproduced, flag, evidenceId, artifactId };
   }
 }

@@ -162,9 +162,11 @@ function scorerEvidence(
   };
 }
 
-test("a second public service factory cannot mint trusted authority for an existing run", async () => {
+test("a service factory with a different explicit credential cannot mint trusted authority for an existing run", async () => {
   const harness = await createHarness("AUTHORITY-ANCHOR");
-  const attacker = createServicesForTesting(harness.root, config);
+  const attacker = createServicesForTesting(harness.root, config, {
+    authoritySecret: "different-untrusted-authority-secret-for-regression",
+  });
   try {
     const candidate = await proposeCandidate(harness, "C-AUTHORITY-ANCHOR", "PB{owner_only_authority}");
     const snapshot = await attacker.control.snapshot(harness.runId);

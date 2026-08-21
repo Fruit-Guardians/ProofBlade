@@ -403,7 +403,7 @@ test("fixture recovery preflight does not mutate the sandbox or generation for a
 test("fixture recovery preflight does not mutate the sandbox or generation under the wrong authority", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-authority-reset-preflight-"));
   const owner = createServices(root, config);
-  const attacker = createServices(root, config);
+  const attacker = createServices(root, config, { authoritySecret: "attacker-authority-secret-that-is-deliberately-different" });
   try {
     const runId = "AUTHORITY-RESET-PREFLIGHT";
     const task = fixtureTask(runId, "reverse-branch-2", root, config);

@@ -621,6 +621,7 @@ export interface RunSnapshot {
 
 export type EventType =
   | "run_started"
+  | "run_authority_migrated"
   | "phase_started"
   | "phase_finished"
   | "domain_phase_changed"

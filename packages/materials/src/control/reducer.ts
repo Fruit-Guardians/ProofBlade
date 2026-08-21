@@ -55,7 +55,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (snapshot.lastSeq !== 0 || snapshot.status !== "CREATED" || snapshot.authorityHash !== "UNANCHORED") {
         throw new Error("run_started is immutable and may only be the first Run event");
       }
-      if (typeof p.taskHash !== "string" || p.taskHash !== next.taskHash) throw new Error("Task contract hash does not match the immutable run anchor");
+      if (p.taskHash !== undefined && (typeof p.taskHash !== "string" || p.taskHash !== next.taskHash)) {
+        throw new Error("Task contract hash does not match the immutable run anchor");
+      }
+      if (p.taskHash === undefined && p.authorityHash !== undefined) {
+        throw new Error("A trusted authority anchor cannot omit its task contract hash");
+      }
       next.authorityHash = typeof p.authorityHash === "string" && /^[a-f0-9]{64}$/i.test(p.authorityHash)
         ? p.authorityHash
         : "LEGACY-UNTRUSTED";
@@ -63,6 +68,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.startedAt = event.ts;
       next.generation = Number(p.generation ?? 0);
       next.versionSnapshot = p.versionSnapshot as RunSnapshot["versionSnapshot"];
+      break;
+    case "run_authority_migrated":
+      if (snapshot.authorityHash !== "LEGACY-UNTRUSTED") throw new Error("Run authority migration is only valid for an untrusted legacy Run");
+      if (typeof p.taskHash !== "string" || p.taskHash !== next.taskHash) throw new Error("Legacy Run migration task hash does not match task.json");
+      if (typeof p.authorityHash !== "string" || !/^[a-f0-9]{64}$/i.test(p.authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
+      next.authorityHash = p.authorityHash;
       break;
     case "phase_started":
       next.phase = p.phase as RunSnapshot["phase"];

@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { HarnessEvent, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -95,6 +95,59 @@ export class JsonlControlStore {
     return this.replayWithTask(runId, resolvedTask, events);
   }
 
+  /**
+   * Upgrade a pre-authority event stream without rewriting its history. The
+   * original task/event files are backed up create-exclusively, then one
+   * migration event binds the persisted task contract to the current local
+   * control credential. If another process owns the migration lock, callers can
+   * still replay the Run as LEGACY-UNTRUSTED/read-only.
+   */
+  public async migrateLegacyRun(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only"> {
+    if (!/^[a-f0-9]{64}$/i.test(authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
+    return await this.writes.run(runId, async () => {
+      const events = await this.events(runId);
+      const first = events[0];
+      if (!first || first.type !== "run_started" || first.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
+      const existing = authorityAnchor(events);
+      if (existing) return "anchored";
+      if (first.payload?.taskHash !== undefined || first.payload?.authorityHash !== undefined) {
+        return "read_only";
+      }
+      const task = await this.loadTask(runId);
+      if (!task) return "read_only";
+      // Prove that the complete legacy stream is replayable against the durable
+      // task contract before granting it a write credential.
+      const legacy = await this.replayWithTask(runId, task, events);
+      if (legacy.authorityHash !== "LEGACY-UNTRUSTED") return "read_only";
+
+      const runDir = dirname(this.runPath(runId));
+      const eventBackup = join(runDir, "events.pre-authority-migration.jsonl");
+      const taskBackup = join(runDir, "task.pre-authority-migration.json");
+      const eventContent = await readFile(this.runPath(runId), "utf8");
+      const taskContent = await readFile(join(runDir, "task.json"), "utf8");
+      try {
+        await writeExclusive(eventBackup, eventContent);
+        await writeExclusive(taskBackup, taskContent);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        // Another process either completed or currently owns migration. Never
+        // append a competing anchor; a later snapshot can retry safely.
+        return authorityAnchor(await this.events(runId)) ? "anchored" : "read_only";
+      }
+
+      const migration = makeEvent(runId, events.at(-1)!.seq + 1, "run_authority_migrated", "orchestrator", "main", {
+        taskHash: sha256(canonicalJson(task)),
+        authorityHash,
+        migratedFrom: "legacy-v1",
+      });
+      // Defense-in-depth: reducer validation happens before the durable append.
+      reduce(legacy, migration);
+      await durableAppendFile(this.runPath(runId), `${canonicalJson(migration)}\n`);
+      this.authorityHashes.set(runId, authorityHash);
+      return "migrated";
+    });
+  }
+
   async #persistTask(runId: string, task: RunSnapshot["task"]): Promise<void> {
     const path = join(this.runsRoot, runId, "task.json");
     await mkdir(dirname(path), { recursive: true });
@@ -145,9 +198,8 @@ export class JsonlControlStore {
   async #authorityHashFor(runId: string): Promise<string> {
     const cached = this.authorityHashes.get(runId);
     if (cached) return cached;
-    const first = (await this.events(runId))[0];
-    const anchored = first?.type === "run_started" ? first.payload?.authorityHash : undefined;
-    if (typeof anchored !== "string" || !/^[a-f0-9]{64}$/i.test(anchored)) {
+    const anchored = authorityAnchor(await this.events(runId));
+    if (!anchored) {
       throw new Error("Run has no trusted JSONL write anchor");
     }
     this.authorityHashes.set(runId, anchored);
@@ -159,6 +211,27 @@ export class JsonlControlStore {
     const snapshot = projector.replay(events);
     snapshot.projectionHash = projectionHash(snapshot);
     return snapshot;
+  }
+}
+
+function authorityAnchor(events: HarnessEvent[]): string | undefined {
+  const anchors = events.flatMap((event) => {
+    if (event.type !== "run_started" && event.type !== "run_authority_migrated") return [];
+    const value = event.payload?.authorityHash;
+    return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value) ? [value] : [];
+  });
+  if (anchors.length === 0) return undefined;
+  if (new Set(anchors).size !== 1) throw new Error("Run contains conflicting authority anchors");
+  return anchors[0];
+}
+
+async function writeExclusive(path: string, content: string): Promise<void> {
+  const handle = await open(path, "wx", 0o600);
+  try {
+    await handle.writeFile(content, "utf8");
+    await handle.sync();
+  } finally {
+    await handle.close();
   }
 }
 

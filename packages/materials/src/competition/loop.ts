@@ -155,6 +155,11 @@ export async function runCompetitionLoop(
       const snapshot = await services.control.snapshot(options.runId);
       const acceptedCompletion = acceptedPlatformCompletion(snapshot);
       if (acceptedCompletion) {
+        // Close the active work item and advance the domain projection before
+        // finish makes the Run terminal; terminal Runs deliberately reject
+        // further work-graph mutation.
+        await ensureCompetitionDomainPhase(services.control, options.runId, "SUBMIT");
+        await completeCompetitionWorkItem(services.control, workItemId, snapshot);
         if (snapshot.status !== "SUCCEEDED") {
           await services.verifier.finish(options.runId, {
             completionId: acceptedCompletion.id,
@@ -165,8 +170,6 @@ export async function runCompetitionLoop(
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
         stopReason = "solved";
-        await ensureCompetitionDomainPhase(services.control, options.runId, "SUBMIT");
-        await completeCompetitionWorkItem(services.control, workItemId, snapshot);
         break;
       }
       // AgentHarness already applies the configured Provider retry policy inside
