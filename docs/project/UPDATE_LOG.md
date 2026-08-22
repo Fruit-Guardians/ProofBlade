@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-20T12:15:00+08:00
+> 状态更新时间：2026-08-23T12:00:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260823-001 | 2026-08-23T12:00:00+08:00 | PLAN-002 | feat/api-index-onboarding | 本条记录所在提交 |
 | UPDATE-20260820-002 | 2026-08-20T12:15:00+08:00 | PLAN-220, PLAN-120 | codex/request-epoch-audit | 本条记录所在提交 |
 | UPDATE-20260820-001 | 2026-08-20T11:30:00+08:00 | PLAN-220, PLAN-110, PLAN-210 | codex/work-graph-vertical-slice | 本条记录所在提交 |
 | UPDATE-20260812-002 | 2026-08-12T16:30:00+08:00 | PLAN-120 | codex/provider-scheduler | 本条记录所在提交 |
@@ -38,6 +39,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260823-001
+
+时间：2026-08-23T12:00:00+08:00
+
+摘要：补充 API 索引插件的 README 新成员上手流程，明确开发前搜索、TSDoc、索引生成、重复检查和提交前门禁命令。
+
+### 变更
+
+- README 快速开始后增加新成员日常开发命令和 API 索引产物说明
+- 明确 npm ci、prepare、api:search、api:explain、api:index、api:duplicates:all、api:index:check、test:atoms 和 verify 的使用顺序
+- 说明 summarySource=tsdoc|inferred、生成文件禁止手工编辑和 atoms 组件开发入口
+
+### 验证
+
+- [x] npm run api:index:check passed
+- [x] npm run api:index:test: 3/3 passed
+- [x] component and change-contract gates passed
+- [x] git diff --check passed
 
 ## UPDATE-20260820-002
 
