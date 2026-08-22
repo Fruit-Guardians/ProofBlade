@@ -56,6 +56,43 @@ npm run eval
 
 运行数据和制品写入 `runs/`。下载内容和外部源码快照统一放在 `tmp/`，该目录默认被 Git 忽略。
 
+### 新成员日常开发命令
+
+仓库安装依赖时会自动运行 `prepare`，生成 API 索引和重复实现报告。它不会启动 Agent、GUI、Docker 或外部服务：
+
+```powershell
+# 第一次拉取或切换分支
+npm ci
+npm run build
+npm run api:index:check
+
+# 修改共享代码前：先搜索已有原语，避免重复实现
+npm run api:search -- canonical json
+npm run api:explain -- canonicalJson
+
+# 修改源码或 TSDoc 后：重新生成并检查全部索引
+npm run api:index
+npm run api:duplicates:all
+npm run api:index:check
+
+# 修改 atoms 时的最小回归
+npm run test:atoms
+
+# 提交前完整门禁
+npm run verify
+```
+
+API 索引位于 `docs/generated/`：
+
+- `api/*.json`：机器可读的公共函数、类、方法、类型和常量；
+- `api/*.md`：开发者可阅读的签名、来源、测试和总结；
+- `agent/*-context.json`：给 AI 编码代理检索的精简上下文；
+- `duplicates/*.json`：精确重复和结构相似候选。
+
+不要手工编辑 `docs/generated/`。源码或 TSDoc 变更后运行 `npm run api:index`，再提交生成结果。每个符号都有 `summarySource`：`tsdoc` 表示来自源码 TSDoc，`inferred` 表示生成器根据名称、类型和实现行为生成的确定性兜底总结；新增公共符号仍应补充真实 TSDoc。精确重复需要处理，结构相似报告是候选，不会自动删除代码。
+
+原子层开发入口见 [`packages/atoms/COMPONENT.md`](packages/atoms/COMPONENT.md)，索引插件和完整设计见 [`docs/FUNCTION_INDEX_AND_DUPLICATE_GUARD_PROPOSAL_ZH.md`](docs/FUNCTION_INDEX_AND_DUPLICATE_GUARD_PROPOSAL_ZH.md) 与 [`plugins/proofblade-api-index/README.md`](plugins/proofblade-api-index/README.md)。
+
 ## 项目计划与维护状态
 
 项目使用 `project-status.json` 统一记录当前计划、每次更新、完成结果和维护活动，并确定性生成以下中文报表：
@@ -190,6 +227,10 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 - `docs/extensions.md`：分层判断、工具开发、MCP、Skill 和扩展验收。
 - `docs/recovery.md`：六个故障注入窗口、恢复顺序和收敛不变量。
 - `docs/gui.md`：动态调试 GUI、Tool 调试对象、Script Lab 和本地 API。
+- `docs/FUNCTION_INDEX_AND_DUPLICATE_GUARD_PROPOSAL_ZH.md`：API 索引、TSDoc 总结、AI 复用流程和重复实现检测方案。
+- `docs/deepseek-harness-reference.md`：DeepSeek Harness 架构调研、ProofBlade 差距映射、落地优先级与验收标准。
+- `docs/cordis-paper-reference.md`：Cordis 时空可组合性论文、可逆效果、反应式依赖与 ProofBlade 落地分析。
+- `docs/pentagi-reference-development-proposal.md`：PentAGI 架构调研、ProofBlade 能力映射、Work Graph/专家委派/持久 Fleet 与容器/经验索引/观测和报告的分阶段开发建议。
 - `docs/project/PLAN.md`：当前开发计划和依赖关系。
 - `docs/project/UPDATE_LOG.md`：按时间排列的更新记录。
 - `docs/project/COMPLETION_REPORT.md`：完成情况和验证证据。
