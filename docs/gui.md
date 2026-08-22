@@ -76,7 +76,7 @@ Browser -> POST /api/runs/:id/chat
         -> Pi Session + Control Store
 ```
 
-侧栏“Fixture 测试”是独立入口。交互调试使用 `PiSolverLane`，自动执行使用 `SingleAgentCtfLoop`；这两种模式才会构建 Fixture、显示阶段条并启用 Evidence、Artifact、Checkpoint 和恢复核对。
+侧栏“Fixture 测试”是独立入口。交互调试和自动执行都使用统一的 `PiCodingLane`（自动执行由 `SingleAgentCtfLoop` 编排）；这两种模式才会构建 Fixture、显示阶段条并启用 Evidence、Artifact、Checkpoint 和恢复核对。
 
 响应使用 `text/event-stream`。服务端把 AgentHarness 事件规范化为：
 

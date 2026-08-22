@@ -55,6 +55,16 @@ test("scheduler never exceeds the concurrency cap and processes all pending", as
   assert.equal(snapshot.totals.pending, 0);
 });
 
+test("scheduler invokes the solver reconciliation hook before claiming work", async () => {
+  const order: string[] = [];
+  const solver: ChallengeSolver = {
+    async reconcile(): Promise<void> { order.push("reconcile"); },
+    async solve(): Promise<ChallengeSolveResult> { order.push("solve"); return { solved: true, status: "SOLVED" }; },
+  };
+  await new FleetScheduler({ api: new FakeApi([challenge("C1", 1)]), solver, concurrency: 1 }).run();
+  assert.deepEqual(order, ["reconcile", "solve"]);
+});
+
 test("higher-value challenges start first at concurrency 1", async () => {
   const ids = [challenge("low", 10), challenge("mid", 50), challenge("high", 100)];
   const order: string[] = [];

@@ -10,6 +10,7 @@ import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
 import { createEffectInput } from "../src/control/control-store.js";
+import { DeterministicObserver } from "../src/knowledge/observer.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -64,6 +65,24 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     });
     await services.control.dispatch(runId, { type: "effect_finished", effectId: "EF-1", outcome: "timeout", artifactId: effectArtifact.id, durationMs: 80, outputBytes: 12, exitCode: null, errorSignature: "e".repeat(64), lane: "executor" });
     await services.control.dispatch(runId, { type: "fail", reason: "verification did not complete", category: "verification_missing" });
+    const automaticOne = await services.artifacts.stageText(runId, "same automatic output", { filename: "automatic-one.txt", sourceEffectId: "EF-AUTOMATIC-1" });
+    const automaticTwo = await services.artifacts.stageText(runId, "same automatic output", { filename: "automatic-two.txt", sourceEffectId: "EF-AUTOMATIC-2" });
+    const observer = new DeterministicObserver(services.control);
+    for (const [index, artifact] of [automaticOne, automaticTwo].entries()) {
+      const effectId = `EF-AUTOMATIC-${index + 1}`;
+      const effectArgs = { path: artifact.path };
+      await services.control.dispatch(runId, { type: "effect_proposed", effect: { id: effectId, idempotencyKey: createEffectInput(runId, "fixture_read", effectArgs, "pure", 0).idempotencyKey, replayPolicy: "pure", operation: "fixture_read", args: effectArgs, status: "PROPOSED" }, lane: "executor" });
+      await services.control.dispatch(runId, { type: "effect_started", effectId, lane: "executor" });
+      await services.control.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" });
+      await services.control.dispatch(runId, { type: "effect_finished", effectId, outcome: "success", artifactId: artifact.id, durationMs: 1, outputBytes: Buffer.byteLength("same automatic output"), exitCode: 0, errorSignature: null, lane: "executor" });
+      await observer.observe(runId, {
+        operation: "read",
+        effectId,
+        artifactId: artifact.id,
+        generation: 0,
+        result: { stdout: "same automatic output", stderr: "", exitCode: 0, durationMs: 0 },
+      });
+    }
 
     const telemetry = new RunTelemetry(services.control);
     const report = await telemetry.report(runId);
@@ -78,6 +97,8 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     assert.equal(report.tools.effectiveActionRatio, 1);
     assert.equal(report.tools.effectTimeouts, 1);
     assert.equal(report.context.compactions, 1);
+    assert.equal(report.evidence.automaticObservationCount, 2);
+    assert.equal(report.evidence.automaticObservationUniqueContentCount, 1);
     assert.equal(report.failure?.primary, "verification_missing");
     assert.equal(report.reportHash, (await telemetry.report(runId)).reportHash);
     assert.doesNotMatch(await readFile(join(root, "runs", runId, "events.jsonl"), "utf8"), /TEST_API_KEY|http:\/\/127\.0\.0\.1/);

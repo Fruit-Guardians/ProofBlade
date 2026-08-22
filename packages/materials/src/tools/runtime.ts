@@ -4,8 +4,8 @@ import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { CompletionProposal, JobRecord, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
-import { DeterministicObserver } from "../knowledge/observer.js";
-import { id, sha256 } from "../domain/utils.js";
+import { DeterministicObserver, type ObservationOutcome } from "../knowledge/observer.js";
+import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityDiscoveryInput, type CapabilityInvocationResult } from "../capabilities/router.js";
@@ -88,7 +88,37 @@ export class ProofBladeToolRuntime {
       generation: snapshot.generation,
       result: stored,
     });
-    return { ...result, observationId: observed.observationId, evidenceId: observed.evidenceId };
+    return {
+      ...result,
+      observationId: observed.observationId,
+      evidenceId: observed.evidenceId,
+      progressKey: progressKey(`capability:${input.capabilityId}.${input.operation}`, artifact.sha256),
+    };
+  }
+
+  /**
+   * Observe an artifact produced by a coding-lane tool that did not originate
+   * in the Effect Journal (for example read/bash output rewriting). The
+   * synthetic effect id is derived from the immutable artifact id, so retries
+   * are idempotent and the observer never emits duplicate evidence.
+   */
+  public async observeArtifact(input: { operation: string; artifactId: string; exitCode?: number | null }): Promise<ObservationOutcome & { progressKey: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const artifact = snapshot.artifacts[input.artifactId];
+    if (!artifact) throw new Error(`Unknown artifact: ${input.artifactId}`);
+    const stored = await this.artifactStore.readText(this.runId, artifact);
+    const observed = await this.observer.observe(this.runId, {
+      operation: input.operation,
+      artifactId: artifact.id,
+      generation: snapshot.generation,
+      result: {
+        stdout: stored.slice(0, MAX_AUTOMATIC_OBSERVATION_CHARS),
+        stderr: "",
+        exitCode: input.exitCode ?? 0,
+        durationMs: 0,
+      },
+    });
+    return { ...observed, progressKey: progressKey(input.operation, artifact.sha256) };
   }
 
   public async runBackground(input: BackgroundJobStartInput): Promise<Record<string, unknown>> {
@@ -210,8 +240,9 @@ export class ProofBladeToolRuntime {
     for (const observation of supportingObservations) {
       const artifact = snapshot.artifacts[observation.source.artifactId];
       if (!artifact) continue;
-      const stored = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as RawEffectResult;
-      if (stored.stdout.includes(normalized) || stored.stderr.includes(normalized)) {
+      const stored = await this.artifactStore.readText(this.runId, artifact);
+      const observationText = rawObservationText(stored);
+      if (observationText.includes(normalized)) {
         observed = true;
         break;
       }
@@ -329,6 +360,29 @@ export class ProofBladeToolRuntime {
     if (isAbsolute(path)) throw new Error("Stored artifact paths must be relative");
     return join(this.runsRoot, this.runId, path);
   }
+}
+
+const MAX_AUTOMATIC_OBSERVATION_CHARS = 64_000;
+
+function progressKey(operation: string, contentKey: string): string {
+  return sha256(canonicalJson({ operation, contentKey }));
+}
+
+/**
+ * Journal artifacts are JSON-wrapped RawEffectResults, while coding-lane read
+ * and bash artifacts are intentionally plain text. Both may anchor a
+ * candidate, so observation consumers must not assume one storage shape.
+ */
+function rawObservationText(stored: string): string {
+  try {
+    const parsed = JSON.parse(stored) as Partial<RawEffectResult>;
+    if (typeof parsed.stdout === "string" || typeof parsed.stderr === "string") {
+      return `${parsed.stdout ?? ""}\n${parsed.stderr ?? ""}`;
+    }
+  } catch {
+    // Plain coding artifacts are already the observation text.
+  }
+  return stored;
 }
 
 function assertEvidence(evidence: Record<string, unknown>, evidenceIds: string[]): void {

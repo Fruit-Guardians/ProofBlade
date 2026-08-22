@@ -211,7 +211,7 @@ const manifests: CapabilityManifest[] = [
   }),
   withCapabilityHash({
     id: "proofblade.binary",
-    version: "1.2.0",
+    version: "1.3.0",
     description: "Read-only structural and deep analysis of visible PE and ELF binaries.",
     trust: "bundled",
     operations: [
@@ -268,6 +268,16 @@ const manifests: CapabilityManifest[] = [
       {
         name: "inspect_elf",
         description: "Return ELF identity, checksec signals, sections, and symbols in one structured result.",
+        parameters: binaryPathParameters,
+        readOnly: true,
+        sideEffect: "none",
+        replay: "pure",
+        outputPolicy: "summary",
+        executionMode: "sequential",
+      },
+      {
+        name: "packed_probe",
+        description: "Detect bounded UPX/packed-binary signatures and return a deterministic unpacking fallback plan.",
         parameters: binaryPathParameters,
         readOnly: true,
         sideEffect: "none",

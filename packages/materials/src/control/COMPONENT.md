@@ -27,6 +27,8 @@
 - `control-store.ts` 负责受校验的领域命令、telemetry-only raw append、snapshot 与 replay；`ControlStore.create()` 通过 ECMAScript 私有工厂拆分普通 Control、Verifier 结果、Verifier Effect 与 Fixture 生命周期 capability。每个 Run 在 `run_started` 时锚定创建者的 authority hash；JSONL/Projection 写入必须证明相同 secret。默认 secret 为进程内随机值；需要可信跨进程恢复时，harness 必须通过 `authoritySecret`（CLI/GUI 对应 `PROOFBLADE_CONTROL_AUTHORITY`）显式注入同一个至少 32 字符的 credential，错误或缺失 credential 只能读取、不能写既有 Run。结果端口在运行时拒绝 Effect 命令，Effect 端口也不能写 Evidence/Completion，二者都不得进入模型 lane。
 - `reducer.ts` 应用事件；`phase-machine.ts` 校验阶段转换；`lease-manager.ts` 处理所有权。
 - 不直接执行外部 Effect，不保存 Provider 消息正文。
+- `app-server.ts` 是对 GUI/外部控制面的稳定边界，只提供 Run 读取、事件游标分页/订阅和审批查询/批准；不得把 ControlStore 的任意写原语直接暴露出去。
+- `security/approval-policy.ts` 负责受保护副作用的持久化审批，资源明文只在进程内使用，账本保存摘要哈希并默认 fail-closed。
 
 ## 开发规则与验证
 

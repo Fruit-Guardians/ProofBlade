@@ -11,7 +11,7 @@ import { ContextCompiler } from "../src/context/compiler.js";
 import { pruneAgentMessages } from "../src/context/agent-pruner.js";
 import { CheckpointService } from "../src/context/checkpoint.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
-import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_MARKER, promptWithContextLengthRecovery } from "../src/runtime/context-length-recovery.js";
 import { isRealUserTask, latestExternalUserMessage } from "../src/context/user-task-anchor.js";
 
@@ -162,7 +162,7 @@ test("mechanical checkpoint is durable and a second context overflow fails expli
 
     let prompts = 0;
     let compactions = 0;
-    const overflowLane: SolverLaneFactory = async () => ({
+    const overflowLane: AgentLaneFactory = async () => ({
       async prompt() {
         prompts += 1;
         return { text: "", stopReason: "error", errorMessage: "maximum context length exceeded", usage: zeroUsage() };
@@ -242,7 +242,7 @@ test("[contract:solver-length-context-recovery] solver treats a length stop as r
     const runId = "LENGTH-OVERFLOW";
     let prompts = 0;
     let compactions = 0;
-    const lane: SolverLaneFactory = async () => ({
+    const lane: AgentLaneFactory = async () => ({
       async prompt() {
         prompts += 1;
         return { text: "", stopReason: prompts === 1 ? "length" : "stop", usage: zeroUsage() };

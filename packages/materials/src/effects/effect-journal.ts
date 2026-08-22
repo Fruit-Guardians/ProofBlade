@@ -7,7 +7,7 @@ import { toToolFailure } from "../tools/errors.js";
 
 export type EffectFaultPoint = "after_proposed" | "after_started" | "after_execute" | "after_artifact";
 export type EffectFaultInjector = (point: EffectFaultPoint, effectId: string) => void | Promise<void>;
-type JournalInput = Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy; artifactSensitivity?: ArtifactRef["sensitivity"] };
+export type JournalInput = Omit<EffectRequest, "id" | "idempotencyKey"> & { replayPolicy?: ReplayPolicy; artifactSensitivity?: ArtifactRef["sensitivity"] };
 
 export interface VerifierEffectJournal {
   /** Trusted verifier execution through the configured Sandbox only. */
@@ -69,6 +69,16 @@ export class EffectJournal {
     signal: AbortSignal = new AbortController().signal,
   ): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
     return await this.#executeWithAuthority(runId, input, executor, signal, false);
+  }
+
+  /** Internal harness seam for verifier-owned effects that attest host-side work. */
+  public async executeVerifierWith(
+    runId: string,
+    input: JournalInput,
+    executor: (request: EffectRequest, signal: AbortSignal) => Promise<RawEffectResult>,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<{ effectId: string; result: RawEffectResult; artifactId: string }> {
+    return await this.#executeWithAuthority(runId, input, executor, signal, true);
   }
 
   async #executeWithAuthority(
@@ -257,6 +267,14 @@ export class EffectJournal {
         } catch {
           valid = false;
         }
+      }
+    } else if (operation === "web_reproduce" && result.exitCode === 0) {
+      try {
+        const parsed = JSON.parse(result.stdout) as { accepted?: unknown; candidateHash?: unknown };
+        valid = typeof parsed.accepted === "boolean" && parsed.candidateHash === completion.candidateHash;
+        accepted = valid && parsed.accepted === true;
+      } catch {
+        valid = false;
       }
     }
     // pwn_reproduce remains fail-closed until the repository contains a

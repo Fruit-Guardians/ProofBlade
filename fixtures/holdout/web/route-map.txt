@@ -1,0 +1,2 @@
+GET /health -> healthy
+GET /internal/status -> PB{holdout_web_route}

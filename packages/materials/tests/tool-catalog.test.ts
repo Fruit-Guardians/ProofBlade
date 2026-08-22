@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { ProofBladeToolCatalogRegistry, TOOL_CATALOG_MANIFEST } from "../src/tools/catalog.js";
+import { bootstrapToolCatalog, ProofBladeToolCatalogRegistry, TOOL_CATALOG_MANIFEST } from "../src/tools/catalog.js";
 
 const MANIFEST = (tools: unknown[]): string => JSON.stringify({ schemaVersion: 1, tools }, null, 2);
 
@@ -215,6 +215,41 @@ test("container mode suppresses the host-local catalog entirely", async () => {
     assert.equal(enabled.isDisabled, false);
     assert.equal(enabled.size, 1);
     assert.notEqual(enabled.catalogHash(), emptyHash);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bootstrap resolves a reviewed executable list once and refuses accidental overwrite", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-bootstrap-"));
+  try {
+    const spec = { id: "node", name: "node", kind: "tool" as const, description: "Node runtime", candidates: [process.execPath], profiles: ["multi"] };
+    const first = await bootstrapToolCatalog(root, [spec]);
+    assert.equal(first.entries[0]?.id, "node");
+    assert.equal(first.missing.length, 0);
+    await assert.rejects(() => bootstrapToolCatalog(root, [spec]), /already exists/);
+    const refreshed = await bootstrapToolCatalog(root, [spec], { force: true });
+    assert.equal(refreshed.overwritten, true);
+    assert.equal((await ProofBladeToolCatalogRegistry.load(root)).size, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("selectForProfile keeps only prepared direction entries and common tools", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-profile-"));
+  try {
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), MANIFEST([
+      { id: "rev", name: "rev", kind: "tool", path: "C:/t/rev.exe", description: "reverse", profiles: ["reverse"] },
+      { id: "web", name: "web", kind: "tool", path: "C:/t/web.exe", description: "web", category: "web" },
+      { id: "common", name: "common", kind: "tool", path: "C:/t/common.exe", description: "common", category: "multi" },
+    ]), "utf8");
+    const registry = await ProofBladeToolCatalogRegistry.load(root);
+    assert.deepEqual(registry.selectForProfile("reverse").map((entry) => entry.id), ["common", "rev"]);
+    const block = registry.promptBlock("reverse");
+    assert.match(block, /name="rev"/);
+    assert.match(block, /name="common"/);
+    assert.doesNotMatch(block, /name="web"/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

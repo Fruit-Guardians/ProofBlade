@@ -10,6 +10,7 @@ import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@pro
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
+import type { ControlStore } from "../control/control-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
@@ -17,7 +18,7 @@ import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.j
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
-import type { RawEffectResult } from "../domain/types.js";
+import type { RawEffectResult, TargetKind } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
@@ -31,6 +32,16 @@ export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
+
+const IDALIB_FIRST_CLASS_TOOLS = new Set([
+  "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
+  "analyze_batch", "analyze_function", "imports", "xrefs_to", "get_string", "search_text",
+]);
+const JADX_FIRST_CLASS_TOOLS = new Set([
+  "get_android_manifest", "get_main_activity_class", "get_main_application_classes_names", "get_main_application_classes_code",
+  "get_class_source", "get_methods_of_class", "get_method_by_name", "get_strings", "search_classes_by_keyword",
+  "search_method_by_name", "get_xrefs_to_class", "get_xrefs_to_method",
+]);
 
 /** Verdict returned by a real platform submission. */
 export interface CodingFlagSubmission {
@@ -47,6 +58,8 @@ export interface CodingFlagSubmission {
 }
 
 export interface CodingResourceContext extends ExecutionToolContext {
+  controlStore: ControlStore;
+  artifactStore: ArtifactStore;
   skills: ProofBladeSkillRegistry;
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
@@ -79,6 +92,12 @@ export interface CodingResourceContext extends ExecutionToolContext {
     artifactStore: ArtifactStore;
     runId: string;
   };
+  /**
+   * Per-lane bounded index of output content already shown to the model. A
+   * repeated hash can be represented by an Artifact reference instead of
+   * reinjecting the entire stdout into the next provider request.
+   */
+  artifactOutputRefs?: Map<string, { artifactId: string; count: number }>;
   /**
    * Per-run count of how many times each distinct image has been read, keyed by
    * the image CONTENT hash (not path). Identical bytes give no new information on
@@ -166,6 +185,18 @@ export async function createMcpFirstClassTools(
           assertMcpEnabled(context, server);
           const capabilityId = context.mcp.summaries().find((item) => item.name === server)?.capabilityId;
           if (!capabilityId) throw new Error(`Unknown MCP server: ${server}`);
+          // Production lanes route MCP calls through the journaled capability
+          // runtime so the raw response is archived and observed. Keep the
+          // direct registry fallback for small/fake tool contexts used by
+          // contract tests and offline callers.
+          if (context.runtime && typeof context.runtime.invokeCapability === "function") {
+            const invocation = await context.runtime.invokeCapability({
+              capabilityId,
+              operation: "call",
+              input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
+            }, sig);
+            return toolResult(invocation);
+          }
           const result = await context.mcp.execute(
             capabilityId,
             "call",
@@ -178,6 +209,18 @@ export async function createMcpFirstClassTools(
     }
   }
   return tools;
+}
+
+/**
+ * Keep decompiler schemas out of unrelated challenge contexts. The generic
+ * `mcp_call` proxy remains active as a deferred escape hatch; only the small
+ * category-specific set below is sent as native provider tools.
+ */
+export function selectFirstClassMcpTools<T extends { name: string }>(tools: T[], targetKind: TargetKind, target = "", profileId?: string): T[] {
+  if (targetKind !== "reverse") return [];
+  const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
+  const allowed = android ? JADX_FIRST_CLASS_TOOLS : IDALIB_FIRST_CLASS_TOOLS;
+  return tools.filter((tool) => allowed.has(tool.name.slice(tool.name.lastIndexOf("__") + 2)));
 }
 
 const READ_ONLY_EFFECT: ToolEffectPolicy = { readOnly: true, sideEffect: "none" };
@@ -220,6 +263,7 @@ export function createCodingToolEffectPolicyResolver(
       }
     }
     if (toolName === "evidence") return EVIDENCE_READ_OPERATIONS.has(String(input.operation)) ? READ_ONLY_EFFECT : WORKSPACE_EFFECT;
+    if (CODING_WEB_SESSION_TOOL_NAMES.includes(toolName as (typeof CODING_WEB_SESSION_TOOL_NAMES)[number])) return { readOnly: false, sideEffect: "network" };
     // Polling a job log is a read; stopping one is a process side effect. Without
     // this split, repeated polling would look like a side-effecting call and could
     // reset the no-progress window that is supposed to catch a stalled agent.
@@ -447,7 +491,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     // Starting a new long-running probe is still investigation. Polling an
     // existing job remains available, but new background work must stop when
     // the durable evidence backlog reaches the hard curation threshold.
-    await context.evidenceCurationGate?.assertInvestigationAllowed();
+    const curationNotice = await context.evidenceCurationGate?.assertInvestigationAllowed();
     const jobId = `sh-${toolCallId.slice(-8)}`;
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
     const logPath = `.proofblade/jobs/${jobId}-${slug}.log`;
@@ -477,7 +521,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
       pid: Number(pid),
       logPath,
       status: "running",
-      note: `Started in the background. Poll with shell_job {"operation":"read","jobId":"${jobId}"} and stop it with {"operation":"stop","jobId":"${jobId}"}. Keep working while it runs.`,
+      note: [`Started in the background. Poll with shell_job {"operation":"read","jobId":"${jobId}"} and stop it with {"operation":"stop","jobId":"${jobId}"}. Keep working while it runs.`, ...(curationNotice ? [curationNotice] : [])].join("\n\n"),
     });
   },
 };
@@ -707,13 +751,14 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
           annotatedBy: "harness",
         },
       });
+      const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
       const notice = await context.evidenceCurationGate?.checkpointNotice();
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       return {
         ...result,
-        content: [...result.content, ...(notice ? [{ type: "text" as const, text: notice }] : [])],
-        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256 },
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
       };
     },
   };
@@ -763,11 +808,11 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout } });
       // Enforce curation even when a test/custom lane omits output rewriting.
       // Production lanes also pass this check before starting another probe.
-      await context.evidenceCurationGate?.assertInvestigationAllowed();
+      const preflightCuration = await context.evidenceCurationGate?.assertInvestigationAllowed();
       if (!pipeline) {
         const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
         await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
-        return result;
+        return preflightCuration ? { ...result, content: [...result.content, { type: "text" as const, text: preflightCuration }] } : result;
       }
       const ticket = await pipeline.port.prepare({ toolCallId, command: input.command, cwd: context.env.cwd }, signal);
       const executor = createBashTool<CodingResourceContext>({
@@ -781,29 +826,109 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
+        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const notice = await context.evidenceCurationGate?.checkpointNotice();
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([visible, ...(hint ? [hint] : []), ...anchor, ...(notice ? [notice] : [])].join("\n\n"), { cause: error });
+        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation), ...(notice ? [notice] : [])].filter(Boolean).join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
+      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
       const notice = await context.evidenceCurationGate?.checkpointNotice();
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...result.content, ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
+          ...observation,
         },
       };
     },
   };
 }
+
+interface AutomaticArtifactDetails {
+  durableProgress?: boolean;
+  progressKey?: string;
+  observationId?: string;
+  evidenceId?: string;
+  candidateKinds?: string[];
+  repeatedArtifactId?: string;
+  repetitionCount?: number;
+}
+
+async function observeCodingArtifact(
+  context: CodingResourceContext,
+  artifactId: string,
+  artifactHash: string,
+  operation: string,
+  exitCode: number | null,
+  name: string,
+  summary: string,
+  role: "intermediate" | "debug",
+  tags: string[],
+): Promise<AutomaticArtifactDetails> {
+  const details: AutomaticArtifactDetails = {};
+  const previous = artifactHash ? context.artifactOutputRefs?.get(artifactHash) : undefined;
+  if (artifactHash && context.artifactOutputRefs) {
+    const next = { artifactId: previous?.artifactId ?? artifactId, count: (previous?.count ?? 0) + 1 };
+    context.artifactOutputRefs.set(artifactHash, next);
+    if (context.artifactOutputRefs.size > MAX_ARTIFACT_REPLAY_KEYS) {
+      const oldest = context.artifactOutputRefs.keys().next().value;
+      if (typeof oldest === "string") context.artifactOutputRefs.delete(oldest);
+    }
+    if (previous) {
+      details.repeatedArtifactId = previous.artifactId;
+      details.repetitionCount = next.count;
+    }
+  }
+  try {
+    const review = await context.evidenceGraph.annotateArtifact({ artifactId, name, summary, role, tags: [...tags, "auto-reviewed"] });
+    // Automatic artifact annotation is bookkeeping, not a solver milestone.
+    // `annotateArtifact` reports a newly seen artifact as progress for explicit
+    // evidence workflows, but read/bash output is produced on every probe.
+    // Propagating that flag here reset the no-progress and experiment breakers
+    // after every successful command, allowing an unbounded investigation loop.
+    details.durableProgress = false;
+    details.progressKey = review.progressKey;
+  } catch {
+    // Artifact annotation is an observer side effect. A transient control-store
+    // failure must not turn a completed bash/read call into a failed solve.
+  }
+  if (context.runtime && typeof context.runtime.observeArtifact === "function") {
+    try {
+      const observed = await context.runtime.observeArtifact({ operation, artifactId, exitCode });
+      details.observationId = observed.observationId;
+      details.evidenceId = observed.evidenceId;
+      details.candidateKinds = observed.candidateKinds;
+      details.progressKey ??= observed.progressKey;
+    } catch {
+      // Automatic observation is best-effort; the raw Artifact remains the
+      // durable source if the control store is temporarily unavailable.
+    }
+  }
+  return details;
+}
+
+function observationNotice(details: AutomaticArtifactDetails): string | undefined {
+  const observationId = details.observationId;
+  const evidenceId = details.evidenceId;
+  const progressKey = details.progressKey;
+  if (!observationId && !evidenceId && !progressKey) return undefined;
+  return `[ProofBlade observation${observationId ? ` ${observationId}` : ""}${evidenceId ? ` evidence ${evidenceId}` : ""}${progressKey ? ` progressKey ${progressKey}` : ""}]`;
+}
+
+function repeatedArtifactNotice(artifactId: string, count: number): string {
+  return `[ProofBlade repeated observation: same artifact content as ${artifactId} (seen ${Math.max(2, count)} times); no new bytes were injected. Change the input or use the existing evidence/artifact reference.]`;
+}
+
+const MAX_ARTIFACT_REPLAY_KEYS = 512;
 
 async function finalizeAndArchive(
   pipeline: NonNullable<CodingResourceContext["outputRewrite"]>,
@@ -971,6 +1096,14 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
     if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) throw new Error("MCP call requires tool and object arguments");
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
     if (!capabilityId) throw new Error(`Unknown MCP server: ${input.server}`);
+    if (context.runtime && typeof context.runtime.invokeCapability === "function") {
+      const invocation = await context.runtime.invokeCapability({
+        capabilityId,
+        operation: "call",
+        input: { tool: input.tool, arguments: input.arguments },
+      }, signal);
+      return toolResult(invocation);
+    }
     const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
     return mcpToolResult(result);
   },

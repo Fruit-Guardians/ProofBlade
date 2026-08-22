@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
 import { BASELINE_PROTOCOL_VERSION, FixtureEvaluationRunner } from "../src/evaluation/fixture-evaluator.js";
-import type { SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import type { AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { getFixtureProfile } from "../src/sandbox/fixture-catalog.js";
 
 const config: ProofBladeConfig = {
@@ -83,7 +83,7 @@ test("fixture evaluator canonicalizes fixture order and hashes the execution bud
 
 test("fixture evaluator keeps unclassified failures out of environment statistics", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-eval-failure-"));
-  const throwingLane: SolverLaneFactory = async () => ({
+  const throwingLane: AgentLaneFactory = async () => ({
     async prompt() { throw new Error("model logic failed"); },
     async compact() {},
     async abort() {},

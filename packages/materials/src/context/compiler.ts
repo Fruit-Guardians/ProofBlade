@@ -24,7 +24,11 @@ export class ContextCompiler {
     const jobs = Object.values(snapshot.jobs).filter((job) => job.generation === snapshot.generation && ["QUEUED", "RUNNING", "UNKNOWN"].includes(job.status)).sort(bySeq);
     const handoffs = Object.values(snapshot.handoffs).filter((handoff) => handoff.status === "PROPOSED" || handoff.status === "ACCEPTED").sort(bySeq).slice(-2);
     const artifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation).sort((a, b) => a.id.localeCompare(b.id));
-    const openIntents = Object.values(snapshot.intents).filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+    const schedulerIntents = Object.values(snapshot.schedulerIntents ?? {})
+      .filter((intent) => intent.fixtureGeneration === snapshot.generation && (intent.status === "PROPOSED" || intent.status === "CLAIMED"))
+      .sort((a, b) => intentPriority(b.priority) - intentPriority(a.priority));
+    const legacyIntents = Object.values(snapshot.intents).filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+    const activeIntentIds = schedulerIntents.length > 0 ? schedulerIntents.map((intent) => intent.id) : legacyIntents.map((intent) => intent.id);
     const inFlightEffects = Object.values(snapshot.effects).filter((effect) => effect.runId === snapshot.runId && effect.generation === snapshot.generation && (effect.status === "PROPOSED" || effect.status === "STARTED" || effect.status === "UNKNOWN"));
 
     const contextWindow = input.contextWindow ?? 20_000;
@@ -36,7 +40,7 @@ export class ContextCompiler {
     const standingInstructions = PROOFBLADE_STANDING_INSTRUCTIONS;
     const l0 = [standingInstructions, formatSkillCatalog(resources), formatMcpCatalog(resources), formatToolCatalog(resources)].filter(Boolean).join("\n\n");
     const l1 = JSON.stringify({ task_id: task.task_id, target: task.target, objective: task.objective, inputs: task.inputs, success_criteria: task.success_criteria, scope: task.scope, constraints: task.constraints });
-    const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: openIntents.map((intent) => intent.id), active_handoffs: handoffs.map((handoff) => ({ id: handoff.id, status: handoff.status, knowledgeVersion: handoff.knowledgeVersion })) });
+    const l2 = JSON.stringify({ phase: input.phase, allowed_next: nextPhases(input.phase), active_intents: activeIntentIds, active_handoffs: handoffs.map((handoff) => ({ id: handoff.id, status: handoff.status, knowledgeVersion: handoff.knowledgeVersion })) });
     const l3 = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, reasoningTrees, completions, jobs, handoffs, inFlightEffects, leases: Object.values(snapshot.leases).filter((lease) => lease.generation === snapshot.generation), tokenBudget: Math.max(512, Math.floor(availableInput * 0.4)) });
     const requiredTokens = estimateTokens(`${l0}\n${l1}\n${l2}\n${l3}`);
     let remaining = Math.max(0, availableInput - requiredTokens);
@@ -287,6 +291,10 @@ function nextPhases(phase: ContextBuildInput["phase"]): string[] {
     report: [],
   };
   return map[phase];
+}
+
+function intentPriority(priority: import("../domain/intent.js").IntentPriority): number {
+  return { low: 1, medium: 2, high: 3, critical: 4 }[priority];
 }
 
 export function contextText(output: ContextBuildOutput): string {

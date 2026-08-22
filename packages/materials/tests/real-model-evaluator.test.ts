@@ -7,15 +7,15 @@ import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
 import { loadRealEvaluationCorpus } from "../src/evaluation/real-corpus.js";
 import { RealModelEvaluationRunner } from "../src/evaluation/real-model-evaluator.js";
-import type { SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import type { AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 
-const solver: SolverLaneFactory = async ({ runtime }) => testSolverLane(runtime, true);
+const solver: AgentLaneFactory = async ({ runtime }) => testAgentLane(runtime, true);
 
-const failingSolver: SolverLaneFactory = async ({ runtime }) => testSolverLane(runtime, false);
+const failingSolver: AgentLaneFactory = async ({ runtime }) => testAgentLane(runtime, false);
 
-const baselineSolver: SolverLaneFactory = async ({ runtime, config }) => testSolverLane(runtime, config.modelProfiles.executor.provider === "alpha");
+const baselineSolver: AgentLaneFactory = async ({ runtime, config }) => testAgentLane(runtime, config.modelProfiles.executor.provider === "alpha");
 
-function testSolverLane(runtime: Parameters<SolverLaneFactory>[0]["runtime"], succeeds: boolean) {
+function testAgentLane(runtime: Parameters<AgentLaneFactory>[0]["runtime"], succeeds: boolean) {
   return {
   async prompt() {
     if (!succeeds) return { text: "no supported candidate", stopReason: "stop", usage: zeroUsage() };

@@ -9,6 +9,7 @@ test("Binary Core v1 analyzes ELF structure and bounded content", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-binary-core-"));
   try {
     await writeFile(join(root, "sample.elf"), makeElf64());
+    await writeFile(join(root, "packed.bin"), Buffer.concat([Buffer.from("MZ"), Buffer.from("UPX!UPX0UPX1", "ascii") ]));
     const backend = new BinaryCapabilityBackend();
     const context = { runId: "BINARY-TEST", fixture: { fixtureId: "fixture", generation: 1, path: root, privatePath: join(root, ".proofblade") }, runsRoot: root, artifacts: {} };
     const invoke = async (operation: string, input: Record<string, unknown>) => {
@@ -38,6 +39,9 @@ test("Binary Core v1 analyzes ELF structure and bounded content", async () => {
     const elf = await invoke("inspect_elf", { path: "sample.elf" });
     assert.equal((elf.identity as { architecture: string }).architecture, "x86_64");
     assert.deepEqual(elf.checksec, { pie: false, nx: null, relro: false, canary: false });
+    const packed = await invoke("packed_probe", { path: "packed.bin" });
+    assert.equal(packed.packed, true);
+    assert.deepEqual((packed.markers as Array<{ marker: string }>).map((item) => item.marker), ["UPX!", "UPX0", "UPX1"]);
     assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "identify", input: { path: ".proofblade/secret" } }, {
       name: "identify", description: "identify", parameters: { type: "object", properties: {}, additionalProperties: false }, readOnly: true, sideEffect: "none", replay: "pure", outputPolicy: "summary", executionMode: "sequential",
     }, context), /private fixture/);

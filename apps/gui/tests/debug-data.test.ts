@@ -478,7 +478,63 @@ test("[contract:no-progress-chat-done] streams a convergence stop as a normal as
   }
 });
 
-test("persists a solve run before returning so an immediate pause aborts its solver lane", async () => {
+test("CTF chat automatically replans after a bounded guard termination", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-replan-"));
+  const prompts: string[] = [];
+  const lane: AgentLanePort = {
+    async prompt(prompt) {
+      prompts.push(prompt);
+      return prompts.length === 1
+        ? { text: "probe budget reached", stopReason: "stop", termination: "experiment_budget", usage: zeroUsage() }
+        : { text: "verified flag", stopReason: "stop", usage: zeroUsage() };
+    },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-CTF-REPLAN-001";
+    await data.createConversation({ runId, title: "ctf replan test", workspacePath: root });
+    const events: ChatStreamEvent[] = [];
+    await data.chat(runId, "题目描述：求解flag", (event) => events.push(event), undefined, undefined, root);
+
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1]!, /automatic CTF replan/);
+    const done = events.find((event): event is Extract<ChatStreamEvent, { type: "done" }> => event.type === "done");
+    assert.equal(done?.text, "verified flag");
+    assert.equal(done?.stopReason, "stop");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GUI selects a prepared challenge profile before creating the coding lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-profile-selection-"));
+  let selectedProfile: string | undefined;
+  const lane: AgentLanePort = {
+    async prompt() { return { text: "done", stopReason: "stop", usage: zeroUsage() }; },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
+      selectedProfile = options.challengeProfile?.id;
+      return lane;
+    });
+    const runId = "CHAT-PROFILE-001";
+    await data.createConversation({ runId, title: "profile selection", workspacePath: root });
+    await data.chat(runId, "Android APK native reverse challenge", () => undefined, undefined, undefined, root);
+    assert.equal(selectedProfile, "mobile");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("persists a solve run before returning so an immediate pause aborts its coding lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-pause-"));
   let releaseFactory!: () => void;
   const factoryReady = new Promise<void>((resolve) => { releaseFactory = resolve; });
@@ -525,7 +581,7 @@ test("persists a solve run before returning so an immediate pause aborts its sol
   }
 });
 
-test("[contract:shutdown-awaits-active-runs] [contract:solver-abort-exactly-once] GUI close aborts each Solver once and awaits it", async () => {
+test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once] GUI close aborts each Coding lane once and awaits it", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-close-"));
   let releasePrompt!: () => void;
   let closeFinished!: () => void;

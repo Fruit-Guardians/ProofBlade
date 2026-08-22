@@ -46,7 +46,10 @@ test("evidence curation gate keeps agent annotations pending and clears only tru
     assert.equal(required.reviewedCount, 0);
     assert.equal(required.promotedCount, 0);
     assert.equal(required.unviewedCount, 8);
-    await assert.rejects(gate.assertInvestigationAllowed(), /Further read\/bash calls are paused/);
+    // Advisory now: returns the nudge string instead of throwing, so a required
+    // backlog no longer hard-stops the next read/bash.
+    const requiredNotice = await gate.assertInvestigationAllowed();
+    assert.match(requiredNotice ?? "", /Further read\/bash calls are paused/);
 
     for (const artifactId of ids) {
       await graph.annotateArtifact({
@@ -65,7 +68,8 @@ test("evidence curation gate keeps agent annotations pending and clears only tru
     assert.equal(viewed.promotedCount, 0);
     assert.equal(viewed.unviewedCount, 0);
     assert.ok(viewed.pendingArtifacts.every((item) => item.curationState === "viewed"));
-    await assert.rejects(gate.assertInvestigationAllowed(), /Agent annotation marks an artifact viewed but does not clear this gate/);
+    const viewedNotice = await gate.assertInvestigationAllowed();
+    assert.match(viewedNotice ?? "", /Agent annotation marks an artifact viewed but does not clear this gate/);
 
     await verifier.dispatch(runId, {
       type: "artifact_annotation",

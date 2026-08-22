@@ -85,10 +85,19 @@ export class EvidenceCurationGate {
     };
   }
 
-  public async assertInvestigationAllowed(): Promise<void> {
+  /**
+   * Advisory: report a "required" curation backlog as a nudge string instead of
+   * throwing. Throwing hard-stopped the next bash/read mid-solve — on
+   * artifact-heavy challenges (crypto/reverse/pwn emit many outputs) the backlog
+   * hits the limit fast and interrupted a legitimate multi-step solve, the same
+   * way the experiment budget did. Callers append the returned notice to their
+   * tool output so the model keeps control and curates when it chooses. Returns
+   * undefined below the "required" threshold.
+   */
+  public async assertInvestigationAllowed(): Promise<string | undefined> {
     const status = await this.inspect();
-    if (status.stage !== "required") return;
-    throw new Error(this.format(status, true));
+    if (status.stage !== "required") return undefined;
+    return this.format(status, true);
   }
 
   public async checkpointNotice(): Promise<string | undefined> {

@@ -26,6 +26,7 @@
 
 - `fixture-evaluator.ts` 是评测运行器。
 - `runtime-scenario-evaluator.ts` 是运行时场景目录与隔离执行器；单场景失败必须形成机器可读结果，不能阻止其余场景执行。
+- `local-holdout.ts` 复用 hash-bound corpus 与生产 evaluator 的报告协议，使用确定性 lane 运行本地 Web/Pwn transcript；它不得创建 Provider 请求或连接远程目标。
 - 评测不使用另一套求解逻辑；Provider-free deterministic lane 只替代模型输出。
 - `baseline-v3` 的最小基线是 30 项：六题各三次形成 18 个生产循环，另有 12 个运行时场景；全部成功、全部证据绑定、全部重放一致、全部事实证据覆盖且无候选泄漏。
 - 12 个运行时场景固定覆盖缓存用量与前缀漂移、上下文单调性与用户任务锚点、三种 Tool 收敛断路器、Evidence 整理背压与并发去重、暂停重放、Verifier 权限和 Lease 所有权隔离。
@@ -40,4 +41,5 @@
 ```powershell
 npm run eval
 npm run eval -- --enforce-gate
+node --import tsx --test packages/materials/tests/local-holdout.test.ts
 ```

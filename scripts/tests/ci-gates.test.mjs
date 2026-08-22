@@ -8,6 +8,7 @@ import { canonicalComponentContent } from "../component-audit-lib.mjs";
 import { componentTransitionErrors } from "../component-transition-lib.mjs";
 import { changeContractErrors } from "../change-contract-lib.mjs";
 import { requiresProjectStatus } from "../project-report-change-lib.mjs";
+import { selectTestCommands } from "../check-changed-tests.mjs";
 
 test("[contract:unchanged-source-no-reaudit] rejects audit churn without a source change", () => {
   const previous = metadata({ version: "1.2.3", updatedAt: "2026-08-07T10:00:00+08:00", count: 4, hash: "a".repeat(64) });
@@ -116,6 +117,22 @@ test("change contracts reject malformed regex and non-normalized test paths", ()
     testFiles: new Map(),
   });
   assert.deepEqual(errors, ["invalid: trigger paths and regular expressions must be valid and normalized"]);
+});
+
+test("changed-test matrix maps source changes to existing targeted commands", () => {
+  const manifest = {
+    schemaVersion: 1,
+    rules: [{ id: "runtime", sourceGlobs: ["packages/materials/src/runtime/**"], testGlobs: ["packages/materials/tests/runtime.test.ts"], command: "node --test packages/materials/tests/runtime.test.ts" }],
+  };
+  const selected = selectTestCommands({ root: process.cwd(), manifest, changedFiles: new Set(["packages/materials/src/runtime/foo.ts"]) });
+  assert.equal(selected.errors.length, 1, "the synthetic test file must be reported as missing");
+  assert.match(selected.errors[0], /mapped test file is missing/);
+});
+
+test("changed-test matrix rejects uncovered production source", () => {
+  const selected = selectTestCommands({ root: process.cwd(), manifest: { schemaVersion: 1, rules: [] }, changedFiles: new Set(["packages/materials/src/unknown/new.ts"]) });
+  assert.deepEqual(selected.commands, []);
+  assert.deepEqual(selected.errors, ["packages/materials/src/unknown/new.ts: no test-matrix rule covers this source file"]);
 });
 
 test("[contract:component-audit-time-fallback] resolves audit time from explicit, environment, commit, then clock", () => {

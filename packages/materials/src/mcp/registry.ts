@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { Client, SdkErrorCode, StreamableHTTPClientTransport, type ListToolsResult } from "@modelcontextprotocol/client";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
@@ -130,6 +131,13 @@ export interface McpToolSummary {
   readOnlyHint: boolean;
 }
 
+export const MCP_SCHEMA_CACHE_FILE = ".proofblade/mcp-schema-cache.json";
+
+interface PersistedMcpSchemaCache {
+  schemaVersion: 1;
+  servers: Record<string, { configHash: string; tools: McpToolSummary[] }>;
+}
+
 /** Failed MCP processes are retried after a short cooldown instead of being
  * treated as permanently unavailable for the lifetime of a Runtime. */
 export const MCP_FAILURE_RETRY_DELAY_MS = 1_000;
@@ -152,6 +160,8 @@ export class McpProjectRegistry {
   private readonly connections = new Map<string, McpConnection>();
   private readonly connecting = new Map<string, Promise<McpConnection>>();
   private readonly failures = new Map<string, number>();
+  private readonly schemaCache = new Map<string, McpToolSummary[]>();
+  private schemaCacheWrite: Promise<void> = Promise.resolve();
 
   private readonly binaryReverseConfig: McpBinaryReverseConfig;
 
@@ -166,6 +176,7 @@ export class McpProjectRegistry {
     });
     validateBinaryReverseConfig(binaryReverse, definitions);
     this.binaryReverseConfig = structuredClone(binaryReverse);
+    this.loadSchemaCache();
   }
 
   public static load(projectRoot: string, configPath = ".mcp.json"): McpProjectRegistry {
@@ -378,17 +389,26 @@ export class McpProjectRegistry {
 
   public async describe(name: string, signal?: AbortSignal): Promise<McpToolSummary[]> {
     const entry = this.entry(name);
-    const connection = await this.ensureConnection(name, signal);
+    const cached = this.schemaCache.get(name);
+    const existing = this.connections.get(name);
+    if (!existing && cached) return cloneToolSummaries(cached);
+    const connection = existing ?? await this.ensureConnection(name, signal);
     if (!connection.tools) {
-      try {
-        const result = await connection.client.listTools(undefined, requestOptions(entry.definition, signal));
-        connection.tools = allowedTools(result, entry.definition).sort((a, b) => a.name.localeCompare(b.name));
-      } catch (error) {
-        if (isTransportFailure(error)) await this.invalidateConnection(name, connection);
-        throw error;
+      if (cached) {
+        connection.tools = cloneToolSummaries(cached);
+      } else {
+        try {
+          const result = await connection.client.listTools(undefined, requestOptions(entry.definition, signal));
+          connection.tools = allowedTools(result, entry.definition).sort((a, b) => a.name.localeCompare(b.name));
+          this.schemaCache.set(name, cloneToolSummaries(connection.tools));
+          await this.persistSchemaCache();
+        } catch (error) {
+          if (isTransportFailure(error)) await this.invalidateConnection(name, connection);
+          throw error;
+        }
       }
     }
-    return connection.tools.map((tool) => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) }));
+    return cloneToolSummaries(connection.tools);
   }
 
   public async describeServer(name: string, signal?: AbortSignal): Promise<{ server: string; configHash: string; tools: McpToolSummary[]; nestedTools?: Array<McpNestedToolDefinition & { name: string }> }> {
@@ -412,6 +432,38 @@ export class McpProjectRegistry {
     const entry = this.definitions.find((item) => item.name === name && !item.definition.disabled);
     if (!entry) throw new Error(`Unknown MCP server: ${name}`);
     return entry;
+  }
+
+  private loadSchemaCache(): void {
+    try {
+      const parsed = JSON.parse(readFileSync(resolve(this.projectRoot, MCP_SCHEMA_CACHE_FILE), "utf8")) as PersistedMcpSchemaCache;
+      if (parsed.schemaVersion !== 1 || !parsed.servers || typeof parsed.servers !== "object") return;
+      for (const entry of this.definitions) {
+        const cached = parsed.servers[entry.name];
+        if (!cached || cached.configHash !== entry.configHash || !Array.isArray(cached.tools)) continue;
+        if (cached.tools.every(isMcpToolSummary)) this.schemaCache.set(entry.name, cloneToolSummaries(cached.tools));
+      }
+    } catch {
+      // Schema cache is an optimization. A missing/corrupt cache falls back to
+      // the normal lazy MCP handshake and listTools call.
+    }
+  }
+
+  private async persistSchemaCache(): Promise<void> {
+    this.schemaCacheWrite = this.schemaCacheWrite.then(async () => {
+      const path = resolve(this.projectRoot, MCP_SCHEMA_CACHE_FILE);
+      const directory = resolve(this.projectRoot, ".proofblade");
+      await mkdir(directory, { recursive: true });
+      const servers: PersistedMcpSchemaCache["servers"] = {};
+      for (const entry of this.definitions) {
+        const tools = this.schemaCache.get(entry.name);
+        if (tools) servers[entry.name] = { configHash: entry.configHash, tools: cloneToolSummaries(tools) };
+      }
+      const temporary = `${path}.tmp-${process.pid}`;
+      await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, servers } satisfies PersistedMcpSchemaCache, null, 2)}\n`, "utf8");
+      await rename(temporary, path);
+    }).catch(() => undefined);
+    await this.schemaCacheWrite;
   }
 
   private async ensureConnection(name: string, signal?: AbortSignal): Promise<McpConnection> {
@@ -731,6 +783,21 @@ function externalId(connection: McpConnection | undefined): string | undefined {
   const transport = connection?.transport;
   const pid = transport && "pid" in transport ? transport.pid : undefined;
   return pid === null || pid === undefined ? undefined : String(pid);
+}
+
+function cloneToolSummaries(tools: readonly McpToolSummary[]): McpToolSummary[] {
+  return tools.map((tool) => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) }));
+}
+
+function isMcpToolSummary(value: unknown): value is McpToolSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const item = value as Partial<McpToolSummary>;
+  return typeof item.name === "string"
+    && typeof item.description === "string"
+    && typeof item.inputSchema === "object"
+    && item.inputSchema !== null
+    && !Array.isArray(item.inputSchema)
+    && typeof item.readOnlyHint === "boolean";
 }
 
 function isWithin(root: string, child: string): boolean {

@@ -1,0 +1,149 @@
+# ProofBlade 开发计划交接文档
+
+> 面向接手后续开发的人。目标：看完就知道**现在在哪、已经做了什么、接下来按什么顺序做、每步的接入点和验收标准**。
+> 最后更新：2026-08-21。配套阅读：`docs/HANDOFF.md`（项目总览与踩坑）、`docs/CTF_AGENT_ARCHITECTURE_PLAN_ZH.md`（Web/Pwn 架构方向）、`docs/SESSION_INTERACTION_DESIGN_ZH.md`（持久会话设计）、`docs/P0_5_CONTAINER_DIFF_ZH.md`（容器+会话落地记录）。
+
+---
+
+## 0. 一句话现状
+
+比赛是 **DASCTF（gcsis.dasctf.com）** competition 模式：连 API 取题 → 起 Docker 容器 → 自动解 → 提交 flag。**不是** GUI 人工对话（那只是调试入口）。DASCTF 的 pwn 靶机是**裸 TCP `nc host port`**（实测：`REMOTE:nc 1.14.76.59:23984`），不是 WebSocket。
+
+持久 pwn tube（P0.5+P1）已建好并接进 competition 的 coding lane，正在 PR #67 审核（已过三轮，共修 15 个问题）。平台链接 API、P0 收敛和 Fleet → Run Actor → Observer → Verifier 离线组合回放也已接入；Web 探索现在有 lane-owned 的 `web_session_open/request/close`，验证器使用独立 clean session，并在 lane 关闭或 generation 变化时失效旧会话。**下一阶段先做运行期回放/恢复审计，再考虑 P3（Planner/Refiner 双 Lane）**。本项目不把真实 DASCTF、远程 tube 或 pwn E2E 作为自动验收前提。
+
+---
+
+## 1. 已完成（PR #67，分支 `feat/pwn-web-persistent-sessions`）
+
+> ⚠️ **PR 当前状态 CONFLICTING**：需要 rebase 到最新 main 才能合并。合并前先 `git rebase origin/main`，重点看 `control-store.ts`/`reducer.ts`/`domain/types.ts` 三个文件（本分支和 main 都动过），冲突解决后重跑 `npm run verify`。
+
+| 层 | 内容 | 关键文件 |
+|---|---|---|
+| **P0.5 容器** | per-profile tmpfs（pwn 得可写可执行 HOME/scratch）；持久 `docker exec -i` 会话原语（open/write/read/signal/close）；signal 精确到 setsid 进程组 | `container/docker.ts`、`container/contracts.ts`、`containers/pwn/Dockerfile` |
+| **P1 会话地基** | `SessionRecord` 领域类型 + `session_*` 事件 + reducer；owner-scoped `SessionRegistry`（可重放、supersede-on-recovery、rollback、disposeAll） | `domain/types.ts`、`control/reducer.ts`、`control/control-store.ts`、`container/session-registry.ts` |
+| **P1 pwn 逻辑层** | `LeakRecord` + 地址解析；`PwnSession`（recvUntil/shellProbe/readFlag）；`PwnReproducer`（shell-probe+flag 双 barrier）；共享 `pwn/bytes.ts`、`pwn/pattern.ts`（ReDoS 防护） | `pwn/*.ts`、`verification/pwn-reproducer.ts` |
+| **P1 工具接线** | `PwnToolHandler` + 7 个模型可见工具（pwn_open/send/recv/signal/close/list/reproduce）；接进 `PiCodingLane`（仅 pwn 容器激活）；base64 二进制 payload；endpoint scope 校验；lane 关闭 disposeAll | `pwn/pwn-tools.ts`、`runtime/pwn-coding-tools.ts`、`runtime/coding-lane.ts` |
+| **CH-10662 超时治理** | pwn prompt 不再诱导"同步塞前台 bash"；按 tube 可用性分支引导；交互 bash 超时给针对性提示（用 tube/shell_background） | `runtime/coding-lane.ts`、`runtime/coding-resources.ts` |
+
+测试：`npm run verify` 409 测试全绿、0 漏洞。
+
+**验证边界**：本项目不执行真实 DASCTF 登录、远程 tube 或 pwn 端到端；competition 路径的 pwn_* 覆盖使用可注入 fake。平台接入本身由 API contract tests 验证，真实连通性只能作为用户明确授权后的独立运维动作。
+
+---
+
+## 2. 诊断得到的核心教训（务必先读，避免重走弯路）
+
+1. **CH-10662 反复 14 次 0 解出的根因**：模型把完整交互式 exploit 当**一条前台 bash** 跑，`recvuntil/interactive` 阻塞 → 撞满 180s → 断路器 → 重写整个脚本 → 再超时。~45min/run 全耗在超时等待，从没产出可提交 candidate。**这正是持久 tube 要解决的问题。**
+2. **GUI 普通对话 ≠ 比赛路径**：GUI「新对话」走 host `NodeExecutionEnv`，不起容器，pwn_* 不激活——这是**设计如此**，不是 bug。比赛只走 competition。
+3. **DASCTF pwn = 裸 TCP nc**：不用做 WebSocket tube。（那些 `wss://ctf.xidian.edu.cn` 是另一场 moectf 的 GUI 测试，与 DASCTF 无关。）
+4. **审核三轮共 15 个问题**：kill -1 误伤、256KiB 增量读死、flagPath 注入、过期 work item 饿死、同 generation 孤儿、二进制 payload、endpoint 越界、ReDoS、lane 清理……说明**会话/进程/正则/边界这类"外部不可信输入 + 长生命周期"的地方最容易出坑**，新代码在这些点要格外小心。
+5. **trust but verify**：有一次我以为改了 #2/#4 其实没落地，靠 `grep -c` 才发现。**推进前先核实文件真实状态。**
+
+---
+
+## 3. 后续开发计划（按建议优先级）
+
+> 优先级理由：P1 收尾和 P0 直接决定"比赛时 pwn 题能不能真解出来"，比 P3（用评测证明双模型收益）更紧迫。P3 是"锦上添花且需评测背书"，放在收敛闭环跑通之后。
+
+### P1 收尾（最高优先，收敛能力闭环）
+
+**P1.1 — 平台链接 API 契约与配置装配（不做真实 E2E）**
+- 目标：保持 `CompetitionApi` 五个操作稳定，DASCTF 适配器覆盖 `/slab-match/api/v1/agent` 的 envelope、`X-Agent-AccessKey`、附件、环境轮询、错旗 allowlist、限流/重试；GUI 从 `competition.json`/环境变量正确选择适配器。
+- 验收：fake `fetch` 契约测试覆盖成功、鉴权/业务错误、附件大小与 URL、环境 build/poll/recover、错误 flag、429/503；配置缺失时 fail-closed，不把演示成功当真实得分。
+- 接入点：`packages/materials/src/competition/api.ts`、`dasctf-api.ts`、`apps/gui/src/competition-settings.ts` 及对应 tests。禁止把真实凭据或远程 tube 放进 CI。
+
+**P1.2 — inspect_elf / gdb_batch 一次性能力**
+- 走现有 `invoke_capability` 一次性模型即可（不必用会话）。inspect_elf = file/arch/checksec/symbols 结构化输出；gdb_batch = 无交互断点 + 寄存器/内存断言。
+- 接入点：`capabilities/catalog.ts`（加 manifest）、`capabilities/backend.ts`（加 backend，注入 ContainerRuntimePort 执行）。
+- 验收：模型能一次调用拿到结构化 checksec/符号，而不是 hand-parse bash 输出。
+
+**P1.3 — LeakRecord 接进证据图**
+- 现在 `pwn/leak.ts` 的 `LeakRecord` 是纯数据结构，没进 reasoning 图。把泄漏地址/gadget/偏移作为 reasoning 节点，让重规划能引用"已确认的 base 公式"。
+- 接入点：`knowledge/evidence-graph.ts`、`domain/types.ts` 的 ReasoningNode。
+- 验收：一次 leak 后，证据图里有对应节点，后续 handoff/replan 能引用它。
+
+### P0（可观测→可收敛，治本次 run 暴露的系统性问题）
+
+**P0.1 — 比赛 Run 持久化 domainPhase**
+- 现状：competition run 全停在 `intake`（CH-10662 实证：622 事件 phase 从没推进）。架构规划第二节要求快照存 `domainPhase`（INTAKE→RECON→TARGET_MODEL→HYPOTHESIS→EXPERIMENT→REPRODUCE→SUBMIT）。
+- 接入点：`domain/types.ts`（加 domainPhase）、`competition/loop.ts`、reducer。
+- 验收：live run 的阶段在事件与 projection 一致，不再全是 intake。
+
+**P0.2 — 每 turn 先查 Gate 再给动作 + ExperimentRecord**
+- 把每次 bash/capability 绑定到 hypothesis + repeatKey（`sha256(domain+generation+action+canonical(input))`）；同一失败动作第三次机械拒绝。重复检测要**剔除给 UI 看的解说字段**再比对（借鉴 pentagi `clearCallArguments`）。
+- 接入点：`competition/loop.ts`（turn 循环）、`domain/types.ts`（ExperimentRecord）。
+- 验收：同一失败动作第三次出现被拒；重启后能恢复当前阶段和下一动作。
+
+**P0.3 — 长计算/交互引导走后台（补 CH-10662 治理的运行时侧）**
+- prompt 治理已做（不诱导前台 bash），但可再加运行时护栏：检测到模型仍把长交互塞前台 bash 时，更强地 nudge 到 tube/shell_background。
+- 接入点：`runtime/coding-resources.ts`（已有 `interactiveTimeoutHint`，可扩展到"启动即检测"而非"超时后才提示"）。
+
+### P2（Web，复用 P1 抽象）
+
+- ✅ `HttpSessionBackend`（cookie jar + CSRF 复用 + host/port scope + 脱敏 exchange Artifact/自动 Observation）；coding lane 通过 `web_session_open/request/close` 提供受 scope 约束的探索会话，并在 lane shutdown 时回收。`BrowserContextBackend`（Playwright-compatible persistent context/storageState + scope + response/state Artifact）；`WebReproducer`（干净 session 重放 ExploitChain，flag 必来自本轮响应且不能是请求字面量）。
+- DASCTF web 靶机形式：`REMOTE:http 1.14.76.59:port (proxy of :80)`（实测），HTTP 代理，不是裸 TCP。
+- 复用 P1 的 `SessionRegistry`/`SessionRecord`/`session_*` 事件/Reproducer 抽象，只换底层 backend 为 HTTP/Playwright。
+- 接入点：`container/`（新 backend）、`domain/types.ts`（SessionKind 已含 "http"/"browser"）、新 `web/` 目录。
+- 验收（离线已通过）：Cookie/CSRF 同 Run 内可复用、跨 Run 不可见；每条链有结构化 exchange/HAR-like Artifact 与 Observation；复用旧 session、跨 generation、越界 host/port 和反射 flag 都会被拒绝；干净重放产出 candidate/evidence。真实 DASCTF/Web 连接不属于自动验收范围。
+
+### P3（Planner/Refiner 双 Lane，以评测为准）
+
+- Planner 只输出结构化 Handoff（不直接操作目标）；Solver 只接受当前 knowledgeVersion 的 Handoff；失败由 Refiner 生成替代假设 + 禁止重复列表。
+- **强烈建议移植 pentagi 的 delta-patch 重规划**（add/remove/modify/reorder by id + afterId，见 `backend/pkg/tools/args.go:65-91`），而不是全量重写——天然是事件，对证据图友好。
+- **门槛**：用 20+ 道 Web/Pwn holdout 对比单 Lane，只有成功率/成本/p95 至少一项**稳定改善**才保留第二模型。没有评测背书不合并。
+- 接入点：`orchestration/planner.ts`、`domain/handoff.ts`、新 planner lane。
+- 现状：PLAN-210 在 project-status.json 里是 `blocked`，依赖 P0/P1/P2 完成。
+
+### P4（无人值守 Fleet / 高级题型）
+
+- ✅ `CompetitionEnvironmentJanitor` 已接入 live GUI backend：启动前容量 reservation、`instanceId`/`expiresAt` 持久账本、重启后的过期 sweep、失败清理保留与重试。
+- 容器/PTY 恢复 + stale reaper；更严格 egress scope-change 审批；pwn-kernel 独立 QEMU profile；Web3/JSVMP 等作为后续，不阻塞基础 Web/Pwn。
+
+---
+
+## 4. 评测指标（P0 起就该记，别只看"是否提交正确 flag"）
+
+`solve_rate`（平台接受率）、`verified_rate`（独立复现成功率）、`first_evidence_ms`/`first_primitive_ms`/`first_candidate_ms`、`tool_calls`/`experiment_count`/`repeat_block_count`、`wrong_submission_count`/`duplicate_submission_count`；pwn 另记：协议同步失败率、Leak 解析成功率、Shell Marker 成功率、local→remote 漂移率、**前台 bash 超时次数**（直接反映 CH-10662 类问题是否复发）。
+
+---
+
+## 5. 工作流约定（沿用本轮）
+
+- 分支：`feat/*`；推自己的 fork（`weixiao33661/ProofBlade`）；从 fork 开 PR 到 `Fruit-Guardians/ProofBlade:main`（无组织写权限）。
+- 每次改动后 `npm run build` → 相关测试 → 合并前 `npm run verify`（含 change-contracts 门禁；`docker.ts`/`coding-lane.ts` 等是高风险文件，改动需带故障路径测试）。
+- **审核修复推同一 PR 分支**（不新开 PR），并在 PR 上逐条回应 + 指向 commit。
+- `docker.ts`/`session-registry.ts`/`pwn/*` 这类"长生命周期 + 外部不可信输入"的地方，任何新增都要问：越界？超时？注入？孤儿？（三轮审核的 15 个问题全集中在这里。）
+- 参考实现：`D:\project\deepseekharness\deepseek-harness`（持久 PTY 会话四层架构）、`D:\project\ai\pentagi`（容器生命周期、护栏、delta-patch 重规划）。
+- `npm test` 在 Windows 并行下偶发 EBUSY/时序 flake（background-jobs / reasoning-forest），隔离重跑即通过，不是回归。
+
+---
+
+## 6. 最小上手路径
+
+```
+1. git rebase origin/main   # 解决 PR #67 的 CONFLICTING（control-store/reducer/domain 三处）
+2. npm run verify           # 409 绿才算基线正常
+3. 读 CTF_AGENT_ARCHITECTURE_PLAN_ZH.md + SESSION_INTERACTION_DESIGN_ZH.md
+4. 做 P1.1（API contract/config wiring，离线完成）
+5. 按 P1 收尾 → P0 → P2 → P3 顺序推进；真实平台连通性不作为自动验收前提
+```
+
+## 7. P0/P1/P2 执行结果（2026-08-22）
+
+本轮按“每个改动必须有测试、类型检查和构建”的约束完成了 P0、P1、P2：
+
+- **P0 工程化恢复**：`check:changed-tests` 根据 `.github/test-matrix.json` 自动把源码变更映射到测试；`CompetitionEnvironmentJanitor` 升级为 schema v2，支持跨进程锁、启动前 reservation、原子账本写入、schema v1 迁移、过期 reservation sweep 和重启恢复。
+- **P1 运行边界**：新增持久化 `ApprovalPolicy`（submit/start/network/session 默认 fail-closed），Solver 的动态 flag 和正常提交路径在未批准时只产生 pending approval；新增 `ProofBladeAppServer`，提供 `run/read`、事件分页/订阅、审批查询和批准接口，不暴露 ControlStore 写原语；GUI 增加 `/api/v2` 只读/审批边界。
+- **P2 本地评测**：新增 hash-bound `fixtures/holdout/`（Web 2 + Pwn 2）和 `LocalHoldoutEvaluationRunner`。确定性 lane 复用生产 evaluator 的证据、重放、成本和对照协议，4 case/2 variant 成功率为 1，Provider 请求数为 0；不连接真实 DASCTF、远程 tube 或 pwn E2E。
+
+本轮验证命令：
+
+```powershell
+npm run check:changed-tests
+npm run build --workspace=@proofblade/materials
+npm run typecheck --workspace=@proofblade/gui
+npm run build --workspace=@proofblade/gui
+node --test scripts/tests/ci-gates.test.mjs
+```
+
+P3 Planner/Refiner 仍需等待更大规模 holdout 数据，不在本轮提前引入。

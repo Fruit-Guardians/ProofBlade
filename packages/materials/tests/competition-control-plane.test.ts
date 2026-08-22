@@ -140,3 +140,23 @@ test("setChallengeMode propagates live to a running solve", async () => {
   await runPromise;
   assert.equal(observedMode, "assist");
 });
+
+test("switching an awaiting approval challenge back to auto requeues it", async () => {
+  const ids = [challenge("approval", 10)];
+  let calls = 0;
+  const solver: ChallengeSolver = {
+    async solve(): Promise<ChallengeSolveResult> {
+      calls += 1;
+      return calls === 1
+        ? { solved: false, status: "AWAITING_APPROVAL", reason: "operator review" }
+        : { solved: true, status: "SOLVED" };
+    },
+  };
+  const scheduler = new FleetScheduler({ api: new FakeApi(ids), solver, concurrency: 1, defaultMode: "assist" });
+  const held = await scheduler.run();
+  assert.equal(held.challenges[0]?.state, "awaiting_approval");
+  scheduler.setChallengeMode("approval", "auto");
+  const resumed = await scheduler.run();
+  assert.equal(resumed.challenges[0]?.state, "solved");
+  assert.equal(calls, 2);
+});

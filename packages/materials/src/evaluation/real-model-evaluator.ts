@@ -7,7 +7,7 @@ import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createServices, type AppServices } from "../app/demo.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
-import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { loadRealEvaluationCorpus, stageRealEvaluationCase, type LoadedRealEvaluationCase, type RealEvaluationCorpusSnapshot } from "./real-corpus.js";
 
@@ -108,11 +108,11 @@ export interface RealModelEvaluationSummary {
 }
 
 /**
- * Runs real provider-backed Solver lanes only after an explicit caller opt-in.
+ * Runs real provider-backed Coding lanes only after an explicit caller opt-in.
  * CI should exercise this class with an injected deterministic lane instead.
  */
 export class RealModelEvaluationRunner {
-  public constructor(private readonly root: string, private readonly createLane?: SolverLaneFactory) {}
+  public constructor(private readonly root: string, private readonly createLane?: AgentLaneFactory) {}
 
   public async run(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary> {
     if (options.allowLive !== true) throw new Error("Real model evaluation requires allowLive: true");

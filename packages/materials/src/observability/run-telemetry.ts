@@ -74,6 +74,8 @@ export interface RunTelemetryReport {
   };
   evidence: {
     count: number;
+    automaticObservationCount: number;
+    automaticObservationUniqueContentCount: number;
     firstEvidenceMs?: number;
   };
   convergence: {
@@ -117,6 +119,7 @@ export class RunTelemetry {
       },
       evidence: {
         count: Object.keys(snapshot.evidence).length,
+        ...automaticObservationReport(snapshot),
         ...(firstEvidence ? { firstEvidenceMs: Math.max(0, Date.parse(firstEvidence.ts) - startedMs) } : {}),
       },
       convergence: convergenceReport(snapshot, events, startedMs, firstCandidate),
@@ -124,6 +127,17 @@ export class RunTelemetry {
     };
     return { ...base, reportHash: sha256(canonicalJson(base)) };
   }
+}
+
+function automaticObservationReport(snapshot: RunSnapshot): Pick<RunTelemetryReport["evidence"], "automaticObservationCount" | "automaticObservationUniqueContentCount"> {
+  const automatic = Object.values(snapshot.observations).filter((item) => item.source.effectId?.startsWith("coding-artifact:")
+    || item.source.operation === "read"
+    || item.source.operation.startsWith("bash"));
+  const contentKeys = new Set(automatic.map((item) => snapshot.artifacts[item.source.artifactId]?.sha256).filter((value): value is string => value !== undefined));
+  return {
+    automaticObservationCount: automatic.length,
+    automaticObservationUniqueContentCount: contentKeys.size,
+  };
 }
 
 function convergenceReport(snapshot: RunSnapshot, events: HarnessEvent[], startedMs: number, firstCandidate: HarnessEvent | undefined): RunTelemetryReport["convergence"] {

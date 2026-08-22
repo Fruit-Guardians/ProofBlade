@@ -27,6 +27,7 @@ import type {
   ExperimentRecord,
   VerificationVerdict,
 } from "../domain/types.js";
+import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
@@ -111,6 +112,7 @@ export type DomainCommand =
   | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "hypothesis"; hypothesis: Omit<Hypothesis, "createdSeq" | "runId" | "generation">; lane?: Lane }
   | { type: "intent"; intent: Omit<Intent, "createdSeq">; lane?: Lane }
+  | { type: "scheduler_intent"; intent: SchedulerIntent; lane?: Lane }
   | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds" | "runId" | "generation">; lane?: Lane }
   | { type: "completion_verified"; completionId: string; accepted: boolean; evidenceIds: string[]; lane?: Lane }
   | { type: "artifact"; generation: number; artifact: Omit<RunSnapshot["artifacts"][string], "runId" | "generation" | "origin">; lane?: Lane }
@@ -381,6 +383,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "reasoning_tree": return "reasoning_tree_upserted";
     case "hypothesis": return "hypothesis_added";
     case "intent": return "intent_changed";
+    case "scheduler_intent": return "scheduler_intent_changed";
     case "completion_proposed": return "completion_proposed";
     case "completion_verified": return "completion_verified";
     case "artifact": return "artifact_registered";
@@ -488,6 +491,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
     case "reasoning_tree": return { tree: command.tree };
     case "hypothesis": return { hypothesis: { ...command.hypothesis, runId: snapshot.runId, generation: snapshot.generation, createdSeq: seq } };
     case "intent": return { intent: { ...command.intent, createdSeq: seq } };
+    case "scheduler_intent": return { intent: command.intent };
     case "completion_proposed": return { completion: { ...command.completion, runId: snapshot.runId, generation: snapshot.generation, status: "PROPOSED", evidenceIds: [], createdSeq: seq } };
     case "completion_verified": return { completionId: command.completionId, accepted: command.accepted, evidenceIds: command.evidenceIds };
     case "artifact": return {
@@ -959,6 +963,9 @@ function validateVerifierEffectProposal(
       throw new Error("claim_reproduction command must come from the task verifier policy");
     }
   }
+  if (effect.operation === "web_reproduce" && !snapshot.task.verification.web?.flag_pattern) {
+    throw new Error("web_reproduce is restricted to tasks with an immutable web verification policy");
+  }
   if (effect.operation === "pwn_reproduce") validatePwnVerifierBinding(snapshot, effect);
 }
 
@@ -989,7 +996,7 @@ function validateTrustedVerificationEffect(snapshot: RunSnapshot, effect: RunSna
   }
 }
 
-const VERIFIER_EFFECT_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce"]);
+const VERIFIER_EFFECT_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce", "web_reproduce"]);
 
 function validatePwnVerifierBinding(
   snapshot: RunSnapshot,

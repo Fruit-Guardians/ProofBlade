@@ -1,0 +1,3 @@
+Welcome to local pwn fixture
+menu: 1) inspect 2) submit
+shell marker: PB{holdout_pwn_shell}

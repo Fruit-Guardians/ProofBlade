@@ -649,7 +649,8 @@ test("agent annotations cannot erase immutable investigation classification or c
     assert.equal(after.stage, "required");
     assert.equal(after.pendingCount, 8);
     assert.equal(after.viewedCount, 8);
-    await assert.rejects(gate.assertInvestigationAllowed());
+    const notice = await gate.assertInvestigationAllowed();
+    assert.match(notice ?? "", /Further read\/bash calls are paused/);
   } finally {
     await destroyHarness(harness);
   }

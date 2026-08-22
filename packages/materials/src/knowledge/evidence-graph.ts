@@ -187,8 +187,8 @@ export class CodingEvidenceGraph {
       const current = snapshot.artifacts[artifactId]!;
       const existing = current.semantic;
       const semantic = semanticInput({
-        name: existing?.annotatedBy === "agent" ? existing.name : artifactIds.length === 1 ? name : `${name} (${index + 1}/${artifactIds.length})`,
-        summary: existing?.annotatedBy === "agent" ? existing.summary : summary,
+        name: existing?.annotatedBy === "agent" && !existing.tags.includes("auto-reviewed") ? existing.name : artifactIds.length === 1 ? name : `${name} (${index + 1}/${artifactIds.length})`,
+        summary: existing?.annotatedBy === "agent" && !existing.tags.includes("auto-reviewed") ? existing.summary : summary,
         tags: boundedUnion(existing?.tags ?? [], tags, 16),
         role: "supporting",
         relatedIds: boundedUnion(existing?.relatedIds ?? [], [evidenceId, ...(factId ? [factId] : [])], 32),

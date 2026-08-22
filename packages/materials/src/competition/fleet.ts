@@ -26,6 +26,8 @@ export interface ChallengeSolveResult {
 
 export interface ChallengeSolver {
   solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult>;
+  /** Optional durable cleanup hook invoked before a Fleet run starts. */
+  reconcile?(): Promise<void>;
 }
 
 export type FleetChallengeState =
@@ -154,6 +156,15 @@ export class FleetScheduler {
     const status = this.states.get(challengeId);
     if (status) {
       status.mode = mode;
+      // A completed assist run is waiting for the supervisor, not permanently
+      // failed. Flipping it back to auto makes the next Fleet start claim it
+      // again and replay the durable run's proposal through the normal path.
+      if (status.state === "awaiting_approval" && mode === "auto") {
+        status.state = "pending";
+        status.reason = undefined;
+        status.startedAt = undefined;
+        status.finishedAt = undefined;
+      }
       this.emit();
     }
   }
@@ -194,6 +205,7 @@ export class FleetScheduler {
   /** Run every pending challenge through the solver under the live concurrency cap. */
   public async run(): Promise<FleetSnapshot> {
     await this.load();
+    if (!this.signal?.aborted) await this.solver.reconcile?.();
     // A later Start may resume the pending queue after the operator repairs the
     // Provider account/configuration. The previous failed challenge remains an
     // explicit diagnostic instead of being retried automatically.

@@ -12,11 +12,11 @@ Tool output is marked as an untrusted observation when it came from a target. It
 
 The effect record also stores the fixture generation and enough execution data to reconcile interrupted work. Pure and idempotent effects may resume under the same effect id. If execution produced and registered an artifact before interruption, reconciliation adopts that artifact without running the command again. Other in-flight effects become `UNKNOWN` for explicit handling.
 
-## Solver tools
+## Unified coding contract
 
-The Pi solver lane exposes fourteen sequential tools. The capability and Skill proxy tools have stable schemas; operation details or full Skill content are loaded only when requested.
+The Pi coding lane exposes the stable ProofBlade tool surface. Capability and Skill proxy tools have stable schemas; operation details or full Skill content are loaded only when requested. The table below is the retained compatibility contract used by telemetry and deterministic tests; it is not a second production lane.
 
-Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `outputPolicy`, `replay`, `executionMode`, `resourceKeys`, `sensitivity`, and `evidenceKinds` in addition to its Provider-visible name, description, and TypeBox schema. Resource keys may contain argument templates such as `artifact:{artifactId}` or `job:{jobId}`; they are stable policy metadata for preflight and future multi-worker lease routing. The current single solver lane executes every core Tool sequentially, while Run recovery fences actual Fixture and target leases. The canonical contract snapshot includes this complete metadata in fixed tool order. A policy-only change therefore changes `solverToolContractHash()` even when the Provider-visible schema is unchanged.
+Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `outputPolicy`, `replay`, `executionMode`, `resourceKeys`, `sensitivity`, and `evidenceKinds` in addition to its Provider-visible name, description, and TypeBox schema. Resource keys may contain argument templates such as `artifact:{artifactId}` or `job:{jobId}`; they are stable policy metadata for preflight and future multi-worker lease routing. The single coding lane executes every core Tool sequentially, while Run recovery fences actual Fixture and target leases. The canonical contract snapshot includes this complete metadata in fixed tool order. A policy-only change therefore changes the tool-contract hash even when the Provider-visible schema is unchanged.
 
 | Tool | Information role |
 | --- | --- |

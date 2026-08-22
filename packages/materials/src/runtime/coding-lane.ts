@@ -27,14 +27,14 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { PwnReproductionContract, RunSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
-import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
+import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination, type ToolCallBudget } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
@@ -44,6 +44,8 @@ import { ExperimentGate } from "../competition/experiment-gate.js";
 import { HttpSessionBackend } from "../web/http-session.js";
 import { WebReproducer, type WebExploitStep } from "../verification/web-reproducer.js";
 import { WebToolHandler } from "../web/web-tools.js";
+import type { ApprovalPolicy } from "../security/approval-policy.js";
+import { ToolPreflightService, profileForTargetKind, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -82,6 +84,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
+    /** Exploratory HTTP sessions are lane-owned and must be closed with the lane. */
+    private readonly webSession?: WebToolHandler,
   ) {}
 
   public static async create(options: {
@@ -111,9 +115,19 @@ export class PiCodingLane implements AgentLanePort {
     /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
     hostWorkspaceRootForMcp?: string;
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] };
+    /** Prepared challenge direction; keeps only profile tools resident in the prompt. */
+    challengeProfile?: ChallengeToolProfile;
     /** Live execution mode for a platform-judged run. "assist" records a flag for
      * operator approval instead of submitting it. Defaults to autonomous play. */
     mode?: () => "auto" | "assist";
+    /** Optional durable approval gate for high-risk platform effects. */
+    approvalPolicy?: ApprovalPolicy;
+    /** Keep hidden-scorer completions proposed until the outer CTF verifier runs. */
+    deferClaimAcceptance?: boolean;
+    /** Optional session id override for non-chat CTF runs. */
+    sessionId?: string;
+    /** Called when the submission path pauses on a pending approval. */
+    onApprovalRequired?: (approvalId: string) => void;
     /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
@@ -121,7 +135,7 @@ export class PiCodingLane implements AgentLanePort {
     const sessionEnv = new NodeExecutionEnv({ cwd: options.projectRoot });
     const env: ExecutionEnv = options.executionEnv ?? new NodeExecutionEnv({ cwd: options.projectRoot });
     const repo = new JsonlSessionRepo({ fs: sessionEnv, sessionsRoot: join(options.runDir, "pi-sessions") });
-    const sessionId = `${options.runId}-chat`;
+    const sessionId = options.sessionId ?? `${options.runId}-chat`;
     const known = await repo.list({ cwd: options.projectRoot });
     const metadata = known.find((item) => item.id === sessionId);
     const session = metadata
@@ -129,7 +143,7 @@ export class PiCodingLane implements AgentLanePort {
       : await repo.create({
         id: sessionId,
         cwd: options.projectRoot,
-        metadata: { runId: options.runId, lane: "main", purpose: "chat" },
+        metadata: { runId: options.runId, lane: "main", purpose: sessionId === `${options.runId}-chat` ? "chat" : "ctf" },
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
@@ -149,14 +163,21 @@ export class PiCodingLane implements AgentLanePort {
     // model chasing ENOENTs.
     const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
     const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
+    const snapshot = await options.controlStore.snapshot(options.runId);
+    const challengeProfile = options.challengeProfile ?? profileForTargetKind(snapshot.task.target_kind, snapshot.task.target);
+    const preflight = challengeProfile
+      ? await new ToolPreflightService(installRoot).prepare(challengeProfile, toolCatalog, mcp)
+      : undefined;
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
-    const enabledSkills = new Set(options.capabilities?.enabledSkills ?? skills.list().map((skill) => skill.name));
-    const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
+    const enabledSkills = new Set(options.capabilities?.enabledSkills ?? challengeProfile?.skillNames ?? skills.list().map((skill) => skill.name));
+    const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? challengeProfile?.mcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     // Expose each enabled MCP server's tools as FIRST-CLASS provider tools
     // (mcp__<server>__<tool>) so the model uses them natively, like Claude Code —
     // instead of the mcp_call proxy it will not drive. mcp_call stays as a fallback.
-    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, enabledMcpServers);
+    const effectiveTargetKind = challengeProfile?.targetKind ?? snapshot.task.target_kind;
+    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers, challengeProfile?.id));
+    const activeMcpTools = selectFirstClassMcpTools(mcpFirstClassTools, effectiveTargetKind, snapshot.task.target, challengeProfile?.id);
     const artifactStore = options.artifactStore;
     const checkpointService = new CheckpointService(options.controlStore, artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
@@ -169,7 +190,6 @@ export class PiCodingLane implements AgentLanePort {
     const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
     const forestContext = { value: formatReasoningForestContext(await evidenceGraph.inspectForest()) };
     const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
-    const snapshot = await options.controlStore.snapshot(options.runId);
     // A live platform is the judge only for competition runs; a GUI chat run has
     // nothing to submit to and must not be given submit_flag.
     const platformJudged = snapshot.task.verification.kind === "platform_submission";
@@ -220,7 +240,13 @@ export class PiCodingLane implements AgentLanePort {
       : undefined;
     const webPolicy = snapshot.task.verification.web;
     const webBaseUrl = webBaseUrlFromTarget(snapshot.task.target);
-    const webReproducer = webPolicy && webBaseUrl ? new WebReproducer(options.controlStore) : undefined;
+    const webReproducer = webPolicy && webBaseUrl
+      ? new WebReproducer(options.controlStore, artifactStore, {
+        executeEffect: async (input, signal) => await options.claimVerifier.executeWebReproductionEffect(input, signal),
+        recordEvidence: async (_runId, evidence) => await options.claimVerifier.recordVerifierEvidence(evidence),
+        finalize: async (_runId, completionId, accepted, evidenceIds) => await options.claimVerifier.finalizeWebReproduction(completionId, accepted, evidenceIds),
+      })
+      : undefined;
     // Interactive web session tools: available whenever the task has a resolvable
     // web target (host-side fetch, origin-locked — no container needed). This is
     // the exploration counterpart to the verifier-only web_reproduce; it lets the
@@ -247,7 +273,7 @@ export class PiCodingLane implements AgentLanePort {
         webReproductionEnabled: Boolean(webReproducer),
         webSessionEnabled: Boolean(webSession),
       }),
-      ...mcpFirstClassTools.map((tool) => tool.name),
+      ...activeMcpTools.map((tool) => tool.name),
     ];
     if (platformJudged && !options.platformVerifier) throw new Error("Platform-judged lane requires a trusted platform verifier");
     const submitFlag = platformJudged
@@ -259,10 +285,14 @@ export class PiCodingLane implements AgentLanePort {
         verifier: options.platformVerifier!,
         artifactStore,
         ...(options.mode ? { mode: options.mode } : {}),
+        ...(options.approvalPolicy ? { approvalPolicy: options.approvalPolicy } : {}),
+        ...(options.onApprovalRequired ? { onApprovalRequired: options.onApprovalRequired } : {}),
       })
       : undefined;
     const toolContext: CodingResourceContext = {
       env,
+      controlStore: options.controlStore,
+      artifactStore,
       skills,
       mcp,
       enabledSkills,
@@ -273,13 +303,14 @@ export class PiCodingLane implements AgentLanePort {
       runtime,
       experimentGate,
       ...(webReproducer ? {
-        webReproduce: async (steps: WebExploitStep[], signal?: AbortSignal) => await webReproducer.reproduce(options.runId, { steps }, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl!, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, experimentGate }), signal),
+        webReproduce: async (steps: WebExploitStep[], signal?: AbortSignal) => await webReproducer.reproduce(options.runId, { steps }, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl!, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports, experimentGate }), signal),
       } : {}),
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
       ...(submitFlag ? { submitFlag } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
+      artifactOutputRefs: new Map(),
       imagesSeen: new Map<string, number>(),
     };
     const skillsLibraryPath = join(installRoot, "skills-library", "ctf-skills");
@@ -288,12 +319,14 @@ export class PiCodingLane implements AgentLanePort {
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
       options.skillsLibraryPathForPrompt ?? skillsLibraryPath,
       options.workspaceRootForPrompt ?? options.projectRoot,
-      toolCatalog.promptBlock(),
+      challengeProfile ? toolCatalog.promptBlock(challengeProfile.id, challengeProfile.hostToolIds) : toolCatalog.promptBlock(),
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
-        targetKind: snapshot.task.target_kind,
+        targetKind: effectiveTargetKind,
         target: snapshot.task.target,
+        challengeProfile,
+        preflight,
         pwnToolsAvailable: Boolean(pwnTools),
         pwnReproductionAvailable: Boolean(pwnTools && pwnReproductionPolicy),
         webToolsAvailable: Boolean(webSession),
@@ -305,6 +338,7 @@ export class PiCodingLane implements AgentLanePort {
     const progressBreaker = new NoProgressToolBreaker();
     const failureStormBreaker = new ToolFailureStormBreaker();
     const experimentBudgetBreaker = new ExperimentBudgetBreaker();
+    const toolBudget: ToolCallBudget = { max: Math.max(0, snapshot.task.constraints.max_tool_calls), count: 0 };
     const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
@@ -318,15 +352,22 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
     const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
     const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.5));
-    harness.on("context", ({ messages }) => {
+    harness.on("context", async ({ messages }) => {
       const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext.value), availableTokens: contextBudget, messageBudget: targetMessageBudget });
+      if (prepared.checkpointRecommended) {
+        // Coding lanes use a stable system prompt rather than ContextCompiler,
+        // so persist the bounded ledger checkpoint directly before Pi compacts.
+        // The append-only transcript remains the source of truth if this
+        // observer-side write is temporarily unavailable.
+        await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
+      }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: prepared.messages };
     });
@@ -375,10 +416,12 @@ export class PiCodingLane implements AgentLanePort {
         return undefined;
       },
       pwnRegistry,
+      webSession,
     );
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
+    const ctfMode = isLikelyCtfPrompt(text);
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();
@@ -387,6 +430,7 @@ export class PiCodingLane implements AgentLanePort {
     delete this.termination.reason;
     this.termination.requested = false;
     this.termination.confirmed = false;
+    this.termination.ctfMode = ctfMode;
     await this.refreshForestContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
@@ -404,13 +448,14 @@ export class PiCodingLane implements AgentLanePort {
       // where re-issuing sends the SAME request without restarting the turn — so
       // it never duplicates the user message or re-runs tools. Here we only
       // recover from context overflow, which legitimately changes the prompt.
+      const effectivePrompt = ctfMode && !text.includes("[ProofBlade CTF fast path]") ? `${text}\n\n${CTF_FAST_PATH_PROMPT}` : text;
       const recovered = await promptWithContextLengthRecovery({
         prompt: async (prompt) => await this.harness.prompt(prompt),
         compact: async (reason) => {
           await this.harness.compact(reason);
           this.maintenance.compactRequested = false;
         },
-      }, text);
+      }, effectivePrompt);
       const response = recovered.response;
       return await finalizeCodingTurn({
         runId: this.runId,
@@ -452,6 +497,7 @@ export class PiCodingLane implements AgentLanePort {
         // sessions would stay OPEN until the container is destroyed. Best-effort
         // so a session cleanup failure never blocks the rest of teardown.
         if (this.pwnRegistry) await this.pwnRegistry.disposeAll("lane shutdown").catch(() => undefined);
+        if (this.webSession) await this.webSession.disposeAll("lane shutdown");
         await this.env.cleanup();
       } finally {
         try {
@@ -509,6 +555,10 @@ export function createPlatformFlagSubmitter(deps: {
   artifactStore: ArtifactStore;
   /** Live execution mode. In "assist" the flag is recorded but NOT sent. */
   mode?: () => "auto" | "assist";
+  /** Optional durable approval gate for high-risk platform effects. */
+  approvalPolicy?: ApprovalPolicy;
+  /** Called when the submission path pauses on a pending approval. */
+  onApprovalRequired?: (approvalId: string) => void;
 }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission> {
   return async (flag, signal) => {
     const before = await deps.controlStore.snapshot(deps.runId);
@@ -539,6 +589,26 @@ export function createPlatformFlagSubmitter(deps: {
         message: `This flag was already submitted and ${known.status === "ACCEPTED" ? "accepted" : "rejected"}; no new submission was spent.`,
         ...(await submissionCounters(deps.runtime, before)),
       };
+    }
+    if (deps.approvalPolicy) {
+      const approval = await deps.approvalPolicy.check({
+        runId: deps.runId,
+        operation: "platform.submit",
+        resource: flag,
+        reason: "A model-derived flag is ready for platform submission.",
+      });
+      if (!approval.allowed) {
+        if (approval.approvalId) deps.onApprovalRequired?.(approval.approvalId);
+        return {
+          accepted: false,
+          completionId,
+          candidateHash,
+          replayed: false,
+          heldForApproval: true,
+          message: `${approval.reason ?? "Operator approval is required before submission."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}`,
+          ...(await submissionCounters(deps.runtime, await deps.controlStore.snapshot(deps.runId))),
+        };
+      }
     }
     const outcome = await deps.verifier.verify(deps.runId, deps.fixture, completionId, signal);
     const after = await deps.controlStore.snapshot(deps.runId);
@@ -599,13 +669,32 @@ function pwnReproductionPolicyFor(contract: PwnReproductionContract | undefined)
   };
 }
 
+/**
+ * Detect challenge-shaped prompts at the GUI boundary, where the durable chat
+ * task is intentionally target-agnostic and therefore cannot provide a
+ * category-specific TaskContract. This stays conservative so a normal request
+ * about a software "feature flag" remains an ordinary coding turn.
+ */
+export function isLikelyCtfPrompt(text: string): boolean {
+  return /(?:\bctf\b|\bchallenge\b|\bpyjail\b|\bpwn\b|\breverse(?:[- ]engineering)?\b|\bapk\b|\bshellcode\b|\bflag\s*\{|(?:题目描述|求解\s*flag|解题|夺旗|靶机|逆向题|破解题|漏洞题|二进制题))/i.test(text);
+}
+
+const CTF_FAST_PATH_PROMPT = [
+  "[ProofBlade CTF fast path]",
+  "Treat this as one bounded challenge-solving turn, not an open-ended coding session.",
+  "First classify the dominant category and read exactly one matching ctf-* playbook from the skills library.",
+  "After the first useful structure/constraint is extracted, write a small solver or reproducer immediately; do not keep dumping AST/disassembly or rewriting equivalent probes.",
+  "Every exploratory command must either produce a new fact, update the solver, or verify a candidate. If the same approach has not advanced after a few probes, stop and change the hypothesis.",
+  "Use verify_claim before reporting a flag.",
+].join("\n");
+
 function codingSystemPrompt(
   skills: Array<{ name: string; description: string; content: string }>,
   mcpServers: Array<{ name: string; description: string }>,
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -634,8 +723,12 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
-  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${categoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
+  const profileBlock = options.challengeProfile
+    ? `\n\n## Prepared challenge tool profile\nDirection: ${options.challengeProfile.id}; target kind: ${options.challengeProfile.targetKind}. The host preflight is authoritative: do not spend a turn rediscovering or installing these tools. Required tool ids: ${options.challengeProfile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${options.challengeProfile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${options.challengeProfile.fallbackStrategies.join(" -> ")}.${options.preflight?.missingRequiredTools.length ? ` Missing required host tools (use a fallback, do not install interactively): ${options.preflight.missingRequiredTools.join(", ")}.` : " Required host tools are ready or not applicable."}${options.preflight?.missingOptionalTools.length ? ` Missing optional host tools (do not rediscover or install during the challenge): ${options.preflight.missingOptionalTools.join(", ")}.` : ""}${options.preflight?.mcpServers.length ? ` MCP readiness: ${options.preflight.mcpServers.map((server) => `${server.name}=${server.status}${server.toolchainState ? `/${server.toolchainState}` : ""}`).join(", ")}.` : ""}`
+    : "";
+  const webAwareCategoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 /**
@@ -667,7 +760,7 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
       : "- INTERACTION MODEL — never hold a live interactive connection inside one foreground `bash` call: an exploit that calls `recvuntil`/`interactive`/`p.recv()` will block until the command timeout kills it, and rewriting the whole script and re-running it is the #1 way pwn turns are lost. Run any long or interactive exploit under `shell_background` and poll with `shell_job`, so a stall costs one bounded poll instead of the whole command budget. Keep each foreground `bash` short: compute offsets/gadgets/payloads, do a single bounded probe (`timeout 20 python solve.py`), inspect, iterate — do not launch the full interactive solve in the foreground.";
     return [
       "\n\n## Pwn category specifics",
-      "- `pwntools`, `pwncli`, `gdb`, `gdb-multiarch`, `qemu-user`, `patchelf`, `ropgadget`, and `one_gadget` are already installed. `context.log_level = 'debug'` when protocol sync is unclear.",
+      "- Use the exact paths in the prepared `<tool-catalog>` profile for `pwntools`, `gdb`, `qemu`, `patchelf`, `ropgadget`, or `one_gadget` when present. Optional tools may be absent; do not install or rediscover them during the solve. `context.log_level = 'debug'` when protocol sync is unclear.",
       interactionRule,
       "- Always run `file` and `checksec` on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
       "- Chinese CTF services often speak GBK, not UTF-8. Never hand-type non-ASCII prompt bytes into a script from what you see in a tool-result echo, because that echo has already been round-tripped through a locale that may not match the wire. Instead: (1) do one probe run, save `p.recv(4096)` to a file, (2) inspect the raw bytes with `xxd`, (3) reference those exact bytes in your parser (`recvuntil(b\"\\xc7\\xeb\\xd1\\xa1\\xd4\\xf1...\")` or a stable ASCII substring/suffix that co-occurs with the prompt). If the banner is confusing, decode with `.decode('gbk', errors='replace')` and `.decode('utf-8', errors='replace')` side by side — whichever produces readable Chinese is the wire encoding, and encoding future sends with the same codec is mandatory.",
@@ -690,11 +783,12 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
       "\n\n## Web category specifics",
       webInteractionRule,
       "- `curl`, `python-requests`, `beautifulsoup4`, `sqlmap`, `chromium` (headless), and `playwright` are already installed. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
+      "- Use the exact prepared catalog paths for `curl`, `chromium`, or `playwright` when present. Python HTTP libraries are the baseline; optional scanners such as `sqlmap` must not be assumed or installed mid-challenge. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
       "- Read the initial page and its response headers first: `curl -sSikL <target>` shows the framework fingerprint (Server, X-Powered-By, Set-Cookie shape, error page style) that decides your subsequent playbook branch (SQLi vs SSTI vs SSRF vs auth-bypass vs deserialization).",
       "- Check `/robots.txt`, `/.git/HEAD`, `/.env`, `/admin`, `/login`, source view (`view-source:` equivalent via `curl`), sitemap, and any JS bundles for endpoints — a large fraction of web CTFs hinge on a route that is not linked from the landing page.",
       "- Decode any JWT with `python -c 'import jwt,sys;print(jwt.decode(sys.argv[1], options={\"verify_signature\":False}))'` (or manual base64) before treating it as opaque. Note the algorithm — `alg:none` and weak HS256 keys are common CTF traps.",
       "- Chinese CTF web challenges frequently return GBK-encoded response bodies. If `curl` output looks mojibake, add `--output` and inspect with `file`/`iconv -f gbk -t utf-8`. Do not rely on the terminal echo of Chinese strings for parsing.",
-      "- When you think the vulnerability is SQLi, try `sqlmap -u '<url>' --batch --level=3 --risk=2` in `shell_background` before hand-rolling payloads; when it's SSTI/RCE, jump to `{{7*7}}` and `${{7*7}}` fingerprints across common template engines.",
+      "- When `sqlmap` is present in the prepared catalog and the vulnerability looks like SQLi, run it in `shell_background` before hand-rolling payloads; otherwise use a bounded requests reproducer. For SSTI/RCE, jump to `{{7*7}}` and `${{7*7}}` fingerprints across common template engines.",
       remoteBlock,
     ].join("\n");
   }
@@ -702,14 +796,16 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
     return [
       "\n\n## Reverse category specifics",
       "- Prefer a decompiler MCP (idalib-mcp / jadx-mcp when available) over hand-reading `objdump -d`. Open the target once, then work from pseudocode.",
-      "- `file`, `strings`, `nm`, `readelf -a`, `checksec` describe the shape; run them first. For packed binaries note the entropy and section layout before decompiling.",
+      "- Call `capability` for `proofblade.binary.packed_probe` early. It detects UPX signatures and returns a bounded fallback plan; run the exact catalog UPX path with `-t` before attempting `-d`.",
+      "- If UPX is missing or reports a corrupt header, switch once to `gdb_batch` (`starti`, `info proc mappings`, then a bounded `dump memory` into a workspace-relative file) or QEMU; do not keep retrying the same unpacker download.",
+      "- Use `proofblade.binary.identify` as the portable file-magic baseline, then run the exact prepared catalog paths for `strings`, `readelf`, `objdump`, `gdb`, or `checksec` when present. For packed binaries note the entropy and section layout before decompiling.",
       "- Once you have identified the transform, reconstruct it in Python instead of stepping through disassembly a fourth time. Search/BFS/bounded brute force is the fifth step of the loop; do not skip it.",
     ].join("\n");
   }
   if (kind === "crypto") {
     return [
       "\n\n## Crypto category specifics",
-      "- `pycryptodome`, `gmpy2`, `sagemath`-style scripting via Python, and `openssl` are available. For classic modular-arithmetic tasks reach for `gmpy2.iroot`, Chinese Remainder Theorem, and lattice reduction (`fpylll`) before trying to brute force.",
+      "- Use the prepared catalog to decide whether `pycryptodome`, `gmpy2`, Sage, OpenSSL, or `fpylll` are available; otherwise keep a pure-Python implementation as the fallback and do not install packages mid-challenge. For classic modular-arithmetic tasks reach for `gmpy2.iroot`, Chinese Remainder Theorem, and lattice reduction (`fpylll`) before trying to brute force when those tools are ready.",
       "- Identify the primitive first (RSA / DLP / AES-mode / hash / stream) and the exact operation being requested. A confused primitive check is the top cause of wasted turns in this category.",
     ].join("\n");
   }
@@ -736,4 +832,10 @@ function webBaseUrlFromTarget(target: string): string | undefined {
       : undefined;
   if (!value) return undefined;
   try { return new URL(value).toString().replace(/\/$/, ""); } catch { return undefined; }
+}
+
+function firstClassMcpServers(targetKind: TaskContract["target_kind"], target: string, enabledServers: Set<string>, profileId?: string): string[] {
+  if (targetKind !== "reverse") return [];
+  const preferred = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target) ? ["jadx"] : ["idalib-mcp"];
+  return preferred.filter((server) => enabledServers.has(server));
 }

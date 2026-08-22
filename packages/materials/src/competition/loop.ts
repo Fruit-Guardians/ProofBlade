@@ -5,9 +5,10 @@ import type { DomainPhase, ExecutionMode, RunSnapshot, TargetKind, TaskContract 
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import { id } from "../domain/utils.js";
+import { id, isTerminal } from "../domain/utils.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { IndependentVerifier } from "../verification/verifier.js";
+import type { ApprovalPolicy } from "../security/approval-policy.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -34,6 +35,8 @@ export interface CompetitionLoopOptions {
   /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
   hostWorkspaceRootForMcp?: string;
   signal?: AbortSignal;
+  /** Optional durable approval gate for platform effects. */
+  approvalPolicy?: ApprovalPolicy;
 }
 
 export interface CompetitionLoopOutcome {
@@ -51,12 +54,9 @@ export interface CompetitionLoopOutcome {
 /**
  * Drive one competition challenge on the CODING lane.
  *
- * This replaces SingleAgentCtfLoop for competition play. The reason is not
- * preference: the solver lane's tools are read-only proxies over a synthetic
- * fixture, so it cannot run a real exploit, script a solve, or drive a
- * decompiler MCP — which is what every real challenge needs. The coding lane has
- * real bash/read/edit/write plus first-class MCP tools and the on-disk skills
- * library, and (since submit_flag) a platform submission path.
+ * This loop is the platform-facing wrapper around the same PiCodingLane used
+ * by Fixture execution. Competition adds the platform submission path and
+ * scoped execution environment; it does not maintain a second solver lane.
  *
  * Kept from the old loop: bounded turns, deadline enforcement, abort wiring, and
  * assist-mode stop-before-submitting. Dropped: phase/planner choreography and
@@ -87,6 +87,9 @@ export async function runCompetitionLoop(
   let replanReason: string | undefined;
   let guardReplans = 0;
   let workItemId: string | undefined;
+  let deadlineReached = false;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let approvalRequiredId: string | undefined;
 
   try {
     const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
@@ -105,6 +108,8 @@ export async function runCompetitionLoop(
       // The fleet's per-challenge toggle is read on every submission, so flipping
       // auto/assist mid-run takes effect without rebuilding the lane.
       mode: () => (mode() === "assist" ? "assist" : "auto"),
+      ...(options.approvalPolicy ? { approvalPolicy: options.approvalPolicy } : {}),
+      onApprovalRequired: (approvalId) => { approvalRequiredId = approvalId; },
       // Bound a single blocking command. A real run hung one bash call for 30+
       // minutes, which in a fleet idles a worker slot for the whole time; long work
       // belongs in shell_background instead.
@@ -116,6 +121,11 @@ export async function runCompetitionLoop(
       ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
     });
     const activeLane = lane;
+    const remainingDeadlineMs = Math.max(0, deadlineMs - (Date.now() - startedAt));
+    deadlineTimer = setTimeout(() => {
+      deadlineReached = true;
+      void activeLane.abort("Challenge deadline exceeded").catch(() => undefined);
+    }, remainingDeadlineMs);
     if (options.signal) {
       const onAbort = () => void activeLane.abort(options.signal?.reason ?? "Challenge cancelled");
       options.signal.addEventListener("abort", onAbort, { once: true });
@@ -128,7 +138,7 @@ export async function runCompetitionLoop(
         stopReason = "aborted";
         break;
       }
-      if (Date.now() - startedAt >= deadlineMs) {
+      if (deadlineReached || Date.now() - startedAt >= deadlineMs) {
         stopReason = "deadline";
         break;
       }
@@ -154,6 +164,18 @@ export async function runCompetitionLoop(
       lastText = outcome.text || lastText;
       const snapshot = await services.control.snapshot(options.runId);
       const acceptedCompletion = acceptedPlatformCompletion(snapshot);
+      if (approvalRequiredId) {
+        stopReason = "held_for_approval";
+        termination = `approval_required:${approvalRequiredId}`;
+        await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
+        break;
+      }
+      if (deadlineReached || Date.now() - startedAt >= deadlineMs) {
+        termination = "deadline_exhausted";
+        stopReason = "deadline";
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, termination);
+        break;
+      }
       if (acceptedCompletion) {
         // Close the active work item and advance the domain projection before
         // finish makes the Run terminal; terminal Runs deliberately reject
@@ -218,6 +240,7 @@ export async function runCompetitionLoop(
       await failCompetitionWorkItem(services.control, options.runId, workItemId, `No verified completion after ${maxTurns} model turns.`);
     }
   } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
     removeAbortListener?.();
     if (lane) {
       try {
@@ -324,6 +347,27 @@ export async function claimCompetitionWorkItem(control: AppServices["control"], 
   return snapshot.workItems[candidate.id]?.id ?? candidate.id;
 }
 
+export async function commitCompetitionSuccess(control: AppServices["control"], verifier: AppServices["verifier"], runId: string, workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
+  const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
+  if (!completion) throw new Error("Cannot commit competition success without an accepted completion");
+  if (isTerminal(snapshot.status)) return;
+  const commands = [
+    { type: "set_domain_phase" as const, domainPhase: "SUBMIT" as const, lane: "executor" as const },
+    ...(workItemId && snapshot.workItems[workItemId]?.status === "RUNNING" ? [{
+      type: "work_item_completed" as const,
+      workItemId,
+      evidenceIds: completion.evidenceIds,
+      artifactIds: [completion.artifactId],
+      lane: "executor" as const,
+    }] : []),
+  ];
+  await control.dispatchBatch(runId, commands);
+  await verifier.finish(runId, {
+    completionId: completion.id,
+    reason: "Platform accepted the candidate and verifier evidence covers the completion.",
+  });
+}
+
 async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
   if (!workItemId || snapshot.workItems[workItemId]?.status !== "RUNNING") return;
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
@@ -409,7 +453,7 @@ function acceptedPlatformCompletion(snapshot: RunSnapshot): RunSnapshot["complet
   });
 }
 
-function countSubmissions(snapshot: RunSnapshot): number {
+export function countSubmissions(snapshot: RunSnapshot): number {
   return Object.values(snapshot.effects).filter((effect) => effect.operation === "fixture_score").length;
 }
 

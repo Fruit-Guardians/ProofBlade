@@ -3,9 +3,14 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
-export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget";
+export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
+
+export interface ToolCallBudget {
+  max: number;
+  count: number;
+}
 
 export interface CodingTurnTermination {
   message?: string;
@@ -13,6 +18,8 @@ export interface CodingTurnTermination {
   confirmed?: boolean;
   reason?: CodingTurnTerminationReason;
   noProgressWindow?: NoProgressWindow;
+  /** Set for a challenge prompt so experiment limits stop the turn, not just nudge it. */
+  ctfMode?: boolean;
 }
 
 export function projectCodingAssistantText(output: string, termination: CodingTurnTermination): string {
@@ -35,6 +42,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   resolveEffectPolicy?: ToolEffectPolicyResolver,
   failureStormBreaker?: ToolFailureStormBreaker,
   experimentBudgetBreaker?: ExperimentBudgetBreaker,
+  toolBudget?: ToolCallBudget,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -50,6 +58,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
   });
   const unsubscribeResult = harness.on("tool_result", (event) => {
+    if (termination.reason === "tool_budget_exhausted") {
+      return {
+        content: [{ type: "text" as const, text: termination.message ?? "[ProofBlade tool budget exhausted]" }],
+        details: { toolBudget: true, count: toolBudget?.count ?? 0, max: toolBudget?.max ?? 0 },
+        isError: true,
+        terminate: true,
+      };
+    }
     if (!event.isError) {
       const observation = {
         toolName: event.toolName,
@@ -61,14 +77,27 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       };
       const experiment = experimentBudgetBreaker?.observe(observation);
       if (experiment?.terminate) {
-        termination.message = experimentBudgetMessage(experiment);
-        termination.reason = "experiment_budget";
-        termination.requested = true;
+        if (termination.ctfMode) {
+          termination.message = experimentBudgetMessage(experiment);
+          termination.reason = "experiment_budget";
+          termination.requested = true;
+          return {
+            content: [{ type: "text" as const, text: termination.message }],
+            details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+            isError: false,
+            terminate: true,
+          };
+        }
+        // Advisory, non-terminating: keep the model in control and append a
+        // change-tactics nudge to the real tool output instead of stopping the
+        // turn and forcing a replan (which interrupts a legitimate multi-step
+        // solve). Reset the window so the nudge is periodic, not per-call spam.
+        experimentBudgetBreaker?.reset();
+        const nudge = experimentBudgetNudge(experiment);
         return {
-          content: [{ type: "text" as const, text: termination.message }],
-          details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+          content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }],
+          details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
           isError: false,
-          terminate: true,
         };
       }
       failureStormBreaker?.observe(observation);
@@ -113,14 +142,25 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
     const experiment = experimentBudgetBreaker?.observe(observation);
     if (experiment?.terminate) {
-      termination.message = experimentBudgetMessage(experiment);
-      termination.reason = "experiment_budget";
-      termination.requested = true;
+      if (termination.ctfMode) {
+        termination.message = experimentBudgetMessage(experiment);
+        termination.reason = "experiment_budget";
+        termination.requested = true;
+        return {
+          content: [{ type: "text" as const, text: termination.message }],
+          details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+          isError: event.isError,
+          terminate: true,
+        };
+      }
+      // Advisory, non-terminating (same as the success path): append the nudge
+      // to the real error output and reset the window; do not stop the turn.
+      experimentBudgetBreaker?.reset();
+      const nudge = experimentBudgetNudge(experiment);
       return {
-        content: [{ type: "text" as const, text: termination.message }],
-        details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
-        isError: true,
-        terminate: true,
+        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }],
+        details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+        isError: event.isError,
       };
     }
     const storm = failureStormBreaker?.observe(observation);
@@ -147,6 +187,20 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       terminate: true,
     };
   });
+  const unsubscribeToolCall = harness.on("tool_call", (event) => {
+    if (!toolBudget || termination.reason === "tool_budget_exhausted") {
+      if (termination.reason === "tool_budget_exhausted") return { block: true, reason: termination.message };
+      return undefined;
+    }
+    if (toolBudget.count >= toolBudget.max) {
+      termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Stop probing and preserve the strongest evidence.`;
+      termination.reason = "tool_budget_exhausted";
+      termination.requested = true;
+      return { block: true, reason: termination.message };
+    }
+    toolBudget.count += 1;
+    return undefined;
+  });
   const unsubscribeProvider = harness.on("before_provider_request", () => {
     if (!termination.requested) return undefined;
     throw new Error(termination.message ?? "ProofBlade stopped a non-converging tool loop.");
@@ -154,6 +208,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   return () => {
     unsubscribeEvents();
     unsubscribeResult();
+    unsubscribeToolCall();
     unsubscribeProvider();
   };
 }

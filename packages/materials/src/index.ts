@@ -1,5 +1,17 @@
 export * from "./config.js";
 export * from "./domain/types.js";
+export type {
+  Intent as SchedulerIntent,
+  IntentStatus,
+  IntentPriority,
+  IntentScore,
+  IntentScoringWeights,
+  SchedulingContext,
+  IntentGenerationRequest,
+  IntentGenerationResult,
+  IntentLeaseClaim,
+  ExpectedEvidence,
+} from "./domain/intent.js";
 export * from "./domain/reasoning.js";
 export * from "./domain/candidate.js";
 export * from "./domain/run-id.js";
@@ -29,6 +41,10 @@ export * from "./pwn/pwn-session.js";
 export * from "./pwn/pwn-tools.js";
 export * from "./orchestration/single-agent-loop.js";
 export * from "./orchestration/planner.js";
+export * from "./orchestration/intent-scheduler.js";
+export * from "./orchestration/intent-scorer.js";
+export * from "./orchestration/intent-filter.js";
+export * from "./orchestration/scheduling-context.js";
 export * from "./orchestration/refiner.js";
 export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
@@ -44,9 +60,9 @@ export * from "./runtime/provider-budget.js";
 export * from "./runtime/provider-scheduler.js";
 export * from "./runtime/coding-resources.js";
 export * from "./runtime/coding-lane.js";
+export * from "./runtime/challenge-tool-profile.js";
 export * from "./runtime/context-length-recovery.js";
 export * from "./runtime/solver-tools.js";
-export * from "./runtime/solver-lane.js";
 export * from "./runtime/version.js";
 export * from "./observability/pi-events.js";
 export * from "./observability/run-telemetry.js";
@@ -61,6 +77,7 @@ export * from "./mcp/registry.js";
 export * from "./evaluation/fixture-evaluator.js";
 export * from "./evaluation/real-corpus.js";
 export * from "./evaluation/real-model-evaluator.js";
+export * from "./evaluation/local-holdout.js";
 export * from "./evaluation/runtime-scenario-evaluator.js";
 export * from "./sandbox/fixture.js";
 export * from "./sandbox/fixture-catalog.js";
@@ -75,6 +92,9 @@ export * from "./competition/sandbox.js";
 export * from "./competition/fleet.js";
 export * from "./competition/solver.js";
 export * from "./competition/experiment-gate.js";
+export * from "./competition/environment-janitor.js";
+export * from "./security/approval-policy.js";
+export * from "./control/app-server.js";
 export * from "./container/contracts.js";
 export * from "./container/docker.js";
 export * from "./container/execution-env.js";

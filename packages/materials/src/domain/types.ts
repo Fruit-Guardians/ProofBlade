@@ -173,7 +173,9 @@ export interface Observation {
   runId: string;
   generation: number;
   summary: string;
-  source: { operation: string; effectId: string; artifactId: string; generation: number };
+  /** effectId is present for journal-backed capability observations. Coding
+   * read/bash artifacts are already durable and may be observed by artifact id. */
+  source: { operation: string; effectId?: string; artifactId: string; generation: number };
   candidateKinds: string[];
   createdSeq: number;
 }
@@ -526,7 +528,7 @@ export interface VerificationVerdict {
   schemaVersion: 1;
   valid: boolean;
   accepted: boolean;
-  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce";
+  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce" | "web_reproduce";
   runId: string;
   taskId: string;
   taskHash: string;
@@ -593,6 +595,7 @@ export interface RunSnapshot {
   reasoningTrees: Record<string, ReasoningTree>;
   hypotheses: Record<string, Hypothesis>;
   intents: Record<string, Intent>;
+  schedulerIntents: Record<string, import("./intent.js").Intent>;
   completions: Record<string, CompletionProposal>;
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;
@@ -605,6 +608,8 @@ export interface RunSnapshot {
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
   leases: Record<string, Lease>;
+  /** Monotonic per-resource lease epochs; stale Intent completion cannot release a newer claim. */
+  leaseEpochs: Record<string, number>;
   activeLanes: Lane[];
   terminalReason?: string;
   failureCategory?: PrimaryFailureCategory;
@@ -635,6 +640,7 @@ export type EventType =
   | "effect_reconciled"
   | "fact_added"
   | "intent_changed"
+  | "scheduler_intent_changed"
   | "hypothesis_added"
   | "evidence_added"
   | "reasoning_node_upserted"

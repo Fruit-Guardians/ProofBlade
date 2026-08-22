@@ -63,6 +63,49 @@ export class CodingClaimVerifier {
     private readonly verifierControl: VerifierControlPort,
   ) {}
 
+  /** Commit verifier-owned Evidence without exposing the verifier port to the lane. */
+  public async recordVerifierEvidence(evidence: Omit<Evidence, "createdSeq" | "provenance">): Promise<void> {
+    await this.verifierControl.dispatch(this.runId, { type: "evidence", evidence });
+  }
+
+  /** Execute a verifier-owned web attestation without exposing the verifier port to the lane. */
+  public async executeWebReproductionEffect(input: {
+    completionId: string;
+    candidateHash: string;
+    candidateArtifactId: string;
+    attemptId: string;
+    sessionId: string;
+    cwd: string;
+    payload: string;
+  }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const execution = await this.journal.executeVerifierWith(this.runId, {
+      operation: "web_reproduce",
+      args: {
+        runId: this.runId,
+        taskId: snapshot.task.task_id,
+        generation: snapshot.generation,
+        completionId: input.completionId,
+        candidateHash: input.candidateHash,
+        candidateArtifactId: input.candidateArtifactId,
+        taskHash: snapshot.taskHash,
+        targetHash: sha256(snapshot.task.target),
+        verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
+        attemptId: input.attemptId,
+      },
+      replayPolicy: "pure",
+      cwd: input.cwd,
+      sessionId: input.sessionId,
+      artifactSensitivity: "flag_candidate",
+    }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
+    return { effectId: execution.effectId, artifactId: execution.artifactId };
+  }
+
+  /** Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded. */
+  public async finalizeWebReproduction(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void> {
+    await this.verifierControl.dispatch(this.runId, { type: "completion_verified", completionId, accepted, evidenceIds });
+  }
+
   /** Execute and attest a claim through a journaled verifier Effect. */
   public async record(input: {
     candidate: string;

@@ -21,6 +21,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     reasoningTrees: {},
     hypotheses: {},
     intents: {},
+    schedulerIntents: {},
     completions: {},
     checkpoints: {},
     jobs: {},
@@ -33,6 +34,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     artifacts: {},
     effects: {},
     leases: {},
+    leaseEpochs: {},
     activeLanes: [],
   };
 }
@@ -47,6 +49,8 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     throw new Error(`Event sequence gap for ${event.runId}: expected ${snapshot.lastSeq + 1}, got ${event.seq}`);
   }
   const next = structuredClone(snapshot);
+  next.schedulerIntents ??= {};
+  next.leaseEpochs ??= {};
   next.lastSeq = event.seq;
   const p = event.payload ?? {};
 
@@ -98,6 +102,16 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
         const generation = Number(p.generation);
         if (!Number.isInteger(generation) || generation <= next.generation) throw new Error("fixture_reset requires a monotonically increasing generation");
         next.generation = generation;
+        for (const intent of Object.values(next.schedulerIntents)) {
+          if (intent.fixtureGeneration === generation || (intent.status !== "PROPOSED" && intent.status !== "CLAIMED")) continue;
+          if (intent.status === "CLAIMED") {
+            for (const [resourceKey, claim] of Object.entries(intent.leaseClaims ?? {})) {
+              const lease = next.leases[resourceKey];
+              if (lease?.ownerLane === claim.ownerLane && lease.generation === claim.generation) delete next.leases[resourceKey];
+            }
+          }
+          intent.status = "STALE";
+        }
       }
       break;
     case "run_paused":
@@ -266,6 +280,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.intents[intent.id] = intent;
       break;
     }
+    case "scheduler_intent_changed": {
+      const intent = p.intent as RunSnapshot["schedulerIntents"][string];
+      if (!intent?.id) throw new Error("scheduler_intent_changed requires intent");
+      next.schedulerIntents[intent.id] = intent;
+      break;
+    }
     case "artifact_registered": {
       const raw = p.artifact as RunSnapshot["artifacts"][string];
       const artifact = {
@@ -349,6 +369,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (!lease?.resourceKey) throw new Error("lease_acquired requires lease");
       if (next.leases[lease.resourceKey]) throw new Error(`Resource already leased: ${lease.resourceKey}`);
       next.leases[lease.resourceKey] = lease;
+      next.leaseEpochs[lease.resourceKey] = Math.max(next.leaseEpochs[lease.resourceKey] ?? 0, lease.generation);
       break;
     }
     case "lease_heartbeat": {

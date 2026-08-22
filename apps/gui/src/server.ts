@@ -100,6 +100,10 @@ process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
 
 async function api(method: string, url: URL, request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse): Promise<void> {
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts[0] === "api" && parts[1] === "v2") {
+    await appServerApi(method, url, request, response, parts);
+    return;
+  }
   if (method === "GET" && url.pathname === "/api/bootstrap") return sendJson(response, 200, data.bootstrap());
   if (method === "GET" && url.pathname === "/api/provider") return sendJson(response, 200, providerSettings.publicSettings());
   if (method === "POST" && url.pathname === "/api/provider/models") {
@@ -288,6 +292,51 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     }
   }
   sendJson(response, 404, { error: "API route not found" });
+}
+
+async function appServerApi(
+  method: string,
+  url: URL,
+  request: import("node:http").IncomingMessage,
+  response: import("node:http").ServerResponse,
+  parts: string[],
+): Promise<void> {
+  if (method === "GET" && parts[2] === "runs" && parts[3] && parts.length === 4) {
+    const result = await data.appServer.request({ method: "run/read", params: { runId: parts[3] } });
+    sendJson(response, 200, result.result);
+    return;
+  }
+  if (method === "GET" && parts[2] === "runs" && parts[3] && parts[4] === "events") {
+    const result = await data.appServer.request({
+      method: "run/events",
+      params: {
+        runId: parts[3],
+        ...(url.searchParams.has("afterSeq") ? { afterSeq: Number(url.searchParams.get("afterSeq")) } : {}),
+        ...(url.searchParams.has("limit") ? { limit: Number(url.searchParams.get("limit")) } : {}),
+      },
+    });
+    sendJson(response, 200, result.result);
+    return;
+  }
+  if (method === "GET" && parts[2] === "runs" && parts[3] && parts[4] === "approvals") {
+    const result = await data.appServer.request({ method: "run/approvals", params: { runId: parts[3] } });
+    sendJson(response, 200, result.result);
+    return;
+  }
+  if (method === "POST" && parts[2] === "approvals" && parts[3] && parts.length === 4) {
+    const body = await readBody(request);
+    const result = await data.appServer.request({
+      method: "run/approve",
+      params: {
+        approvalId: parts[3],
+        decision: body.decision,
+        actor: body.actor,
+      },
+    });
+    sendJson(response, 200, result.result);
+    return;
+  }
+  sendJson(response, 404, { error: "App Server route not found" });
 }
 
 async function readBody(request: import("node:http").IncomingMessage): Promise<Record<string, unknown>> {

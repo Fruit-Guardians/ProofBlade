@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   CompetitionChallengeSolver,
+  CompetitionEnvironmentJanitor,
+  ApprovalPolicy,
   DasctfCompetitionApi,
   HttpCompetitionApi,
   DockerContainerRuntime,
@@ -56,6 +58,10 @@ interface StoredCompetitionConfig {
   envReadyTimeoutMs?: number;
   /** DASCTF response codes that are confirmed to mean a wrong flag. */
   wrongFlagCodes?: string[];
+  /** Maximum live platform environments owned by this GUI/Fleet ledger. */
+  maxActiveEnvironments?: number;
+  /** Require a durable operator approval before platform submission effects. */
+  requireApproval?: boolean;
   headers?: Record<string, string>;
   endpoints?: Partial<CompetitionHttpEndpoints>;
 }
@@ -102,7 +108,9 @@ export class CompetitionSettingsStore {
       });
       const execution = resolveExecutionConfig(this.config);
       const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
-      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", ...(containerRuntime ? { containerRuntime } : {}) });
+      const environmentJanitor = this.createEnvironmentJanitor(api);
+      const approvalPolicy = this.createApprovalPolicy();
+      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
       return { api, solver, kind: "http", baseUrl: serverHost, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
     }
     const baseUrl = this.stored.baseUrl?.trim();
@@ -119,8 +127,24 @@ export class CompetitionSettingsStore {
     });
     const execution = resolveExecutionConfig(this.config);
     const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
-    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", ...(containerRuntime ? { containerRuntime } : {}) });
+    const environmentJanitor = this.createEnvironmentJanitor(api);
+    const approvalPolicy = this.createApprovalPolicy();
+    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
     return { api, solver, kind: "http", baseUrl, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
+  }
+
+  private createEnvironmentJanitor(api: CompetitionApi): CompetitionEnvironmentJanitor {
+    return new CompetitionEnvironmentJanitor({
+      api,
+      ledgerPath: join(this.root, this.config.storage.runsDir, "competition-environments.json"),
+      maxActive: this.stored.maxActiveEnvironments ?? 8,
+    });
+  }
+
+  private createApprovalPolicy(): ApprovalPolicy | undefined {
+    return this.stored.requireApproval
+      ? new ApprovalPolicy({ ledgerPath: join(this.root, this.config.storage.runsDir, "approvals.json") })
+      : undefined;
   }
 }
 
@@ -196,6 +220,16 @@ function validate(value: unknown): StoredCompetitionConfig {
       return raw.trim();
     });
   }
+  if (present("maxActiveEnvironments")) {
+    if (typeof input.maxActiveEnvironments !== "number" || !Number.isInteger(input.maxActiveEnvironments) || input.maxActiveEnvironments < 1 || input.maxActiveEnvironments > 128) {
+      throw fieldError("maxActiveEnvironments", "1 到 128 之间的整数");
+    }
+    config.maxActiveEnvironments = input.maxActiveEnvironments;
+  }
+  if (present("requireApproval")) {
+    if (typeof input.requireApproval !== "boolean") throw fieldError("requireApproval", "true 或 false");
+    config.requireApproval = input.requireApproval;
+  }
   if (present("headers")) {
     if (typeof input.headers !== "object" || Array.isArray(input.headers)) throw fieldError("headers", "一个字符串到字符串的对象");
     const headers: Record<string, string> = {};
@@ -261,6 +295,8 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   const serverHost = process.env.PROOFBLADE_COMPETITION_SERVER_HOST?.trim();
   const accessKey = process.env.PROOFBLADE_COMPETITION_ACCESS_KEY?.trim();
   const wrongFlagCodes = process.env.PROOFBLADE_COMPETITION_WRONG_FLAG_CODES;
+  const maxActiveEnvironments = process.env.PROOFBLADE_COMPETITION_MAX_ACTIVE_ENVIRONMENTS?.trim();
+  const requireApproval = process.env.PROOFBLADE_COMPETITION_REQUIRE_APPROVAL?.trim();
   if (baseUrl) merged.baseUrl = validateBaseUrl(baseUrl);
   if (token) merged.token = token;
   if (tokenHeader) merged.tokenHeader = tokenHeader;
@@ -271,6 +307,15 @@ function applyEnvOverrides(base: StoredCompetitionConfig): StoredCompetitionConf
   if (wrongFlagCodes !== undefined) {
     merged.wrongFlagCodes = wrongFlagCodes.split(",").map((code) => code.trim()).filter(Boolean);
     merged.platform = "dasctf";
+  }
+  if (maxActiveEnvironments) {
+    const parsed = Number(maxActiveEnvironments);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 128) throw new Error("PROOFBLADE_COMPETITION_MAX_ACTIVE_ENVIRONMENTS 必须是 1 到 128 之间的整数");
+    merged.maxActiveEnvironments = parsed;
+  }
+  if (requireApproval !== undefined && requireApproval !== "") {
+    if (requireApproval !== "true" && requireApproval !== "false") throw new Error("PROOFBLADE_COMPETITION_REQUIRE_APPROVAL 必须是 true 或 false");
+    merged.requireApproval = requireApproval === "true";
   }
   return merged;
 }

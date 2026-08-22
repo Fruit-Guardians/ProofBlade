@@ -242,6 +242,37 @@ test("MCP toolchain profiles keep host paths out of summaries and gate unavailab
   }
 });
 
+test("MCP schemas persist across registry instances and invalidate on config changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-schema-cache-"));
+  const marker = join(root, "mcp-started.txt");
+  try {
+    await writeMcpConfig(root, marker);
+    const first = McpProjectRegistry.load(root);
+    const initial = await first.describeServer("echo");
+    assert.ok(initial.tools.some((tool) => tool.name === "echo"));
+    await access(marker);
+    await first.close();
+    await rm(marker, { force: true });
+
+    const cached = McpProjectRegistry.load(root);
+    const reused = await cached.describeServer("echo");
+    assert.deepEqual(reused.tools.map((tool) => tool.name), initial.tools.map((tool) => tool.name));
+    await assert.rejects(() => access(marker), /ENOENT/);
+    await cached.close();
+
+    const configPath = join(root, ".mcp.json");
+    const config = JSON.parse(await readFile(configPath, "utf8")) as { mcpServers: Record<string, Record<string, unknown>> };
+    config.mcpServers.echo.description = "changed config invalidates schema";
+    await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+    const invalidated = McpProjectRegistry.load(root);
+    await invalidated.describeServer("echo");
+    await access(marker);
+    await invalidated.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("MCP toolchain profiles default JADX, Ghidra, and Rizin homes to directories", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-directories-"));
   const profiles = [

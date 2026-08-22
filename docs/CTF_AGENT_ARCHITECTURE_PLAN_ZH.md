@@ -31,10 +31,10 @@ ProofBlade 现在最有价值的部分已经不是“再增加一个 Agent 角�
               |
   +-----------+-----------+
   |                       |
- Planner / Refiner    Domain Solver Lane
+ Planner / Refiner    Unified Coding Lane
  (小而确定性)       +----+----------------+
                     |                     |
-               Web Lane              Pwn Lane
+               Web tools             Pwn tools
              HTTP + Browser      ELF + PTY + GDB
                     |                     |
              Evidence / Artifact / Effect Journal
@@ -44,7 +44,7 @@ ProofBlade 现在最有价值的部分已经不是“再增加一个 Agent 角�
               Host-only submit_flag
 ```
 
-“多 Agent”只用于不同职责的上下文隔离和工具权限隔离，不要求每一步都启动一个独立进程或独立服务。一个 Run 可以拥有 Planner、Web/Pwn Solver、Verifier 三条逻辑 Lane，共享同一 Control Store。
+“多 Agent”只用于不同职责的上下文隔离和工具权限隔离，不要求每一步都启动一个独立进程或独立服务。一个 Run 由 Planner、统一 Coding Lane 和 Verifier 组成，共享同一 Control Store；Web/Pwn 通过能力和工具集合切换，不再复制一条 Solver Lane。
 
 ## 一、从 PentAGI 借什么，什么不要借
 

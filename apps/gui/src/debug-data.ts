@@ -7,10 +7,11 @@ import {
   CodingClaimVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
-  PiSolverLane,
   ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
+  ApprovalPolicy,
+  ProofBladeAppServer,
   SingleAgentCtfLoop,
   createServices,
   assertRunId,
@@ -18,6 +19,8 @@ import {
   fixtureTask,
   listFixtureProfiles,
   requiresClaimVerification,
+  isLikelyCtfPrompt,
+  classifyChallengePrompt,
   type AppServices,
   type AgentLanePort,
   type AgentOutcome,
@@ -25,7 +28,7 @@ import {
   type ModelProfileConfig,
   type ProofBladeConfig,
   type RunSnapshot,
-  type SolverLaneFactory,
+  type AgentLaneFactory,
   type TaskContract,
 } from "@proofblade/materials";
 import type {
@@ -81,6 +84,7 @@ type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) =>
 
 export class DebugDataService {
   private readonly services: AppServices;
+  public readonly appServer: ProofBladeAppServer;
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
   private readonly chatTasks = new Set<Promise<void>>();
@@ -104,10 +108,14 @@ export class DebugDataService {
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
     private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
-    private readonly createSolverLane?: SolverLaneFactory,
+    private readonly createCtfLane?: AgentLaneFactory,
   ) {
     const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
     this.services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
+    this.appServer = new ProofBladeAppServer({
+      control: this.services.control,
+      approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
+    });
   }
 
   public updateModelProfile(profile: ModelProfileConfig): void {
@@ -285,7 +293,7 @@ export class DebugDataService {
     this.assertOpen();
     const info: ActiveRunInfo = { runId: input.runId, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(input.runId, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createSolverLane);
+    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane);
     const controller = new AbortController();
     const runPromise = loop.run({
       runId: input.runId,
@@ -404,8 +412,10 @@ export class DebugDataService {
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
       if (runKind(snapshot.task) === "chat") {
+        const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
+        const challengeClassification = classifyChallengePrompt(text, projectRoot);
         lane = await this.createCodingLane({
-          projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
+          projectRoot,
           installRoot: this.root,
           runId,
           runDir: join(this.services.runsRoot, runId),
@@ -415,20 +425,25 @@ export class DebugDataService {
           claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
           capabilities,
+          ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       } else {
         this.assertOpen();
         const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
         runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-        lane = await PiSolverLane.create({
-          projectRoot: this.root,
+        lane = await PiCodingLane.create({
+          projectRoot: recovery.fixture.path,
+          installRoot: this.root,
           runId,
           runDir: join(this.services.runsRoot, runId),
           controlStore: this.services.control,
           artifactStore: this.services.artifacts,
+          journal: this.services.journal,
+          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
-          runtime,
+          deferClaimAcceptance: true,
+          sessionId: `${runId}-coding`,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       }
@@ -439,7 +454,21 @@ export class DebugDataService {
         emit({ type: "paused", runId });
         return;
       }
-      const outcome = await lane.prompt(text);
+      let outcome = await lane.prompt(text);
+      // The fixture-backed CTF loop already has an outer replan loop. GUI chat
+      // historically did not: a guard termination was rendered to the user
+      // and the lane was closed, so a recoverable probe loop required a manual
+      // second message. Preserve ordinary coding semantics, but give an
+      // explicitly challenge-shaped prompt two bounded automatic replans so
+      // the evidence already collected can be turned into a solver.
+      for (let retry = 0; isLikelyCtfPrompt(text) && retry < 2 && isCtfReplanTermination(outcome.termination); retry += 1) {
+        if (this.pauseRequests.has(runId)) break;
+        outcome = await lane.prompt([
+          "[ProofBlade automatic CTF replan]",
+          "The previous bounded turn stopped because the current probe family or observation window did not converge.",
+          "Use the existing artifacts/evidence as memory, state one new hypothesis, and switch to a small solver or a materially different bounded test. Do not repeat the same probe.",
+        ].join("\n"));
+      }
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
@@ -761,7 +790,11 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
 }
 
 function isRecoverableTermination(value: unknown): value is NonNullable<AgentOutcome["termination"]> {
-  return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm";
+  return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm" || value === "experiment_budget";
+}
+
+function isCtfReplanTermination(value: unknown): boolean {
+  return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm" || value === "experiment_budget";
 }
 
 export function correlateToolCalls(

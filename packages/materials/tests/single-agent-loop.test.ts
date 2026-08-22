@@ -8,7 +8,7 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
 
 const config: ProofBladeConfig = {
@@ -32,7 +32,7 @@ const config: ProofBladeConfig = {
   },
 };
 
-const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
+const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async prompt() {
     const inspected = await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
@@ -99,7 +99,7 @@ test("auto mode preserves a pause raised during a turn instead of exhausting the
     const services = createServices(root, config);
     const runId = "PAUSE-TURN-web-source-1";
     const task = fixtureTask(runId, "web-source-1", root, config);
-    const pausingLane: SolverLaneFactory = async ({ services: laneServices }) => ({
+    const pausingLane: AgentLaneFactory = async ({ services: laneServices }) => ({
       async prompt() {
         await laneServices.control.dispatch(runId, { type: "pause", reason: "test pause", lane: "executor" });
         return {
@@ -126,7 +126,7 @@ test("[contract:provider-budget-exhaustion] a Provider budget termination ends t
   try {
     const services = createServices(root, config);
     let prompts = 0;
-    const budgetLane: SolverLaneFactory = async () => ({
+    const budgetLane: AgentLaneFactory = async () => ({
       async prompt() {
         prompts += 1;
         return { text: "", stopReason: "error", errorMessage: "Provider cost budget exhausted", termination: "budget_exhausted", usage: zeroUsage() };
@@ -163,7 +163,7 @@ test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after
     if (command.type === "handoff_accepted") controller.abort();
     return events;
   };
-  const lane: SolverLaneFactory = async () => ({
+  const lane: AgentLaneFactory = async () => ({
     async prompt() { prompts += 1; return { text: "unexpected", stopReason: "stop", usage: zeroUsage() }; },
     async compact() {},
     async abort() { aborts += 1; },
@@ -191,7 +191,7 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
   const services = createServices(root, config);
   const controller = new AbortController();
   let prompts = 0;
-  const lane: SolverLaneFactory = async ({ runtime }) => ({
+  const lane: AgentLaneFactory = async ({ runtime }) => ({
     async prompt() {
       prompts += 1;
       const inspected = await runtime.inspectTarget();
@@ -237,7 +237,7 @@ test("[contract:pause-during-verifier] pause during verifier remains PAUSED inst
     }
     return result;
   };
-  const lane: SolverLaneFactory = async ({ runtime }) => ({
+  const lane: AgentLaneFactory = async ({ runtime }) => ({
     async prompt() {
       const inspected = await runtime.inspectTarget();
       const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
@@ -305,7 +305,7 @@ test("[contract:pause-before-exhaust] an atomically persisted pause wins the rac
     }
     return await originalDispatch(runId, command);
   };
-  const idleLane: SolverLaneFactory = async () => ({
+  const idleLane: AgentLaneFactory = async () => ({
     async prompt() { return { text: "no candidate", stopReason: "stop", usage: zeroUsage() }; },
     async compact() {},
     async abort() {},
@@ -377,7 +377,7 @@ test("terminal reopen projects the exact finalResult completion instead of a new
     assert.equal(verified.accepted, true);
     await services.verifier.finish(runId, { completionId: "C-FINAL", reason: "terminal reopen projection regression" });
 
-    const neverCreateLane: SolverLaneFactory = async () => { throw new Error("terminal reopen must not create a lane"); };
+    const neverCreateLane: AgentLaneFactory = async () => { throw new Error("terminal reopen must not create a lane"); };
     const reopened = await new SingleAgentCtfLoop(root, config, services, neverCreateLane).run({ runId, task, mode: "auto" });
     const snapshot = await services.control.snapshot(runId);
     assert.equal(reopened.status, "SUCCEEDED");

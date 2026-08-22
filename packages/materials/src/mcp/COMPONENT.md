@@ -39,6 +39,13 @@
 - `binaryReverse` 映射显式绑定逻辑逆向操作到 Server/outer Tool/参数，嵌套 dispatcher 必须与 `nestedToolPolicy` 完全匹配。
 - Deep reverse MCP 映射只有在 Server 或内层 Tool 声明 `readOnly=true` 且 `replay=pure` 时才可用，配置哈希进入 Backend 版本。
 
+### Schema cache
+
+`describe()` 会把已验证的 MCP Tool schema 按当前 Server 配置哈希持久化到安装根目录的
+`.proofblade/mcp-schema-cache.json`。后续运行可直接复用 schema 摘要而不启动 stdio Server；
+配置哈希变化时缓存自动失效，真正执行 Tool 仍必须经过正常连接、策略和审计路径。缓存只保存
+名称、描述、输入 schema 和只读/重放元数据，不保存凭据、题目数据或原始调用参数。
+
 ```powershell
 npm run test:materials
 ```
