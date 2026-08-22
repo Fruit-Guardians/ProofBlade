@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-20T12:15:00+08:00",
+  "updatedAt": "2026-08-23T12:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -231,6 +231,27 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260823-001",
+      "occurredAt": "2026-08-23T12:00:00+08:00",
+      "summary": "补充 API 索引插件的 README 新成员上手流程，明确开发前搜索、TSDoc、索引生成、重复检查和提交前门禁命令。",
+      "branch": "feat/api-index-onboarding",
+      "commit": "self",
+      "planIds": [
+        "PLAN-002"
+      ],
+      "changes": [
+        "README 快速开始后增加新成员日常开发命令和 API 索引产物说明",
+        "明确 npm ci、prepare、api:search、api:explain、api:index、api:duplicates:all、api:index:check、test:atoms 和 verify 的使用顺序",
+        "说明 summarySource=tsdoc|inferred、生成文件禁止手工编辑和 atoms 组件开发入口"
+      ],
+      "validation": [
+        "npm run api:index:check passed",
+        "npm run api:index:test: 3/3 passed",
+        "component and change-contract gates passed",
+        "git diff --check passed"
+      ]
+    },
     {
       "id": "UPDATE-20260820-002",
       "occurredAt": "2026-08-20T12:15:00+08:00",
