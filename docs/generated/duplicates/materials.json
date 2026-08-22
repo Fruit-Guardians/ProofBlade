@@ -129,7 +129,7 @@
           "kind": "method",
           "signature": "(): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 114,
+          "line": 129,
           "summary": "Inferred summary: close operation used to provide a reusable operation."
         },
         {
@@ -139,7 +139,7 @@
           "kind": "method",
           "signature": "(_fixture: FixtureRef): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 110,
+          "line": 125,
           "summary": "Inferred summary: destroy operation used to provide a reusable operation."
         }
       ],
@@ -158,7 +158,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 117,
+          "line": 201,
           "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
@@ -168,7 +168,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 113,
+          "line": 196,
           "summary": "Inferred summary: snapshot operation used to read or inspect state."
         }
       ],
@@ -187,7 +187,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 411,
+          "line": 478,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -198,16 +198,6 @@
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
           "line": 130,
-          "summary": "Inferred summary: abort operation used to provide a reusable operation."
-        },
-        {
-          "id": "@proofblade/materials::method::PiSolverLane.abort",
-          "package": "@proofblade/materials",
-          "name": "PiSolverLane.abort",
-          "kind": "method",
-          "signature": "(_reason: string): Promise<void>",
-          "module": "src/runtime/solver-lane.ts",
-          "line": 230,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
@@ -226,7 +216,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 415,
+          "line": 482,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -238,16 +228,35 @@
           "module": "src/runtime/pi-adapter.ts",
           "line": 134,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::ApprovalPolicy.deny",
+          "package": "@proofblade/materials",
+          "name": "ApprovalPolicy.deny",
+          "kind": "method",
+          "signature": "(approvalId: string, actor?: string): Promise<ApprovalRecord>",
+          "module": "src/security/approval-policy.ts",
+          "line": 111,
+          "summary": "Inferred summary: deny operation used to provide a reusable operation."
         },
         {
-          "id": "@proofblade/materials::method::PiSolverLane.compact",
+          "id": "@proofblade/materials::method::ApprovalPolicy.grant",
           "package": "@proofblade/materials",
-          "name": "PiSolverLane.compact",
+          "name": "ApprovalPolicy.grant",
           "kind": "method",
-          "signature": "(reason: string): Promise<void>",
-          "module": "src/runtime/solver-lane.ts",
-          "line": 234,
-          "summary": "Inferred summary: compact operation used to provide a reusable operation."
+          "signature": "(approvalId: string, actor?: string): Promise<ApprovalRecord>",
+          "module": "src/security/approval-policy.ts",
+          "line": 107,
+          "summary": "Inferred summary: grant operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -258,6 +267,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 7
+    "candidates": 8
   }
 }
