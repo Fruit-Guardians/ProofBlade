@@ -60,7 +60,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "de45f9ec53c2f8f4b5d946cfe7e7283e76486cedd1ca005b5d160fad8c25a3ac");
-  assert.equal(bundledCapabilityCatalogHash(), "7601e67d56766f7f75541421fc84678cd5406d159076f618379c14e61c0c9d86");
+  assert.equal(bundledCapabilityCatalogHash(), "a8f993b8344a62572a7a3e643e0506edc301f8750f69609353d081eaeb2f3e9e");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
