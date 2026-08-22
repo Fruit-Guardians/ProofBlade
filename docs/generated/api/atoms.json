@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 1,
+  "package": "@proofblade/atoms",
+  "packageId": "atoms",
+  "sourceRoot": "packages/atoms",
+  "moduleHashes": {
+    "src/contracts.ts": "e6f2bbeddebf3f63a85ccbea1959f59de404e34f41e67d256688fc34a5f58470",
+    "src/index.ts": "018ea5543b77959ac5e12e29354ab3cd9043e78806eb0bfbfb65f0a4d7bbb4da",
+    "src/storage/atomic.ts": "11e7b2a982a977f6390f62e6c39acc6e37199f450454d33401b56bf024162345",
+    "src/storage/operation-queue.ts": "f90a7e642c7fea1d157d2301dc1854118828d5ebe4005cd593dfdd4723297f3a",
+    "src/value.ts": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b"
+  },
+  "symbols": [
+    {
+      "id": "@proofblade/atoms::class::KeyedOperationQueue",
+      "name": "KeyedOperationQueue",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/storage/operation-queue.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 2,
+      "signature": "KeyedOperationQueue",
+      "summary": "Serialize asynchronous operations by key while allowing different keys to progress independently.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/atoms::function::atomicWriteFile",
+      "name": "atomicWriteFile",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/storage/atomic.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 9,
+      "signature": "(path: string, content: string | Uint8Array): Promise<void>",
+      "summary": "Write content through a synced temporary file followed by an atomic rename.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "This provides one-file replacement, not a multi-file transaction."
+        }
+      ],
+      "imports": [
+        "node:crypto",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [],
+      "structureHash": "b396dea72771240424756c9a5047ceb0e13674173566f0f1d3f89efa9b3b64ec"
+    },
+    {
+      "id": "@proofblade/atoms::function::durableAppendFile",
+      "name": "durableAppendFile",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/storage/atomic.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 30,
+      "signature": "(path: string, content: string): Promise<void>",
+      "summary": "Append UTF-8 content and sync the file before returning.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "Append ordering across independent processes is outside this helper's contract."
+        }
+      ],
+      "imports": [
+        "node:crypto",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [],
+      "structureHash": "6cb4d46b6b83d8c07c7018c1a9b918b5e01e77a85fa004640c1a102e9f8ab0e4"
+    },
+    {
+      "id": "@proofblade/atoms::function::canonicalJson",
+      "name": "canonicalJson",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/value.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 23,
+      "signature": "(value: unknown): string",
+      "summary": "Serialize a value deterministically by recursively sorting object keys.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "Array order is preserved and the input value is not mutated."
+        }
+      ],
+      "imports": [
+        "node:crypto"
+      ],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ],
+      "structureHash": "6d7cf67a7c87cdae43337b961f4bbb7fb494c7886793be616a61f4eb246149f6"
+    },
+    {
+      "id": "@proofblade/atoms::function::createId",
+      "name": "createId",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/value.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 7,
+      "signature": "(prefix: string): string",
+      "summary": "Create a unique identifier with a caller-supplied display prefix.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "The prefix is preserved; the identifier is not sortable or a security token."
+        }
+      ],
+      "imports": [
+        "node:crypto"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::function::estimateTokens",
+      "name": "estimateTokens",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/value.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 43,
+      "signature": "(value: string): number",
+      "summary": "Estimate token count with a bounded character-based approximation.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "This is not an exact provider tokenizer count."
+        }
+      ],
+      "imports": [
+        "node:crypto"
+      ],
+      "testRefs": [],
+      "structureHash": "7716b1a56fdc44f5a6ca9777315272a1672de14724b58a07443e68c846ab7afb"
+    },
+    {
+      "id": "@proofblade/atoms::function::sha256",
+      "name": "sha256",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/value.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 15,
+      "signature": "(value: string | Uint8Array): string",
+      "summary": "Compute a lowercase SHA-256 digest for text or bytes.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "The result is deterministic for identical input bytes."
+        }
+      ],
+      "imports": [
+        "node:crypto"
+      ],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ],
+      "structureHash": "fa56db467b5a198a1ad3448e18e5c6239da66d2ffa2d326ff38f0520b103d032"
+    },
+    {
+      "id": "@proofblade/atoms::interface::AppendOnlyLogAtom",
+      "name": "AppendOnlyLogAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 72,
+      "signature": "AppendOnlyLogAtom<TEvent>",
+      "summary": "Inferred summary: append only log atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::ArtifactAtom",
+      "name": "ArtifactAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 56,
+      "signature": "ArtifactAtom",
+      "summary": "Inferred summary: artifact atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::EffectAtom",
+      "name": "EffectAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 63,
+      "signature": "EffectAtom<TPolicy, TArgs>",
+      "summary": "Inferred summary: effect atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::EventAtom",
+      "name": "EventAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 33,
+      "signature": "EventAtom<TType, TPayload>",
+      "summary": "Inferred summary: event atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::MessageAtom",
+      "name": "MessageAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 28,
+      "signature": "MessageAtom<TRole, TContent>",
+      "summary": "Inferred summary: message atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::SequencedEventAtom",
+      "name": "SequencedEventAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 38,
+      "signature": "SequencedEventAtom<TType, TPayload, TLane, TActor>",
+      "summary": "Inferred summary: sequenced event atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::ToolAtom",
+      "name": "ToolAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 1,
+      "signature": "ToolAtom<TParameters>",
+      "summary": "Inferred summary: tool atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/atoms::interface::ToolErrorAtom",
+      "name": "ToolErrorAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 13,
+      "signature": "ToolErrorAtom<TArtifactRef>",
+      "summary": "Inferred summary: tool error atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::ToolFailureAtom",
+      "name": "ToolFailureAtom",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 23,
+      "signature": "ToolFailureAtom<TArtifactRef>",
+      "summary": "Inferred summary: tool failure atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::method::KeyedOperationQueue.run",
+      "name": "KeyedOperationQueue.run",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/storage/operation-queue.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 9,
+      "signature": "<T>(key: string, operation: () => Promise<T>): Promise<T>",
+      "summary": "Run one operation after the previous operation for the same key settles.",
+      "summarySource": "tsdoc",
+      "tags": [
+        {
+          "name": "invariant",
+          "text": "A rejected operation does not poison the next operation in the key queue."
+        }
+      ],
+      "imports": [],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ],
+      "structureHash": "c124ae6edc0ffd58bf7c6d6d22527fe9c4b69892807256505e6c7a1be10fadc9",
+      "parentId": "@proofblade/atoms::class::KeyedOperationQueue"
+    },
+    {
+      "id": "@proofblade/atoms::type::ReducerAtom",
+      "name": "ReducerAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 70,
+      "signature": "ReducerAtom<TState, TEvent>",
+      "summary": "Inferred summary: reducer atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ReplayPolicyAtom",
+      "name": "ReplayPolicyAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 54,
+      "signature": "ReplayPolicyAtom",
+      "summary": "Inferred summary: replay policy atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ToolErrorPhaseAtom",
+      "name": "ToolErrorPhaseAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 11,
+      "signature": "ToolErrorPhaseAtom",
+      "summary": "Inferred summary: tool error phase atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ToolExecutionModeAtom",
+      "name": "ToolExecutionModeAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 9,
+      "signature": "ToolExecutionModeAtom",
+      "summary": "Inferred summary: tool execution mode atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ToolOutputPolicyAtom",
+      "name": "ToolOutputPolicyAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 8,
+      "signature": "ToolOutputPolicyAtom",
+      "summary": "Inferred summary: tool output policy atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ToolSensitivityAtom",
+      "name": "ToolSensitivityAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 10,
+      "signature": "ToolSensitivityAtom",
+      "summary": "Inferred summary: tool sensitivity atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::type::ToolSideEffectAtom",
+      "name": "ToolSideEffectAtom",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/contracts.ts",
+      "exportPath": "@proofblade/atoms",
+      "line": 7,
+      "signature": "ToolSideEffectAtom",
+      "summary": "Inferred summary: tool side effect atom type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [],
+      "testRefs": []
+    }
+  ]
+}
