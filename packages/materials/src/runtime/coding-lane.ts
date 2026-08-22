@@ -94,6 +94,10 @@ export class PiCodingLane implements AgentLanePort {
     controlStore: ControlStore;
     artifactStore: ArtifactStore;
     journal: EffectJournal;
+    /** Safe claim service; owns but does not expose the trusted verifier capabilities. */
+    claimVerifier: CodingClaimVerifier;
+    /** Present only for platform-judged lanes; executes through the real Sandbox scorer. */
+    platformVerifier?: IndependentVerifier;
     config: ProofBladeConfig;
     /** Optional process backend. Files remain on the host; bash/exec runs here. */
     executionEnv?: ExecutionEnv;
@@ -155,7 +159,7 @@ export class PiCodingLane implements AgentLanePort {
     const artifactStore = options.artifactStore;
     const checkpointService = new CheckpointService(options.controlStore, artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
-    const claimVerifier = new CodingClaimVerifier(options.runId, options.controlStore, artifactStore);
+    const claimVerifier = options.claimVerifier;
     const evidenceGraph = new CodingEvidenceGraph(options.runId, options.controlStore, artifactStore);
     // Wire the curation gate into every coding lane. Without this optional
     // context being populated, read/bash artifacts are archived but never
@@ -229,15 +233,15 @@ export class PiCodingLane implements AgentLanePort {
       }),
       ...mcpFirstClassTools.map((tool) => tool.name),
     ];
+    if (platformJudged && !options.platformVerifier) throw new Error("Platform-judged lane requires a trusted platform verifier");
     const submitFlag = platformJudged
       ? createPlatformFlagSubmitter({
         runId: options.runId,
         runtime,
         fixture,
         controlStore: options.controlStore,
+        verifier: options.platformVerifier!,
         artifactStore,
-        journal: options.journal,
-        runsRoot: dirname(options.runDir),
         ...(options.mode ? { mode: options.mode } : {}),
       })
       : undefined;
@@ -483,13 +487,11 @@ export function createPlatformFlagSubmitter(deps: {
   runtime: ProofBladeToolRuntime;
   fixture: FixtureRef;
   controlStore: ControlStore;
+  verifier: Pick<IndependentVerifier, "verify">;
   artifactStore: ArtifactStore;
-  journal: EffectJournal;
-  runsRoot: string;
   /** Live execution mode. In "assist" the flag is recorded but NOT sent. */
   mode?: () => "auto" | "assist";
 }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission> {
-  const verifier = new IndependentVerifier(deps.controlStore, deps.artifactStore, deps.journal, deps.runsRoot);
   return async (flag, signal) => {
     const before = await deps.controlStore.snapshot(deps.runId);
     const { completionId, candidateHash } = await deps.runtime.submitCandidate(flag);
@@ -520,7 +522,7 @@ export function createPlatformFlagSubmitter(deps: {
         ...(await submissionCounters(deps.runtime, before)),
       };
     }
-    const outcome = await verifier.verify(deps.runId, deps.fixture, completionId, signal);
+    const outcome = await deps.verifier.verify(deps.runId, deps.fixture, completionId, signal);
     const after = await deps.controlStore.snapshot(deps.runId);
     return {
       accepted: outcome.accepted,

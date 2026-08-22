@@ -17,6 +17,18 @@ export class ArtifactStore {
   public constructor(private readonly runsRoot: string, private readonly controlStore: ControlStore) {}
 
   public async putText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
+    const artifact = await this.stageText(runId, content, meta);
+    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" });
+    return (await this.controlStore.snapshot(runId)).artifacts[artifact.id] ?? artifact;
+  }
+
+  /**
+   * Store bytes without adding them to the Run. Registration remains a separate
+   * capability-gated step; an unregistered file is never Evidence provenance.
+   */
+  public async stageText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
+    const snapshot = await this.controlStore.snapshot(runId);
+    const generation = snapshot.generation;
     const redacted = redactSecrets(content);
     const artifactId = id("A");
     const filename = sanitizeFilename(meta.filename ?? `${artifactId}.txt`);
@@ -25,13 +37,20 @@ export class ArtifactStore {
     const stored = await repository.put(relativePath, redacted, meta.mime ?? "text/plain");
     const artifact: ArtifactRef = {
       id: artifactId,
+      runId,
+      generation,
+      origin: {
+        schemaVersion: 1,
+        registeredBy: "agent",
+        operation: meta.sourceEffectId ? snapshot.effects[meta.sourceEffectId]?.operation : undefined,
+        tags: [...(meta.semantic?.tags ?? [])],
+      },
       ...stored,
       sensitivity: meta.sensitivity ?? "public",
       sourceEffectId: meta.sourceEffectId,
       truncated: meta.truncated,
       semantic: meta.semantic ? { ...meta.semantic, updatedSeq: 0 } : undefined,
     };
-    await this.controlStore.dispatch(runId, { type: "artifact", artifact, lane: "executor" });
     return artifact;
   }
 

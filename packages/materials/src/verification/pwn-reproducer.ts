@@ -86,23 +86,11 @@ export class PwnReproducer {
     }
 
     const reproduced = shellConfirmed && flag !== undefined;
-    const evidenceId = id("EV");
-    await this.control.dispatch(runId, {
-      type: "evidence",
-      evidence: {
-        id: evidenceId,
-        kind: reproduced ? "reproduction" : "negative",
-        summary: reproduced
-          ? `Independent pwn reproduce succeeded: shell marker + flag extracted from a fresh session.`
-          : `Independent pwn reproduce failed at ${firstFailure(stages)}.`,
-        tags: ["pwn", "reproduce"],
-        source: { tool: "pwn_reproduce" },
-        confidence: 1,
-        supports: [],
-        refutes: [],
-      },
-      lane: "verifier",
-    });
+    // Deliberately not promoted into Evidence: this recipe and its success
+    // barriers remain model-driven and have no task-owned verifier Effect or
+    // immutable result Artifact. The durable Session events remain available
+    // for audit; only a platform/hidden scorer may create trusted Evidence.
+    const evidenceId = id("LOCAL-PWN");
 
     return { reproduced, shellConfirmed, ...(flag !== undefined ? { flag } : {}), stages, evidenceId };
   }

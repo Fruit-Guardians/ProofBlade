@@ -10,10 +10,10 @@ import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
-test("evidence curation gate checkpoints exploration and clears reviewed artifacts", async () => {
+test("evidence curation gate keeps agent annotations pending and clears only trusted reviews or promotions", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-curation-"));
   try {
-    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const { control, verifier } = ControlStore.create(new JsonlControlStore(join(root, "runs")));
     const runId = "CURATION-001";
     await control.createRun(runId, task(runId, root));
     const artifacts = new ArtifactStore(join(root, "runs"), control);
@@ -39,28 +39,83 @@ test("evidence curation gate checkpoints exploration and clears reviewed artifac
       if (index < 3) assert.equal(status.stage, "clear");
       if (index >= 3 && index < 7) assert.equal(status.stage, "checkpoint");
     }
-    assert.equal((await gate.inspect()).stage, "required");
+    const required = await gate.inspect();
+    assert.equal(required.stage, "required");
+    assert.equal(required.pendingCount, 8);
+    assert.equal(required.viewedCount, 0);
+    assert.equal(required.reviewedCount, 0);
+    assert.equal(required.promotedCount, 0);
+    assert.equal(required.unviewedCount, 8);
     await assert.rejects(gate.assertInvestigationAllowed(), /Further read\/bash calls are paused/);
+
+    for (const artifactId of ids) {
+      await graph.annotateArtifact({
+        artifactId,
+        name: "普通目录输出",
+        summary: "Agent 已查看，但不能把自身 annotation 提升为可信审阅。",
+        role: "debug",
+        tags: ["read", "reviewed-routine"],
+      });
+    }
+    const viewed = await gate.inspect();
+    assert.equal(viewed.stage, "required");
+    assert.equal(viewed.pendingCount, 8);
+    assert.equal(viewed.viewedCount, 8);
+    assert.equal(viewed.reviewedCount, 0);
+    assert.equal(viewed.promotedCount, 0);
+    assert.equal(viewed.unviewedCount, 0);
+    assert.ok(viewed.pendingArtifacts.every((item) => item.curationState === "viewed"));
+    await assert.rejects(gate.assertInvestigationAllowed(), /Agent annotation marks an artifact viewed but does not clear this gate/);
+
+    await verifier.dispatch(runId, {
+      type: "artifact_annotation",
+      artifactId: ids[0]!,
+      semantic: {
+        name: "Harness 审阅的普通输出",
+        summary: "受信 harness 已确认该输出无需提升为 Evidence。",
+        tags: ["read", "reviewed-routine"],
+        role: "debug",
+        relatedIds: [],
+        annotatedBy: "harness",
+      },
+    });
+    const harnessReviewed = await gate.inspect();
+    assert.equal(harnessReviewed.stage, "checkpoint");
+    assert.equal(harnessReviewed.pendingCount, 7);
+    assert.equal(harnessReviewed.viewedCount, 7);
+    assert.equal(harnessReviewed.reviewedCount, 1);
+    assert.equal(harnessReviewed.promotedCount, 0);
+    await gate.assertInvestigationAllowed();
+
+    await verifier.dispatch(runId, {
+      type: "artifact_annotation",
+      artifactId: ids[1]!,
+      semantic: {
+        name: "User 审阅的普通输出",
+        summary: "受信 user 已确认该输出无需提升为 Evidence。",
+        tags: ["read", "reviewed-routine"],
+        role: "debug",
+        relatedIds: [],
+        annotatedBy: "user",
+      },
+    });
+    const userReviewed = await gate.inspect();
+    assert.equal(userReviewed.pendingCount, 6);
+    assert.equal(userReviewed.viewedCount, 6);
+    assert.equal(userReviewed.reviewedCount, 2);
 
     await graph.recordEvidence({
       name: "有效发现",
-      summary: "第一个离散观察能够支撑当前方向。",
-      artifactIds: [ids[0]!],
+      summary: "第三个离散观察能够支撑当前方向。",
+      artifactIds: [ids[2]!],
       claim: "当前方向具有可验证依据。",
     });
-    assert.equal((await gate.inspect()).pendingCount, 7);
-    await gate.assertInvestigationAllowed();
-
-    await graph.annotateArtifact({
-      artifactId: ids[1]!,
-      name: "普通目录输出",
-      summary: "已审阅，对当前假设没有证据价值。",
-      role: "debug",
-      tags: ["read", "reviewed-routine"],
-    });
-    const reviewed = await gate.inspect();
-    assert.equal(reviewed.pendingCount, 6);
-    assert.equal(reviewed.pendingArtifacts.some((item) => item.id === ids[1]), false);
+    const promoted = await gate.inspect();
+    assert.equal(promoted.pendingCount, 5);
+    assert.equal(promoted.viewedCount, 5);
+    assert.equal(promoted.reviewedCount, 2);
+    assert.equal(promoted.promotedCount, 1);
+    assert.equal(promoted.pendingArtifacts.some((item) => item.id === ids[2]), false);
 
     await artifacts.putText(runId, "observation 1", {
       filename: "read-duplicate.txt",
@@ -75,7 +130,9 @@ test("evidence curation gate checkpoints exploration and clears reviewed artifac
         annotatedBy: "harness",
       },
     });
-    assert.equal((await gate.inspect()).pendingCount, 6);
+    const duplicate = await gate.inspect();
+    assert.equal(duplicate.pendingCount, 5);
+    assert.equal(duplicate.reviewedCount, 2);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -241,7 +241,7 @@ export function createCodingToolEffectPolicyResolver(
 const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
   name: "verify_claim",
   label: "verify_claim",
-  description: "Reproduce a final challenge answer with a deterministic workspace command. The command must derive and print the candidate without embedding the candidate literal. A match creates durable Artifact, Evidence, and accepted Completion records.",
+  description: "Run a deterministic workspace command and journal its exact candidate output. Only a command pre-bound by the task verifier policy can create trusted reproduction Evidence and accept a Completion; model-supplied commands remain audited observations.",
   parameters: Type.Object({
     candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
     command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
@@ -256,12 +256,23 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
     if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
     if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
     const executor = createBashTool<CodingResourceContext>();
-    const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, signal, onUpdate, context);
-    const output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-    if (!output.includes(candidate)) throw new Error("Reproduction output does not contain the exact candidate");
-    const reproduction = await context.claimVerifier.record({ candidate, command, cwd: context.env.cwd, output, toolCallId, supportingEvidenceIds: input.evidenceIds });
+    let output = "";
+    const reproduction = await context.claimVerifier.record({
+      candidate,
+      command,
+      cwd: context.env.cwd,
+      toolCallId,
+      supportingEvidenceIds: input.evidenceIds,
+      signal,
+      execute: async (innerSignal) => {
+        const started = Date.now();
+        const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
+        output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+        return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
+      },
+    });
     return toolResult({
-      verified: true,
+      verified: reproduction.verified,
       candidateHash: reproduction.candidateHash,
       commandHash: reproduction.commandHash,
       artifactId: reproduction.artifactId,
@@ -276,7 +287,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use curation_status for the exact pending Artifact ids. Record accepts artifactIds (plural), name, and summary; it does not accept artifactId or role. Annotate accepts artifactId (singular), name, summary, and optional role. Record promotes artifacts into Evidence and an optional claim/tree. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
       enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"],

@@ -283,7 +283,7 @@ function realEvaluationTask(runId: string, corpusCase: LoadedRealEvaluationCase,
       "The report references accepted completion and evidence ids.",
     ],
     verification: { kind: "hidden_scorer", required_reproductions: 2 },
-    scope: { allowed_hosts: ["LOCAL_EVALUATION_CORPUS"], allowed_ports: [], external_network: false, allowed_workspace: join(root, config.storage.runsDir, runId) },
+    scope: { allowed_hosts: ["LOCAL_EVALUATION_CORPUS"], allowed_ports: [], external_network: false, allowed_workspace: join(root, config.storage.fixturesDir, runId) },
     pause_policy: ["scope_change", "credential_required", "irreversible_external_effect"],
     constraints: { deadline_ms: budget.deadlineMs, max_cost_usd: budget.maxCostUsd, max_tool_calls: 80, max_submissions: 3 },
   };

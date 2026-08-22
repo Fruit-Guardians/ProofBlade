@@ -9,6 +9,7 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
+import { createEffectInput } from "../src/control/control-store.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -53,9 +54,15 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
       { schemaVersion: 1, lane: "executor", correlationId: "tool-1", actor: "tool", type: "tool_result_recorded", payload: { toolCallId: "TC-1", toolName: "inspect_target", durationMs: 30, outputBytes: 64, isError: false, artifactHashes: [], evidenceAdded: true } },
       { schemaVersion: 1, lane: "executor", correlationId: "compact-1", actor: "orchestrator", type: "compaction_recorded", payload: { fromHook: true, tokensBefore: 900 } },
     ]);
-    await services.control.dispatch(runId, { type: "effect_proposed", effect: { id: "EF-1", idempotencyKey: "effect-key", replayPolicy: "pure", operation: "fixture_read", args: {}, status: "PROPOSED" }, lane: "executor" });
+    const effectArgs = {};
+    await services.control.dispatch(runId, { type: "effect_proposed", effect: { id: "EF-1", idempotencyKey: createEffectInput(runId, "fixture_read", effectArgs, "pure", 0).idempotencyKey, replayPolicy: "pure", operation: "fixture_read", args: effectArgs, status: "PROPOSED" }, lane: "executor" });
     await services.control.dispatch(runId, { type: "effect_started", effectId: "EF-1", lane: "executor" });
-    await services.control.dispatch(runId, { type: "effect_finished", effectId: "EF-1", outcome: "timeout", durationMs: 80, outputBytes: 12, exitCode: null, errorSignature: "e".repeat(64), lane: "executor" });
+    const effectArtifact = await services.artifacts.putText(runId, JSON.stringify({ stdout: "", stderr: "timeout", exitCode: null, durationMs: 80 }), {
+      filename: "effect-timeout.json",
+      mime: "application/json",
+      sourceEffectId: "EF-1",
+    });
+    await services.control.dispatch(runId, { type: "effect_finished", effectId: "EF-1", outcome: "timeout", artifactId: effectArtifact.id, durationMs: 80, outputBytes: 12, exitCode: null, errorSignature: "e".repeat(64), lane: "executor" });
     await services.control.dispatch(runId, { type: "fail", reason: "verification did not complete", category: "verification_missing" });
 
     const telemetry = new RunTelemetry(services.control);

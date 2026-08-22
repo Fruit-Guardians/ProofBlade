@@ -65,7 +65,7 @@ test("competition pwn path provisions the pwn profile, uses a durable tube, repr
       const snapshot = await options.controlStore.snapshot(options.runId);
       const fixture = { fixtureId: options.runId, generation: snapshot.generation, path: options.projectRoot, privatePath: join(options.projectRoot, ".proofblade") };
       const toolRuntime = new ProofBladeToolRuntime(options.runId, fixture, join(options.runDir, ".."), options.controlStore, options.artifactStore, options.journal, options.installRoot ?? options.projectRoot, { includeMcp: false });
-      const submit = createPlatformFlagSubmitter({ runId: options.runId, runtime: toolRuntime, fixture, controlStore: options.controlStore, artifactStore: options.artifactStore, journal: options.journal, runsRoot: join(options.runDir, ".."), mode: options.mode });
+      const submit = createPlatformFlagSubmitter({ runId: options.runId, runtime: toolRuntime, fixture, controlStore: options.controlStore, verifier: options.platformVerifier!, artifactStore: options.artifactStore, mode: options.mode });
       return {
         async prompt() {
           const tube = await PwnSession.openRemote(registry, { ref, ownerLane: "executor", command: ["nc", "127.0.0.1", "31337"], endpoint: "127.0.0.1:31337" });

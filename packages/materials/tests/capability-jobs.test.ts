@@ -109,7 +109,7 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
@@ -186,7 +186,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
     await assert.rejects(() => services.control.dispatch(runId, {

@@ -120,6 +120,7 @@ export interface TaskContract {
   scope: {
     allowed_hosts: string[];
     allowed_ports: number[];
+    allowed_endpoints?: Array<{ host: string; port: number }>;
     external_network: boolean;
     allowed_workspace: string;
   };
@@ -139,7 +140,28 @@ export interface Evidence {
   summary: string;
   tags?: string[];
   dependsOn?: string[];
-  source: { tool?: string; effectId?: string; artifactId?: string; artifactIds?: string[]; generation?: number };
+  source: { tool?: string; effectId?: string; artifactId?: string; artifactIds?: string[]; generation: number };
+  /**
+   * Control-plane materialized provenance. Callers provide `source`; the
+   * ControlStore derives this record from the current Run, referenced Artifact,
+   * and completed Effect. It is immutable because Evidence ids are append-only.
+   */
+  provenance: {
+    schemaVersion: 1;
+    runId: string;
+    generation: number;
+    recordedBy: "agent" | "verifier";
+    artifactIds: string[];
+    effect?: {
+      id: string;
+      operation: string;
+      status: "FINISHED";
+      outcome: "success" | "error" | "timeout" | "unknown";
+      exitCode: number | null;
+      commandHash?: string;
+      sessionId?: string;
+    };
+  };
   confidence: number;
   supports: string[];
   refutes: string[];
@@ -148,6 +170,8 @@ export interface Evidence {
 
 export interface Observation {
   id: string;
+  runId: string;
+  generation: number;
   summary: string;
   source: { operation: string; effectId: string; artifactId: string; generation: number };
   candidateKinds: string[];
@@ -156,6 +180,8 @@ export interface Observation {
 
 export interface Fact {
   id: string;
+  runId: string;
+  generation: number;
   statement: string;
   status: "PROPOSED" | "CONFIRMED" | "REJECTED";
   evidenceIds: string[];
@@ -164,6 +190,8 @@ export interface Fact {
 
 export interface Hypothesis {
   id: string;
+  runId: string;
+  generation: number;
   statement: string;
   status: "OPEN" | "CONFIRMED" | "REJECTED";
   evidenceIds: string[];
@@ -339,6 +367,10 @@ export interface RequestEpoch {
 
 export interface CompletionProposal {
   id: string;
+  runId: string;
+  generation: number;
+  /** Immutable intent used to keep local claim checks out of platform submission accounting. */
+  purpose: "submission" | "claim_reproduction" | "harness_verification" | "legacy_unclassified";
   candidateHash: string;
   artifactId: string;
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
@@ -474,15 +506,49 @@ export interface ArtifactSemanticMetadata {
 
 export interface ArtifactRef extends ArtifactAtom {
   id: string;
+  runId: string;
+  generation: number;
+  /** Registration-time classification; annotations may not rewrite it. */
+  origin: {
+    schemaVersion: 1;
+    /** Derived by the ControlStore capability that registered the Artifact. */
+    registeredBy: "agent" | "verifier";
+    operation?: string;
+    tags: string[];
+  };
   sensitivity: "public" | "secret" | "flag_candidate";
   sourceEffectId?: string;
   truncated?: boolean;
   semantic?: ArtifactSemanticMetadata;
 }
 
+export interface VerificationVerdict {
+  schemaVersion: 1;
+  valid: boolean;
+  accepted: boolean;
+  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce";
+  runId: string;
+  taskId: string;
+  taskHash: string;
+  generation: number;
+  completionId: string;
+  candidateHash: string;
+  candidateArtifactId: string;
+  attemptId: string;
+  sessionId: string;
+  resultArtifactId: string;
+  resultArtifactSha256: string;
+  transcriptHash: string;
+}
+
 export interface Effect extends EffectAtom<ReplayPolicy> {
   id: string;
+  runId: string;
+  generation: number;
+  producerLane: Lane;
   command?: string;
+  commandHash?: string;
+  sessionId?: string;
   cwd?: string;
   timeoutMs?: number;
   status: "PROPOSED" | "STARTED" | "FINISHED" | "UNKNOWN" | "RECONCILED";
@@ -493,6 +559,7 @@ export interface Effect extends EffectAtom<ReplayPolicy> {
   outputBytes?: number;
   exitCode?: number | null;
   errorSignature?: string;
+  verification?: VerificationVerdict;
   createdSeq: number;
 }
 
@@ -508,6 +575,9 @@ export interface Lease {
 export interface RunSnapshot {
   runId: string;
   task: TaskContract;
+  taskHash: string;
+  /** Hash of the in-memory control authority that created this Run. */
+  authorityHash: string;
   status: RunStatus;
   phase: Phase;
   domainPhase: DomainPhase;
@@ -540,10 +610,18 @@ export interface RunSnapshot {
   failureCategory?: PrimaryFailureCategory;
   versionSnapshot?: RunVersionSnapshot;
   projectionHash?: string;
+  finalResult?: {
+    completionId: string;
+    candidateHash: string;
+    artifactId: string;
+    evidenceIds: string[];
+    generation: number;
+  };
 }
 
 export type EventType =
   | "run_started"
+  | "run_authority_migrated"
   | "phase_started"
   | "phase_finished"
   | "domain_phase_changed"
@@ -631,6 +709,7 @@ export interface RawEffectResult {
 
 export interface EffectRequest extends EffectAtom<ReplayPolicy> {
   id: string;
+  sessionId?: string;
   command?: string;
   cwd?: string;
   timeoutMs?: number;

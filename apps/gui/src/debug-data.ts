@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
+  CodingClaimVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
   PiSolverLane,
@@ -105,7 +106,8 @@ export class DebugDataService {
     private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
     private readonly createSolverLane?: SolverLaneFactory,
   ) {
-    this.services = createServices(root, config);
+    const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
+    this.services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
   }
 
   public updateModelProfile(profile: ModelProfileConfig): void {
@@ -270,7 +272,7 @@ export class DebugDataService {
 
   public async recover(runId: string): Promise<unknown> {
     assertRunId(runId);
-    return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
+    return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
   }
 
   public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
@@ -341,8 +343,9 @@ export class DebugDataService {
     task.objective = input.objective.trim() || task.objective;
     await this.services.control.createRun(input.runId, task);
     const fixture = await this.services.sandbox.build(task);
+    await this.services.fixtureControl.assertResetAllowed(input.runId);
     const generation = await this.services.sandbox.reset(fixture);
-    await this.services.control.dispatch(input.runId, { type: "fixture_reset", generation });
+    await this.services.fixtureControl.reset(input.runId, generation);
     await this.services.control.dispatch(input.runId, { type: "start_phase", phase: "reconnaissance" });
     return await this.services.control.snapshot(input.runId);
   }
@@ -409,13 +412,14 @@ export class DebugDataService {
           controlStore: this.services.control,
           artifactStore: this.services.artifacts,
           journal: this.services.journal,
+          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
           capabilities,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       } else {
         this.assertOpen();
-        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox).recover(runId);
+        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
         runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
         lane = await PiSolverLane.create({
           projectRoot: this.root,

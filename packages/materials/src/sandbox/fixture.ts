@@ -37,13 +37,15 @@ export interface FixtureReconcileResult {
 }
 
 export interface SandboxPort {
+  /** Resolve the durable replay policy before an Effect is proposed. */
+  resolveReplayPolicy(operation: string, requested: ReplayPolicy): ReplayPolicy;
   build(task: TaskContract): Promise<FixtureRef>;
   reset(fixture: FixtureRef): Promise<number>;
   score(fixture: FixtureRef, candidate: string): Promise<{ accepted: boolean; candidateHash: string }>;
   execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>;
   reconcile(effect: Effect): Promise<ReconcileResult>;
   health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>;
-  reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult>;
+  reconcileFixture(task: TaskContract, expectedGeneration: number, beforeReset?: () => Promise<void>): Promise<FixtureReconcileResult>;
   destroy(fixture: FixtureRef): Promise<void>;
   close(): Promise<void>;
 }
@@ -52,6 +54,10 @@ export class LocalFixtureSandbox implements SandboxPort {
   private readonly generations = new Map<string, number>();
 
   public constructor(private readonly root: string) {}
+
+  public resolveReplayPolicy(_operation: string, requested: ReplayPolicy): ReplayPolicy {
+    return requested;
+  }
 
   public async build(task: TaskContract): Promise<FixtureRef> {
     const fixtureId = task.task_id;
@@ -138,7 +144,7 @@ export class LocalFixtureSandbox implements SandboxPort {
     return { status: "healthy", expectedGeneration, actualGeneration };
   }
 
-  public async reconcileFixture(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult> {
+  public async reconcileFixture(task: TaskContract, expectedGeneration: number, beforeReset?: () => Promise<void>): Promise<FixtureReconcileResult> {
     const profile = fixtureProfileFromTarget(task.target);
     const fixture: FixtureRef = {
       fixtureId: task.task_id,
@@ -149,6 +155,7 @@ export class LocalFixtureSandbox implements SandboxPort {
     };
     const health = await this.health(fixture, expectedGeneration);
     if (health.status === "healthy") return { fixture, health, action: "none", generation: expectedGeneration };
+    await beforeReset?.();
     const rebuilt = await this.build(task);
     const generation = await this.reset({ ...rebuilt, generation: Math.max(expectedGeneration, health.actualGeneration) });
     return { fixture: { ...rebuilt, generation }, health, action: "reset", generation };

@@ -226,10 +226,16 @@ export class ProofBladeToolRuntime {
     // compared sha256(json blob) to candidateHash and threw "Candidate hash
     // mismatch" — losing an already-correct flag. The predicate below IS the
     // verifier's own precondition, so a reused completion always passes it.
+    const submissionCount = Object.values(snapshot.completions).filter((item) =>
+      item.purpose === "submission" && item.runId === snapshot.runId,
+    ).length;
     const submittable = await this.submittableCompletions(snapshot);
-    if (submittable.length >= snapshot.task.constraints.max_submissions) throw new Error("Submission budget exhausted");
     const existing = submittable.find((item) => item.candidateHash === candidateHash);
     if (existing) return { completionId: existing.id, candidateHash };
+    // The submission budget is a run-wide, durable accounting invariant. It must
+    // not reset with fixture generation and must not depend on an Artifact still
+    // being readable, otherwise reset/deletion can mint fresh attempts.
+    if (submissionCount >= snapshot.task.constraints.max_submissions) throw new Error("Submission budget exhausted");
     const artifact = await this.artifactStore.putText(this.runId, normalized, {
       filename: `candidate-${candidateHash.slice(0, 12)}.txt`,
       mime: "text/plain",
@@ -238,22 +244,19 @@ export class ProofBladeToolRuntime {
     const completionId = id("C");
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, candidateHash, artifactId: artifact.id },
+      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id },
       lane: "executor",
     });
     return { completionId, candidateHash };
   }
 
-  /**
-   * Completions whose stored artifact IS the bare candidate, i.e. the ones a
-   * verifier can actually submit. Excludes `verify_claim`'s completions, whose
-   * artifact is a claim-reproduction JSON document.
-   */
+  /** Completions explicitly proposed for submission whose Artifact is still the exact candidate. */
   public async submittableCompletions(snapshot: RunSnapshot): Promise<CompletionProposal[]> {
     const submittable: CompletionProposal[] = [];
     for (const item of Object.values(snapshot.completions)) {
+      if (item.purpose !== "submission" || item.runId !== snapshot.runId || item.generation !== snapshot.generation) continue;
       const artifact = snapshot.artifacts[item.artifactId];
-      if (!artifact) continue;
+      if (!artifact || artifact.runId !== snapshot.runId || artifact.generation !== snapshot.generation) continue;
       try {
         const stored = (await this.artifactStore.readText(this.runId, artifact)).trim();
         if (sha256(stored) === item.candidateHash) submittable.push(item);
@@ -307,10 +310,10 @@ export class ProofBladeToolRuntime {
     if (normalized.length < 2) throw new Error("History query must contain at least two characters");
     const snapshot = await this.controlStore.snapshot(this.runId);
     const rows = [
-      ...Object.values(snapshot.facts).map((item) => ({ kind: "fact", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
-      ...Object.values(snapshot.hypotheses).map((item) => ({ kind: "hypothesis", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
-      ...Object.values(snapshot.observations).map((item) => ({ kind: "observation", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
-      ...Object.values(snapshot.evidence).map((item) => ({ kind: "evidence", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.facts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).map((item) => ({ kind: "fact", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.hypotheses).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).map((item) => ({ kind: "hypothesis", id: item.id, status: item.status, text: item.statement, evidenceIds: item.evidenceIds, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).map((item) => ({ kind: "observation", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
+      ...Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation).map((item) => ({ kind: "evidence", id: item.id, text: item.summary, artifactId: item.source.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.checkpoints).map((item) => ({ kind: "checkpoint", id: item.id, text: item.reason, artifactId: item.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.jobs).map((item) => ({ kind: "job", id: item.id, text: `${item.capabilityId}.${item.operation} ${item.status}`, artifactId: item.artifactId, createdSeq: item.createdSeq })),
       ...Object.values(snapshot.handoffs).map((item) => ({ kind: "handoff", id: item.id, text: `${item.phase} ${item.status} ${item.knowledgeVersion}`, artifactId: undefined, createdSeq: item.createdSeq })),

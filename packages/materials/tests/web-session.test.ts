@@ -52,7 +52,7 @@ test("HTTP session reuses Cookie/CSRF within one run and WebReproducer uses a cl
     assert.equal(result.reproduced, true);
     assert.equal(result.flag, "flag{web-clean}");
     const snapshot = await services.control.replay(runId);
-    assert.equal(snapshot.evidence[result.evidenceId]?.kind, "reproduction");
+    assert.equal(snapshot.evidence[result.evidenceId]?.kind, "observation");
     assert.ok(Object.values(snapshot.sessions).some((item) => item.kind === "http" && item.stateHash));
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

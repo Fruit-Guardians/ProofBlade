@@ -191,7 +191,7 @@ export async function finalizeCodingTurn(options: {
     : options.recoveryExhausted
       ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
       : options.response.errorMessage;
-  const claimVerification = options.claimVerifier.project(options.userPrompt, output);
+  const claimVerification = await options.claimVerifier.project(options.userPrompt, output);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
     lane: "main",

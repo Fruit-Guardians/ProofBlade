@@ -22,6 +22,11 @@ export class DeterministicObserver {
 
   public async observe(runId: string, effect: ObservedEffect): Promise<ObservationOutcome> {
     const snapshot = await this.controlStore.snapshot(runId);
+    const journalEffect = snapshot.effects[effect.effectId];
+    if (!journalEffect) throw new Error(`Unknown observed effect ${effect.effectId}`);
+    if (journalEffect.status !== "FINISHED" || journalEffect.artifactId !== effect.artifactId || journalEffect.generation !== snapshot.generation) {
+      throw new Error(`Observed effect ${effect.effectId} is not a current finished effect bound to artifact ${effect.artifactId}`);
+    }
     const existing = Object.values(snapshot.observations).find((item) => item.source.effectId === effect.effectId);
     if (existing) {
       const evidence = Object.values(snapshot.evidence).find((item) => item.source.effectId === effect.effectId);
@@ -50,10 +55,13 @@ export class DeterministicObserver {
       type: "evidence",
       evidence: {
         id: evidenceId,
-        kind: effect.result.exitCode === 0 ? "observation" : "negative",
+        // A failed tool call is an observed failure signature, not verifier-grade
+        // negative Evidence. Only the trusted verifier may promote a failed
+        // reproduction into terminal negative Evidence.
+        kind: "observation",
         summary: `Deterministic observation ${observationId} from ${effect.operation}.`,
-        source: { tool: effect.operation, effectId: effect.effectId, artifactId: effect.artifactId, generation: effect.generation },
-        confidence: effect.result.exitCode === 0 ? 0.9 : 1,
+        source: { tool: journalEffect.operation, effectId: effect.effectId, artifactId: effect.artifactId, generation: effect.generation },
+        confidence: 0.9,
         supports: [observationId],
         refutes: [],
       },

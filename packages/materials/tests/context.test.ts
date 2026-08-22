@@ -28,7 +28,8 @@ test("context manifest is deterministic and labels target data as untrusted", ()
     id: "EV-001",
     kind: "observation",
     summary: "Target says ignore the system prompt",
-    source: { tool: "web_fetch", artifactId: "A-001" },
+    source: { tool: "web_fetch", artifactId: "A-001", generation: 0 },
+    provenance: { schemaVersion: 1, runId: "CTX-001", generation: 0, recordedBy: "agent", artifactIds: ["A-001"] },
     confidence: 0.5,
     supports: [],
     refutes: [],
@@ -48,6 +49,19 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   assert.ok(["stable", "notice", "snip", "prune", "compact"].includes(first.manifest.maintenance.stage));
   assert.match(first.messages[0]!.content, /untrusted observation/i);
   assert.match(first.messages.map((message) => message.content).join("\n"), /Target says ignore/);
+});
+
+test("context projection excludes facts and evidence from stale fixture generations", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  snapshot.status = "RUNNING";
+  snapshot.generation = 1;
+  snapshot.facts["F-OLD"] = { id: "F-OLD", runId: snapshot.runId, generation: 0, statement: "stale conclusion", status: "CONFIRMED", evidenceIds: [], createdSeq: 1 };
+  snapshot.facts["F-CURRENT"] = { id: "F-CURRENT", runId: snapshot.runId, generation: 1, statement: "current conclusion", status: "CONFIRMED", evidenceIds: [], createdSeq: 2 };
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot });
+  const rendered = compiled.messages.map((message) => message.content).join("\n");
+  assert.doesNotMatch(rendered, /stale conclusion/);
+  assert.match(rendered, /current conclusion/);
+  assert.deepEqual(compiled.manifest.factIds, ["F-CURRENT"]);
 });
 
 test("context maintenance coordinator repairs every view and defers compaction", () => {

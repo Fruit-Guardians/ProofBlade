@@ -65,7 +65,7 @@ export * from "./sandbox/fixture.js";
 export * from "./sandbox/fixture-catalog.js";
 export * from "./recovery/run-recovery.js";
 export * from "./storage/jsonl-store.js";
-export * from "./app/demo.js";
+export { createServices, demoTask, runDemo, type AppServices, type CreateServicesOptions } from "./app/demo.js";
 export * from "./app/fixture-task.js";
 export * from "./competition/api.js";
 export * from "./competition/dasctf-api.js";

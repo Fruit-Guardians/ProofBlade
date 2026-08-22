@@ -37,7 +37,8 @@ async function main(): Promise<void> {
   const args = withoutOption(rawArgs, "--config");
   const [command = "help", arg, ...rest] = args;
   const config = await loadConfig(root, configPath);
-  const services = createServices(root, config);
+  const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
+  const services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
   switch (command) {
     case "init": {
       const runId = required(arg, "task id");
@@ -201,7 +202,7 @@ async function main(): Promise<void> {
     }
     case "reconcile": {
       const runId = required(arg, "run id");
-      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox).recover(runId);
+      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId);
       print({
         runId,
         fixtureHealth: recovery.fixtureHealth,
@@ -299,8 +300,9 @@ async function main(): Promise<void> {
       const runId = required(arg, "run id");
       const snapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(snapshot.task);
+      await services.fixtureControl.assertResetAllowed(runId);
       const generation = await services.sandbox.reset(fixture);
-      await services.control.dispatch(runId, { type: "fixture_reset", generation });
+      await services.fixtureControl.reset(runId, generation);
       print({ runId, generation });
       break;
     }

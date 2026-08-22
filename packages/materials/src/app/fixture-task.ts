@@ -23,7 +23,7 @@ export function fixtureTask(runId: string, profileId: string, root: string, conf
       allowed_hosts: ["LOCAL_FIXTURE"],
       allowed_ports: [],
       external_network: false,
-      allowed_workspace: join(root, config.storage.runsDir, runId),
+      allowed_workspace: join(root, config.storage.fixturesDir, runId),
     },
     pause_policy: ["scope_change", "credential_required", "irreversible_external_effect"],
     constraints: { deadline_ms: 300_000, max_cost_usd: 0, max_tool_calls: 20, max_submissions: 3 },

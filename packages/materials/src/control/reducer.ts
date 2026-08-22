@@ -6,6 +6,8 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
   return {
     runId,
     task,
+    taskHash: sha256(canonicalJson(task)),
+    authorityHash: "UNANCHORED",
     status: "CREATED",
     phase: "intake",
     domainPhase: "INTAKE",
@@ -38,6 +40,9 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
 const terminal: RunStatus[] = ["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"];
 
 export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot {
+  if (event.runId !== snapshot.runId || event.streamId !== snapshot.runId) {
+    throw new Error(`Event stream does not match Run ${snapshot.runId}`);
+  }
   if (event.seq !== snapshot.lastSeq + 1) {
     throw new Error(`Event sequence gap for ${event.runId}: expected ${snapshot.lastSeq + 1}, got ${event.seq}`);
   }
@@ -47,10 +52,28 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
 
   switch (event.type) {
     case "run_started":
+      if (snapshot.lastSeq !== 0 || snapshot.status !== "CREATED" || snapshot.authorityHash !== "UNANCHORED") {
+        throw new Error("run_started is immutable and may only be the first Run event");
+      }
+      if (p.taskHash !== undefined && (typeof p.taskHash !== "string" || p.taskHash !== next.taskHash)) {
+        throw new Error("Task contract hash does not match the immutable run anchor");
+      }
+      if (p.taskHash === undefined && p.authorityHash !== undefined) {
+        throw new Error("A trusted authority anchor cannot omit its task contract hash");
+      }
+      next.authorityHash = typeof p.authorityHash === "string" && /^[a-f0-9]{64}$/i.test(p.authorityHash)
+        ? p.authorityHash
+        : "LEGACY-UNTRUSTED";
       next.status = "READY";
       next.startedAt = event.ts;
       next.generation = Number(p.generation ?? 0);
       next.versionSnapshot = p.versionSnapshot as RunSnapshot["versionSnapshot"];
+      break;
+    case "run_authority_migrated":
+      if (snapshot.authorityHash !== "LEGACY-UNTRUSTED") throw new Error("Run authority migration is only valid for an untrusted legacy Run");
+      if (typeof p.taskHash !== "string" || p.taskHash !== next.taskHash) throw new Error("Legacy Run migration task hash does not match task.json");
+      if (typeof p.authorityHash !== "string" || !/^[a-f0-9]{64}$/i.test(p.authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
+      next.authorityHash = p.authorityHash;
       break;
     case "phase_started":
       next.phase = p.phase as RunSnapshot["phase"];
@@ -69,8 +92,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "fixture_reset":
-      next.generation = Number(p.generation);
-      if (!Number.isInteger(next.generation) || next.generation < 1) throw new Error("fixture_reset requires a positive generation");
+      {
+        if (terminal.includes(next.status)) throw new Error(`Cannot reset fixture for terminal run ${next.status}`);
+        if (next.phase === "verification" || next.phase === "report") throw new Error(`Cannot reset fixture during ${next.phase}`);
+        const generation = Number(p.generation);
+        if (!Number.isInteger(generation) || generation <= next.generation) throw new Error("fixture_reset requires a monotonically increasing generation");
+        next.generation = generation;
+      }
       break;
     case "run_paused":
       ensureNotTerminal(next.status);
@@ -84,8 +112,47 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const status = p.status as RunStatus;
       if (!terminal.includes(status)) throw new Error(`Invalid terminal status: ${String(status)}`);
       if (next.status === "PAUSED") throw new Error(`Cannot transition a paused run to ${status}; resume it first`);
+      if (status === "SUCCEEDED" && typeof p.completionId !== "string") {
+        // Pre-provenance success events cannot be upgraded into trusted current
+        // conclusions. Keep the Run replayable, but fail closed for consumers.
+        ensureNotTerminal(next.status);
+        next.status = "NEED_HUMAN";
+        next.finishedAt = event.ts;
+        next.terminalReason = "Legacy success lacks a completion-bound verifier verdict";
+        next.failureCategory = "verification_missing";
+        break;
+      }
       if (status === "SUCCEEDED" && (p.verified !== true || !Array.isArray(p.evidenceIds) || p.evidenceIds.length === 0)) {
         throw new Error("A successful run requires verifier approval and evidence");
+      }
+      if (status === "SUCCEEDED" && typeof p.completionId !== "string") throw new Error("A successful run requires an explicitly bound completion");
+      if (status === "SUCCEEDED") {
+        const completionId = String(p.completionId);
+        const completion = next.completions[completionId];
+        if (!completion || completion.status !== "ACCEPTED") throw new Error(`Successful run references a non-accepted completion: ${completionId}`);
+        const evidenceIds = Array.isArray(p.evidenceIds) ? p.evidenceIds.map(String) : [];
+        if (!sameStringSet(evidenceIds, completion.evidenceIds)) throw new Error("Successful run evidence does not exactly match its completion");
+        if (completion.runId !== next.runId || completion.generation !== next.generation) throw new Error("Successful run completion is stale");
+        if (p.candidateHash !== completion.candidateHash || p.artifactId !== completion.artifactId || Number(p.generation) !== completion.generation) {
+          throw new Error("Successful run result payload does not match its completion");
+        }
+        for (const evidenceId of evidenceIds) {
+          const evidence = next.evidence[evidenceId];
+          if (!evidence || evidence.kind !== "reproduction" || evidence.provenance?.recordedBy !== "verifier" || evidence.provenance.generation !== next.generation || !evidence.supports.includes(completion.id)) {
+            throw new Error(`Successful run contains invalid evidence ${evidenceId}`);
+          }
+          const verdict = evidence.provenance.effect ? next.effects[evidence.provenance.effect.id]?.verification : undefined;
+          if (!verdict?.valid || !verdict.accepted || verdict.completionId !== completion.id || verdict.candidateHash !== completion.candidateHash || verdict.candidateArtifactId !== completion.artifactId) {
+            throw new Error(`Successful run contains evidence without a bound accepted verdict: ${evidenceId}`);
+          }
+        }
+        next.finalResult = {
+          completionId: completion.id,
+          candidateHash: completion.candidateHash,
+          artifactId: completion.artifactId,
+          evidenceIds,
+          generation: completion.generation,
+        };
       }
       ensureNotTerminal(next.status);
       next.status = status;
@@ -102,20 +169,46 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.failureCategory = p.failureCategory as RunSnapshot["failureCategory"];
       break;
     case "fact_added": {
-      const fact = p.fact as RunSnapshot["facts"][string];
+      const raw = p.fact as RunSnapshot["facts"][string];
+      const fact = { ...raw, runId: raw?.runId ?? next.runId, generation: raw?.generation ?? next.generation };
       if (!fact?.id) throw new Error("fact_added requires fact");
+      if (fact.runId !== next.runId || fact.generation !== next.generation) throw new Error(`Fact ${fact.id} provenance is stale or invalid`);
+      const previous = next.facts[fact.id];
+      if (previous && (previous.runId !== fact.runId || previous.generation !== fact.generation)) throw new Error(`Fact ${fact.id} cannot cross generations`);
       next.facts[fact.id] = fact;
       break;
     }
     case "observation_added": {
-      const observation = p.observation as RunSnapshot["observations"][string];
+      const raw = p.observation as RunSnapshot["observations"][string];
+      const observation = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+        source: { ...raw?.source, generation: raw?.source?.generation ?? next.generation },
+      };
       if (!observation?.id) throw new Error("observation_added requires observation");
+      if (observation.runId !== next.runId || observation.generation !== next.generation || observation.source.generation !== next.generation) throw new Error(`Observation ${observation.id} provenance is stale or invalid`);
+      if (next.observations[observation.id]) throw new Error(`Observation already exists: ${observation.id}`);
       next.observations[observation.id] = observation;
       break;
     }
     case "evidence_added": {
-      const evidence = p.evidence as RunSnapshot["evidence"][string];
+      const raw = p.evidence as RunSnapshot["evidence"][string];
+      const source = { ...raw?.source, generation: raw?.source?.generation ?? next.generation };
+      const artifactIds = [...new Set([...(source.artifactIds ?? []), ...(source.artifactId ? [source.artifactId] : [])])];
+      const evidence = {
+        ...raw,
+        source,
+        provenance: raw?.provenance ?? {
+          schemaVersion: 1 as const,
+          runId: next.runId,
+          generation: next.generation,
+          recordedBy: "agent" as const,
+          artifactIds,
+        },
+      };
       if (!evidence?.id) throw new Error("evidence_added requires evidence");
+      if (next.evidence[evidence.id]) throw new Error(`Evidence already exists: ${evidence.id}`);
       next.evidence[evidence.id] = evidence;
       break;
     }
@@ -158,8 +251,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "hypothesis_added": {
-      const hypothesis = p.hypothesis as RunSnapshot["hypotheses"][string];
+      const raw = p.hypothesis as RunSnapshot["hypotheses"][string];
+      const hypothesis = { ...raw, runId: raw?.runId ?? next.runId, generation: raw?.generation ?? next.generation };
       if (!hypothesis?.id) throw new Error("hypothesis_added requires hypothesis");
+      if (hypothesis.runId !== next.runId || hypothesis.generation !== next.generation) throw new Error(`Hypothesis ${hypothesis.id} provenance is stale or invalid`);
+      const previous = next.hypotheses[hypothesis.id];
+      if (previous && (previous.runId !== hypothesis.runId || previous.generation !== hypothesis.generation)) throw new Error(`Hypothesis ${hypothesis.id} cannot cross generations`);
       next.hypotheses[hypothesis.id] = hypothesis;
       break;
     }
@@ -170,8 +267,27 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "artifact_registered": {
-      const artifact = p.artifact as RunSnapshot["artifacts"][string];
+      const raw = p.artifact as RunSnapshot["artifacts"][string];
+      const artifact = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+        origin: raw?.origin ? {
+          ...raw.origin,
+          // Legacy Artifact events did not attest a registration capability.
+          // Treat them as ordinary agent artifacts so verifier recovery fails closed.
+          registeredBy: raw.origin.registeredBy ?? "agent",
+        } : {
+          schemaVersion: 1 as const,
+          registeredBy: "agent" as const,
+          operation: raw?.sourceEffectId ? next.effects[raw.sourceEffectId]?.operation : undefined,
+          tags: [...(raw?.semantic?.tags ?? [])],
+        },
+      };
       if (!artifact?.id) throw new Error("artifact_registered requires artifact");
+      if (artifact.runId !== next.runId || artifact.generation !== next.generation || artifact.origin?.schemaVersion !== 1
+        || !["agent", "verifier"].includes(artifact.origin.registeredBy) || !Array.isArray(artifact.origin.tags)) throw new Error(`Artifact ${artifact.id} provenance is stale or invalid`);
+      if (next.artifacts[artifact.id]) throw new Error(`Artifact already exists: ${artifact.id}`);
       next.artifacts[artifact.id] = artifact;
       break;
     }
@@ -184,18 +300,32 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     }
     case "effect_proposed": {
-      const effect = p.effect as RunSnapshot["effects"][string];
+      const raw = p.effect as RunSnapshot["effects"][string];
+      const effect = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+        producerLane: raw?.producerLane ?? event.lane,
+        commandHash: raw?.commandHash ?? (raw?.command ? sha256(raw.command) : undefined),
+      };
       if (!effect?.id) throw new Error("effect_proposed requires effect");
+      if (effect.status !== "PROPOSED") throw new Error("A proposed Effect must start in PROPOSED state");
+      if (effect.outcome !== undefined || effect.artifactId !== undefined || effect.externalId !== undefined || effect.durationMs !== undefined || effect.outputBytes !== undefined || effect.exitCode !== undefined || effect.errorSignature !== undefined || effect.verification !== undefined) {
+        throw new Error("A proposed Effect cannot contain result fields");
+      }
+      if (next.effects[effect.id]) throw new Error(`Effect already exists: ${effect.id}`);
       next.effects[effect.id] = effect;
       break;
     }
     case "effect_started": {
       const effect = getEffect(next, String(p.effectId));
+      if (effect.status !== "PROPOSED") throw new Error(`Cannot start effect in ${effect.status}`);
       effect.status = "STARTED";
       break;
     }
     case "effect_finished": {
       const effect = getEffect(next, String(p.effectId));
+      if (effect.status !== "STARTED") throw new Error(`Cannot finish effect in ${effect.status}`);
       effect.status = "FINISHED";
       effect.outcome = p.outcome as typeof effect.outcome;
       effect.artifactId = typeof p.artifactId === "string" ? p.artifactId : effect.artifactId;
@@ -204,10 +334,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       effect.outputBytes = typeof p.outputBytes === "number" ? p.outputBytes : effect.outputBytes;
       effect.exitCode = typeof p.exitCode === "number" || p.exitCode === null ? p.exitCode : effect.exitCode;
       effect.errorSignature = typeof p.errorSignature === "string" ? p.errorSignature : effect.errorSignature;
+      effect.verification = p.verification as typeof effect.verification;
       break;
     }
     case "effect_reconciled": {
       const effect = getEffect(next, String(p.effectId));
+      if (effect.status !== "PROPOSED" && effect.status !== "STARTED") throw new Error(`Cannot reconcile effect in ${effect.status}`);
       effect.status = p.outcome === "unknown" ? "UNKNOWN" : "RECONCILED";
       effect.outcome = p.outcome as typeof effect.outcome;
       break;
@@ -232,14 +364,23 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       delete next.leases[String(p.resourceKey)];
       break;
     case "completion_proposed": {
-      const completion = p.completion as RunSnapshot["completions"][string];
+      const raw = p.completion as RunSnapshot["completions"][string];
+      const completion = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+        purpose: raw?.purpose ?? "legacy_unclassified" as const,
+      };
       if (!completion?.id) throw new Error("completion_proposed requires completion");
+      if (!["submission", "claim_reproduction", "harness_verification", "legacy_unclassified"].includes(completion.purpose)) throw new Error("completion_proposed requires an immutable purpose");
+      if (next.completions[completion.id]) throw new Error(`Completion already exists: ${completion.id}`);
       next.completions[completion.id] = completion;
       break;
     }
     case "completion_verified": {
       const completion = next.completions[String(p.completionId)];
       if (!completion) throw new Error(`Unknown completion ${String(p.completionId)}`);
+      if (completion.status !== "PROPOSED") throw new Error(`Completion ${completion.id} is already ${completion.status}`);
       completion.status = p.accepted === true ? "ACCEPTED" : "REJECTED";
       completion.evidenceIds = Array.isArray(p.evidenceIds) ? p.evidenceIds.map(String) : [];
       break;
@@ -548,6 +689,10 @@ function updateEpochStatus(snapshot: RunSnapshot, payload: Record<string, unknow
 function mergeIds(existing: string[], value: unknown): string[] {
   const additions = Array.isArray(value) ? value.map(String) : [];
   return [...new Set([...existing, ...additions])];
+}
+
+function sameStringSet(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value) => right.includes(value));
 }
 
 export function projectionHash(snapshot: RunSnapshot): string {

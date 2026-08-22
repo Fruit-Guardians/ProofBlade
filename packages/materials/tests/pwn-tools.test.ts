@@ -144,7 +144,7 @@ test("handler.reproduce runs the barrier-gated verifier on a fresh remote sessio
     assert.equal(outcome.reproduced, true);
     assert.equal(outcome.flag, "flag{tool-repro}");
     const snap = await control.snapshot("PWN-TOOL-REPRO");
-    assert.equal(snap.evidence[outcome.evidenceId]?.kind, "reproduction");
+    assert.equal(snap.evidence[outcome.evidenceId], undefined, "local tube barriers must not mint trusted Evidence");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
