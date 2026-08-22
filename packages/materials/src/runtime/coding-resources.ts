@@ -22,10 +22,14 @@ import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { WebExploitStep } from "../verification/web-reproducer.js";
+import type { WebToolHandler } from "../web/web-tools.js";
+import { createWebSessionTools } from "./web-coding-tools.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
+/** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
+export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
 
 /** Verdict returned by a real platform submission. */
@@ -54,6 +58,12 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /** Durable per-run gate for repeated process/network experiments. */
   experimentGate?: ExperimentGate;
   webReproduce?: (steps: WebExploitStep[], signal?: AbortSignal) => Promise<unknown>;
+  /**
+   * Present only when the task has a resolvable web target. Drives interactive
+   * HTTP session tools (web_open/request/replay/close/list); absent for non-web
+   * runs, in which case those tools fail closed with a clear message.
+   */
+  webSession?: WebToolHandler;
   /** Present only when the run is judged by a live competition platform. */
   submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
@@ -96,7 +106,7 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
   }));
 }
 
-export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
+export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyClaimTool,
@@ -107,6 +117,7 @@ export function createCodingTools(options: { platformJudged?: boolean; webReprod
     shellBackgroundTool,
     shellJobTool,
     ...createPwnCodingTools(),
+    ...(options.webSessionEnabled ? createWebSessionTools() : []),
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
     // Registered only for platform-judged runs: it spends a real submission, and
     // a GUI chat run has no platform to submit to.
@@ -597,7 +608,7 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
@@ -606,6 +617,8 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   if (input.pwnEnabled) {
     active.push(...CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce" || input.pwnReproductionEnabled));
   }
+  // Interactive web session tools: only when the task has a resolvable web target.
+  if (input.webSessionEnabled) active.push(...CODING_WEB_SESSION_TOOL_NAMES);
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
   if (input.platformJudged) active.push(submitFlagTool.name);
   return active;
