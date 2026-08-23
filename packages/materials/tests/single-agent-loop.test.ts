@@ -4,10 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
-import { createServices } from "../src/app/demo.js";
+import { createServices, demoTask } from "../src/app/demo.js";
+import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, type SolverLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { IndependentVerifier } from "../src/verification/verifier.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -30,7 +32,7 @@ const config: ProofBladeConfig = {
   },
 };
 
-const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
+const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async prompt() {
     const inspected = await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
@@ -85,7 +87,9 @@ test("assist mode pauses before verification and resumes from the durable propos
     const resumed = await loop.run({ runId, task, mode: "assist", maxTurns: 1 });
     assert.equal(resumed.status, "SUCCEEDED");
     assert.equal(resumed.turns, 0);
-    assert.equal(Object.values((await services.control.snapshot(runId)).completions)[0]?.status, "ACCEPTED");
+    const finalSnapshot = await services.control.snapshot(runId);
+    assert.equal(Object.values(finalSnapshot.completions)[0]?.status, "ACCEPTED");
+    assert.ok(Object.values(finalSnapshot.workItems).some((item) => item.status === "SUCCEEDED"), "approval resume must settle the blocked work item");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -97,7 +101,7 @@ test("auto mode preserves a pause raised during a turn instead of exhausting the
     const services = createServices(root, config);
     const runId = "PAUSE-TURN-web-source-1";
     const task = fixtureTask(runId, "web-source-1", root, config);
-    const pausingLane: SolverLaneFactory = async ({ services: laneServices }) => ({
+    const pausingLane: AgentLaneFactory = async ({ services: laneServices }) => ({
       async prompt() {
         await laneServices.control.dispatch(runId, { type: "pause", reason: "test pause", lane: "executor" });
         return {
@@ -124,7 +128,7 @@ test("[contract:provider-budget-exhaustion] a Provider budget termination ends t
   try {
     const services = createServices(root, config);
     let prompts = 0;
-    const budgetLane: SolverLaneFactory = async () => ({
+    const budgetLane: AgentLaneFactory = async () => ({
       async prompt() {
         prompts += 1;
         return { text: "", stopReason: "error", errorMessage: "Provider cost budget exhausted", termination: "budget_exhausted", usage: zeroUsage() };
@@ -161,7 +165,7 @@ test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after
     if (command.type === "handoff_accepted") controller.abort();
     return events;
   };
-  const lane: SolverLaneFactory = async () => ({
+  const lane: AgentLaneFactory = async () => ({
     async prompt() { prompts += 1; return { text: "unexpected", stopReason: "stop", usage: zeroUsage() }; },
     async compact() {},
     async abort() { aborts += 1; },
@@ -189,7 +193,7 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
   const services = createServices(root, config);
   const controller = new AbortController();
   let prompts = 0;
-  const lane: SolverLaneFactory = async ({ runtime }) => ({
+  const lane: AgentLaneFactory = async ({ runtime }) => ({
     async prompt() {
       prompts += 1;
       const inspected = await runtime.inspectTarget();
@@ -225,17 +229,17 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
 test("[contract:pause-during-verifier] pause during verifier remains PAUSED instead of completing successfully", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-pause-during-verifier-"));
   const services = createServices(root, config);
-  const originalExecute = services.journal.execute.bind(services.journal);
+  const originalExecute = services.sandbox.execute.bind(services.sandbox);
   let pauseDuringScore = true;
-  services.journal.execute = async (runId, input, signal) => {
-    const result = await originalExecute(runId, input, signal);
+  services.sandbox.execute = async (input, signal) => {
+    const result = await originalExecute(input, signal);
     if (pauseDuringScore && input.operation === "fixture_score") {
       pauseDuringScore = false;
-      await services.control.dispatch(runId, { type: "pause", reason: "paused during verifier", lane: "verifier" });
+      await services.control.dispatch(String(input.args.runId), { type: "pause", reason: "paused during verifier", lane: "verifier" });
     }
     return result;
   };
-  const lane: SolverLaneFactory = async ({ runtime }) => ({
+  const lane: AgentLaneFactory = async ({ runtime }) => ({
     async prompt() {
       const inspected = await runtime.inspectTarget();
       const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];
@@ -262,14 +266,15 @@ test("[contract:pause-during-verifier] pause during verifier remains PAUSED inst
 test("[contract:pause-before-finish] an atomically persisted pause wins the race with successful finish", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-pause-before-finish-"));
   const services = createServices(root, config);
-  const originalDispatch = services.control.dispatch.bind(services.control);
+  const originalVerifier = services.verifier;
   let finishAttempts = 0;
-  services.control.dispatch = async (runId, command) => {
-    if (command.type === "finish" && command.verified) {
+  services.verifier = {
+    ...originalVerifier,
+    async finish(runId, input) {
       finishAttempts += 1;
-      await originalDispatch(runId, { type: "pause", reason: "pause won finish race", lane: "main" });
-    }
-    return await originalDispatch(runId, command);
+      await services.control.dispatch(runId, { type: "pause", reason: "pause won finish race", lane: "main" });
+      return await originalVerifier.finish(runId, input);
+    },
   };
   try {
     const runId = "PAUSE-FINISH-web-source-1";
@@ -302,7 +307,7 @@ test("[contract:pause-before-exhaust] an atomically persisted pause wins the rac
     }
     return await originalDispatch(runId, command);
   };
-  const idleLane: SolverLaneFactory = async () => ({
+  const idleLane: AgentLaneFactory = async () => ({
     async prompt() { return { text: "no candidate", stopReason: "stop", usage: zeroUsage() }; },
     async compact() {},
     async abort() {},
@@ -335,13 +340,54 @@ test("completion proposals must be grounded in a successful current-generation o
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     const { ProofBladeToolRuntime } = await import("../src/tools/runtime.js");
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     await runtime.inspectTarget();
     await assert.rejects(runtime.submitCandidate("PB{fabricated_value}"), /does not occur in a successful target observation/);
     assert.equal(Object.keys((await services.control.snapshot(runId)).completions).length, 0);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("terminal reopen projects the exact finalResult completion instead of a newer unrelated proposal", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-final-result-reopen-"));
+  const services = createServices(root, config);
+  try {
+    const runId = "FINAL-RESULT-REOPEN";
+    const task = demoTask(runId, root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    await services.fixtureControl.assertResetAllowed(runId);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+
+    const acceptedArtifact = await services.artifacts.putText(runId, "PB{evidence_first}", { filename: "accepted.txt", sensitivity: "flag_candidate" });
+    await services.control.dispatch(runId, {
+      type: "completion_proposed",
+      completion: { id: "C-FINAL", purpose: "harness_verification", candidateHash: sha256("PB{evidence_first}"), artifactId: acceptedArtifact.id },
+    });
+    const unrelatedArtifact = await services.artifacts.putText(runId, "PB{unrelated_newer}", { filename: "unrelated.txt", sensitivity: "flag_candidate" });
+    await services.control.dispatch(runId, {
+      type: "completion_proposed",
+      completion: { id: "C-NEWER", purpose: "harness_verification", candidateHash: sha256("PB{unrelated_newer}"), artifactId: unrelatedArtifact.id },
+    });
+
+    const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
+      .verify(runId, { ...fixture, generation }, "C-FINAL");
+    assert.equal(verified.accepted, true);
+    await services.verifier.finish(runId, { completionId: "C-FINAL", reason: "terminal reopen projection regression" });
+
+    const neverCreateLane: AgentLaneFactory = async () => { throw new Error("terminal reopen must not create a lane"); };
+    const reopened = await new SingleAgentCtfLoop(root, config, services, neverCreateLane).run({ runId, task, mode: "auto" });
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(reopened.status, "SUCCEEDED");
+    assert.equal(reopened.completionId, "C-FINAL");
+    assert.deepEqual(reopened.evidenceIds, snapshot.finalResult?.evidenceIds);
+    assert.equal(snapshot.completions["C-NEWER"]?.status, "PROPOSED");
+  } finally {
+    await services.sandbox.close();
     await rm(root, { recursive: true, force: true });
   }
 });

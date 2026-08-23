@@ -34,6 +34,15 @@ test("renderers are deterministic and contain the generated marker", () => {
   assert.match(renderAgentContext(index), /canonicalJson/);
 });
 
+test("normalizes imported type signatures to package-relative paths", () => {
+  const index = collectApi({ repoRoot, packageId: "materials" });
+  const serialized = JSON.stringify(index);
+  assert.doesNotMatch(serialized, /import\("(?:[A-Za-z]:[\\/]|\/)/);
+  const intentWeights = index.symbols.find((symbol) => symbol.name === "IntentScheduler.getScoringWeights");
+  assert.ok(intentWeights);
+  assert.match(intentWeights.signature, /import\("\.\/src\/domain\/intent"\)/);
+});
+
 test("duplicate detector separates exact duplicates from structural candidates", () => {
   const make = (id, signature, structureHash) => ({ id, package: "fixture", name: id, kind: "function", visibility: "public", signature, summary: "same summary", module: "src/index.ts", line: 1, structureHash });
   const report = findDuplicateCandidates([{ package: "fixture", symbols: [make("one", "(): string", "same") ] }, { package: "fixture", symbols: [make("one", "(): string", "same"), make("three", "(value: string): string", "same")] }]);

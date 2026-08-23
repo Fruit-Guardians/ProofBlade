@@ -5,7 +5,11 @@ import type { DomainPhase, ExecutionMode, RunSnapshot, TargetKind, TaskContract 
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import { id } from "../domain/utils.js";
+import { isTerminal } from "../domain/utils.js";
+import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { IndependentVerifier } from "../verification/verifier.js";
+import type { ApprovalPolicy } from "../security/approval-policy.js";
+import { RunWorkScheduler } from "../orchestration/run-work-scheduler.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -32,6 +36,8 @@ export interface CompetitionLoopOptions {
   /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
   hostWorkspaceRootForMcp?: string;
   signal?: AbortSignal;
+  /** Optional durable approval gate for platform effects. */
+  approvalPolicy?: ApprovalPolicy;
 }
 
 export interface CompetitionLoopOutcome {
@@ -49,12 +55,9 @@ export interface CompetitionLoopOutcome {
 /**
  * Drive one competition challenge on the CODING lane.
  *
- * This replaces SingleAgentCtfLoop for competition play. The reason is not
- * preference: the solver lane's tools are read-only proxies over a synthetic
- * fixture, so it cannot run a real exploit, script a solve, or drive a
- * decompiler MCP — which is what every real challenge needs. The coding lane has
- * real bash/read/edit/write plus first-class MCP tools and the on-disk skills
- * library, and (since submit_flag) a platform submission path.
+ * This loop is the platform-facing wrapper around the same PiCodingLane used
+ * by Fixture execution. Competition adds the platform submission path and
+ * scoped execution environment; it does not maintain a second solver lane.
  *
  * Kept from the old loop: bounded turns, deadline enforcement, abort wiring, and
  * assist-mode stop-before-submitting. Dropped: phase/planner choreography and
@@ -85,8 +88,13 @@ export async function runCompetitionLoop(
   let replanReason: string | undefined;
   let guardReplans = 0;
   let workItemId: string | undefined;
+  let deadlineReached = false;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let approvalRequiredId: string | undefined;
 
   try {
+    const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const platformVerifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
     lane = await createLane({
       runId: options.runId,
       projectRoot: options.workspaceRoot,
@@ -95,10 +103,14 @@ export async function runCompetitionLoop(
       controlStore: services.control,
       artifactStore: services.artifacts,
       journal: services.journal,
+      claimVerifier,
+      platformVerifier,
       config,
       // The fleet's per-challenge toggle is read on every submission, so flipping
       // auto/assist mid-run takes effect without rebuilding the lane.
       mode: () => (mode() === "assist" ? "assist" : "auto"),
+      ...(options.approvalPolicy ? { approvalPolicy: options.approvalPolicy } : {}),
+      onApprovalRequired: (approvalId) => { approvalRequiredId = approvalId; },
       // Bound a single blocking command. A real run hung one bash call for 30+
       // minutes, which in a fleet idles a worker slot for the whole time; long work
       // belongs in shell_background instead.
@@ -110,6 +122,11 @@ export async function runCompetitionLoop(
       ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
     });
     const activeLane = lane;
+    const remainingDeadlineMs = Math.max(0, deadlineMs - (Date.now() - startedAt));
+    deadlineTimer = setTimeout(() => {
+      deadlineReached = true;
+      void activeLane.abort("Challenge deadline exceeded").catch(() => undefined);
+    }, remainingDeadlineMs);
     if (options.signal) {
       const onAbort = () => void activeLane.abort(options.signal?.reason ?? "Challenge cancelled");
       options.signal.addEventListener("abort", onAbort, { once: true });
@@ -122,7 +139,7 @@ export async function runCompetitionLoop(
         stopReason = "aborted";
         break;
       }
-      if (Date.now() - startedAt >= deadlineMs) {
+      if (deadlineReached || Date.now() - startedAt >= deadlineMs) {
         stopReason = "deadline";
         break;
       }
@@ -147,13 +164,34 @@ export async function runCompetitionLoop(
       }
       lastText = outcome.text || lastText;
       const snapshot = await services.control.snapshot(options.runId);
-      if (accepted(snapshot)) {
+      const acceptedCompletion = acceptedPlatformCompletion(snapshot);
+      if (approvalRequiredId) {
+        stopReason = "held_for_approval";
+        termination = `approval_required:${approvalRequiredId}`;
+        await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
+        break;
+      }
+      if (deadlineReached || Date.now() - startedAt >= deadlineMs) {
+        termination = "deadline_exhausted";
+        stopReason = "deadline";
+        await failCompetitionWorkItem(services.control, options.runId, workItemId, termination);
+        break;
+      }
+      if (acceptedCompletion) {
+        // Close the active work item and advance the domain projection before
+        // finish makes the Run terminal; terminal Runs deliberately reject
+        // further work-graph mutation.
+        await new RunWorkScheduler(services.control).completeForSubmission(options.runId, workItemId);
+        if (snapshot.status !== "SUCCEEDED") {
+          await services.verifier.finish(options.runId, {
+            completionId: acceptedCompletion.id,
+            reason: "The platform scorer accepted this exact submission Completion.",
+          });
+        }
         // A prior recoverable guard may have caused a replan, but the run is
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
         stopReason = "solved";
-        await ensureCompetitionDomainPhase(services.control, options.runId, "SUBMIT");
-        await completeCompetitionWorkItem(services.control, workItemId, snapshot);
         break;
       }
       // AgentHarness already applies the configured Provider retry policy inside
@@ -167,7 +205,8 @@ export async function runCompetitionLoop(
         await failCompetitionWorkItem(services.control, options.runId, workItemId, "Provider request failed");
         break;
       }
-      if (mode() === "assist" && Object.keys(snapshot.completions).length > 0) {
+      if (mode() === "assist" && Object.values(snapshot.completions).some((completion) => completion.purpose === "submission"
+        && completion.runId === snapshot.runId && completion.generation === snapshot.generation)) {
         await ensureCompetitionDomainPhase(services.control, options.runId, "REPRODUCE");
         stopReason = "held_for_approval";
         await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
@@ -201,6 +240,7 @@ export async function runCompetitionLoop(
       await failCompetitionWorkItem(services.control, options.runId, workItemId, `No verified completion after ${maxTurns} model turns.`);
     }
   } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
     removeAbortListener?.();
     if (lane) {
       try {
@@ -215,7 +255,7 @@ export async function runCompetitionLoop(
   return {
     runId: options.runId,
     turns,
-    solved: accepted(finalSnapshot),
+    solved: hasAcceptedPlatformSubmission(finalSnapshot),
     heldForApproval: stopReason === "held_for_approval",
     // Count real platform submissions, not every completion: `verify_claim` also
     // proposes completions and never contacts the platform, so counting those
@@ -253,108 +293,34 @@ function competitionPhaseForTurn(turn: number): DomainPhase {
  * create duplicate work nodes.
  */
 export async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
-  let snapshot = await control.snapshot(runId);
-  const active = Object.values(snapshot.workItems)
-    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && item.lease && Date.parse(item.lease.expiresAt) > Date.now())
-    .sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
-  if (active) return active.id;
-
-  // Recover a crashed/killed prior owner's orphaned RUNNING item BEFORE picking
-  // a READY item. If READY won, the reclaimed item would be starved: the active
-  // branch above only returns valid-lease items, so an expired RUNNING that is
-  // never re-selected stays RUNNING forever while newer READY work advances. The
-  // re-claim increments attempt, so maxAttempts still bounds retries; the oldest
-  // expired item goes first and the rest are recovered on later turns.
-  let candidate: RunSnapshot["workItems"][string] | undefined = Object.values(snapshot.workItems)
-    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && (!item.lease || Date.parse(item.lease.expiresAt) <= Date.now()))
-    .sort((a, b) => a.updatedSeq - b.updatedSeq)[0];
-  if (!candidate) {
-    candidate = Object.values(snapshot.workItems)
-      .filter((item) => item.status === "READY")
-      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
-  }
-  if (!candidate) {
-    const planned = Object.values(snapshot.workItems)
-      .filter((item) => item.status === "PLANNED")
-      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
-    if (planned) {
-      await control.dispatch(runId, { type: "work_item_ready", workItemId: planned.id, lane: "executor" });
-      candidate = (await control.snapshot(runId)).workItems[planned.id];
-    }
-  }
-  if (!candidate) {
-    const previous = Object.values(snapshot.workItems).sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
-    const created = {
-      id: id("WI"),
-      runId,
-      ...(previous && (previous.status === "BLOCKED" || previous.status === "FAILED") ? { parentId: previous.id } : {}),
-      title: `Advance target investigation (turn ${turn})`,
-      objective: task.objective,
-      role: "executor" as const,
-      status: "READY" as const,
-      dependsOn: [],
-      evidenceIds: [],
-      artifactIds: [],
-      attempt: 0,
-      maxAttempts: 3,
-    };
-    await control.dispatch(runId, { type: "work_item_created", workItem: created, lane: "executor" });
-    candidate = (await control.snapshot(runId)).workItems[created.id];
-  }
-  const leaseExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
-  await control.dispatch(runId, { type: "work_item_claimed", workItemId: candidate.id, ownerLane: "executor", leaseExpiresAt, lane: "executor" });
-  snapshot = await control.snapshot(runId);
-  return snapshot.workItems[candidate.id]?.id ?? candidate.id;
+  return (await new RunWorkScheduler(control).claim(runId, task, turn)).id;
 }
 
-async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
-  if (!workItemId || snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+export async function commitCompetitionSuccess(control: AppServices["control"], verifier: AppServices["verifier"], runId: string, workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
-  await control.dispatch(snapshot.runId, {
-    type: "work_item_completed",
-    workItemId,
-    evidenceIds: completion?.evidenceIds ?? [],
-    artifactIds: completion?.artifactId ? [completion.artifactId] : [],
-    lane: "executor",
+  if (!completion) throw new Error("Cannot commit competition success without an accepted completion");
+  if (isTerminal(snapshot.status)) return;
+  await new RunWorkScheduler(control).completeForSubmission(runId, workItemId);
+  await verifier.finish(runId, {
+    completionId: completion.id,
+    reason: "Platform accepted the candidate and verifier evidence covers the completion.",
   });
 }
 
+async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
+  await new RunWorkScheduler(control).completeForSubmission(snapshot.runId, workItemId);
+}
+
 async function failCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  await control.dispatch(runId, { type: "work_item_failed", workItemId, reason, lane: "executor" });
+  await new RunWorkScheduler(control).fail(runId, workItemId, reason);
 }
 
 async function blockCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  await control.dispatch(runId, { type: "work_item_blocked", workItemId, reason, lane: "executor" });
+  await new RunWorkScheduler(control).block(runId, workItemId, reason);
 }
 
 async function blockAndQueueCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, workItemId: string | undefined, reason: string, turn: number): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  const created = {
-    id: id("WI"),
-    runId,
-    parentId: workItemId,
-    title: `Replan after ${reason}`,
-    objective: task.objective,
-    role: "executor" as const,
-    status: "READY" as const,
-    dependsOn: [],
-    evidenceIds: [],
-    artifactIds: [],
-    attempt: 0,
-    maxAttempts: 3,
-  };
-  await control.dispatchBatch(runId, [
-    { type: "work_item_blocked", workItemId, reason, lane: "executor" },
-    { type: "work_item_created", workItem: created, lane: "executor" },
-  ]);
+  await new RunWorkScheduler(control).blockAndQueue(runId, task, workItemId, reason);
   void turn;
 }
 
@@ -364,13 +330,35 @@ async function blockAndQueueCompetitionWorkItem(control: AppServices["control"],
  * produces completions, and before this check a local reproduction could report a
  * challenge as solved with the platform never contacted.
  */
-function accepted(snapshot: RunSnapshot): boolean {
-  if (!Object.values(snapshot.completions).some((completion) => completion.status === "ACCEPTED")) return false;
-  const submitted = Object.values(snapshot.effects).some((effect) => effect.operation === "fixture_score");
-  return submitted;
+export function hasAcceptedPlatformSubmission(snapshot: RunSnapshot): boolean {
+  return acceptedPlatformCompletion(snapshot) !== undefined;
 }
 
-function countSubmissions(snapshot: RunSnapshot): number {
+function acceptedPlatformCompletion(snapshot: RunSnapshot): RunSnapshot["completions"][string] | undefined {
+  if (["FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) return undefined;
+  return Object.values(snapshot.completions).find((completion) => {
+    if (completion.purpose !== "submission" || completion.status !== "ACCEPTED"
+      || completion.runId !== snapshot.runId || completion.generation !== snapshot.generation
+      || completion.evidenceIds.length === 0) return false;
+    return completion.evidenceIds.every((evidenceId) => {
+      const evidence = snapshot.evidence[evidenceId];
+      const effect = evidence?.provenance.effect ? snapshot.effects[evidence.provenance.effect.id] : undefined;
+      const verdict = effect?.verification;
+      return evidence?.kind === "reproduction"
+        && evidence.provenance.recordedBy === "verifier"
+        && evidence.supports.includes(completion.id)
+        && effect?.operation === "fixture_score"
+        && verdict?.valid === true
+        && verdict.accepted === true
+        && verdict.completionId === completion.id
+        && verdict.candidateHash === completion.candidateHash
+        && verdict.candidateArtifactId === completion.artifactId
+        && verdict.generation === completion.generation;
+    });
+  });
+}
+
+export function countSubmissions(snapshot: RunSnapshot): number {
   return Object.values(snapshot.effects).filter((effect) => effect.operation === "fixture_score").length;
 }
 

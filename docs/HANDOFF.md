@@ -48,22 +48,22 @@ atoms → molecules → materials → apps
 
 反向引用会导致测试失败，别绕过它。
 
-### 两条 lane，只有一条有用
+### 统一解题 lane
 
-| | Solver Lane | **Coding Lane** |
-| --- | --- | --- |
-| 工具 | 只读代理（`inspect_target` 等） | 真 `bash`/`read`/`edit`/`write` + 一等 MCP + 技能库 |
-| 能不能解真题 | **不能**（跑不了利用、写不了脚本、驱动不了反编译器） | 能，已解出多道真题 |
-| 比赛是否使用 | 否 | **是** |
+| | **Unified Coding Lane** |
+| --- | --- |
+| 工具 | 真 `bash`/`read`/`edit`/`write` + 一等 MCP + 技能库；Fixture 任务额外启用证据与复现约束 |
+| 能不能解真题 | 能，已解出多道真题 |
+| 比赛是否使用 | **是** |
 
-`SingleAgentCtfLoop`（solver lane 的编排器）已经不在比赛路径上。solver lane 目前只被 evaluator 和测试引用，暂时留着没删——删它是独立的一次改动，跟别的混在一起出问题会分不清锅。
+`SingleAgentCtfLoop` 仍是 Fixture 自动执行的编排器，但它现在创建统一的 `PiCodingLane`；旧的生产 Solver Lane 已删除。评测和单元测试仍可注入确定性 `AgentLaneFactory` 作为测试替身。
 
 ### 竞赛路径（`packages/materials/src/competition/`）
 
 ```
 FleetScheduler          并发 worker 池 + 控制面
   └─ CompetitionChallengeSolver   一题 = 一次完整运行
-       ├─ CompetitionApi          与平台之间唯一的接缝（尚未实现真 HTTP 客户端）
+       ├─ CompetitionApi          与平台之间唯一的接缝（通用 HTTP + DASCTF 专用适配器）
        ├─ CompetitionSandbox      解附件、写 connection-info.txt、fixture_score → 提交平台
        └─ runCompetitionLoop      在 coding lane 上驱动，有界轮数/deadline/abort/assist
 ```
@@ -217,7 +217,7 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 - `stop` 先杀子进程（`pkill -P`）再杀父进程，必要时升级到 `-9`。记录的 pid 是 `bash -c` 包装器，真正干活的在它的子进程里。
 - **轮询在 effect policy 里是只读的**，`stop` 才是 process 副作用。否则反复轮询看起来像有副作用的调用，会重置本该抓住卡死 agent 的 no-progress 窗口。
 
-注意 solver lane 的 `run_background` **不能**解决这个问题——它只启动 capability job（`capabilityId` + `operation`），不是 shell 命令。
+统一 coding lane 的 `shell_background` 用于长任务；它返回可恢复的 job id，后续用 `shell_job` 读取或停止，不会阻塞整个回合。
 
 ---
 
@@ -233,28 +233,24 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 
 ## 9. 下一步（按优先级）
 
-### 🔴 阻塞项：真 HTTP `CompetitionApi`
+### 🔴 平台链接 API（已落地）
 
-**这是唯一挡在实战前面的东西。** solver、sandbox、fleet、提交链全都是真的了，只差平台客户端。需要赛事 API 文档：端点、鉴权方式、5 个操作（listChallenges / getChallenge / startEnvironment / submitFlag / stopEnvironment）的请求响应字段。
+通用 `HttpCompetitionApi` 与 DASCTF `DasctfCompetitionApi` 已实现五个操作，并由 fake HTTP/contract tests 覆盖鉴权、附件、环境轮询、错旗、限流/重试和 fail-closed 行为。不要把真实 DASCTF 登录、远程 tube 或 pwn E2E 放进自动测试；本任务只要求平台链接 API 能力。Fleet → Run Actor → Observer → Verifier 的离线组合回放也已覆盖原子终态提交。`CompetitionEnvironmentJanitor` 已补上并发环境容量 reservation、`expires_at` 回收、重启恢复和清理失败重试。
 
-写的时候：`NotConfiguredCompetitionApi` 是 fail-closed 的占位，**别让它静默退回假数据**。
+### 🟡 Web / Pwn 的真实平台连通性仍未验证（离线契约已覆盖）
 
-同时要做环境生命周期 janitor（并发环境上限 + `expires_at` 回收）。
-
-### 🟡 Web / Pwn 类型还没验证过
-
-目前只验证了 **RE 和 Crypto**，这两类都是「本地文件 + 不需要网络」。Web 和 Pwn 是不同性质的东西：
+目前真实平台连通性仍未验证；Web/Pwn 的 session、scope、Artifact、clean replay 和 barrier 使用 fake/fixture 契约覆盖。Web 和 Pwn 是不同性质的东西：
 
 - **Web** 需要能跨回合保持 cookie/session 的 HTTP 客户端，以及真实可达的目标。`external_network: true` 和 `allowed_hosts` 在 task 里设了，但**我没有验证过有任何东西真的在强制这个 scope**。
 - **Pwn** 需要跨回合保持的交互式 socket。现实答案是脚本里用 `pwntools`，但**没确认装了没有**。`shell_background` 在这里很关键：本地目标或代理得在回合之间一直活着。
 - **验证方式反而更有利**：web/pwn 的 flag 是从活服务**回来**的，会落在 recorded observation 里。crypto/RE 才是难的情况——flag 是离线算出来的，从不出现在任何工具输出里，这正是 `submitCandidate` 对 platform-judged 运行放宽 observation 锚定的原因。
 
-建议做法：**各挑一道真题跑，让它大声失败**，然后按暴露出的问题修。别提前建设推测出来的支持。
+当前边界：先用 fake API、fixture、session contract 和 clean replay 测试验证 Web/Pwn 接口与生命周期，不把真实题目、远程 tube 或平台凭据作为自动验收前提；如未来需要连通性检查，必须是用户明确授权后的独立运维动作。HTTP session 每次请求都会生成脱敏 exchange Artifact，并由统一 Observer 记录候选类型；coding lane 的 `web_session_open/request/close` 只允许访问 task scope，session 随 lane 关闭；WebReproducer 只接受当前 Run 新建的 verifier session，generation 变化后旧 session 不能继续请求。
 
 ### 🟢 可选
 
 - GUI Fleet 面板目前默认接 demo API。接上真 solver + 本地文件 API 就能在 GUI 里看真题跑完整流程，比脚本更接近实战形态。
-- 删 solver lane / verifier / 事件溯源（确认真的没人用之后）
+- 继续收敛 verifier 与事件溯源的边界（生产 Solver Lane 已删除，不能再恢复第二条解题路径）
 - GUI 里支持逐 profile 的 `contextWindow`
 - 动态 flag 直提路径（`solver.ts`）是**未经真实平台验证的假设**：只有平台在开环境时返回 `teamFlag` 才有意义。API 文档到了要么证实要么删。
 
@@ -267,3 +263,11 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 3. **改了工具契约要更新哈希**：`coding-resources.test.ts` 里的 `CODING_TOOL_CONTRACT_HASH`。它守的是 provider prompt cache 前缀，不是形式主义。
 4. **每个模块的 `COMPONENT.md` 是有约束力的**，不是摆设。改了行为要同步改它。
 5. **模型是底座**。任何一处改动，问一句：这让模型解题更快或更准了吗？如果答案是「让流程更规范」，那大概是应该删掉的东西——门禁和证据链就是这么没的。
+
+## 11. P0/P1/P2 当前交付（2026-08-22）
+
+- P0：`npm run check:changed-tests` 已成为变更测试门禁；Janitor v2 使用原子账本、跨进程锁、reservation 和 schema 迁移，避免并发超限与崩溃遗留。
+- P1：`ApprovalPolicy` 和 `ProofBladeAppServer` 已接入 GUI；未批准的提交/启动/网络/session 副作用会停在 pending approval，App Server 通过游标事件 API 提供可恢复观测。
+- P2：本地 `fixtures/holdout` 提供 Web/Pwn 各两题，`LocalHoldoutEvaluationRunner` 不访问 Provider 网络，可验证成功率、成本、重放和候选脱敏。
+
+本轮回归通过 materials targeted tests、App Server/审批/Janitor/holdout tests、materials build、GUI typecheck/build 和 CI gate。真实 DASCTF、远程 tube、远程 pwn E2E 仍不在自动化范围。

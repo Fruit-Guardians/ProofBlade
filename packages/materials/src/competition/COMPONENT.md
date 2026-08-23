@@ -6,7 +6,7 @@
   "name": "Competition Play",
   "version": "0.2.4",
   "createdAt": "2026-08-13T10:00:00+08:00",
-  "updatedAt": "2026-08-18T16:00:00+08:00",
+  "updatedAt": "2026-08-21T00:00:00+08:00",
   "qualityAudit": {
     "bugAuditCount": 0,
     "securityAuditCount": 0,
@@ -27,9 +27,11 @@
 - `api.ts` 是与平台之间**唯一**的接缝。未配置时用 `NotConfiguredCompetitionApi` 显式失败，绝不静默回退到假数据。
 - `task.ts` 生成 `verification.kind = "platform_submission"` 的 TaskContract，标志本次由线上平台而非本地 scorer 裁定。`max_tool_calls` 只约束进入 Effect Journal 的调用（capability invoke、artifact read、fixture_score）；coding lane 的 bash/read/edit/write 与一等 MCP 工具不走 Journal，因此不计入。
 - `sandbox.ts` 实现 `SandboxPort`：本地解包附件、写 `connection-info.txt`，并把 `fixture_score` effect 接到 `api.submitFlag`。
-- `loop.ts` 在 **coding lane** 上驱动单题。不用 solver lane 是因为后者的工具是只读代理，跑不了真实利用、写不了解题脚本、也驱动不了反编译器 MCP。保留有界轮数、deadline、abort 与 assist 模式的「提交前停下」；去掉 phase/planner 编排和 verifier 编排——`submit_flag` 已在同一轮内完成提交并把裁定结果交回模型。
+- `loop.ts` 在统一 **coding lane** 上驱动单题。Fixture 自动执行和比赛运行共享同一套 `read`/`bash`/编辑/能力/MCP 工具；比赛只额外注入平台边界和 `submit_flag`，保留有界轮数、deadline、abort 与 assist 模式的「提交前停下」。
 - `fleet.ts` 是有界 worker 池加控制面（优先级、逐题 auto/assist、取消、实时并发）。没有全局暂停：暂停整支队伍在限时赛里等于送分。
-- `solver.ts` 把上面几件组装成一次完整运行；动态 flag 题在开环境时直接提交，不花一次模型运行。
+- `environment-janitor.ts` 在 `startEnvironment()` 前占用容量槽，并将 instance/expiry 写入挑战工作区之外的持久账本；正常结束和过期 sweep 走同一个 stop 路径，清理失败的 ACTIVE 记录保留给下一次恢复重试。
+- Coding lane 可接收 `ApprovalPolicy`；当提交或动态 flag 路径需要批准时，只记录 pending approval 并停止在提交前，不触碰平台 API。
+- `solver.ts` 把上面几件组装成一次完整运行；动态 flag 题跳过模型 turn，但仍创建 Run、候选 Artifact、`fixture_score` Effect 和 verifier 终态。生产 GUI 的 live backend 为每个 API/solver pair 共享一份 janitor，避免 Fleet 并发超过平台环境上限。
 
 Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回 `stopReason=error`，竞赛循环必须立即以 `PROVIDER_ERROR` 结束该题并保留 `errorMessage`。Fleet 收到该状态后触发本次运行的 Provider 断路器，不再领取新的 pending 题；修复余额、凭据或上游故障后再次 Start 可继续 pending 队列，已经失败的诊断题不会被静默重试。
 

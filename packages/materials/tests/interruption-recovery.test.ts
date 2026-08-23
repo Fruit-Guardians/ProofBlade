@@ -17,6 +17,7 @@ import { repairAgentMessages, toolPairViolations } from "../src/context/agent-pr
 import { LeaseManager } from "../src/control/lease-manager.js";
 import { RunRecoveryService } from "../src/recovery/run-recovery.js";
 import { SessionRegistry } from "../src/container/session-registry.js";
+import { createEffectInput } from "../src/control/control-store.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -52,7 +53,7 @@ test("interruption 1: effect_started before launch reruns once under the origina
     const runId = "INTERRUPT-EFFECT-START";
     const task = fixtureTask(runId, "reverse-strings-1", root, config);
     await services.control.createRun(runId, task);
-    const recovered = await new RunRecoveryService(services.control, services.journal, services.sandbox).recover(runId);
+    const recovered = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId);
     await assert.rejects(services.journal.execute(runId, {
       operation: "fixture_read",
       args: { path: "strings.txt", generation: recovered.fixture.generation },
@@ -89,7 +90,7 @@ test("interruption 2: persisted artifact is adopted before effect_finished witho
     const runId = "INTERRUPT-EFFECT-ARTIFACT";
     const task = fixtureTask(runId, "web-source-1", root, config);
     await services.control.createRun(runId, task);
-    const recovered = await new RunRecoveryService(services.control, services.journal, services.sandbox).recover(runId);
+    const recovered = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId);
     await assert.rejects(services.journal.execute(runId, {
       operation: "fixture_inspect",
       args: { generation: recovered.fixture.generation },
@@ -151,10 +152,9 @@ test("interruption 5: mechanical summary survives before Pi Session append and r
     const services = createServices(root, config);
     const runId = "INTERRUPT-COMPACTION";
     await services.control.createRun(runId, fixtureTask(runId, "web-route-2", root, config));
-    await services.control.dispatch(runId, {
+    await services.verifier.dispatch(runId, {
       type: "fact",
       fact: { id: "F-DURABLE", statement: "confirmed state survives compaction interruption", status: "CONFIRMED", evidenceIds: [] },
-      lane: "verifier",
     });
     const env = new NodeExecutionEnv({ cwd: root });
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
@@ -287,14 +287,15 @@ test("interruption 6: expired heartbeat and missing target reset lifecycle state
     const runId = "INTERRUPT-LIFECYCLE";
     const task = fixtureTask(runId, "reverse-branch-2", root, config);
     await services.control.createRun(runId, task);
-    const recovery = new RunRecoveryService(services.control, services.journal, services.sandbox);
+    const recovery = new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl);
     const initial = await recovery.recover(runId);
     const generation = initial.fixture.generation;
     const leases = new LeaseManager(services.control);
     const lease = await leases.acquire(runId, `target:${runId}`, "executor", 30_000);
+    const staleEffectArgs = { path: "strings.txt", generation };
     await services.control.dispatch(runId, {
       type: "effect_proposed",
-      effect: { id: "EF-STALE", idempotencyKey: "stale-generation", replayPolicy: "pure", operation: "fixture_read", args: { path: "strings.txt", generation }, cwd: initial.fixture.path, status: "PROPOSED" },
+      effect: { id: "EF-STALE", idempotencyKey: createEffectInput(runId, "fixture_read", staleEffectArgs, "pure", generation).idempotencyKey, replayPolicy: "pure", operation: "fixture_read", args: staleEffectArgs, cwd: initial.fixture.path, status: "PROPOSED" },
       lane: "executor",
     });
     await services.control.dispatch(runId, { type: "effect_started", effectId: "EF-STALE", lane: "executor" });
@@ -350,6 +351,7 @@ test("interruption 7: RunRecoveryService supersedes an orphaned OPEN session on 
     // the durably-OPEN session is recognized as an orphan and superseded.
     const recovery = new RunRecoveryService(
       services.control, services.journal, services.sandbox,
+      services.fixtureControl,
       SessionRegistry.forRecovery(runId, services.control),
     );
     const result = await recovery.recover(runId, task);
@@ -360,6 +362,71 @@ test("interruption 7: RunRecoveryService supersedes an orphaned OPEN session on 
     const again = await recovery.recover(runId, task);
     assert.equal(again.supersededSessions, 0);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture recovery preflight does not mutate the sandbox or generation for a terminal run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-terminal-reset-preflight-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "TERMINAL-RESET-PREFLIGHT";
+    const task = fixtureTask(runId, "reverse-branch-2", root, config);
+    await services.control.createRun(runId, task);
+    await services.control.dispatch(runId, {
+      type: "fail",
+      reason: "terminal reset preflight regression",
+      category: "verification_missing",
+    });
+    const before = await services.control.snapshot(runId);
+    const reset = services.sandbox.reset.bind(services.sandbox);
+    let resetCalls = 0;
+    services.sandbox.reset = async (fixture) => {
+      resetCalls += 1;
+      return await reset(fixture);
+    };
+
+    await assert.rejects(
+      new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId, task),
+      /Cannot reset fixture for terminal run FAILED/,
+    );
+
+    const after = await services.control.snapshot(runId);
+    assert.equal(resetCalls, 0, "terminal preflight must reject before Sandbox.reset");
+    assert.equal(after.generation, before.generation);
+    assert.equal(after.status, "FAILED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture recovery preflight does not mutate the sandbox or generation under the wrong authority", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-authority-reset-preflight-"));
+  const owner = createServices(root, config);
+  const attacker = createServices(root, config, { authoritySecret: "attacker-authority-secret-that-is-deliberately-different" });
+  try {
+    const runId = "AUTHORITY-RESET-PREFLIGHT";
+    const task = fixtureTask(runId, "reverse-branch-2", root, config);
+    await owner.control.createRun(runId, task);
+    const before = await owner.control.snapshot(runId);
+    const reset = attacker.sandbox.reset.bind(attacker.sandbox);
+    let resetCalls = 0;
+    attacker.sandbox.reset = async (fixture) => {
+      resetCalls += 1;
+      return await reset(fixture);
+    };
+
+    await assert.rejects(
+      new RunRecoveryService(attacker.control, attacker.journal, attacker.sandbox, attacker.fixtureControl).recover(runId, task),
+      /authority does not match the immutable Run anchor/,
+    );
+
+    const after = await owner.control.snapshot(runId);
+    assert.equal(resetCalls, 0, "unanchored preflight must reject before Sandbox.reset");
+    assert.equal(after.generation, before.generation);
+    assert.equal(after.status, "READY");
+  } finally {
+    await Promise.allSettled([owner.sandbox.close(), attacker.sandbox.close()]);
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -1,15 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sha256 } from "@proofblade/atoms";
 import { CompetitionSandbox } from "../src/competition/sandbox.js";
 import { competitionTask } from "../src/competition/task.js";
 import { normalizeCategory, type CompetitionApi, type CompetitionChallengeSummary } from "../src/competition/api.js";
+import { createServices } from "../src/app/demo.js";
+import { IndependentVerifier } from "../src/verification/verifier.js";
 import type { ProofBladeConfig } from "../src/config.js";
 
-const CONFIG = { storage: { runsDir: "runs" } } as unknown as ProofBladeConfig;
+const CONFIG: ProofBladeConfig = {
+  schemaVersion: 1,
+  runtime: { piVersion: "0.83.0" },
+  storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+  modelProfiles: {
+    executor: {
+      provider: "test",
+      api: "openai-completions",
+      baseUrl: "http://127.0.0.1:1/v1",
+      model: "test-model",
+      modelDiscoveryPath: "/models",
+      apiKeyEnv: "TEST_API_KEY",
+      contextWindow: 4096,
+      maxTokens: 512,
+      requestTimeoutMs: 1000,
+      maxRetries: 0,
+      input: ["text"],
+    },
+  },
+};
 
 class FakeCompetitionApi implements CompetitionApi {
   public submissions: string[] = [];
@@ -61,8 +82,29 @@ test("competitionTask uses platform_submission with a single reproduction", () =
   assert.equal(task.verification.kind, "platform_submission");
   assert.equal(task.verification.required_reproductions, 1);
   assert.equal(task.scope.external_network, true);
+  assert.equal(task.scope.allowed_workspace, join("/root", "fixtures/runtime", "RUN-1"));
+  assert.deepEqual(task.scope.allowed_endpoints, [{ host: "host", port: 1337 }]);
   assert.equal(task.target, "REMOTE:nc host 1337");
   assert.equal(task.target_kind, "web");
+});
+
+test("competitionTask binds exact endpoint tuples without allowing host-port cross products", () => {
+  const task = competitionTask(
+    "RUN-ENDPOINTS",
+    summary(),
+    { connectionInfo: "tcp://pwn-a.example:31337 udp://pwn-b.example:4444" },
+    "/root",
+    CONFIG,
+  );
+
+  assert.deepEqual(task.scope.allowed_hosts, ["pwn-a.example", "pwn-b.example"]);
+  assert.deepEqual(task.scope.allowed_ports, [31337, 4444]);
+  assert.deepEqual(task.scope.allowed_endpoints, [
+    { host: "pwn-a.example", port: 31337 },
+    { host: "pwn-b.example", port: 4444 },
+  ]);
+  assert.equal(task.scope.allowed_endpoints?.some((endpoint) => endpoint.host === "pwn-a.example" && endpoint.port === 4444), false);
+  assert.equal(task.scope.allowed_workspace, join("/root", "fixtures/runtime", "RUN-ENDPOINTS"));
 });
 
 test("CompetitionSandbox unpacks attachments and writes connection info", async () => {
@@ -142,11 +184,24 @@ test("fixture_score submits to the platform and maps the verdict", async () => {
       environment: {},
     });
     const candidatePath = join(root, "candidate.txt");
-    const { writeFile } = await import("node:fs/promises");
     await writeFile(candidatePath, "  flag{ok}\n", "utf8");
 
+    await assert.rejects(
+      sandbox.execute(
+        { id: "E0", idempotencyKey: "k0", operation: "fixture_score", replayPolicy: "pure", args: { candidatePath } } as never,
+        new AbortController().signal,
+      ),
+      /requires forbidden-replay/,
+    );
+    assert.deepEqual(api.submissions, [], "a remotely submitted score must never execute under a pure replay policy");
+    assert.deepEqual(
+      await sandbox.reconcile({ operation: "fixture_score", replayPolicy: "pure" } as never),
+      { action: "unknown", outcome: "unknown" },
+      "legacy pure platform effects must also reconcile fail-closed",
+    );
+
     const good = await sandbox.execute(
-      { id: "E1", idempotencyKey: "k1", operation: "fixture_score", replayPolicy: "pure", args: { candidatePath } } as never,
+      { id: "E1", idempotencyKey: "k1", operation: "fixture_score", replayPolicy: "forbidden-replay", args: { candidatePath } } as never,
       new AbortController().signal,
     );
     const goodParsed = JSON.parse(good.stdout) as { accepted: boolean; candidateHash: string };
@@ -155,13 +210,80 @@ test("fixture_score submits to the platform and maps the verdict", async () => {
 
     await writeFile(candidatePath, "flag{wrong}", "utf8");
     const bad = await sandbox.execute(
-      { id: "E2", idempotencyKey: "k2", operation: "fixture_score", replayPolicy: "pure", args: { candidatePath } } as never,
+      { id: "E2", idempotencyKey: "k2", operation: "fixture_score", replayPolicy: "forbidden-replay", args: { candidatePath } } as never,
       new AbortController().signal,
     );
     assert.equal((JSON.parse(bad.stdout) as { accepted: boolean }).accepted, false);
 
     // Exactly the two candidates were submitted — no duplicate reproduction.
     assert.deepEqual(api.submissions, ["flag{ok}", "flag{wrong}"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a crash after a competition submit never replays fixture_score", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-comp-replay-"));
+  try {
+    const runId = "RUN-CRASH-AFTER-SUBMIT";
+    const api = new FakeCompetitionApi("flag{ok}");
+    const sandbox = new CompetitionSandbox({
+      api,
+      challengeId: "CH-1",
+      workspaceRoot: join(root, CONFIG.storage.fixturesDir),
+      attachments: [],
+      environment: {},
+    });
+    let injectCrash = true;
+    const services = createServices(root, CONFIG, {
+      sandbox,
+      effectFault: (point) => {
+        if (injectCrash && point === "after_execute") {
+          injectCrash = false;
+          throw new Error("simulated crash after remote submit");
+        }
+      },
+    });
+    const task = competitionTask(runId, summary(), {}, root, CONFIG);
+    await services.control.createRun(runId, task);
+    const fixture = await sandbox.build(task);
+    const candidateArtifact = await services.artifacts.putText(runId, "flag{ok}", {
+      mime: "text/plain",
+      filename: "candidate.txt",
+      sensitivity: "flag_candidate",
+    });
+    await services.control.dispatch(runId, {
+      type: "completion_proposed",
+      completion: {
+        id: "C-REMOTE",
+        purpose: "submission",
+        candidateHash: candidateArtifact.sha256,
+        artifactId: candidateArtifact.id,
+      },
+      lane: "executor",
+    });
+    const verifier = new IndependentVerifier(
+      services.control,
+      services.artifacts,
+      services.verifierJournal,
+      services.runsRoot,
+      services.verifier,
+    );
+
+    await assert.rejects(verifier.verify(runId, fixture, "C-REMOTE"), /simulated crash after remote submit/);
+    assert.deepEqual(api.submissions, ["flag{ok}"], "the platform was contacted exactly once before the crash");
+    const interrupted = await services.control.snapshot(runId);
+    const effect = Object.values(interrupted.effects).find((item) => item.operation === "fixture_score")!;
+    assert.equal(effect.status, "STARTED");
+    assert.equal(effect.replayPolicy, "forbidden-replay", "the durable Effect must describe the real external side effect");
+
+    assert.deepEqual(await services.journal.reconcile(runId), [effect.id]);
+    const reconciled = await services.control.snapshot(runId);
+    assert.equal(reconciled.effects[effect.id]?.status, "UNKNOWN", "an ambiguous platform result must fail closed");
+    assert.deepEqual(api.submissions, ["flag{ok}"], "recovery must not submit the flag a second time");
+
+    await assert.rejects(verifier.verify(runId, fixture, "C-REMOTE"), /idempotency key already exists/);
+    assert.deepEqual(api.submissions, ["flag{ok}"], "a later verifier call cannot bypass the ambiguous durable Effect");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

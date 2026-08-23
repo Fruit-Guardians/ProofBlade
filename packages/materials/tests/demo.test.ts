@@ -39,8 +39,10 @@ test("demo reaches success with artifacts, evidence and replay parity", async ()
     const replayed = await services.control.replay(runId);
     assert.equal(snapshot.status, "SUCCEEDED");
     assert.equal(snapshot.generation, 1);
-    assert.equal(Object.keys(snapshot.evidence).length, 2);
-    assert.equal(Object.keys(snapshot.effects).length, 2);
+    assert.equal(Object.keys(snapshot.evidence).length, 3);
+    assert.equal(Object.values(snapshot.evidence).filter((evidence) => evidence.kind === "reproduction" && evidence.provenance.recordedBy === "verifier").length, 2);
+    assert.equal(Object.keys(snapshot.effects).length, 3);
+    assert.equal(snapshot.finalResult?.completionId, "C-001");
     assert.equal(projectionHash(snapshot), projectionHash(replayed));
   } finally {
     await rm(root, { recursive: true, force: true });

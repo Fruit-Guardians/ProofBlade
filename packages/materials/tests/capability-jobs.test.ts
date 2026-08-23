@@ -60,7 +60,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
   assert.equal(solverToolContractHash(), "de45f9ec53c2f8f4b5d946cfe7e7283e76486cedd1ca005b5d160fad8c25a3ac");
-  assert.equal(bundledCapabilityCatalogHash(), "7601e67d56766f7f75541421fc84678cd5406d159076f618379c14e61c0c9d86");
+  assert.equal(bundledCapabilityCatalogHash(), "a8f993b8344a62572a7a3e643e0506edc301f8750f69609353d081eaeb2f3e9e");
 });
 
 test("tool failures preserve structured errors and set the Pi error flag", async () => {
@@ -109,7 +109,7 @@ test("capability catalog and router keep stable manifests and artifact anchors",
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
     const catalog = runtime.listCapabilities();
     assert.ok(catalog.catalogHash.length === 64);
@@ -186,7 +186,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
     const generation = await services.sandbox.reset(fixture);
-    await services.control.dispatch(runId, { type: "fixture_reset", generation });
+    await services.fixtureControl.reset(runId, generation);
     runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
     await assert.rejects(() => services.control.dispatch(runId, {

@@ -20,14 +20,14 @@
 
 ## 职责
 
-适配 Pi AgentHarness、Provider Profile、OpenAI-compatible/Responses/Anthropic Messages 传输、Coding/Solver lane、系统提示和实际 Tool 装配。
+适配 Pi AgentHarness、Provider Profile、OpenAI-compatible/Responses/Anthropic Messages 传输、统一 Coding lane、系统提示和实际 Tool 装配。
 
 ## 入口与边界
 
-- `coding-lane.ts` 驱动普通对话并在动态尾部注入隐藏 Forest 摘要；`solver-lane.ts` 驱动证据型任务。
+- `coding-lane.ts` 是唯一生产 Agent lane：普通对话和 Fixture/CTF 任务都由它驱动；Fixture 只通过工作区、任务快照和 `deferClaimAcceptance` 改变边界。确定性 lane 仅由评测和单元测试注入。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
-- `solver-tools.ts` 与 `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
+- `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
@@ -60,7 +60,7 @@ Artifact 锚点只在可见输出确实少于原始输出时追加，并写明�
 
 CTF flag、挑战答案或恢复密钥等确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现候选不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
 
-输出改写不得改变 `bash` 的名称、描述、Schema 或 Tool 顺序。Solver Lane 的业务工具继续使用 Effect Journal/Capability Router，不叠加第二条 RTK 裁剪链。
+输出改写不得改变 `bash` 的名称、描述、Schema 或 Tool 顺序。统一 Coding lane 的业务工具继续使用 Effect Journal/Capability Router，不叠加第二条 RTK 裁剪链。
 
 ```powershell
 npm run test:materials

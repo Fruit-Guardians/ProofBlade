@@ -93,6 +93,29 @@ test("getChallenge downloads attachment URLs and encodes them as base64", async 
   assert.equal(attachments[0]!.base64, Buffer.from(bytes).toString("base64"));
 });
 
+test("getChallenge downloads an attachment inlined on `attachment` (empty files[])", async () => {
+  // 西湖论剑 2026 shape: the download url/name sit directly on `attachment` and
+  // `attachment.files` is []. Reading only files[] previously dropped it, leaving
+  // the challenge workspace empty. Both shapes must yield the attachment.
+  const bytes = new Uint8Array([9, 8, 7]);
+  const { client } = api({
+    "GET /ctf/exercise": () => ok({ id: 1002, name: "CRYPTO-01", attachment: { files: [], name: "chall.zip", url: "https://cdn.example/chall.zip", key: "k", signature: "s" }, isNeedInit: false, isNeedCheck: false }),
+    "GET https://cdn.example/chall.zip": () => ({ body: bytes }),
+  });
+  const { attachments } = await client.getChallenge("1002");
+  assert.equal(attachments.length, 1);
+  assert.equal(attachments[0]!.name, "chall.zip");
+  assert.equal(attachments[0]!.base64, Buffer.from(bytes).toString("base64"));
+});
+
+test("a challenge with no attachment at all yields zero attachments (no throw)", async () => {
+  const { client } = api({
+    "GET /ctf/exercise": () => ok({ id: 1003, name: "remote-only", isNeedInit: true, isNeedCheck: false }),
+  });
+  const { attachments } = await client.getChallenge("1003");
+  assert.equal(attachments.length, 0);
+});
+
 test("an oversized attachment is rejected by the byte cap (content-length precheck)", async () => {
   const big = new Uint8Array(2048);
   const { client } = api({

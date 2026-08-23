@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "proofblade-local-web-pwn-v1",
+  "cases": [
+    {
+      "id": "web-debug",
+      "targetKind": "web",
+      "objective": "Inspect the captured debug response and recover the proof value.",
+      "expected": "PB{holdout_web_debug}",
+      "files": [
+        {
+          "source": "web/debug-response.txt",
+          "path": "debug-response.txt",
+          "sha256": "27b9cb600973463e1893f973468643e9d72d4c913499244b844e8012a583f42a"
+        }
+      ]
+    },
+    {
+      "id": "web-route",
+      "targetKind": "web",
+      "objective": "Trace the internal route map and recover the protected route value.",
+      "expected": "PB{holdout_web_route}",
+      "files": [
+        {
+          "source": "web/route-map.txt",
+          "path": "route-map.txt",
+          "sha256": "0a99b885353b4d86d58230e1055ca43611a8d146ab3c0d58a20b183a6316fb17"
+        }
+      ]
+    },
+    {
+      "id": "pwn-shell",
+      "targetKind": "pwn",
+      "objective": "Inspect the local menu transcript and identify the shell marker.",
+      "expected": "PB{holdout_pwn_shell}",
+      "files": [
+        {
+          "source": "pwn/menu.txt",
+          "path": "menu.txt",
+          "sha256": "2d5176fbfaa699a00476dc7464b61db76cd5141d2230a4f3cff0ad2b81d44b8d"
+        }
+      ]
+    },
+    {
+      "id": "pwn-leak",
+      "targetKind": "pwn",
+      "objective": "Use the captured leak transcript to recover the computed answer.",
+      "expected": "PB{holdout_pwn_leak}",
+      "files": [
+        {
+          "source": "pwn/leak.txt",
+          "path": "leak.txt",
+          "sha256": "616f14a7b4fc69e3282b35b0dc32745cba4f8f8cc570c1fe5aedfd4e39791f87"
+        }
+      ]
+    }
+  ]
+}

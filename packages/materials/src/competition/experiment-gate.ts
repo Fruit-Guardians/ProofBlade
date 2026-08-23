@@ -21,7 +21,29 @@ export interface ExperimentGateResult {
 
 /** Durable no-repeat gate for process/network experiments. */
 export class ExperimentGate {
+  private readonly runLocks = new Map<string, Promise<void>>();
+
   public constructor(private readonly controlStore: ControlStore) {}
+
+  /**
+   * Serialize one model experiment from assertion through outcome recording.
+   * The durable record remains the source of truth; this in-process lock also
+   * prevents concurrent pwn calls from passing a stale preflight snapshot and
+   * reaching the target after the repeat budget is exhausted.
+   */
+  public async runExclusive<T>(runId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.runLocks.get(runId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    this.runLocks.set(runId, current);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.runLocks.get(runId) === current) this.runLocks.delete(runId);
+    }
+  }
 
   public async record(input: ExperimentGateInput): Promise<ExperimentGateResult> {
     return await this.controlStore.dispatchTransaction<ExperimentGateResult>(input.runId, (snapshot) => {

@@ -257,7 +257,7 @@ export function repeatedToolFailureMessage(toolName: string, count: number): str
   return [
     `[ProofBlade repeated tool failure: ${toolName} failed identically ${count} times]`,
     "The current agent turn was stopped to prevent an infinite loop.",
-    "Change the operation or arguments, then retry; for evidence curation use evidence record or evidence annotate to resolve pending artifacts.",
+    "Change the operation or arguments, then retry; for evidence curation use evidence record to promote a finding. Evidence annotate only marks an artifact viewed and does not clear the gate.",
   ].join("\n");
 }
 
@@ -277,18 +277,38 @@ export function toolFailureStormMessage(count: number): string {
   ].join("\n");
 }
 
-export function experimentBudgetMessage(decision: ExperimentBudgetDecision): string {
-  const label = decision.reason === "experiment_family"
+function experimentBudgetLabel(decision: ExperimentBudgetDecision): string {
+  return decision.reason === "experiment_family"
     ? "the same experiment family"
     : decision.reason === "long_running"
       ? "long-running probes"
       : decision.reason === "timeouts"
         ? "timed-out probes"
         : "process/network experiment calls";
+}
+
+export function experimentBudgetMessage(decision: ExperimentBudgetDecision): string {
+  const label = experimentBudgetLabel(decision);
   return [
     `[ProofBlade experiment budget: ${label} reached the per-turn limit (${decision.count})]`,
     "The current provider turn was stopped before another probe could repeat the same approach.",
     "Preserve the strongest observation in an evidence record or annotate an existing artifact, state one alternative hypothesis, then continue in the next turn with one bounded test.",
+  ].join("\n");
+}
+
+/**
+ * Advisory (non-terminating) variant of {@link experimentBudgetMessage}. Instead
+ * of stopping the turn and forcing a replan — which interrupts a legitimate
+ * multi-step solve mid-chain — this nudge is appended to the tool output so the
+ * model keeps control and can change tactics itself. Emitted once per window;
+ * the breaker's counters are reset after it fires.
+ */
+export function experimentBudgetNudge(decision: ExperimentBudgetDecision): string {
+  const label = experimentBudgetLabel(decision);
+  return [
+    `[ProofBlade experiment budget notice: ${label} is repeating (${decision.count} this window)]`,
+    "You are not blocked — but repeating the same kind of probe rarely yields new signal.",
+    "Before the next call: record the strongest observation so far, then either change the hypothesis/input meaningfully or reconstruct the logic as a small script instead of probing again.",
   ].join("\n");
 }
 

@@ -16,16 +16,16 @@ export function handoffKnowledgeVersion(snapshot: RunSnapshot): string {
     phase: snapshot.phase,
     domainPhase: snapshot.domainPhase,
     generation: snapshot.generation,
-    facts: Object.values(snapshot.facts).sort(byId).map(({ id, statement, status, evidenceIds }) => ({ id, statement, status, evidenceIds })),
-    hypotheses: Object.values(snapshot.hypotheses).sort(byId).map(({ id, statement, status, evidenceIds }) => ({ id, statement, status, evidenceIds })),
-    observations: Object.values(snapshot.observations).sort(byId).map(({ id, summary, source }) => ({ id, summary, source })),
-    evidence: Object.values(snapshot.evidence).sort(byId).map(({ id, summary, kind, source, supports, refutes }) => ({ id, summary, kind, source, supports, refutes })),
+    facts: Object.values(snapshot.facts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(byId).map(({ id, statement, status, evidenceIds }) => ({ id, statement, status, evidenceIds })),
+    hypotheses: Object.values(snapshot.hypotheses).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(byId).map(({ id, statement, status, evidenceIds }) => ({ id, statement, status, evidenceIds })),
+    observations: Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(byId).map(({ id, summary, source }) => ({ id, summary, source })),
+    evidence: Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation).sort(byId).map(({ id, summary, kind, source, supports, refutes }) => ({ id, summary, kind, source, supports, refutes })),
     intents: Object.values(snapshot.intents).sort(byId).map(({ id, title, description, phase, status, priority, ownerLane }) => ({ id, title, description, phase, status, priority, ownerLane })),
-    completions: Object.values(snapshot.completions).sort(byId).map(({ id, candidateHash, status, evidenceIds }) => ({ id, candidateHash, status, evidenceIds })),
-    jobs: Object.values(snapshot.jobs).sort(byId).map(({ id, capabilityId, operation, status, generation, artifactId, outputTier }) => ({ id, capabilityId, operation, status, generation, artifactId, outputTier })),
-    artifacts: Object.values(snapshot.artifacts).sort(byId).map(({ id, path, sha256, bytes, sensitivity, sourceEffectId }) => ({ id, path, sha256, bytes, sensitivity, sourceEffectId })),
+    completions: Object.values(snapshot.completions).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(byId).map(({ id, candidateHash, status, evidenceIds }) => ({ id, candidateHash, status, evidenceIds })),
+    jobs: Object.values(snapshot.jobs).filter((item) => item.generation === snapshot.generation).sort(byId).map(({ id, capabilityId, operation, status, generation, artifactId, outputTier }) => ({ id, capabilityId, operation, status, generation, artifactId, outputTier })),
+    artifacts: Object.values(snapshot.artifacts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(byId).map(({ id, path, sha256, bytes, sensitivity, sourceEffectId }) => ({ id, path, sha256, bytes, sensitivity, sourceEffectId })),
     workItems: Object.values(snapshot.workItems).sort(byId).map(({ id, parentId, title, objective, role, status, dependsOn, evidenceIds, artifactIds, attempt, maxAttempts, ownerLane, blockReason, failureReason }) => ({ id, parentId, title, objective, role, status, dependsOn, evidenceIds, artifactIds, attempt, maxAttempts, ownerLane, blockReason, failureReason })),
-    experiments: Object.values(snapshot.experiments).sort(byId).map(({ id, generation, domainPhase, hypothesisId, repeatKey, action, inputHash, outcome }) => ({ id, generation, domainPhase, hypothesisId, repeatKey, action, inputHash, outcome })),
+    experiments: Object.values(snapshot.experiments).filter((item) => item.generation === snapshot.generation).sort(byId).map(({ id, generation, domainPhase, hypothesisId, repeatKey, action, inputHash, outcome }) => ({ id, generation, domainPhase, hypothesisId, repeatKey, action, inputHash, outcome })),
   }));
 }
 
@@ -39,7 +39,7 @@ export function buildHandoffDraft(snapshot: RunSnapshot, handoffId: string): Han
     .filter((intent) => intent.status === "OPEN" || intent.status === "CLAIMED")
     .sort((a, b) => b.priority - a.priority || a.createdSeq - b.createdSeq)
     .slice(0, 3);
-  const observations = Object.values(snapshot.observations).sort(bySeq);
+  const observations = Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq);
   const workItems = Object.values(snapshot.workItems)
     .filter((item) => item.status === "PLANNED" || item.status === "READY" || item.status === "BLOCKED")
     .sort((a, b) => a.createdSeq - b.createdSeq)
@@ -85,13 +85,13 @@ export function buildHandoffDraft(snapshot: RunSnapshot, handoffId: string): Han
     phase: snapshot.phase,
     domainPhase: snapshot.domainPhase,
     objective: snapshot.task.objective,
-    confirmedFacts: Object.values(snapshot.facts).filter((fact) => fact.status === "CONFIRMED").sort(bySeq).slice(-8).map((fact) => ({ id: fact.id, summary: fact.statement, evidenceIds: fact.evidenceIds })),
-    hypotheses: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.status === "OPEN" || hypothesis.status === "CONFIRMED").sort(bySeq).slice(-8).map((hypothesis) => ({ id: hypothesis.id, statement: hypothesis.statement, evidenceIds: hypothesis.evidenceIds })),
-    rejectedHypotheses: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.status === "REJECTED").sort(bySeq).slice(-8).map((hypothesis) => ({ id: hypothesis.id, statement: hypothesis.statement, evidenceIds: hypothesis.evidenceIds })),
+    confirmedFacts: Object.values(snapshot.facts).filter((fact) => fact.runId === snapshot.runId && fact.generation === snapshot.generation && fact.status === "CONFIRMED").sort(bySeq).slice(-8).map((fact) => ({ id: fact.id, summary: fact.statement, evidenceIds: fact.evidenceIds })),
+    hypotheses: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.runId === snapshot.runId && hypothesis.generation === snapshot.generation && (hypothesis.status === "OPEN" || hypothesis.status === "CONFIRMED")).sort(bySeq).slice(-8).map((hypothesis) => ({ id: hypothesis.id, statement: hypothesis.statement, evidenceIds: hypothesis.evidenceIds })),
+    rejectedHypotheses: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.runId === snapshot.runId && hypothesis.generation === snapshot.generation && hypothesis.status === "REJECTED").sort(bySeq).slice(-8).map((hypothesis) => ({ id: hypothesis.id, statement: hypothesis.statement, evidenceIds: hypothesis.evidenceIds })),
     nextActions: actions,
     budget: { remainingMs, remainingToolCalls },
-    requiredArtifacts: Object.values(snapshot.evidence).sort(bySeq).slice(-8).flatMap((evidence) => [evidence.source.artifactId]).filter((value): value is string => Boolean(value)),
-    prohibitedRepeats: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.status === "REJECTED").map((hypothesis) => hypothesis.statement).slice(-8),
+    requiredArtifacts: Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation).sort(bySeq).slice(-8).flatMap((evidence) => [evidence.source.artifactId]).filter((value): value is string => Boolean(value)),
+    prohibitedRepeats: Object.values(snapshot.hypotheses).filter((hypothesis) => hypothesis.runId === snapshot.runId && hypothesis.generation === snapshot.generation && hypothesis.status === "REJECTED").map((hypothesis) => hypothesis.statement).slice(-8),
     expectedOutputSchema: "executor-progress-v1",
     status: "PROPOSED",
   };

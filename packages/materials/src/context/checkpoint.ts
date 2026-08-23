@@ -37,14 +37,19 @@ export class CheckpointService {
 }
 
 function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: string, manifest?: ContextManifest): string {
-  const confirmed = Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").sort(bySeq);
-  const rejected = Object.values(snapshot.hypotheses).filter((item) => item.status === "REJECTED").sort(bySeq);
-  const completed = Object.values(snapshot.effects).filter((item) => item.status === "FINISHED" || item.status === "RECONCILED").sort(bySeq);
-  const next = Object.values(snapshot.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
-  const observations = Object.values(snapshot.observations).sort(bySeq).slice(-24);
-  const evidence = Object.values(snapshot.evidence).sort(bySeq).slice(-24);
-  const activeEffects = Object.values(snapshot.effects).filter((item) => item.status === "PROPOSED" || item.status === "STARTED" || item.status === "UNKNOWN").sort(bySeq);
-  const jobs = Object.values(snapshot.jobs).filter((item) => ["QUEUED", "RUNNING", "UNKNOWN"].includes(item.status)).sort(bySeq);
+  const confirmed = Object.values(snapshot.facts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && item.status === "CONFIRMED").sort(bySeq);
+  const rejected = Object.values(snapshot.hypotheses).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && item.status === "REJECTED").sort(bySeq);
+  const completed = Object.values(snapshot.effects).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && (item.status === "FINISHED" || item.status === "RECONCILED")).sort(bySeq);
+  const schedulerNext = Object.values(snapshot.schedulerIntents ?? {})
+    .filter((intent) => intent.fixtureGeneration === snapshot.generation && (intent.status === "PROPOSED" || intent.status === "CLAIMED"))
+    .sort((a, b) => schedulerPriority(b.priority) - schedulerPriority(a.priority))
+    .map((intent) => ({ id: intent.id, title: intent.objective }));
+  const legacyNext = Object.values(snapshot.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED").sort((a, b) => b.priority - a.priority);
+  const next = schedulerNext.length > 0 ? schedulerNext : legacyNext;
+  const observations = Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-24);
+  const evidence = Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation).sort(bySeq).slice(-24);
+  const activeEffects = Object.values(snapshot.effects).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && (item.status === "PROPOSED" || item.status === "STARTED" || item.status === "UNKNOWN")).sort(bySeq);
+  const jobs = Object.values(snapshot.jobs).filter((item) => item.generation === snapshot.generation && ["QUEUED", "RUNNING", "UNKNOWN"].includes(item.status)).sort(bySeq);
   const handoffs = Object.values(snapshot.handoffs).filter((item) => item.status === "PROPOSED" || item.status === "ACCEPTED").sort(bySeq);
   return [
     "## Task",
@@ -73,7 +78,7 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
     ...orNone(evidence.map((item) => `- evidence ${item.id}: ${safeValue(item.name ?? item.summary)}, artifacts=${[...(item.source.artifactIds ?? []), ...(item.source.artifactId ? [item.source.artifactId] : [])].join(",") || "none"}, depends_on=${(item.dependsOn ?? []).join(",") || "none"}, ${safeValue(item.summary)}`)),
     "",
     "## Artifacts",
-    ...orNone(Object.values(snapshot.artifacts).sort((a, b) => a.id.localeCompare(b.id)).map((item) => `- ${item.id}: ${safeValue(item.semantic?.name ?? item.path)}, role=${item.semantic?.role ?? "intermediate"}, tags=${item.semantic?.tags.join(",") || "none"}, path=${item.path}, sha256=${item.sha256}`)),
+    ...orNone(Object.values(snapshot.artifacts).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort((a, b) => a.id.localeCompare(b.id)).map((item) => `- ${item.id}: ${safeValue(item.semantic?.name ?? item.path)}, role=${item.semantic?.role ?? "intermediate"}, tags=${item.semantic?.tags.join(",") || "none"}, path=${item.path}, sha256=${item.sha256}`)),
     "",
     "## Actions already completed",
     ...orNone(completed.map((item) => `- ${item.operation}: effect=${item.id}, outcome=${item.outcome ?? "unknown"}, artifact=${item.artifactId ?? "none"}`)),
@@ -82,7 +87,7 @@ function checkpointText(snapshot: RunSnapshot, checkpointId: string, reason: str
     ...orNone(activeEffects.map((item) => `- effect ${item.id}: ${item.operation}, status=${item.status}, policy=${item.replayPolicy}`)),
     ...orNone(jobs.map((item) => `- job ${item.id}: ${item.capabilityId}.${item.operation}, status=${item.status}, replay=${item.replayPolicy}, artifact=${item.artifactId ?? "none"}`)),
     ...orNone(handoffs.map((item) => `- handoff ${item.id}: ${item.sourceLane}->${item.targetLane}, status=${item.status}, knowledge=${item.knowledgeVersion}, hash=${item.hash}`)),
-    ...orNone(Object.values(snapshot.leases).map((item) => `- lease ${item.resourceKey}: owner=${item.ownerLane}, generation=${item.generation}, expires=${item.expiresAt}`)),
+    ...orNone(Object.values(snapshot.leases).filter((item) => item.generation === snapshot.generation).map((item) => `- lease ${item.resourceKey}: owner=${item.ownerLane}, generation=${item.generation}, expires=${item.expiresAt}`)),
     "",
     "## Next actions",
     ...orNone(next.map((item, index) => `${index + 1}. ${item.id}: ${item.title}`)),
@@ -109,4 +114,8 @@ function orNone(values: string[]): string[] {
 
 function bySeq(a: { createdSeq: number }, b: { createdSeq: number }): number {
   return a.createdSeq - b.createdSeq;
+}
+
+function schedulerPriority(priority: import("../domain/intent.js").IntentPriority): number {
+  return { low: 1, medium: 2, high: 3, critical: 4 }[priority];
 }

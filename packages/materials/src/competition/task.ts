@@ -39,7 +39,7 @@ export function competitionTask(
   root: string,
   config: ProofBladeConfig,
 ): TaskContract {
-  const workspace = join(root, config.storage.runsDir, runId);
+  const workspace = join(root, config.storage.fixturesDir, runId);
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
   const objective = objectiveParts.join("\n\n") || `Solve competition challenge ${summary.challengeId}.`;
   const connection = env.connectionInfo?.trim();
@@ -65,6 +65,7 @@ export function competitionTask(
     scope: {
       allowed_hosts: targets.length > 0 ? targets.map((target) => target.host) : connection ? [] : [`CHALLENGE:${summary.challengeId}`],
       allowed_ports: [...new Set(targets.map((target) => target.port))],
+      allowed_endpoints: targets.map((target) => ({ host: target.host, port: target.port })),
       external_network: true,
       allowed_workspace: workspace,
     },

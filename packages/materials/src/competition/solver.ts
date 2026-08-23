@@ -2,13 +2,17 @@ import { join } from "node:path";
 import { resolveExecutionConfig, type ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode } from "../domain/types.js";
-import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi } from "./api.js";
+import { id, isTerminal, sha256 } from "../domain/utils.js";
+import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi, type CompetitionAttachment, type CompetitionEnvironment } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
-import { runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
+import { commitCompetitionSuccess, countSubmissions, runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
 import type { ChallengeSolveRequest, ChallengeSolveResult, ChallengeSolver } from "./fleet.js";
 import { DockerContainerRuntime } from "../container/docker.js";
 import type { ContainerRef, ContainerRuntimePort } from "../container/contracts.js";
+import { CompetitionEnvironmentJanitor, type CompetitionEnvironmentReservation, type ManagedCompetitionEnvironment } from "./environment-janitor.js";
+import { IndependentVerifier } from "../verification/verifier.js";
+import type { ApprovalPolicy } from "../security/approval-policy.js";
 
 export interface CompetitionChallengeSolverInit {
   root: string;
@@ -23,19 +27,29 @@ export interface CompetitionChallengeSolverInit {
   runIdPrefix?: string;
   /** Injectable container runtime; production defaults to Docker when enabled. */
   containerRuntime?: ContainerRuntimePort;
+  /** Optional durable environment capacity/expiry guard shared by the Fleet. */
+  environmentJanitor?: CompetitionEnvironmentJanitor;
+  /** Optional durable approval gate for platform submission effects. */
+  approvalPolicy?: ApprovalPolicy;
 }
 
 /**
  * The real ChallengeSolver: turns one competition challenge into a full harness
  * run. Fetches detail + attachments, provisions the environment, and either
- * submits a platform-provided dynamic flag directly or drives the CODING lane
- * over a CompetitionSandbox. The provisioned environment is always released.
+ * takes a journaled no-model dynamic-flag path or drives the CODING lane over
+ * a CompetitionSandbox. The provisioned environment is always released.
  */
 export class CompetitionChallengeSolver implements ChallengeSolver {
   public constructor(private readonly init: CompetitionChallengeSolverInit) {}
 
+  /** Reconcile expired environments before the Fleet claims new challenges. */
+  public async reconcile(): Promise<void> {
+    await this.init.environmentJanitor?.sweepExpired();
+  }
+
   public async solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult> {
     const challengeId = request.challenge.challengeId;
+    const runId = `${this.init.runIdPrefix ?? "CH"}-${challengeId}-${Date.now()}`;
     let detail: Awaited<ReturnType<CompetitionApi["getChallenge"]>>;
     try {
       detail = await this.init.api.getChallenge(challengeId);
@@ -48,37 +62,42 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     const profile = profileForCategory(request.challenge.normalizedCategory);
     const needsContainer = execution.backend === "docker" && profile !== undefined && execution.requireFor?.includes(request.challenge.normalizedCategory as never);
 
-    let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>>;
+    let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>> | undefined;
+    let reservation: CompetitionEnvironmentReservation | undefined;
+    let managedEnvironment: ManagedCompetitionEnvironment | undefined;
     try {
+      if (this.init.environmentJanitor) reservation = await this.init.environmentJanitor.acquire(runId, request.signal);
       environment = await this.init.api.startEnvironment(challengeId);
+      if (this.init.environmentJanitor && reservation) {
+        managedEnvironment = await this.init.environmentJanitor.register(reservation, challengeId, environment);
+        reservation = undefined;
+      }
     } catch (error) {
       // startEnvironment can fail after the build POST has already succeeded
       // (for example while polling or parsing readiness). We may not have an
       // instance handle yet, so use the challenge id for a best-effort,
       // idempotent cleanup instead of leaking the provisioned environment.
-      await this.stop(challengeId);
+      if (environment) await this.stop(challengeId, environment.instanceId, managedEnvironment);
+      else await this.stop(challengeId);
+      if (reservation) await this.init.environmentJanitor?.releaseReservation(reservation);
       this.throwIfAborted(request.signal, error);
       return competitionFailure("provision environment", error);
     }
+    if (!environment) throw new Error("Competition environment provisioning returned no environment");
 
     // Dynamic-flag challenges hand us the flag at provisioning time — submit it
-    // directly rather than spending a whole model run to rediscover it.
+    // without spending a model turn to rediscover it. It still goes through a
+    // durable Run, Artifact, independent verifier, and journaled fixture_score
+    // so the fast path cannot bypass the single terminal state machine.
     if (environment.teamFlag && environment.teamFlag.trim()) {
       const flag = environment.teamFlag.trim();
       try {
-        const verdict = await this.init.api.submitFlag(challengeId, flag);
-        return {
-          solved: verdict.correct,
-          flag: verdict.correct ? flag : undefined,
-          status: verdict.correct ? "SOLVED_DYNAMIC" : "DYNAMIC_REJECTED",
-          submissions: 1,
-          reason: verdict.message,
-        };
+        return await this.solveDynamicFlag(runId, request, challengeId, detail.attachments, environment, flag);
       } catch (error) {
         this.throwIfAborted(request.signal, error);
         return competitionFailure("submit dynamic flag", error);
       } finally {
-        await this.stop(challengeId, environment.instanceId);
+        await this.stop(challengeId, environment.instanceId, managedEnvironment);
       }
     }
 
@@ -93,13 +112,12 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         const doctor = await containerRuntime.doctor(profile!);
         if (!doctor.daemon || doctor.image?.available === false) throw new Error(doctor.reason ?? `Docker image unavailable: ${doctor.image?.name ?? "unknown"}`);
       } catch (error) {
-        await this.stop(challengeId, environment.instanceId);
+        await this.stop(challengeId, environment.instanceId, managedEnvironment);
         this.throwIfAborted(request.signal, error);
         return competitionFailure("prepare Docker execution", new CompetitionContainerError(error instanceof Error ? error.message : String(error), error));
       }
     }
 
-    const runId = `${this.init.runIdPrefix ?? "CH"}-${challengeId}-${Date.now()}`;
     const sandbox = new CompetitionSandbox({
       api: this.init.api,
       challengeId,
@@ -162,6 +180,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
           mode: request.mode ?? this.init.mode ?? "auto",
           ...(this.init.maxTurns === undefined ? {} : { maxTurns: this.init.maxTurns }),
           ...(request.signal ? { signal: request.signal } : {}),
+          ...(this.init.approvalPolicy ? { approvalPolicy: this.init.approvalPolicy } : {}),
         }, this.init.createLane);
         return {
           solved: outcome.solved,
@@ -173,15 +192,111 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         if (container && containerRuntime) await containerRuntime.destroy(container);
       }
     } finally {
-      await this.stop(challengeId, environment.instanceId);
+      await this.stop(challengeId, environment.instanceId, managedEnvironment);
     }
   }
 
-  private async stop(challengeId: string, instanceId?: string): Promise<void> {
+  private async stop(challengeId: string, instanceId?: string, managedEnvironment?: ManagedCompetitionEnvironment): Promise<void> {
+    if (managedEnvironment && this.init.environmentJanitor) {
+      await this.init.environmentJanitor.release(managedEnvironment.leaseId, "challenge solver finished").catch(() => false);
+      return;
+    }
     try {
       await this.init.api.stopEnvironment(challengeId, instanceId);
     } catch {
       // Best-effort teardown; the platform reclaims environments on expiry.
+    }
+  }
+
+  private async solveDynamicFlag(
+    runId: string,
+    request: ChallengeSolveRequest,
+    challengeId: string,
+    attachments: CompetitionAttachment[],
+    environment: CompetitionEnvironment,
+    flag: string,
+  ): Promise<ChallengeSolveResult> {
+    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
+    const sandbox = new CompetitionSandbox({
+      api: this.init.api,
+      challengeId,
+      workspaceRoot: join(this.init.root, this.init.config.storage.fixturesDir),
+      attachments,
+      environment,
+    });
+    const services = createServices(this.init.root, this.init.config, { sandbox });
+    let created = false;
+    try {
+      await services.control.createRun(runId, task);
+      created = true;
+      const fixture = await sandbox.build(task);
+      const candidateArtifact = await services.artifacts.putText(runId, flag, {
+        filename: "dynamic-flag.txt",
+        sensitivity: "flag_candidate",
+      });
+      const workItemId = id("WI");
+      const completionId = id("C");
+      await services.control.dispatchBatch(runId, [
+        { type: "set_domain_phase", domainPhase: "RECON", lane: "executor" },
+        {
+          type: "work_item_created",
+          workItem: {
+            id: workItemId,
+            runId,
+            title: "Submit platform-provided dynamic flag",
+            objective: task.objective,
+            role: "executor",
+            status: "READY",
+            dependsOn: [],
+            evidenceIds: [],
+            artifactIds: [candidateArtifact.id],
+            attempt: 0,
+            maxAttempts: 1,
+          },
+          lane: "executor",
+        },
+        { type: "work_item_claimed", workItemId, ownerLane: "executor", leaseExpiresAt: new Date(Date.now() + task.constraints.deadline_ms).toISOString(), lane: "executor" },
+        { type: "completion_proposed", completion: { id: completionId, purpose: "submission", candidateHash: sha256(flag), artifactId: candidateArtifact.id }, lane: "executor" },
+      ]);
+      if ((request.mode?.() ?? this.init.mode ?? "auto") === "assist") {
+        await services.control.dispatch(runId, { type: "work_item_blocked", workItemId, reason: "Completion is waiting for operator approval.", lane: "executor" });
+        return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: "Completion is waiting for operator approval." };
+      }
+      if (this.init.approvalPolicy) {
+        const approval = await this.init.approvalPolicy.check({
+          runId,
+          operation: "platform.submit",
+          resource: flag,
+          reason: "A platform-provided dynamic flag is ready for submission.",
+        });
+        if (!approval.allowed) return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: `${approval.reason ?? "Completion is waiting for operator approval."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}` };
+      }
+      const verifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, join(this.init.root, this.init.config.storage.runsDir), services.verifier);
+      const verified = await verifier.verify(runId, fixture, completionId, request.signal);
+      const snapshot = await services.control.snapshot(runId);
+      const submissions = countSubmissions(snapshot);
+      if (!verified.accepted) {
+        await services.control.dispatchBatch(runId, [
+          { type: "work_item_failed", workItemId, reason: "The platform rejected the dynamic flag.", lane: "executor" },
+          { type: "fail", reason: verified.evidenceIds.join(", ") || "The platform rejected the dynamic flag.", category: "verifier_disagreement", lane: "verifier" },
+        ]);
+        return { solved: false, status: "DYNAMIC_REJECTED", submissions, reason: "The platform rejected the dynamic flag." };
+      }
+      await commitCompetitionSuccess(services.control, services.verifier, runId, workItemId, await services.control.snapshot(runId));
+      return { solved: true, status: "SOLVED_DYNAMIC", flag, submissions };
+    } catch (error) {
+      if (created) {
+        const current = await services.control.snapshot(runId);
+        if (!isTerminal(current.status)) {
+          await services.control.dispatch(runId, {
+            type: "fail",
+            reason: error instanceof Error ? error.message : String(error),
+            category: "permission_or_environment",
+            lane: "verifier",
+          }).catch(() => undefined);
+        }
+      }
+      throw error;
     }
   }
 

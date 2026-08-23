@@ -12,11 +12,15 @@ import {
   loadConfig,
   listFixtureProfiles,
   PiAgentLane,
-  PiSolverLane,
+  PiCodingLane,
   PlannerCoordinator,
   ProofBladeToolRuntime,
   ProofBladeSkillRegistry,
   ProofBladeToolCatalogRegistry,
+  bootstrapToolCatalog,
+  ToolPreflightService,
+  challengeToolProfiles,
+  challengeToolCatalogSpecs,
   McpProjectRegistry,
   listBundledCapabilities,
   projectionHash,
@@ -27,6 +31,9 @@ import {
   RealModelEvaluationRunner,
   RunTelemetry,
   RunRecoveryService,
+  CodingClaimVerifier,
+  IntentScheduler,
+  LeaseManager,
 } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
@@ -37,7 +44,8 @@ async function main(): Promise<void> {
   const args = withoutOption(rawArgs, "--config");
   const [command = "help", arg, ...rest] = args;
   const config = await loadConfig(root, configPath);
-  const services = createServices(root, config);
+  const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
+  const services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
   switch (command) {
     case "init": {
       const runId = required(arg, "task id");
@@ -145,12 +153,33 @@ async function main(): Promise<void> {
       const action = arg ?? "list";
       if (action === "list") print({ catalogHash: registry.catalogHash(), tools: registry.list(), diagnostics: registry.diagnostics });
       else if (action === "probe") print({ catalogHash: registry.catalogHash(), diagnostics: [...registry.diagnostics, ...(await registry.probe())] });
+      else if (action === "init") print(await bootstrapToolCatalog(root, challengeToolCatalogSpecs(), { force: rest.includes("--refresh") }));
+      else if (action === "preflight") {
+        const requested = rest[0] ?? "all";
+        const profiles = requested === "all"
+          ? challengeToolProfiles()
+          : (() => {
+            const profile = challengeToolProfiles().find((item) => item.id === requested);
+            if (!profile) throw new Error(`Unknown challenge profile: ${requested}`);
+            return [profile];
+          })();
+        const mcp = McpProjectRegistry.load(root);
+        const results = await new ToolPreflightService(root, { force: rest.includes("--refresh") }).prepareAll(profiles, registry, mcp);
+        await mcp.close();
+        print({ catalogHash: registry.catalogHash(), mcpCatalogHash: mcp.catalogHash(), profiles: results });
+      }
       else if (action === "show") {
         const id = required(rest[0], "tool id");
         const entry = registry.get(id);
         if (!entry) throw new Error(`Unknown tool id: ${id}`);
         print({ tool: entry });
-      } else throw new Error("tools action must be list, probe, or show");
+      } else throw new Error("tools action must be list, probe, init, preflight, or show");
+      break;
+    }
+    case "intents": {
+      const scheduler = new IntentScheduler(services.control, new LeaseManager(services.control), config.intentScheduler);
+      const { handleIntentsCommand } = await import("./commands/intents.js");
+      await handleIntentsCommand([arg ?? "", ...rest], scheduler, services.control, (message) => console.log(message));
       break;
     }
     case "solve": {
@@ -201,7 +230,7 @@ async function main(): Promise<void> {
     }
     case "reconcile": {
       const runId = required(arg, "run id");
-      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox).recover(runId);
+      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId);
       print({
         runId,
         fixtureHealth: recovery.fixtureHealth,
@@ -224,13 +253,13 @@ async function main(): Promise<void> {
     }
     case "compact": {
       const runId = required(arg, "run id");
-      const runtime = await toolRuntime(runId, services);
-      const lane = await PiSolverLane.create({ projectRoot: root, runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, config, runtime });
+      const compactSnapshot = await services.control.snapshot(runId);
+      const fixture = await services.sandbox.build(compactSnapshot.task);
+      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, deferClaimAcceptance: true, sessionId: `${runId}-coding` });
       try {
         await lane.compact(rest.join(" ").trim() || "Manual ProofBlade compaction");
       } finally {
         await lane.close();
-        await runtime.close();
       }
       const snapshot = await services.control.snapshot(runId);
       print({ runId, checkpoints: Object.values(snapshot.checkpoints) });
@@ -241,13 +270,13 @@ async function main(): Promise<void> {
       const skillName = required(rest[0], "skill name");
       const runDir = join(services.runsRoot, runId);
       await access(runDir);
-      const runtime = await toolRuntime(runId, services);
-      const lane = await PiSolverLane.create({ projectRoot: root, runId, runDir, controlStore: services.control, artifactStore: services.artifacts, config, runtime });
+      const skillSnapshot = await services.control.snapshot(runId);
+      const fixture = await services.sandbox.build(skillSnapshot.task);
+      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir, controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, deferClaimAcceptance: true, sessionId: `${runId}-coding` });
       try {
-        print(await lane.skill(skillName, rest.slice(1).join(" ").trim() || undefined));
+        print(await lane.prompt(`Load and apply the ProofBlade skill \"${skillName}\". ${rest.slice(1).join(" ").trim()}`));
       } finally {
         await lane.close();
-        await runtime.close();
       }
       break;
     }
@@ -299,8 +328,9 @@ async function main(): Promise<void> {
       const runId = required(arg, "run id");
       const snapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(snapshot.task);
+      await services.fixtureControl.assertResetAllowed(runId);
       const generation = await services.sandbox.reset(fixture);
-      await services.control.dispatch(runId, { type: "fixture_reset", generation });
+      await services.fixtureControl.reset(runId, generation);
       print({ runId, generation });
       break;
     }
@@ -423,7 +453,8 @@ function helpText(): string {
     "  capabilities",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",
-    "  tools [list|probe|show] [tool-id]      Host-local tool catalog (tool-catalog.json)",
+    "  tools [list|probe|init|preflight|show] [profile|tool-id]  Host catalog/readiness",
+    "  intents list|score|graph|claim <run-id>",
     "  skill <run-id> <skill-name> [additional instructions]",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",

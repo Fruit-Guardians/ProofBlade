@@ -1,4 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { readFile, stat, writeFile, rename } from "node:fs/promises";
+import { promisify } from "node:util";
 import { join } from "node:path";
 import type { RuntimeResourceSnapshot, ToolKind } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
@@ -28,6 +30,7 @@ import { canonicalJson, sha256 } from "../domain/utils.js";
 export const TOOL_CATALOG_MANIFEST = "tool-catalog.json";
 
 const KNOWN_KINDS: readonly ToolKind[] = ["tool", "interpreter", "toolchain"];
+const execFile = promisify(execFileCallback);
 
 export type ToolCatalogDiagnosticCode =
   | "manifest_missing"
@@ -53,8 +56,10 @@ export interface ToolCatalogEntry {
   description: string;
   /** Optional path to a usage doc. Kept as metadata only; read on demand. */
   doc?: string;
-  /** Optional category for future per-target-kind filtering. Unused in v1. */
+  /** Optional legacy profile/category selector used by selectForProfile. */
   category?: string;
+  /** Optional profile ids. `category` remains accepted for older manifests. */
+  profiles?: string[];
   /** Hash of the normative entry fields (identity + description), stable across manifests. */
   contentHash: string;
 }
@@ -67,6 +72,7 @@ interface RawToolEntry {
   description?: unknown;
   doc?: unknown;
   category?: unknown;
+  profiles?: unknown;
 }
 
 export interface ToolCatalogLoadOptions {
@@ -158,6 +164,7 @@ export class ProofBladeToolCatalogRegistry {
       }
       const doc = asNonEmptyString(raw.doc, `${label}.doc`);
       const category = asNonEmptyString(raw.category, `${label}.category`);
+      const profiles = asStringArray(raw.profiles);
       byId.add(id);
       byName.add(name);
       entries.push({
@@ -168,6 +175,7 @@ export class ProofBladeToolCatalogRegistry {
         description,
         ...(doc === undefined ? {} : { doc }),
         ...(category === undefined ? {} : { category }),
+        ...(profiles === undefined ? {} : { profiles }),
         contentHash: entryContentHash({ id, name, kind, path: normalized, description, doc }),
       });
     }
@@ -186,6 +194,18 @@ export class ProofBladeToolCatalogRegistry {
     return this.entries.find((entry) => entry.id === id);
   }
 
+  /** Select only the host entries prepared for one challenge profile. */
+  public selectForProfile(profileId: string, toolIds: readonly string[] = []): ToolCatalogEntry[] {
+    if (this.disabled) return [];
+    const requested = new Set(toolIds);
+    const selected = this.entries.filter((entry) => {
+      if (requested.size > 0) return requested.has(entry.id);
+      const declared = entry.profiles ?? (entry.category ? entry.category.split(/[|,]/).map((item) => item.trim()).filter(Boolean) : []);
+      return declared.length === 0 || declared.includes("multi") || declared.includes("common") || declared.includes(profileId);
+    });
+    return [...selected];
+  }
+
   public get size(): number {
     return this.entries.length;
   }
@@ -199,7 +219,8 @@ export class ProofBladeToolCatalogRegistry {
    * description, and the path/doc the model sees. Path/doc changes (which are
    * injected into the system prompt) therefore legitimately churn this hash and
    * its prompt prefix — that is intentional, because the model sees the new path.
-   * The unused category stays excluded. See docs/tool-catalog.md. */
+   * Profile selectors stay excluded because they do not change the full catalog
+   * content shown to ordinary Coding conversations. See docs/tool-catalog.md. */
   public catalogHash(): string {
     if (this.disabled) return sha256(canonicalJson([]));
     return sha256(canonicalJson(this.entries.map(({ id, name, kind, path, description, doc }) => ({
@@ -213,10 +234,11 @@ export class ProofBladeToolCatalogRegistry {
   }
 
   /** The stable `<tool-catalog>` block injected into the coding system prompt. */
-  public promptBlock(): string {
-    if (this.disabled || this.entries.length === 0) return "";
+  public promptBlock(profileId?: string, toolIds: readonly string[] = []): string {
+    const entries = profileId === undefined ? this.entries : this.selectForProfile(profileId, toolIds);
+    if (this.disabled || entries.length === 0) return "";
     const sections = new Map<string, ToolCatalogEntry[]>();
-    for (const entry of this.entries) {
+    for (const entry of entries) {
       const list = sections.get(entry.kind) ?? [];
       list.push(entry);
       sections.set(entry.kind, list);
@@ -225,7 +247,7 @@ export class ProofBladeToolCatalogRegistry {
       ? "\nInterpreters are versioned and may not be on the shell PATH (this host's bash often lacks bare `php`/`python`). For those, call the listed interpreter by its EXACT path rather than the bare name when you must run that language."
       : "";
     const lines = [
-      `<tool-catalog catalog-hash="${escapeAttribute(this.catalogHash())}">`,
+      `<tool-catalog catalog-hash="${escapeAttribute(catalogHashForEntries(entries))}">`,
       "Host-local tools are trusted project configuration. Call them with bash by their EXACT path; the path is the canonical spelling. Read the referenced doc for usage details." + interpreterHint,
     ];
     for (const kind of KNOWN_KINDS) {
@@ -253,10 +275,17 @@ export class ProofBladeToolCatalogRegistry {
    * does not exist; NEVER feeds the catalog hash, so a stale path does not churn
    * the stable prompt prefix. Diagnostics-only.
    */
-  public async probe(): Promise<ToolCatalogDiagnostic[]> {
+  public async probe(profileId?: string, toolIds: readonly string[] = []): Promise<ToolCatalogDiagnostic[]> {
+    if (this.disabled) return [];
+    const entries = profileId === undefined ? this.entries : this.selectForProfile(profileId, toolIds);
+    return await this.probeEntries(entries);
+  }
+
+  /** Probe a preselected bounded set without rediscovering the whole catalog. */
+  public async probeEntries(entries: readonly ToolCatalogEntry[]): Promise<ToolCatalogDiagnostic[]> {
     if (this.disabled) return [];
     const missing: ToolCatalogDiagnostic[] = [];
-    for (const entry of this.entries) {
+    for (const entry of entries) {
       try {
         await stat(entry.path);
       } catch {
@@ -312,4 +341,91 @@ function escapeText(value: string): string {
 
 function isMissingFile(error: unknown): boolean {
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+export interface ToolCatalogBootstrapSpec {
+  id: string;
+  name: string;
+  kind: ToolKind;
+  description: string;
+  candidates: string[];
+  profiles: string[];
+}
+
+export interface ToolCatalogBootstrapResult {
+  manifestPath: string;
+  entries: Array<Omit<ToolCatalogEntry, "contentHash">>;
+  missing: string[];
+  overwritten: boolean;
+}
+
+/**
+ * One-time machine setup for the host catalog. It only resolves a fixed,
+ * reviewed list of executable names; it never installs packages or executes a
+ * tool. The generated manifest is ignored by Git and reused by later lanes.
+ */
+export async function bootstrapToolCatalog(root: string, specs: readonly ToolCatalogBootstrapSpec[], options: { force?: boolean } = {}): Promise<ToolCatalogBootstrapResult> {
+  const manifestPath = join(root, TOOL_CATALOG_MANIFEST);
+  let existed = false;
+  try {
+    await stat(manifestPath);
+    existed = true;
+  } catch {
+    // The normal first-run path.
+  }
+  if (existed && options.force !== true) throw new Error(`${TOOL_CATALOG_MANIFEST} already exists; pass --refresh to rebuild it`);
+  const entries: Array<Omit<ToolCatalogEntry, "contentHash">> = [];
+  const missing: string[] = [];
+  for (const spec of specs) {
+    const path = await resolveExecutable(spec.candidates);
+    if (!path) {
+      missing.push(spec.id);
+      continue;
+    }
+    entries.push({ id: spec.id, name: spec.name, kind: spec.kind, path, description: spec.description, profiles: [...spec.profiles] });
+  }
+  entries.sort((left, right) => left.id.localeCompare(right.id));
+  const temporary = `${manifestPath}.tmp-${process.pid}`;
+  await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, tools: entries }, null, 2)}\n`, "utf8");
+  await rename(temporary, manifestPath);
+  return { manifestPath, entries, missing, overwritten: existed };
+}
+
+function catalogHashForEntries(entries: readonly ToolCatalogEntry[]): string {
+  return sha256(canonicalJson(entries.map(({ id, name, kind, path, description, doc }) => ({
+    id,
+    name,
+    kind,
+    path,
+    description,
+    ...(doc === undefined ? {} : { doc }),
+  }))));
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const values = value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+  return values.length > 0 ? [...new Set(values)] : undefined;
+}
+
+async function resolveExecutable(candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    if (isAbsolutePath(candidate)) {
+      try {
+        await stat(candidate);
+        return normalizePath(candidate);
+      } catch {
+        continue;
+      }
+    }
+    try {
+      const resolver = process.platform === "win32" ? "where.exe" : "which";
+      const result = await execFile(resolver, [candidate], { windowsHide: true, maxBuffer: 16 * 1024 });
+      const path = result.stdout.split(/\r?\n/).map((line) => line.trim()).find((line) => line.length > 0 && isAbsolutePath(line));
+      if (path) return normalizePath(path);
+    } catch {
+      // Try the next reviewed alias.
+    }
+  }
+  return undefined;
 }

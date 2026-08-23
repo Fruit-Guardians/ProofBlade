@@ -31,7 +31,7 @@
 
 ## P4 基础
 
-现有 per-run 容器、target-only egress、stale reaper、`pwn-kernel` profile、session orphan supersede 和 lane dispose 继续作为无人值守 Fleet 基础；本轮新增测试覆盖容器和持久会话在 competition 路径的组合。
+现有 per-run 容器、target-only egress、stale reaper、`pwn-kernel` profile、session orphan supersede、lane dispose 和 `CompetitionEnvironmentJanitor` 继续作为无人值守 Fleet 基础；janitor 对环境容量、`expiresAt` sweep、重启恢复和清理失败重试提供持久账本，本轮新增测试覆盖容器和持久会话在 competition 路径的组合。
 
 ## 测试矩阵
 
@@ -42,6 +42,7 @@
 - `handoff.test.ts`：Refiner delta、旧 Handoff supersede、禁止重复动作。
 - `coding-resources.test.ts`：交互 bash 启动前护栏。
 - `pwn-layer.test.ts`：LeakRecord、base 公式、证据图搜索和冲突保护。
+- `environment-janitor.test.ts`：环境账本重启恢复、容量 reservation、过期回收和失败重试。
 
 ## 验证结果
 
@@ -52,6 +53,25 @@
 - `npm run test:ci-gates`：8/8 通过。
 - roadmap 相关定向回归：42/42 通过。
 - `npm test`：业务测试通过；Windows 上已有的 `coding-resources` 两个时序/目录锁定用例仍存在环境抖动（`shell_background` 进程在轮询前结束、临时目录 `EBUSY`），隔离重跑可分别观察到同类现象，未涉及本轮新增代码路径。
+
+## P0/P1/P2 执行记录（2026-08-22）
+
+### P0
+
+- 新增 `.github/test-matrix.json` 与 `scripts/check-changed-tests.mjs`，源码变更若没有对应测试映射会直接失败；本轮 gate 输出 11 个 targeted commands。
+- `CompetitionEnvironmentJanitor` 使用 schema v2、原子写入和跨进程 lock；reservation 在 `startEnvironment` 前落盘，旧 schema 可迁移，过期 reservation/ACTIVE 记录可在重启后 sweep。
+
+### P1
+
+- `ApprovalPolicy` 将平台提交、环境启动、网络请求和 session 打开列为受保护副作用；资源明文不落盘，未批准路径不会触碰平台。
+- `ProofBladeAppServer` 只暴露 `run/read`、`run/events`、`run/approvals`、`run/approve` 和订阅；GUI 通过 `/api/v2` 接入。
+
+### P2
+
+- `fixtures/holdout/manifest.json` 绑定 2 个 Web 和 2 个 Pwn 本地 transcript 的 SHA-256；`LocalHoldoutEvaluationRunner` 复用生产 evaluator 的证据、重放、成本和 baseline 对照协议，确定性 lane 不创建 Provider 请求。
+- local holdout 测试验证 4/4 case、2 个 variant 成功率 1、Provider 请求 0、报告不含期望答案。
+
+本轮验收只使用本地 fixture/fake API；真实 DASCTF、远程 tube、远程 pwn E2E 明确不在范围内。
 
 ## PR #69 复审修复
 

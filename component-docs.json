@@ -20,6 +20,7 @@
     { "id": "materials-recovery", "paths": ["packages/materials/src/recovery/"], "document": "packages/materials/src/recovery/COMPONENT.md" },
     { "id": "materials-runtime", "paths": ["packages/materials/src/runtime/"], "document": "packages/materials/src/runtime/COMPONENT.md" },
     { "id": "materials-sandbox", "paths": ["packages/materials/src/sandbox/"], "document": "packages/materials/src/sandbox/COMPONENT.md" },
+    { "id": "materials-security", "paths": ["packages/materials/src/security/"], "document": "packages/materials/src/security/COMPONENT.md" },
     { "id": "materials-skills", "paths": ["packages/materials/src/skills/"], "document": "packages/materials/src/skills/COMPONENT.md" },
     { "id": "materials-storage", "paths": ["packages/materials/src/storage/"], "document": "packages/materials/src/storage/COMPONENT.md" },
     { "id": "materials-tools", "paths": ["packages/materials/src/tools/"], "document": "packages/materials/src/tools/COMPONENT.md" },

@@ -70,7 +70,7 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
         type: "reasoning_edge_added",
         payload: { edge: { id: "RE-CORRUPT", from: "UNKNOWN-A", to: "UNKNOWN-B", relation: "supports", explanation: "corrupt event", confidence: 1, generation: 0 } },
       }]),
-      /unknown nodes/,
+      /Raw append is restricted to telemetry events/,
     );
 
     const firstHash = (await services.control.replay(runId)).projectionHash;
@@ -85,7 +85,7 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     assert.ok(longSnapshot.reasoningNodes[longRecord.factId!]!.name.length <= 160);
     assert.ok(longSnapshot.reasoningTrees[longRecord.treeId!]!.name.length <= 160);
 
-    await services.control.dispatch(runId, { type: "fixture_reset", generation: 1 });
+    await services.fixtureControl.reset(runId, 1);
     await assert.rejects(
       graph.linkNodes({ from: shared.evidenceId, to: branchB.factId!, relation: "adopts" }),
       /crosses generations/,

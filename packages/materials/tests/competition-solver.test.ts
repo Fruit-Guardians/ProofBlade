@@ -4,17 +4,21 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../src/config.js";
+import type { RunSnapshot } from "../src/domain/types.js";
 import { readdir, readFile } from "node:fs/promises";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
-import type { CompetitionLaneFactory } from "../src/competition/loop.js";
+import { hasAcceptedPlatformSubmission, type CompetitionLaneFactory } from "../src/competition/loop.js";
 import type { ContainerRuntimePort } from "../src/container/contracts.js";
 import {
   CompetitionChallengeSolver,
+  CompetitionEnvironmentJanitor,
+  ApprovalPolicy,
   CompetitionChallengeError,
   CompetitionHttpError,
   FleetScheduler,
+  JsonlControlStore,
   normalizeCategory,
   type CompetitionApi,
   type CompetitionAttachment,
@@ -68,9 +72,8 @@ const flagLane: CompetitionLaneFactory = async (options) => {
     runtime,
     fixture,
     controlStore: options.controlStore,
+    verifier: options.platformVerifier!,
     artifactStore: options.artifactStore,
-    journal: options.journal,
-    runsRoot: join(options.runDir, ".."),
     ...(options.mode ? { mode: options.mode } : {}),
   });
   return {
@@ -84,7 +87,48 @@ const flagLane: CompetitionLaneFactory = async (options) => {
     async compact() {},
     async abort() {},
     async isIdle() { return true; },
-    async close() {},
+    async close() {
+      await runtime.close();
+    },
+  };
+};
+
+/**
+ * Production-shaped lane wrapper used by the composition replay test. The
+ * flag submission remains deterministic, while one coding artifact is routed
+ * through the real observer so replay covers both the work graph and the
+ * evidence graph in the same run stream.
+ */
+const observedFlagLane: CompetitionLaneFactory = async (options) => {
+  const inner = await flagLane(options);
+  const snapshot = await options.controlStore.snapshot(options.runId);
+  const fixture = { fixtureId: options.runId, generation: snapshot.generation, path: options.projectRoot, privatePath: join(options.projectRoot, ".proofblade") };
+  const runtime = new ProofBladeToolRuntime(
+    options.runId,
+    fixture,
+    join(options.runDir, ".."),
+    options.controlStore,
+    options.artifactStore,
+    options.journal,
+    options.installRoot ?? options.projectRoot,
+    { includeMcp: false },
+  );
+  let observed = false;
+  return {
+    ...inner,
+    async prompt(text: string) {
+      if (!observed) {
+        const content = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
+        const artifact = await options.artifactStore.putText(options.runId, content, { filename: "observed-flag.txt" });
+        await runtime.observeArtifact({ operation: "fixture_read", artifactId: artifact.id });
+        observed = true;
+      }
+      return await inner.prompt(text);
+    },
+    async close() {
+      await inner.close();
+      await runtime.close();
+    },
   };
 };
 
@@ -120,6 +164,8 @@ interface FakeChallengeSpec {
   submitError?: string;
   /** A typed error confined to this challenge's detail/attachments. */
   detailError?: Error;
+  /** Optional short environment expiry used by deadline/abort regression tests. */
+  expiresAt?: number;
 }
 
 class FakeApi implements CompetitionApi {
@@ -148,7 +194,9 @@ class FakeApi implements CompetitionApi {
     const s = this.spec(id);
     this.started.push(id);
     if (s.startError) throw new Error(s.startError);
-    return s.dynamic ? { instanceId: `inst-${id}`, teamFlag: s.flag } : { instanceId: `inst-${id}`, connectionInfo: "nc host 1337" };
+    return s.dynamic
+      ? { instanceId: `inst-${id}`, teamFlag: s.flag, ...(s.expiresAt ? { expiresAt: s.expiresAt } : {}) }
+      : { instanceId: `inst-${id}`, connectionInfo: "nc host 1337", ...(s.expiresAt ? { expiresAt: s.expiresAt } : {}) };
   }
   async submitFlag(id: string, flag: string) {
     this.submitted.push({ id, flag });
@@ -174,10 +222,117 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
     assert.ok(api.stopped.includes("CH1"), "environment must be released");
     const runIds = await readdir(join(root, "runs"));
     const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
-      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } });
+      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string; status?: string } });
     assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
     assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
     assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "SUBMIT"]);
+    const runId = (await readdir(join(root, "runs")))[0]!;
+    const projection = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"), "utf8")) as RunSnapshot;
+    assert.equal(hasAcceptedPlatformSubmission(projection), true);
+    assert.equal(projection.status, "SUCCEEDED", "a platform solve must commit a durable terminal result");
+    assert.equal(projection.finalResult?.completionId, Object.values(projection.completions).find((item) => item.status === "ACCEPTED")?.id);
+    assert.deepEqual(projection.finalResult?.evidenceIds, Object.values(projection.completions).find((item) => item.status === "ACCEPTED")?.evidenceIds);
+
+    const unrelatedAccepted = structuredClone(projection);
+    const acceptedCompletion = Object.values(unrelatedAccepted.completions).find((item) => item.status === "ACCEPTED")!;
+    acceptedCompletion.purpose = "claim_reproduction";
+    assert.equal(hasAcceptedPlatformSubmission(unrelatedAccepted), false, "a non-submission completion cannot combine with an unrelated scorer Effect");
+
+    const mismatchedVerdict = structuredClone(projection);
+    const submittedCompletion = Object.values(mismatchedVerdict.completions).find((item) => item.status === "ACCEPTED")!;
+    const evidence = mismatchedVerdict.evidence[submittedCompletion.evidenceIds[0]!]!;
+    const sourceEffectId = evidence.provenance.effect!.id;
+    const sourceEffect = mismatchedVerdict.effects[sourceEffectId]!;
+    mismatchedVerdict.effects["EF-UNRELATED-REJECTION"] = {
+      ...sourceEffect,
+      id: "EF-UNRELATED-REJECTION",
+      verification: { ...sourceEffect.verification!, accepted: false, completionId: "C-UNRELATED" },
+    };
+    evidence.provenance.effect!.id = "EF-UNRELATED-REJECTION";
+    assert.equal(hasAcceptedPlatformSubmission(mismatchedVerdict), false, "an accepted Completion must bind its own accepted scorer verdict");
+    assert.deepEqual(events.filter((event) => event.type === "run_finished").map((event) => event.payload?.status), ["SUCCEEDED"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("competition solver registers and releases environments through the durable janitor", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-janitor-"));
+  try {
+    const api = new FakeApi([{ id: "JANITOR", value: 100, flag: "flag{janitor}" }]);
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath: join(root, "runs", "environment-ledger.json") });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, environmentJanitor: janitor, mode: "auto", maxTurns: 1, createLane: flagLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.status);
+    assert.deepEqual(await janitor.active(), []);
+    const records = await janitor.records();
+    assert.equal(records.length, 1);
+    assert.equal(records[0]?.status, "STOPPED");
+    assert.equal(records[0]?.instanceId, "inst-JANITOR");
+    assert.deepEqual(api.stopped, ["JANITOR"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Fleet -> run actor -> observer -> verifier replays one atomic terminal commit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-composition-"));
+  try {
+    const api = new FakeApi([{ id: "COMPOSE", value: 100, flag: "flag{compose}" }]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 1, createLane: observedFlagLane });
+    const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
+
+    assert.equal(snapshot.totals.solved, 1);
+    assert.equal(snapshot.totals.failed, 0);
+    const runIds = await readdir(join(root, "runs"));
+    assert.equal(runIds.length, 1, "the fleet must create one run for one challenge");
+    const runId = runIds[0]!;
+    const eventStore = new JsonlControlStore(join(root, "runs"));
+    const events = await eventStore.events(runId);
+    const types = events.map((event) => event.type);
+    assert.ok(types.includes("observation_added"), "the observer event must be durable");
+    assert.ok(types.includes("evidence_added"), "the evidence event must be durable");
+
+    const submitPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "SUBMIT");
+    assert.ok(submitPhaseIndex >= 0, "the terminal commit must enter SUBMIT");
+    assert.deepEqual(types.slice(submitPhaseIndex, submitPhaseIndex + 3), ["domain_phase_changed", "work_item_completed", "run_finished"]);
+
+    const replayed = await eventStore.replay(runId);
+    assert.equal(replayed.status, "SUCCEEDED");
+    assert.equal(replayed.domainPhase, "SUBMIT");
+    assert.ok(Object.values(replayed.workItems).some((item) => item.status === "SUCCEEDED"));
+    assert.ok(Object.keys(replayed.observations).length >= 1);
+    assert.ok(Object.keys(replayed.evidence).length >= 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("competition deadline aborts a prompt already inside the Pi loop", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-deadline-"));
+  let aborted = false;
+  try {
+    const api = new FakeApi([{ id: "DEADLINE", value: 100, flag: "flag{never_reached}", expiresAt: Date.now() + 1_000 }]);
+    const hangingLane: CompetitionLaneFactory = async () => {
+      let resolvePrompt: ((outcome: { text: string; stopReason: string; usage: ReturnType<typeof zeroUsage> }) => void) | undefined;
+      return {
+        prompt: async () => await new Promise((resolve) => { resolvePrompt = resolve; }),
+        compact: async () => undefined,
+        abort: async () => {
+          aborted = true;
+          resolvePrompt?.({ text: "deadline", stopReason: "aborted", usage: zeroUsage() });
+        },
+        isIdle: async () => true,
+        close: async () => undefined,
+      };
+    };
+    const started = Date.now();
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 4, createLane: hangingLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "DEADLINE");
+    assert.equal(aborted, true);
+    assert.ok(Date.now() - started < 3_000, "in-flight prompt must not outlive the challenge deadline");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -238,7 +393,7 @@ test("a repeated identical flag replays the stored verdict instead of a second A
   }
 });
 
-test("dynamic-flag challenge is submitted directly without a model run", async () => {
+test("dynamic-flag challenge skips the model turn but keeps a journaled run", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-"));
   try {
     const api = new FakeApi([{ id: "DYN", value: 50, flag: "flag{dynamic}", dynamic: true }]);
@@ -249,6 +404,49 @@ test("dynamic-flag challenge is submitted directly without a model run", async (
     assert.equal(result.status, "SOLVED_DYNAMIC");
     assert.deepEqual(api.submitted, [{ id: "DYN", flag: "flag{dynamic}" }]);
     assert.ok(api.stopped.includes("DYN"));
+    const runIds = await readdir(join(root, "runs"));
+    const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
+      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string; status?: string } });
+    assert.ok(events.some((event) => event.type === "effect_finished"), "dynamic submission must be journaled");
+    const submitPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "SUBMIT");
+    assert.ok(submitPhaseIndex >= 0, "dynamic path must reach SUBMIT");
+    assert.deepEqual(events.slice(submitPhaseIndex, submitPhaseIndex + 3).map((event) => event.type), ["domain_phase_changed", "work_item_completed", "run_finished"]);
+    assert.equal(events.find((event) => event.type === "run_finished")?.payload?.status, "SUCCEEDED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dynamic-flag assist records a proposal without contacting the platform", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-assist-"));
+  try {
+    const api = new FakeApi([{ id: "DYN-ASSIST", value: 50, flag: "flag{dynamic_assist}", dynamic: true }]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "assist" });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.status, "AWAITING_APPROVAL");
+    assert.equal(result.submissions, 0);
+    assert.deepEqual(api.submitted, []);
+    const runIds = await readdir(join(root, "runs"));
+    const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
+      .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string });
+    assert.equal(events.filter((event) => event.type === "completion_proposed").length, 1);
+    assert.equal(events.filter((event) => event.type === "work_item_blocked").length, 1);
+    assert.equal(events.filter((event) => event.type === "effect_finished").length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("configured approval policy holds a dynamic platform effect before submission", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-approval-"));
+  try {
+    const api = new FakeApi([{ id: "DYN-APPROVAL", value: 50, flag: "flag{approval_required}", dynamic: true }]);
+    const approvals = new ApprovalPolicy({ ledgerPath: join(root, "runs", "approvals.json") });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, approvalPolicy: approvals });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.status, "AWAITING_APPROVAL");
+    assert.equal(api.submitted.length, 0);
+    assert.equal((await approvals.pending()).length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -301,6 +499,29 @@ test("dynamic flag submission skips Docker preflight when the daemon is unavaila
     assert.equal(doctorCalls, 0);
     assert.deepEqual(api.submitted, [{ id: "DYN-DOCKER", flag: "flag{dynamic_docker_skip}" }]);
     assert.deepEqual(api.stopped, ["DYN-DOCKER"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Docker preflight failure releases the durable environment lease", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-docker-janitor-"));
+  try {
+    const api = new FakeApi([{ id: "DOCKER-JANITOR", value: 100, flag: "flag{unused}" }]);
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath: join(root, "runs", "environment-ledger.json") });
+    const unavailableRuntime = {
+      async prewarm() { throw new Error("docker unavailable"); },
+      async doctor() { throw new Error("docker unavailable"); },
+    } as unknown as ContainerRuntimePort;
+    const dockerConfig: ProofBladeConfig = { ...CONFIG, execution: { backend: "docker", requireFor: ["pwn"] } };
+    const challenge = { ...(await api.listChallenges())[0]!, normalizedCategory: "pwn" as const };
+    const solver = new CompetitionChallengeSolver({ root, config: dockerConfig, api, environmentJanitor: janitor, containerRuntime: unavailableRuntime });
+    const result = await solver.solve({ challenge, signal: new AbortController().signal });
+
+    assert.equal(result.status, "CONTAINER_ERROR");
+    assert.deepEqual(await janitor.active(), []);
+    assert.equal((await janitor.records())[0]?.status, "STOPPED");
+    assert.deepEqual(api.stopped, ["DOCKER-JANITOR"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -440,7 +661,7 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
     const api = new FakeApi([{ id: "VC", value: 100, flag: "flag{needs_submit}" }]);
     const verifyOnlyLane: CompetitionLaneFactory = async (options) => {
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         async prompt() {
           const text = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
@@ -449,8 +670,8 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
             candidate,
             command: `grep -o 'flag{[^}]*}' flag.txt`,
             cwd: options.projectRoot,
-            output: candidate,
             toolCallId: `vc-${snapshot.generation}`,
+            execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
           });
           return { text: "verified locally", stopReason: "stop", usage: zeroUsage() };
         },
@@ -475,8 +696,13 @@ test("verify_claim alone cannot report a challenge as solved", async () => {
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload: Record<string, unknown> });
     const verified = events.filter((event) => event.type === "completion_verified");
     const proposed = events.filter((event) => event.type === "completion_proposed");
+    const claimEffect = events.find((event) => event.type === "effect_proposed" && (event.payload.effect as { operation?: string } | undefined)?.operation === "claim_observation");
+    const claimEvidence = events.find((event) => event.type === "evidence_added")?.payload.evidence as { kind?: string; provenance?: { recordedBy?: string } } | undefined;
     assert.equal(proposed.length, 1, "verify_claim must still record its candidate as a proposal");
     assert.deepEqual(verified, [], "verify_claim must not mark a completion ACCEPTED when the platform is the judge");
+    assert.equal((claimEffect?.payload.effect as { producerLane?: string } | undefined)?.producerLane, "executor", "a model-selected command must not run as a verifier Effect");
+    assert.equal(claimEvidence?.kind, "observation");
+    assert.equal(claimEvidence?.provenance?.recordedBy, "agent", "a model-selected command must not receive verifier provenance");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -495,7 +721,7 @@ test("verify_claim then submit_flag on the same flag still reaches the platform"
     const bothLane: CompetitionLaneFactory = async (options) => {
       const inner = await flagLane(options);
       const snapshot = await options.controlStore.snapshot(options.runId);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         ...inner,
         async prompt(text: string) {
@@ -506,8 +732,8 @@ test("verify_claim then submit_flag on the same flag still reaches the platform"
             candidate,
             command: `grep -o 'flag{[^}]*}' flag.txt`,
             cwd: options.projectRoot,
-            output: candidate,
             toolCallId: `vc-${snapshot.generation}`,
+            execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
           });
           // 2) then the real submission
           return await inner.prompt(text);
@@ -533,7 +759,7 @@ test("verify_claim calls cannot exhaust the platform submission budget", async (
     const api = new FakeApi([{ id: "BUD", value: 100, flag: "flag{budget}" }]);
     const exhaustThenSubmitLane: CompetitionLaneFactory = async (options) => {
       const inner = await flagLane(options);
-      const verifier = new CodingClaimVerifier(options.runId, options.controlStore, options.artifactStore);
+      const verifier = options.claimVerifier;
       return {
         ...inner,
         async prompt(text: string) {
@@ -545,8 +771,8 @@ test("verify_claim calls cannot exhaust the platform submission budget", async (
               candidate,
               command: `echo attempt-${i}`,
               cwd: options.projectRoot,
-              output: candidate,
               toolCallId: `vc-${i}`,
+              execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
             });
           }
           return await inner.prompt(text);

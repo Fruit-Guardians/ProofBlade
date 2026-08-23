@@ -6,7 +6,7 @@ import { fixtureTask } from "../app/fixture-task.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
 import { listFixtureProfiles, type FixtureProfile } from "../sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, type SolverLaneFactory } from "../orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { sha256, canonicalJson } from "../domain/utils.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import type { PrimaryFailureCategory } from "../domain/types.js";
@@ -116,7 +116,7 @@ export class FixtureEvaluationRunner {
   public constructor(
     private readonly root: string,
     private readonly config: ProofBladeConfig,
-    private readonly createLane: SolverLaneFactory = deterministicLane,
+    private readonly createLane: AgentLaneFactory = deterministicLane,
   ) {}
 
   public async run(options: FixtureEvaluationOptions = {}): Promise<FixtureEvaluationSummary> {
@@ -278,7 +278,7 @@ export class FixtureEvaluationRunner {
   }
 }
 
-const deterministicLane: SolverLaneFactory = async ({ runtime }) => ({
+const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async prompt() {
     const inspected = await runtime.inspectTarget();
     const candidate = inspected.output.match(/PB\{[^}\r\n]+\}/)?.[0];

@@ -5,7 +5,10 @@ import { containsCtfCandidate } from "../domain/candidate.js";
 
 export interface ObservedEffect {
   operation: string;
-  effectId: string;
+  /** Journal effect id when the producer is journal-backed. Coding read/bash
+   * artifacts are already registered by the lane and intentionally use the
+   * artifact identity without inventing a fake Effect record. */
+  effectId?: string;
   artifactId: string;
   generation: number;
   result: RawEffectResult;
@@ -22,9 +25,18 @@ export class DeterministicObserver {
 
   public async observe(runId: string, effect: ObservedEffect): Promise<ObservationOutcome> {
     const snapshot = await this.controlStore.snapshot(runId);
-    const existing = Object.values(snapshot.observations).find((item) => item.source.effectId === effect.effectId);
+    const journalEffect = effect.effectId ? snapshot.effects[effect.effectId] : undefined;
+    if (effect.effectId && !journalEffect) throw new Error(`Unknown observed effect ${effect.effectId}`);
+    if (journalEffect && (journalEffect.status !== "FINISHED" || journalEffect.artifactId !== effect.artifactId || journalEffect.generation !== snapshot.generation)) {
+      throw new Error(`Observed effect ${effect.effectId} is not a current finished effect bound to artifact ${effect.artifactId}`);
+    }
+    const existing = Object.values(snapshot.observations).find((item) => effect.effectId
+      ? item.source.effectId === effect.effectId
+      : item.source.artifactId === effect.artifactId && item.source.operation === effect.operation);
     if (existing) {
-      const evidence = Object.values(snapshot.evidence).find((item) => item.source.effectId === effect.effectId);
+      const evidence = Object.values(snapshot.evidence).find((item) => effect.effectId
+        ? item.source.effectId === effect.effectId
+        : item.source.artifactId === effect.artifactId && item.source.tool === effect.operation);
       if (!evidence) throw new Error(`Observation ${existing.id} has no evidence`);
       return { observationId: existing.id, evidenceId: evidence.id, candidateKinds: existing.candidateKinds };
     }
@@ -41,7 +53,7 @@ export class DeterministicObserver {
       observation: {
         id: observationId,
         summary: `${effect.operation} ${outcome}; ${Buffer.byteLength(combined, "utf8")} bytes; candidates=${candidateKinds.join(",") || "none"}`,
-        source: { operation: effect.operation, effectId: effect.effectId, artifactId: effect.artifactId, generation: effect.generation },
+        source: { operation: effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
         candidateKinds,
       },
       lane: "executor",
@@ -50,10 +62,13 @@ export class DeterministicObserver {
       type: "evidence",
       evidence: {
         id: evidenceId,
-        kind: effect.result.exitCode === 0 ? "observation" : "negative",
+        // A failed tool call is an observed failure signature, not verifier-grade
+        // negative Evidence. Only the trusted verifier may promote a failed
+        // reproduction into terminal negative Evidence.
+        kind: "observation",
         summary: `Deterministic observation ${observationId} from ${effect.operation}.`,
-        source: { tool: effect.operation, effectId: effect.effectId, artifactId: effect.artifactId, generation: effect.generation },
-        confidence: effect.result.exitCode === 0 ? 0.9 : 1,
+        source: { tool: journalEffect?.operation ?? effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
+        confidence: 0.9,
         supports: [observationId],
         refutes: [],
       },

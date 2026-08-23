@@ -35,7 +35,7 @@
 - Runtime 的 `repeated_tool_failure`、`no_progress` 与 `tool_failure_storm` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
 - Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
-- Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Solver lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。
+- Fixture 求解必须在 `startSolve` 返回前创建 durable Run；Coding lane 建成后登记到同一运行控制表，确保立即点击暂停时不会出现 `Run not found`，也不会在后台继续调用模型。
 - 运行中状态以服务端 `active` 投影为准，页面切换或组件重挂载不得恢复为可发送状态；暂停确认前按钮保持可见并禁用重复暂停。
 - 模型标签和右侧配置必须显示当前对话下一轮使用的 Provider/Model/Thinking；最近一条响应的模型仅作为历史元数据，不得覆盖当前选择。
 - Provider Profile 必须显示并保存实际 wire protocol；模型发现按 OpenAI Bearer 或 Anthropic `x-api-key`/版本头发送。能力面板按本对话 Profile 显示 Provider Native 状态：协议候选未接入时不可勾选，和受控 workspace 工具语义重合时显示被接管原因，不能把产品内置工具误展示为 ProofBlade 可执行能力。

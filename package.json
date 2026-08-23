@@ -14,6 +14,7 @@
   "scripts": {
     "check:components": "node scripts/check-component-docs.mjs",
     "check:change-contracts": "node scripts/check-change-contracts.mjs",
+    "check:changed-tests": "node scripts/check-changed-tests.mjs",
     "record:component-audit": "node scripts/record-component-audits.mjs",
     "reports:project": "node scripts/generate-project-reports.mjs",
     "check:project-reports": "node scripts/check-project-reports.mjs",

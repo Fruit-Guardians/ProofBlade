@@ -27,7 +27,7 @@ const config: ProofBladeConfig = {
   },
 };
 
-const ENV_KEYS = ["PROOFBLADE_COMPETITION_BASE_URL", "PROOFBLADE_COMPETITION_TOKEN", "PROOFBLADE_COMPETITION_TOKEN_HEADER", "PROOFBLADE_COMPETITION_SERVER_HOST", "PROOFBLADE_COMPETITION_ACCESS_KEY", "PROOFBLADE_COMPETITION_WRONG_FLAG_CODES"] as const;
+const ENV_KEYS = ["PROOFBLADE_COMPETITION_BASE_URL", "PROOFBLADE_COMPETITION_TOKEN", "PROOFBLADE_COMPETITION_TOKEN_HEADER", "PROOFBLADE_COMPETITION_SERVER_HOST", "PROOFBLADE_COMPETITION_ACCESS_KEY", "PROOFBLADE_COMPETITION_WRONG_FLAG_CODES", "PROOFBLADE_COMPETITION_MAX_ACTIVE_ENVIRONMENTS", "PROOFBLADE_COMPETITION_REQUIRE_APPROVAL"] as const;
 
 function clearEnv(): void {
   for (const key of ENV_KEYS) delete process.env[key];
@@ -112,6 +112,16 @@ test("DASCTF wrongFlagCodes can come from a comma-separated env var", async () =
   }
 });
 
+test("requireApproval can be enabled without putting an approval token in platform config", async () => {
+  clearEnv();
+  const dir = await tempDir("competition-settings-approval-");
+  const path = join(dir, "competition.json");
+  await writeFile(path, JSON.stringify({ platform: "dasctf", serverHost: "https://gcsis.dasctf.com", accessKey: "ak_secret", requireApproval: true }), "utf8");
+  const backend = (await CompetitionSettingsStore.create("/root", config, path)).backend();
+  assert.equal(backend.kind, "http");
+  clearEnv();
+});
+
 test("a wrong-typed platform value fails closed with a clear message", async () => {
   clearEnv();
   const dir = await tempDir("competition-settings-badplatform-");
@@ -181,13 +191,15 @@ test("fails closed on a present-but-wrong-typed baseUrl instead of falling back 
   await assert.rejects(() => CompetitionSettingsStore.create("/root", config, path), /baseUrl 类型错误/);
 });
 
-test("fails closed on wrong-typed token, timeoutMs, wrongFlagCodes, headers, and endpoints", async () => {
+test("fails closed on wrong-typed token, timeoutMs, wrongFlagCodes, capacity, headers, and endpoints", async () => {
   clearEnv();
   const cases: Array<[Record<string, unknown>, RegExp]> = [
     [{ baseUrl: "https://ctf.example/api", token: 5 }, /token 类型错误/],
     [{ baseUrl: "https://ctf.example/api", timeoutMs: "30s" }, /timeoutMs 类型错误/],
     [{ platform: "dasctf", wrongFlagCodes: "B0001" }, /wrongFlagCodes 类型错误/],
     [{ platform: "dasctf", wrongFlagCodes: ["B0001", ""] }, /wrongFlagCodes\.1 类型错误/],
+    [{ platform: "dasctf", maxActiveEnvironments: 0 }, /maxActiveEnvironments 类型错误/],
+    [{ platform: "dasctf", requireApproval: "yes" }, /requireApproval 类型错误/],
     [{ baseUrl: "https://ctf.example/api", headers: { "X-A": 1 } }, /headers\.X-A 类型错误/],
     [{ baseUrl: "https://ctf.example/api", endpoints: { submitFlag: 42 } }, /endpoints\.submitFlag 类型错误/],
   ];

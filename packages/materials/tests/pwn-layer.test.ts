@@ -193,7 +193,7 @@ test("PwnReproducer produces a candidate only when shell marker AND flag both su
     assert.equal(outcome.shellConfirmed, true);
     assert.equal(outcome.flag, "flag{repro-ok}");
     const snap = await control.snapshot(runId);
-    assert.equal(snap.evidence[outcome.evidenceId]?.kind, "reproduction");
+    assert.equal(snap.evidence[outcome.evidenceId], undefined, "model-driven pwn output must not become trusted Evidence");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -259,7 +259,7 @@ test("PwnReproducer records negative evidence when the process dies before the s
     assert.equal(outcome.shellConfirmed, false);
     assert.equal(outcome.flag, undefined);
     const snap = await control.snapshot(runId);
-    assert.equal(snap.evidence[outcome.evidenceId]?.kind, "negative");
+    assert.equal(snap.evidence[outcome.evidenceId], undefined, "local failure is not a trusted verifier negative");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

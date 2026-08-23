@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
-import type { Effect, EffectRequest, RawEffectResult, TaskContract } from "../domain/types.js";
+import type { Effect, EffectRequest, RawEffectResult, ReplayPolicy, TaskContract } from "../domain/types.js";
 import {
   LocalFixtureSandbox,
   type FixtureHealth,
@@ -55,6 +55,14 @@ export class CompetitionSandbox implements SandboxPort {
     return this.environment.teamFlag;
   }
 
+  public resolveReplayPolicy(operation: string, requested: ReplayPolicy): ReplayPolicy {
+    // A platform submission is externally irreversible and the platform API has
+    // no query-by-idempotency-key contract. A crash after submitFlag returns but
+    // before the local artifact is committed must therefore stop for review,
+    // never spend another attempt by replaying a nominally "pure" Effect.
+    return operation === "fixture_score" ? "forbidden-replay" : requested;
+  }
+
   public async build(task: TaskContract): Promise<FixtureRef> {
     const path = join(this.init.workspaceRoot, task.task_id);
     const privatePath = join(path, ".proofblade");
@@ -87,12 +95,19 @@ export class CompetitionSandbox implements SandboxPort {
 
   public async execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult> {
     if (effect.operation === "fixture_score") {
+      if (effect.replayPolicy !== "forbidden-replay") {
+        throw new Error("Competition fixture_score requires forbidden-replay");
+      }
       return this.executeScore(effect);
     }
     return this.local.execute(effect, signal);
   }
 
   public async reconcile(effect: Effect): Promise<ReconcileResult> {
+    // Defense in depth for legacy/in-flight records that were incorrectly
+    // persisted as pure: without a durable platform receipt, the outcome is
+    // ambiguous and submitting again could consume an attempt twice.
+    if (effect.operation === "fixture_score") return { action: "unknown", outcome: "unknown" };
     return this.local.reconcile(effect);
   }
 

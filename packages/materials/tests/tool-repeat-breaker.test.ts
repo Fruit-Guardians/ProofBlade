@@ -719,11 +719,16 @@ test("read-window termination cannot replace an earlier declared no-progress sto
   }
 });
 
-test("[contract:experiment-budget-visible] inner provider probe budget produces a visible termination", async () => {
-  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-visible-"));
+test("[contract:experiment-budget-advisory] inner probe budget nudges without stopping the turn", async () => {
+  // Advisory contract (was: visible termination). Hitting the experiment budget
+  // must NOT stop the provider turn or force a replan — that interrupted
+  // legitimate multi-step solves mid-chain. Instead the real tool output is kept
+  // and a change-tactics nudge is appended; the breaker window is reset so the
+  // nudge is periodic, not per-call. The model stays in control.
+  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-advisory-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
-    const faux = fauxProvider({ provider: "faux-experiment-budget-visible" });
+    const faux = fauxProvider({ provider: "faux-experiment-budget-advisory" });
     const models = createModels();
     models.setProvider(faux.provider);
     faux.setResponses([
@@ -731,14 +736,14 @@ test("[contract:experiment-budget-visible] inner provider probe budget produces 
       fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe2.py" }, { id: "probe-2" }), { stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe3.py" }, { id: "probe-3" }), { stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe4.py" }, { id: "probe-4" }), { stopReason: "toolUse" }),
-      fauxAssistantMessage("must not reach a fifth probe"),
+      fauxAssistantMessage("done exploring", { stopReason: "stop" }),
     ]);
     const bash: AgentHarnessTool<undefined> = {
       name: "bash", label: "bash", description: "bounded process probe", parameters: Type.Object({ command: Type.String() }),
       async execute() { return { content: [{ type: "text" as const, text: "probe completed" }] }; },
     };
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
-    const session = await repo.create({ id: "experiment-budget-visible", cwd: root });
+    const session = await repo.create({ id: "experiment-budget-advisory", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
     const termination: CodingTurnTermination = {};
     attachCodingTurnGuards(
@@ -752,11 +757,110 @@ test("[contract:experiment-budget-visible] inner provider probe budget produces 
     );
 
     const response = await harness.prompt("continue");
-    assert.equal(faux.state.callCount, 3);
-    assert.ok(response.stopReason === "toolUse" || response.stopReason === "error");
+    // Turn ran to its natural end (all 5 provider responses consumed), not cut at 3.
+    assert.equal(faux.state.callCount, 5);
+    assert.equal(response.stopReason, "stop");
+    // The budget breaker did NOT terminate the turn.
+    assert.notEqual(termination.reason, "experiment_budget");
+    assert.notEqual(termination.requested, true);
+    // The advisory nudge (not the "turn was stopped" message) reached the model
+    // in a tool-result message, alongside the real probe output.
+    const branch = await session.getBranch();
+    const toolResults = branch.filter((entry) => entry.type === "message" && entry.message.role === "toolResult");
+    const texts = toolResults.flatMap((entry) => (entry.type === "message" ? entry.message.content : []).map((c) => (c.type === "text" ? c.text : "")));
+    assert.ok(texts.some((t) => /experiment budget notice/i.test(t)), "expected an advisory budget nudge in a tool result");
+    assert.ok(texts.some((t) => /probe completed/.test(t)), "expected the real probe output to be preserved");
+    assert.ok(texts.every((t) => !/turn was stopped/i.test(t)), "must not use the terminating message");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CTF turns stop at the experiment budget and return a replan signal", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-ctf-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-experiment-budget-ctf" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe1.py" }, { id: "probe-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe2.py" }, { id: "probe-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "python3 probe3.py" }, { id: "probe-3" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not reach the unbounded continuation", { stopReason: "stop" }),
+    ]);
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "bounded process probe", parameters: Type.Object({ command: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "probe completed" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "experiment-budget-ctf", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = { ctfMode: true };
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      undefined,
+      termination,
+      () => ({ readOnly: false, sideEffect: "process" }),
+      undefined,
+      new ExperimentBudgetBreaker({ maxExperimentCalls: 20, maxLongRunning: 20, maxTimeouts: 2, maxFamily: 2 }),
+    );
+
+    const response = await harness.prompt("题目描述：求解flag");
+    assert.equal(faux.state.callCount, 2);
+    // Pi preserves the assistant tool-use stop reason when a tool result asks
+    // to terminate; finalizeCodingTurn converts the requested termination into
+    // the visible replan response.
+    assert.equal(response.stopReason, "toolUse");
     assert.equal(termination.requested, true);
     assert.equal(termination.reason, "experiment_budget");
-    assert.match(termination.message ?? "", /per-turn limit/i);
+    assert.match(termination.message ?? "", /turn was stopped/i);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("tool-call budget blocks and terminates the next inner turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-tool-budget-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-tool-budget" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("bash", { command: "probe-1" }, { id: "budget-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "probe-2" }, { id: "budget-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "probe-3" }, { id: "budget-3" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not reach natural completion", { stopReason: "stop" }),
+    ]);
+    let executions = 0;
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "bounded probe", parameters: Type.Object({ command: Type.String() }),
+      async execute() { executions += 1; return { content: [{ type: "text" as const, text: "probe completed" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "tool-budget", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = {};
+    attachCodingTurnGuards(
+      harness,
+      new RepeatedToolFailureBreaker(),
+      undefined,
+      termination,
+      undefined,
+      undefined,
+      undefined,
+      { max: 2, count: 0 },
+    );
+
+    const response = await harness.prompt("continue");
+    assert.equal(executions, 2);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.reason, "tool_budget_exhausted");
+    assert.equal(termination.requested, true);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });

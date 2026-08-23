@@ -24,9 +24,11 @@
 
 ## 入口与边界
 
-- `control-store.ts` 负责 append、snapshot 与 replay。
+- `control-store.ts` 负责受校验的领域命令、telemetry-only raw append、snapshot 与 replay；`ControlStore.create()` 通过 ECMAScript 私有工厂拆分普通 Control、Verifier 结果、Verifier Effect 与 Fixture 生命周期 capability。每个 Run 在 `run_started` 时锚定创建者的 authority hash；JSONL/Projection 写入必须证明相同 secret。默认 secret 为进程内随机值；需要可信跨进程恢复时，harness 必须通过 `authoritySecret`（CLI/GUI 对应 `PROOFBLADE_CONTROL_AUTHORITY`）显式注入同一个至少 32 字符的 credential，错误或缺失 credential 只能读取、不能写既有 Run。结果端口在运行时拒绝 Effect 命令，Effect 端口也不能写 Evidence/Completion，二者都不得进入模型 lane。
 - `reducer.ts` 应用事件；`phase-machine.ts` 校验阶段转换；`lease-manager.ts` 处理所有权。
 - 不直接执行外部 Effect，不保存 Provider 消息正文。
+- `app-server.ts` 是对 GUI/外部控制面的稳定边界，只提供 Run 读取、事件游标分页/订阅和审批查询/批准；不得把 ControlStore 的任意写原语直接暴露出去。
+- `security/approval-policy.ts` 负责受保护副作用的持久化审批，资源明文只在进程内使用，账本保存摘要哈希并默认 fail-closed。
 
 ## 开发规则与验证
 
@@ -36,6 +38,10 @@
 - 需要共同成立的一组领域命令必须通过 `dispatchBatch` 在同一单写者临界区内预验证和投影；任一命令失败时不得追加部分事件或保存部分投影。
 - 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
 - 新 `job_queued` 命令在领域层强制携带 `backendId` 与 `backendVersion`；`job_queued_legacy` 只用于读取/迁移没有 Backend 绑定的历史事件，最终仍投影为 `job_queued`。
+- Evidence ID、Artifact ID、Effect ID 与 Completion ID 都是不可覆盖的；Evidence 必须绑定当前 run/generation 的既有 Artifact，并校验所有 `dependsOn/supports/refutes` 引用。`reproduction`、`negative`、`confidence: 1`、Completion 终态和成功 finish 只能经私有 Verifier capability 提交，伪造 `lane: "verifier"` 没有权限效果。
+- Completion 只能从 `PROPOSED` 原子转换一次；接受时 Evidence 必须逐条支持该 Completion，并以不同 Effect、session、attempt 与 transcript 满足 reproduction 数量。Verifier Effect 必须从纯 `PROPOSED` 初态启动，终态携带与 Task/Run/Generation/Completion/Candidate/Artifact 精确绑定的结构化 verdict；仅有 `exitCode: 0` 不能表示验证通过。成功 finish 必须显式指定 ACCEPTED Completion，最终 candidate hash、Artifact 和完整 Evidence 集合均从该 Completion 派生并写入 `finalResult`。
+- `append()` 仅允许 Provider/Tool/Turn/usage telemetry；领域事件必须走命令校验，避免绕过引用和终态不变量。
+- Run 目录采用 create-exclusive 锚点；重复 `runId` 不得重写 `task.json` 或截断 `events.jsonl`。Reducer 只允许 seq=1 的唯一 `run_started`，authority hash 一经锚定不可替换；公开 JSONL reader 的 append/projection write 原语还必须提交创建者 secret。`fixture_reset` 只能由 Fixture capability 单独提交，Sandbox 在实际 reset 前必须调用 `assertResetAllowed` preflight；终态、错误 authority 及 verification/report 阶段不得先改变外部 fixture 再被 ControlStore 拒绝。submission 配额按整个 Run 计数，不能用 generation bump 清零。
 
 ```powershell
 npm run test:materials

@@ -179,14 +179,14 @@ export class BinaryCapabilityBackend implements CapabilityBackend {
   public readonly id = "proofblade-binary";
   public readonly kind = "bundled" as const;
   public readonly priority = 90;
-  private readonly version = "1.2.0";
+  private readonly version = "1.3.0";
 
   public status(): CapabilityBackendStatus {
     return { id: this.id, kind: this.kind, version: this.version, priority: this.priority, available: true };
   }
 
   public handles(capabilityId: string, operation: string): boolean {
-    return capabilityId === "proofblade.binary" && ["identify", "read_range", "sections", "symbols", "strings", "inspect_elf", "gdb_batch"].includes(operation);
+    return capabilityId === "proofblade.binary" && ["identify", "read_range", "sections", "symbols", "strings", "inspect_elf", "packed_probe", "gdb_batch"].includes(operation);
   }
 
   public availability(_request: CapabilityBackendRequest): CapabilityBackendAvailability {

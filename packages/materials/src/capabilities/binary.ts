@@ -69,6 +69,7 @@ export async function executeBinaryCapability(operation: string, input: BinaryCa
           : operation === "symbols" ? symbols(bytes)
       : operation === "strings" ? strings(bytes, input)
         : operation === "inspect_elf" ? inspectElf(bytes)
+          : operation === "packed_probe" ? packedProbe(bytes)
               : (() => { throw new Error(`Unsupported binary operation: ${operation}`); })();
     throwIfAborted(signal);
     return { stdout: JSON.stringify(value, null, 2), stderr: "", exitCode: 0, durationMs: Date.now() - started };
@@ -225,6 +226,29 @@ function inspectElf(bytes: Buffer): Record<string, unknown> {
     },
     sections: sectionInfo,
     symbols: symbolInfo.slice(0, 4_000),
+  };
+}
+
+function packedProbe(bytes: Buffer): Record<string, unknown> {
+  const markerDefinitions = ["UPX!", "UPX0", "UPX1", "UPX2", "UPX$"];
+  const markers = markerDefinitions
+    .map((marker) => ({ marker, offset: bytes.indexOf(Buffer.from(marker, "ascii")) }))
+    .filter((item) => item.offset >= 0);
+  const format = identify(bytes).format;
+  const packed = markers.length > 0;
+  return {
+    format,
+    size: bytes.length,
+    packed,
+    confidence: packed ? "high" : "unknown",
+    markers,
+    nextActions: packed
+      ? [
+        "Confirm the local UPX executable with `upx -t` before modifying the input.",
+        "If UPX is unavailable or reports a corrupt header, use bounded gdb_batch starti/info proc mappings and dump the unpacked image to a workspace-relative file.",
+        "Re-run packed_probe/identify on the derived image before decompilation.",
+      ]
+      : ["No UPX signature was found; continue with normal identify/sections/strings and decompiler analysis."],
   };
 }
 
