@@ -102,7 +102,7 @@ export class HttpSessionBackend {
       throw error;
     }
     this.captureCookies(response.headers);
-    const body = (await response.text()).slice(0, 1_048_576);
+    const body = await readBoundedResponseBody(response);
     this.csrfToken = extractCsrfToken(response.headers, body) ?? this.csrfToken;
     const stateHash = this.stateHash();
     const responseHeaders = sanitizeHeaders(Object.fromEntries(response.headers.entries()));
@@ -169,6 +169,7 @@ export class HttpSessionBackend {
   }
 }
 
+const MAX_RESPONSE_BYTES = 1_048_576;
 const SENSITIVE_HTTP_HEADERS = /^(?:authorization|cookie|set-cookie|proxy-authorization|x-api-key|x-auth-token|x-csrf-token|x-xsrf-token)$/i;
 
 function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
@@ -190,4 +191,34 @@ function extractCsrfToken(headers: Headers, body: string): string | undefined {
   if (header?.trim()) return header.trim().slice(0, 4_096);
   const match = /(?:name=["'](?:csrf-token|csrf_token|_csrf)["'][^>]*content=["']([^"']+)|name=["'](?:csrf_token|_csrf)["'][^>]*value=["']([^"']+))/i.exec(body);
   return (match?.[1] ?? match?.[2])?.slice(0, 4_096);
+}
+
+/** Read at most one MiB from a response and cancel an unbounded stream early. */
+async function readBoundedResponseBody(response: Response): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let body = "";
+  let bytesRead = 0;
+  let truncated = false;
+  try {
+    while (bytesRead < MAX_RESPONSE_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+      const remaining = MAX_RESPONSE_BYTES - bytesRead;
+      const chunk = value.byteLength > remaining ? new Uint8Array(value.subarray(0, remaining)) : value;
+      body += decoder.decode(chunk, { stream: true });
+      bytesRead += chunk.byteLength;
+      if (chunk.byteLength < value.byteLength) {
+        truncated = true;
+        break;
+      }
+    }
+  } finally {
+    if (bytesRead >= MAX_RESPONSE_BYTES) truncated = true;
+    if (truncated) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  return body + decoder.decode();
 }

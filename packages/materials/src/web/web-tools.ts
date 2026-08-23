@@ -69,6 +69,7 @@ export class WebToolHandler {
   // HttpSessionBackend does not expose its base URL, so track it alongside the
   // backend for list()/replay() (which reopens a clean session at the same origin).
   private readonly sessions = new Map<string, LiveWebSession>();
+  private readonly closed = new Set<string>();
   private readonly ownerLane: Lane;
 
   public constructor(private readonly deps: WebToolHandlerDeps) {
@@ -88,6 +89,7 @@ export class WebToolHandler {
       ...(this.deps.fetchImpl ? { fetchImpl: this.deps.fetchImpl } : {}),
     });
     this.sessions.set(backend.sessionId, { backend, baseUrl: input.baseUrl });
+    this.closed.delete(backend.sessionId);
     return { sessionId: backend.sessionId, baseUrl: input.baseUrl };
   }
 
@@ -134,9 +136,11 @@ export class WebToolHandler {
   }
 
   public async close(sessionId: string): Promise<void> {
+    if (this.closed.has(sessionId)) return;
     const { backend } = this.require(sessionId);
     await backend.close("closed by model");
     this.sessions.delete(sessionId);
+    this.closed.add(sessionId);
   }
 
   public list(): Array<{ sessionId: string; baseUrl: string }> {
@@ -145,7 +149,10 @@ export class WebToolHandler {
 
   /** Best-effort teardown of every live session (lane shutdown). */
   public async disposeAll(reason = "lane shutdown"): Promise<void> {
-    for (const { backend } of this.sessions.values()) await backend.close(reason).catch(() => undefined);
+    for (const [sessionId, { backend }] of this.sessions) {
+      await backend.close(reason).catch(() => undefined);
+      this.closed.add(sessionId);
+    }
     this.sessions.clear();
   }
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import * as ts from "typescript";
 
 export const PACKAGE_CONFIGS = {
@@ -53,7 +53,7 @@ function describeSymbol(symbol, declaration, checker, packageRoot, packageName, 
   const name = symbol.getName();
   const position = sourceFile.getLineAndCharacterOfPosition(declaration.getStart(sourceFile));
   const docs = documentation(symbol, checker);
-  const signature = signatureOf(symbol, declaration, checker);
+  const signature = signatureOf(symbol, declaration, checker, packageRoot);
   const module = normalize(relative(packageRoot, sourceFile.fileName));
   const summary = docs.summary || inferSummary(name, kind, declaration);
   return {
@@ -93,7 +93,7 @@ function describeMethods(classSymbol, classDeclaration, checker, packageRoot, pa
       module: normalize(relative(packageRoot, sourceFile.fileName)),
       exportPath: packageName,
       line: position.line + 1,
-      signature: signatureOf(methodSymbol, member, checker),
+      signature: signatureOf(methodSymbol, member, checker, packageRoot),
       summary,
       summarySource: docs.summary ? "tsdoc" : "inferred",
       tags: docs.tags,
@@ -123,13 +123,28 @@ function symbolKind(symbol, declaration) {
   return undefined;
 }
 
-function signatureOf(symbol, declaration, checker) {
+function signatureOf(symbol, declaration, checker, packageRoot) {
   if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration) || ts.isConstructorDeclaration(declaration)) {
     const signature = checker.getSignatureFromDeclaration(declaration);
-    if (signature) return checker.signatureToString(signature, declaration, ts.TypeFormatFlags.NoTruncation);
+    if (signature) return normalizeSignature(checker.signatureToString(signature, declaration, ts.TypeFormatFlags.NoTruncation), packageRoot);
   }
   const type = checker.getTypeAtLocation(declaration);
-  return checker.typeToString(type, declaration, ts.TypeFormatFlags.NoTruncation);
+  return normalizeSignature(checker.typeToString(type, declaration, ts.TypeFormatFlags.NoTruncation), packageRoot);
+}
+
+/**
+ * TypeScript prints imported types with the absolute file name used by the
+ * current checkout.  Keep generated API indexes portable by expressing those
+ * imports relative to the package root instead.
+ */
+function normalizeSignature(signature, packageRoot) {
+  return signature.replace(/import\("([^"]+)"\)/g, (full, importedPath) => {
+    if (!isAbsolute(importedPath)) return full;
+    const file = resolve(importedPath);
+    if (!isInside(packageRoot, file)) return full;
+    const modulePath = normalize(relative(packageRoot, file)).replace(/\.d?\.(?:ts|tsx)$/, "");
+    return `import("./${modulePath.replace(/^\.\//, "")}")`;
+  });
 }
 
 function documentation(symbol, checker) {

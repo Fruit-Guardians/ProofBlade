@@ -9,6 +9,7 @@ import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-reproducer.js";
 import { PwnToolHandler } from "../src/pwn/pwn-tools.js";
+import { ExperimentGate } from "../src/competition/experiment-gate.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle, ContainerSessionResult } from "../src/container/contracts.js";
 
@@ -42,6 +43,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private count = 0;
   public lastWriteBytes: Uint8Array | undefined;
   public closed: string[] = [];
+  public readCalls = 0;
   public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false) {}
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
@@ -57,7 +59,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
     this.pending.set(handle.sessionId, (this.pending.get(handle.sessionId) ?? "") + out);
     return this.drain(handle.sessionId);
   }
-  public async sessionRead(handle: ContainerSessionHandle): Promise<ContainerSessionResult> { return this.drain(handle.sessionId); }
+  public async sessionRead(handle: ContainerSessionHandle): Promise<ContainerSessionResult> { this.readCalls += 1; return this.drain(handle.sessionId); }
   public async sessionSignal(): Promise<boolean> { return true; }
   public async closeSession(handle: ContainerSessionHandle): Promise<{ exitCode: number | null }> {
     this.closed.push(handle.sessionId);
@@ -70,12 +72,16 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   }
 }
 
-async function makeHandler(root: string, runId: string, flag = "flag{tool}"): Promise<{ handler: PwnToolHandler; control: ControlStore }> {
+class UndeliveredSignalRuntime extends EchoTubeRuntime {
+  public async sessionSignal(): Promise<boolean> { return false; }
+}
+
+async function makeHandler(root: string, runId: string, flag = "flag{tool}", experimentGate?: ExperimentGate, runtimeOverride?: ContainerRuntimePort): Promise<{ handler: PwnToolHandler; control: ControlStore }> {
   const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
   await control.createRun(runId, demoTask(runId, root, config));
-  const runtime = new EchoTubeRuntime(flag, "/flag") as unknown as ContainerRuntimePort;
+  const runtime = runtimeOverride ?? new EchoTubeRuntime(flag, "/flag") as unknown as ContainerRuntimePort;
   const registry = new SessionRegistry(runId, runtime, control);
-  const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
+  const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, experimentGate);
   return { handler, control };
 }
 
@@ -238,6 +244,67 @@ test("an exited tube is removed from both handler and durable live state", async
     assert.deepEqual(runtime.closed, ["dxs-1"]);
     assert.deepEqual(await handler.close(opened.sessionId), { exitCode: null });
     assert.equal((await control.snapshot(runId)).sessions[opened.sessionId]?.status, "CLOSED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("pwn experiment failures are durable, session-independent, and gate all probes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-gate-"));
+  try {
+    const runId = "PWN-TOOL-GATE";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, demoTask(runId, root, config));
+    const gate = new ExperimentGate(control);
+    const runtime = new EchoTubeRuntime("flag{x}", "/flag");
+    const registry = new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, gate);
+    const first = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const second = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const third = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const attempts = await Promise.allSettled([
+      handler.recv(first.sessionId, ">", 1),
+      handler.recv(second.sessionId, ">", 1),
+      handler.recv(third.sessionId, ">", 1),
+    ]);
+    assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 2);
+    assert.equal(attempts.filter((attempt) => attempt.status === "rejected" && /blocked action/.test(String(attempt.reason))).length, 1);
+    assert.equal(runtime.readCalls, 2, "the third concurrent attempt must be blocked before reaching the tube");
+
+    const experiments = Object.values((await control.snapshot(runId)).experiments).filter((item) => item.action === "pwn_recv");
+    assert.equal(experiments.length, 2);
+    assert.equal(new Set(experiments.map((item) => item.repeatKey)).size, 1, "session ids must not distinguish the same recv experiment");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("pwn signal and shell probe failures count toward their own repeat gates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-gate-actions-"));
+  try {
+    const runId = "PWN-TOOL-GATE-ACTIONS";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, demoTask(runId, root, config));
+    const gate = new ExperimentGate(control);
+    const signalRuntime = new UndeliveredSignalRuntime("flag{x}", "/flag");
+    const registry = new SessionRegistry(runId, signalRuntime as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, gate);
+    const first = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const second = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    assert.deepEqual(await handler.signal(first.sessionId, "SIGTERM"), { delivered: false });
+    assert.deepEqual(await handler.signal(second.sessionId, "SIGTERM"), { delivered: false });
+    const third = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await assert.rejects(handler.signal(third.sessionId, "SIGTERM"), /blocked action/);
+
+    const exitedRuntime = new EchoTubeRuntime("flag{x}", "/flag", true);
+    const exitedRegistry = new SessionRegistry(runId, exitedRuntime as unknown as ContainerRuntimePort, control);
+    const exitedHandler = new PwnToolHandler(runId, exitedRegistry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, gate);
+    const probeOne = await exitedHandler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    const probeTwo = await exitedHandler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    assert.equal((await exitedHandler.shellProbe(probeOne.sessionId)).ok, false);
+    assert.equal((await exitedHandler.shellProbe(probeTwo.sessionId)).ok, false);
+    const probeThree = await exitedHandler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await assert.rejects(exitedHandler.shellProbe(probeThree.sessionId), /blocked action/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

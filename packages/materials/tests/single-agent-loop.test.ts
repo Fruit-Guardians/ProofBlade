@@ -87,7 +87,9 @@ test("assist mode pauses before verification and resumes from the durable propos
     const resumed = await loop.run({ runId, task, mode: "assist", maxTurns: 1 });
     assert.equal(resumed.status, "SUCCEEDED");
     assert.equal(resumed.turns, 0);
-    assert.equal(Object.values((await services.control.snapshot(runId)).completions)[0]?.status, "ACCEPTED");
+    const finalSnapshot = await services.control.snapshot(runId);
+    assert.equal(Object.values(finalSnapshot.completions)[0]?.status, "ACCEPTED");
+    assert.ok(Object.values(finalSnapshot.workItems).some((item) => item.status === "SUCCEEDED"), "approval resume must settle the blocked work item");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

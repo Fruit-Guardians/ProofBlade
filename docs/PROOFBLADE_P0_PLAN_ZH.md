@@ -42,7 +42,17 @@
 
 - P1：平台链接契约与运行期可观测性（不执行真实 DASCTF 登录、远程 tube 或 pwn 端到端）；`inspect_elf`/`gdb_batch`、LeakRecord 接入 evidence graph。
 - P2：HTTP session/browser session 和 clean replay verifier（当前已完成离线契约闭环）。
-- P3：Planner/Refiner 双 lane，仅在 20+ holdout 评测中成功率、成本或 p95 有稳定收益时合入。
+- P3：Planner/Refiner 只作为可选策略层，不能新增第二条解题 lane；只有在 20+ holdout 评测中成功率、成本或 p95 有稳定收益时才启用模型化策略。
+
+### P0.5 统一 Run Actor 控制面（本轮）
+
+- `WorkItem` 是唯一持久化的执行单元，负责 claim、lease recovery、complete/fail/block 及父子重规划关系。
+- `IntentScheduler` 只负责选择探索目标，并通过 `schedulerIntentId` 与 WorkItem 建立可回放关联；它不再拥有独立的执行 lane。
+- Competition 与 Fixture/Evaluation 的入口共用 `RunWorkScheduler`；兼容的 Competition helper 只保留 API 兼容，不再复制调度逻辑。
+- Assist 暂停的阻塞 WorkItem 在恢复时重新 ready/claim，验证成功后再完成，避免终态 Run 已成功但 WorkItem 仍阻塞。
+- 旧 `RunSnapshot.intents` 仅作为迁移兼容读模型，新的 SingleAgent 收尾不再写入它。
+
+验收：共享调度器的 claim、过期 lease 恢复、父子重规划、Intent 关联和 projection replay 已由 materials 定向测试覆盖；Competition 与 SingleAgent 回归均通过。
 
 ## 统一评测指标
 

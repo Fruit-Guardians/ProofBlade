@@ -19,6 +19,7 @@ import { LeaseManager } from "../control/lease-manager.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { IntentScheduler } from "./intent-scheduler.js";
 import { buildSchedulingContext } from "./scheduling-context.js";
+import { RunWorkScheduler } from "./run-work-scheduler.js";
 
 export interface AgentLaneCreateInput {
   projectRoot: string;
@@ -98,6 +99,7 @@ export class SingleAgentCtfLoop {
     throwIfAborted(options.signal);
     if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     const intentScheduler = new IntentScheduler(this.services.control, new LeaseManager(this.services.control), this.config.intentScheduler);
+    const workScheduler = new RunWorkScheduler(this.services.control);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.verifierJournal, this.services.runsRoot, this.services.verifier);
     const claimVerifier = new CodingClaimVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
@@ -108,7 +110,8 @@ export class SingleAgentCtfLoop {
       throwIfAborted(options.signal);
       let verified: VerificationOutcome;
       try {
-        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, intentScheduler, options.signal);
+        const resumedWorkItem = await workScheduler.claim(options.runId, options.task, 0);
+        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, intentScheduler, workScheduler, resumedWorkItem.id, options.signal);
       } catch (error) {
         const paused = await this.services.control.snapshot(options.runId);
         if (paused.status === "PAUSED") return outcome(paused, mode, 0);
@@ -123,6 +126,7 @@ export class SingleAgentCtfLoop {
     let abortPromise: Promise<void> | undefined;
     let turns = 0;
     let verification: VerificationOutcome | undefined;
+    let activeWorkItemId: string | undefined;
     try {
       throwIfAborted(options.signal);
       lane = await this.createLane({
@@ -154,20 +158,25 @@ export class SingleAgentCtfLoop {
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
         await planner.prepare(options.runId);
+        activeWorkItemId = (await workScheduler.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
         const agentOutcome = await lane.prompt(turnPrompt(before, turns, activeIntent));
         throwIfAborted(options.signal);
         if (agentOutcome.termination === "budget_exhausted" || agentOutcome.termination === "deadline_exhausted") {
+          await workScheduler.fail(options.runId, activeWorkItemId, agentOutcome.termination);
           await this.exhaust(options.runId, agentOutcome.termination === "deadline_exhausted" ? "Run deadline exhausted during a Provider request." : "Run provider cost budget exhausted.");
           break;
         }
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
+            await workScheduler.fail(options.runId, activeWorkItemId, "context_overflow: recovery already used for this run.");
             await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });
             break;
           }
+          await workScheduler.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery");
+          activeWorkItemId = undefined;
           const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");
           await this.services.control.dispatch(options.runId, { type: "context_recovery", checkpointId: checkpoint.checkpointId });
           try {
@@ -182,17 +191,26 @@ export class SingleAgentCtfLoop {
         const pending = latestPending(after);
         if (pending) {
           if (mode() === "assist") {
+            await workScheduler.block(options.runId, activeWorkItemId, "Completion is waiting for verifier approval.");
             await this.services.control.dispatch(options.runId, { type: "pause", reason: `Completion ${pending.id} is waiting for verifier approval.` });
             break;
           }
           throwIfAborted(options.signal);
-          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, intentScheduler, options.signal);
+          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, intentScheduler, workScheduler, activeWorkItemId, options.signal);
+          activeWorkItemId = undefined;
           if (verification.accepted) break;
           await refiner.refineAfterFailure(options.runId, "candidate verification failed");
           await this.moveTo(options.runId, "experiment");
           continue;
         }
+        const evidenceIds = newIds(before.evidence, after.evidence);
+        const progressed = newIds(before.observations, after.observations).length > 0
+          || evidenceIds.length > 0
+          || newIds(before.facts, after.facts).length > 0
+          || newIds(before.hypotheses, after.hypotheses).length > 0;
         await this.settleIntentAfterTurn(options.runId, intentScheduler, activeIntent, before, after);
+        await workScheduler.settle(options.runId, activeWorkItemId, progressed, evidenceIds, []);
+        activeWorkItemId = undefined;
         if (mode() === "assist") {
           await this.services.control.dispatch(options.runId, { type: "pause", reason: "Assist turn completed without a completion proposal." });
           break;
@@ -211,6 +229,7 @@ export class SingleAgentCtfLoop {
         }
       }
     } catch (error) {
+      await workScheduler.fail(options.runId, activeWorkItemId, "Coding lane failed before returning a turn outcome.").catch(() => undefined);
       const paused = await this.services.control.snapshot(options.runId);
       if (paused.status === "PAUSED") {
         snapshot = paused;
@@ -229,6 +248,7 @@ export class SingleAgentCtfLoop {
     snapshot = await this.services.control.snapshot(options.runId);
     if (mode() === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
       try {
+        await workScheduler.fail(options.runId, activeWorkItemId, `No verified completion after ${maxTurns} model turns.`);
         await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
       } catch (error) {
         const current = await this.services.control.snapshot(options.runId);
@@ -239,7 +259,7 @@ export class SingleAgentCtfLoop {
     return outcome(snapshot, mode, turns, verification);
   }
 
-  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, scheduler: IntentScheduler, signal?: AbortSignal): Promise<VerificationOutcome> {
+  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, scheduler: IntentScheduler, workScheduler: RunWorkScheduler, workItemId: string | undefined, signal?: AbortSignal): Promise<VerificationOutcome> {
     throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     if (Object.keys(snapshot.hypotheses).length === 0) {
@@ -257,6 +277,7 @@ export class SingleAgentCtfLoop {
     await this.ensureVerifierActive(runId, signal);
     if (!verified.accepted) {
       await this.failClaimedIntents(runId, scheduler, `Verifier rejected completion ${completionId}`);
+      await workScheduler.fail(runId, workItemId, `Verifier rejected completion ${completionId}`);
       return verified;
     }
     await this.ensureVerifierActive(runId, signal);
@@ -285,9 +306,7 @@ export class SingleAgentCtfLoop {
         producedFacts: Object.keys(current.facts),
       });
     }
-    for (const intent of Object.values(current.intents).filter((item) => item.status === "OPEN" || item.status === "CLAIMED")) {
-      await this.services.control.dispatch(runId, { type: "intent", intent: { ...intent, status: "DONE" }, lane: "executor" });
-    }
+    await workScheduler.complete(runId, workItemId, current);
     await this.ensureVerifierActive(runId, signal);
     await this.services.verifier.finish(runId, { completionId: acceptedCompletion.id, reason: "Hidden scorer reproduced the candidate." });
     return verified;

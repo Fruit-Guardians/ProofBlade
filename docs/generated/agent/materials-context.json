@@ -14,9 +14,9 @@
     "src/competition/api.ts": "5103e8688c9311b247730f2a6ab9d808e3bdabc5fe6de0d5f7545d9fc14cc7d9",
     "src/competition/dasctf-api.ts": "412483724c067824c10e55494f148f800ddc8119bfb7e1aa020cab51aac471af",
     "src/competition/environment-janitor.ts": "28661652b22321886ce80886cf2c9e08e1771a6b03e67b175476e755f283e370",
-    "src/competition/experiment-gate.ts": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+    "src/competition/experiment-gate.ts": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
     "src/competition/fleet.ts": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
-    "src/competition/loop.ts": "dcdb12d3c82f12024af194e8c943978fd0fa1ac051a6f238824ca697eeb2897f",
+    "src/competition/loop.ts": "2c2ff4e391b9770ed4dea288dbeac3a22552521d7bdce1912d37f9bd49c4489e",
     "src/competition/sandbox.ts": "42f8e85517e59a85fcef391763756d7f0d89a0d254634f41dc507a6a32465509",
     "src/competition/solver.ts": "b3d5473f7053dc3ae0978893cea1d48ded753ce4dc7587747691082137bbc52b",
     "src/competition/task.ts": "f6068501f63337a2e51c7ed680dbbd4fc3caa3c183030e9d15f0e4a5bf1079af",
@@ -41,7 +41,7 @@
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
     "src/domain/reasoning.ts": "8b963b8589782b26805e02dad008b06def6ed33b75d95a05fd6cb0005de2fec0",
     "src/domain/run-id.ts": "44bc23a8071c0b6e545b52c4718d13eef4c453741f0a05eee1b51a5befc1d5a5",
-    "src/domain/types.ts": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+    "src/domain/types.ts": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
     "src/domain/utils.ts": "129e4b46b3d45bfb4d02c0d30a2ae2ec575a6ab7b3a609dbd1d133b3ff27fe0c",
     "src/effects/artifact-store.ts": "f0ea314d23e5e482d9801d18b70c3d82a9e1261bbb98da9607ed29776a7f2b8c",
     "src/effects/effect-journal.ts": "d23cc035d2a1d2eda06f4be837c781cacf070da8ad6a078244d003a298fcd2d1",
@@ -50,7 +50,7 @@
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
     "src/evaluation/real-model-evaluator.ts": "70bb7e79ae795cc8a723595086868e6efe405469ef38fdb977c2ad61297e5d7a",
     "src/evaluation/runtime-scenario-evaluator.ts": "968f570e38d9e260ed52b4ae743f18940d41087402cd1d1a3ee3dd2d3d9f4ffe",
-    "src/index.ts": "6f91197bc35b246cedbdb1a819df0af395039106482aa958eaccce6199d9ea7b",
+    "src/index.ts": "f2e7b33e587dc3496a3662548e55a20b9a472e05684da3dd95791537be1c4142",
     "src/jobs/background-runner.ts": "fa637a3f0761300b604df12079e100caffba229d4fe63561752d2d404b7eb0c6",
     "src/knowledge/evidence-curation-gate.ts": "3902d606fa24907f02b093e1ef9bfb885b619a1052b698030caf39a5cde72f16",
     "src/knowledge/evidence-graph.ts": "1cb8e573819837f3f64e02b3f1734a4b19e2a29240a747c3d8fb8e9117939fe6",
@@ -63,13 +63,14 @@
     "src/orchestration/intent-scorer.ts": "ccee923e3ff918933ef5443989a60df835710e83384843b9ab8f0d484f298bf9",
     "src/orchestration/planner.ts": "1af2274f0cd0d164fdc6754ff675133d6d55213862a19b31e1b2384671c771b1",
     "src/orchestration/refiner.ts": "38858c61f8bc343c11ddef52a1b602c0f788af49209752add8a80e9ed31c8229",
+    "src/orchestration/run-work-scheduler.ts": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+    "src/orchestration/single-agent-loop.ts": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
     "src/pwn/pwn-session.ts": "497e6a3a23e8b919b86dcfba1b8516f4183dabe3e3f96d21fcdaf8ba0e0b61f4",
-    "src/pwn/pwn-tools.ts": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+    "src/pwn/pwn-tools.ts": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
     "src/recovery/run-recovery.ts": "088038f7edc9bf890868bda39f56762e170188e10874e1f81efc997d90e5b0df",
     "src/runtime/challenge-tool-profile.ts": "33b78e4a07983d181153c22f8d8a0af0a1d9c5ff64b97f424df5eb067bceb3ad",
     "src/runtime/coding-lane.ts": "701d4d4fd138999e69aab4b33631c7d297a4b7e81ea7500f1fbc626c16050269",
@@ -103,8 +104,8 @@
     "src/verification/verifier.ts": "b9ed75f3269445776370a0efe58fe6e2bc1a82879fec87c2594d24b2132f1b32",
     "src/verification/web-reproducer.ts": "e0d9ebce8e59fcbbeb60bd22827eaa5552126e9671b1ba102087f5fb77742cbe",
     "src/web/browser-session.ts": "702fd3119a4d2d1edfc08de5f65aabf8c638f12d29ea2699ea6fb8bf6e8038a4",
-    "src/web/http-session.ts": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
-    "src/web/web-tools.ts": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb"
+    "src/web/http-session.ts": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
+    "src/web/web-tools.ts": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e"
   },
   "instructions": [
     "Prefer an existing canonical export before adding a new helper.",
@@ -374,9 +375,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 23,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": [
-        "packages/materials/tests/competition-convergence.test.ts"
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
     {
@@ -919,6 +921,22 @@
       ]
     },
     {
+      "id": "@proofblade/materials::class::RunWorkScheduler",
+      "name": "RunWorkScheduler",
+      "kind": "class",
+      "signature": "RunWorkScheduler",
+      "summary": "Durable execution lifecycle shared by every ProofBlade run entrypoint.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 14,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/run-work-scheduler.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::class::SingleAgentCtfLoop",
       "name": "SingleAgentCtfLoop",
       "kind": "class",
@@ -928,8 +946,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 63,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 64,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -963,7 +981,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 55,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
@@ -1358,7 +1376,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 50,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
@@ -1375,7 +1393,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 68,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -1811,6 +1829,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -1845,6 +1864,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
@@ -2114,8 +2134,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 63,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "line": 85,
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": []
     },
     {
@@ -2389,6 +2409,7 @@
         "packages/materials/tests/demo.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts"
       ]
     },
@@ -2410,6 +2431,7 @@
         "packages/materials/tests/demo.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/skills.test.ts"
       ]
@@ -2812,8 +2834,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 203,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 267,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -2826,8 +2848,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 193,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 257,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -4201,7 +4223,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 5,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": []
     },
     {
@@ -4215,7 +4237,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 15,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": []
     },
     {
@@ -4470,6 +4492,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -5052,7 +5075,8 @@
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
-        "packages/materials/tests/intent-scheduler.test.ts"
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts"
       ]
     },
     {
@@ -5152,8 +5176,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 509,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 515,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -5168,8 +5192,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 499,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 505,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5182,8 +5206,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 383,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 389,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5196,8 +5220,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 370,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 376,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5210,8 +5234,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 788,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 794,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5224,8 +5248,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 801,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 807,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5238,8 +5262,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 726,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 732,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5252,8 +5276,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 724,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 730,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5266,8 +5290,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 546,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 552,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -5297,8 +5321,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 716,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 722,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5312,7 +5336,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 136,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -5328,6 +5352,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -5343,7 +5368,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 20,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -5359,7 +5384,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 183,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -5369,6 +5394,7 @@
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
       ]
     },
@@ -5382,8 +5408,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 458,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 464,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5396,8 +5422,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 469,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 475,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5410,8 +5436,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 698,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 704,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/provider-budget.test.ts"
       ]
@@ -5427,7 +5453,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 193,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -5444,12 +5470,13 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 283,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
-        "packages/materials/tests/intent-scheduler.test.ts"
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts"
       ]
     },
     {
@@ -5462,8 +5489,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 394,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 400,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5476,8 +5503,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 568,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 574,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
@@ -5496,7 +5523,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 171,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
@@ -5515,7 +5542,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 88,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5528,8 +5555,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 708,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 714,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -5548,7 +5575,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 227,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5562,7 +5589,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 272,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5576,7 +5603,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 255,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5590,7 +5617,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 207,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5604,7 +5631,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 238,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5617,8 +5644,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 345,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 351,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5631,8 +5658,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 577,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 583,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts"
       ]
@@ -5647,8 +5674,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 778,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 784,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -5664,7 +5691,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 63,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5677,8 +5704,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 432,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 438,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5692,7 +5719,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 102,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -5711,8 +5738,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 527,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 533,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5726,7 +5753,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 98,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -5740,10 +5767,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 312,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/control-store.test.ts",
-        "packages/materials/tests/handoff.test.ts"
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts"
       ]
     },
     {
@@ -6462,8 +6490,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 23,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 24,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": []
     },
     {
@@ -6476,8 +6504,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 39,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 40,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": []
     },
     {
@@ -6490,8 +6518,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 53,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 54,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": []
     },
     {
@@ -6547,7 +6575,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 19,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -6561,7 +6589,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 33,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -6575,7 +6603,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 40,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -6589,7 +6617,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 45,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {
@@ -7462,7 +7490,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 20,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": []
     },
     {
@@ -7476,7 +7504,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 37,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": []
     },
     {
@@ -7490,7 +7518,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 8,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": []
     },
     {
@@ -7504,7 +7532,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 20,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": []
     },
     {
@@ -7518,7 +7546,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 25,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": []
     },
     {
@@ -7532,7 +7560,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 34,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": []
     },
     {
@@ -7546,7 +7574,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 45,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -7562,7 +7590,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
       "line": 50,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": []
     },
     {
@@ -7686,6 +7714,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -7831,6 +7860,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -8050,6 +8080,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -8195,6 +8226,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -8340,6 +8372,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -8485,6 +8518,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -9209,8 +9243,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 45,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "line": 67,
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -9225,8 +9259,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 26,
-      "moduleHash": "c6871446f6c40becb3b3e867fae8bb6b1cef6d2151ec74973d1048a14ffa5879",
+      "line": 48,
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -9249,6 +9283,20 @@
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ]
+    },
+    {
+      "id": "@proofblade/materials::method::ExperimentGate.runExclusive",
+      "name": "ExperimentGate.runExclusive",
+      "kind": "method",
+      "signature": "<T>(runId: string, operation: () => Promise<T>): Promise<T>",
+      "summary": "Serialize one model experiment from assertion through outcome recording.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/competition/experiment-gate.ts",
+      "line": 34,
+      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "testRefs": []
     },
     {
       "id": "@proofblade/materials::method::FleetScheduler.cancelChallenge",
@@ -9393,6 +9441,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -9479,6 +9528,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -9883,6 +9933,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -9980,6 +10031,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10211,6 +10263,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10294,6 +10347,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10436,6 +10490,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10494,6 +10549,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -10527,6 +10583,7 @@
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -10665,6 +10722,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -10751,6 +10809,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10825,6 +10884,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -10999,6 +11059,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -11043,6 +11104,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -11080,6 +11142,7 @@
         "packages/materials/tests/mcp.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -11189,6 +11252,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -11253,6 +11317,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -11482,6 +11547,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -11645,6 +11711,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -11722,6 +11789,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -11799,6 +11867,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -11876,6 +11945,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -11905,7 +11975,8 @@
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
-        "packages/materials/tests/tool-repeat-breaker.test.ts"
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/web-session.test.ts"
       ]
     },
     {
@@ -12019,6 +12090,7 @@
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -12069,6 +12141,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -12153,6 +12226,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -12865,6 +12939,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -12951,7 +13026,7 @@
       "id": "@proofblade/materials::method::IntentScheduler.getScoringWeights",
       "name": "IntentScheduler.getScoringWeights",
       "kind": "method",
-      "signature": "(): import(\"D:/project/ai/ProofBlade/packages/materials/src/domain/intent\").IntentScoringWeights",
+      "signature": "(): import(\"./src/domain/intent\").IntentScoringWeights",
       "summary": "获取评分权重配置",
       "summarySource": "tsdoc",
       "tags": [],
@@ -12983,7 +13058,8 @@
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
-        "packages/materials/tests/provider-scheduler.test.ts"
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts"
       ]
     },
     {
@@ -13179,6 +13255,185 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::method::RunWorkScheduler.block",
+      "name": "RunWorkScheduler.block",
+      "kind": "method",
+      "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
+      "summary": "Blocks a running item while retaining it for a later recovery decision.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 166,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/binary-core.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/firmware-core.test.ts",
+        "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.blockAndQueue",
+      "name": "RunWorkScheduler.blockAndQueue",
+      "kind": "method",
+      "signature": "(runId: string, task: TaskContract, workItemId: string | undefined, reason: string): Promise<void>",
+      "summary": "Blocks the current item and atomically queues its child replan item.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 174,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.claim",
+      "name": "RunWorkScheduler.claim",
+      "kind": "method",
+      "signature": "(runId: string, task: TaskContract, turn: number, schedulerIntent?: SchedulerIntent): Promise<WorkItem>",
+      "summary": "Selects or creates one executor item and acquires its durable lease.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 18,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.complete",
+      "name": "RunWorkScheduler.complete",
+      "kind": "method",
+      "signature": "(runId: string, workItemId: string | undefined, snapshot?: RunSnapshot): Promise<void>",
+      "summary": "Marks a running item complete, attaching any accepted completion evidence.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 94,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/intent-filter.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/provider-retry-harness.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.completeForSubmission",
+      "name": "RunWorkScheduler.completeForSubmission",
+      "kind": "method",
+      "signature": "(runId: string, workItemId: string | undefined): Promise<void>",
+      "summary": "Atomically closes a submission work item with the competition phase move.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 109,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.fail",
+      "name": "RunWorkScheduler.fail",
+      "kind": "method",
+      "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
+      "summary": "Marks a running item failed without mutating an already-settled item.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 158,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/approval-policy.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/control-authority-migration.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evaluation.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::RunWorkScheduler.settle",
+      "name": "RunWorkScheduler.settle",
+      "kind": "method",
+      "signature": "(runId: string, workItemId: string | undefined, progressed: boolean, evidenceIds?: string[], artifactIds?: string[]): Promise<void>",
+      "summary": "Settles a turn as success when it produced progress, otherwise as failure.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/run-work-scheduler.ts",
+      "line": 129,
+      "moduleHash": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
+      "testRefs": [
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::method::SingleAgentCtfLoop.run",
       "name": "SingleAgentCtfLoop.run",
       "kind": "method",
@@ -13188,8 +13443,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 71,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 72,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -13244,6 +13499,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -13417,7 +13673,8 @@
       "moduleHash": "497e6a3a23e8b919b86dcfba1b8516f4183dabe3e3f96d21fcdaf8ba0e0b61f4",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
-        "packages/materials/tests/pwn-layer.test.ts"
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
     {
@@ -13430,8 +13687,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 121,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 180,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -13475,8 +13732,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 132,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 191,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -13509,13 +13766,13 @@
       "name": "PwnToolHandler.open",
       "kind": "method",
       "signature": "(input: PwnOpenInput): Promise<{ sessionId: string; kind: string; endpoint?: string; }>",
-      "summary": "Inferred summary: open operation used to validate input or state.",
+      "summary": "Inferred summary: open operation used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 72,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -13556,6 +13813,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -13574,8 +13832,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 102,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 122,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -13593,8 +13851,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 143,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 207,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -13612,13 +13870,13 @@
       "name": "PwnToolHandler.send",
       "kind": "method",
       "signature": "(sessionId: string, data: string | Uint8Array, line?: boolean): Promise<PwnViewport>",
-      "summary": "Inferred summary: send operation used to perform a durable write.",
+      "summary": "Inferred summary: send operation used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 85,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 95,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
@@ -13639,11 +13897,12 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 117,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 162,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
-        "packages/materials/tests/pwn-layer.test.ts"
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts"
       ]
     },
     {
@@ -13656,8 +13915,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 111,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "line": 143,
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -13672,6 +13931,7 @@
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -13710,6 +13970,7 @@
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -13904,6 +14165,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -14110,6 +14372,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -14697,6 +14960,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -14980,6 +15244,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -15118,6 +15383,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -15196,6 +15462,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -15293,6 +15560,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -15928,6 +16196,7 @@
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -16062,6 +16331,7 @@
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
@@ -16300,6 +16570,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -16319,7 +16590,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 139,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -16364,7 +16635,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 152,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": []
     },
     {
@@ -16378,7 +16649,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 65,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -16419,6 +16690,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -16438,7 +16710,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 79,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -16479,6 +16751,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -16499,7 +16772,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/web/http-session.ts",
       "line": 147,
-      "moduleHash": "3a9d40411841d422438f42d7ec6e12f731226b1a09e3fad76ed6bbc58dc5beec",
+      "moduleHash": "11cfd69253999596cf12c7f044cf8f34402a34203d0bcdf547d1f89c37d0bf32",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -16509,13 +16782,13 @@
       "name": "WebToolHandler.close",
       "kind": "method",
       "signature": "(sessionId: string): Promise<void>",
-      "summary": "Inferred summary: close operation used to provide a reusable operation.",
+      "summary": "Inferred summary: close operation used to perform a durable write.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 136,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 138,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -16559,8 +16832,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 147,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 151,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/session-registry.test.ts",
@@ -16577,8 +16850,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 142,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 146,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -16616,8 +16889,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 78,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 79,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -16658,6 +16931,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -16676,8 +16950,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 111,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 113,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -16705,6 +16979,7 @@
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -16721,8 +16996,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/web/web-tools.ts",
-      "line": 94,
-      "moduleHash": "8798b1445bdfb268b61d9e45524699534468a890e3d60314dea5e728495d84eb",
+      "line": 96,
+      "moduleHash": "cce5344af20aaf29d98ba6ce73f36df580b9c996e0857d4313ece6da2e28c37e",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -16763,6 +17038,7 @@
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -17136,8 +17412,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 497,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 503,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17151,7 +17427,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 16,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17164,8 +17440,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 627,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 633,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17179,7 +17455,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 5,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17193,7 +17469,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 18,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17206,8 +17482,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 456,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 462,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17220,8 +17496,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 392,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 398,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17235,7 +17511,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 3,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -17266,7 +17542,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 7,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -17284,7 +17560,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 46,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17298,7 +17574,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 225,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17312,7 +17588,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 203,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17326,7 +17602,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 205,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17339,8 +17615,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 495,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 501,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17353,8 +17629,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 343,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 349,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17368,7 +17644,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 34,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17381,8 +17657,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 426,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 432,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17395,8 +17671,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 428,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 434,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17409,8 +17685,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
-      "line": 430,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "line": 436,
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17424,7 +17700,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 86,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -17440,7 +17716,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 84,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17454,7 +17730,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 310,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17468,7 +17744,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/types.ts",
       "line": 300,
-      "moduleHash": "7487ad5d444330581aaa2b88055b905d692fdb63e5a31618d13480658da57d30",
+      "moduleHash": "fc0141593e73aabb34eb418aff926fab2f83e9ba246993c728dfc191e3b741e1",
       "testRefs": []
     },
     {
@@ -17637,8 +17913,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 37,
-      "moduleHash": "9cf4b13e1303266ac6ae70eb85d8910c781fdf22c57f86496ade54062c56ec37",
+      "line": 38,
+      "moduleHash": "2ef4c92420b69ba874488b1cf3738d048643586aea2bdc6ea0916c827e3ebb48",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
@@ -17685,7 +17961,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 28,
-      "moduleHash": "27f452f5fe30f05eea9f75d67a5039b717a9b272715a81bee2f96267e3291d41",
+      "moduleHash": "8bdfd957eb3c4033fbc5b8a7ddb41e567c70a6e2883d0a9bd847070e8329c72c",
       "testRefs": []
     },
     {

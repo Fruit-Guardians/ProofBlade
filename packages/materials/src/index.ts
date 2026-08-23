@@ -42,6 +42,7 @@ export * from "./pwn/pwn-tools.js";
 export * from "./orchestration/single-agent-loop.js";
 export * from "./orchestration/planner.js";
 export * from "./orchestration/intent-scheduler.js";
+export * from "./orchestration/run-work-scheduler.js";
 export * from "./orchestration/intent-scorer.js";
 export * from "./orchestration/intent-filter.js";
 export * from "./orchestration/scheduling-context.js";

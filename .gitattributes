@@ -1,0 +1,2 @@
+# Hash-bound local evaluation fixtures must have identical bytes on every host.
+fixtures/holdout/** text eol=lf

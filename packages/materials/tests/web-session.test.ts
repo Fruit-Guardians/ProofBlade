@@ -127,6 +127,7 @@ test("coding web session tools keep exploratory state lane-owned and journal the
       assert.equal(handler.list().length, 1);
       await execute("web_close", { sessionId });
       assert.equal(handler.list().length, 0);
+      await execute("web_close", { sessionId });
       const snapshot = await services.control.snapshot(runId);
       assert.equal(snapshot.sessions[sessionId]?.status, "CLOSED");
       assert.ok(Object.values(snapshot.observations).filter((item) => item.source.operation.startsWith("http:")).length >= 2);
@@ -135,6 +136,42 @@ test("coding web session tools keep exploratory state lane-owned and journal the
     }
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("HTTP response bodies are streamed and cancelled at the one MiB bound", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-http-stream-bound-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "WEB-STREAM-BOUND";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    let pulls = 0;
+    let cancelled = false;
+    const chunk = new TextEncoder().encode("A".repeat(64 * 1024));
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const session = await HttpSessionBackend.open({
+      runId,
+      baseUrl: "http://target.test/",
+      ownerLane: "executor",
+      controlStore: services.control,
+      artifactStore: services.artifacts,
+      fetchImpl: async () => new Response(stream, { status: 200 }),
+    });
+    const response = await session.request("/");
+    assert.equal(response.body.length, 1_048_576);
+    assert.ok(pulls <= 17, `reader should stop after the bounded chunks, got ${pulls}`);
+    assert.equal(cancelled, true);
+    await session.close();
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

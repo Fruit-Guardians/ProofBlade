@@ -181,6 +181,35 @@
       "status": "candidate",
       "symbols": [
         {
+          "id": "@proofblade/materials::method::RunWorkScheduler.block",
+          "package": "@proofblade/materials",
+          "name": "RunWorkScheduler.block",
+          "kind": "method",
+          "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
+          "module": "src/orchestration/run-work-scheduler.ts",
+          "line": 166,
+          "summary": "Blocks a running item while retaining it for a later recovery decision."
+        },
+        {
+          "id": "@proofblade/materials::method::RunWorkScheduler.fail",
+          "package": "@proofblade/materials",
+          "name": "RunWorkScheduler.fail",
+          "kind": "method",
+          "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
+          "module": "src/orchestration/run-work-scheduler.ts",
+          "line": 158,
+          "summary": "Marks a running item failed without mutating an already-settled item."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
           "id": "@proofblade/materials::method::PiCodingLane.abort",
           "package": "@proofblade/materials",
           "name": "PiCodingLane.abort",
@@ -267,6 +296,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 8
+    "candidates": 9
   }
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { LocalHoldoutEvaluationRunner } from "../src/index.js";
 import type { ProofBladeConfig } from "../src/config.js";
@@ -28,11 +29,11 @@ const config: ProofBladeConfig = {
 };
 
 test("local Web/Pwn holdout evaluates both categories without Provider requests", async () => {
-  const fixtureRoot = process.cwd();
+  const fixtureRoot = fileURLToPath(new URL("../../../fixtures/holdout/", import.meta.url));
   const root = await mkdtemp(join(tmpdir(), "proofblade-local-holdout-"));
   try {
     const summary = await new LocalHoldoutEvaluationRunner(root, config).run({
-      corpusPath: join(fixtureRoot, "fixtures", "holdout", "manifest.json"),
+      corpusPath: join(fixtureRoot, "manifest.json"),
       runPrefix: "LOCAL-HOLDOUT-TEST",
     });
     assert.equal(summary.gate.passed, true, JSON.stringify(summary.gate.checks));
@@ -41,7 +42,7 @@ test("local Web/Pwn holdout evaluates both categories without Provider requests"
     assert.ok(summary.corpus.cases.every((item) => item.targetKind === "web" || item.targetKind === "pwn"));
     assert.ok(summary.variants.every((variant) => variant.successRate === 1 && variant.metrics.providerRequests === 0));
     assert.equal(summary.variants.reduce((total, variant) => total + variant.candidateLeakCount, 0), 0);
-    const manifest = await readFile(join(fixtureRoot, "fixtures", "holdout", "manifest.json"), "utf8");
+    const manifest = await readFile(join(fixtureRoot, "manifest.json"), "utf8");
     assert.equal(manifest.includes("PB{holdout_web_debug}"), true, "the local manifest is intentionally a fixture source; reports must still omit expected values");
     assert.doesNotMatch(JSON.stringify(summary.corpus), /holdout_web_debug|holdout_pwn_shell/);
   } finally {

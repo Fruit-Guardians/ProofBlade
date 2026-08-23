@@ -334,12 +334,12 @@ Pwn 是有状态的字节协议和进程控制问题。一个连接关闭不等�
 
 验收：Cookie/CSRF 在同一 Run 内可复用、不同 Run 互不可见；每条链至少有一份 HAR/响应 Artifact；重放结果具有明确断言。
 
-### P3：Planner/Refiner 双 Lane（以评测为准）
+### P3：Planner/Refiner 策略层（不新增解题 Lane）
 
 - Planner 只输出结构化 Handoff，不直接操作目标；
-- Solver 只接受当前 knowledgeVersion 的 Handoff；
-- 失败时由 Refiner 生成替代假设和禁止重复列表；
-- 用 20 道以上 Web/Pwn holdout 对比单 Lane，只有成功率、成本或 p95 稳定改善才保留第二模型。
+- Solver 始终是唯一的 Unified Coding Lane，WorkItem 是唯一执行状态；
+- 失败时由 Refiner 生成替代假设和禁止重复列表，但不创建第二条 Solver lane；
+- 用 20 道以上 Web/Pwn holdout 评估策略层，只有成功率、成本或 p95 稳定改善才启用模型化 Planner/Refiner。
 
 ### P4：无人值守 Fleet 和高级题型
 

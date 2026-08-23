@@ -312,6 +312,12 @@ export type WorkItemRole = "planner" | "researcher" | "coder" | "executor" | "ve
 export interface WorkItem {
   id: string;
   runId: string;
+  /**
+   * Optional link to the scheduler projection that selected this work.  The
+   * WorkItem remains the durable execution record; this link lets replay and
+   * recovery correlate the policy decision without creating a second lane.
+   */
+  schedulerIntentId?: string;
   parentId?: string;
   title: string;
   objective: string;

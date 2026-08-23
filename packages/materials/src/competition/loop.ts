@@ -5,10 +5,11 @@ import type { DomainPhase, ExecutionMode, RunSnapshot, TargetKind, TaskContract 
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import { id, isTerminal } from "../domain/utils.js";
+import { isTerminal } from "../domain/utils.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
+import { RunWorkScheduler } from "../orchestration/run-work-scheduler.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -180,8 +181,7 @@ export async function runCompetitionLoop(
         // Close the active work item and advance the domain projection before
         // finish makes the Run terminal; terminal Runs deliberately reject
         // further work-graph mutation.
-        await ensureCompetitionDomainPhase(services.control, options.runId, "SUBMIT");
-        await completeCompetitionWorkItem(services.control, workItemId, snapshot);
+        await new RunWorkScheduler(services.control).completeForSubmission(options.runId, workItemId);
         if (snapshot.status !== "SUCCEEDED") {
           await services.verifier.finish(options.runId, {
             completionId: acceptedCompletion.id,
@@ -293,75 +293,14 @@ function competitionPhaseForTurn(turn: number): DomainPhase {
  * create duplicate work nodes.
  */
 export async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
-  let snapshot = await control.snapshot(runId);
-  const active = Object.values(snapshot.workItems)
-    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && item.lease && Date.parse(item.lease.expiresAt) > Date.now())
-    .sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
-  if (active) return active.id;
-
-  // Recover a crashed/killed prior owner's orphaned RUNNING item BEFORE picking
-  // a READY item. If READY won, the reclaimed item would be starved: the active
-  // branch above only returns valid-lease items, so an expired RUNNING that is
-  // never re-selected stays RUNNING forever while newer READY work advances. The
-  // re-claim increments attempt, so maxAttempts still bounds retries; the oldest
-  // expired item goes first and the rest are recovered on later turns.
-  let candidate: RunSnapshot["workItems"][string] | undefined = Object.values(snapshot.workItems)
-    .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor" && (!item.lease || Date.parse(item.lease.expiresAt) <= Date.now()))
-    .sort((a, b) => a.updatedSeq - b.updatedSeq)[0];
-  if (!candidate) {
-    candidate = Object.values(snapshot.workItems)
-      .filter((item) => item.status === "READY")
-      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
-  }
-  if (!candidate) {
-    const planned = Object.values(snapshot.workItems)
-      .filter((item) => item.status === "PLANNED")
-      .sort((a, b) => a.createdSeq - b.createdSeq)[0];
-    if (planned) {
-      await control.dispatch(runId, { type: "work_item_ready", workItemId: planned.id, lane: "executor" });
-      candidate = (await control.snapshot(runId)).workItems[planned.id];
-    }
-  }
-  if (!candidate) {
-    const previous = Object.values(snapshot.workItems).sort((a, b) => b.updatedSeq - a.updatedSeq)[0];
-    const created = {
-      id: id("WI"),
-      runId,
-      ...(previous && (previous.status === "BLOCKED" || previous.status === "FAILED") ? { parentId: previous.id } : {}),
-      title: `Advance target investigation (turn ${turn})`,
-      objective: task.objective,
-      role: "executor" as const,
-      status: "READY" as const,
-      dependsOn: [],
-      evidenceIds: [],
-      artifactIds: [],
-      attempt: 0,
-      maxAttempts: 3,
-    };
-    await control.dispatch(runId, { type: "work_item_created", workItem: created, lane: "executor" });
-    candidate = (await control.snapshot(runId)).workItems[created.id];
-  }
-  const leaseExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
-  await control.dispatch(runId, { type: "work_item_claimed", workItemId: candidate.id, ownerLane: "executor", leaseExpiresAt, lane: "executor" });
-  snapshot = await control.snapshot(runId);
-  return snapshot.workItems[candidate.id]?.id ?? candidate.id;
+  return (await new RunWorkScheduler(control).claim(runId, task, turn)).id;
 }
 
 export async function commitCompetitionSuccess(control: AppServices["control"], verifier: AppServices["verifier"], runId: string, workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
   if (!completion) throw new Error("Cannot commit competition success without an accepted completion");
   if (isTerminal(snapshot.status)) return;
-  const commands = [
-    { type: "set_domain_phase" as const, domainPhase: "SUBMIT" as const, lane: "executor" as const },
-    ...(workItemId && snapshot.workItems[workItemId]?.status === "RUNNING" ? [{
-      type: "work_item_completed" as const,
-      workItemId,
-      evidenceIds: completion.evidenceIds,
-      artifactIds: [completion.artifactId],
-      lane: "executor" as const,
-    }] : []),
-  ];
-  await control.dispatchBatch(runId, commands);
+  await new RunWorkScheduler(control).completeForSubmission(runId, workItemId);
   await verifier.finish(runId, {
     completionId: completion.id,
     reason: "Platform accepted the candidate and verifier evidence covers the completion.",
@@ -369,53 +308,19 @@ export async function commitCompetitionSuccess(control: AppServices["control"], 
 }
 
 async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
-  if (!workItemId || snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
-  await control.dispatch(snapshot.runId, {
-    type: "work_item_completed",
-    workItemId,
-    evidenceIds: completion?.evidenceIds ?? [],
-    artifactIds: completion?.artifactId ? [completion.artifactId] : [],
-    lane: "executor",
-  });
+  await new RunWorkScheduler(control).completeForSubmission(snapshot.runId, workItemId);
 }
 
 async function failCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  await control.dispatch(runId, { type: "work_item_failed", workItemId, reason, lane: "executor" });
+  await new RunWorkScheduler(control).fail(runId, workItemId, reason);
 }
 
 async function blockCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  await control.dispatch(runId, { type: "work_item_blocked", workItemId, reason, lane: "executor" });
+  await new RunWorkScheduler(control).block(runId, workItemId, reason);
 }
 
 async function blockAndQueueCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, workItemId: string | undefined, reason: string, turn: number): Promise<void> {
-  if (!workItemId) return;
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
-  const created = {
-    id: id("WI"),
-    runId,
-    parentId: workItemId,
-    title: `Replan after ${reason}`,
-    objective: task.objective,
-    role: "executor" as const,
-    status: "READY" as const,
-    dependsOn: [],
-    evidenceIds: [],
-    artifactIds: [],
-    attempt: 0,
-    maxAttempts: 3,
-  };
-  await control.dispatchBatch(runId, [
-    { type: "work_item_blocked", workItemId, reason, lane: "executor" },
-    { type: "work_item_created", workItem: created, lane: "executor" },
-  ]);
+  await new RunWorkScheduler(control).blockAndQueue(runId, task, workItemId, reason);
   void turn;
 }
 
