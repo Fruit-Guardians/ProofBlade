@@ -1,0 +1,3 @@
+ELF x86-64, function verify_candidate
+branch: strcmp(input, derived) == 0 -> accepted
+derived candidate: PB{holdout_reverse_control_flow}

@@ -244,7 +244,7 @@ export class CompetitionEnvironmentJanitor {
     const due = await this.serial(async () => await this.withLedgerLock(async () => {
       const reservationsChanged = this.pruneExpiredReservations(now);
       const expired = [...this.recordsById.values()]
-        .filter((record) => record.status === "ACTIVE" && record.expiresAt !== undefined && record.expiresAt <= now)
+        .filter((record) => record.status === "ACTIVE" && (record.lastError !== undefined || (record.expiresAt !== undefined && record.expiresAt <= now)))
         .map((record) => record.leaseId);
       if (reservationsChanged) await this.persist();
       return expired;
@@ -335,7 +335,11 @@ export class CompetitionEnvironmentJanitor {
         await mkdir(this.lockPath);
         return;
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        // Windows may report EPERM while another janitor is removing the
+        // directory lock. Treat it as contention just like EEXIST; the
+        // bounded retry below still surfaces a real permission problem.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "EEXIST" && code !== "EPERM") throw error;
         try {
           const details = await stat(this.lockPath);
           if (Date.now() - details.mtimeMs > this.lockStaleMs) await rm(this.lockPath, { recursive: true, force: true });

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import {
   contextText,
@@ -29,12 +30,20 @@ import {
   snapshotContext,
   FixtureEvaluationRunner,
   RealModelEvaluationRunner,
+  preflightRealModelEvaluation,
+  LocalHoldoutEvaluationRunner,
+  anonymizeRunReplay,
+  anonymizeEvaluationSummary,
+  CompetitionApiJournal,
+  replayCompetitionApiScript,
   RunTelemetry,
   RunRecoveryService,
   CodingClaimVerifier,
+  IndependentVerifier,
   IntentScheduler,
   LeaseManager,
 } from "@proofblade/materials";
+import type { CompetitionApiReplayStep } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
 
@@ -75,18 +84,40 @@ async function main(): Promise<void> {
       if (evalArgs.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
       break;
     }
-    case "eval-real": {
+  case "eval-real": {
       const corpusPath = required(arg, "real evaluation corpus path");
-      if (!rest.includes("--allow-live")) throw new Error("eval-real requires --allow-live because it sends real Provider requests");
+      const preflightOnly = rest.includes("--preflight");
+      if (!preflightOnly && !rest.includes("--allow-live")) throw new Error("eval-real requires --allow-live because it sends real Provider requests");
       const variants = await Promise.all(optionValues(rest, "--variant").map(async (value) => {
         const separator = value.indexOf("=");
         if (separator <= 0 || separator === value.length - 1) throw new Error("--variant must use id=config-path");
         return { id: value.slice(0, separator), config: await loadConfig(root, value.slice(separator + 1)) };
       }));
+      const preflight = await preflightRealModelEvaluation({
+        corpusPath,
+        variants,
+        requireProviderTraffic: true,
+        minimumCorpusCases: 20,
+        attempts: parsePositiveOption(rest, "--attempts"),
+        maxTurns: parsePositiveOption(rest, "--max-turns"),
+        maxCostUsd: parsePositiveDecimalOption(rest, "--max-cost-usd"),
+        deadlineMs: parsePositiveOption(rest, "--deadline-ms"),
+      });
+      if (preflightOnly) {
+        print(preflight);
+        if (!preflight.ready) process.exitCode = 1;
+        break;
+      }
+      if (!preflight.ready) {
+        const failed = preflight.checks.filter((item) => !item.passed).map((item) => `${item.id} (actual=${item.actual}, expected=${item.expected})`).join("; ");
+        throw new Error(`eval-real preflight failed before any Provider request: ${failed}`);
+      }
       const summary = await new RealModelEvaluationRunner(root).run({
         corpusPath,
         variants,
         allowLive: true,
+        requireProviderTraffic: true,
+        minimumCorpusCases: 20,
         attempts: parsePositiveOption(rest, "--attempts"),
         maxTurns: parsePositiveOption(rest, "--max-turns"),
         maxCostUsd: parsePositiveDecimalOption(rest, "--max-cost-usd"),
@@ -99,6 +130,50 @@ async function main(): Promise<void> {
       print(summary);
       if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
       break;
+    }
+    case "eval-holdout": {
+      const evalArgs = arg === undefined ? rest : [arg, ...rest];
+      const corpusPath = positional(evalArgs, ["--attempts", "--max-turns", "--run-prefix", "--prefix", "--min-success-rate"])[0]
+        ?? join(root, "fixtures", "holdout", "manifest.json");
+      const summary = await new LocalHoldoutEvaluationRunner(root, config).run({
+        corpusPath,
+        attempts: parsePositiveOption(evalArgs, "--attempts"),
+        maxTurns: parsePositiveOption(evalArgs, "--max-turns"),
+        runPrefix: option(evalArgs, "--run-prefix") ?? option(evalArgs, "--prefix"),
+        minimumSuccessRate: parseRateOption(evalArgs, "--min-success-rate"),
+      });
+      print(summary);
+      if (evalArgs.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
+      break;
+    }
+    case "eval-anonymize": {
+      const summaryPath = required(arg, "evaluation summary path");
+      const summary = JSON.parse(await readFile(summaryPath, "utf8")) as Parameters<typeof anonymizeEvaluationSummary>[0];
+      print(anonymizeEvaluationSummary(summary));
+      break;
+    }
+    case "run-anonymize": {
+      const runId = required(arg, "run id");
+      const events = await services.control.events(runId);
+      print(anonymizeRunReplay(events));
+      break;
+    }
+    case "competition-api": {
+      const action = arg ?? "inspect";
+      const journalPath = required(rest[0], "competition API journal path");
+      if (action === "inspect") {
+        print({ path: journalPath, ...(await CompetitionApiJournal.inspect(journalPath)) });
+        break;
+      }
+      if (action === "replay") {
+        const scriptPath = option(rest, "--script");
+        const scriptText = await readFile(required(scriptPath, "--script path"), "utf8");
+        const steps = parseCompetitionApiReplayScript(JSON.parse(scriptText));
+        const journal = await CompetitionApiJournal.replay(journalPath);
+        print({ path: journalPath, results: await replayCompetitionApiScript(journal, steps) });
+        break;
+      }
+      throw new Error("competition-api action must be inspect or replay");
     }
     case "capabilities": {
       const mcp = McpProjectRegistry.load(root);
@@ -339,7 +414,25 @@ async function main(): Promise<void> {
       const candidate = required(rest[0], "candidate");
       const snapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(snapshot.task);
-      print(await services.sandbox.score(fixture, candidate));
+      const normalized = candidate.trim();
+      const candidateArtifact = await services.artifacts.putText(runId, normalized, {
+        filename: "cli-fixture-score-candidate.txt",
+        sensitivity: "flag_candidate",
+      });
+      const completionId = `C-CLI-${randomUUID()}`;
+      await services.control.dispatch(runId, {
+        type: "completion_proposed",
+        completion: {
+          id: completionId,
+          purpose: snapshot.task.verification.kind === "platform_submission" ? "submission" : "harness_verification",
+          candidateHash: createHash("sha256").update(normalized).digest("hex"),
+          artifactId: candidateArtifact.id,
+        },
+        lane: "executor",
+      });
+      const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
+        .verify(runId, fixture, completionId);
+      print({ completionId, accepted: verified.accepted, candidateHash: verified.candidateHash, evidenceIds: verified.evidenceIds });
       break;
     }
     case "agent": {
@@ -440,6 +533,31 @@ function parseObject(value: string, label: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+function parseCompetitionApiReplayScript(value: unknown): CompetitionApiReplayStep[] {
+  if (!Array.isArray(value)) throw new Error("Competition API replay script must be a JSON array");
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Replay step ${index} must be an object`);
+    const record = item as Record<string, unknown>;
+    const operation = record.operation;
+    if (typeof operation !== "string") throw new Error(`Replay step ${index} operation is required`);
+    if (operation === "listChallenges") return { operation };
+    if (operation === "getChallenge" || operation === "startEnvironment") {
+      if (typeof record.challengeId !== "string" || !record.challengeId.trim()) throw new Error(`Replay step ${index} challengeId is required`);
+      return { operation, challengeId: record.challengeId.trim() };
+    }
+    if (operation === "submitFlag") {
+      if (typeof record.challengeId !== "string" || !record.challengeId.trim() || typeof record.flag !== "string") throw new Error(`Replay step ${index} requires challengeId and flag`);
+      return { operation, challengeId: record.challengeId.trim(), flag: record.flag };
+    }
+    if (operation === "stopEnvironment") {
+      if (typeof record.challengeId !== "string" || !record.challengeId.trim()) throw new Error(`Replay step ${index} challengeId is required`);
+      if (record.instanceId !== undefined && typeof record.instanceId !== "string") throw new Error(`Replay step ${index} instanceId must be a string`);
+      return { operation, challengeId: record.challengeId.trim(), ...(record.instanceId === undefined ? {} : { instanceId: record.instanceId }) };
+    }
+    throw new Error(`Unsupported competition API replay operation: ${operation}`);
+  });
+}
+
 function helpText(): string {
   return [
     "ProofBlade / 证锋",
@@ -449,11 +567,16 @@ function helpText(): string {
     "  run demo [--run-id ID]",
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
-    "  eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
+    "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
+    "  eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--run-prefix ID] [--min-success-rate 0..1] [--enforce-gate]",
+    "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
+    "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",
     "  tools [list|probe|init|preflight|show] [profile|tool-id]  Host catalog/readiness",
+    "  competition-api inspect <journal.jsonl>",
+    "  competition-api replay <journal.jsonl> --script <requests.json>",
     "  intents list|score|graph|claim <run-id>",
     "  skill <run-id> <skill-name> [additional instructions]",
     "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",

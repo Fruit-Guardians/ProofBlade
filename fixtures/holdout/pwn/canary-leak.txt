@@ -1,0 +1,2 @@
+stack_canary=0x00aabbccddeeff00
+answer=PB{holdout_pwn_canary_leak}

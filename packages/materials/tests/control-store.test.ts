@@ -9,6 +9,7 @@ import { demoTask, runDemo } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { claimCompetitionWorkItem } from "../src/competition/loop.js";
 import type { ProofBladeConfig } from "../src/config.js";
+import { canonicalJson, sha256 } from "../src/domain/utils.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -74,6 +75,88 @@ test("phase transitions do not implicitly resume a paused run", async () => {
     assert.equal((await control.snapshot(runId)).status, "PAUSED");
     await control.dispatch(runId, { type: "resume" });
     assert.equal((await control.snapshot(runId)).status, "RUNNING");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CTF control events redact candidate-shaped annotation text at the replay boundary", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-control-redaction-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "CTF-REDACTION-001";
+    const candidate = "PB{control_event_secret}";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const snapshot = await control.snapshot(runId);
+    await control.dispatch(runId, {
+      type: "artifact",
+      generation: snapshot.generation,
+      artifact: {
+        id: "A-REDACTION",
+        path: "artifacts/redaction.txt",
+        sha256: "a".repeat(64),
+        bytes: candidate.length,
+        mime: "text/plain",
+        sensitivity: "public",
+        semantic: { name: "Candidate output", summary: `Observed ${candidate}`, tags: ["candidate"], role: "debug", relatedIds: [], annotatedBy: "agent" },
+      },
+    });
+    await control.dispatch(runId, {
+      type: "artifact_annotation",
+      artifactId: "A-REDACTION",
+      semantic: { name: "Reviewed", summary: `The answer is ${candidate}`, tags: ["review"], role: "result", relatedIds: [], annotatedBy: "agent" },
+    });
+    const eventText = (await control.events(runId)).map((event) => JSON.stringify(event)).join("\n");
+    assert.equal(eventText.includes(candidate), false);
+    assert.match(eventText, new RegExp(sha256(candidate)));
+    const replayed = await control.replay(runId);
+    assert.equal(replayed.artifacts["A-REDACTION"]?.semantic?.summary, "The answer is [candidate sha256=" + sha256(candidate) + "]");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("tool preparation is a bounded durable Run projection and replays exactly", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-tool-preparation-state-"));
+  try {
+    const events = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(events);
+    const runId = "TOOL-PREP-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const preparation = {
+      schemaVersion: 1 as const,
+      generation: 0,
+      profileId: "misc",
+      targetKind: "misc" as const,
+      runtime: "host" as const,
+      runtimeKey: "host",
+      cacheKey: "cache-key",
+      toolCatalogHash: "a".repeat(64),
+      mcpCatalogHash: "b".repeat(64),
+      checkedAt: Date.now(),
+      health: "degraded" as const,
+      tools: [{ id: "python", name: "python", path: "C:/Python/python.exe", status: "missing" as const, required: true }],
+      mcpServers: [{ name: "jadx", status: "unavailable" }],
+      missingRequiredTools: ["python"],
+      missingOptionalTools: [],
+      fallbackStrategies: ["solver:bounded-fallback"],
+      hash: "",
+    };
+    const { hash: _hash, ...unsigned } = preparation;
+    preparation.hash = sha256(canonicalJson(unsigned));
+    await control.dispatch(runId, { type: "record_tool_preparation", preparation, lane: "executor" });
+    const replayed = await control.replay(runId);
+    assert.deepEqual(replayed.toolPreparation, preparation);
+    assert.equal((await control.events(runId)).at(-1)?.type, "tool_preparation_recorded");
+    assert.equal(projectionHash(replayed), projectionHash((await events.loadProjection(runId))!));
+    await assert.rejects(
+      control.dispatch(runId, { type: "record_tool_preparation", preparation: { ...preparation, generation: 1 }, lane: "executor" }),
+      /generation must equal current generation/,
+    );
+    await assert.rejects(
+      control.dispatch(runId, { type: "record_tool_preparation", preparation: { ...preparation, hash: "c".repeat(64) }, lane: "executor" }),
+      /hash does not match/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

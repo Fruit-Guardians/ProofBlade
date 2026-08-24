@@ -166,6 +166,8 @@ interface FakeChallengeSpec {
   detailError?: Error;
   /** Optional short environment expiry used by deadline/abort regression tests. */
   expiresAt?: number;
+  /** Number of initial stop calls that should fail before cleanup recovers. */
+  stopFailures?: number;
 }
 
 class FakeApi implements CompetitionApi {
@@ -205,6 +207,11 @@ class FakeApi implements CompetitionApi {
     return { correct: flag === s.flag };
   }
   async stopEnvironment(id: string): Promise<void> {
+    const s = this.spec(id);
+    if ((s.stopFailures ?? 0) > 0) {
+      s.stopFailures = (s.stopFailures ?? 0) - 1;
+      throw new Error("platform stop unavailable");
+    }
     this.stopped.push(id);
   }
 }
@@ -225,7 +232,7 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string; status?: string } });
     assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
     assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
-    assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "SUBMIT"]);
+    assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "REPORT", "SUBMIT"]);
     const runId = (await readdir(join(root, "runs")))[0]!;
     const projection = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"), "utf8")) as RunSnapshot;
     assert.equal(hasAcceptedPlatformSubmission(projection), true);
@@ -295,6 +302,8 @@ test("Fleet -> run actor -> observer -> verifier replays one atomic terminal com
 
     const submitPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "SUBMIT");
     assert.ok(submitPhaseIndex >= 0, "the terminal commit must enter SUBMIT");
+    const reportPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "REPORT");
+    assert.ok(reportPhaseIndex >= 0 && reportPhaseIndex < submitPhaseIndex, "the report phase must precede SUBMIT");
     assert.deepEqual(types.slice(submitPhaseIndex, submitPhaseIndex + 3), ["domain_phase_changed", "work_item_completed", "run_finished"]);
 
     const replayed = await eventStore.replay(runId);
@@ -410,8 +419,24 @@ test("dynamic-flag challenge skips the model turn but keeps a journaled run", as
     assert.ok(events.some((event) => event.type === "effect_finished"), "dynamic submission must be journaled");
     const submitPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "SUBMIT");
     assert.ok(submitPhaseIndex >= 0, "dynamic path must reach SUBMIT");
+    assert.ok(events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "REPORT") < submitPhaseIndex, "dynamic path must report before SUBMIT");
     assert.deepEqual(events.slice(submitPhaseIndex, submitPhaseIndex + 3).map((event) => event.type), ["domain_phase_changed", "work_item_completed", "run_finished"]);
     assert.equal(events.find((event) => event.type === "run_finished")?.payload?.status, "SUCCEEDED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("solver default janitor retries a failed platform stop on the next fleet reconcile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-default-janitor-"));
+  try {
+    const api = new FakeApi([{ id: "DYN-RETRY-STOP", value: 100, flag: "flag{retry_stop}", dynamic: true, stopFailures: 1 }]);
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.deepEqual(api.stopped, [], "the first cleanup failure must not be reported as a successful stop");
+    await solver.reconcile();
+    assert.deepEqual(api.stopped, ["DYN-RETRY-STOP"], "the default durable janitor must retry the recorded failure");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,7 +1,7 @@
 # 项目计划
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-23T12:00:00+08:00
+> 状态更新时间：2026-08-24T22:00:00+08:00
 
 ## 概览
 
@@ -21,7 +21,7 @@
 | PLAN-220 | P0 | Milestone 2 / 5 | 进行中 | 45% | unassigned | 2026-08-20T12:15:00+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-200 | P1 | Milestone 6 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
-| PLAN-210 | P1 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-07T18:37:33+08:00 |
+| PLAN-210 | P3 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-24T22:00:00+08:00 |
 
 ## PLAN-100 二进制 Artifact 与 Reverse 能力包
 
@@ -139,16 +139,16 @@
 - [ ] Shadow 计算不影响主 Run
 - [ ] 策略比较报告包含成功率、成本、缓存和错误提交率
 
-## PLAN-210 Planner 与 Executor 双模型会话
+## PLAN-210 单 coding lane 上的 Planner/Refiner 策略层
 
-目标：在结构化 Handoff 边界后增加独立 Planner Session，并用评测证明收益。
+目标：在单一 coding lane 的结构化 Handoff 边界上完善确定性 Planner/Refiner，并用评测证明是否值得增加可选 Planner 模型调用；不创建第二条解题 lane。
 
 依赖：PLAN-100, PLAN-110, PLAN-120, PLAN-130, PLAN-200
 
 ### 交付物
 
-- planner/executor 独立模型配置与 Pi Session
-- 确定性路由、fallback 和 fail-closed 审批边界
+- Planner/Refiner 的结构化 Handoff 与 knowledgeVersion 校验
+- add/remove/modify/reorder + afterId 的增量重规划
 - 重复 Intent 和并行浪费指标
 
 ### 验收条件
@@ -156,6 +156,7 @@
 - [ ] 至少 20 道题每题三次与单 Agent 配对比较
 - [ ] 成功率、成本或 p95 延迟至少一项稳定改善
 - [ ] 其他指标不突破预算
+- [ ] Planner/Refiner 只作为策略层，不新增第二条解题 lane 或独立 solver transcript
 
 ## 已完成计划
 

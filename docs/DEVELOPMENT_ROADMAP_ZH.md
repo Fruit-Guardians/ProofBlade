@@ -9,7 +9,7 @@
 
 比赛是 **DASCTF（gcsis.dasctf.com）** competition 模式：连 API 取题 → 起 Docker 容器 → 自动解 → 提交 flag。**不是** GUI 人工对话（那只是调试入口）。DASCTF 的 pwn 靶机是**裸 TCP `nc host port`**（实测：`REMOTE:nc 1.14.76.59:23984`），不是 WebSocket。
 
-持久 pwn tube（P0.5+P1）已建好并接进 competition 的 coding lane，正在 PR #67 审核（已过三轮，共修 15 个问题）。平台链接 API、P0 收敛和 Fleet → Run Actor → Observer → Verifier 离线组合回放也已接入；Web 探索现在有 lane-owned 的 `web_session_open/request/close`，验证器使用独立 clean session，并在 lane 关闭或 generation 变化时失效旧会话。**下一阶段先做运行期回放/恢复审计，再考虑 P3（Planner/Refiner 双 Lane）**。本项目不把真实 DASCTF、远程 tube 或 pwn E2E 作为自动验收前提。
+持久 pwn tube（P0.5+P1）已建好并接进 competition 的 coding lane，正在 PR #67 审核（已过三轮，共修 15 个问题）。平台链接 API、P0 收敛和 Fleet → Run Actor → Observer → Verifier 离线组合回放也已接入；Web 探索现在有 lane-owned 的 `web_session_open/request/close`，验证器使用独立 clean session，并在 lane 关闭或 generation 变化时失效旧会话。**下一阶段先做运行期回放/恢复审计，再考虑 P3（单 coding lane 上的 Planner/Refiner 策略层）**。本项目不把真实 DASCTF、远程 tube 或 pwn E2E 作为自动验收前提。
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 3. 后续开发计划（按建议优先级）
 
-> 优先级理由：P1 收尾和 P0 直接决定"比赛时 pwn 题能不能真解出来"，比 P3（用评测证明双模型收益）更紧迫。P3 是"锦上添花且需评测背书"，放在收敛闭环跑通之后。
+> 优先级理由：P1 收尾和 P0 直接决定"比赛时 pwn 题能不能真解出来"，比 P3（用评测证明策略层是否值得增加模型调用）更紧迫。P3 是"锦上添花且需评测背书"，放在收敛闭环跑通之后。
 
 ### P1 收尾（最高优先，收敛能力闭环）
 
@@ -65,7 +65,7 @@
 ### P0（可观测→可收敛，治本次 run 暴露的系统性问题）
 
 **P0.1 — 比赛 Run 持久化 domainPhase**
-- 现状：competition run 全停在 `intake`（CH-10662 实证：622 事件 phase 从没推进）。架构规划第二节要求快照存 `domainPhase`（INTAKE→RECON→TARGET_MODEL→HYPOTHESIS→EXPERIMENT→REPRODUCE→SUBMIT）。
+- 现状：competition run 全停在 `intake`（CH-10662 实证：622 事件 phase 从没推进）。架构规划第二节要求快照存 `domainPhase`（INTAKE→RECON→TARGET_MODEL→HYPOTHESIS→EXPERIMENT→REPRODUCE→REPORT→SUBMIT）。
 - 接入点：`domain/types.ts`（加 domainPhase）、`competition/loop.ts`、reducer。
 - 验收：live run 的阶段在事件与 projection 一致，不再全是 intake。
 
@@ -86,12 +86,12 @@
 - 接入点：`container/`（新 backend）、`domain/types.ts`（SessionKind 已含 "http"/"browser"）、新 `web/` 目录。
 - 验收（离线已通过）：Cookie/CSRF 同 Run 内可复用、跨 Run 不可见；每条链有结构化 exchange/HAR-like Artifact 与 Observation；复用旧 session、跨 generation、越界 host/port 和反射 flag 都会被拒绝；干净重放产出 candidate/evidence。真实 DASCTF/Web 连接不属于自动验收范围。
 
-### P3（Planner/Refiner 双 Lane，以评测为准）
+### P3（单 coding lane 上的 Planner/Refiner 策略层，以评测为准）
 
-- Planner 只输出结构化 Handoff（不直接操作目标）；Solver 只接受当前 knowledgeVersion 的 Handoff；失败由 Refiner 生成替代假设 + 禁止重复列表。
+- Planner 只输出结构化 Handoff（不直接操作目标）；唯一的 coding lane/executor 只接受当前 knowledgeVersion 的 Handoff；失败由 Refiner 生成替代假设 + 禁止重复列表。
 - **强烈建议移植 pentagi 的 delta-patch 重规划**（add/remove/modify/reorder by id + afterId，见 `backend/pkg/tools/args.go:65-91`），而不是全量重写——天然是事件，对证据图友好。
-- **门槛**：用 20+ 道 Web/Pwn holdout 对比单 Lane，只有成功率/成本/p95 至少一项**稳定改善**才保留第二模型。没有评测背书不合并。
-- 接入点：`orchestration/planner.ts`、`domain/handoff.ts`、新 planner lane。
+- **门槛**：用 20+ 道 Web/Pwn holdout 对比当前单 coding lane，只有成功率/成本/p95 至少一项**稳定改善**才允许启用可选的 Planner 模型；没有评测背书不增加模型调用。
+- 接入点：`orchestration/planner.ts`、`orchestration/refiner.ts`、`domain/handoff.ts`；不新增第二条解题 lane。
 - 现状：PLAN-210 在 project-status.json 里是 `blocked`，依赖 P0/P1/P2 完成。
 
 ### P4（无人值守 Fleet / 高级题型）
@@ -134,7 +134,7 @@
 
 - **P0 工程化恢复**：`check:changed-tests` 根据 `.github/test-matrix.json` 自动把源码变更映射到测试；`CompetitionEnvironmentJanitor` 升级为 schema v2，支持跨进程锁、启动前 reservation、原子账本写入、schema v1 迁移、过期 reservation sweep 和重启恢复。
 - **P1 运行边界**：新增持久化 `ApprovalPolicy`（submit/start/network/session 默认 fail-closed），Solver 的动态 flag 和正常提交路径在未批准时只产生 pending approval；新增 `ProofBladeAppServer`，提供 `run/read`、事件分页/订阅、审批查询和批准接口，不暴露 ControlStore 写原语；GUI 增加 `/api/v2` 只读/审批边界。
-- **P2 本地评测**：新增 hash-bound `fixtures/holdout/`（Web 2 + Pwn 2）和 `LocalHoldoutEvaluationRunner`。确定性 lane 复用生产 evaluator 的证据、重放、成本和对照协议，4 case/2 variant 成功率为 1，Provider 请求数为 0；不连接真实 DASCTF、远程 tube 或 pwn E2E。
+- **P2 本地评测**：新增 hash-bound `fixtures/holdout/`（Web 12 + Pwn 12，并加入 Reverse/Crypto/Forensics 冒烟题）和 `LocalHoldoutEvaluationRunner`。确定性 lane 复用生产 evaluator 的证据、重放、成本和对照协议，27 case/2 variant 成功率为 1，Provider 请求数为 0；不连接真实 DASCTF、远程 tube 或 pwn E2E。
 
 本轮验证命令：
 

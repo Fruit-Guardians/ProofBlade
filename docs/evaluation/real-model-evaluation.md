@@ -1,6 +1,10 @@
 # Real Model Evaluation
 
-`eval-real` compares two or more configured providers on one private local corpus. It never runs in CI and requires `--allow-live` because it sends real Provider requests.
+`eval-real` compares two or more configured providers on one private local corpus. It never runs in CI. Use `--preflight` first to validate the corpus, Web/Pwn coverage, priced variants, credential environment variables, and budget without creating a Run or sending a Provider request; the actual comparison requires `--allow-live`.
+
+The CLI's live gate also requires observable Provider traffic from every Variant, at least 20 corpus cases, and both Web and Pwn target kinds. A deterministic injected lane, a tiny corpus, or a run that fails before the first Provider request cannot satisfy `eval-real --enforce-gate`, even if it produces a locally accepted candidate. The provider-free local holdout explicitly disables these checks because its purpose is to exercise Run/verifier/replay plumbing.
+
+The checked-in multi-direction holdout is intentionally separate: `proofblade eval-holdout fixtures/holdout/manifest.json --enforce-gate` runs 27 deterministic cases without Provider traffic (12 Web, 12 Pwn, and Reverse/Crypto/Forensics smoke cases). It validates the shared Run, verifier, replay, and metric pipeline; it does not establish real model solving quality. Use `eval-real` for that measurement only after configuring two priced model variants.
 
 Keep the corpus, samples, and expected values under `.proofblade/evaluation/`; that directory is ignored by Git. Copy `examples/real-evaluation-corpus.example.json` there, replace every placeholder, and calculate each sample hash in PowerShell:
 
@@ -31,7 +35,18 @@ Create one ordinary ProofBlade config per provider/model. API keys remain enviro
 
 When `--enforce-gate` is present, every Variant must reach `--min-success-rate` (default `0.5`). The selected `--baseline ID` defaults to the first canonical Variant id, and every other Variant may trail it by at most `--max-success-rate-drop` (default `0.1`). Set a rate to `0` only for exploratory reports where that corresponding gate should not constrain the comparison.
 
-Run prefixes and corpus case ids must be safe Run ID segments (`[A-Za-z0-9][A-Za-z0-9._-]{0,95}`); this keeps Fixture staging within the configured Fixture root. Then run a paired comparison:
+Run prefixes and corpus case ids must be safe Run ID segments (`[A-Za-z0-9][A-Za-z0-9._-]{0,95}`); this keeps Fixture staging within the configured Fixture root. First run the no-network preflight:
+
+```powershell
+npm run cli -- eval-real .proofblade/evaluation/corpus.json --preflight `
+  --variant deepseek=.proofblade/evaluation/deepseek.config.json `
+  --variant gpt=.proofblade/evaluation/gpt.config.json
+```
+
+`--preflight` reports only credential environment variable names and whether
+they are present; it never prints their values. A normal `eval-real` invocation
+repeats this check and refuses to start before any Provider request when it is
+not ready. After it passes, run the paired comparison:
 
 ```powershell
 npm run cli -- eval-real .proofblade/evaluation/corpus.json --allow-live `
@@ -41,4 +56,6 @@ npm run cli -- eval-real .proofblade/evaluation/corpus.json --allow-live `
   --min-success-rate 0.5 --baseline deepseek --max-success-rate-drop 0.1 --enforce-gate
 ```
 
-The report contains one section per Variant plus paired success-rate, cost, and p95-latency deltas. Its stable hash binds the corpus content hashes, expected-value hashes, selected model configuration fingerprints, budgets, and behavioral results. Wall-clock durations remain visible but are deliberately excluded from the stable hash.
+The report contains one section per Variant plus paired success-rate, cost, and p95-latency deltas. Each Variant also exposes `categoryMetrics` keyed by the corpus `targetKind`, including success rate, Provider requests/tokens/cost, first-Evidence latency, repeated experiments, submissions, context tokens, and failure categories. Its stable hash binds the corpus content hashes, expected-value hashes, selected model configuration fingerprints, budgets, and behavioral results. Wall-clock durations and first-Evidence latency remain visible but are deliberately excluded from the stable hash.
+
+For budget/deadline tuning, each case carries a replay-derived `providerDiagnostics` projection. It shows Provider requests and completed requests per durable executor turn, token totals, Evidence count, phases, aggregate requests by phase, the first-Evidence phase, the last Provider phase, and `deadlineBeforeCompletion`. Variant metrics expose first-turn request/token totals and the count of deadlines that arrived before completion. This is derived from the append-only event sequence and does not copy prompts or response bodies.

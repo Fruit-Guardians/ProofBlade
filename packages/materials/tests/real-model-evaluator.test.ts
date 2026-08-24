@@ -6,14 +6,37 @@ import { join } from "node:path";
 import test from "node:test";
 import type { ProofBladeConfig } from "../src/config.js";
 import { loadRealEvaluationCorpus } from "../src/evaluation/real-corpus.js";
-import { RealModelEvaluationRunner } from "../src/evaluation/real-model-evaluator.js";
+import { deriveProviderDiagnostics, preflightRealModelEvaluation, RealModelEvaluationRunner } from "../src/evaluation/real-model-evaluator.js";
+import { anonymizeEvaluationSummary, anonymizeRunReplay } from "../src/evaluation/anonymous-replay.js";
 import type { AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import type { HarnessEvent } from "../src/domain/types.js";
 
 const solver: AgentLaneFactory = async ({ runtime }) => testAgentLane(runtime, true);
 
 const failingSolver: AgentLaneFactory = async ({ runtime }) => testAgentLane(runtime, false);
 
+const throwingSolver: AgentLaneFactory = async () => ({
+  async prompt() { throw new Error("provider stream failed"); },
+  async compact() {},
+  async abort() {},
+  async isIdle() { return true; },
+  async close() {},
+});
+
 const baselineSolver: AgentLaneFactory = async ({ runtime, config }) => testAgentLane(runtime, config.modelProfiles.executor.provider === "alpha");
+
+const deadlineSolver: AgentLaneFactory = async () => {
+  let abortPrompt: (() => void) | undefined;
+  return {
+    prompt: () => new Promise((_resolve, reject) => {
+      abortPrompt = () => reject(new Error("test lane aborted"));
+    }),
+    compact: async () => {},
+    abort: async () => abortPrompt?.(),
+    isIdle: async () => false,
+    close: async () => {},
+  };
+};
 
 function testAgentLane(runtime: Parameters<AgentLaneFactory>[0]["runtime"], succeeds: boolean) {
   return {
@@ -56,6 +79,7 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
       corpusPath: join(root, "corpus.json"),
       variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
       allowLive: true as const,
+      requireProviderTraffic: false,
       attempts: 1,
       maxTurns: 1,
       maxCostUsd: 1,
@@ -64,14 +88,230 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
     const second = await runner.run({ ...options, runPrefix: "REAL-B" });
     assert.deepEqual(first.variants.map((item) => item.id), ["alpha", "beta"]);
     assert.equal(first.gate.passed, true);
+    assert.deepEqual(first.gate.policy, { minimumSuccessRate: 0.5, baselineVariantId: "alpha", maxBaselineSuccessRateDrop: 0.1, requireProviderTraffic: false, minimumCorpusCases: 0, requiredTargetKinds: [] });
     assert.equal(first.comparisons.length, 1);
     assert.ok(first.variants.every((item) => item.successRate === 1 && item.candidateLeakCount === 0));
+    assert.deepEqual(first.variants[0]?.categoryMetrics, {
+      reverse: {
+        total: 1,
+        successCount: 1,
+        successRate: 1,
+        providerRequests: 0,
+        totalTokens: 0,
+        totalCostUsd: 0,
+        firstEvidenceMs: first.variants[0]?.categoryMetrics.reverse.firstEvidenceMs,
+        repeatedExperimentCount: 0,
+        submissionCount: 2,
+        contextTokens: 0,
+        failureCategories: {},
+      },
+    });
     assert.ok(first.variants.every((item) => item.cases.every((candidate) => candidate.success && candidate.evidenceBacked && candidate.replayParity)));
+    assert.ok(first.variants.every((item) => item.metrics.firstEvidenceMs.total >= 0 && item.metrics.contextTokens >= 0 && item.metrics.submissionCount >= 1));
+    assert.ok(first.variants.every((item) => item.cases.every((candidate) => candidate.repeatedExperimentCount >= 0 && candidate.submissionCount >= 1)));
     assert.equal(first.reportHash, second.reportHash);
     assert.doesNotMatch(JSON.stringify(first.corpus), new RegExp(expected.replace(/[{}]/g, "\\$&")));
+    const anonymous = anonymizeEvaluationSummary(first);
+    assert.doesNotMatch(JSON.stringify(anonymous), /REAL-A|fixtures|expected|real_model_corpus/);
+    assert.ok(anonymous.variants.every((variant) => variant.cases.every((candidate) => !Object.hasOwn(candidate, "runId") && !Object.hasOwn(candidate, "error"))));
+
+    const strict = await runner.run({ ...options, requireProviderTraffic: true, runPrefix: "REAL-STRICT" });
+    assert.equal(strict.gate.passed, false);
+    assert.equal(strict.gate.policy.requireProviderTraffic, true);
+    assert.equal(strict.gate.policy.minimumCorpusCases, 20);
+    assert.deepEqual(strict.gate.policy.requiredTargetKinds, ["pwn", "web"]);
+    assert.equal(strict.gate.checks.find((item) => item.id === "minimum_corpus_cases")?.passed, false);
+    assert.ok(strict.gate.checks.filter((item) => item.id.startsWith("provider_traffic:")).every((item) => !item.passed));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("real evaluation preflight validates Web/Pwn coverage and never contacts a Provider", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-"));
+  try {
+    const web = "web marker";
+    const pwn = "pwn marker";
+    await writeFile(join(root, "web.txt"), web, "utf8");
+    await writeFile(join(root, "pwn.txt"), pwn, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "preflight-corpus",
+      cases: [
+        { ...corpusCase("web-case", "web.txt", "flag{web}", web), targetKind: "web" },
+        { ...corpusCase("pwn-case", "pwn.txt", "flag{pwn}", pwn), targetKind: "pwn" },
+      ],
+    }), "utf8");
+    const variants = [config("alpha"), config("beta")].map((value, index) => ({
+      id: index === 0 ? "alpha" : "beta",
+      config: { ...value, modelProfiles: { executor: { ...value.modelProfiles.executor, apiKeyEnv: "PATH" } } },
+    }));
+    const ready = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants,
+      requireProviderTraffic: true,
+      minimumCorpusCases: 2,
+      maxCostUsd: 1,
+      attempts: 1,
+      maxTurns: 1,
+    });
+    assert.equal(ready.ready, true);
+    assert.deepEqual(ready.corpus.targetKinds, { pwn: 1, web: 1 });
+    assert.ok(ready.variants.every((variant) => variant.credentialPresent && variant.pricingPresent));
+    assert.ok(ready.checks.every((check) => check.passed));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation preflight reports missing credentials and direction coverage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-fail-"));
+  try {
+    const source = "reverse marker";
+    await writeFile(join(root, "target.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "preflight-failure-corpus",
+      cases: [corpusCase("reverse-case", "target.txt", "flag{reverse}", source)],
+    }), "utf8");
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      requireProviderTraffic: true,
+      minimumCorpusCases: 20,
+    });
+    assert.equal(result.ready, false);
+    assert.equal(result.checks.find((check) => check.id === "minimum_corpus_cases")?.passed, false);
+    assert.equal(result.checks.find((check) => check.id === "target_kind_coverage:web")?.passed, false);
+    assert.equal(result.checks.find((check) => check.id === "target_kind_coverage:pwn")?.passed, false);
+    assert.equal(result.checks.find((check) => check.id === "credential:alpha")?.passed, false);
+    assert.equal(result.checks.find((check) => check.id === "credential:beta")?.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real model evaluator aborts a provider turn when the case deadline expires", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-deadline-"));
+  try {
+    const source = "deadline fixture";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "deadline-corpus",
+      cases: [corpusCase("deadline", "target.bin", "flag{deadline}", source)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, deadlineSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      // Leave enough wall-clock room for the fixture/control-store setup under
+      // the full test suite; the lane itself never resolves and must still be
+      // interrupted by this case deadline.
+      deadlineMs: 2_000,
+      maxCostUsd: 1,
+      runPrefix: "REAL-DEADLINE",
+    });
+    assert.ok(summary.variants.every((variant) => variant.cases.every((item) => !item.success
+      && item.error
+      && ["FAILED", "EXHAUSTED"].includes(item.status)
+      && item.failureCategory === "budget_exhausted"
+      && item.turns === 1
+      && item.providerDiagnostics.deadlineBeforeCompletion)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("provider diagnostics replay requests, tokens, phases, and first-turn evidence", () => {
+  const events = [
+    diagnosticEvent(1, "run_started", "main", {}),
+    diagnosticEvent(2, "phase_started", "orchestrator", { phase: "reconnaissance" }),
+    diagnosticEvent(3, "work_item_claimed", "executor", { ownerLane: "executor" }),
+    diagnosticEvent(4, "provider_request_started", "main", { phase: "reconnaissance" }),
+    diagnosticEvent(5, "model_usage", "main", { usage: { totalTokens: 120 } }),
+    diagnosticEvent(6, "evidence_added", "verifier", {}),
+    diagnosticEvent(7, "work_item_completed", "executor", {}),
+    diagnosticEvent(8, "phase_started", "orchestrator", { phase: "target_model" }),
+    diagnosticEvent(9, "work_item_claimed", "executor", { ownerLane: "executor" }),
+    diagnosticEvent(10, "provider_request_started", "main", { phase: "target_model" }),
+    diagnosticEvent(11, "model_usage", "main", { usage: { input: 30, output: 50 } }),
+  ] satisfies HarnessEvent[];
+
+  assert.deepEqual(deriveProviderDiagnostics(events, false, true), {
+    turns: [
+      { turn: 1, providerRequests: 1, completedRequests: 1, totalTokens: 120, evidenceAdded: 1, phases: ["reconnaissance"] },
+      { turn: 2, providerRequests: 1, completedRequests: 1, totalTokens: 80, evidenceAdded: 0, phases: ["target_model"] },
+    ],
+    providerRequestsByPhase: { reconnaissance: 1, target_model: 1 },
+    firstEvidencePhase: "reconnaissance",
+    lastProviderPhase: "target_model",
+    deadlineBeforeCompletion: false,
+  });
+});
+
+test("anonymous Run replay keeps convergence signals without copying secrets or paths", () => {
+  const events = [
+    {
+      schemaVersion: 1,
+      runId: "REAL-HISTORY-1",
+      seq: 1,
+      ts: "2026-08-24T00:00:00.000Z",
+      id: "REAL-HISTORY-1-E1",
+      streamId: "REAL-HISTORY-1",
+      type: "domain_phase_changed",
+      lane: "executor",
+      actor: "orchestrator",
+      payload: {
+        domainPhase: "RECON",
+        taskPath: "D:\\private\\challenge\\flag.txt",
+        summary: "flag{must-not-leak}",
+      },
+    },
+    {
+      schemaVersion: 1,
+      runId: "REAL-HISTORY-1",
+      seq: 2,
+      ts: "2026-08-24T00:00:01.000Z",
+      id: "REAL-HISTORY-1-E2",
+      streamId: "REAL-HISTORY-1",
+      type: "tool_result_recorded",
+      lane: "tool",
+      actor: "tool",
+      payload: {
+        toolName: "pwn_recv",
+        isError: false,
+        evidenceAdded: true,
+        output: "flag{must-not-leak}",
+        command: "cat D:\\private\\challenge\\flag.txt",
+      },
+    },
+    {
+      schemaVersion: 1,
+      runId: "REAL-HISTORY-1",
+      seq: 3,
+      ts: "2026-08-24T00:00:02.000Z",
+      id: "REAL-HISTORY-1-E3",
+      streamId: "REAL-HISTORY-1",
+      type: "work_item_completed",
+      lane: "executor",
+      actor: "orchestrator",
+      payload: { outcome: "success", workItemId: "W-SECRET", operation: "pwn_reproduce" },
+    },
+  ] satisfies HarnessEvent[];
+
+  const first = anonymizeRunReplay(events);
+  const second = anonymizeRunReplay(events.map((event) => ({ ...event, ts: "2099-01-01T00:00:00.000Z" })));
+  const encoded = JSON.stringify(first);
+  assert.equal(first.eventCount, 3);
+  assert.equal(first.events[0]?.payload.domainPhase, "RECON");
+  assert.equal(first.events[1]?.payload.toolName, "pwn_recv");
+  assert.equal(first.events[2]?.payload.operation, "pwn_reproduce");
+  assert.doesNotMatch(encoded, /REAL-HISTORY|private|flag\{|W-SECRET|taskPath|output|command/);
+  assert.equal(first.replayHash, second.replayHash);
+  assert.equal(first.runKey, second.runKey);
 });
 
 test("real evaluation corpus rejects an input whose content changed after manifest creation", async () => {
@@ -218,6 +458,34 @@ test("real evaluation gate fails when every Variant fails its minimum success ra
   }
 });
 
+test("real evaluation preserves a durable failure category when the lane throws", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-throwing-lane-"));
+  const source = "throwing lane target";
+  try {
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "throwing-lane",
+      cases: [corpusCase("sample", "target.bin", "flag{throwing_lane}", source)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, throwingSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-THROWING-LANE",
+    });
+    assert.ok(summary.variants.every((variant) => variant.cases.every((item) => item.error?.includes("provider stream failed"))));
+    assert.ok(summary.variants.every((variant) => variant.cases.every((item) => item.failureCategory === "effect_outcome_unknown")));
+    assert.ok(summary.variants.every((variant) => variant.failureCategories.effect_outcome_unknown === 1));
+    assert.ok(summary.variants.every((variant) => variant.failureCategories.unclassified === undefined));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("real evaluation gate rejects a Variant that regresses beyond its baseline allowance", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-baseline-"));
   const expected = "flag{baseline_gate}";
@@ -288,5 +556,20 @@ function corpusCase(id: string, source: string, expected: string, content: strin
     objective: `Inspect ${source}`,
     expected,
     files: [{ source, sha256: createHash("sha256").update(content).digest("hex") }],
+  };
+}
+
+function diagnosticEvent(seq: number, type: HarnessEvent["type"], lane: HarnessEvent["lane"], payload: Record<string, unknown>): HarnessEvent {
+  return {
+    schemaVersion: 1,
+    runId: "DIAGNOSTIC-RUN",
+    seq,
+    ts: new Date(seq * 1_000).toISOString(),
+    id: `DIAGNOSTIC-RUN-E${seq}`,
+    streamId: "DIAGNOSTIC-RUN",
+    type,
+    lane,
+    actor: lane === "verifier" ? "orchestrator" : "orchestrator",
+    payload,
   };
 }

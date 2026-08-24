@@ -2,7 +2,7 @@
 
 面向接手这个项目的人。目标是让你在一小时内知道：这东西为什么这样设计、哪些地方踩过坑、下一步该做什么。
 
-最后更新：2026-08-14。测试状态：**243/243 通过**（`npm test`）。
+最后更新：2026-08-24。测试状态：**561/561 通过**（`npm test`，`npm run verify`）。
 
 ---
 
@@ -18,7 +18,7 @@ ProofBlade（证锋）是一个**参赛用**的 CTF 解题 Agent，不是研究�
 
 最后两项 tiebreaker 是很多设计决策的直接原因，看到「为什么要走 Journal」这类问题时先回来看这一条。
 
-底座是 Pi AgentHarness（`@earendil-works/pi-agent-core`，版本锁定）。**核心原则：模型是底座，框架的每一处改动都只应该让模型解题更快、更准。** 历史上违反这条原则的设计（门禁、证据链强制流程）已经被移除，因为它们真的把一次成功的解题搞坏了。
+底座是 Pi AgentHarness（`@earendil-works/pi-agent-core`，版本锁定）。**核心原则：模型是底座，框架的每一处改动都只应该让模型解题更快、更准。** ProofBlade 不把模型文本当成事实或终态；Verifier、Evidence 和 Effect Journal 只约束完成判定与外部副作用，保持模型可以自由探索，同时避免“模型说成功但平台没有得分”。
 
 ---
 
@@ -26,7 +26,7 @@ ProofBlade（证锋）是一个**参赛用**的 CTF 解题 Agent，不是研究�
 
 ```powershell
 npm install
-npm test                    # 243 个测试，全绿才算环境正常
+npm test                    # 561 个测试，全绿才算环境正常
 npm run gui                 # GUI 在 http://127.0.0.1:4172
 ```
 
@@ -58,15 +58,23 @@ atoms → molecules → materials → apps
 
 `SingleAgentCtfLoop` 仍是 Fixture 自动执行的编排器，但它现在创建统一的 `PiCodingLane`；旧的生产 Solver Lane 已删除。评测和单元测试仍可注入确定性 `AgentLaneFactory` 作为测试替身。
 
+所有入口再经过同一个 `RunCoordinator`：它推进
+`INTAKE → RECON → TARGET_MODEL → HYPOTHESIS → EXPERIMENT → REPRODUCE → REPORT → SUBMIT`，
+认领和结算 `WorkItem`，并把 verifier-owned Evidence、Effect 和 Completion 绑定到终态。
+`submit_flag` 的平台结果不能单独让 Run 成功；动态 flag 快速路径也必须创建候选 Artifact、执行 verifier-owned `fixture_score` Effect，再由 `RunCoordinator` 完成终态。
+
 ### 竞赛路径（`packages/materials/src/competition/`）
 
 ```
 FleetScheduler          并发 worker 池 + 控制面
-  └─ CompetitionChallengeSolver   一题 = 一次完整运行
+  └─ CompetitionChallengeSolver   一题 = 一次完整 Run
        ├─ CompetitionApi          与平台之间唯一的接缝（通用 HTTP + DASCTF 专用适配器）
        ├─ CompetitionSandbox      解附件、写 connection-info.txt、fixture_score → 提交平台
-       └─ runCompetitionLoop      在 coding lane 上驱动，有界轮数/deadline/abort/assist
+       ├─ RunCoordinator           阶段、WorkItem、Verifier-first 终态
+       └─ runCompetitionLoop       唯一 PiCodingLane，有界轮数/deadline/abort/assist
 ```
+
+GUI 和本地 Fixture 通过 `SingleAgentCtfLoop` 进入同一个 Coordinator；区别只在于 Task Contract 的验证类型和是否注入平台 API，不再存在独立的比赛 Solver Lane。
 
 **控制面没有全局暂停**，这是刻意的：限时赛里暂停整支队伍等于送分。有的是逐题优先级、逐题 auto/assist、逐题取消、运行中动态调并发。
 
@@ -112,6 +120,7 @@ GUI 聊天运行拿的是 `verification: { kind: "reproduction" }` 和 `max_subm
 npm test                                                        # 全套
 node --import tsx --test packages/materials/tests/competition-*.test.ts   # 竞赛部分
 node --import tsx --test packages/materials/tests/coding-resources.test.ts # 工具层
+npm run cli -- run-anonymize <run-id>                                  # 脱敏历史 Run 事件回放
 ```
 
 ### `e2e-submit.mjs`（真模型 + 真题 + 假平台）
@@ -237,12 +246,16 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 
 通用 `HttpCompetitionApi` 与 DASCTF `DasctfCompetitionApi` 已实现五个操作，并由 fake HTTP/contract tests 覆盖鉴权、附件、环境轮询、错旗、限流/重试和 fail-closed 行为。不要把真实 DASCTF 登录、远程 tube 或 pwn E2E 放进自动测试；本任务只要求平台链接 API 能力。Fleet → Run Actor → Observer → Verifier 的离线组合回放也已覆盖原子终态提交。`CompetitionEnvironmentJanitor` 已补上并发环境容量 reservation、`expires_at` 回收、重启恢复和清理失败重试。
 
+### 🔴 当前最高优先：真实模型能力评测
+
+本地 holdout 已经证明 Run、Evidence、Verifier 和 replay 管道可以工作，但不代表模型会解题。下一步应准备至少 20 个匿名化 Web/Pwn case、两个带 token pricing 的 Provider 配置，并运行 `eval-real --allow-live --enforce-gate`。CLI 会拒绝没有 Provider telemetry 或题目数不足的报告；在这个评测完成前，不引入第二条解题 Lane，也不让 Planner/Refiner 使用独立模型。
+
 ### 🟡 Web / Pwn 的真实平台连通性仍未验证（离线契约已覆盖）
 
 目前真实平台连通性仍未验证；Web/Pwn 的 session、scope、Artifact、clean replay 和 barrier 使用 fake/fixture 契约覆盖。Web 和 Pwn 是不同性质的东西：
 
-- **Web** 需要能跨回合保持 cookie/session 的 HTTP 客户端，以及真实可达的目标。`external_network: true` 和 `allowed_hosts` 在 task 里设了，但**我没有验证过有任何东西真的在强制这个 scope**。
-- **Pwn** 需要跨回合保持的交互式 socket。现实答案是脚本里用 `pwntools`，但**没确认装了没有**。`shell_background` 在这里很关键：本地目标或代理得在回合之间一直活着。
+- **Web** 需要能跨回合保持 cookie/session 的 HTTP 客户端，以及真实可达的目标。Task scope、session generation 和 clean verifier replay 已由离线契约测试强制；真实平台目标仍未作为自动测试前提。
+- **Pwn** 需要跨回合保持的交互式 socket。容器内工具 profile、持久 tube、session ownership 和 shell/flag 双 barrier 已由离线契约测试覆盖；真实远程服务仍未作为自动测试前提。
 - **验证方式反而更有利**：web/pwn 的 flag 是从活服务**回来**的，会落在 recorded observation 里。crypto/RE 才是难的情况——flag 是离线算出来的，从不出现在任何工具输出里，这正是 `submitCandidate` 对 platform-judged 运行放宽 observation 锚定的原因。
 
 当前边界：先用 fake API、fixture、session contract 和 clean replay 测试验证 Web/Pwn 接口与生命周期，不把真实题目、远程 tube 或平台凭据作为自动验收前提；如未来需要连通性检查，必须是用户明确授权后的独立运维动作。HTTP session 每次请求都会生成脱敏 exchange Artifact，并由统一 Observer 记录候选类型；coding lane 的 `web_session_open/request/close` 只允许访问 task scope，session 随 lane 关闭；WebReproducer 只接受当前 Run 新建的 verifier session，generation 变化后旧 session 不能继续请求。
@@ -258,16 +271,16 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 
 ## 10. 改代码时的规矩
 
-1. **先跑 `npm test`**，243 全绿再动手。改完再跑一遍。
+1. **先跑 `npm test`**，561 全绿再动手。改完再跑一遍；合并前再跑 `npm run verify`。
 2. **不要为了让测试通过而改测试的语义**。第 6 节里每个 bug 都有对应的钉子测试，它们钉的是真实事故。
 3. **改了工具契约要更新哈希**：`coding-resources.test.ts` 里的 `CODING_TOOL_CONTRACT_HASH`。它守的是 provider prompt cache 前缀，不是形式主义。
 4. **每个模块的 `COMPONENT.md` 是有约束力的**，不是摆设。改了行为要同步改它。
-5. **模型是底座**。任何一处改动，问一句：这让模型解题更快或更准了吗？如果答案是「让流程更规范」，那大概是应该删掉的东西——门禁和证据链就是这么没的。
+5. **模型是底座**。任何一处改动，问一句：这让模型解题更快或更准了吗？如果增加了流程约束，必须证明它只保护副作用和终态，并且不会替模型决定解题路径。
 
 ## 11. P0/P1/P2 当前交付（2026-08-22）
 
-- P0：`npm run check:changed-tests` 已成为变更测试门禁；Janitor v2 使用原子账本、跨进程锁、reservation 和 schema 迁移，避免并发超限与崩溃遗留。
+- P0：`RunCoordinator` 已统一 Competition、GUI、Fixture 的阶段和 Verifier-first 终态；`npm run check:changed-tests` 已成为变更测试门禁；Janitor v2 使用原子账本、跨进程锁、reservation 和 schema 迁移，避免并发超限与崩溃遗留。
 - P1：`ApprovalPolicy` 和 `ProofBladeAppServer` 已接入 GUI；未批准的提交/启动/网络/session 副作用会停在 pending approval，App Server 通过游标事件 API 提供可恢复观测。
-- P2：本地 `fixtures/holdout` 提供 Web/Pwn 各两题，`LocalHoldoutEvaluationRunner` 不访问 Provider 网络，可验证成功率、成本、重放和候选脱敏。
+- P2：本地 `fixtures/holdout` 提供 27 个 hash-bound case（Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1），`LocalHoldoutEvaluationRunner` 不访问 Provider 网络，可验证成功率、Evidence、成本、重放和候选脱敏；`run-anonymize` 可导出事件级匿名历史；严格 `eval-real` 还要求至少 20 个真实 case 且每个 Variant 有真实 Provider telemetry。
 
 本轮回归通过 materials targeted tests、App Server/审批/Janitor/holdout tests、materials build、GUI typecheck/build 和 CI gate。真实 DASCTF、远程 tube、远程 pwn E2E 仍不在自动化范围。

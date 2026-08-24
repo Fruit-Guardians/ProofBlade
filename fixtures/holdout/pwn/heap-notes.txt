@@ -1,0 +1,2 @@
+tcache[0x90] -> freed_chunk
+win=PB{holdout_pwn_heap_path}

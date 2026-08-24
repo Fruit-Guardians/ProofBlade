@@ -148,6 +148,11 @@ interface McpConnection {
   tools?: McpToolSummary[];
 }
 
+interface PendingMcpConnection {
+  promise: Promise<McpConnection>;
+  controller: AbortController;
+}
+
 interface McpServerEntry {
   name: string;
   capabilityId: string;
@@ -158,10 +163,11 @@ interface McpServerEntry {
 export class McpProjectRegistry {
   private readonly definitions: McpServerEntry[];
   private readonly connections = new Map<string, McpConnection>();
-  private readonly connecting = new Map<string, Promise<McpConnection>>();
+  private readonly connecting = new Map<string, PendingMcpConnection>();
   private readonly failures = new Map<string, number>();
   private readonly schemaCache = new Map<string, McpToolSummary[]>();
   private schemaCacheWrite: Promise<void> = Promise.resolve();
+  private closed = false;
 
   private readonly binaryReverseConfig: McpBinaryReverseConfig;
 
@@ -419,11 +425,14 @@ export class McpProjectRegistry {
   }
 
   public async close(): Promise<void> {
-    const pending = await Promise.allSettled(this.connecting.values());
+    if (this.closed && this.connecting.size === 0 && this.connections.size === 0) return;
+    this.closed = true;
+    for (const pending of this.connecting.values()) pending.controller.abort(new Error("MCP registry is closing"));
+    const pending = await Promise.allSettled([...this.connecting.values()].map((item) => item.promise));
     const connected = [...this.connections.values(), ...pending.flatMap((item) => item.status === "fulfilled" ? [item.value] : [])];
     this.connecting.clear();
     this.connections.clear();
-    const results = await Promise.allSettled([...new Set(connected)].map((entry) => entry.client.close()));
+    const results = await Promise.allSettled([...new Set(connected)].map((entry) => closeMcpConnection(entry)));
     const failures = results.flatMap((item) => item.status === "rejected" ? [item.reason] : []);
     if (failures.length > 0) throw new AggregateError(failures, "MCP connection cleanup failed");
   }
@@ -467,15 +476,21 @@ export class McpProjectRegistry {
   }
 
   private async ensureConnection(name: string, signal?: AbortSignal): Promise<McpConnection> {
+    if (this.closed) throw new Error("MCP registry is closed");
     const existing = this.connections.get(name);
     if (existing) return existing;
     const pending = this.connecting.get(name);
-    if (pending) return await pending;
+    if (pending) return await pending.promise;
     const entry = this.entry(name);
     const toolchain = diagnoseToolchain(entry.definition.toolchain);
     if (toolchain && toolchain.state !== "ready") throw new Error(toolchain.reason ?? `MCP server ${name} toolchain is unavailable`);
-    const connecting = this.connect(entry, signal).finally(() => this.connecting.delete(name));
-    this.connecting.set(name, connecting);
+    const controller = new AbortController();
+    const connectSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+    const connecting = this.connect(entry, connectSignal).finally(() => {
+      const current = this.connecting.get(name);
+      if (current?.controller === controller) this.connecting.delete(name);
+    });
+    this.connecting.set(name, { promise: connecting, controller });
     return await connecting;
   }
 
@@ -483,7 +498,7 @@ export class McpProjectRegistry {
     if (this.connections.get(name) !== connection) return;
     this.connections.delete(name);
     this.failures.set(name, Date.now());
-    await connection.client.close().catch(() => connection.transport.close().catch(() => undefined));
+    await closeMcpConnection(connection).catch(() => undefined);
   }
 
   private async connect(entry: McpServerEntry, signal?: AbortSignal): Promise<McpConnection> {
@@ -498,6 +513,11 @@ export class McpProjectRegistry {
       { name: `proofblade-${entry.name}`, version: "0.1.0" },
       { versionNegotiation: entry.definition.protocolVersion === "auto" ? { mode: "auto" } : entry.definition.protocolVersion === "2026-07-28" ? { mode: { pin: "2026-07-28" } } : undefined },
     );
+    const onAbort = (): void => {
+      const pid = transportPid(transport);
+      if (pid !== undefined) void terminateMcpProcess(pid);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     try {
       await client.connect(transport, requestOptions(entry.definition, signal));
       const connection = { client, transport };
@@ -506,8 +526,18 @@ export class McpProjectRegistry {
       return connection;
     } catch (error) {
       this.failures.set(entry.name, Date.now());
-      await client.close().catch(() => transport.close().catch(() => undefined));
+      const pid = transportPid(transport);
+      if (pid !== undefined) await terminateMcpProcess(pid);
+      // A failed handshake can leave the SDK client in a state where
+      // client.close() resolves without closing the stdio transport. Close
+      // the transport first while it still owns the child-process handle, then
+      // close the protocol layer so the child process and cwd handles are
+      // released before the failed connection is observed by callers.
+      await transport.close().catch(() => undefined);
+      await client.close().catch(() => undefined);
       throw error;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
     }
   }
 }
@@ -626,6 +656,75 @@ function allowedTools(result: ListToolsResult, definition: McpServerDefinition):
 
 function requestOptions(definition: McpServerDefinition, signal?: AbortSignal): { signal?: AbortSignal; timeout: number } {
   return { ...(signal ? { signal } : {}), timeout: definition.requestTimeoutMs ?? 30_000 };
+}
+
+const MCP_CLOSE_TIMEOUT_MS = 2_000;
+
+async function closeMcpConnection(connection: McpConnection): Promise<void> {
+  const pid = transportPid(connection.transport);
+  let clientError: unknown;
+  try {
+    await withTimeout(connection.client.close(), MCP_CLOSE_TIMEOUT_MS);
+  } catch (error) {
+    clientError = error;
+  }
+  if (pid !== undefined) await terminateMcpProcess(pid);
+  let transportError: unknown;
+  try {
+    await withTimeout(connection.transport.close(), MCP_CLOSE_TIMEOUT_MS);
+  } catch (error) {
+    transportError = error;
+  }
+  if (clientError && transportError) throw new AggregateError([clientError, transportError], "MCP client and transport cleanup failed");
+  if (clientError) throw clientError;
+  if (transportError) throw transportError;
+}
+
+function transportPid(transport: McpConnection["transport"]): number | undefined {
+  if (!("pid" in transport)) return undefined;
+  const pid = transport.pid;
+  return pid === null ? undefined : pid;
+}
+
+async function terminateMcpProcess(pid: number): Promise<void> {
+  try {
+    process.kill(pid);
+  } catch {
+    return;
+  }
+  await waitForProcessExit(pid, 250);
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    return;
+  }
+  await waitForProcessExit(pid, MCP_CLOSE_TIMEOUT_MS);
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`MCP cleanup timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function resolveEnvironment(values: Record<string, string> | undefined): Record<string, string> {

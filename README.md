@@ -168,6 +168,11 @@ proofblade init <task-id>
 proofblade run demo
 proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]
+proofblade eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--enforce-gate]
+proofblade eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json
+proofblade tools [list|probe|init|preflight|show] [profile|tool-id]
+proofblade competition-api inspect <journal.jsonl>
+proofblade competition-api replay <journal.jsonl> --script <requests.json>
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
@@ -188,7 +193,7 @@ proofblade jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]
 proofblade artifact <run-id> <artifact-id> [max-chars]
 proofblade fixture-build <run-id>
 proofblade fixture-reset <run-id>
-proofblade fixture-score <run-id> <candidate>
+proofblade fixture-score <run-id> <candidate>  # verifier-backed diagnostic
 proofblade agent <run-id> [prompt]
 ```
 

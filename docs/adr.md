@@ -58,7 +58,7 @@ Planner and executor do not share a chat transcript. The planner lane writes a b
 
 ## ADR-015 Evaluation is a deterministic pre-push gate
 
-Keep the six-fixture evaluator provider-free. It reuses the production Control Store, Observer, verifier and replay path with deterministic executor decisions, and reports success, evidence-backed success, replay parity and candidate-leak checks. A model-backed run remains a separate smoke test; it must not make the commit gate dependent on LM Studio availability.
+Keep the 27-case multi-direction holdout evaluator provider-free (12 Web, 12 Pwn, one Reverse, one Crypto and one Forensics case; Forensics uses the platform-compatible `misc` wire kind). It reuses the production Control Store, Observer, verifier and replay path with deterministic executor decisions, and reports success, evidence-backed success, replay parity and candidate-leak checks. A model-backed run remains a separate smoke test; it must not make the commit gate dependent on LM Studio availability.
 
 ## ADR-016 Skills are project resources with two-level context loading
 

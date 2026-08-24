@@ -91,10 +91,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       break;
     case "domain_phase_changed": {
       const phase = p.domainPhase as RunSnapshot["domainPhase"];
-      if (!["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "SUBMIT"].includes(phase)) throw new Error(`Unknown domain phase: ${String(phase)}`);
+      if (!["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "REPORT", "SUBMIT"].includes(phase)) throw new Error(`Unknown domain phase: ${String(phase)}`);
       next.domainPhase = phase;
       break;
     }
+    case "tool_preparation_recorded":
+      next.toolPreparation = p.preparation as RunSnapshot["toolPreparation"];
+      break;
     case "fixture_reset":
       {
         if (terminal.includes(next.status)) throw new Error(`Cannot reset fixture for terminal run ${next.status}`);
@@ -427,7 +430,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     }
     case "job_finished": {
       const job = getJob(next, String(p.jobId));
-      if (job.status === "CANCELLED") break;
+      if (["CANCELLED", "SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) break;
       const status = p.status as typeof job.status;
       if (!["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(status)) throw new Error(`Invalid job terminal status: ${String(status)}`);
       job.status = status;

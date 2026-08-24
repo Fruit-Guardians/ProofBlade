@@ -29,6 +29,76 @@
       ]
     },
     {
+      "id": "web-auth-header",
+      "targetKind": "web",
+      "objective": "Inspect an administrative request and recover the diagnostic authorization value.",
+      "expected": "PB{holdout_web_auth_header}",
+      "files": [{ "source": "web/auth-header.txt", "path": "auth-header.txt", "sha256": "57bfc13b3fd4ce6294135f0377ca7046a7161442cbad57ecb1f9e37e79da02f6" }]
+    },
+    {
+      "id": "web-cookie",
+      "targetKind": "web",
+      "objective": "Review a captured response cookie note and recover the proof value.",
+      "expected": "PB{holdout_web_cookie_comment}",
+      "files": [{ "source": "web/cookie.txt", "path": "cookie.txt", "sha256": "1eb550599a72482f5ad77fdf5a0b95c2bbe6bbe3d5aca7d834697b5bae562d4e" }]
+    },
+    {
+      "id": "web-graphql",
+      "targetKind": "web",
+      "objective": "Inspect a GraphQL introspection response and recover its schema marker.",
+      "expected": "PB{holdout_web_graphql_schema}",
+      "files": [{ "source": "web/graphql-introspection.txt", "path": "graphql-introspection.txt", "sha256": "857ef4f283624314f51a8b0dace6f8622c7713d2115903a0fb5be71055765fab" }]
+    },
+    {
+      "id": "web-jwt",
+      "targetKind": "web",
+      "objective": "Decode the captured token payload and recover the proof claim.",
+      "expected": "PB{holdout_web_jwt_claim}",
+      "files": [{ "source": "web/jwt-payload.txt", "path": "jwt-payload.txt", "sha256": "be78f0a32b409db53c627efba197ab1164d70f39f6726b3c4ba1cda7bf019551" }]
+    },
+    {
+      "id": "web-sourcemap",
+      "targetKind": "web",
+      "objective": "Review a source map and recover the embedded source marker.",
+      "expected": "PB{holdout_web_source_map}",
+      "files": [{ "source": "web/sourcemap.txt", "path": "sourcemap.txt", "sha256": "3683a567d739bc1eec4d6b13384571ed5f7d1d48487d4f0bef87d210a1109a0e" }]
+    },
+    {
+      "id": "web-ssrf",
+      "targetKind": "web",
+      "objective": "Inspect a proxy metadata log and recover the SSRF proof marker.",
+      "expected": "PB{holdout_web_ssrf_metadata}",
+      "files": [{ "source": "web/ssrf-log.txt", "path": "ssrf-log.txt", "sha256": "b0ecab2622dc010992fcc980de514d47c54cc1d0ad58b0a4b2ac217333cc49d8" }]
+    },
+    {
+      "id": "web-template-error",
+      "targetKind": "web",
+      "objective": "Read the captured template error context and recover its proof marker.",
+      "expected": "PB{holdout_web_template_error}",
+      "files": [{ "source": "web/template-error.txt", "path": "template-error.txt", "sha256": "97662499d76bffe70aafa49bd4cd17eb31895b322ded0557ca8f80f979e26042" }]
+    },
+    {
+      "id": "web-upload",
+      "targetKind": "web",
+      "objective": "Inspect an upload manifest and recover the stored path marker.",
+      "expected": "PB{holdout_web_upload_path}",
+      "files": [{ "source": "web/upload-manifest.txt", "path": "upload-manifest.txt", "sha256": "e9ef50b5eede991648a68a666af0349f3360c12c6510b58c073cc205ffa025c8" }]
+    },
+    {
+      "id": "web-cors",
+      "targetKind": "web",
+      "objective": "Inspect a CORS preflight trace and recover the allowed-origin marker.",
+      "expected": "PB{holdout_web_cors_origin}",
+      "files": [{ "source": "web/cors-origin.txt", "path": "cors-origin.txt", "sha256": "b368762d74119fff12178142d3d0273f4398db1a43641c8921c6d7742501be57" }]
+    },
+    {
+      "id": "web-xml",
+      "targetKind": "web",
+      "objective": "Inspect an XML parser trace and recover the entity-handling marker.",
+      "expected": "PB{holdout_web_xml_entity}",
+      "files": [{ "source": "web/xml-error.txt", "path": "xml-error.txt", "sha256": "4b40d61a69122334ab827e93d881c9d05cd58c5735b22fc860f136b2d4458f3d" }]
+    },
+    {
       "id": "pwn-shell",
       "targetKind": "pwn",
       "objective": "Inspect the local menu transcript and identify the shell marker.",
@@ -42,6 +112,62 @@
       ]
     },
     {
+      "id": "pwn-canary",
+      "targetKind": "pwn",
+      "objective": "Inspect a stack leak transcript and recover the canary marker.",
+      "expected": "PB{holdout_pwn_canary_leak}",
+      "files": [{ "source": "pwn/canary-leak.txt", "path": "canary-leak.txt", "sha256": "bad691a4209d312b6be77551e41c82efdafa173c098e83adb48cccd3feb24785" }]
+    },
+    {
+      "id": "pwn-format",
+      "targetKind": "pwn",
+      "objective": "Inspect a format string transcript and recover the stack note.",
+      "expected": "PB{holdout_pwn_format_string}",
+      "files": [{ "source": "pwn/format-string.txt", "path": "format-string.txt", "sha256": "185914725ff0f550faa2db434a37045875516af0fa7ea85e8c8c31ddd1b42e47" }]
+    },
+    {
+      "id": "pwn-heap",
+      "targetKind": "pwn",
+      "objective": "Inspect allocator notes and recover the heap exploitation marker.",
+      "expected": "PB{holdout_pwn_heap_path}",
+      "files": [{ "source": "pwn/heap-notes.txt", "path": "heap-notes.txt", "sha256": "e69d3f8c9e81ca126e20b0ee4575d19d10bbd90762bc93ac0e99ed953dac31d9" }]
+    },
+    {
+      "id": "pwn-integer",
+      "targetKind": "pwn",
+      "objective": "Inspect an integer boundary transcript and recover the wraparound proof.",
+      "expected": "PB{holdout_pwn_integer_wrap}",
+      "files": [{ "source": "pwn/integer-overflow.txt", "path": "integer-overflow.txt", "sha256": "711b78c48b15876280347d1109a2aa2e0b1f986b2d28d0fbef4381562b171583" }]
+    },
+    {
+      "id": "pwn-libc",
+      "targetKind": "pwn",
+      "objective": "Inspect a libc leak and recover the computed base marker.",
+      "expected": "PB{holdout_pwn_libc_base}",
+      "files": [{ "source": "pwn/libc-leak.txt", "path": "libc-leak.txt", "sha256": "8a414324275ae68838ece4e98278a628fdc86c68563d2e1cf438ef58d03969cf" }]
+    },
+    {
+      "id": "pwn-rop",
+      "targetKind": "pwn",
+      "objective": "Inspect a ROP transcript and recover the target marker.",
+      "expected": "PB{holdout_pwn_rop_chain}",
+      "files": [{ "source": "pwn/rop-chain.txt", "path": "rop-chain.txt", "sha256": "24f1c1218d397e02e811eeeefdd239be9a3b1417a6f6950f696fbb9af3045100" }]
+    },
+    {
+      "id": "pwn-seccomp",
+      "targetKind": "pwn",
+      "objective": "Inspect a seccomp transcript and recover the escape marker.",
+      "expected": "PB{holdout_pwn_seccomp_escape}",
+      "files": [{ "source": "pwn/seccomp.txt", "path": "seccomp.txt", "sha256": "1d3ac72c6fbc0307a159753e28c30feb8c29aad8d63fccd73f5d5b0883c6ca90" }]
+    },
+    {
+      "id": "pwn-stack-pivot",
+      "targetKind": "pwn",
+      "objective": "Inspect a stack pivot transcript and recover the flag marker.",
+      "expected": "PB{holdout_pwn_stack_pivot}",
+      "files": [{ "source": "pwn/stack-pivot.txt", "path": "stack-pivot.txt", "sha256": "8b5ff3ef726ee90d900f6b4628a74f1fdd3376bd80e7024ec6c881dd7a1567e8" }]
+    },
+    {
       "id": "pwn-leak",
       "targetKind": "pwn",
       "objective": "Use the captured leak transcript to recover the computed answer.",
@@ -53,6 +179,41 @@
           "sha256": "616f14a7b4fc69e3282b35b0dc32745cba4f8f8cc570c1fe5aedfd4e39791f87"
         }
       ]
+    },
+    {
+      "id": "pwn-pie",
+      "targetKind": "pwn",
+      "objective": "Inspect a PIE leak transcript and recover the computed base marker.",
+      "expected": "PB{holdout_pwn_pie_base}",
+      "files": [{ "source": "pwn/pie-base.txt", "path": "pie-base.txt", "sha256": "fec2f7bd521f928c51862c3566c8df7b43edd25ca095851a78aca0dc6ca7412a" }]
+    },
+    {
+      "id": "pwn-uaf",
+      "targetKind": "pwn",
+      "objective": "Inspect allocator notes and recover the use-after-free marker.",
+      "expected": "PB{holdout_pwn_uaf_reclaim}",
+      "files": [{ "source": "pwn/uaf-notes.txt", "path": "uaf-notes.txt", "sha256": "2558f83a404be1cbac87862ac9e5dffe7152deb9f183dc1bb40600d3ed68fa2f" }]
+    },
+    {
+      "id": "reverse-control-flow",
+      "targetKind": "reverse",
+      "objective": "Trace the verifier control flow and recover the derived candidate.",
+      "expected": "PB{holdout_reverse_control_flow}",
+      "files": [{ "source": "reverse/control-flow.txt", "path": "control-flow.txt", "sha256": "63bbfa7ef804152c7490008b81beaabdbb782ecfb68ddbb394753255c47cae05" }]
+    },
+    {
+      "id": "crypto-low-exponent",
+      "targetKind": "crypto",
+      "objective": "Identify the low-exponent RSA issue and recover the decoded plaintext marker.",
+      "expected": "PB{holdout_crypto_low_exponent}",
+      "files": [{ "source": "crypto/rsa-low-exponent.txt", "path": "rsa-low-exponent.txt", "sha256": "e05c9355b009fefb805b6411255dd10d06ca38693f223b4d72b6ea891f200e89" }]
+    },
+    {
+      "id": "forensics-pcap",
+      "targetKind": "misc",
+      "objective": "Reassemble the captured network stream and recover the forensics marker.",
+      "expected": "PB{holdout_forensics_pcap}",
+      "files": [{ "source": "forensics/pcap-stream.txt", "path": "pcap-stream.txt", "sha256": "5ea4a8bace0b51e91820e9e557db0ac51b692034de98161870d783b7e92690cb" }]
     }
   ]
 }

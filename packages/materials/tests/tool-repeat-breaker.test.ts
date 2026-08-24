@@ -7,6 +7,7 @@ import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessTool
 import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { ControlStore } from "../src/control/control-store.js";
+import { sha256 } from "../src/domain/utils.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
@@ -21,6 +22,36 @@ const failed = (input: Record<string, unknown>, text = "tool rejected the argume
   input,
   isError: true,
   content: [{ type: "text", text }],
+});
+
+test("CTF assistant events hash text instead of persisting candidate plaintext", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-assistant-redaction-"));
+  try {
+    const runId = "ASSISTANT-REDACTION-001";
+    const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await controlStore.createRun(runId, { ...task(runId, root), mode: "ctf_solve", target_kind: "web" });
+    const candidate = "PB{assistant_event_secret}";
+    await finalizeCodingTurn({
+      runId,
+      controlStore,
+      correlationId: `${runId}:main:chat-turn`,
+      userPrompt: "Inspect the target.",
+      response: fauxAssistantMessage(candidate),
+      recoveryCount: 0,
+      recoveryExhausted: false,
+      termination: {},
+      claimVerifier: { project: () => ({ required: false, status: "not_required" }) },
+      maintainAfterTurn: async () => undefined,
+    });
+    const event = (await controlStore.events(runId)).findLast((item) => item.type === "assistant_message");
+    assert.equal(event?.payload?.text, undefined);
+    assert.equal(event?.payload?.textHash, sha256(candidate));
+    assert.equal(event?.payload?.textLength, candidate.length);
+    assert.equal(event?.payload?.textRedacted, true);
+    assert.doesNotMatch(JSON.stringify(event), /assistant_event_secret/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("[contract:evidence-repeat-breaker] repeated tool failures terminate after a bounded number of identical calls", () => {
@@ -861,6 +892,46 @@ test("tool-call budget blocks and terminates the next inner turn", async () => {
     assert.equal(response.stopReason, "error");
     assert.equal(termination.reason, "tool_budget_exhausted");
     assert.equal(termination.requested, true);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:first-action-budget] blocks broad tools until the prepared probe produces an observation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-first-action-budget-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-first-action" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "search", query: "anything" }, { id: "first-invalid" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "file target" }, { id: "first-valid" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("bounded first action complete", { stopReason: "stop" }),
+    ]);
+    let evidenceExecutions = 0;
+    let bashExecutions = 0;
+    const evidence: AgentHarnessTool<undefined> = {
+      name: "evidence", label: "evidence", description: "evidence search", parameters: Type.Object({ operation: Type.String(), query: Type.String() }),
+      async execute() { evidenceExecutions += 1; return { content: [{ type: "text" as const, text: "should be blocked" }] }; },
+    };
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "bounded probe", parameters: Type.Object({ command: Type.String() }),
+      async execute() { bashExecutions += 1; return { content: [{ type: "text" as const, text: "ELF 64-bit" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "first-action", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, bash], activeToolNames: ["evidence", "bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = { ctfMode: true };
+    const firstActionBudget = { allowedToolNames: ["bash"], maxCalls: 1, count: 0, completed: false };
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, undefined, firstActionBudget);
+
+    const response = await harness.prompt("CTF challenge: inspect the target");
+    assert.equal(evidenceExecutions, 0);
+    assert.equal(bashExecutions, 1);
+    assert.equal(firstActionBudget.completed, true);
+    assert.equal(response.stopReason, "stop");
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });

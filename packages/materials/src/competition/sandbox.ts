@@ -87,12 +87,6 @@ export class CompetitionSandbox implements SandboxPort {
     return fixture.generation + 1;
   }
 
-  public async score(_fixture: FixtureRef, candidate: string): Promise<{ accepted: boolean; candidateHash: string }> {
-    const normalized = candidate.trim();
-    const result = await this.init.api.submitFlag(this.init.challengeId, normalized);
-    return { accepted: result.correct, candidateHash: hash(normalized) };
-  }
-
   public async execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult> {
     if (effect.operation === "fixture_score") {
       if (effect.replayPolicy !== "forbidden-replay") {

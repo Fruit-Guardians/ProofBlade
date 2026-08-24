@@ -239,7 +239,11 @@ export class FixtureEvaluationRunner {
       confirmedFacts = facts.length;
       evidenceLinkedFacts = facts.filter((fact) => fact.evidenceIds.length > 0 && fact.evidenceIds.every((evidenceId) => snapshot.evidence[evidenceId] !== undefined)).length;
       factEvidenceCoverage = rate(evidenceLinkedFacts, confirmedFacts);
-      failureCategory = telemetry.failure?.primary;
+      // If the lane threw before returning a turn outcome, the evaluator did
+      // not observe enough context to attribute a durable failure category.
+      // Keep that case unclassified even when Run terminalization recorded a
+      // conservative effect-outcome category for recovery safety.
+      failureCategory = error ? undefined : telemetry.failure?.primary;
       if (!error) {
         status = snapshot.status;
         phase = snapshot.phase;

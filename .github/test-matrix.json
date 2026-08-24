@@ -8,6 +8,12 @@
       "command": "node --import tsx --test packages/materials/tests/mcp.test.ts"
     },
     {
+      "id": "durable-jobs",
+      "sourceGlobs": ["packages/materials/src/jobs/**"],
+      "testGlobs": ["packages/materials/tests/capability-jobs.test.ts"],
+      "command": "node --import tsx --test packages/materials/tests/capability-jobs.test.ts"
+    },
+    {
       "id": "competition-runtime",
       "sourceGlobs": ["packages/materials/src/competition/**"],
       "testGlobs": [
@@ -35,9 +41,10 @@
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/observability.test.ts",
-        "packages/materials/tests/durability.test.ts"
+        "packages/materials/tests/durability.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/durability.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/durability.test.ts packages/materials/tests/provider-pi-http-smoke.test.ts"
     },
     {
       "id": "agent-orchestration",
@@ -146,7 +153,7 @@
     },
     {
       "id": "gui-server-control",
-      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts"],
+      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts", "apps/gui/src/App.tsx"],
       "testGlobs": [
         "packages/materials/tests/app-server.test.ts",
         "apps/gui/tests/competition-settings.test.ts",

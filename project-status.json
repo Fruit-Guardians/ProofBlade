@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-23T12:00:00+08:00",
+  "updatedAt": "2026-08-24T22:00:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -203,23 +203,24 @@
     },
     {
       "id": "PLAN-210",
-      "title": "Planner 与 Executor 双模型会话",
+      "title": "单 coding lane 上的 Planner/Refiner 策略层",
       "status": "blocked",
-      "priority": "P1",
+      "priority": "P3",
       "milestone": "Milestone 5",
       "owner": "unassigned",
       "progress": 15,
-      "updatedAt": "2026-08-07T18:37:33+08:00",
-      "objective": "在结构化 Handoff 边界后增加独立 Planner Session，并用评测证明收益。",
+      "updatedAt": "2026-08-24T22:00:00+08:00",
+      "objective": "在单一 coding lane 的结构化 Handoff 边界上完善确定性 Planner/Refiner，并用评测证明是否值得增加可选 Planner 模型调用；不创建第二条解题 lane。",
       "deliverables": [
-        "planner/executor 独立模型配置与 Pi Session",
-        "确定性路由、fallback 和 fail-closed 审批边界",
+        "Planner/Refiner 的结构化 Handoff 与 knowledgeVersion 校验",
+        "add/remove/modify/reorder + afterId 的增量重规划",
         "重复 Intent 和并行浪费指标"
       ],
       "acceptance": [
         "至少 20 道题每题三次与单 Agent 配对比较",
         "成功率、成本或 p95 延迟至少一项稳定改善",
-        "其他指标不突破预算"
+        "其他指标不突破预算",
+        "Planner/Refiner 只作为策略层，不新增第二条解题 lane 或独立 solver transcript"
       ],
       "dependencies": [
         "PLAN-100",
@@ -231,6 +232,32 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260824-001",
+      "occurredAt": "2026-08-24T22:00:00+08:00",
+      "summary": "统一 ProofBlade 的 durable CTF Run、单一 verifier-first coding lane、工具预检、Competition API 重放和评估门禁。",
+      "branch": "codex/proofblade-agent-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-200",
+        "PLAN-220"
+      ],
+      "changes": [
+        "新增 RunCoordinator，将 GUI、CLI、Competition 和 Fixture 接入同一套可恢复阶段与 ControlStore 投影",
+        "将 Pi Coding Lane、ToolPreflight、Evidence/Artifact/Effect journal 和独立 Verifier 连接为单一解题路径",
+        "增加 Competition API journal/replay、环境清理、匿名 Run replay 和 Web/Pwn/Reverse/Crypto/Forensics holdout",
+        "扩展真实模型评估的 corpus 校验、失败分类、Provider-free gate 和多 Variant 门禁"
+      ],
+      "validation": [
+        "npm run verify passed",
+        "579/579 repository tests passed",
+        "CI gates 10/10 passed",
+        "provider-free evaluation 30/30 passed",
+        "npm audit --omit=dev: 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260823-001",
       "occurredAt": "2026-08-23T12:00:00+08:00",

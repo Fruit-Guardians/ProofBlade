@@ -1,5 +1,5 @@
 import type { HandoffAction, HandoffRecord, RunSnapshot } from "./types.js";
-import { canonicalJson, sha256 } from "./utils.js";
+import { canonicalJson, remainingRunDeadlineMs, sha256 } from "./utils.js";
 
 export interface HandoffDraft extends Omit<HandoffRecord, "createdSeq" | "hash" | "status"> {
   status: "PROPOSED";
@@ -71,8 +71,7 @@ export function buildHandoffDraft(snapshot: RunSnapshot, handoffId: string): Han
       estimatedToolCalls: 1,
     });
   }
-  const elapsedMs = snapshot.startedAt ? Math.max(0, Date.now() - Date.parse(snapshot.startedAt)) : 0;
-  const remainingMs = Math.max(0, snapshot.task.constraints.deadline_ms - elapsedMs);
+  const remainingMs = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
   const remainingToolCalls = Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length);
   const draft: Omit<HandoffDraft, "hash"> = {
     id: handoffId,

@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { McpProjectRegistry, McpServerSummary, McpToolchainState } from "../mcp/registry.js";
-import type { TargetKind } from "../domain/types.js";
+import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import type { FirstActionPlan, RunToolPreparation, TargetKind, ToolPreparationRuntime } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { ToolCatalogBootstrapSpec } from "../tools/catalog.js";
@@ -19,6 +20,14 @@ export type ChallengeCategory = "reverse" | "pwn" | "web" | "crypto" | "forensic
 export interface ChallengeToolProfile {
   id: ChallengeCategory;
   targetKind: Exclude<TargetKind, "unknown" | "mixed">;
+  /**
+   * The bounded action the first solver turn must perform for this direction.
+   * This is deliberately a contract, not a tool list: it turns preflight's
+   * classification into useful progress without asking the model to rediscover
+   * the direction or launch an unbounded experiment.
+  */
+  firstAction: string;
+  firstActionPlan: FirstActionPlan;
   skillNames: string[];
   hostToolIds: string[];
   requiredToolIds: string[];
@@ -36,9 +45,23 @@ export interface ChallengeClassification {
 
 const COMMON_HOST_TOOLS = ["python311", "python", "jq", "xxd"];
 
+const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
+  reverse: { id: "reverse-recon", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
+  mobile: { id: "mobile-manifest", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
+  pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "pwn_open", "pwn_recv"], maxCalls: 2 },
+  web: { id: "web-request-or-artifact", allowedToolNames: ["read", "bash", "web_open", "web_request"], maxCalls: 2 },
+  crypto: { id: "crypto-normalize", allowedToolNames: ["read", "bash"], maxCalls: 2 },
+  forensics: { id: "forensics-container", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
+  malware: { id: "malware-static", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
+  osint: { id: "osint-source", allowedToolNames: ["read", "bash", "web_open", "web_request"], maxCalls: 2 },
+  misc: { id: "misc-input", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 2 },
+};
+
 const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> = {
   reverse: {
     targetKind: "reverse",
+    firstAction: "Identify the artifact once with file/headers/strings and one targeted entrypoint or decompiler probe; persist format, architecture, and mitigations before following xrefs.",
+    firstActionPlan: FIRST_ACTION_PLANS.reverse,
     skillNames: ["ctf-reverse"],
     hostToolIds: ["file", "strings", "readelf", "objdump", "gdb", "upx", "patchelf", "qemu", "ghidra-headless", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["strings", "python"],
@@ -49,6 +72,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   mobile: {
     targetKind: "reverse",
+    firstAction: "Extract the APK manifest/package and main activity, then decompile one relevant class; persist exported components and secret-bearing paths before broad source browsing.",
+    firstActionPlan: FIRST_ACTION_PLANS.mobile,
     skillNames: ["ctf-reverse"],
     hostToolIds: ["jadx", "apktool", "adb", "aapt", "python311", "python", "file", "strings", "xxd"],
     requiredToolIds: ["jadx", "python"],
@@ -59,6 +84,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   pwn: {
     targetKind: "pwn",
+    firstAction: "Run file/checksec and one bounded protocol probe (pwn_open plus pwn_recv when a tube is ready); persist architecture, mitigations, prompt anchor, and interaction state before crafting a payload.",
+    firstActionPlan: FIRST_ACTION_PLANS.pwn,
     skillNames: ["ctf-pwn"],
     hostToolIds: ["checksec", "gdb", "pwntools", "ropgadget", "one_gadget", "patchelf", "qemu", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["checksec", "python"],
@@ -69,6 +96,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   web: {
     targetKind: "web",
+    firstAction: "Make one bounded request through the prepared web session or curl; capture status, headers, body, and auth/CSRF state, then persist the route and state before any mutation.",
+    firstActionPlan: FIRST_ACTION_PLANS.web,
     skillNames: ["ctf-web"],
     hostToolIds: ["curl", "python311", "playwright", "chromium", "jwt-tool", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["curl", "python"],
@@ -79,6 +108,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   crypto: {
     targetKind: "crypto",
+    firstAction: "Normalize the supplied encoding and identify the primitive, operation, and parameters; write one parser/recompute check and persist an invariant before trying attacks.",
+    firstActionPlan: FIRST_ACTION_PLANS.crypto,
     skillNames: ["ctf-crypto"],
     hostToolIds: ["python311", "gmpy2", "sympy", "pycryptodome", "sage", "fpylll", "hashcat", "john", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["python"],
@@ -89,6 +120,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   forensics: {
     targetKind: "misc",
+    firstAction: "Identify the file/container and metadata, enumerate its layers or streams once, and persist format, offsets, and boundaries before extracting content.",
+    firstActionPlan: FIRST_ACTION_PLANS.forensics,
     skillNames: ["ctf-forensics"],
     hostToolIds: ["file", "binwalk", "exiftool", "7z", "tshark", "volatility", "python311", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["python"],
@@ -99,6 +132,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   malware: {
     targetKind: "misc",
+    firstAction: "Hash and identify the sample, then run bounded static metadata/strings/YARA/CAPA checks; persist the family, IOC, and config location before emulation.",
+    firstActionPlan: FIRST_ACTION_PLANS.malware,
     skillNames: ["ctf-malware"],
     hostToolIds: ["yara", "capa", "pefile", "oletools", "volatility", "python311", "python", "file", "strings"],
     requiredToolIds: ["python"],
@@ -109,6 +144,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   osint: {
     targetKind: "misc",
+    firstAction: "State the exact claim to prove and collect one timestamped, attributable source or artifact; persist its provenance before broadening the search.",
+    firstActionPlan: FIRST_ACTION_PLANS.osint,
     skillNames: ["ctf-osint"],
     hostToolIds: ["curl", "python311", "exiftool", "tshark", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["curl", "python"],
@@ -119,6 +156,8 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   misc: {
     targetKind: "misc",
+    firstAction: "Identify the input format and dominant constraint with one bounded probe, then write a small reproducer and persist the first invariant before branching.",
+    firstActionPlan: FIRST_ACTION_PLANS.misc,
     skillNames: ["ctf-misc"],
     hostToolIds: ["python311", "python", "z3", "jq", "xxd", "imagemagick", "file"],
     requiredToolIds: ["python"],
@@ -132,7 +171,7 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
 /** Return a fresh immutable-by-convention profile object for a category. */
 export function challengeToolProfile(category: ChallengeCategory): ChallengeToolProfile {
   const data = PROFILE_DATA[category];
-  return { id: category, ...data, skillNames: [...data.skillNames], hostToolIds: [...data.hostToolIds], requiredToolIds: [...data.requiredToolIds], optionalToolIds: [...data.optionalToolIds], mcpServers: [...data.mcpServers], capabilities: [...data.capabilities], fallbackStrategies: [...data.fallbackStrategies] };
+  return { id: category, ...data, firstActionPlan: copyFirstActionPlan(data.firstActionPlan), skillNames: [...data.skillNames], hostToolIds: [...data.hostToolIds], requiredToolIds: [...data.requiredToolIds], optionalToolIds: [...data.optionalToolIds], mcpServers: [...data.mcpServers], capabilities: [...data.capabilities], fallbackStrategies: [...data.fallbackStrategies] };
 }
 
 /** Return every built-in profile in deterministic order for one-time setup/doctor commands. */
@@ -201,7 +240,20 @@ export function challengeToolCatalogSpecs(): ToolCatalogBootstrapSpec[] {
 /** Map a durable task target kind to the default prepared profile. */
 export function profileForTargetKind(targetKind: TargetKind, target = ""): ChallengeToolProfile | undefined {
   if (targetKind === "reverse") return classifyChallengePrompt(target)?.profile ?? challengeToolProfile("reverse");
-  if (targetKind === "pwn" || targetKind === "web" || targetKind === "crypto" || targetKind === "misc") return challengeToolProfile(targetKind);
+  if (targetKind === "pwn" || targetKind === "web" || targetKind === "crypto") return challengeToolProfile(targetKind);
+  if (targetKind === "misc") {
+    // Platforms often collapse forensics, malware, OSINT and misc into one
+    // bucket. Keep the durable TargetKind compatible with that wire value, but
+    // still select the specialized prepared tool profile when the target text
+    // carries a stronger direction marker.
+    return classifyChallengePrompt(`CTF ${target}`)?.profile ?? challengeToolProfile("misc");
+  }
+  // GUI/chat tasks can legitimately arrive with an unknown or mixed wire kind.
+  // Do the same deterministic text classification before the first Pi turn so
+  // they receive a bounded profile instead of falling through to an unprepared
+  // generic tool set. Ordinary non-challenge conversations still return none.
+  if (targetKind === "mixed") return classifyChallengePrompt(`CTF ${target}`)?.profile;
+  if (targetKind === "unknown") return classifyChallengePrompt(target)?.profile;
   return undefined;
 }
 
@@ -245,7 +297,11 @@ export interface McpHealthRecord {
 export interface ChallengeToolPreflight {
   profileId: ChallengeCategory;
   targetKind: Exclude<TargetKind, "unknown" | "mixed">;
+  runtime: ToolPreparationRuntime;
+  runtimeKey: string;
   cacheKey: string;
+  toolCatalogHash: string;
+  mcpCatalogHash: string;
   cacheHit: boolean;
   checkedAt: number;
   tools: ToolHealthRecord[];
@@ -253,6 +309,7 @@ export interface ChallengeToolPreflight {
   missingRequiredTools: string[];
   missingOptionalTools: string[];
   fallbackStrategies: string[];
+  firstActionPlan?: FirstActionPlan;
 }
 
 interface PersistedPreflight {
@@ -260,11 +317,16 @@ interface PersistedPreflight {
   cacheKey: string;
   profileId: ChallengeCategory;
   targetKind: ChallengeToolPreflight["targetKind"];
+  runtime?: ToolPreparationRuntime;
+  runtimeKey?: string;
   tools: ToolHealthRecord[];
   mcpServers: McpHealthRecord[];
+  toolCatalogHash?: string;
+  mcpCatalogHash?: string;
   missingRequiredTools: string[];
   /** Added after the initial cache format; old health entries remain readable. */
   missingOptionalTools?: string[];
+  firstActionPlan?: FirstActionPlan;
   checkedAt: number;
 }
 
@@ -291,13 +353,16 @@ export class ToolPreflightService {
         requiredToolIds: profile.requiredToolIds,
         optionalToolIds: profile.optionalToolIds,
         mcpServers: profile.mcpServers,
+        firstActionPlan: profile.firstActionPlan,
       },
       catalog: catalog.catalogHash(),
       mcp: mcp.catalogHash(),
+      runtime: "host",
+      runtimeKey: "host",
       tools: selected.map((entry) => entry.id),
     }));
     const cached = await this.readCached(cacheKey);
-    if (cached) return { ...cached, cacheHit: true };
+    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
     const checkedAt = Date.now();
     const diagnostics = await catalog.probeEntries(selected);
     const missingPaths = new Set(diagnostics.filter((item) => item.code === "path_missing").map((item) => item.id));
@@ -306,9 +371,42 @@ export class ToolPreflightService {
     const missingRequiredTools = profile.requiredToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const missingOptionalTools = profile.optionalToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const mcpServers = mcp.summaries().filter((server) => profile.mcpServers.includes(server.name) && !server.disabled).map((server) => ({ name: server.name, status: server.status, ...(server.toolchain ? { toolchainState: server.toolchain.state } : {}) }));
-    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, tools, mcpServers, missingRequiredTools, missingOptionalTools, checkedAt };
+    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), checkedAt };
     await this.writeCached(persisted);
-    return { ...persisted, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], cacheHit: false };
+    return { ...persisted, runtime: "host", runtimeKey: "host", toolCatalogHash: persisted.toolCatalogHash!, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), cacheHit: false };
+  }
+
+  /**
+   * Probe the actual execution backend used by the lane. Host catalog paths are
+   * intentionally unavailable inside Docker, so this method checks command and
+   * Python-module availability through the container's ExecutionEnv instead of
+   * trusting the host machine.
+   */
+  public async prepareInExecution(
+    profile: ChallengeToolProfile,
+    env: ExecutionEnv,
+    mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">,
+    options: { runtimeKey: string; force?: boolean } = { runtimeKey: "container" },
+  ): Promise<ChallengeToolPreflight> {
+    const specs = challengeToolCatalogSpecs().filter((spec) => profile.hostToolIds.includes(spec.id));
+    const toolCatalogHash = sha256(canonicalJson(specs.map(({ id, name, kind, candidates }) => ({ id, name, kind, candidates }))));
+    const runtimeKey = options.runtimeKey.trim() || "container";
+    const cacheKey = sha256(canonicalJson({ profile: profile.id, targetKind: profile.targetKind, firstActionPlan: profile.firstActionPlan, runtime: "container", runtimeKey, catalog: toolCatalogHash, mcp: mcp.catalogHash(), tools: specs.map((entry) => entry.id) }));
+    const cached = options.force ? undefined : await this.readCached(cacheKey);
+    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
+    const checkedAt = Date.now();
+    const tools: ToolHealthRecord[] = [];
+    for (const spec of specs) {
+      const ready = await probeExecutionTool(env, spec.id, spec.candidates);
+      tools.push({ id: spec.id, name: spec.name, path: `container:${spec.candidates[0] ?? spec.id}`, status: ready ? "ready" : "missing" });
+    }
+    const configured = new Set(specs.map((spec) => spec.id));
+    const missingRequiredTools = profile.requiredToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
+    const missingOptionalTools = profile.optionalToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
+    const mcpServers = mcp.summaries().filter((server) => profile.mcpServers.includes(server.name) && !server.disabled).map((server) => ({ name: server.name, status: server.status, ...(server.toolchain ? { toolchainState: server.toolchain.state } : {}) }));
+    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), checkedAt };
+    await this.writeCached(persisted);
+    return { ...persisted, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), cacheHit: false };
   }
 
   public async prepareAll(profiles: readonly ChallengeToolProfile[], catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight[]> {
@@ -325,7 +423,17 @@ export class ToolPreflightService {
       const maxAgeMs = this.options.maxAgeMs ?? 10 * 60_000;
       if (!cached || cached.schemaVersion !== 1 || cached.cacheKey !== cacheKey || !Number.isFinite(cached.checkedAt) || Date.now() - cached.checkedAt > maxAgeMs) return undefined;
       const profile = challengeToolProfile(cached.profileId);
-      return { ...cached, missingOptionalTools: cached.missingOptionalTools ?? [], fallbackStrategies: [...profile.fallbackStrategies], cacheHit: true };
+      return {
+        ...cached,
+        runtime: cached.runtime ?? "host",
+        runtimeKey: cached.runtimeKey ?? "host",
+        toolCatalogHash: cached.toolCatalogHash ?? "",
+        mcpCatalogHash: cached.mcpCatalogHash ?? "",
+        missingOptionalTools: cached.missingOptionalTools ?? [],
+        firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan),
+        fallbackStrategies: [...profile.fallbackStrategies],
+        cacheHit: true,
+      };
     } catch {
       return undefined;
     }
@@ -351,4 +459,81 @@ export class ToolPreflightService {
       // Readiness must never make a lane fail; a later run can simply probe again.
     }
   }
+}
+
+/** Convert the transient preflight result into the bounded durable Run state. */
+export function runToolPreparationFromPreflight(preflight: ChallengeToolPreflight, profile: ChallengeToolProfile, generation: number): RunToolPreparation {
+  const base = {
+    schemaVersion: 1 as const,
+    generation,
+    profileId: preflight.profileId,
+    targetKind: preflight.targetKind,
+    runtime: preflight.runtime,
+    runtimeKey: preflight.runtimeKey,
+    cacheKey: preflight.cacheKey,
+    toolCatalogHash: preflight.toolCatalogHash,
+    mcpCatalogHash: preflight.mcpCatalogHash,
+    checkedAt: preflight.checkedAt,
+    health: preflight.missingRequiredTools.length === 0 ? "ready" as const : "degraded" as const,
+    tools: preflight.tools.map((tool) => ({ ...tool, required: profile.requiredToolIds.includes(tool.id) })),
+    mcpServers: preflight.mcpServers.map((server) => ({ ...server, ...(server.toolchainState === undefined ? {} : { toolchainState: String(server.toolchainState) }) })),
+    missingRequiredTools: [...preflight.missingRequiredTools],
+    missingOptionalTools: [...preflight.missingOptionalTools],
+    fallbackStrategies: [...preflight.fallbackStrategies],
+    firstActionPlan: copyFirstActionPlan(profile.firstActionPlan),
+  };
+  return { ...base, hash: sha256(canonicalJson(base)) };
+}
+
+/** Rehydrate the prompt-facing preflight view from a persisted Run state. */
+export function preflightFromRunToolPreparation(preparation: RunToolPreparation): ChallengeToolPreflight {
+  const profile = challengeToolProfile(preparation.profileId as ChallengeCategory);
+  return {
+    profileId: preparation.profileId as ChallengeCategory,
+    targetKind: preparation.targetKind,
+    runtime: preparation.runtime,
+    runtimeKey: preparation.runtimeKey,
+    cacheKey: preparation.cacheKey,
+    toolCatalogHash: preparation.toolCatalogHash,
+    mcpCatalogHash: preparation.mcpCatalogHash,
+    cacheHit: true,
+    checkedAt: preparation.checkedAt,
+    tools: preparation.tools.map(({ id, name, path, status }) => ({ id, name, path, status })),
+    mcpServers: preparation.mcpServers.map(({ name, status, toolchainState }) => ({ name, status: status as McpServerSummary["status"], ...(toolchainState === undefined ? {} : { toolchainState: toolchainState as McpToolchainState }) })),
+    missingRequiredTools: [...preparation.missingRequiredTools],
+    missingOptionalTools: [...preparation.missingOptionalTools],
+    fallbackStrategies: [...preparation.fallbackStrategies],
+    firstActionPlan: copyFirstActionPlan(preparation.firstActionPlan ?? profile.firstActionPlan),
+  };
+}
+
+function copyFirstActionPlan(plan: FirstActionPlan): FirstActionPlan {
+  return { id: plan.id, allowedToolNames: [...plan.allowedToolNames], maxCalls: plan.maxCalls };
+}
+
+const PYTHON_MODULES: Record<string, string> = {
+  pwntools: "pwn",
+  gmpy2: "gmpy2",
+  sympy: "sympy",
+  pycryptodome: "Crypto",
+  fpylll: "fpylll",
+  pefile: "pefile",
+  oletools: "oletools",
+};
+
+async function probeExecutionTool(env: ExecutionEnv, id: string, candidates: readonly string[]): Promise<boolean> {
+  const commandChecks = candidates.map((candidate) => `command -v ${shellQuote(candidate)} >/dev/null 2>&1`).join(" || ");
+  const module = PYTHON_MODULES[id];
+  const moduleCheck = module === undefined ? "" : `for py in python3 python py; do if command -v \"$py\" >/dev/null 2>&1 && \"$py\" -c ${shellQuote(`import ${module}`)} >/dev/null 2>&1; then exit 0; fi; done;`;
+  const command = `${moduleCheck} if ${commandChecks || "false"}; then exit 0; fi; exit 1`;
+  try {
+    const result = await env.exec(command, { timeout: 5 });
+    return result.ok && result.value.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }

@@ -4,9 +4,8 @@ import type { ProofBladeConfig } from "../config.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AppServices } from "../app/demo.js";
-import type { ExecutionMode, RunSnapshot, TaskContract } from "../domain/types.js";
-import { id, isTerminal } from "../domain/utils.js";
-import { pathToPhase } from "../control/phase-machine.js";
+import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract } from "../domain/types.js";
+import { id, isTerminal, remainingRunDeadlineMs } from "../domain/utils.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
@@ -19,7 +18,7 @@ import { LeaseManager } from "../control/lease-manager.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { IntentScheduler } from "./intent-scheduler.js";
 import { buildSchedulingContext } from "./scheduling-context.js";
-import { RunWorkScheduler } from "./run-work-scheduler.js";
+import { RunCoordinator } from "./run-coordinator.js";
 
 export interface AgentLaneCreateInput {
   projectRoot: string;
@@ -49,6 +48,11 @@ export interface SingleAgentRunOptions {
   maxTurns?: number;
   onLaneReady?: (lane: AgentLanePort) => void | Promise<void>;
   signal?: AbortSignal;
+  /**
+   * Convert a caller-owned deadline abort into a durable terminal Run. Normal
+   * user cancellation intentionally remains resumable and does not use this.
+   */
+  terminalizeAbort?: { reason: string; category: PrimaryFailureCategory };
 }
 
 export interface SingleAgentRunOutcome {
@@ -97,10 +101,14 @@ export class SingleAgentCtfLoop {
     const fixture = recovery.fixture;
     snapshot = await this.services.control.snapshot(options.runId);
     throwIfAborted(options.signal);
-    if (snapshot.phase === "intake") await this.services.control.dispatch(options.runId, { type: "start_phase", phase: "reconnaissance" });
     const intentScheduler = new IntentScheduler(this.services.control, new LeaseManager(this.services.control), this.config.intentScheduler);
-    const workScheduler = new RunWorkScheduler(this.services.control);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.verifierJournal, this.services.runsRoot, this.services.verifier);
+    const coordinator = new RunCoordinator(this.services.control, this.services.verifier, { verifier });
+    // Keep the initial generic projection and the CTF projection in one
+    // transaction.  A direct `start_phase` here used to leave a fresh local
+    // Run at `domainPhase=INTAKE, phase=reconnaissance` until the first model
+    // turn, which made GUI/Fixture replay diverge from Competition replay.
+    if (snapshot.phase === "intake") await coordinator.setDomainPhase(options.runId, "RECON");
     const claimVerifier = new CodingClaimVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
@@ -110,8 +118,8 @@ export class SingleAgentCtfLoop {
       throwIfAborted(options.signal);
       let verified: VerificationOutcome;
       try {
-        const resumedWorkItem = await workScheduler.claim(options.runId, options.task, 0);
-        verified = await this.verifyAndFinalize(options.runId, fixture, verifier, pendingAtStart.id, intentScheduler, workScheduler, resumedWorkItem.id, options.signal);
+        const resumedWorkItem = await coordinator.claim(options.runId, options.task, 0);
+        verified = await this.verifyAndFinalize(options.runId, fixture, coordinator, pendingAtStart.id, intentScheduler, resumedWorkItem.id, options.signal);
       } catch (error) {
         const paused = await this.services.control.snapshot(options.runId);
         if (paused.status === "PAUSED") return outcome(paused, mode, 0);
@@ -157,25 +165,27 @@ export class SingleAgentCtfLoop {
         const activeIntent = await this.claimIntent(options.runId, intentScheduler);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
+        await coordinator.setDomainPhase(options.runId, coordinator.domainPhaseForTurn(turns + 1));
+        const turnContext = await this.services.control.snapshot(options.runId);
         await planner.prepare(options.runId);
-        activeWorkItemId = (await workScheduler.claim(options.runId, options.task, turns + 1, activeIntent)).id;
+        activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(before, turns, activeIntent));
+        const agentOutcome = await lane.prompt(turnPrompt(turnContext, turns, activeIntent));
         throwIfAborted(options.signal);
         if (agentOutcome.termination === "budget_exhausted" || agentOutcome.termination === "deadline_exhausted") {
-          await workScheduler.fail(options.runId, activeWorkItemId, agentOutcome.termination);
+          await coordinator.fail(options.runId, activeWorkItemId, agentOutcome.termination);
           await this.exhaust(options.runId, agentOutcome.termination === "deadline_exhausted" ? "Run deadline exhausted during a Provider request." : "Run provider cost budget exhausted.");
           break;
         }
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
           if (failed.contextOverflowRecoveries >= 1) {
-            await workScheduler.fail(options.runId, activeWorkItemId, "context_overflow: recovery already used for this run.");
+            await coordinator.fail(options.runId, activeWorkItemId, "context_overflow: recovery already used for this run.");
             await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });
             break;
           }
-          await workScheduler.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery");
+          await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery");
           activeWorkItemId = undefined;
           const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");
           await this.services.control.dispatch(options.runId, { type: "context_recovery", checkpointId: checkpoint.checkpointId });
@@ -191,16 +201,23 @@ export class SingleAgentCtfLoop {
         const pending = latestPending(after);
         if (pending) {
           if (mode() === "assist") {
-            await workScheduler.block(options.runId, activeWorkItemId, "Completion is waiting for verifier approval.");
+            await coordinator.setDomainPhase(options.runId, "REPRODUCE");
+            await coordinator.block(options.runId, activeWorkItemId, "Completion is waiting for verifier approval.");
             await this.services.control.dispatch(options.runId, { type: "pause", reason: `Completion ${pending.id} is waiting for verifier approval.` });
             break;
           }
           throwIfAborted(options.signal);
-          verification = await this.verifyAndFinalize(options.runId, fixture, verifier, pending.id, intentScheduler, workScheduler, activeWorkItemId, options.signal);
+          verification = await this.verifyAndFinalize(options.runId, fixture, coordinator, pending.id, intentScheduler, activeWorkItemId, options.signal);
           activeWorkItemId = undefined;
           if (verification.accepted) break;
           await refiner.refineAfterFailure(options.runId, "candidate verification failed");
-          await this.moveTo(options.runId, "experiment");
+          // Verification is a real domain phase.  A rejected candidate must
+          // explicitly return to EXPERIMENT before the next turn can advance;
+          // otherwise the next absolute turn mapping would try to move from
+          // REPRODUCE directly to TARGET_MODEL and the durable phase guard
+          // would reject the run.
+          await coordinator.setDomainPhase(options.runId, "EXPERIMENT");
+          await coordinator.moveToPhase(options.runId, "experiment");
           continue;
         }
         const evidenceIds = newIds(before.evidence, after.evidence);
@@ -209,7 +226,7 @@ export class SingleAgentCtfLoop {
           || newIds(before.facts, after.facts).length > 0
           || newIds(before.hypotheses, after.hypotheses).length > 0;
         await this.settleIntentAfterTurn(options.runId, intentScheduler, activeIntent, before, after);
-        await workScheduler.settle(options.runId, activeWorkItemId, progressed, evidenceIds, []);
+        await coordinator.settle(options.runId, activeWorkItemId, progressed, evidenceIds, []);
         activeWorkItemId = undefined;
         if (mode() === "assist") {
           await this.services.control.dispatch(options.runId, { type: "pause", reason: "Assist turn completed without a completion proposal." });
@@ -229,11 +246,24 @@ export class SingleAgentCtfLoop {
         }
       }
     } catch (error) {
-      await workScheduler.fail(options.runId, activeWorkItemId, "Coding lane failed before returning a turn outcome.").catch(() => undefined);
+      await coordinator.fail(options.runId, activeWorkItemId, "Coding lane failed before returning a turn outcome.").catch(() => undefined);
       const paused = await this.services.control.snapshot(options.runId);
       if (paused.status === "PAUSED") {
         snapshot = paused;
         return outcome(snapshot, mode, turns, verification);
+      }
+      if (!isTerminal(paused.status)) {
+        // A caller-owned terminalization policy describes an AbortSignal
+        // deadline, not every exception from the coding lane.  Applying it to
+        // ordinary provider/tool errors misclassified those failures as
+        // budget exhaustion in evaluation reports.
+        const terminalization = options.signal?.aborted ? options.terminalizeAbort : undefined;
+        await this.services.control.dispatch(options.runId, {
+          type: "fail",
+          reason: terminalization?.reason ?? "Coding lane failed before returning a turn outcome.",
+          category: terminalization?.category ?? "effect_outcome_unknown",
+          lane: "executor",
+        }).catch(() => undefined);
       }
       throw error;
     } finally {
@@ -248,7 +278,7 @@ export class SingleAgentCtfLoop {
     snapshot = await this.services.control.snapshot(options.runId);
     if (mode() === "auto" && snapshot.status !== "PAUSED" && !isTerminal(snapshot.status) && turns >= maxTurns) {
       try {
-        await workScheduler.fail(options.runId, activeWorkItemId, `No verified completion after ${maxTurns} model turns.`);
+        await coordinator.fail(options.runId, activeWorkItemId, `No verified completion after ${maxTurns} model turns.`);
         await this.services.control.dispatch(options.runId, { type: "exhaust", reason: `No verified completion after ${maxTurns} model turns.` });
       } catch (error) {
         const current = await this.services.control.snapshot(options.runId);
@@ -259,7 +289,7 @@ export class SingleAgentCtfLoop {
     return outcome(snapshot, mode, turns, verification);
   }
 
-  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, verifier: IndependentVerifier, completionId: string, scheduler: IntentScheduler, workScheduler: RunWorkScheduler, workItemId: string | undefined, signal?: AbortSignal): Promise<VerificationOutcome> {
+  private async verifyAndFinalize(runId: string, fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>, coordinator: RunCoordinator, completionId: string, scheduler: IntentScheduler, workItemId: string | undefined, signal?: AbortSignal): Promise<VerificationOutcome> {
     throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     if (Object.keys(snapshot.hypotheses).length === 0) {
@@ -271,17 +301,16 @@ export class SingleAgentCtfLoop {
       });
     }
     throwIfAborted(signal);
-    await this.moveTo(runId, "verification");
     throwIfAborted(signal);
-    const verified = await verifier.verify(runId, fixture, completionId, signal);
+    const verified = await coordinator.verifyCompletion(runId, fixture, completionId, signal);
     await this.ensureVerifierActive(runId, signal);
     if (!verified.accepted) {
       await this.failClaimedIntents(runId, scheduler, `Verifier rejected completion ${completionId}`);
-      await workScheduler.fail(runId, workItemId, `Verifier rejected completion ${completionId}`);
+      await coordinator.fail(runId, workItemId, `Verifier rejected completion ${completionId}`);
       return verified;
     }
     await this.ensureVerifierActive(runId, signal);
-    await this.moveTo(runId, "report");
+    await coordinator.moveToPhase(runId, "report");
     await this.ensureVerifierActive(runId, signal);
     const verifiedSnapshot = await this.services.control.snapshot(runId);
     const acceptedCompletion = verifiedSnapshot.completions[verified.completionId];
@@ -306,9 +335,8 @@ export class SingleAgentCtfLoop {
         producedFacts: Object.keys(current.facts),
       });
     }
-    await workScheduler.complete(runId, workItemId, current);
     await this.ensureVerifierActive(runId, signal);
-    await this.services.verifier.finish(runId, { completionId: acceptedCompletion.id, reason: "Hidden scorer reproduced the candidate." });
+    await coordinator.finishAccepted(runId, workItemId, acceptedCompletion.id, "Hidden scorer reproduced the candidate.");
     return verified;
   }
 
@@ -351,11 +379,6 @@ export class SingleAgentCtfLoop {
       .filter((intent) => intent.status === "CLAIMED" && intent.fixtureGeneration === snapshot.generation);
   }
 
-  private async moveTo(runId: string, phase: RunSnapshot["phase"]): Promise<void> {
-    const snapshot = await this.services.control.snapshot(runId);
-    for (const next of pathToPhase(snapshot.phase, phase)) await this.services.control.dispatch(runId, { type: "start_phase", phase: next });
-  }
-
   private async exhaust(runId: string, reason: string): Promise<void> {
     try {
       await this.services.control.dispatch(runId, { type: "exhaust", reason });
@@ -391,8 +414,12 @@ function latestPending(snapshot: RunSnapshot) {
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent): string {
+  const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
+    `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. Treat this phase as a bounded step, not an invitation to restart the whole analysis.`,
+    `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`,
+    `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
     "Inspect every visible target file with read or a bounded bash command; do not guess from the task description.",
     "Preserve useful Artifact/Evidence ids and use them to support your reasoning.",

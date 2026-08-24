@@ -1,0 +1,2 @@
+puts@libc=0x7ffff7e12340
+computed=PB{holdout_pwn_libc_base}

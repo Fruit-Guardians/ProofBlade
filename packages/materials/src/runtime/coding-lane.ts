@@ -34,7 +34,7 @@ import type { PwnReproductionContract, RunSnapshot, TaskContract } from "../doma
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
-import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination, type ToolCallBudget } from "./coding-turn-projection.js";
+import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
@@ -45,7 +45,7 @@ import { HttpSessionBackend } from "../web/http-session.js";
 import { WebReproducer, type WebExploitStep } from "../verification/web-reproducer.js";
 import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { ToolPreflightService, profileForTargetKind, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
+import { ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -67,6 +67,8 @@ export class PiCodingLane implements AgentLanePort {
   private constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
+    private readonly challengeMode: boolean,
+    private readonly preparedChallenge: boolean,
     private readonly harness: AgentHarness<CodingResourceContext>,
     private readonly env: ExecutionEnv,
     private readonly sessionEnv: ExecutionEnv,
@@ -164,10 +166,27 @@ export class PiCodingLane implements AgentLanePort {
     const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
     const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
     const snapshot = await options.controlStore.snapshot(options.runId);
-    const challengeProfile = options.challengeProfile ?? profileForTargetKind(snapshot.task.target_kind, snapshot.task.target);
-    const preflight = challengeProfile
-      ? await new ToolPreflightService(installRoot).prepare(challengeProfile, toolCatalog, mcp)
-      : undefined;
+    const challengeMode = isChallengeTask(snapshot.task);
+    const challengeProfile = options.challengeProfile ?? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`);
+    const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
+    let preflight: ChallengeToolPreflight | undefined;
+    if (challengeProfile) {
+      const existing = snapshot.toolPreparation;
+      const reusable = existing
+        && existing.generation === snapshot.generation
+        && existing.profileId === challengeProfile.id
+        && existing.runtime === (inContainer ? "container" : "host")
+        && existing.runtimeKey === runtimeKey;
+      preflight = reusable
+        ? preflightFromRunToolPreparation(existing)
+        : inContainer
+          ? await new ToolPreflightService(installRoot).prepareInExecution(challengeProfile, env, mcp, { runtimeKey })
+          : await new ToolPreflightService(installRoot).prepare(challengeProfile, toolCatalog, mcp);
+      if (!reusable) {
+        const preparation = runToolPreparationFromPreflight(preflight, challengeProfile, snapshot.generation);
+        await options.controlStore.dispatch(options.runId, { type: "record_tool_preparation", preparation, lane: "executor" });
+      }
+    }
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
     const enabledSkills = new Set(options.capabilities?.enabledSkills ?? challengeProfile?.skillNames ?? skills.list().map((skill) => skill.name));
     const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? challengeProfile?.mcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
@@ -339,6 +358,17 @@ export class PiCodingLane implements AgentLanePort {
     const failureStormBreaker = new ToolFailureStormBreaker();
     const experimentBudgetBreaker = new ExperimentBudgetBreaker();
     const toolBudget: ToolCallBudget = { max: Math.max(0, snapshot.task.constraints.max_tool_calls), count: 0 };
+    const firstActionPlan = preflight?.firstActionPlan ?? challengeProfile?.firstActionPlan;
+    const firstActionBudget: FirstActionBudget | undefined = firstActionPlan
+      ? {
+        allowedToolNames: [...firstActionPlan.allowedToolNames],
+        maxCalls: firstActionPlan.maxCalls,
+        count: 0,
+        // Observations are durable and generation-bound, so a recovered lane
+        // does not force the model to repeat its initial probe.
+        completed: Object.values(snapshot.observations).some((item) => item.generation === snapshot.generation),
+      }
+      : undefined;
     const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
@@ -352,7 +382,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -393,6 +423,8 @@ export class PiCodingLane implements AgentLanePort {
     return new PiCodingLane(
       options.runId,
       options.controlStore,
+      challengeMode,
+      challengeProfile !== undefined,
       harness,
       env,
       sessionEnv,
@@ -421,7 +453,11 @@ export class PiCodingLane implements AgentLanePort {
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
-    const ctfMode = isLikelyCtfPrompt(text);
+    // Durable TaskContract classification is authoritative for non-chat Runs.
+    // A generated executor prompt may not repeat the words "CTF" or "flag";
+    // falling back to text-only detection would silently disable the hard
+    // experiment budget for Competition/Fixture evaluation.
+    const ctfMode = this.challengeMode || isLikelyCtfPrompt(text);
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();
@@ -448,7 +484,8 @@ export class PiCodingLane implements AgentLanePort {
       // where re-issuing sends the SAME request without restarting the turn — so
       // it never duplicates the user message or re-runs tools. Here we only
       // recover from context overflow, which legitimately changes the prompt.
-      const effectivePrompt = ctfMode && !text.includes("[ProofBlade CTF fast path]") ? `${text}\n\n${CTF_FAST_PATH_PROMPT}` : text;
+      const fastPathPrompt = this.preparedChallenge ? PREPARED_CTF_FAST_PATH_PROMPT : CTF_FAST_PATH_PROMPT;
+      const effectivePrompt = ctfMode && !text.includes("[ProofBlade CTF fast path]") && !text.includes("[ProofBlade prepared CTF path]") ? `${text}\n\n${fastPathPrompt}` : text;
       const recovered = await promptWithContextLengthRecovery({
         prompt: async (prompt) => await this.harness.prompt(prompt),
         compact: async (reason) => {
@@ -679,6 +716,11 @@ export function isLikelyCtfPrompt(text: string): boolean {
   return /(?:\bctf\b|\bchallenge\b|\bpyjail\b|\bpwn\b|\breverse(?:[- ]engineering)?\b|\bapk\b|\bshellcode\b|\bflag\s*\{|(?:题目描述|求解\s*flag|解题|夺旗|靶机|逆向题|破解题|漏洞题|二进制题))/i.test(text);
 }
 
+/** Durable task classification used when generated executor prompts omit CTF keywords. */
+export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind">): boolean {
+  return task.mode !== "coding_assistant" || task.target_kind !== "unknown";
+}
+
 const CTF_FAST_PATH_PROMPT = [
   "[ProofBlade CTF fast path]",
   "Treat this as one bounded challenge-solving turn, not an open-ended coding session.",
@@ -686,6 +728,13 @@ const CTF_FAST_PATH_PROMPT = [
   "After the first useful structure/constraint is extracted, write a small solver or reproducer immediately; do not keep dumping AST/disassembly or rewriting equivalent probes.",
   "Every exploratory command must either produce a new fact, update the solver, or verify a candidate. If the same approach has not advanced after a few probes, stop and change the hypothesis.",
   "Use verify_claim before reporting a flag.",
+].join("\n");
+
+const PREPARED_CTF_FAST_PATH_PROMPT = [
+  "[ProofBlade prepared CTF path]",
+  "Treat this as one bounded challenge-solving turn using the already selected and preflighted direction.",
+  "Execute the prepared first-action contract with the listed tools, persist its observation, and do not reclassify the challenge, scan unrelated playbooks, discover tools, install packages, or retry missing binaries.",
+  "After the first useful structure or constraint is extracted, write a small solver or reproducer and validate a candidate through the verifier before reporting it.",
 ].join("\n");
 
 function codingSystemPrompt(
@@ -708,6 +757,17 @@ function codingSystemPrompt(
   // switching challenge type just reads a different file — nothing here changes.
   const lib = skillsLibraryPath.replace(/\\/g, "/");
   const orchestrator = `\n\n## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
+  const preparedOrchestrator = [
+    "\n\n## CTF solving workflow (prepared direction)",
+    "When the task is to solve this prepared CTF challenge:",
+    "1. Use the durable profile and first-action contract below; do not reclassify the challenge, read unrelated playbooks, discover tools, install packages, or retry missing binaries.",
+    "2. The first assistant action MUST be one allowed tool call, not a prose plan or another classification. Persist its observation before choosing a second action.",
+    "3. Once the first useful structure or constraint is observed, write the smallest solver or reproducer that can test it. Change the hypothesis when a probe does not add a fact.",
+    "4. Validate the candidate through the verifier and only then report or submit it.",
+    "\n\n## Interactive native/Pwn protocol discipline",
+    "Use complete state-specific prompt anchors for interactive targets, log timeout and received bytes, and treat EOF or a timeout as protocol failure. Use a fresh connection for retries and confirm a shell with a unique PB_READY marker.",
+  ].join("\n");
+  const effectiveOrchestrator = options.challengeProfile ? preparedOrchestrator : orchestrator;
   const nativeSkills = skills.length > 0
     ? `\n\nAlso available via load_skill (optional): ${skills.map((s) => s.name).join(", ")}.`
     : "";
@@ -724,11 +784,30 @@ function codingSystemPrompt(
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
   const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
-  const profileBlock = options.challengeProfile
-    ? `\n\n## Prepared challenge tool profile\nDirection: ${options.challengeProfile.id}; target kind: ${options.challengeProfile.targetKind}. The host preflight is authoritative: do not spend a turn rediscovering or installing these tools. Required tool ids: ${options.challengeProfile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${options.challengeProfile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${options.challengeProfile.fallbackStrategies.join(" -> ")}.${options.preflight?.missingRequiredTools.length ? ` Missing required host tools (use a fallback, do not install interactively): ${options.preflight.missingRequiredTools.join(", ")}.` : " Required host tools are ready or not applicable."}${options.preflight?.missingOptionalTools.length ? ` Missing optional host tools (do not rediscover or install during the challenge): ${options.preflight.missingOptionalTools.join(", ")}.` : ""}${options.preflight?.mcpServers.length ? ` MCP readiness: ${options.preflight.mcpServers.map((server) => `${server.name}=${server.status}${server.toolchainState ? `/${server.toolchainState}` : ""}`).join(", ")}.` : ""}`
-    : "";
+  const profileBlock = options.challengeProfile ? preparedChallengeProfileBlock(options.challengeProfile, options.preflight) : "";
   const webAwareCategoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${orchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+}
+
+function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {
+  const runtime = preflight?.runtime === "container"
+    ? `the target execution container (${preflight.runtimeKey})`
+    : "the host execution environment";
+  const required = preflight?.missingRequiredTools.length
+    ? `Missing required tools in ${runtime}: ${preflight.missingRequiredTools.join(", ")}. Use a listed fallback; do not install interactively.`
+    : `Required tools in ${runtime} are ready or not applicable.`;
+  const optional = preflight?.missingOptionalTools.length
+    ? ` Missing optional tools in ${runtime}: ${preflight.missingOptionalTools.join(", ")}; do not rediscover or install them during the challenge.`
+    : "";
+  const mcp = preflight?.mcpServers.length
+    ? ` MCP readiness: ${preflight.mcpServers.map((server) => `${server.name}=${server.status}${server.toolchainState ? `/${server.toolchainState}` : ""}`).join(", ")}.`
+    : "";
+  const readiness = preflight?.tools.length
+    ? ` Tool readiness in ${runtime}: ${preflight.tools.map((tool) => `${tool.id}=${tool.status}`).join(", ")}.`
+    : "";
+  const firstAction = profile.firstActionPlan;
+  const firstActionBudget = ` First action budget: at most ${firstAction.maxCalls} calls through ${firstAction.allowedToolNames.join(", ")}; completion tools may be used immediately when a verifier-ready candidate exists.`;
+  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight is authoritative and has already classified this challenge. Do not spend a model turn reclassifying the task, reading unrelated playbooks, discovering tools, installing packages, or retrying a missing binary. Use the selected direction directly. First action contract: ${profile.firstAction}${firstActionBudget} Otherwise persist the new fact before choosing the next action. Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}. ${required}${optional}${readiness}${mcp}`;
 }
 
 /**

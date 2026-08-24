@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { DasctfCompetitionApi, HttpCompetitionApi, type ProofBladeConfig } from "@proofblade/materials";
+import { CompetitionApiJournal, DasctfCompetitionApi, HttpCompetitionApi, type ProofBladeConfig } from "@proofblade/materials";
 import { CompetitionSettingsStore, sanitizeUrlForLog } from "../src/competition-settings.js";
 import { DemoCompetitionApi } from "../src/fleet.js";
 
@@ -40,8 +40,10 @@ async function tempDir(prefix: string): Promise<string> {
   return await mkdtemp(join(tempRoot, prefix));
 }
 
-function configuredWrongFlagCodes(api: DasctfCompetitionApi): string[] {
-  return [...(api as unknown as { wrongFlagCodes: Set<string> }).wrongFlagCodes];
+function configuredWrongFlagCodes(api: CompetitionApiJournal): string[] {
+  const delegate = api.delegate;
+  assert.ok(delegate instanceof DasctfCompetitionApi);
+  return [...(delegate as unknown as { wrongFlagCodes: Set<string> }).wrongFlagCodes];
 }
 
 test("falls back to the demo backend when no baseUrl is configured", async () => {
@@ -64,8 +66,9 @@ test("builds a live DasctfCompetitionApi when platform=dasctf with serverHost+ac
   assert.equal(backend.kind, "http");
   assert.equal(backend.source, "config-file");
   assert.equal(backend.baseUrl, "https://gcsis.dasctf.com");
-  assert.ok(backend.api instanceof DasctfCompetitionApi);
-  assert.deepEqual(configuredWrongFlagCodes(backend.api), ["B0001"]);
+  assert.ok(backend.api instanceof CompetitionApiJournal);
+  assert.ok(backend.api.delegate instanceof DasctfCompetitionApi);
+  assert.deepEqual(configuredWrongFlagCodes(backend.api as CompetitionApiJournal), ["B0001"]);
 });
 
 test("dasctf platform without an accessKey falls back to demo (fail-closed, no false solves)", async () => {
@@ -91,7 +94,7 @@ test("the DASCTF accessKey can come from an env var (kept off disk) and selects 
     const backend = store.backend();
     assert.equal(backend.kind, "http");
     assert.equal(backend.source, "env");
-    assert.ok(backend.api instanceof DasctfCompetitionApi);
+    assert.ok(backend.api instanceof CompetitionApiJournal);
   } finally {
     clearEnv();
   }
@@ -105,8 +108,8 @@ test("DASCTF wrongFlagCodes can come from a comma-separated env var", async () =
   process.env.PROOFBLADE_COMPETITION_WRONG_FLAG_CODES = " B0001, 40001 ";
   try {
     const backend = (await CompetitionSettingsStore.create("/root", config, path)).backend();
-    assert.ok(backend.api instanceof DasctfCompetitionApi);
-    assert.deepEqual(configuredWrongFlagCodes(backend.api), ["B0001", "40001"]);
+    assert.ok(backend.api instanceof CompetitionApiJournal);
+    assert.deepEqual(configuredWrongFlagCodes(backend.api as CompetitionApiJournal), ["B0001", "40001"]);
   } finally {
     clearEnv();
   }
@@ -140,7 +143,8 @@ test("builds a live HttpCompetitionApi from the config file", async () => {
   assert.equal(backend.kind, "http");
   assert.equal(backend.source, "config-file");
   assert.equal(backend.baseUrl, "https://ctf.example/api");
-  assert.ok(backend.api instanceof HttpCompetitionApi);
+  assert.ok(backend.api instanceof CompetitionApiJournal);
+  assert.ok(backend.api.delegate instanceof HttpCompetitionApi);
 });
 
 test("env vars override the file and report source=env when only env sets baseUrl", async () => {

@@ -129,7 +129,7 @@
           "kind": "method",
           "signature": "(): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 129,
+          "line": 123,
           "summary": "Inferred summary: close operation used to provide a reusable operation."
         },
         {
@@ -139,7 +139,7 @@
           "kind": "method",
           "signature": "(_fixture: FixtureRef): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 125,
+          "line": 119,
           "summary": "Inferred summary: destroy operation used to provide a reusable operation."
         }
       ],
@@ -158,7 +158,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 201,
+          "line": 204,
           "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
@@ -168,7 +168,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 196,
+          "line": 199,
           "summary": "Inferred summary: snapshot operation used to read or inspect state."
         }
       ],
@@ -216,7 +216,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 478,
+          "line": 515,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -226,7 +226,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 130,
+          "line": 132,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
@@ -245,7 +245,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 482,
+          "line": 519,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -255,7 +255,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 134,
+          "line": 136,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         }
       ],
