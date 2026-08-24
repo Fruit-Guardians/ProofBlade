@@ -41,7 +41,6 @@ export interface SandboxPort {
   resolveReplayPolicy(operation: string, requested: ReplayPolicy): ReplayPolicy;
   build(task: TaskContract): Promise<FixtureRef>;
   reset(fixture: FixtureRef): Promise<number>;
-  score(fixture: FixtureRef, candidate: string): Promise<{ accepted: boolean; candidateHash: string }>;
   execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>;
   reconcile(effect: Effect): Promise<ReconcileResult>;
   health(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>;
@@ -82,16 +81,6 @@ export class LocalFixtureSandbox implements SandboxPort {
     if (fixture.profileId) await writeProfile(fixture.path, fixture.privatePath, getFixtureProfile(fixture.profileId));
     await writeFile(join(fixture.path, "generation.txt"), `${generation}\n`, "utf8");
     return generation;
-  }
-
-  public async score(fixture: FixtureRef, candidate: string): Promise<{ accepted: boolean; candidateHash: string }> {
-    const { createHash } = await import("node:crypto");
-    const scorer = JSON.parse(await readFile(join(fixture.privatePath, "scorer.json"), "utf8")) as { expected?: string };
-    const expected = scorer.expected;
-    return {
-      accepted: expected !== undefined && candidate.trim() === expected,
-      candidateHash: createHash("sha256").update(candidate.trim()).digest("hex"),
-    };
   }
 
   public async execute(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult> {

@@ -1,0 +1,3 @@
+PIE leak: 0x5555555547a0
+base adjustment: 0x7a0
+derived marker: PB{holdout_pwn_pie_base}

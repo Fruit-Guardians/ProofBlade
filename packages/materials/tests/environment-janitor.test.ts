@@ -76,6 +76,25 @@ test("failed cleanup remains active for a later retry", async () => {
   }
 });
 
+test("a failed cleanup without a platform expiry is retried on the next reconcile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-retry-no-expiry-"));
+  try {
+    const api = new FakeStopApi();
+    const ledgerPath = join(root, "ledger.json");
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath });
+    const reservation = await janitor.acquire("RUN-1");
+    const record = await janitor.register(reservation, "CH-1", { instanceId: "INST-1" });
+    assert.ok(record);
+    api.fail = true;
+    assert.equal(await janitor.release(record!.leaseId), false);
+    api.fail = false;
+    assert.deepEqual(await janitor.sweepExpired(), { examined: 1, stopped: 1, failed: 0, retained: 0 });
+    assert.deepEqual(api.stopped, [{ challengeId: "CH-1", instanceId: "INST-1" }]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("schema-1 ledgers migrate on the next mutation without losing active records", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-env-migration-"));
   try {

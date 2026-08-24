@@ -14,6 +14,7 @@ import type { ProofBladeConfig } from "../config.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import type { ClaimVerificationProjection } from "../verification/claim-verification.js";
+import { persistedAssistantText } from "./assistant-message.js";
 
 export interface AgentOutcome {
   text: string;
@@ -111,6 +112,7 @@ export class PiAgentLane implements AgentLanePort {
         .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
         .map((item) => item.text)
         .join("\n");
+      const task = await this.controlStore.snapshot(this.runId);
       await this.controlStore.append(this.runId, [
         {
           schemaVersion: 1,
@@ -118,7 +120,7 @@ export class PiAgentLane implements AgentLanePort {
           correlationId: `${this.runId}:${this.lane}:turn`,
           actor: "model",
           type: "assistant_message",
-          payload: { text: output, stopReason: response.stopReason },
+          payload: { ...persistedAssistantText(task.task.mode, output), stopReason: response.stopReason },
         },
       ]);
       return { text: output, stopReason: response.stopReason, usage: response.usage, errorMessage: response.errorMessage };

@@ -28,7 +28,7 @@
 - 平台 accepted 后，在一个 `dispatchBatch` 中完成 `SUBMIT`、work item completed 和 verifier `finish`，避免“已接受但 run 仍 READY/intake”。
 - 成功终态只允许 verifier lane 提交，并要求 accepted completion 覆盖全部 reproduction evidence。
 
-验收：accepted run 的 projection status 为 `SUCCEEDED`、`domainPhase=SUBMIT`、work item 为 `DONE`，重放事件后结果不变。
+验收：accepted run 的 projection status 为 `SUCCEEDED`、事件顺序包含 `REPRODUCE -> REPORT -> SUBMIT`、work item 为 `DONE`，重放事件后结果不变。
 
 ### P0.4 自动观察与上下文维护
 
@@ -72,6 +72,6 @@ Web P2 离线闭环也已完成：HTTP session 在同一 Run 内复用 Cookie/CS
 
 - P0 已补齐变更—测试矩阵门禁和 Janitor v2 原子恢复；覆盖 schema 迁移、跨进程容量 reservation、崩溃后 reservation 过期和重启 sweep。
 - P1 已补齐审批策略与 App Server 边界；`platform.submit`、`environment.start`、`network.request`、`session.open` 默认 fail-closed，审批记录只保存资源摘要哈希；`run/events` 支持游标分页与订阅恢复。
-- P2 已补齐本地 Web/Pwn holdout：4 个 hash-bound fixture、2 个本地对照 variant、确定性 lane、零 Provider 请求指标和报告脱敏断言。
+- P2 已补齐本地多方向 holdout：27 个 hash-bound fixture（Web 12 + Pwn 12，并加入 Reverse/Crypto/Forensics 冒烟题）、2 个本地对照 variant、确定性 lane、零 Provider 请求指标和报告脱敏断言。
 
 本轮不执行真实 DASCTF 登录、真实平台提交、远程 tube 或 pwn 端到端；平台接入能力继续由 fake HTTP/contract tests 验证。

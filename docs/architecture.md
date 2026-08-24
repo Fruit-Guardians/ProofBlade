@@ -58,6 +58,10 @@ Pi owns the provider turn and its JSONL Session. The coding lane can inspect the
 
 The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
 
+Before the first CTF model turn, the selected `ChallengeToolProfile` contributes a durable `firstActionPlan` to `RunToolPreparation`. It names the small set of tools allowed to establish the initial observation and caps those calls; `verify_claim`, platform submission and reproduction tools remain an explicit completion escape. The Coding lane enforces this at the Pi `tool_call` boundary, and a recovered lane treats the current-generation Observation ledger as the source of truth for whether the first action already completed. This is a coordinator/tool contract, not a prompt-only instruction, so a model cannot spend its initial turn rediscovering tools or launching an unrelated experiment.
+
+For Competition and Fixture Runs, challenge mode is derived from the durable `TaskContract` (`ctf_solve` or a non-unknown target kind), not from keywords in the generated prompt. This keeps the hard CTF experiment budget and evidence-first replan active even when an executor prompt only contains a generic WorkItem objective.
+
 ## Capabilities and background jobs
 
 The provider sees a fixed `invoke_capability` schema rather than a changing list of every plugin operation. `list_capabilities` returns the bundled manifest and canonical catalog hash; the router validates the capability id, operation, argument keys and replay policy before mapping it to a journaled sandbox operation. Target results are wrapped as untrusted observations and linked to deterministic Observation/Evidence records; artifact reads remain retrieval-only.

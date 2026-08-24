@@ -1,0 +1,2 @@
+GET /admin HTTP/1.1
+X-Debug-Authorization: PB{holdout_web_auth_header}

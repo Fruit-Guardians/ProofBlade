@@ -6,12 +6,13 @@ import { id, isTerminal, sha256 } from "../domain/utils.js";
 import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi, type CompetitionAttachment, type CompetitionEnvironment } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
-import { commitCompetitionSuccess, countSubmissions, runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
+import { countSubmissions, runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
 import type { ChallengeSolveRequest, ChallengeSolveResult, ChallengeSolver } from "./fleet.js";
 import { DockerContainerRuntime } from "../container/docker.js";
 import type { ContainerRef, ContainerRuntimePort } from "../container/contracts.js";
 import { CompetitionEnvironmentJanitor, type CompetitionEnvironmentReservation, type ManagedCompetitionEnvironment } from "./environment-janitor.js";
 import { IndependentVerifier } from "../verification/verifier.js";
+import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
 
 export interface CompetitionChallengeSolverInit {
@@ -40,11 +41,20 @@ export interface CompetitionChallengeSolverInit {
  * a CompetitionSandbox. The provisioned environment is always released.
  */
 export class CompetitionChallengeSolver implements ChallengeSolver {
-  public constructor(private readonly init: CompetitionChallengeSolverInit) {}
+  private readonly environmentJanitor: CompetitionEnvironmentJanitor;
+
+  public constructor(private readonly init: CompetitionChallengeSolverInit) {
+    this.environmentJanitor = init.environmentJanitor ?? new CompetitionEnvironmentJanitor({
+      api: init.api,
+      // Keep the lifecycle ledger beside other private runtime state rather
+      // than under `runs/`, whose children are individual Run directories.
+      ledgerPath: join(init.root, ".proofblade", "competition-environments.json"),
+    });
+  }
 
   /** Reconcile expired environments before the Fleet claims new challenges. */
   public async reconcile(): Promise<void> {
-    await this.init.environmentJanitor?.sweepExpired();
+    await this.environmentJanitor.sweepExpired();
   }
 
   public async solve(request: ChallengeSolveRequest): Promise<ChallengeSolveResult> {
@@ -66,12 +76,10 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     let reservation: CompetitionEnvironmentReservation | undefined;
     let managedEnvironment: ManagedCompetitionEnvironment | undefined;
     try {
-      if (this.init.environmentJanitor) reservation = await this.init.environmentJanitor.acquire(runId, request.signal);
+      reservation = await this.environmentJanitor.acquire(runId, request.signal);
       environment = await this.init.api.startEnvironment(challengeId);
-      if (this.init.environmentJanitor && reservation) {
-        managedEnvironment = await this.init.environmentJanitor.register(reservation, challengeId, environment);
-        reservation = undefined;
-      }
+      managedEnvironment = await this.environmentJanitor.register(reservation, challengeId, environment);
+      reservation = undefined;
     } catch (error) {
       // startEnvironment can fail after the build POST has already succeeded
       // (for example while polling or parsing readiness). We may not have an
@@ -79,7 +87,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       // idempotent cleanup instead of leaking the provisioned environment.
       if (environment) await this.stop(challengeId, environment.instanceId, managedEnvironment);
       else await this.stop(challengeId);
-      if (reservation) await this.init.environmentJanitor?.releaseReservation(reservation);
+      if (reservation) await this.environmentJanitor.releaseReservation(reservation);
       this.throwIfAborted(request.signal, error);
       return competitionFailure("provision environment", error);
     }
@@ -197,8 +205,8 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
   }
 
   private async stop(challengeId: string, instanceId?: string, managedEnvironment?: ManagedCompetitionEnvironment): Promise<void> {
-    if (managedEnvironment && this.init.environmentJanitor) {
-      await this.init.environmentJanitor.release(managedEnvironment.leaseId, "challenge solver finished").catch(() => false);
+    if (managedEnvironment) {
+      await this.environmentJanitor.release(managedEnvironment.leaseId, "challenge solver finished").catch(() => false);
       return;
     }
     try {
@@ -234,32 +242,18 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
         filename: "dynamic-flag.txt",
         sensitivity: "flag_candidate",
       });
-      const workItemId = id("WI");
       const completionId = id("C");
-      await services.control.dispatchBatch(runId, [
-        { type: "set_domain_phase", domainPhase: "RECON", lane: "executor" },
-        {
-          type: "work_item_created",
-          workItem: {
-            id: workItemId,
-            runId,
-            title: "Submit platform-provided dynamic flag",
-            objective: task.objective,
-            role: "executor",
-            status: "READY",
-            dependsOn: [],
-            evidenceIds: [],
-            artifactIds: [candidateArtifact.id],
-            attempt: 0,
-            maxAttempts: 1,
-          },
-          lane: "executor",
-        },
-        { type: "work_item_claimed", workItemId, ownerLane: "executor", leaseExpiresAt: new Date(Date.now() + task.constraints.deadline_ms).toISOString(), lane: "executor" },
-        { type: "completion_proposed", completion: { id: completionId, purpose: "submission", candidateHash: sha256(flag), artifactId: candidateArtifact.id }, lane: "executor" },
-      ]);
+      const verifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, join(this.init.root, this.init.config.storage.runsDir), services.verifier);
+      const coordinator = new RunCoordinator(services.control, services.verifier, { verifier });
+      await coordinator.setDomainPhase(runId, "RECON");
+      const workItemId = (await coordinator.claim(runId, task, 0)).id;
+      await services.control.dispatch(runId, {
+        type: "completion_proposed",
+        completion: { id: completionId, purpose: "submission", candidateHash: sha256(flag), artifactId: candidateArtifact.id },
+        lane: "executor",
+      });
       if ((request.mode?.() ?? this.init.mode ?? "auto") === "assist") {
-        await services.control.dispatch(runId, { type: "work_item_blocked", workItemId, reason: "Completion is waiting for operator approval.", lane: "executor" });
+        await coordinator.block(runId, workItemId, "Completion is waiting for operator approval.");
         return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: "Completion is waiting for operator approval." };
       }
       if (this.init.approvalPolicy) {
@@ -269,20 +263,20 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
           resource: flag,
           reason: "A platform-provided dynamic flag is ready for submission.",
         });
-        if (!approval.allowed) return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: `${approval.reason ?? "Completion is waiting for operator approval."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}` };
+        if (!approval.allowed) {
+          await coordinator.block(runId, workItemId, "Completion is waiting for operator approval.");
+          return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: `${approval.reason ?? "Completion is waiting for operator approval."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}` };
+        }
       }
-      const verifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, join(this.init.root, this.init.config.storage.runsDir), services.verifier);
-      const verified = await verifier.verify(runId, fixture, completionId, request.signal);
+      const verified = await coordinator.verifyCompletion(runId, fixture, completionId, request.signal);
       const snapshot = await services.control.snapshot(runId);
       const submissions = countSubmissions(snapshot);
       if (!verified.accepted) {
-        await services.control.dispatchBatch(runId, [
-          { type: "work_item_failed", workItemId, reason: "The platform rejected the dynamic flag.", lane: "executor" },
-          { type: "fail", reason: verified.evidenceIds.join(", ") || "The platform rejected the dynamic flag.", category: "verifier_disagreement", lane: "verifier" },
-        ]);
+        await coordinator.fail(runId, workItemId, "The platform rejected the dynamic flag.");
+        await services.control.dispatch(runId, { type: "fail", reason: verified.evidenceIds.join(", ") || "The platform rejected the dynamic flag.", category: "verifier_disagreement", lane: "verifier" });
         return { solved: false, status: "DYNAMIC_REJECTED", submissions, reason: "The platform rejected the dynamic flag." };
       }
-      await commitCompetitionSuccess(services.control, services.verifier, runId, workItemId, await services.control.snapshot(runId));
+      await coordinator.finishAccepted(runId, workItemId, completionId, "Platform accepted the candidate and verifier evidence covers the completion.");
       return { solved: true, status: "SOLVED_DYNAMIC", flag, submissions };
     } catch (error) {
       if (created) {

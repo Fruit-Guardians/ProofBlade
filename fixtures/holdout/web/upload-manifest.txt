@@ -1,0 +1,2 @@
+uploaded=avatar.png
+stored_name=PB{holdout_web_upload_path}

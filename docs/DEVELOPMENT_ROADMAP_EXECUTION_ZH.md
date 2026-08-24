@@ -8,13 +8,15 @@
 - `inspect_elf`：`proofblade.binary` 新增聚合能力，一次返回 ELF identity、checksec 信号、sections 和 symbols。
 - `gdb_batch`：新增有界非交互 GDB 能力，禁止 shell/source/python 等逃逸命令，限制命令数、长度与超时。
 - `LeakRecord`：泄漏和 base 公式可写入 evidence graph，并可被 search、handoff 和 replan 引用。
+- 方向预检：平台折叠为 `misc` 的题目会结合 target/objective 重新识别 `forensics`、`malware`、`osint` 等专用 profile，避免误用通用工具集。
 
 ## P0 收敛
 
-- `domainPhase`：快照持久化 `INTAKE -> RECON -> TARGET_MODEL -> HYPOTHESIS -> EXPERIMENT -> REPRODUCE -> SUBMIT`，competition loop 每轮推进并写事件。
+- `domainPhase`：快照持久化 `INTAKE -> RECON -> TARGET_MODEL -> HYPOTHESIS -> EXPERIMENT -> REPRODUCE -> REPORT -> SUBMIT`，competition loop 每轮推进并写事件。
 - `ExperimentRecord`：记录 generation、hypothesis、repeatKey、输入哈希、动作、结果；展示字段不参与 repeatKey；第三次相同失败动作机械拒绝。
 - 前台交互护栏：`bash` 启动前检测 pwntools recv/interactive、nc/ncat/socat 等模式，直接引导到 pwn tube 或 background job。
 - 遥测：增加 domainPhase、实验数、失败实验数、重复失败动作、前台 bash 超时和 first candidate 指标。
+- 评测：RealModelEvaluation 增加 first evidence、重复实验、提交次数、上下文 token 指标，并提供匿名历史 Run replay 投影。
 
 ## P2 Web
 
@@ -50,9 +52,20 @@
 - `npm run check:components`：通过。
 - `npm run check:change-contracts`：通过。
 - `npm run check:project-reports`：通过。
-- `npm run test:ci-gates`：8/8 通过。
+- `npm run test:ci-gates`：10/10 通过。
 - roadmap 相关定向回归：42/42 通过。
-- `npm test`：业务测试通过；Windows 上已有的 `coding-resources` 两个时序/目录锁定用例仍存在环境抖动（`shell_background` 进程在轮询前结束、临时目录 `EBUSY`），隔离重跑可分别观察到同类现象，未涉及本轮新增代码路径。
+- `npm test`：561/561 通过；本次完整运行未出现既有 `coding-resources` 时序或目录锁定失败。
+
+## 最新审计（2026-08-24）
+
+- `npm run api:index:check`：atoms、molecules、materials 全部通过，生成物跨工作区路径可重复。
+- `npm run typecheck`：atoms、molecules、materials、CLI、GUI 全部通过。
+- `npm run check:components`：26 个组件、8 个受影响组件通过。
+- `npm run check:change-contracts`：8 个契约、65 个变更文件通过。
+- `npm run check:project-reports`：4 份项目报告完整。
+- 本地 27 案例多方向 holdout 通过（Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1），且无 Provider 请求；这验证的是 Run/Verifier/replay 管道，不代表真实模型解题率。
+- 严格 `eval-real` 已增加至少 20 个 corpus case、每个 Variant 必须产生 Provider telemetry 的门禁；provider-free holdout 明确关闭这两个条件。
+- 真实 Provider 评测仍待配置可用的 Provider 和两组显式 token pricing；本机 `127.0.0.1:1234` 当前不可用。
 
 ## P0/P1/P2 执行记录（2026-08-22）
 
@@ -68,8 +81,8 @@
 
 ### P2
 
-- `fixtures/holdout/manifest.json` 绑定 2 个 Web 和 2 个 Pwn 本地 transcript 的 SHA-256；`LocalHoldoutEvaluationRunner` 复用生产 evaluator 的证据、重放、成本和 baseline 对照协议，确定性 lane 不创建 Provider 请求。
-- local holdout 测试验证 4/4 case、2 个 variant 成功率 1、Provider 请求 0、报告不含期望答案。
+- `fixtures/holdout/manifest.json` 绑定 12 个 Web 和 12 个 Pwn 本地 transcript 的 SHA-256；`LocalHoldoutEvaluationRunner` 复用生产 evaluator 的证据、重放、成本和 baseline 对照协议，确定性 lane 不创建 Provider 请求。
+- local holdout 测试验证 27/27 case、2 个 variant 成功率 1、Provider 请求 0、报告不含期望答案。
 
 本轮验收只使用本地 fixture/fake API；真实 DASCTF、远程 tube、远程 pwn E2E 明确不在范围内。
 

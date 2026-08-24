@@ -203,6 +203,10 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.match((await runtime.readJobOutput(completed.id)).output, /binary-info|strings/);
 
     const timeout = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 250 }, timeoutMs: 50 });
+    const blockedUntil = Date.now() + 100;
+    while (Date.now() < blockedUntil) {
+      // Exercise the durable deadline path when the event loop delays the timer callback.
+    }
     assert.equal((await runtime.waitJob(String(timeout.jobId), 2_000)).status, "TIMED_OUT");
 
     const cancel = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 1_000 }, timeoutMs: 5_000 });

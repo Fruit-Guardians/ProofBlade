@@ -13,7 +13,7 @@ export type Phase =
   | "report";
 
 /** Competition-specific phase that survives the generic harness phase machine. */
-export type DomainPhase = "INTAKE" | "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE" | "SUBMIT";
+export type DomainPhase = "INTAKE" | "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE" | "REPORT" | "SUBMIT";
 
 export type ExperimentOutcome = "success" | "failure" | "timeout" | "blocked" | "unknown";
 
@@ -82,6 +82,44 @@ export interface RunVersionSnapshot {
 }
 
 export type ToolKind = "tool" | "interpreter" | "toolchain";
+
+export type ToolPreparationRuntime = "host" | "container";
+
+export type ToolPreparationHealth = "ready" | "degraded";
+
+/**
+ * Bounded, category-specific action allowed before a challenge lane broadens
+ * its investigation. The model-facing description remains in the selected
+ * tool profile; this structure is the durable policy the lane can enforce.
+ */
+export interface FirstActionPlan {
+  id: string;
+  allowedToolNames: string[];
+  maxCalls: number;
+}
+
+export interface RunToolPreparation {
+  schemaVersion: 1;
+  generation: number;
+  profileId: string;
+  targetKind: Exclude<TargetKind, "unknown" | "mixed">;
+  runtime: ToolPreparationRuntime;
+  /** Stable runtime identity: `host` or the container image/runtime digest. */
+  runtimeKey: string;
+  cacheKey: string;
+  toolCatalogHash: string;
+  mcpCatalogHash: string;
+  checkedAt: number;
+  health: ToolPreparationHealth;
+  tools: Array<{ id: string; name: string; path: string; status: "ready" | "missing"; required: boolean }>;
+  mcpServers: Array<{ name: string; status: string; toolchainState?: string }>;
+  missingRequiredTools: string[];
+  missingOptionalTools: string[];
+  fallbackStrategies: string[];
+  /** Added after schema 1 was introduced; old preparations remain replayable. */
+  firstActionPlan?: FirstActionPlan;
+  hash: string;
+}
 
 export type TargetKind = "unknown" | "web" | "reverse" | "pwn" | "crypto" | "misc" | "mixed";
 
@@ -614,6 +652,8 @@ export interface RunSnapshot {
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
   leases: Record<string, Lease>;
+  /** Direction-specific tool readiness captured before the first model turn. */
+  toolPreparation?: RunToolPreparation;
   /** Monotonic per-resource lease epochs; stale Intent completion cannot release a newer claim. */
   leaseEpochs: Record<string, number>;
   activeLanes: Lane[];
@@ -636,6 +676,7 @@ export type EventType =
   | "phase_started"
   | "phase_finished"
   | "domain_phase_changed"
+  | "tool_preparation_recorded"
   | "fixture_reset"
   | "turn_started"
   | "assistant_message"

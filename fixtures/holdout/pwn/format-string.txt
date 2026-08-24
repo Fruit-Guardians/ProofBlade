@@ -1,0 +1,2 @@
+printf leak: 0x7ffff7dd18c0
+stack note: PB{holdout_pwn_format_string}

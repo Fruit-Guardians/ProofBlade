@@ -28,6 +28,8 @@
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
+- `ChallengeToolProfile.firstActionPlan` 将首个挑战动作结构化为允许的 Tool 集和有界调用次数；Preflight 结果与该计划一起写入 Run。Coding lane 在 Pi 的 `tool_call` 边界拒绝越过首探测的宽泛工具，首个成功 Observation 后解除限制；恢复时从当前代 Observation 推导已完成状态。
+- CTF 硬约束由持久化 `TaskContract` 的 `mode/target_kind` 判定，不能依赖 executor prompt 是否包含 “CTF/flag” 关键词；这样 Competition/Fixture 的实验预算和 evidence-first replan 不会因提示词投影变化而失效。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。

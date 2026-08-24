@@ -1,0 +1,3 @@
+primitive: RSA
+exponent: 3
+decoded plaintext: PB{holdout_crypto_low_exponent}

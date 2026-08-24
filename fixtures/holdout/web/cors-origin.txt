@@ -1,0 +1,3 @@
+OPTIONS /admin/export HTTP/1.1
+Access-Control-Allow-Origin: https://dashboard.local
+diagnostic marker: PB{holdout_web_cors_origin}

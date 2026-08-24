@@ -3,6 +3,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
+import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
@@ -10,6 +11,18 @@ export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress
 export interface ToolCallBudget {
   max: number;
   count: number;
+}
+
+/**
+ * Guard for the first challenge action. It is intentionally independent from
+ * the generic tool-call budget: the first action constrains *which* tools may
+ * establish the initial fact, while the run budget constrains total volume.
+ */
+export interface FirstActionBudget {
+  allowedToolNames: readonly string[];
+  maxCalls: number;
+  count: number;
+  completed: boolean;
 }
 
 export interface CodingTurnTermination {
@@ -43,6 +56,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   failureStormBreaker?: ToolFailureStormBreaker,
   experimentBudgetBreaker?: ExperimentBudgetBreaker,
   toolBudget?: ToolCallBudget,
+  firstActionBudget?: FirstActionBudget,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -58,6 +72,9 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
   });
   const unsubscribeResult = harness.on("tool_result", (event) => {
+    if (firstActionBudget && !firstActionBudget.completed && !event.isError && matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
+      firstActionBudget.completed = true;
+    }
     if (termination.reason === "tool_budget_exhausted") {
       return {
         content: [{ type: "text" as const, text: termination.message ?? "[ProofBlade tool budget exhausted]" }],
@@ -188,6 +205,23 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
   });
   const unsubscribeToolCall = harness.on("tool_call", (event) => {
+    if (firstActionBudget && !firstActionBudget.completed) {
+      if (isFirstActionCompletionTool(event.toolName)) {
+        firstActionBudget.completed = true;
+      } else if (!matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
+        return {
+          block: true,
+          reason: `[ProofBlade first action] Use one bounded first-action tool (${firstActionBudget.allowedToolNames.join(", ")}) before ${event.toolName}. Persist its result, then continue with the next hypothesis.`,
+        };
+      } else if (firstActionBudget.count >= firstActionBudget.maxCalls) {
+        return {
+          block: true,
+          reason: `[ProofBlade first action budget exhausted] The initial probe is limited to ${firstActionBudget.maxCalls} tool calls; preserve the strongest observation and continue on the next bounded step.`,
+        };
+      } else {
+        firstActionBudget.count += 1;
+      }
+    }
     if (!toolBudget || termination.reason === "tool_budget_exhausted") {
       if (termination.reason === "tool_budget_exhausted") return { block: true, reason: termination.message };
       return undefined;
@@ -211,6 +245,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     unsubscribeToolCall();
     unsubscribeProvider();
   };
+}
+
+function isFirstActionCompletionTool(toolName: string): boolean {
+  return toolName === "verify_claim" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
+}
+
+function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {
+  return allowedToolNames.some((allowed) => allowed === toolName || (allowed === "mcp__*" && toolName.startsWith("mcp__")));
 }
 
 export async function finalizeCodingTurn(options: {
@@ -247,6 +289,7 @@ export async function finalizeCodingTurn(options: {
       ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
       : options.response.errorMessage;
   const claimVerification = await options.claimVerifier.project(options.userPrompt, output);
+  const task = await options.controlStore.snapshot(options.runId);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
     lane: "main",
@@ -254,7 +297,7 @@ export async function finalizeCodingTurn(options: {
     actor: "model",
     type: "assistant_message",
     payload: {
-      text: output,
+      ...persistedAssistantText(task.task.mode, output),
       stopReason,
       claimVerification,
       contextRecoveryCount: options.recoveryCount,

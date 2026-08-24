@@ -14,7 +14,7 @@ export interface LocalHoldoutEvaluationOptions {
 }
 
 /**
- * Local-only Web/Pwn holdout runner. It reuses the hash-bound corpus and
+ * Local-only CTF holdout runner. It reuses the hash-bound corpus and
  * replay/evidence metrics from the real-model evaluator, but injects a
  * deterministic lane and never creates a Provider request. Two local variants
  * are retained by default so baseline-vs-candidate metrics exercise the same
@@ -29,8 +29,8 @@ export class LocalHoldoutEvaluationRunner {
 
   public async run(options: LocalHoldoutEvaluationOptions): Promise<RealModelEvaluationSummary> {
     const corpus = await loadRealEvaluationCorpus(options.corpusPath);
-    if (corpus.cases.length === 0 || corpus.cases.some((item) => item.targetKind !== "web" && item.targetKind !== "pwn")) {
-      throw new Error("Local Web/Pwn holdout corpus must contain only web and pwn cases");
+    if (corpus.cases.length === 0 || corpus.cases.some((item) => !isLocalHoldoutTargetKind(item.targetKind))) {
+      throw new Error("Local holdout corpus must contain only web, pwn, reverse, crypto, or misc cases");
     }
     const localConfig = withLocalPricing(this.config);
     const variants = options.variants ?? [
@@ -42,10 +42,15 @@ export class LocalHoldoutEvaluationRunner {
       corpusPath: options.corpusPath,
       variants,
       allowLive: true,
+      requireProviderTraffic: false,
+      minimumCorpusCases: 0,
       attempts: options.attempts ?? 1,
       maxTurns: options.maxTurns ?? 1,
       maxCostUsd: 0.01,
-      deadlineMs: 30_000,
+      // The deterministic lane itself is cheap, but verifier/effect replay is
+      // deliberately exercised for every case. Keep a hard per-run bound while
+      // leaving enough wall-clock headroom for a fully parallel CI test worker.
+      deadlineMs: 60_000,
       runPrefix: options.runPrefix ?? `LOCAL-HOLDOUT-${Date.now()}`,
       minimumSuccessRate: options.minimumSuccessRate ?? 1,
       baselineVariantId: variants[0]!.id,
@@ -59,7 +64,7 @@ const localDeterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async prompt(): Promise<AgentOutcome> {
     const inspected = await runtime.inspectTarget();
     const candidate = inspected.output.match(/[A-Za-z][A-Za-z0-9_-]{0,31}\{[^{}\r\n]{1,512}\}/)?.[0];
-    if (!candidate) throw new Error("Local Web/Pwn holdout contains no candidate-shaped value");
+    if (!candidate) throw new Error("Local holdout contains no candidate-shaped value");
     await runtime.proposeHypothesis({ statement: "The bounded local observation contains the accepted candidate.", evidenceIds: [inspected.evidenceId] });
     await runtime.submitCandidate(candidate);
     return { text: "local holdout candidate proposed", stopReason: "stop", usage: zeroUsage() };
@@ -87,4 +92,8 @@ function withLocalPricing(config: ProofBladeConfig): ProofBladeConfig {
 
 function zeroUsage(): AgentOutcome["usage"] {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function isLocalHoldoutTargetKind(targetKind: string): boolean {
+  return targetKind === "web" || targetKind === "pwn" || targetKind === "reverse" || targetKind === "crypto" || targetKind === "misc";
 }

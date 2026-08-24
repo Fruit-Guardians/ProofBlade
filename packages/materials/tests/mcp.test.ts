@@ -273,6 +273,35 @@ test("MCP schemas persist across registry instances and invalidate on config cha
   }
 });
 
+test("MCP close aborts a pending handshake and leaves no child process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-close-"));
+  let registry: McpProjectRegistry | undefined;
+  try {
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        hanging: {
+          command: process.execPath,
+          args: ["-e", "setInterval(() => {}, 1000)"],
+          requestTimeoutMs: 120_000,
+        },
+      },
+    }), "utf8");
+    registry = McpProjectRegistry.load(root);
+    const pending = registry.describeServer("hanging");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const started = Date.now();
+    await registry.close();
+    assert.ok(Date.now() - started < 2_000);
+    await assert.rejects(() => pending, /aborted|closing|closed|cancelled|terminated|timeout/i);
+    registry = undefined;
+  } finally {
+    await registry?.close().catch(() => undefined);
+    // Windows can briefly keep a just-closed child cwd locked after the
+    // process-exit assertion; bounded fs.rm retries cover that release window.
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+  }
+});
+
 test("MCP toolchain profiles default JADX, Ghidra, and Rizin homes to directories", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-directories-"));
   const profiles = [

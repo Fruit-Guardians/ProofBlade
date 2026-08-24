@@ -51,6 +51,42 @@ const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async close() {},
 });
 
+test("local Run prompt carries the remaining deadline into the single coding lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-deadline-prompt-"));
+  let promptText = "";
+  const services = createServices(root, config);
+  let phaseAtLaneCreation: { domainPhase: string; phase: string } | undefined;
+  const lane: AgentLaneFactory = async ({ services: laneServices, runId }) => {
+    const snapshot = await laneServices.control.snapshot(runId);
+    phaseAtLaneCreation = { domainPhase: snapshot.domainPhase, phase: snapshot.phase };
+    return {
+      async prompt(text) {
+        promptText = text;
+        return { text: "no candidate yet", stopReason: "stop", usage: zeroUsage() };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    };
+  };
+  try {
+    const runId = "DEADLINE-PROMPT-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 1,
+    });
+    assert.equal(result.status, "EXHAUSTED");
+    assert.deepEqual(phaseAtLaneCreation, { domainPhase: "RECON", phase: "reconnaissance" });
+    assert.match(promptText, /Remaining deadline: \d+ seconds/);
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("auto mode solves all three web and three reverse fixtures through the verifier gate", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-fixtures-"));
   try {
@@ -67,6 +103,11 @@ test("auto mode solves all three web and three reverse fixtures through the veri
       assert.equal(Object.values(snapshot.completions)[0]?.status, "ACCEPTED", profile.id);
       assert.ok(Object.values(snapshot.artifacts).some((item) => item.path.endsWith("report.md")), profile.id);
       const events = await readFile(join(root, "runs", runId, "events.jsonl"), "utf8");
+      const domainPhases = events.trim().split(/\r?\n/)
+        .map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } })
+        .filter((event) => event.type === "domain_phase_changed")
+        .map((event) => event.payload?.domainPhase);
+      assert.deepEqual(domainPhases, ["RECON", "REPRODUCE", "REPORT", "SUBMIT"], profile.id);
       assert.doesNotMatch(events, new RegExp(escapeRegExp(profile.expected)), `${profile.id} leaked its candidate into the event log`);
     }
   } finally {
@@ -220,6 +261,37 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
     assert.equal(Object.values(snapshot.completions)[0]?.status, "PROPOSED");
     assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 0);
     assert.notEqual(snapshot.status, "EXHAUSTED");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("an unexpected coding lane failure terminalizes the Run for replay", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-lane-failure-terminal-"));
+  const services = createServices(root, config);
+  const failingLane: AgentLaneFactory = async () => ({
+    async prompt() { throw new Error("provider stream failed"); },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "LANE-FAILURE-web-source-1";
+    await assert.rejects(
+      new SingleAgentCtfLoop(root, config, services, failingLane).run({
+        runId,
+        task: fixtureTask(runId, "web-source-1", root, config),
+        mode: "auto",
+        maxTurns: 1,
+      }),
+      /provider stream failed/,
+    );
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(snapshot.status, "FAILED");
+    assert.equal(snapshot.failureCategory, "effect_outcome_unknown");
+    assert.match(snapshot.terminalReason ?? "", /Coding lane failed/);
   } finally {
     await services.sandbox.close();
     await rm(root, { recursive: true, force: true });

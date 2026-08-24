@@ -14,7 +14,7 @@ import {
   interactiveCommandHint,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
-import { codingCtfCategoryGuidance, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
+import { codingCtfCategoryGuidance, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -90,6 +90,11 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /generic suffix/);
   assert.match(source, /PB_READY/);
   assert.match(source, /PYTHONIOENCODING=utf-8/);
+  assert.match(source, /First action contract/);
+  assert.match(source, /preparedOrchestrator/);
+  assert.match(source, /first assistant action MUST be one allowed tool call/);
+  assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
+  assert.match(source, /this\.preparedChallenge \? PREPARED_CTF_FAST_PATH_PROMPT/);
 });
 
 test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
@@ -583,6 +588,12 @@ test("CTF-shaped prompts opt into the bounded challenge path without matching or
   assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
   assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
   assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
+});
+
+test("durable CTF task classification enables challenge guards without prompt keywords", () => {
+  assert.equal(isChallengeTask({ mode: "ctf_solve", target_kind: "unknown" }), true);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), true);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
 test("shell_background returns immediately and shell_job polls then stops the real process", async () => {

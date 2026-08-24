@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AppServices } from "../app/demo.js";
-import type { DomainPhase, ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
+import type { ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -10,6 +10,8 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { RunWorkScheduler } from "../orchestration/run-work-scheduler.js";
+import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import { remainingRunDeadlineMs } from "../domain/utils.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -60,9 +62,9 @@ export interface CompetitionLoopOutcome {
  * scoped execution environment; it does not maintain a second solver lane.
  *
  * Kept from the old loop: bounded turns, deadline enforcement, abort wiring, and
- * assist-mode stop-before-submitting. Dropped: phase/planner choreography and
- * verifier orchestration, because submit_flag now performs the submission inline
- * and returns the verdict to the model in the same turn.
+ * assist-mode stop-before-submitting. Phase movement and verifier-first
+ * finalization are delegated to RunCoordinator so Competition and Fixture/GUI
+ * runs replay through the same durable state machine.
  */
 export async function runCompetitionLoop(
   root: string,
@@ -95,6 +97,7 @@ export async function runCompetitionLoop(
   try {
     const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
     const platformVerifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
+    const coordinator = new RunCoordinator(services.control, services.verifier, { verifier: platformVerifier });
     lane = await createLane({
       runId: options.runId,
       projectRoot: options.workspaceRoot,
@@ -144,12 +147,15 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
-      await ensureCompetitionDomainPhase(services.control, options.runId, competitionPhaseForTurn(turns));
-      workItemId = await claimCompetitionWorkItem(services.control, options.runId, options.task, turns);
+      await coordinator.setDomainPhase(options.runId, coordinator.domainPhaseForTurn(turns));
+      workItemId = (await coordinator.claim(options.runId, options.task, turns)).id;
       const preTurnSnapshot = await services.control.snapshot(options.runId);
       const submissionsSoFar = countSubmissions(preTurnSnapshot);
       const prompt = turnPrompt(options.task, turns, options.workspaceRootForPrompt ?? options.workspaceRoot, {
         submissionsSoFar,
+        domainPhase: preTurnSnapshot.domainPhase,
+        remainingToolCalls: options.task.constraints.max_tool_calls - Object.keys(preTurnSnapshot.effects).length,
+        remainingDeadlineMs: remainingRunDeadlineMs(new Date(startedAt).toISOString(), deadlineMs),
         forceReplan,
         previousTermination: replanReason,
       });
@@ -181,13 +187,7 @@ export async function runCompetitionLoop(
         // Close the active work item and advance the domain projection before
         // finish makes the Run terminal; terminal Runs deliberately reject
         // further work-graph mutation.
-        await new RunWorkScheduler(services.control).completeForSubmission(options.runId, workItemId);
-        if (snapshot.status !== "SUCCEEDED") {
-          await services.verifier.finish(options.runId, {
-            completionId: acceptedCompletion.id,
-            reason: "The platform scorer accepted this exact submission Completion.",
-          });
-        }
+        await coordinator.finishAccepted(options.runId, workItemId, acceptedCompletion.id, "The platform scorer accepted this exact submission Completion.");
         // A prior recoverable guard may have caused a replan, but the run is
         // solved now; do not report that intermediate guard as the final stop.
         termination = undefined;
@@ -207,7 +207,7 @@ export async function runCompetitionLoop(
       }
       if (mode() === "assist" && Object.values(snapshot.completions).some((completion) => completion.purpose === "submission"
         && completion.runId === snapshot.runId && completion.generation === snapshot.generation)) {
-        await ensureCompetitionDomainPhase(services.control, options.runId, "REPRODUCE");
+        await coordinator.setDomainPhase(options.runId, "REPRODUCE");
         stopReason = "held_for_approval";
         await blockCompetitionWorkItem(services.control, options.runId, workItemId, "Completion is waiting for operator approval.");
         break;
@@ -267,25 +267,6 @@ export async function runCompetitionLoop(
   };
 }
 
-async function ensureCompetitionDomainPhase(control: AppServices["control"], runId: string, phase: DomainPhase): Promise<void> {
-  const snapshot = await control.snapshot(runId);
-  if (snapshot.domainPhase === phase) return;
-  try {
-    await control.dispatch(runId, { type: "set_domain_phase", domainPhase: phase, lane: "executor" });
-  } catch (error) {
-    // A replan may race a phase transition; keep the durable state authoritative.
-    const current = await control.snapshot(runId);
-    if (current.domainPhase !== phase) throw error;
-  }
-}
-
-function competitionPhaseForTurn(turn: number): DomainPhase {
-  if (turn <= 1) return "RECON";
-  if (turn === 2) return "TARGET_MODEL";
-  if (turn === 3) return "HYPOTHESIS";
-  return "EXPERIMENT";
-}
-
 /**
  * Claim a durable executor work item before each provider turn.  A lease that
  * survived a process restart can be reclaimed after expiry; an active lease
@@ -300,15 +281,7 @@ export async function commitCompetitionSuccess(control: AppServices["control"], 
   const completion = Object.values(snapshot.completions).find((item) => item.status === "ACCEPTED");
   if (!completion) throw new Error("Cannot commit competition success without an accepted completion");
   if (isTerminal(snapshot.status)) return;
-  await new RunWorkScheduler(control).completeForSubmission(runId, workItemId);
-  await verifier.finish(runId, {
-    completionId: completion.id,
-    reason: "Platform accepted the candidate and verifier evidence covers the completion.",
-  });
-}
-
-async function completeCompetitionWorkItem(control: AppServices["control"], workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
-  await new RunWorkScheduler(control).completeForSubmission(snapshot.runId, workItemId);
+  await new RunCoordinator(control, verifier).finishAccepted(runId, workItemId, completion.id, "Platform accepted the candidate and verifier evidence covers the completion.");
 }
 
 async function failCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
@@ -385,14 +358,23 @@ const MAX_GUARD_REPLANS = 2;
  * a model that has run twelve turns of the same failing approach won't
  * self-correct from a generic "continue".
  */
-export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string } = { submissionsSoFar: 0 }): string {
+export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string; domainPhase?: string; remainingToolCalls?: number; remainingDeadlineMs?: number } = { submissionsSoFar: 0 }): string {
+  const phaseLine = progress.domainPhase
+    ? `Durable phase: ${progress.domainPhase}. Treat this as a bounded phase step; do not restart the entire analysis.`
+    : "Treat this as one bounded phase step; do not restart the entire analysis.";
+  const budgetLine = progress.remainingToolCalls === undefined
+    ? "Every tool call must produce a new fact, evidence item, or candidate check."
+    : `Remaining effect budget: ${Math.max(0, progress.remainingToolCalls)}. Every tool call must produce a new fact, evidence item, or candidate check.`;
+  const deadlineLine = progress.remainingDeadlineMs === undefined
+    ? undefined
+    : `Remaining deadline: ${Math.ceil(Math.max(0, progress.remainingDeadlineMs) / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`;
   if (turn > 1) {
     if (progress.forceReplan || (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS)) {
-      return replanNudge(task.target_kind, turn, progress.previousTermination);
+      return [phaseLine, deadlineLine, budgetLine, replanNudge(task.target_kind, turn, progress.previousTermination)].filter((line): line is string => Boolean(line)).join("\n");
     }
-    return "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag.";
+    return [phaseLine, deadlineLine, budgetLine, "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag."].filter((line): line is string => Boolean(line)).join("\n");
   }
-  const lines = [task.objective.trim()];
+  const lines = [phaseLine, deadlineLine, budgetLine, task.objective.trim()].filter((line): line is string => Boolean(line));
   if (task.target.startsWith("REMOTE:")) {
     lines.push(`\nLive target: ${task.target.slice("REMOTE:".length)} (also in connection-info.txt).`);
   }

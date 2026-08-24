@@ -1,0 +1,2 @@
+seccomp: openat read write execve
+escape=PB{holdout_pwn_seccomp_escape}

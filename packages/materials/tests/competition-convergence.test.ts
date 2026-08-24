@@ -6,8 +6,21 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
+import { turnPrompt } from "../src/competition/loop.js";
+import { fixtureTask } from "../src/app/fixture-task.js";
+import { remainingRunDeadlineMs } from "../src/domain/utils.js";
+import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 
 const config = { schemaVersion: 1, runtime: { piVersion: "0.83.0" }, storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" }, modelProfiles: { executor: { thinkingLevel: "off" } } } as unknown as ProofBladeConfig;
+
+test("deadline budget is bounded and visible in the competition turn prompt", () => {
+  const task = fixtureTask("PROMPT-DEADLINE", "web-source-1", "/workspace", config);
+  const startedAt = "2026-08-24T00:00:00.000Z";
+  assert.equal(remainingRunDeadlineMs(startedAt, 5_000, Date.parse(startedAt) + 1_500), 3_500);
+  assert.equal(remainingRunDeadlineMs("not-a-date", 5_000, Date.parse(startedAt) + 1_500), 5_000);
+  const prompt = turnPrompt(task, 1, "/workspace", { submissionsSoFar: 0, remainingDeadlineMs: 1_501 });
+  assert.match(prompt, /Remaining deadline: 2 seconds/);
+});
 
 test("domainPhase and ExperimentRecord replay durably and block a third failed repeat", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-convergence-"));
@@ -29,6 +42,38 @@ test("domainPhase and ExperimentRecord replay durably and block a third failed r
     assert.equal(replayed.domainPhase, "EXPERIMENT");
     assert.equal(Object.keys(replayed.experiments).length, 2);
     assert.equal((await services.control.runHash(runId)), (await services.control.runHash(runId)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("RunCoordinator keeps generic and CTF phase projections in one replayable path", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-phase-projection-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "PHASE-PROJECTION";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const coordinator = new RunCoordinator(services.control, services.verifier);
+
+    for (const phase of ["RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE"] as const) {
+      await coordinator.setDomainPhase(runId, phase);
+    }
+    // A rejected reproduction is allowed to return to the experiment loop;
+    // this is the path used before a refiner schedules the next attempt.
+    await coordinator.setDomainPhase(runId, "EXPERIMENT");
+    await coordinator.setDomainPhase(runId, "REPORT");
+    await coordinator.setDomainPhase(runId, "SUBMIT");
+
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(snapshot.domainPhase, "SUBMIT");
+    assert.equal(snapshot.phase, "report");
+    assert.deepEqual(
+      (await services.control.events(runId)).filter((event) => event.type === "phase_started").map((event) => event.payload?.phase),
+      ["reconnaissance", "hypothesis", "experiment", "verification", "experiment", "verification", "report"],
+    );
+    const replayed = await services.control.replay(runId);
+    assert.equal(replayed.domainPhase, snapshot.domainPhase);
+    assert.equal(replayed.phase, snapshot.phase);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

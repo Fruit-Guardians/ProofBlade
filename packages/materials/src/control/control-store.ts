@@ -26,10 +26,12 @@ import type {
   DomainPhase,
   ExperimentRecord,
   VerificationVerdict,
+  RunToolPreparation,
 } from "../domain/types.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
+import { redactCtfCandidates } from "../domain/candidate.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
 import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
@@ -96,6 +98,7 @@ export type DomainCommand =
   | { type: "start_phase"; phase: Phase; lane?: Lane }
   | { type: "finish_phase"; phase: Phase; lane?: Lane }
   | { type: "set_domain_phase"; domainPhase: DomainPhase; lane?: Lane }
+  | { type: "record_tool_preparation"; preparation: RunToolPreparation; lane?: Lane }
   | { type: "fixture_reset"; generation: number; lane?: Lane }
   | { type: "pause"; reason: string; lane?: Lane }
   | { type: "resume"; lane?: Lane }
@@ -289,7 +292,9 @@ export class ControlStore {
       validateCommand(after, command, references, authority);
       const lane = command.lane ?? "main";
       const seq = after.lastSeq + 1;
-      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payloadFor(command, seq, after, lane, authority));
+      const rawPayload = payloadFor(command, seq, after, lane, authority);
+      const payload = after.task.mode === "coding_assistant" ? rawPayload : redactCtfEventPayload(rawPayload);
+      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payload);
       after = reduce(after, event);
       events.push(event);
     }
@@ -368,6 +373,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "start_phase": return "phase_started";
     case "finish_phase": return "phase_finished";
     case "set_domain_phase": return "domain_phase_changed";
+    case "record_tool_preparation": return "tool_preparation_recorded";
     case "fixture_reset": return "fixture_reset";
     case "pause": return "run_paused";
     case "resume": return "run_resumed";
@@ -428,11 +434,28 @@ function commandActor(command: DomainCommand): HarnessEvent["actor"] {
   return command.type === "effect_finished" || command.type === "effect_started" ? "tool" : "orchestrator";
 }
 
+/**
+ * Control events are the replay/audit surface, not a second transcript. A
+ * model can put a recovered flag into an otherwise harmless annotation,
+ * evidence summary, or failure message, so redact every CTF-shaped value at
+ * the event boundary while keeping its stable hash for correlation.
+ */
+function redactCtfEventPayload(value: unknown): Record<string, unknown> {
+  const redact = (current: unknown): unknown => {
+    if (typeof current === "string") return redactCtfCandidates(current, (candidate) => `[candidate sha256=${sha256(candidate)}]`);
+    if (Array.isArray(current)) return current.map(redact);
+    if (current && typeof current === "object") return Object.fromEntries(Object.entries(current).map(([key, item]) => [key, redact(item)]));
+    return current;
+  };
+  return (redact(value) as Record<string, unknown>);
+}
+
 function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, lane: Lane, authority: ControlAuthority): Record<string, unknown> {
   switch (command.type) {
     case "start_phase": return { phase: command.phase };
     case "finish_phase": return { phase: command.phase };
     case "set_domain_phase": return { domainPhase: command.domainPhase };
+    case "record_tool_preparation": return { preparation: command.preparation };
     case "fixture_reset": return { generation: command.generation };
     case "pause": return { reason: command.reason };
     case "resume": return {};
@@ -723,6 +746,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   }
   if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
   if (command.type === "set_domain_phase") validateDomainPhaseTransition(snapshot, command.domainPhase);
+  if (command.type === "record_tool_preparation") validateToolPreparation(snapshot, command.preparation);
   if (command.type === "experiment") validateExperimentCommand(snapshot, command);
   if (command.type === "completion_verified") validateCompletionVerification(snapshot, command);
   if (command.type === "fact" && command.fact.status === "CONFIRMED" && command.lane !== "verifier") {
@@ -1111,11 +1135,50 @@ function validateTaskContract(task: TaskContract): void {
 }
 
 function validateDomainPhaseTransition(snapshot: RunSnapshot, next: DomainPhase): void {
-  const order: DomainPhase[] = ["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "SUBMIT"];
+  const order: DomainPhase[] = ["INTAKE", "RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE", "REPORT", "SUBMIT"];
   const allowedBacktracks: Partial<Record<DomainPhase, DomainPhase[]>> = { HYPOTHESIS: ["RECON"], EXPERIMENT: ["HYPOTHESIS", "RECON"], REPRODUCE: ["EXPERIMENT"] };
   if (next === snapshot.domainPhase) return;
   if (order.indexOf(next) > order.indexOf(snapshot.domainPhase)) return;
   if (!allowedBacktracks[snapshot.domainPhase]?.includes(next)) throw new Error(`Invalid domain phase transition: ${snapshot.domainPhase} -> ${next}`);
+}
+
+function validateToolPreparation(snapshot: RunSnapshot, preparation: RunToolPreparation): void {
+  if (isTerminal(snapshot.status)) throw new Error(`Cannot record tool preparation for terminal run ${snapshot.status}`);
+  if (preparation.schemaVersion !== 1) throw new Error("Unsupported tool preparation schema version");
+  if (preparation.generation !== snapshot.generation) throw new Error(`Tool preparation generation must equal current generation ${snapshot.generation}`);
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(preparation.profileId)) throw new Error("Tool preparation profileId is invalid");
+  if (!["host", "container"].includes(preparation.runtime)) throw new Error("Tool preparation runtime is invalid");
+  for (const [label, value] of [["runtimeKey", preparation.runtimeKey], ["cacheKey", preparation.cacheKey], ["toolCatalogHash", preparation.toolCatalogHash], ["mcpCatalogHash", preparation.mcpCatalogHash], ["hash", preparation.hash]] as const) {
+    if (typeof value !== "string" || value.length === 0 || value.length > 256) throw new Error(`Tool preparation ${label} is invalid`);
+  }
+  const { hash, ...unsigned } = preparation;
+  if (sha256(canonicalJson(unsigned)) !== hash) throw new Error("Tool preparation hash does not match its contents");
+  if (!Number.isFinite(preparation.checkedAt) || preparation.checkedAt <= 0) throw new Error("Tool preparation checkedAt is invalid");
+  if (preparation.health !== "ready" && preparation.health !== "degraded") throw new Error("Tool preparation health is invalid");
+  if (preparation.health === "ready" && preparation.missingRequiredTools.length > 0) throw new Error("Ready tool preparation cannot have missing required tools");
+  validateBoundedStringList(preparation.missingRequiredTools, "missing required tools", 64, 128);
+  validateBoundedStringList(preparation.missingOptionalTools, "missing optional tools", 64, 128);
+  validateBoundedStringList(preparation.fallbackStrategies, "fallback strategies", 512, 64);
+  if (preparation.firstActionPlan !== undefined) {
+    const plan = preparation.firstActionPlan;
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(plan.id)) throw new Error("Tool preparation first action id is invalid");
+    if (!Number.isInteger(plan.maxCalls) || plan.maxCalls < 1 || plan.maxCalls > 16) throw new Error("Tool preparation first action maxCalls is invalid");
+    validateBoundedStringList(plan.allowedToolNames, "first action tools", 128, 32);
+  }
+  if (!Array.isArray(preparation.tools) || preparation.tools.length > 128) throw new Error("Tool preparation tool list is invalid");
+  for (const tool of preparation.tools) {
+    if (!tool.id || tool.id.length > 64 || !tool.name || tool.name.length > 128 || !tool.path || tool.path.length > 512) throw new Error("Tool preparation entry is invalid");
+    if (tool.status !== "ready" && tool.status !== "missing") throw new Error(`Tool preparation status is invalid: ${tool.id}`);
+    if (typeof tool.required !== "boolean") throw new Error(`Tool preparation required marker is invalid: ${tool.id}`);
+  }
+  if (!Array.isArray(preparation.mcpServers) || preparation.mcpServers.length > 32) throw new Error("Tool preparation MCP list is invalid");
+  for (const server of preparation.mcpServers) {
+    if (!server.name || server.name.length > 128 || !server.status || server.status.length > 64 || (server.toolchainState !== undefined && server.toolchainState.length > 64)) throw new Error("Tool preparation MCP entry is invalid");
+  }
+}
+
+function validateBoundedStringList(values: unknown, label: string, maxItemLength: number, maxItems: number): void {
+  if (!Array.isArray(values) || values.length > maxItems || values.some((value) => typeof value !== "string" || value.length === 0 || value.length > maxItemLength)) throw new Error(`Tool preparation ${label} is invalid`);
 }
 
 function validateExperimentCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "experiment" }>): void {

@@ -200,7 +200,7 @@ Cookie/CSRF 在同一 Run 内可复用、跨 Run 不可见——靠 `SessionReco
 
 ### 6.3 规划里"暂缓/降级"的判断
 
-- **P3 Planner/Executor 双模型**：规划说"以评测为准"——正确，应保持 `blocked`，别在会话闭环跑通前投入。
+- **P3 Planner/Refiner 策略层**：规划说"以评测为准"——正确，应保持 `blocked`，别在会话闭环跑通前增加模型调用；唯一解题路径仍是 coding lane/executor。
 - **P4 无人值守 Fleet / kernel / Web3**：正确地放在最后。
 - **浏览器逆向/JSVMP 等**：正确地不阻塞基础 Web/Pwn。
 
@@ -228,7 +228,7 @@ P2（Web，复用 P1 抽象，自研 backend）
   http_session_* / browser_* / network(HAR)；WebReproducer + 干净复现；
   回归题：SQLi / SSRF / upload-穿越 / XSS-adminbot。
 
-P3（评测门槛后才做）Planner/Refiner delta-patch 双 Lane。
+P3（评测门槛后才做）单 coding lane 上的 Planner/Refiner delta-patch 策略层。
 P4  Fleet 恢复 / kernel QEMU / 高级题型。
 ```
 

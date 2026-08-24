@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   CompetitionChallengeSolver,
+  CompetitionApiJournal,
   CompetitionEnvironmentJanitor,
   ApprovalPolicy,
   DasctfCompetitionApi,
@@ -41,6 +42,8 @@ export interface CompetitionBackend {
   source: "config-file" | "env" | "none";
   /** Shared Docker runtime, when live execution is configured for containers. */
   containerRuntime?: ContainerRuntimePort;
+  /** Private JSONL path containing this backend session's API journal. */
+  journalPath?: string;
 }
 
 interface StoredCompetitionConfig {
@@ -74,6 +77,8 @@ export class CompetitionSettingsStore {
     private readonly source: CompetitionBackend["source"],
   ) {}
 
+  private apiJournalSequence = 0;
+
   public static async create(
     root: string,
     config: ProofBladeConfig,
@@ -106,12 +111,14 @@ export class CompetitionSettingsStore {
         ...(this.stored.envReadyTimeoutMs !== undefined ? { envReadyTimeoutMs: this.stored.envReadyTimeoutMs } : {}),
         ...(this.stored.wrongFlagCodes !== undefined ? { wrongFlagCodes: this.stored.wrongFlagCodes } : {}),
       });
+      const journalPath = this.apiJournalPath();
+      const journaledApi = CompetitionApiJournal.record(api, journalPath);
       const execution = resolveExecutionConfig(this.config);
       const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
-      const environmentJanitor = this.createEnvironmentJanitor(api);
+      const environmentJanitor = this.createEnvironmentJanitor(journaledApi);
       const approvalPolicy = this.createApprovalPolicy();
-      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
-      return { api, solver, kind: "http", baseUrl: serverHost, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
+      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
+      return { api: journaledApi, solver, kind: "http", baseUrl: serverHost, source: this.source, journalPath, ...(containerRuntime ? { containerRuntime } : {}) };
     }
     const baseUrl = this.stored.baseUrl?.trim();
     if (!baseUrl) {
@@ -125,12 +132,19 @@ export class CompetitionSettingsStore {
       ...(this.stored.headers ? { headers: this.stored.headers } : {}),
       ...(this.stored.endpoints ? { endpoints: this.stored.endpoints } : {}),
     });
+    const journalPath = this.apiJournalPath();
+    const journaledApi = CompetitionApiJournal.record(api, journalPath);
     const execution = resolveExecutionConfig(this.config);
     const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
-    const environmentJanitor = this.createEnvironmentJanitor(api);
+    const environmentJanitor = this.createEnvironmentJanitor(journaledApi);
     const approvalPolicy = this.createApprovalPolicy();
-    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
-    return { api, solver, kind: "http", baseUrl, source: this.source, ...(containerRuntime ? { containerRuntime } : {}) };
+    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
+    return { api: journaledApi, solver, kind: "http", baseUrl, source: this.source, journalPath, ...(containerRuntime ? { containerRuntime } : {}) };
+  }
+
+  private apiJournalPath(): string {
+    const sequence = this.apiJournalSequence++;
+    return join(this.root, this.config.storage.runsDir, `competition-api-${Date.now()}-${sequence}.jsonl`);
   }
 
   private createEnvironmentJanitor(api: CompetitionApi): CompetitionEnvironmentJanitor {

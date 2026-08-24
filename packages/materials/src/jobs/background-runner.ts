@@ -62,6 +62,17 @@ export class BackgroundJobRunner {
   public async poll(jobId: string): Promise<JobRecord> {
     const job = (await this.controlStore.snapshot(this.runId)).jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
+    if (isExpired(job)) {
+      await this.controlStore.dispatch(this.runId, {
+        type: "job_finished",
+        jobId: job.id,
+        status: "TIMED_OUT",
+        outcome: "timeout",
+        error: "Background job timeout exceeded.",
+        lane: "executor",
+      });
+      return (await this.controlStore.snapshot(this.runId)).jobs[jobId]!;
+    }
     return job;
   }
 
@@ -151,7 +162,7 @@ export class BackgroundJobRunner {
       if (job.timeoutMs) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, job.timeoutMs);
       const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput, backendId: job.backendId, backendVersion: job.backendVersion }, entry.controller.signal);
       const after = await this.poll(job.id);
-      if (after.status === "CANCELLED") return;
+      if (["CANCELLED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(after.status)) return;
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
         jobId: job.id,
@@ -164,7 +175,7 @@ export class BackgroundJobRunner {
       });
     } catch (error) {
       const after = await this.poll(job.id).catch(() => undefined);
-      if (!after || after.status === "CANCELLED") return;
+      if (!after || ["CANCELLED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(after.status)) return;
       const timedOut = entry.timedOut;
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
@@ -176,6 +187,12 @@ export class BackgroundJobRunner {
       });
     }
   }
+}
+
+function isExpired(job: JobRecord): boolean {
+  if (job.status !== "RUNNING" || !job.timeoutMs || !job.startedAt) return false;
+  const startedAt = Date.parse(job.startedAt);
+  return Number.isFinite(startedAt) && Date.now() >= startedAt + job.timeoutMs;
 }
 
 function isTerminalRun(status: string): boolean {

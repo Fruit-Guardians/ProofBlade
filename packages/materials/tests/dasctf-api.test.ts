@@ -232,6 +232,14 @@ test("startEnvironment posts build then polls the detail until isNeedCheck is fa
   assert.equal(env.expiresAt, 1780000000000);
 });
 
+test("an environment that never becomes ready fails on the bounded poll timeout", async () => {
+  const { client, calls } = api({
+    "GET /ctf/exercise": () => ok({ id: 1001, isNeedInit: true, isNeedCheck: true }),
+  }, { envReadyTimeoutMs: 100, sleep: async () => await new Promise((resolve) => setTimeout(resolve, 110)) });
+  await assert.rejects(() => client.startEnvironment("1001"), /not ready within 100ms/);
+  assert.equal(calls.filter((call) => call.url.includes("build-exercise-env")).length, 0, "a pending build must not be retried after the poll deadline");
+});
+
 test("parallel environment starts serialize the build decision and avoid a duplicate POST", async () => {
   let buildStarted = false;
   let buildCalls = 0;

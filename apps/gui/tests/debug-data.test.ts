@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import { SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlControlStore, SingleAgentCtfLoop } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent } from "../src/shared.js";
@@ -581,6 +582,60 @@ test("persists a solve run before returning so an immediate pause aborts its cod
   }
 });
 
+test("GUI Fixture solve uses the shared verifier-first Run path and replays terminal state", { timeout: 30_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-replay-"));
+  const runId = "GUI-REPLAY-web-source-1";
+  let data: DebugDataService | undefined;
+  try {
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async (options) => {
+      let proposed = false;
+      return {
+        async prompt() {
+          if (!proposed) {
+            proposed = true;
+            const candidate = "PB{web_source_trace}";
+            const artifact = await options.services.artifacts.putText(options.runId, candidate, { filename: "gui-candidate.txt", sensitivity: "flag_candidate" });
+            await options.services.control.dispatch(options.runId, {
+              type: "completion_proposed",
+              completion: { id: "C-GUI-REPLAY", purpose: "harness_verification", candidateHash: hash(candidate), artifactId: artifact.id },
+              lane: "executor",
+            });
+          }
+          return { text: "候选已提交验证。", stopReason: "stop", usage: zeroUsage() };
+        },
+        async abort() {},
+        async compact() {},
+        async isIdle() { return true; },
+        async close() {},
+      };
+    });
+
+    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    const store = new JsonlControlStore(join(root, "runs"));
+    let snapshot;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      snapshot = await store.replay(runId);
+      if (["SUCCEEDED", "FAILED", "PAUSED", "EXHAUSTED"].includes(snapshot.status)) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const detail = await data.getRun(runId);
+    assert.equal(detail?.snapshot.status, "SUCCEEDED");
+    assert.equal(detail?.snapshot.domainPhase, "SUBMIT");
+    assert.ok(Object.values(detail?.snapshot.workItems ?? {}).some((item) => item.status === "SUCCEEDED"));
+    assert.ok(Object.values(detail?.snapshot.effects ?? {}).some((effect) => effect.producerLane === "verifier" && effect.operation === "fixture_score" && effect.verification?.accepted === true));
+    assert.ok(Object.values(detail?.snapshot.evidence ?? {}).some((item) => item.kind === "reproduction" && item.provenance.recordedBy === "verifier"));
+
+    const replayed = await store.replay(runId);
+    assert.equal(replayed.status, detail?.snapshot.status);
+    assert.equal(replayed.domainPhase, detail?.snapshot.domainPhase);
+    assert.equal(Object.keys(replayed.effects).length, Object.keys(detail?.snapshot.effects ?? {}).length);
+    assert.equal(Object.keys(replayed.evidence).length, Object.keys(detail?.snapshot.evidence ?? {}).length);
+  } finally {
+    await data?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once] GUI close aborts each Coding lane once and awaits it", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-close-"));
   let releasePrompt!: () => void;
@@ -673,4 +728,8 @@ const config: ProofBladeConfig = {
 
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function hash(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
