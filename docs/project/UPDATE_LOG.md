@@ -7,6 +7,7 @@
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260824-001 | 2026-08-24T22:00:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260823-001 | 2026-08-23T12:00:00+08:00 | PLAN-002 | feat/api-index-onboarding | 本条记录所在提交 |
 | UPDATE-20260820-002 | 2026-08-20T12:15:00+08:00 | PLAN-220, PLAN-120 | codex/request-epoch-audit | 本条记录所在提交 |
 | UPDATE-20260820-001 | 2026-08-20T11:30:00+08:00 | PLAN-220, PLAN-110, PLAN-210 | codex/work-graph-vertical-slice | 本条记录所在提交 |
@@ -39,6 +40,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260824-001
+
+时间：2026-08-24T22:00:00+08:00
+
+摘要：统一 ProofBlade 的 durable CTF Run、单一 verifier-first coding lane、工具预检、Competition API 重放和评估门禁。
+
+### 变更
+
+- 新增 RunCoordinator，将 GUI、CLI、Competition 和 Fixture 接入同一套可恢复阶段与 ControlStore 投影
+- 将 Pi Coding Lane、ToolPreflight、Evidence/Artifact/Effect journal 和独立 Verifier 连接为单一解题路径
+- 增加 Competition API journal/replay、环境清理、匿名 Run replay 和 Web/Pwn/Reverse/Crypto/Forensics holdout
+- 扩展真实模型评估的 corpus 校验、失败分类、Provider-free gate 和多 Variant 门禁
+
+### 验证
+
+- [x] npm run verify passed
+- [x] 579/579 repository tests passed
+- [x] CI gates 10/10 passed
+- [x] provider-free evaluation 30/30 passed
+- [x] npm audit --omit=dev: 0 vulnerabilities
 
 ## UPDATE-20260823-001
 
