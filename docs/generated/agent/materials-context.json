@@ -2479,7 +2479,8 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
-        "packages/materials/tests/session-registry.test.ts"
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts"
       ]
     },
     {
@@ -2502,6 +2503,7 @@
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts"
       ]
     },
