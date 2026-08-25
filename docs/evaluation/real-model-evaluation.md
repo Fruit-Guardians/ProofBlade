@@ -16,7 +16,7 @@ Each corpus file path is relative to the Manifest directory. The loader rejects 
 
 Create one ordinary ProofBlade config per provider/model. API keys remain environment variables referenced by each config. Real evaluation requires a published USD token price for every Variant; without it, `eval-real` refuses to start. Prices are per one million tokens and should include the Provider's cache-read and cache-write rates when it reports them:
 
-Ready-to-copy config skeletons are available at `examples/real-evaluation-provider.openai.example.json` and `examples/real-evaluation-provider.anthropic.example.json`. For a single-key paired comparison, use `examples/real-evaluation-provider.deepseek-flash.example.json` and `examples/real-evaluation-provider.deepseek-pro.example.json`; both reference `PROOFBLADE_EVAL_DEEPSEEK_API_KEY` and the official OpenAI-compatible DeepSeek endpoint. Copy the selected files into the ignored `.proofblade/evaluation/` directory, replace the model names only if the Provider has changed them, verify the currently published prices, and export the referenced environment variables. The numeric prices in all examples are placeholders and must not be treated as provider pricing.
+Ready-to-copy config skeletons are available at `examples/real-evaluation-provider.openai.example.json` and `examples/real-evaluation-provider.anthropic.example.json`. For a single-key paired comparison, use `examples/real-evaluation-provider.deepseek-flash.example.json` and `examples/real-evaluation-provider.deepseek-pro.example.json`; both reference `PROOFBLADE_EVAL_DEEPSEEK_API_KEY` and the official OpenAI-compatible DeepSeek endpoint. The DeepSeek examples use the currently published peak rates as a conservative reservation (cache miss for input, cache hit for `cacheRead`, and zero `cacheWrite` because the published table has no separate write rate). Copy the selected files into the ignored `.proofblade/evaluation/` directory, replace the model names only if the Provider has changed them, verify the currently published prices, and export the referenced environment variables. Prices can change and the live run must be rechecked against the Provider's current pricing page.
 
 The checked-in DeepSeek pair uses `deepseek-v4-flash` and `deepseek-v4-pro` with text input. DeepSeek's legacy `deepseek-chat` and `deepseek-reasoner` identifiers are not suitable for a new evaluation because the Provider scheduled them for retirement on 2026-07-24; consult the [official model list](https://api-docs.deepseek.com/api/list-models/) and [current pricing](https://api-docs.deepseek.com/quick_start/pricing/) before a live run. Do not advertise image support for these profiles unless the Provider's current API contract and a separate vision model are configured.
 
@@ -25,10 +25,10 @@ The checked-in DeepSeek pair uses `deepseek-v4-flash` and `deepseek-v4-pro` with
   "modelProfiles": {
     "executor": {
       "pricing": {
-        "inputUsdPerMillion": 0.28,
-        "outputUsdPerMillion": 0.42,
-        "cacheReadUsdPerMillion": 0.028,
-        "cacheWriteUsdPerMillion": 0.28
+        "inputUsdPerMillion": 0.44,
+        "outputUsdPerMillion": 1.32,
+        "cacheReadUsdPerMillion": 0.014,
+        "cacheWriteUsdPerMillion": 0
       }
     }
   }
