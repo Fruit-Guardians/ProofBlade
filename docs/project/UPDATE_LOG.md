@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T13:05:00+08:00
+> 状态更新时间：2026-08-25T13:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-005 | 2026-08-25T13:20:00+08:00 | PLAN-200 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-004 | 2026-08-25T13:05:00+08:00 | PLAN-200, PLAN-210 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-003 | 2026-08-25T12:50:00+08:00 | PLAN-110, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-002 | 2026-08-25T12:45:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
@@ -44,6 +45,24 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-005
+
+时间：2026-08-25T13:20:00+08:00
+
+摘要：补齐真实评测的无密钥 Provider 配置模板和启动说明，降低 eval-real 配置错误风险。
+
+### 变更
+
+- 新增 OpenAI-compatible 与 Anthropic 两份可复制的 real-evaluation Provider 配置模板，显式包含 apiKeyEnv、预算字段和占位模型/价格
+- 在 .env.example 中增加真实评测专用环境变量名，不写入任何密钥
+- 评测文档明确模板中的价格是占位值，真实运行前必须替换为已发布价格并先执行 preflight
+
+### 验证
+
+- [x] loadConfig successfully validated both example Provider configs
+- [x] change-contract and project-report checks passed
+- [x] npm run api:index:check passed
 
 ## UPDATE-20260825-004
 

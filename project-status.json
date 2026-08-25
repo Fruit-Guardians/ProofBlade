@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-25T13:05:00+08:00",
+  "updatedAt": "2026-08-25T13:20:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -232,6 +232,26 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260825-005",
+      "occurredAt": "2026-08-25T13:20:00+08:00",
+      "summary": "补齐真实评测的无密钥 Provider 配置模板和启动说明，降低 eval-real 配置错误风险。",
+      "branch": "codex/proofblade-agent-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-200"
+      ],
+      "changes": [
+        "新增 OpenAI-compatible 与 Anthropic 两份可复制的 real-evaluation Provider 配置模板，显式包含 apiKeyEnv、预算字段和占位模型/价格",
+        "在 .env.example 中增加真实评测专用环境变量名，不写入任何密钥",
+        "评测文档明确模板中的价格是占位值，真实运行前必须替换为已发布价格并先执行 preflight"
+      ],
+      "validation": [
+        "loadConfig successfully validated both example Provider configs",
+        "change-contract and project-report checks passed",
+        "npm run api:index:check passed"
+      ]
+    },
     {
       "id": "UPDATE-20260825-004",
       "occurredAt": "2026-08-25T13:05:00+08:00",

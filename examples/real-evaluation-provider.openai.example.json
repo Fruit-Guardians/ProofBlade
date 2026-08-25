@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "piVersion": "0.83.0"
+  },
+  "storage": {
+    "runsDir": "runs/real-evaluation-openai",
+    "fixturesDir": "fixtures/real-evaluation-openai"
+  },
+  "modelProfiles": {
+    "executor": {
+      "provider": "openai-compatible",
+      "api": "openai-completions",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "replace-with-priced-openai-model",
+      "modelDiscoveryPath": "/models",
+      "apiKeyEnv": "PROOFBLADE_EVAL_OPENAI_API_KEY",
+      "contextWindow": 128000,
+      "maxTokens": 16384,
+      "requestTimeoutMs": 120000,
+      "maxRetries": 0,
+      "input": ["text", "image"],
+      "pricing": {
+        "inputUsdPerMillion": 1,
+        "outputUsdPerMillion": 1,
+        "cacheReadUsdPerMillion": 0,
+        "cacheWriteUsdPerMillion": 0
+      }
+    }
+  }
+}
