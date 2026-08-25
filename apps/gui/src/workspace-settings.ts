@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import type { ConversationFolder, ConversationPreferences, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 interface StoredConversationPreferences {
+  title?: string;
   folderId?: string;
   workspacePath?: string;
   profileId?: string;
@@ -61,6 +62,16 @@ export class WorkspaceSettingsStore {
     return next;
   }
 
+  public async renameConversation(runId: string, title: string, defaults: ConversationPreferences): Promise<ConversationPreferences> {
+    return await this.saveConversation(runId, { title: required(title, "对话名称") }, defaults);
+  }
+
+  public async removeConversation(runId: string): Promise<void> {
+    if (!(runId in this.conversations)) return;
+    delete this.conversations[runId];
+    await this.persist();
+  }
+
   public async createFolder(name: string): Promise<ConversationFolder> {
     const normalized = required(name, "文件夹名称");
     const used = new Set(this.folders.map((folder) => folder.id));
@@ -88,6 +99,7 @@ export class WorkspaceSettingsStore {
     return {
       ...defaults,
       ...stored,
+      ...(stored.title?.trim() || defaults.title ? { title: stored.title?.trim() || defaults.title } : {}),
       enabledTools: normalizeList(stored.enabledTools ?? defaults.enabledTools),
       enabledSkills: normalizeList(stored.enabledSkills ?? defaults.enabledSkills),
       enabledMcpServers: normalizeList(stored.enabledMcpServers ?? defaults.enabledMcpServers),
@@ -132,6 +144,7 @@ function validatePreferences(value: unknown): StoredConversationPreferences {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const input = value as StoredConversationPreferences;
   return {
+    ...(typeof input.title === "string" && input.title.trim() ? { title: input.title.trim() } : {}),
     ...(typeof input.folderId === "string" && input.folderId ? { folderId: input.folderId } : {}),
     ...(typeof input.workspacePath === "string" && input.workspacePath.trim() ? { workspacePath: input.workspacePath.trim() } : {}),
     ...(typeof input.profileId === "string" && input.profileId ? { profileId: input.profileId } : {}),

@@ -1,4 +1,4 @@
-import { access, readdir, stat } from "node:fs/promises";
+import { access, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
@@ -357,6 +357,16 @@ export class DebugDataService {
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
     return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root));
+  }
+
+  public async deleteConversation(runId: string): Promise<void> {
+    assertRunId(runId);
+    if (this.active.has(runId) || this.activeLanes.has(runId)) throw new Error("运行中的对话不能删除，请先暂停");
+    const snapshot = await this.services.control.snapshot(runId);
+    if (runKind(snapshot.task) !== "chat") throw new Error("只能删除普通对话，Fixture Run 请保留用于复盘");
+    await rm(join(this.services.runsRoot, runId), { recursive: true, force: false });
+    this.runListCache.delete(runId);
+    this.runDetailCache.delete(runId);
   }
 
   public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {

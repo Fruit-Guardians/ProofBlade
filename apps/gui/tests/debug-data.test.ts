@@ -202,6 +202,19 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
 });
 
+test("deletes an idle coding conversation and rejects active deletion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-delete-conversation-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-DELETE-001";
+    await data.createConversation({ runId, title: "待删除", workspacePath: root });
+    await data.deleteConversation(runId);
+    await assert.rejects(() => data.getRun(runId), /ENOENT|no such file/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("reuses unchanged run details, invalidates durable changes, and clears the cache on close", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-detail-cache-"));
   try {
