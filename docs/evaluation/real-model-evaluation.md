@@ -52,6 +52,13 @@ they are present; it never prints their values. A normal `eval-real` invocation
 repeats this check and refuses to start before any Provider request when it is
 not ready. After it passes, run the paired comparison:
 
+Never paste an API key into chat, an issue, a commit, a config file, or a
+captured command log. If a key is exposed, revoke it at the Provider and create
+a replacement before setting the environment variable locally. The two
+DeepSeek example Variants intentionally reference one environment variable, so
+one rotated key can authenticate both model profiles without duplicating the
+secret.
+
 ```powershell
 npm run cli -- eval-real .proofblade/evaluation/corpus.json --allow-live `
   --variant deepseek=.proofblade/evaluation/deepseek.config.json `
