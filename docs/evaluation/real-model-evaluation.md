@@ -11,6 +11,11 @@ the provider-free holdout or replace them with private, non-leaking inputs.
 
 The checked-in multi-direction holdout is intentionally separate: `proofblade eval-holdout fixtures/holdout/manifest.json --enforce-gate` runs 27 deterministic cases without Provider traffic (12 Web, 12 Pwn, and Reverse/Crypto/Forensics smoke cases). It validates the shared Run, verifier, replay, and metric pipeline; it does not establish real model solving quality. Use `eval-real` for that measurement only after configuring two priced model variants.
 
+Do not pass that checked-in holdout to strict `eval-real`: its expected literals
+are intentionally present to make the provider-free plumbing lane deterministic,
+so strict preflight rejects all of those cases. A live comparison must use a
+private corpus whose target inputs do not contain their expected answers.
+
 Keep the corpus, samples, and expected values under `.proofblade/evaluation/`; that directory is ignored by Git. Copy `examples/real-evaluation-corpus.example.json` there, replace every placeholder, and calculate each sample hash in PowerShell:
 
 ```powershell
