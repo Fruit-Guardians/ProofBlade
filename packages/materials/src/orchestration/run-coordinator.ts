@@ -126,7 +126,7 @@ export class RunCoordinator {
    * Run terminal, because terminal Runs reject further graph mutations.
    */
   public async finishAccepted(runId: string, workItemId: string | undefined, completionId: string, reason: string): Promise<void> {
-    const snapshot = await this.control.snapshot(runId);
+    let snapshot = await this.control.snapshot(runId);
     if (snapshot.status === "SUCCEEDED") return;
     if (isTerminal(snapshot.status)) throw new Error(`Cannot finish accepted completion in terminal run ${snapshot.status}`);
     const completion = snapshot.completions[completionId];
@@ -144,6 +144,17 @@ export class RunCoordinator {
       } else {
         await this.setDomainPhase(runId, "SUBMIT");
         await this.scheduler.complete(runId, workItemId, await this.control.snapshot(runId));
+      }
+    }
+    // Recovery may observe SUBMIT after the phase projection was committed but
+    // before WorkItem settlement. Repair that durable graph edge before the
+    // verifier closes the Run; terminal Runs reject all later graph mutations.
+    snapshot = await this.control.snapshot(runId);
+    if (snapshot.workItems[workItemId ?? ""]?.status === "RUNNING") {
+      if (snapshot.task.verification.kind === "platform_submission") {
+        await this.scheduler.completeForSubmission(runId, workItemId);
+      } else {
+        await this.scheduler.complete(runId, workItemId, snapshot);
       }
     }
     await this.verifierControl.finish(runId, { completionId, reason });

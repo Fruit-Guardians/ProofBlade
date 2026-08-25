@@ -8,8 +8,9 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
 import { turnPrompt } from "../src/competition/loop.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
-import { remainingRunDeadlineMs } from "../src/domain/utils.js";
+import { remainingRunDeadlineMs, sha256 } from "../src/domain/utils.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
+import { IndependentVerifier } from "../src/verification/verifier.js";
 
 const config = { schemaVersion: 1, runtime: { piVersion: "0.83.0" }, storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" }, modelProfiles: { executor: { thinkingLevel: "off" } } } as unknown as ProofBladeConfig;
 
@@ -76,6 +77,47 @@ test("RunCoordinator keeps generic and CTF phase projections in one replayable p
     const replayed = await services.control.replay(runId);
     assert.equal(replayed.domainPhase, snapshot.domainPhase);
     assert.equal(replayed.phase, snapshot.phase);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("finishAccepted repairs a SUBMIT recovery gap before closing the Run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-submit-recovery-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "SUBMIT-RECOVERY";
+    const task = demoTask(runId, root, config);
+    await services.control.createRun(runId, task);
+    const coordinator = new RunCoordinator(services.control, services.verifier);
+    await coordinator.setDomainPhase(runId, "EXPERIMENT");
+    const workItem = await coordinator.claim(runId, task, 1);
+    const fixture = await services.sandbox.build(task);
+    const candidate = "PB{evidence_first}";
+    const artifact = await services.artifacts.putText(runId, candidate, { filename: "candidate.txt", sensitivity: "flag_candidate" });
+    const completionId = "C-SUBMIT-RECOVERY";
+    await services.control.dispatch(runId, {
+      type: "completion_proposed",
+      completion: { id: completionId, purpose: "harness_verification", candidateHash: sha256(candidate), artifactId: artifact.id },
+      lane: "executor",
+    });
+    await coordinator.setDomainPhase(runId, "REPRODUCE");
+    const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
+      .verify(runId, fixture, completionId);
+    assert.equal(verified.accepted, true);
+
+    // Simulate a crash after the durable SUBMIT projection but before the
+    // WorkItem completion and verifier-owned terminal event.
+    await coordinator.setDomainPhase(runId, "SUBMIT");
+    await coordinator.finishAccepted(runId, workItem.id, completionId, "Recovered accepted completion");
+
+    const snapshot = await services.control.snapshot(runId);
+    const replayed = await services.control.replay(runId);
+    assert.equal(snapshot.status, "SUCCEEDED");
+    assert.equal(snapshot.domainPhase, "SUBMIT");
+    assert.equal(snapshot.workItems[workItem.id]?.status, "SUCCEEDED");
+    assert.equal(snapshot.finalResult?.completionId, completionId);
+    assert.deepEqual(replayed.workItems[workItem.id], snapshot.workItems[workItem.id]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
