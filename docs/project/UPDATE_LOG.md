@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T12:45:00+08:00
+> 状态更新时间：2026-08-25T12:50:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-003 | 2026-08-25T12:50:00+08:00 | PLAN-110, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-002 | 2026-08-25T12:45:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-001 | 2026-08-25T12:30:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260824-001 | 2026-08-24T22:00:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
@@ -42,6 +43,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-003
+
+时间：2026-08-25T12:50:00+08:00
+
+摘要：把 Competition 的真实可见输入与统一提示边界接入 TaskContract，阻止模型从安装根或历史 runs 中寻找题目答案。
+
+### 变更
+
+- 平台附件和 connection-info.txt 以相对路径、只读标记和 SHA-256 写入 Competition TaskContract.inputs，任务哈希和 replay 绑定实际工作区输入
+- Competition solver 在动态 flag 与 Coding 路径都传递附件清单，避免两条路径生成不同的任务输入投影
+- Competition 首轮 prompt 显式列出只读输入并禁止搜索 ProofBlade 安装根、skills library、runs 和父目录
+- Sandbox 拒绝附件路径穿越，并增加 TaskContract 输入哈希与 Competition prompt 边界回归测试
+- 交接文档记录 583/583 回归结果和真实模型评测仍待凭据的边界
+
+### 验证
+
+- [x] Materials build passed
+- [x] Competition convergence, sandbox and solver tests: 39/39 passed
+- [x] component and change-contract gates passed
+- [x] npm run api:index:check passed
+- [x] npm run check:project-reports -- --base 7e00ead passed
 
 ## UPDATE-20260825-002
 

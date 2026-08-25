@@ -2,7 +2,7 @@
 
 面向接手这个项目的人。目标是让你在一小时内知道：这东西为什么这样设计、哪些地方踩过坑、下一步该做什么。
 
-最后更新：2026-08-24。测试状态：**561/561 通过**（`npm test`，`npm run verify`）。
+最后更新：2026-08-25。测试状态：**583/583 通过**（`npm test`，`npm run verify`）。
 
 ---
 
@@ -282,5 +282,11 @@ shell_job {operation, jobId?, maxChars?}  → read / stop / list
 - P0：`RunCoordinator` 已统一 Competition、GUI、Fixture 的阶段和 Verifier-first 终态；`npm run check:changed-tests` 已成为变更测试门禁；Janitor v2 使用原子账本、跨进程锁、reservation 和 schema 迁移，避免并发超限与崩溃遗留。
 - P1：`ApprovalPolicy` 和 `ProofBladeAppServer` 已接入 GUI；未批准的提交/启动/网络/session 副作用会停在 pending approval，App Server 通过游标事件 API 提供可恢复观测。
 - P2：本地 `fixtures/holdout` 提供 27 个 hash-bound case（Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1），`LocalHoldoutEvaluationRunner` 不访问 Provider 网络，可验证成功率、Evidence、成本、重放和候选脱敏；`run-anonymize` 可导出事件级匿名历史；严格 `eval-real` 还要求至少 20 个真实 case 且每个 Variant 有真实 Provider telemetry。
+
+### 2026-08-25 继续审计
+
+- Competition `TaskContract.inputs` 现在绑定平台附件与生成的 `connection-info.txt` 的相对路径、只读标记和 SHA-256；Competition 首轮 prompt 与本地 Run 使用同一套安装根/父目录隔离提示，附件路径穿越也会在 Sandbox 边界拒绝。
+- Competition convergence/sandbox/solver 定向回归为 39/39；完整 `npm run verify` 为 583/583，provider-free eval 为 30/30，审计无漏洞。
+- 本机没有可用 Provider 凭据，未擅自启动付费真实评测。已有私有 24-case Web/Pwn 报告仍是探索性结果，历史最佳 Variant 成功率约 66.7%，严格 baseline/regression gate 未通过；因此 P2 的真实模型能力门槛仍未完成，不能用 27-case provider-free holdout 冒充模型解题率。
 
 本轮回归通过 materials targeted tests、App Server/审批/Janitor/holdout tests、materials build、GUI typecheck/build 和 CI gate。真实 DASCTF、远程 tube、远程 pwn E2E 仍不在自动化范围。

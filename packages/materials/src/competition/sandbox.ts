@@ -162,7 +162,8 @@ function hash(value: string): string {
 }
 
 function safeJoin(root: string, name: string): string {
-  const cleaned = name.replace(/\\/g, "/").split("/").filter((part) => part && part !== "." && part !== "..");
-  if (cleaned.length === 0) throw new Error(`Unsafe attachment name: ${name}`);
-  return join(root, ...cleaned);
+  const normalized = name.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+  if (isAbsolute(name) || parts.some((part) => part.length === 0 || part === "." || part === "..")) throw new Error(`Unsafe attachment name: ${name}`);
+  return join(root, ...parts);
 }

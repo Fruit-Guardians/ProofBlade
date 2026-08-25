@@ -20,6 +20,8 @@ test("deadline budget is bounded and visible in the competition turn prompt", ()
   assert.equal(remainingRunDeadlineMs("not-a-date", 5_000, Date.parse(startedAt) + 1_500), 5_000);
   const prompt = turnPrompt(task, 1, "/workspace", { submissionsSoFar: 0, remainingDeadlineMs: 1_501 });
   assert.match(prompt, /Remaining deadline: 2 seconds/);
+  assert.match(prompt, /Task inputs \(read-only, relative to this challenge workspace\)/);
+  assert.match(prompt, /Do not search the ProofBlade install root/);
 });
 
 test("domainPhase and ExperimentRecord replay durably and block a third failed repeat", async () => {

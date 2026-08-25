@@ -26,7 +26,7 @@
 
 - `api.ts` 是与平台之间**唯一**的接缝。未配置时用 `NotConfiguredCompetitionApi` 显式失败，绝不静默回退到假数据。
 - `api-journal.ts` 是可选的同一接缝记录层：生产 GUI 将五类 API 请求、响应/错误按序写入私有 JSONL；离线 replay 只消费记录并校验参数摘要，不触碰平台。
-- `task.ts` 生成 `verification.kind = "platform_submission"` 的 TaskContract，标志本次由线上平台而非本地 scorer 裁定。`max_tool_calls` 只约束进入 Effect Journal 的调用（capability invoke、artifact read、fixture_score）；coding lane 的 bash/read/edit/write 与一等 MCP 工具不走 Journal，因此不计入。
+- `task.ts` 生成 `verification.kind = "platform_submission"` 的 TaskContract，标志本次由线上平台而非本地 scorer 裁定；平台附件和生成的 `connection-info.txt` 以相对路径与 SHA-256 写入 `inputs`，让 prompt、任务哈希和 replay 绑定真实可见输入。`max_tool_calls` 只约束进入 Effect Journal 的调用（capability invoke、artifact read、fixture_score）；coding lane 的 bash/read/edit/write 与一等 MCP 工具不走 Journal，因此不计入。
 - `sandbox.ts` 实现 `SandboxPort`：本地解包附件、写 `connection-info.txt`，并把 `fixture_score` effect 接到 `api.submitFlag`。
 - `loop.ts` 在统一 **coding lane** 上驱动单题。Fixture 自动执行和比赛运行共享同一套 `read`/`bash`/编辑/能力/MCP 工具；比赛只额外注入平台边界和 `submit_flag`，保留有界轮数、deadline、abort 与 assist 模式的「提交前停下」。
 - `fleet.ts` 是有界 worker 池加控制面（优先级、逐题 auto/assist、取消、实时并发）。没有全局暂停：暂停整支队伍在限时赛里等于送分。

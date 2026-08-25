@@ -141,7 +141,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     try {
       let task: ReturnType<typeof competitionTask>;
       try {
-        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
+        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config, detail.attachments);
       } catch (error) {
         this.throwIfAborted(request.signal, error);
         return competitionFailure("parse challenge targets", error);
@@ -224,7 +224,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     environment: CompetitionEnvironment,
     flag: string,
   ): Promise<ChallengeSolveResult> {
-    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config);
+    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config, attachments);
     const sandbox = new CompetitionSandbox({
       api: this.init.api,
       challengeId,

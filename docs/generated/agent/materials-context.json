@@ -18,10 +18,10 @@
     "src/competition/environment-janitor.ts": "7d9795c1e67ed070711d48c08192dba61df5131e1b3860ae8afe76a74c4d21e3",
     "src/competition/experiment-gate.ts": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
     "src/competition/fleet.ts": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
-    "src/competition/loop.ts": "98565edd798093c0bec3d318f84f921890d22755765dc72a8f427a9f7ac6e63e",
-    "src/competition/sandbox.ts": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
-    "src/competition/solver.ts": "d156ef2f306965692ba2bfb5bd67a75a25e368963d8e6d0861b6f5843d30d927",
-    "src/competition/task.ts": "f6068501f63337a2e51c7ed680dbbd4fc3caa3c183030e9d15f0e4a5bf1079af",
+    "src/competition/loop.ts": "67c8f7a04777ad067930efb84088462bf7934d3657b4b2db99296ff30409e3aa",
+    "src/competition/sandbox.ts": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
+    "src/competition/solver.ts": "9201f10e33cb67d92c42e817949a0436e6ba7d1c1e580c82c6d17d084d1b5966",
+    "src/competition/task.ts": "e46cda9583b79e6b0be9d500930b38cfb73e0c085449c624cbfe5a14d80b219e",
     "src/config.ts": "84b5c77b6adf17df5bd505bb0d70743b16cbfc594372201c156201e8018fc2f5",
     "src/container/contracts.ts": "6d53954667269c6e099e3f2c7003e8c8fb6f314e859a720112b468174cfcfc10",
     "src/container/docker.ts": "5dfc6fc10ee8bed7498c816465865dad046e0c3710b28f7e7d53f73fcb5e44b5",
@@ -433,7 +433,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 39,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts"
@@ -450,7 +450,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/solver.ts",
       "line": 43,
-      "moduleHash": "d156ef2f306965692ba2bfb5bd67a75a25e368963d8e6d0861b6f5843d30d927",
+      "moduleHash": "9201f10e33cb67d92c42e817949a0436e6ba7d1c1e580c82c6d17d084d1b5966",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -2210,14 +2210,14 @@
       "id": "@proofblade/materials::function::competitionTask",
       "name": "competitionTask",
       "kind": "function",
-      "signature": "(runId: string, summary: CompetitionChallengeSummary, env: CompetitionEnvironment, root: string, config: ProofBladeConfig): TaskContract",
+      "signature": "(runId: string, summary: CompetitionChallengeSummary, env: CompetitionEnvironment, root: string, config: ProofBladeConfig, attachments?: readonly CompetitionAttachment[]): TaskContract",
       "summary": "Build a TaskContract for a live competition challenge.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/task.ts",
-      "line": 35,
-      "moduleHash": "f6068501f63337a2e51c7ed680dbbd4fc3caa3c183030e9d15f0e4a5bf1079af",
+      "line": 36,
+      "moduleHash": "e46cda9583b79e6b0be9d500930b38cfb73e0c085449c624cbfe5a14d80b219e",
       "testRefs": [
         "packages/materials/tests/competition-sandbox.test.ts"
       ]
@@ -2232,8 +2232,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/task.ts",
-      "line": 87,
-      "moduleHash": "f6068501f63337a2e51c7ed680dbbd4fc3caa3c183030e9d15f0e4a5bf1079af",
+      "line": 104,
+      "moduleHash": "e46cda9583b79e6b0be9d500930b38cfb73e0c085449c624cbfe5a14d80b219e",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -4594,7 +4594,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 15,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": []
     },
     {
@@ -4608,7 +4608,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/solver.ts",
       "line": 18,
-      "moduleHash": "d156ef2f306965692ba2bfb5bd67a75a25e368963d8e6d0861b6f5843d30d927",
+      "moduleHash": "9201f10e33cb67d92c42e817949a0436e6ba7d1c1e580c82c6d17d084d1b5966",
       "testRefs": []
     },
     {
@@ -10209,7 +10209,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 66,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -10239,7 +10239,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 123,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -10286,7 +10286,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 119,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -10306,7 +10306,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 90,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -10344,7 +10344,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 108,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -10364,7 +10364,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 100,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -10387,7 +10387,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 113,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": []
     },
     {
@@ -10401,7 +10401,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 82,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -10434,7 +10434,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/sandbox.ts",
       "line": 58,
-      "moduleHash": "b3ae526e9bcb528261be044b3b5868106dcab84c6571165aa9c6d75fd3ceec1e",
+      "moduleHash": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
       "testRefs": []
     },
     {
@@ -10448,7 +10448,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/solver.ts",
       "line": 56,
-      "moduleHash": "d156ef2f306965692ba2bfb5bd67a75a25e368963d8e6d0861b6f5843d30d927",
+      "moduleHash": "9201f10e33cb67d92c42e817949a0436e6ba7d1c1e580c82c6d17d084d1b5966",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -10471,7 +10471,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/solver.ts",
       "line": 60,
-      "moduleHash": "d156ef2f306965692ba2bfb5bd67a75a25e368963d8e6d0861b6f5843d30d927",
+      "moduleHash": "9201f10e33cb67d92c42e817949a0436e6ba7d1c1e580c82c6d17d084d1b5966",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -11187,6 +11187,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -13166,6 +13167,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/provider-native.test.ts",

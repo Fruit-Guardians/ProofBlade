@@ -78,7 +78,9 @@ test("normalizeCategory maps common platform labels", () => {
 });
 
 test("competitionTask uses platform_submission with a single reproduction", () => {
-  const task = competitionTask("RUN-1", summary(), { connectionInfo: "nc host 1337" }, "/root", CONFIG);
+  const task = competitionTask("RUN-1", summary(), { connectionInfo: "nc host 1337" }, "/root", CONFIG, [
+    { name: "challenge.bin", base64: Buffer.from("binary fixture").toString("base64") },
+  ]);
   assert.equal(task.verification.kind, "platform_submission");
   assert.equal(task.verification.required_reproductions, 1);
   assert.equal(task.scope.external_network, true);
@@ -86,6 +88,10 @@ test("competitionTask uses platform_submission with a single reproduction", () =
   assert.deepEqual(task.scope.allowed_endpoints, [{ host: "host", port: 1337 }]);
   assert.equal(task.target, "REMOTE:nc host 1337");
   assert.equal(task.target_kind, "web");
+  assert.deepEqual(task.inputs, [
+    { path: "challenge.bin", sha256: sha256("binary fixture"), read_only: true },
+    { path: "connection-info.txt", sha256: sha256("nc host 1337\n"), read_only: true },
+  ]);
 });
 
 test("competitionTask binds exact endpoint tuples without allowing host-port cross products", () => {
@@ -123,6 +129,23 @@ test("CompetitionSandbox unpacks attachments and writes connection info", async 
     assert.equal((await readFile(join(ref.path, "connection-info.txt"), "utf8")).trim(), "nc host 1337");
     await sandbox.close();
     assert.equal(api.stopped, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CompetitionSandbox rejects traversal-shaped attachment names", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-comp-unsafe-"));
+  try {
+    const sandbox = new CompetitionSandbox({
+      api: new FakeCompetitionApi("flag{ok}"),
+      challengeId: "CH-1",
+      workspaceRoot: root,
+      attachments: [{ name: "../outside.txt", base64: Buffer.from("escape").toString("base64") }],
+      environment: { connectionInfo: "nc host 1337" },
+    });
+    const task = competitionTask("RUN-UNSAFE", summary(), { connectionInfo: "nc host 1337" }, root, CONFIG, [{ name: "../outside.txt", base64: Buffer.from("escape").toString("base64") }]);
+    await assert.rejects(() => sandbox.build(task), /Unsafe attachment name/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
