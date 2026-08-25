@@ -7,6 +7,7 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
+import { projectionHash } from "../src/control/reducer.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
@@ -104,6 +105,8 @@ test("auto mode solves all three web and three reverse fixtures through the veri
       assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 2, profile.id);
       assert.equal(Object.values(snapshot.completions)[0]?.status, "ACCEPTED", profile.id);
       assert.ok(Object.values(snapshot.artifacts).some((item) => item.path.endsWith("report.md")), profile.id);
+      const replayed = await services.control.replay(runId);
+      assert.equal(projectionHash(snapshot), projectionHash(replayed), `${profile.id} replay projection must match the live snapshot`);
       const events = await readFile(join(root, "runs", runId, "events.jsonl"), "utf8");
       const domainPhases = events.trim().split(/\r?\n/)
         .map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } })
