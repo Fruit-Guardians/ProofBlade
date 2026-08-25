@@ -346,6 +346,9 @@ export class PiCodingLane implements AgentLanePort {
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
+        ...(snapshot.task.verification.kind === "reproduction" && snapshot.task.verification.command
+          ? { verificationCommand: snapshot.task.verification.command }
+          : {}),
         targetKind: effectiveTargetKind,
         target: snapshot.task.target,
         challengeProfile,
@@ -762,7 +765,7 @@ function codingSystemPrompt(
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; verificationCommand?: string; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -802,10 +805,13 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
+  const verificationBlock = options.verificationCommand
+    ? `\n\n## Task-bound candidate verification\nThis run has one immutable verifier command. When reporting a deterministic candidate, call \`verify_claim\` with the exact command below; do not substitute a model-invented command:\n\n\`${options.verificationCommand}\``
+    : "\n\n## Candidate verification\nThis run has no immutable verifier command. You may continue investigating and record observations, but any candidate conclusion remains unverified until the task is created with a verifier policy.";
   const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
   const profileBlock = options.challengeProfile ? preparedChallengeProfileBlock(options.challengeProfile, options.preflight) : "";
   const webAwareCategoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${verificationBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {

@@ -54,6 +54,34 @@ test("CTF assistant events hash text instead of persisting candidate plaintext",
   }
 });
 
+test("unverified candidate output is labeled and cannot retain a Flag label", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-unverified-claim-output-"));
+  try {
+    const runId = "UNVERIFIED-CLAIM-OUTPUT-001";
+    const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await controlStore.createRun(runId, task(runId, root));
+    const outcome = await finalizeCodingTurn({
+      runId,
+      controlStore,
+      correlationId: `${runId}:main:chat-turn`,
+      userPrompt: "完成这道题，并得到flag",
+      response: fauxAssistantMessage("Flag：PB{candidate_without_reproduction}"),
+      recoveryCount: 0,
+      recoveryExhausted: false,
+      termination: {},
+      claimVerifier: { project: () => ({ required: true, status: "unverified", reason: "缺少任务绑定的复现命令。" }) },
+      maintainAfterTurn: async () => undefined,
+    });
+    assert.match(outcome.text, /本轮候选未验证/);
+    assert.doesNotMatch(outcome.text, /\bflag\s*[:：]/i);
+    assert.match(outcome.text, /候选（未验证）：PB\{candidate_without_reproduction\}/);
+    const event = (await controlStore.events(runId)).findLast((item) => item.type === "assistant_message");
+    assert.equal(event?.payload?.text, outcome.text);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:evidence-repeat-breaker] repeated tool failures terminate after a bounded number of identical calls", () => {
   const breaker = new RepeatedToolFailureBreaker(3);
   assert.equal(breaker.observe(failed({ operation: "inspect_forest", maxChars: 12000 })).terminate, false);

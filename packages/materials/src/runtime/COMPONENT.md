@@ -24,11 +24,11 @@
 
 ## 入口与边界
 
-- `coding-lane.ts` 是唯一生产 Agent lane：普通对话和 Fixture/CTF 任务都由它驱动；Fixture 只通过工作区、任务快照和 `deferClaimAcceptance` 改变边界。确定性 lane 仅由评测和单元测试注入。
+- `coding-lane.ts` 是唯一生产 Agent lane：普通 Chat、CTF Chat、Fixture 和 Competition 都由它驱动；差异只来自不可变 `TaskContract` 能力和外层是否需要多轮 Coordinator，不再分叉 Tool、上下文、Evidence 或 Completion 系统。确定性 lane 仅由评测和单元测试注入。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
-- Fixture/GUI 的 `deferClaimAcceptance` 模式会让 `verify_claim` 通过 Pi 的 `terminate` 结束当前 Provider 回合，把控制权交回外层 `RunCoordinator` 做 hidden-scorer 或 task-owned verifier；Competition 不启用该模式，因此同一回合仍可先观察再调用 `submit_flag`。
+- `CodingClaimVerifier` 是唯一候选验证路径。任务绑定的 reproduction command 对所有模式都走同一 verifier journal；没有绑定命令的普通探索仍可继续，但只能写入明确标记的 observation，不能接受 Completion，最终文本也会统一标记为未验证。`deferClaimAcceptance` 只控制外层编排时机，不改变验证规则。
 - `ChallengeToolProfile.firstActionPlan` 将首个挑战动作结构化为允许的 Tool 集和有界调用次数；Preflight 结果与该计划一起写入 Run。Coding lane 在 Pi 的 `tool_call` 边界拒绝越过首探测的宽泛工具，首个成功 Observation 后解除限制；恢复时从当前代 Observation 推导已完成状态。
 - CTF 硬约束由持久化 `TaskContract` 的 `mode/target_kind` 判定，不能依赖 executor prompt 是否包含 “CTF/flag” 关键词；这样 Competition/Fixture 的实验预算和 evidence-first replan 不会因提示词投影变化而失效。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。

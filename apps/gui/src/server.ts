@@ -160,10 +160,12 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const capabilities = await capabilityCatalog();
     const defaults = defaultPreferences(capabilities);
     const workspacePath = await requireDirectory(optionalString(body.workspacePath) || projectRoot);
+    const verificationCommand = optionalString(body.verificationCommand);
     const snapshot = await data.createConversation({
       runId: string(body.runId, "runId"),
       title: typeof body.title === "string" ? body.title : "新对话",
       workspacePath,
+      ...(verificationCommand ? { verificationCommand } : {}),
     });
     await workspaceSettings.saveConversation(snapshot.runId, {
       title: typeof body.title === "string" ? body.title : "新对话",

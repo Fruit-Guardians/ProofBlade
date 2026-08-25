@@ -31,6 +31,13 @@ export interface ClaimVerificationProjection {
   reason?: string;
 }
 
+/** Keep candidate-shaped output visibly non-authoritative until projection verifies it. */
+export function rewriteUnverifiedClaimText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
+  const rewritten = assistantText.replace(/\bflag\s*[:：]/gi, "候选（未验证）：");
+  if (rewritten.startsWith("[ProofBlade] 本轮候选未验证：")) return rewritten;
+  return [`[ProofBlade] 本轮候选未验证：${reason}`, rewritten].filter((value) => value.length > 0).join("\n");
+}
+
 interface ClaimReceipt {
   schemaVersion: 3;
   kind: "claim_reproduction";
@@ -125,9 +132,14 @@ export class CodingClaimVerifier {
     const candidateHash = sha256(candidate);
     const commandHash = sha256(command);
     const supportingEvidenceIds = [...new Set(input.supportingEvidenceIds ?? [])];
-    const verifierDefinedCommand = snapshot.task.verification.kind === "reproduction"
+    const taskBoundCommand = snapshot.task.verification.kind === "reproduction"
       && typeof snapshot.task.verification.command === "string"
-      && snapshot.task.verification.command.trim() === command;
+      ? snapshot.task.verification.command.trim()
+      : undefined;
+    const verifierDefinedCommand = taskBoundCommand === command;
+    if (taskBoundCommand && !verifierDefinedCommand) {
+      throw new Error("verify_claim must use the exact immutable task-bound verification command");
+    }
     const missingEvidence = supportingEvidenceIds.filter((evidenceId) => !snapshot.evidence[evidenceId]);
     if (missingEvidence.length > 0) throw new Error(`Unknown supporting evidence ids: ${missingEvidence.join(", ")}`);
     for (const evidenceId of supportingEvidenceIds) {

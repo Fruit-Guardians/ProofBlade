@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 108
-- Symbols: 955
+- Symbols: 956
 
 ## Public Symbols
 
@@ -650,7 +650,7 @@
 ### CodingClaimVerifier
 - Kind: `class`
 - Signature: `CodingClaimVerifier`
-- Source: [src/verification/claim-verification.ts:56](../../../packages/materials/src/verification/claim-verification.ts:56)
+- Source: [src/verification/claim-verification.ts:63](../../../packages/materials/src/verification/claim-verification.ts:63)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding claim verifier class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1603,7 +1603,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:846](../../../packages/materials/src/runtime/coding-lane.ts:846)
+- Source: [src/runtime/coding-lane.ts:852](../../../packages/materials/src/runtime/coding-lane.ts:852)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -1612,7 +1612,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:913](../../../packages/materials/src/runtime/coding-lane.ts:913)
+- Source: [src/runtime/coding-lane.ts:919](../../../packages/materials/src/runtime/coding-lane.ts:919)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1621,7 +1621,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:606](../../../packages/materials/src/runtime/coding-lane.ts:606)
+- Source: [src/runtime/coding-lane.ts:609](../../../packages/materials/src/runtime/coding-lane.ts:609)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -1630,7 +1630,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:696](../../../packages/materials/src/runtime/coding-lane.ts:696)
+- Source: [src/runtime/coding-lane.ts:699](../../../packages/materials/src/runtime/coding-lane.ts:699)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1639,7 +1639,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:739](../../../packages/materials/src/runtime/coding-lane.ts:739)
+- Source: [src/runtime/coding-lane.ts:742](../../../packages/materials/src/runtime/coding-lane.ts:742)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -1648,7 +1648,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:734](../../../packages/materials/src/runtime/coding-lane.ts:734)
+- Source: [src/runtime/coding-lane.ts:737](../../../packages/materials/src/runtime/coding-lane.ts:737)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -2013,11 +2013,19 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:438](../../../packages/materials/src/verification/claim-verification.ts:438)
+- Source: [src/verification/claim-verification.ts:450](../../../packages/materials/src/verification/claim-verification.ts:450)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/coding-resources.test.ts`
+
+### rewriteUnverifiedClaimText
+- Kind: `function`
+- Signature: `(assistantText: string, reason?: string): string`
+- Source: [src/verification/claim-verification.ts:35](../../../packages/materials/src/verification/claim-verification.ts:35)
+- Export: `@proofblade/materials`
+- Summary: Keep candidate-shaped output visibly non-authoritative until projection verifies it.
+- Summary source: `tsdoc`
 
 ### AppServices
 - Kind: `interface`
@@ -4755,7 +4763,7 @@
 - Export: `@proofblade/materials`
 - Summary: Start a fresh durable recording session.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CompetitionApiJournal.replay
 - Kind: `method`
@@ -5007,7 +5015,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ExperimentGate.runExclusive
 - Kind: `method`
@@ -6620,7 +6628,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:535](../../../packages/materials/src/runtime/coding-lane.ts:535)
+- Source: [src/runtime/coding-lane.ts:538](../../../packages/materials/src/runtime/coding-lane.ts:538)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6629,7 +6637,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:547](../../../packages/materials/src/runtime/coding-lane.ts:547)
+- Source: [src/runtime/coding-lane.ts:550](../../../packages/materials/src/runtime/coding-lane.ts:550)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6638,7 +6646,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:539](../../../packages/materials/src/runtime/coding-lane.ts:539)
+- Source: [src/runtime/coding-lane.ts:542](../../../packages/materials/src/runtime/coding-lane.ts:542)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6656,7 +6664,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:543](../../../packages/materials/src/runtime/coding-lane.ts:543)
+- Source: [src/runtime/coding-lane.ts:546](../../../packages/materials/src/runtime/coding-lane.ts:546)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6665,7 +6673,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:475](../../../packages/materials/src/runtime/coding-lane.ts:475)
+- Source: [src/runtime/coding-lane.ts:478](../../../packages/materials/src/runtime/coding-lane.ts:478)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7396,7 +7404,7 @@
 ### CodingClaimVerifier.executeWebReproductionEffect
 - Kind: `method`
 - Signature: `(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>`
-- Source: [src/verification/claim-verification.ts:72](../../../packages/materials/src/verification/claim-verification.ts:72)
+- Source: [src/verification/claim-verification.ts:79](../../../packages/materials/src/verification/claim-verification.ts:79)
 - Export: `@proofblade/materials`
 - Summary: Execute a verifier-owned web attestation without exposing the verifier port to the lane.
 - Summary source: `tsdoc`
@@ -7405,7 +7413,7 @@
 ### CodingClaimVerifier.finalizeWebReproduction
 - Kind: `method`
 - Signature: `(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>`
-- Source: [src/verification/claim-verification.ts:105](../../../packages/materials/src/verification/claim-verification.ts:105)
+- Source: [src/verification/claim-verification.ts:112](../../../packages/materials/src/verification/claim-verification.ts:112)
 - Export: `@proofblade/materials`
 - Summary: Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded.
 - Summary source: `tsdoc`
@@ -7414,7 +7422,7 @@
 ### CodingClaimVerifier.project
 - Kind: `method`
 - Signature: `(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection>`
-- Source: [src/verification/claim-verification.ts:323](../../../packages/materials/src/verification/claim-verification.ts:323)
+- Source: [src/verification/claim-verification.ts:335](../../../packages/materials/src/verification/claim-verification.ts:335)
 - Export: `@proofblade/materials`
 - Summary: Rebuild verification exclusively from durable current-generation state.
 - Summary source: `tsdoc`
@@ -7423,16 +7431,16 @@
 ### CodingClaimVerifier.record
 - Kind: `method`
 - Signature: `(input: { candidate: string; command: string; cwd: string; toolCallId: string; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ClaimReproduction>`
-- Source: [src/verification/claim-verification.ts:110](../../../packages/materials/src/verification/claim-verification.ts:110)
+- Source: [src/verification/claim-verification.ts:117](../../../packages/materials/src/verification/claim-verification.ts:117)
 - Export: `@proofblade/materials`
 - Summary: Execute and attest a claim through a journaled verifier Effect.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CodingClaimVerifier.recordVerifierEvidence
 - Kind: `method`
 - Signature: `(evidence: Omit<Evidence, "createdSeq" | "provenance">): Promise<void>`
-- Source: [src/verification/claim-verification.ts:67](../../../packages/materials/src/verification/claim-verification.ts:67)
+- Source: [src/verification/claim-verification.ts:74](../../../packages/materials/src/verification/claim-verification.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Commit verifier-owned Evidence without exposing the verifier port to the lane.
 - Summary source: `tsdoc`

@@ -35,7 +35,7 @@ Key 只在模型发现请求和 Provider 调用时作为 Bearer 凭据使用。`
 
 ## 对话工作区与能力
 
-侧栏支持“全部对话”“未分类”和自定义文件夹筛选。新建对话时可以选择文件夹，并通过绝对路径输入或服务端目录浏览器选择工作目录；既有对话也可从输入框下方切换目录。服务端校验路径为已存在的目录，再将其作为下一轮 `PiCodingLane.projectRoot`。工作目录、文件夹与会话级偏好写入：
+侧栏支持“全部对话”“未分类”和自定义文件夹筛选。新建对话时可以选择文件夹，并通过绝对路径输入或服务端目录浏览器选择工作目录；也可以填写可选的任务验证命令，该命令会绑定到不可变 `TaskContract`，与 CTF/Fixture 使用同一受信复现链。既有对话也可从输入框下方切换目录。服务端校验路径为已存在的目录，再将其作为下一轮 `PiCodingLane.projectRoot`。工作目录、文件夹与会话级偏好写入：
 
 ```text
 %USERPROFILE%\.proofblade\gui-workspace.json
@@ -64,19 +64,19 @@ Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`）
 
 ## 真实模型对话
 
-“新建对话”创建普通 Coding Agent 会话，不选择或初始化 Fixture。对话 composer 调用：
+“新建对话”创建 Coding Agent 会话，不选择或初始化 Fixture；普通 Chat、CTF Chat 和 Fixture 都调用同一个 Coding Lane。对话 composer 调用：
 
 ```text
 Browser -> POST /api/runs/:id/chat
         -> validate conversation workspacePath
-        -> PiCodingLane.create(projectRoot = workspacePath)
+        -> PiCodingLane.create(projectRoot = workspacePath, task-bound verifier policy)
         -> PiCodingLane.prompt(user text)
         -> configured Provider / real model
         -> read / bash / edit / write (按需)
         -> Pi Session + Control Store
 ```
 
-侧栏“Fixture 测试”是独立入口。交互调试和自动执行都使用统一的 `PiCodingLane`（自动执行由 `SingleAgentCtfLoop` 编排）；这两种模式才会构建 Fixture、显示阶段条并启用 Evidence、Artifact、Checkpoint 和恢复核对。
+侧栏“Fixture 测试”是独立入口，但交互 Chat、CTF Chat 和 Fixture 自动执行共用同一个 `PiCodingLane`、`CodingClaimVerifier`、上下文维护和恢复路径。自动执行只由 `SingleAgentCtfLoop` 在外层编排多轮；它不拥有第二套 Tool、Completion 或验证判定逻辑。Fixture 额外构建靶场、显示阶段条并提供 Evidence、Artifact、Checkpoint 和恢复核对。
 
 响应使用 `text/event-stream`。服务端把 AgentHarness 事件规范化为：
 
@@ -205,7 +205,7 @@ return {
 | `GET` | `/api/runs` | Run 摘要列表 |
 | `GET` | `/api/runs/:id` | Snapshot、Events、Telemetry、Pi Sessions 与 Tool 投影 |
 | `GET` | `/api/runs/:id/artifacts/:artifactId` | 校验引用后读取 Artifact 文本 |
-| `POST` | `/api/conversations` | 校验工作目录并创建不绑定 Fixture 的普通 Coding Agent 会话 |
+| `POST` | `/api/conversations` | 校验工作目录和可选验证命令，并创建不绑定 Fixture 的 Coding Agent 会话 |
 | `POST` | `/api/fixture-conversations` | 创建绑定 Fixture 的交互调试会话 |
 | `POST` | `/api/runs/:id/chat` | 通过 SSE 执行一个真实模型 turn |
 | `POST` | `/api/solve` | 使用生产 `SingleAgentCtfLoop` 创建并执行 Run |

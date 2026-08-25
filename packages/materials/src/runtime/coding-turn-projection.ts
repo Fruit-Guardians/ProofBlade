@@ -1,7 +1,7 @@
 import { AgentHarness } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
-import type { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
@@ -323,7 +323,7 @@ export async function finalizeCodingTurn(options: {
     && options.termination.reason !== undefined
     && (options.response.stopReason === "toolUse" || options.response.stopReason === "error");
   options.termination.confirmed = confirmed;
-  const output = projectCodingAssistantText(rawOutput, options.termination)
+  const projectedOutput = projectCodingAssistantText(rawOutput, options.termination)
     || interruptedTurnMessage(options.response.stopReason, options.response.errorMessage);
   const stopReason = confirmed ? "stop" : options.response.stopReason;
   const errorMessage = confirmed
@@ -331,7 +331,11 @@ export async function finalizeCodingTurn(options: {
     : options.recoveryExhausted
       ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
       : options.response.errorMessage;
-  const claimVerification = await options.claimVerifier.project(options.userPrompt, output);
+  const initialClaimVerification = await options.claimVerifier.project(options.userPrompt, projectedOutput);
+  const output = initialClaimVerification.status === "unverified"
+    ? rewriteUnverifiedClaimText(projectedOutput, initialClaimVerification.reason)
+    : projectedOutput;
+  const claimVerification = initialClaimVerification;
   const task = await options.controlStore.snapshot(options.runId);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
