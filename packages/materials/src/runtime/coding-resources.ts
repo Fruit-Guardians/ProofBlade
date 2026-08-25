@@ -65,6 +65,13 @@ export interface CodingResourceContext extends ExecutionToolContext {
   enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
   claimVerifier: CodingClaimVerifier;
+  /**
+   * Stop the current Pi turn after verify_claim so the outer Run coordinator
+   * can perform verifier-owned scoring before the model issues another tool
+   * call. Competition lanes leave this unset so submit_flag may follow a
+   * preliminary observation in the same turn.
+   */
+  deferClaimAcceptance?: boolean;
   evidenceGraph: CodingEvidenceGraph;
   evidenceCurationGate?: EvidenceCurationGate;
   runtime: ProofBladeToolRuntime;
@@ -326,7 +333,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
         return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
       },
     });
-    return toolResult({
+    const result = toolResult({
       verified: reproduction.verified,
       candidateHash: reproduction.candidateHash,
       commandHash: reproduction.commandHash,
@@ -336,6 +343,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
+    return context.deferClaimAcceptance ? { ...result, terminate: true } : result;
   },
 };
 

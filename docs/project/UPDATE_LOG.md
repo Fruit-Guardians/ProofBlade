@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T12:30:00+08:00
+> 状态更新时间：2026-08-25T12:45:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-002 | 2026-08-25T12:45:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-001 | 2026-08-25T12:30:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260824-001 | 2026-08-24T22:00:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260823-001 | 2026-08-23T12:00:00+08:00 | PLAN-002 | feat/api-index-onboarding | 本条记录所在提交 |
@@ -41,6 +42,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-002
+
+时间：2026-08-25T12:45:00+08:00
+
+摘要：修复真实评测中 verify_claim 成功后仍在同一 Provider 回合继续探索，导致 hidden scorer 未被外层 RunCoordinator 调用并最终超时。
+
+### 变更
+
+- 将 deferClaimAcceptance 接入 CodingResourceContext；Fixture/GUI 延迟验收模式下 verify_claim 返回 Pi terminate，立即交回统一 verifier-first 状态机
+- 保留 Competition 同回合 verify_claim 后继续 submit_flag 的行为，避免改变平台提交契约
+- 在 executor turn prompt 中显式列出只读输入并禁止搜索 ProofBlade 安装根、skills library、runs 和父目录，减少真实题目工作区漂移
+- 增加普通 Coding 与延迟验收两种 verify_claim 终止语义回归测试，并同步 API 索引
+
+### 验证
+
+- [x] npm run build --workspace=@proofblade/materials passed
+- [x] Coding resources + SingleAgentCtfLoop tests: 36/36 passed
+- [x] component and change-contract gates passed
+- [x] npm run api:index:check passed
+- [x] npm run verify passed: 582/582 repository tests, provider-free evaluation 30/30, npm audit 0 vulnerabilities
 
 ## UPDATE-20260825-001
 

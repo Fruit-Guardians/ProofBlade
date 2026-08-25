@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-25T12:30:00+08:00",
+  "updatedAt": "2026-08-25T12:45:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -232,6 +232,32 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260825-002",
+      "occurredAt": "2026-08-25T12:45:00+08:00",
+      "summary": "修复真实评测中 verify_claim 成功后仍在同一 Provider 回合继续探索，导致 hidden scorer 未被外层 RunCoordinator 调用并最终超时。",
+      "branch": "codex/proofblade-agent-foundation",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-200",
+        "PLAN-220"
+      ],
+      "changes": [
+        "将 deferClaimAcceptance 接入 CodingResourceContext；Fixture/GUI 延迟验收模式下 verify_claim 返回 Pi terminate，立即交回统一 verifier-first 状态机",
+        "保留 Competition 同回合 verify_claim 后继续 submit_flag 的行为，避免改变平台提交契约",
+        "在 executor turn prompt 中显式列出只读输入并禁止搜索 ProofBlade 安装根、skills library、runs 和父目录，减少真实题目工作区漂移",
+        "增加普通 Coding 与延迟验收两种 verify_claim 终止语义回归测试，并同步 API 索引"
+      ],
+      "validation": [
+        "npm run build --workspace=@proofblade/materials passed",
+        "Coding resources + SingleAgentCtfLoop tests: 36/36 passed",
+        "component and change-contract gates passed",
+        "npm run api:index:check passed",
+        "npm run verify passed: 582/582 repository tests, provider-free evaluation 30/30, npm audit 0 vulnerabilities"
+      ]
+    },
     {
       "id": "UPDATE-20260825-001",
       "occurredAt": "2026-08-25T12:30:00+08:00",

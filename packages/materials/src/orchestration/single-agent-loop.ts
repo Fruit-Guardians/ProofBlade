@@ -506,6 +506,8 @@ function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerInten
     `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
     ...(userPrompt?.trim() ? ["User's latest challenge instruction:", userPrompt.trim()] : []),
+    `Task inputs (read-only, relative to the current challenge workspace): ${snapshot.task.inputs.map((input) => input.path).join(", ") || "none listed; inspect the workspace manifest only"}.`,
+    "Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.",
     "Inspect every visible target file with read or a bounded bash command; do not guess from the task description.",
     "Preserve useful Artifact/Evidence ids and use them to support your reasoning.",
     "When a candidate is ready, call verify_claim with the exact candidate and a deterministic command that derives it from workspace inputs without embedding the candidate literal.",
