@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.12",
+  "version": "0.7.14",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-13T04:00:00.000Z",
+  "updatedAt": "2026-08-25T05:05:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 12,
-    "securityAuditCount": 12,
-    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
-    "sourceHash": "285e754a3e2cef90ee4801ee3b088d43560771a374e0dfb7b0eb62af87f183dd",
+    "bugAuditCount": 14,
+    "securityAuditCount": 14,
+    "lastBugAuditAt": "2026-08-25T05:05:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T05:05:00.000Z",
+    "sourceHash": "4cc7e8cafcd67399e5ad8e800cedbd7bffb15e7800e2d6c84aaf290e576feccc",
     "result": "passed"
   }
 }
@@ -31,7 +31,7 @@
 ## 开发规则
 
 - API 响应只暴露 `hasApiKey`，不回传 Key。
-- SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
+- SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换；用户暂停或 Provider idle/error 造成的空 Assistant entry 必须由持久化 assistant_message 的可见恢复文本补回，不能留下无提示的空气泡。
 - Runtime 的 `repeated_tool_failure`、`no_progress` 与 `tool_failure_storm` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
 - Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
@@ -46,7 +46,7 @@
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
 - 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
-- “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
+- “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。没有推理树但已有 Evidence/Artifact reasoning node 时，必须展示尚未整理的图节点，不能只显示空的 Fact → Evidence → Artifact 兼容视图。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。

@@ -76,6 +76,20 @@ test("projects persisted provider failures into assistant conversation messages"
   assert.equal(messages[0]?.error, "Connection error.");
 });
 
+test("projects visible interruption text onto an empty aborted assistant entry", () => {
+  const messages = conversationMessagesFromEntries([{
+    type: "message",
+    id: "assistant-aborted",
+    timestamp: "2026-08-05T00:00:03.000Z",
+    message: { role: "assistant", content: [], stopReason: "aborted" },
+  }], [{
+    type: "assistant_message",
+    payload: { text: "[ProofBlade] 本轮已停止。", stopReason: "aborted", piEntryId: "assistant-aborted" },
+  }] as HarnessEvent[]);
+  assert.equal(messages[0]?.text, "[ProofBlade] 本轮已停止。");
+  assert.equal(messages[0]?.stopReason, "aborted");
+});
+
 test("[contract:repeated-tool-failure-conversation] projects a persisted breaker termination as a normal assistant reply", () => {
   const messages = conversationMessagesFromEntries([{
     type: "message",

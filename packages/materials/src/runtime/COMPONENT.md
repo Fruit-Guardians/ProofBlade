@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.18",
+  "version": "0.10.20",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-25T04:30:00.000Z",
+  "updatedAt": "2026-08-25T05:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 16,
-    "securityAuditCount": 16,
-    "lastBugAuditAt": "2026-08-25T04:30:00.000Z",
-    "lastSecurityAuditAt": "2026-08-25T04:30:00.000Z",
-    "sourceHash": "a7ab65ae2804458ba8d64d93acf10cd8c12dbb0a8a748683eb6613544e247e3a",
+    "bugAuditCount": 18,
+    "securityAuditCount": 18,
+    "lastBugAuditAt": "2026-08-25T05:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T05:00:00.000Z",
+    "sourceHash": "f6e486cc2c844c856ae2fc064f295c81d6e486b40217505230134dff76de76a2",
     "result": "passed"
   }
 }
@@ -45,7 +45,7 @@
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 
-Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。内部恢复提示保留在 Pi 调试轨迹中，但不冒充 GUI 用户消息。错误或人工暂停的回合不启动普通摘要请求。
+Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。Coding chat 的重复观察先追加软提示并保留当前 Provider 回合，Solver/Competition 仍由硬守卫停止并交给外层重规划。Provider idle/error 和人工暂停即使没有模型文本，也必须持久化可见的状态说明；错误或人工暂停的回合不启动普通摘要请求。
 
 重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；无进展断路器在单回合滚动窗口内比较 Tool Contract 明确声明为只读且无副作用的工具参数和稳定 Artifact 内容哈希，第三次取回同一观察时停止。待处理终止携带窗口来源，同批 process 成功可取消 read-window 终止，但不能取消 declared-no-progress-window 终止；后续 read-window 终止也不得覆盖或降级已有的 declared-no-progress 终止。混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止；同批出现符合该窗口进展语义的观察则取消顺序相关的无进展停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
 

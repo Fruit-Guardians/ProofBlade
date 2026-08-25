@@ -10,7 +10,7 @@ import { ControlStore } from "../src/control/control-store.js";
 import { sha256 } from "../src/domain/utils.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
 const readOnlyEffect = { readOnly: true, sideEffect: "none" as const };
@@ -264,6 +264,70 @@ test("a breaker message only fills an otherwise empty assistant response", () =>
   assert.equal(projectCodingAssistantText("", termination), termination.message);
   termination.confirmed = false;
   assert.equal(projectCodingAssistantText("", termination), "");
+});
+
+test("coding chat turns use a soft no-progress notice and keep the provider turn alive", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-no-progress-advisory-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-no-progress-advisory" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "advisory-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "advisory-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("read", { path: "same" }, { id: "advisory-3" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("continued", { stopReason: "stop" }),
+    ]);
+    const read: AgentHarnessTool<undefined> = {
+      name: "read", label: "read", description: "stable read", parameters: Type.Object({ path: Type.String() }),
+      async execute() { return { content: [{ type: "text" as const, text: "same" }], details: { artifactHash: "same-hash" } }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "no-progress-advisory", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [read], activeToolNames: ["read"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = { softNoProgress: true };
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), new NoProgressToolBreaker(3), termination, () => readOnlyEffect);
+
+    const response = await harness.prompt("Continue the coding investigation.");
+    assert.equal(faux.state.callCount, 4);
+    assert.equal(response.stopReason, "stop");
+    assert.equal(termination.requested, undefined);
+    const texts = (await session.getBranch()).flatMap((entry) => entry.type === "message" ? entry.message.content : []).map((item) => item.type === "text" ? item.text : "");
+    assert.ok(texts.some((text) => /soft|软提示/i.test(text) && /no-progress|相同观察/i.test(text)));
+    assert.match(noProgressToolNudge("read", 3), /软提示/);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("aborted and idle provider turns persist visible recovery text", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-interrupted-visible-"));
+  try {
+    const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "INTERRUPTED-VISIBLE-001";
+    await controlStore.createRun(runId, task(runId, root));
+    for (const [stopReason, errorMessage] of [["aborted", undefined], ["error", "Provider stream idle for more than 120000ms"]] as const) {
+      await finalizeCodingTurn({
+        runId,
+        controlStore,
+        correlationId: `${runId}:${stopReason}`,
+        userPrompt: "继续分析",
+        response: fauxAssistantMessage([], { stopReason, ...(errorMessage ? { errorMessage } : {}) }),
+        recoveryCount: 0,
+        recoveryExhausted: false,
+        termination: {},
+        claimVerifier: { project: () => ({ required: false, status: "not_required" }) },
+        maintainAfterTurn: async () => undefined,
+      });
+    }
+    const messages = (await controlStore.events(runId)).filter((event) => event.type === "assistant_message").map((event) => String(event.payload?.text ?? ""));
+    assert.match(messages[0]!, /本轮已停止/);
+    assert.match(messages[1]!, /Provider stream idle/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("[contract:repeated-tool-failure-visible] real Harness termination produces and persists a visible assistant reply", async () => {

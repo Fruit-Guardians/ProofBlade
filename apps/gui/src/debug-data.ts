@@ -810,10 +810,12 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
   const assistantEvents = events.filter((event) => event.type === "assistant_message");
   for (const event of [...assistantEvents].reverse()) {
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
-    if (isRecoverableTermination(event.payload?.termination) && text) {
+    const providerStopReason = event.payload?.stopReason;
+    const isVisibleInterruptedTurn = providerStopReason === "error" || providerStopReason === "aborted" || providerStopReason === "toolUse";
+    if ((isRecoverableTermination(event.payload?.termination) || isVisibleInterruptedTurn) && text) {
       const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
       const interrupted = piEntryId
-        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && (item.stopReason === "error" || item.stopReason === "toolUse"))
+        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && (item.stopReason === "error" || item.stopReason === "aborted" || item.stopReason === "toolUse"))
         : undefined;
       if (interrupted) {
         interrupted.text = text;

@@ -371,6 +371,10 @@ export class PiCodingLane implements AgentLanePort {
       }
       : undefined;
     const termination: CodingTurnTermination = {};
+    // GUI chat lanes use the default `-chat` session and keep repeated reads
+    // advisory; CTF/Competition lanes pass an explicit `-coding` session and
+    // retain the outer loop's hard-stop/replan contract.
+    termination.softNoProgress = options.deferClaimAcceptance === true && options.sessionId === undefined;
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,

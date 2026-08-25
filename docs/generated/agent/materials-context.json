@@ -78,9 +78,9 @@
     "src/recovery/run-recovery.ts": "088038f7edc9bf890868bda39f56762e170188e10874e1f81efc997d90e5b0df",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "57db0f6e2a63b16265abfdaa4f7315fbda25204c5e59a8dfd680f4aed4d1b89c",
-    "src/runtime/coding-lane.ts": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+    "src/runtime/coding-lane.ts": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
     "src/runtime/coding-resources.ts": "2e0631bdbed07fa8e57b0ef3c731281995803bb7174ec74e5cdd9cca4a45d87f",
-    "src/runtime/coding-turn-projection.ts": "7f153cee837835e60598ece5ba88e2e0e6659484e05b68730b2f99591ca52329",
+    "src/runtime/coding-turn-projection.ts": "cd990a6ed28c1439b17844d3dc72b4f348337b23a3901647af451ec027ec1f3c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "7a20212a0c4051593022955c9dc1058d0794c18c7b616fa74ccc744872e9f0bb",
     "src/runtime/pi-adapter.ts": "7f365236581f2630354ea266ca5e5b5e364e525d9447990beda879a274dc9051",
@@ -90,7 +90,7 @@
     "src/runtime/provider-transport.ts": "0c1652999beba307d5a760f294935fd85bee8c402f8cff3dfc0f61c477d891b3",
     "src/runtime/pwn-coding-tools.ts": "49372c1d832ea7432ee71a2eb8666bb0a308b57f31549f66840fb3833bcc65a8",
     "src/runtime/solver-tools.ts": "c6b5232951bc1b90ba2102e43d70af959c1debb18df9e1e012104b0be52047ad",
-    "src/runtime/tool-repeat-breaker.ts": "9573710e31a85b8b3d66e0e81a986e879efdd0082bba244da20f4213ebb2227b",
+    "src/runtime/tool-repeat-breaker.ts": "f998cc13dd983858b65fa3ab43a2caaa2c4bdd53fb4ab3e30c15013e0788256e",
     "src/runtime/version.ts": "55adb4951c5ba9470892eb0a282f7ecafac499c14739f12127d4ba6ae561d762",
     "src/runtime/web-coding-tools.ts": "b8f66ff57f8145b7fd9a1b49523484959d6dd386d93d8c48e54ffe7a71dab219",
     "src/sandbox/fixture-catalog.ts": "87ec44f57d4bff81b3d82b19732d1687522795a844cd468b824c6ecb094888bf",
@@ -1074,7 +1074,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 64,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
       ]
@@ -3109,8 +3109,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 827,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 831,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -3125,8 +3125,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 894,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 898,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -3141,8 +3141,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 587,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 591,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -3158,8 +3158,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 677,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 681,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -3174,8 +3174,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 720,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 724,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -3190,8 +3190,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 715,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 719,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -15027,8 +15027,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 516,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 520,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -15043,7 +15043,8 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
-        "packages/materials/tests/single-agent-loop.test.ts"
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -15056,8 +15057,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 528,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 532,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -15103,8 +15104,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 520,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 524,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -15128,7 +15129,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 93,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -15191,8 +15192,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 524,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 528,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -15212,8 +15213,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 456,
-      "moduleHash": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
+      "line": 460,
+      "moduleHash": "e214a8c7660ba62c0cc7e23c3c50d67de4c0d424adf2db5783051854ff50e2ce",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -15257,7 +15258,8 @@
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
-        "packages/materials/tests/single-agent-loop.test.ts"
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {

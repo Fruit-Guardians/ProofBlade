@@ -675,7 +675,10 @@ function ReasoningForest({ detail }: { detail: RunDetail }) {
   for (const tree of trees) for (const nodeId of tree.nodeIds) usage.set(nodeId, [...(usage.get(nodeId) ?? []), tree.id]);
   const organized = new Set(trees.flatMap((tree) => tree.nodeIds));
   const orphaned = Object.values(detail.snapshot.reasoningNodes).filter((node) => !organized.has(node.id));
-  if (trees.length === 0) return <EvidenceChain detail={detail} />;
+  if (trees.length === 0) {
+    if (orphaned.length === 0) return <EvidenceChain detail={detail} />;
+    return <section className="reasoning-forest-section"><div className="section-head"><div><GitBranch size={14} /><strong>推理节点</strong><span>{orphaned.length} 个待整理节点</span></div></div><div className="reasoning-forest"><details className="forest-orphans" open><summary><Link2 size={13} /><span><strong>尚未整理的图节点</strong><small>这些节点来自已总结的 Artifact/Evidence，尚未形成推理树</small></span><em>{orphaned.length}</em><ChevronRight size={14} /></summary><div className="reasoning-node-list">{orphaned.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={new Set(orphaned.map((item) => item.id))} />)}</div></details></div></section>;
+  }
   return <section className="reasoning-forest-section"><div className="section-head"><div><GitBranch size={14} /><strong>推理森林</strong><span>{trees.length} 棵树 · {usage.size} 个节点 · {[...usage.values()].filter((ids) => ids.length > 1).length} 个共享节点</span></div></div><div className="reasoning-forest">
     {trees.map((tree) => <ReasoningTreeView key={tree.id} detail={detail} tree={tree} usage={usage} />)}
     {orphaned.length > 0 && <details className="forest-orphans"><summary><Link2 size={13} /><span><strong>尚未整理的图节点</strong><small>可由 Evidence Curator 纳入一棵或多棵推理树</small></span><em>{orphaned.length}</em><ChevronRight size={14} /></summary><div className="reasoning-node-list">{orphaned.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={new Set(orphaned.map((item) => item.id))} />)}</div></details>}
