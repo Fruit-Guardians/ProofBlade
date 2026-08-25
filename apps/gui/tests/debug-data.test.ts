@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { JsonlControlStore, SingleAgentCtfLoop } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
-import type { ChatStreamEvent } from "../src/shared.js";
+import type { ChatStreamEvent, RunDetail } from "../src/shared.js";
 
 const entries = [
   { type: "message", id: "user-1", timestamp: "2026-08-05T00:00:00.000Z", message: { role: "user", content: [{ type: "text", text: "inspect" }] } },
@@ -636,7 +636,82 @@ test("GUI Fixture solve uses the shared verifier-first Run path and replays term
   }
 });
 
-test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once] GUI close aborts each Coding lane once and awaits it", async () => {
+test("GUI CTF input stages attachments and completes through the shared reproduction path", { timeout: 30_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-workspace-"));
+  const source = join(root, "source");
+  const candidate = "PB{gui_workspace_reproduction}";
+  const command = process.platform === "win32" ? "type attachments\\answer.txt" : "cat attachments/answer.txt";
+  await mkdir(source, { recursive: true });
+  await writeFile(join(source, "answer.txt"), `${candidate}\n`, "utf8");
+  let data: DebugDataService | undefined;
+  try {
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async ({ claimVerifier, fixture, runId }) => ({
+      async prompt() {
+        await claimVerifier.record({ candidate, command, cwd: fixture.path, toolCallId: `${runId}-verify` });
+        return { text: `verified ${candidate}`, stopReason: "stop", usage: zeroUsage() };
+      },
+      async abort() {},
+      async compact() {},
+      async isIdle() { return true; },
+      async close() {},
+    }));
+    const runId = "GUI-CTF-WORKSPACE-001";
+    await data.startCtfSolve({ runId, objective: "从附件中恢复候选。", workspacePath: source, attachmentPaths: ["answer.txt"], targetKind: "misc", verificationCommand: command, mode: "auto", maxTurns: 1 });
+    let detail: RunDetail | undefined;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      detail = await data.getRun(runId);
+      if (["SUCCEEDED", "FAILED", "PAUSED", "EXHAUSTED"].includes(detail.snapshot.status)) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(detail?.snapshot.status, "SUCCEEDED");
+    assert.equal(detail?.snapshot.task.target, "LOCAL_WORKSPACE:misc");
+    assert.deepEqual(detail?.snapshot.task.inputs.map((item) => item.path), ["attachments/answer.txt"]);
+    assert.ok(Object.values(detail?.snapshot.effects ?? {}).some((effect) => effect.operation === "claim_reproduction" && effect.producerLane === "verifier"));
+    assert.equal(Object.values(detail?.snapshot.effects ?? {}).some((effect) => effect.operation === "fixture_score"), false);
+    assert.ok(Object.values(detail?.snapshot.artifacts ?? {}).some((artifact) => artifact.path.endsWith("report.md")));
+  } finally {
+    await data?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GUI CTF chat resumes the same RunCoordinator loop with the latest user instruction", { timeout: 30_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-chat-"));
+  const source = join(root, "source");
+  await mkdir(source, { recursive: true });
+  const prompts: string[] = [];
+  let data: DebugDataService | undefined;
+  try {
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => ({
+      async prompt(prompt) {
+        prompts.push(prompt);
+        return { text: "本轮只完成了侦察", stopReason: "stop", usage: zeroUsage() };
+      },
+      async abort() {},
+      async compact() {},
+      async isIdle() { return true; },
+      async close() {},
+    }));
+    const runId = "GUI-CTF-CHAT-001";
+    const command = process.platform === "win32" ? "type challenge.md" : "cat challenge.md";
+    await data.startCtfSolve({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if ((await data.getRun(runId)).snapshot.status === "PAUSED") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
+    const events: ChatStreamEvent[] = [];
+    await data.chat(runId, "继续检查附件中的约束", (event) => events.push(event));
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1]!, /继续检查附件中的约束/);
+    assert.ok(events.some((event) => event.type === "paused"));
+  } finally {
+    await data?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once] [contract:solver-abort-exactly-once] GUI close aborts each Coding lane once and awaits it", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-close-"));
   let releasePrompt!: () => void;
   let closeFinished!: () => void;

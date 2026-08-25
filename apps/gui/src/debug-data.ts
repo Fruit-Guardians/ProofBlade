@@ -31,6 +31,7 @@ import {
   type AgentLaneFactory,
   type TaskContract,
 } from "@proofblade/materials";
+import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
 import type {
   ActiveRunInfo,
   AssistantTurnDebug,
@@ -286,43 +287,58 @@ export class DebugDataService {
   public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
     assertRunId(input.runId);
-    const current = this.active.get(input.runId);
-    if (current && current.state !== "failed") throw new Error(`Run is already active: ${input.runId}`);
     const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
     await this.ensureRunCreated(input.runId, task);
+    return await this.startCtfTask(task, input.mode, input.maxTurns);
+  }
+
+  /** Start an arbitrary attachment-backed CTF Run through the same durable loop as Fixture and Competition. */
+  public async startCtfSolve(input: CtfWorkspaceInput & { mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
-    const info: ActiveRunInfo = { runId: input.runId, startedAt: new Date().toISOString(), state: "running" };
-    this.active.set(input.runId, info);
+    assertRunId(input.runId);
+    if (this.active.has(input.runId)) throw new Error(`Run is already active: ${input.runId}`);
+    await this.assertRunDoesNotExist(input.runId);
+    const task = await stageCtfWorkspace(input, this.services.runsRoot);
+    await this.ensureRunCreated(input.runId, task);
+    return await this.startCtfTask(task, input.mode, input.maxTurns);
+  }
+
+  private async startCtfTask(task: TaskContract, mode: "auto" | "assist", maxTurns?: number): Promise<ActiveRunInfo> {
+    const current = this.active.get(task.task_id);
+    if (current && current.state !== "failed") throw new Error(`Run is already active: ${task.task_id}`);
+    this.assertOpen();
+    const info: ActiveRunInfo = { runId: task.task_id, startedAt: new Date().toISOString(), state: "running" };
+    this.active.set(task.task_id, info);
     const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane);
     const controller = new AbortController();
     const runPromise = loop.run({
-      runId: input.runId,
+      runId: task.task_id,
       task,
-      mode: input.mode,
-      maxTurns: input.maxTurns,
+      mode,
+      maxTurns,
       signal: controller.signal,
       onLaneReady: async (lane) => {
-        this.activeLanes.set(input.runId, lane);
-        if (this.pauseRequests.has(input.runId)) {
-          await this.ensurePaused(input.runId, "Paused by user");
+        this.activeLanes.set(task.task_id, lane);
+        if (this.pauseRequests.has(task.task_id)) {
+          await this.ensurePaused(task.task_id, "Paused by user");
           await lane.abort("Paused by user");
         }
       },
     }).then(() => {
-      this.active.delete(input.runId);
+      this.active.delete(task.task_id);
     }).catch((error: unknown) => {
       if (controller.signal.aborted && error instanceof Error && error.message === "Run aborted") {
-        this.active.delete(input.runId);
+        this.active.delete(task.task_id);
         return;
       }
-      this.active.set(input.runId, { ...info, state: "failed", error: error instanceof Error ? error.message : String(error) });
+      this.active.set(task.task_id, { ...info, state: "failed", error: error instanceof Error ? error.message : String(error) });
       throw error;
     }).finally(() => {
-      this.activeLanes.delete(input.runId);
-      this.pauseRequests.delete(input.runId);
-      if (this.solveTasks.get(input.runId)?.promise === runPromise) this.solveTasks.delete(input.runId);
+      this.activeLanes.delete(task.task_id);
+      this.pauseRequests.delete(task.task_id);
+      if (this.solveTasks.get(task.task_id)?.promise === runPromise) this.solveTasks.delete(task.task_id);
     });
-    this.solveTasks.set(input.runId, { controller, promise: runPromise });
+    this.solveTasks.set(task.task_id, { controller, promise: runPromise });
     void runPromise.catch(() => undefined);
     return info;
   }
@@ -396,7 +412,13 @@ export class DebugDataService {
     assertRunId(runId);
     const text = prompt.trim();
     if (!text) throw new Error("Prompt is required");
-    if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
+    const active = this.active.get(runId);
+    if (active) {
+      const solveTask = this.solveTasks.get(runId);
+      const pausedSnapshot = solveTask ? await this.services.control.snapshot(runId) : undefined;
+      if (solveTask && pausedSnapshot?.status === "PAUSED") await solveTask.promise.catch(() => undefined);
+      if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
+    }
     const snapshot = await this.services.control.snapshot(runId);
     this.assertOpen();
     if (["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
@@ -411,6 +433,38 @@ export class DebugDataService {
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
+      if (snapshot.task.mode === "ctf_solve") {
+        let ctfOutcome: AgentOutcome | undefined;
+        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane);
+        const result = await loop.run({
+          runId,
+          task: snapshot.task,
+          mode: "assist",
+          maxTurns: 1,
+          userPrompt: text,
+          onTurn: (outcome) => { ctfOutcome = outcome; },
+          onEvent: (event) => emitAgentEvent(event, emit),
+          onLaneReady: async (activeLane) => {
+            this.activeLanes.set(runId, activeLane);
+            if (this.pauseRequests.has(runId)) {
+              await this.ensurePaused(runId, "Paused by user");
+              await activeLane.abort("Paused by user");
+            }
+          },
+        });
+        if (result.status === "PAUSED" || this.pauseRequests.has(runId)) {
+          emit({ type: "paused", runId });
+          return;
+        }
+        emit({
+          type: "done",
+          text: ctfOutcome?.text ?? `CTF turn finished with ${result.status}.`,
+          stopReason: ctfOutcome?.stopReason ?? result.status.toLowerCase(),
+          usage: normalizeUsage(ctfOutcome?.usage) ?? emptyUsage(),
+          claimVerification: ctfOutcome?.claimVerification,
+        });
+        return;
+      }
       if (runKind(snapshot.task) === "chat") {
         const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
         const challengeClassification = classifyChallengePrompt(text, projectRoot);

@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-24T22:00:00+08:00
+> 状态更新时间：2026-08-25T12:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-001 | 2026-08-25T12:30:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260824-001 | 2026-08-24T22:00:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260823-001 | 2026-08-23T12:00:00+08:00 | PLAN-002 | feat/api-index-onboarding | 本条记录所在提交 |
 | UPDATE-20260820-002 | 2026-08-20T12:15:00+08:00 | PLAN-220, PLAN-120 | codex/request-epoch-audit | 本条记录所在提交 |
@@ -40,6 +41,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-001
+
+时间：2026-08-25T12:30:00+08:00
+
+摘要：把 GUI 的题目描述与附件输入接入统一的 durable CTF Run，并修复暂停后对话续解的活动状态竞态。
+
+### 变更
+
+- 新增 CTF 解题输入对话框与 /api/ctf-solve，校验工作区、附件边界、哈希和不可变验证命令
+- GUI CTF、Fixture 和 Competition 继续共用 SingleAgentCtfLoop、RunCoordinator 与 verifier-first 完成路径
+- 工作区附件使用 LOCAL_WORKSPACE 目标和持久化 staging，避免依赖 fixture scorer；接受 claim 后补齐 reproduction/report/submission
+- 修复 assist CTF 暂停后聊天续解等待旧 Solve promise 清理的竞态，并增加 GUI/Materials 端到端回归测试
+
+### 验证
+
+- [x] npm run verify passed
+- [x] CI gates: 10/10 passed
+- [x] Repository tests: 582/582 passed
+- [x] Provider-free evaluation: 30/30 passed
+- [x] npm audit --omit=dev: 0 vulnerabilities
 
 ## UPDATE-20260824-001
 

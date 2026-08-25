@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startCtfSolve, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
@@ -73,6 +73,7 @@ export function App() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
+  const [ctfOpen, setCtfOpen] = useState(false);
   const [fixtureOpen, setFixtureOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [capabilityOpen, setCapabilityOpen] = useState(false);
@@ -188,7 +189,7 @@ export function App() {
     <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button></div>
+      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button><button className="fixture-test-button" onClick={() => setCtfOpen(true)}><Zap size={15} />CTF 解题</button></div>
       <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
       <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
@@ -252,6 +253,7 @@ export function App() {
       {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
+    {ctfOpen && <CtfSolveModal defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setCtfOpen(false)} onCreated={(id) => { setCtfOpen(false); setRunKindFilter("fixture"); setStatusFilter("ALL"); setRunId(id); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
@@ -1039,6 +1041,37 @@ function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }:
     try { await createConversation({ runId, title, folderId: folderId || undefined, workspacePath }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
+}
+
+function CtfSolveModal({ defaultWorkspace, onClose, onCreated }: { defaultWorkspace: string; onClose(): void; onCreated(id: string): void }) {
+  const [runId, setRunId] = useState(`CTF-${Date.now()}`);
+  const [objective, setObjective] = useState("");
+  const [workspacePath, setWorkspacePath] = useState(defaultWorkspace);
+  const [attachments, setAttachments] = useState("");
+  const [targetKind, setTargetKind] = useState("unknown");
+  const [verificationCommand, setVerificationCommand] = useState("");
+  const [mode, setMode] = useState<"assist" | "auto">("assist");
+  const [maxTurns, setMaxTurns] = useState(6);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try {
+      await startCtfSolve({
+        runId,
+        objective,
+        workspacePath,
+        attachmentPaths: attachments.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
+        targetKind,
+        verificationCommand,
+        mode,
+        maxTurns,
+      });
+      onCreated(runId);
+    } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Zap size={17} /><strong>CTF 解题 Run</strong><span className="modal-subtitle">题目、附件和验证命令一次绑定</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>Run ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>题目描述</span><textarea required rows={5} value={objective} onChange={(event) => setObjective(event.target.value)} placeholder="粘贴完整题目描述、目标和约束" autoFocus /></label><label><span>原始工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>附件位置</span><textarea rows={3} value={attachments} onChange={(event) => setAttachments(event.target.value)} placeholder="每行一个路径（相对或绝对，但必须位于工作目录内）" /></label><div className="modal-row"><label><span>方向</span><select value={targetKind} onChange={(event) => setTargetKind(event.target.value)}>{[["unknown", "自动识别"], ["web", "Web"], ["pwn", "Pwn"], ["reverse", "Reverse"], ["crypto", "Crypto"], ["misc", "Misc"]].map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div><label><span>任务验证命令（必须从附件推导并逐行输出候选）</span><textarea required rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：python solve.py | tail -n 1" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !objective.trim() || !workspacePath.trim() || !verificationCommand.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}启动 verifier-first Run</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
 }
 
 function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath: string; onClose(): void; onSelect(path: string): void | Promise<void> }) {

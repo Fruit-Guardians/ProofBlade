@@ -69,6 +69,19 @@ export async function startSolve(input: { runId: string; fixtureId: string; mode
   return await request("/api/solve", { method: "POST", body: JSON.stringify(input) });
 }
 
+export async function startCtfSolve(input: {
+  runId: string;
+  objective: string;
+  workspacePath: string;
+  attachmentPaths: string[];
+  targetKind?: string;
+  verificationCommand: string;
+  mode: "auto" | "assist";
+  maxTurns: number;
+}): Promise<ActiveRunInfo> {
+  return await request("/api/ctf-solve", { method: "POST", body: JSON.stringify(input) });
+}
+
 export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }

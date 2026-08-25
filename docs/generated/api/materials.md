@@ -457,7 +457,7 @@
 - Export: `@proofblade/materials`
 - Summary: Durable orchestration boundary shared by every ProofBlade entrypoint.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/competition-convergence.test.ts`
+- Tests: `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
 
 ### RunWorkScheduler
 - Kind: `class`
@@ -471,7 +471,7 @@
 ### SingleAgentCtfLoop
 - Kind: `class`
 - Signature: `SingleAgentCtfLoop`
-- Source: [src/orchestration/single-agent-loop.ts:68](../../../packages/materials/src/orchestration/single-agent-loop.ts:68)
+- Source: [src/orchestration/single-agent-loop.ts:73](../../../packages/materials/src/orchestration/single-agent-loop.ts:73)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent ctf loop class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -569,7 +569,7 @@
 ### LocalFixtureSandbox
 - Kind: `class`
 - Signature: `LocalFixtureSandbox`
-- Source: [src/sandbox/fixture.ts:52](../../../packages/materials/src/sandbox/fixture.ts:52)
+- Source: [src/sandbox/fixture.ts:54](../../../packages/materials/src/sandbox/fixture.ts:54)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: local fixture sandbox class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3661,7 +3661,7 @@
 ### SingleAgentRunOptions
 - Kind: `interface`
 - Signature: `SingleAgentRunOptions`
-- Source: [src/orchestration/single-agent-loop.ts:39](../../../packages/materials/src/orchestration/single-agent-loop.ts:39)
+- Source: [src/orchestration/single-agent-loop.ts:40](../../../packages/materials/src/orchestration/single-agent-loop.ts:40)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent run options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3669,7 +3669,7 @@
 ### SingleAgentRunOutcome
 - Kind: `interface`
 - Signature: `SingleAgentRunOutcome`
-- Source: [src/orchestration/single-agent-loop.ts:58](../../../packages/materials/src/orchestration/single-agent-loop.ts:58)
+- Source: [src/orchestration/single-agent-loop.ts:63](../../../packages/materials/src/orchestration/single-agent-loop.ts:63)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent run outcome type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3945,7 +3945,7 @@
 ### FixtureHealth
 - Kind: `interface`
 - Signature: `FixtureHealth`
-- Source: [src/sandbox/fixture.ts:25](../../../packages/materials/src/sandbox/fixture.ts:25)
+- Source: [src/sandbox/fixture.ts:27](../../../packages/materials/src/sandbox/fixture.ts:27)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture health type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3953,7 +3953,7 @@
 ### FixtureReconcileResult
 - Kind: `interface`
 - Signature: `FixtureReconcileResult`
-- Source: [src/sandbox/fixture.ts:32](../../../packages/materials/src/sandbox/fixture.ts:32)
+- Source: [src/sandbox/fixture.ts:34](../../../packages/materials/src/sandbox/fixture.ts:34)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture reconcile result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3977,7 +3977,7 @@
 ### SandboxPort
 - Kind: `interface`
 - Signature: `SandboxPort`
-- Source: [src/sandbox/fixture.ts:39](../../../packages/materials/src/sandbox/fixture.ts:39)
+- Source: [src/sandbox/fixture.ts:41](../../../packages/materials/src/sandbox/fixture.ts:41)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: sandbox port type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4747,7 +4747,7 @@
 - Export: `@proofblade/materials`
 - Summary: Start a fresh durable recording session.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CompetitionApiJournal.replay
 - Kind: `method`
@@ -4999,7 +4999,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ExperimentGate.runExclusive
 - Kind: `method`
@@ -5392,7 +5392,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: write operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/exact-endpoint.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/exact-endpoint.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### CheckpointService.create
 - Kind: `method`
@@ -6283,7 +6283,7 @@
 - Export: `@proofblade/materials`
 - Summary: Claim one durable executor WorkItem for a model turn.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RunCoordinator.domainPhaseForTurn
 - Kind: `method`
@@ -6376,7 +6376,7 @@
 - Export: `@proofblade/materials`
 - Summary: Selects or creates one executor item and acquires its durable lease.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RunWorkScheduler.complete
 - Kind: `method`
@@ -6416,7 +6416,7 @@
 ### SingleAgentCtfLoop.run
 - Kind: `method`
 - Signature: `(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome>`
-- Source: [src/orchestration/single-agent-loop.ts:76](../../../packages/materials/src/orchestration/single-agent-loop.ts:76)
+- Source: [src/orchestration/single-agent-loop.ts:81](../../../packages/materials/src/orchestration/single-agent-loop.ts:81)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6748,7 +6748,7 @@
 ### LocalFixtureSandbox.build
 - Kind: `method`
 - Signature: `(task: TaskContract): Promise<FixtureRef>`
-- Source: [src/sandbox/fixture.ts:61](../../../packages/materials/src/sandbox/fixture.ts:61)
+- Source: [src/sandbox/fixture.ts:63](../../../packages/materials/src/sandbox/fixture.ts:63)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6757,7 +6757,7 @@
 ### LocalFixtureSandbox.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/sandbox/fixture.ts:157](../../../packages/materials/src/sandbox/fixture.ts:157)
+- Source: [src/sandbox/fixture.ts:163](../../../packages/materials/src/sandbox/fixture.ts:163)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6766,7 +6766,7 @@
 ### LocalFixtureSandbox.destroy
 - Kind: `method`
 - Signature: `(_fixture: FixtureRef): Promise<void>`
-- Source: [src/sandbox/fixture.ts:153](../../../packages/materials/src/sandbox/fixture.ts:153)
+- Source: [src/sandbox/fixture.ts:159](../../../packages/materials/src/sandbox/fixture.ts:159)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: destroy operation used to read or inspect state.
 - Summary source: `inferred`
@@ -6775,7 +6775,7 @@
 ### LocalFixtureSandbox.execute
 - Kind: `method`
 - Signature: `(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>`
-- Source: [src/sandbox/fixture.ts:86](../../../packages/materials/src/sandbox/fixture.ts:86)
+- Source: [src/sandbox/fixture.ts:90](../../../packages/materials/src/sandbox/fixture.ts:90)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: execute operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6784,7 +6784,7 @@
 ### LocalFixtureSandbox.health
 - Kind: `method`
 - Signature: `(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>`
-- Source: [src/sandbox/fixture.ts:118](../../../packages/materials/src/sandbox/fixture.ts:118)
+- Source: [src/sandbox/fixture.ts:122](../../../packages/materials/src/sandbox/fixture.ts:122)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: health operation used to read or inspect state.
 - Summary source: `inferred`
@@ -6793,7 +6793,7 @@
 ### LocalFixtureSandbox.reconcile
 - Kind: `method`
 - Signature: `(effect: Effect): Promise<ReconcileResult>`
-- Source: [src/sandbox/fixture.ts:113](../../../packages/materials/src/sandbox/fixture.ts:113)
+- Source: [src/sandbox/fixture.ts:117](../../../packages/materials/src/sandbox/fixture.ts:117)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reconcile operation used to read or inspect state.
 - Summary source: `inferred`
@@ -6802,7 +6802,7 @@
 ### LocalFixtureSandbox.reconcileFixture
 - Kind: `method`
 - Signature: `(task: TaskContract, expectedGeneration: number, beforeReset?: () => Promise<void>): Promise<FixtureReconcileResult>`
-- Source: [src/sandbox/fixture.ts:136](../../../packages/materials/src/sandbox/fixture.ts:136)
+- Source: [src/sandbox/fixture.ts:140](../../../packages/materials/src/sandbox/fixture.ts:140)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reconcile fixture operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6810,7 +6810,7 @@
 ### LocalFixtureSandbox.reset
 - Kind: `method`
 - Signature: `(fixture: FixtureRef): Promise<number>`
-- Source: [src/sandbox/fixture.ts:78](../../../packages/materials/src/sandbox/fixture.ts:78)
+- Source: [src/sandbox/fixture.ts:82](../../../packages/materials/src/sandbox/fixture.ts:82)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reset operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6819,7 +6819,7 @@
 ### LocalFixtureSandbox.resolveReplayPolicy
 - Kind: `method`
 - Signature: `(_operation: string, requested: ReplayPolicy): ReplayPolicy`
-- Source: [src/sandbox/fixture.ts:57](../../../packages/materials/src/sandbox/fixture.ts:57)
+- Source: [src/sandbox/fixture.ts:59](../../../packages/materials/src/sandbox/fixture.ts:59)
 - Export: `@proofblade/materials`
 - Summary: Resolve the durable replay policy before an Effect is proposed.
 - Summary source: `tsdoc`
@@ -7411,7 +7411,7 @@
 - Export: `@proofblade/materials`
 - Summary: Execute and attest a claim through a journaled verifier Effect.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CodingClaimVerifier.recordVerifierEvidence
 - Kind: `method`
@@ -8088,7 +8088,7 @@
 ### AgentLaneFactory
 - Kind: `type`
 - Signature: `AgentLaneFactory`
-- Source: [src/orchestration/single-agent-loop.ts:37](../../../packages/materials/src/orchestration/single-agent-loop.ts:37)
+- Source: [src/orchestration/single-agent-loop.ts:38](../../../packages/materials/src/orchestration/single-agent-loop.ts:38)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: agent lane factory type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -8137,7 +8137,7 @@
 ### FixtureHealthStatus
 - Kind: `type`
 - Signature: `FixtureHealthStatus`
-- Source: [src/sandbox/fixture.ts:23](../../../packages/materials/src/sandbox/fixture.ts:23)
+- Source: [src/sandbox/fixture.ts:25](../../../packages/materials/src/sandbox/fixture.ts:25)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture health status type contract used to provide a reusable operation.
 - Summary source: `inferred`

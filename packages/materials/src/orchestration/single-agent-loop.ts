@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
-import type { AgentLanePort } from "../runtime/pi-adapter.js";
+import type { AgentLanePort, AgentOutcome } from "../runtime/pi-adapter.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AppServices } from "../app/demo.js";
 import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract } from "../domain/types.js";
@@ -32,6 +32,7 @@ export interface AgentLaneCreateInput {
   /** Safe claim service; the lane never receives verifier control directly. */
   claimVerifier: CodingClaimVerifier;
   config: ProofBladeConfig;
+  onEvent?: Parameters<typeof PiCodingLane.create>[0]["onEvent"];
 }
 
 export type AgentLaneFactory = (input: AgentLaneCreateInput) => Promise<AgentLanePort>;
@@ -53,6 +54,10 @@ export interface SingleAgentRunOptions {
    * user cancellation intentionally remains resumable and does not use this.
    */
   terminalizeAbort?: { reason: string; category: PrimaryFailureCategory };
+  /** Optional user instruction appended to the durable task prompt for one interactive turn. */
+  userPrompt?: string;
+  onTurn?: (outcome: AgentOutcome) => void | Promise<void>;
+  onEvent?: Parameters<typeof PiCodingLane.create>[0]["onEvent"];
 }
 
 export interface SingleAgentRunOutcome {
@@ -127,6 +132,13 @@ export class SingleAgentCtfLoop {
       }
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
+    const acceptedAtStart = latestAcceptedClaim(await this.services.control.snapshot(options.runId), options.task);
+    if (acceptedAtStart) {
+      const current = await this.services.control.snapshot(options.runId);
+      const workItem = Object.values(current.workItems).find((item) => item.status === "RUNNING" && item.ownerLane === "executor");
+      const verified = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedAtStart.id, workItem?.id, options.signal);
+      return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
+    }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
     await runtime.recoverJobs();
     let lane: AgentLanePort | undefined;
@@ -171,7 +183,8 @@ export class SingleAgentCtfLoop {
         activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(turnContext, turns, activeIntent));
+        const agentOutcome = await lane.prompt(turnPrompt(turnContext, turns, activeIntent, options.userPrompt));
+        await options.onTurn?.(agentOutcome);
         throwIfAborted(options.signal);
         if (agentOutcome.termination === "budget_exhausted" || agentOutcome.termination === "deadline_exhausted") {
           await coordinator.fail(options.runId, activeWorkItemId, agentOutcome.termination);
@@ -198,6 +211,12 @@ export class SingleAgentCtfLoop {
         }
         const after = await this.services.control.snapshot(options.runId);
         if (after.status === "PAUSED") break;
+        const acceptedClaim = latestAcceptedClaim(after, options.task);
+        if (acceptedClaim) {
+          verification = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedClaim.id, activeWorkItemId, options.signal);
+          activeWorkItemId = undefined;
+          break;
+        }
         const pending = latestPending(after);
         if (pending) {
           if (mode() === "assist") {
@@ -340,6 +359,62 @@ export class SingleAgentCtfLoop {
     return verified;
   }
 
+  /**
+   * A task-owned reproduction is already verified by CodingClaimVerifier's
+   * verifier journal before the loop observes the turn. Do not send it through
+   * the hidden-scorer verifier (which would be a different authority); finish
+   * the same durable report/submit edge from the accepted Completion instead.
+   */
+  private async finalizeAcceptedClaim(
+    runId: string,
+    coordinator: RunCoordinator,
+    scheduler: IntentScheduler,
+    completionId: string,
+    workItemId: string | undefined,
+    signal?: AbortSignal,
+  ): Promise<VerificationOutcome> {
+    throwIfAborted(signal);
+    const snapshot = await this.services.control.snapshot(runId);
+    const completion = snapshot.completions[completionId];
+    if (!completion || completion.status !== "ACCEPTED") throw new Error(`Task-owned completion is not accepted: ${completionId}`);
+    const artifact = snapshot.artifacts[completion.artifactId];
+    if (!artifact) throw new Error(`Task-owned completion candidate artifact is missing: ${completion.artifactId}`);
+    const candidate = (await this.services.artifacts.readText(runId, artifact)).trim();
+    const evidenceIds = [...completion.evidenceIds];
+    if (evidenceIds.length === 0) throw new Error(`Task-owned completion has no reproduction Evidence: ${completionId}`);
+    if (snapshot.domainPhase !== "REPORT" && snapshot.domainPhase !== "SUBMIT") {
+      await coordinator.setDomainPhase(runId, "REPRODUCE");
+      await coordinator.moveToPhase(runId, "verification");
+      await coordinator.moveToPhase(runId, "report");
+      await coordinator.setDomainPhase(runId, "REPORT");
+    }
+    const fact = Object.values(snapshot.facts).find((item) => item.status === "CONFIRMED" && item.evidenceIds.some((evidenceId) => evidenceIds.includes(evidenceId)));
+    const report = [
+      "# ProofBlade verification report",
+      "",
+      `Run: ${runId}`,
+      `Completion: ${completion.id}`,
+      `Candidate: ${candidate}`,
+      `Candidate SHA-256: ${completion.candidateHash}`,
+      `Evidence: ${evidenceIds.join(", ")}`,
+      `Fact: ${fact?.id ?? "none"}`,
+      `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
+      "Verification authority: task-owned reproduction command.",
+    ].join("\n");
+    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+    const current = await this.services.control.snapshot(runId);
+    for (const intent of this.claimedSchedulerIntents(current)) {
+      await scheduler.completeIntent(runId, intent.id, {
+        producedObservations: Object.keys(current.observations),
+        producedEvidence: evidenceIds,
+        producedFacts: Object.keys(current.facts),
+      });
+    }
+    throwIfAborted(signal);
+    await coordinator.finishAccepted(runId, workItemId, completion.id, "Task-owned reproduction command accepted the candidate.");
+    return { completionId: completion.id, accepted: true, candidate, candidateHash: completion.candidateHash, evidenceIds, ...(fact ? { factId: fact.id } : {}) };
+  }
+
   private async ensureVerifierActive(runId: string, signal?: AbortSignal): Promise<void> {
     throwIfAborted(signal);
     if ((await this.services.control.snapshot(runId)).status === "PAUSED") throw new Error("Run paused during verification");
@@ -406,6 +481,7 @@ async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLan
     config: input.config,
     deferClaimAcceptance: true,
     sessionId: `${input.runId}-coding`,
+    ...(input.onEvent ? { onEvent: input.onEvent } : {}),
   });
 }
 
@@ -413,7 +489,14 @@ function latestPending(snapshot: RunSnapshot) {
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
-function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent): string {
+function latestAcceptedClaim(snapshot: RunSnapshot, task: TaskContract) {
+  if (task.verification.kind !== "reproduction") return undefined;
+  return Object.values(snapshot.completions)
+    .filter((item) => item.status === "ACCEPTED" && item.purpose === "claim_reproduction" && item.generation === snapshot.generation)
+    .sort((a, b) => b.createdSeq - a.createdSeq)[0];
+}
+
+function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
   const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
@@ -421,6 +504,7 @@ function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerInten
     `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`,
     `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
+    ...(userPrompt?.trim() ? ["User's latest challenge instruction:", userPrompt.trim()] : []),
     "Inspect every visible target file with read or a bounded bash command; do not guess from the task description.",
     "Preserve useful Artifact/Evidence ids and use them to support your reasoning.",
     "When a candidate is ready, call verify_claim with the exact candidate and a deterministic command that derives it from workspace inputs without embedding the candidate literal.",

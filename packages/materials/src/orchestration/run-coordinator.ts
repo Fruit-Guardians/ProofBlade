@@ -131,15 +131,20 @@ export class RunCoordinator {
     if (isTerminal(snapshot.status)) throw new Error(`Cannot finish accepted completion in terminal run ${snapshot.status}`);
     const completion = snapshot.completions[completionId];
     if (!completion || completion.status !== "ACCEPTED") throw new Error(`Completion ${completionId} is not ACCEPTED`);
-    await this.moveToPhase(runId, "report");
-    await this.setDomainPhase(runId, "REPORT");
-    if (snapshot.task.verification.kind === "platform_submission") {
-      // completeForSubmission includes the phase change in the same durable
-      // transaction as WorkItem completion; do not emit a duplicate event.
-      await this.scheduler.completeForSubmission(runId, workItemId);
-    } else {
-      await this.setDomainPhase(runId, "SUBMIT");
-      await this.scheduler.complete(runId, workItemId, await this.control.snapshot(runId));
+    // A crash can occur after the SUBMIT projection and WorkItem settlement but
+    // before verifier.finish.  SUBMIT is monotonic, so do not backtrack to
+    // REPORT during recovery; the verifier finish is the only missing edge.
+    if (snapshot.domainPhase !== "SUBMIT") {
+      await this.moveToPhase(runId, "report");
+      await this.setDomainPhase(runId, "REPORT");
+      if (snapshot.task.verification.kind === "platform_submission") {
+        // completeForSubmission includes the phase change in the same durable
+        // transaction as WorkItem completion; do not emit a duplicate event.
+        await this.scheduler.completeForSubmission(runId, workItemId);
+      } else {
+        await this.setDomainPhase(runId, "SUBMIT");
+        await this.scheduler.complete(runId, workItemId, await this.control.snapshot(runId));
+      }
     }
     await this.verifierControl.finish(runId, { completionId, reason });
   }

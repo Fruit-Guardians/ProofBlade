@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -263,6 +263,55 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
     assert.notEqual(snapshot.status, "EXHAUSTED");
   } finally {
     await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("attachment-backed reproduction completion finishes through RunCoordinator without fixture_score", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-workspace-reproduction-"));
+  const workspace = join(root, ".proofblade-workspaces", "WORKSPACE-REPRO");
+  const command = process.platform === "win32" ? "type attachments\\answer.txt" : "cat attachments/answer.txt";
+  const candidate = "PB{workspace_reproduction}";
+  await mkdir(join(workspace, "attachments"), { recursive: true });
+  await writeFile(join(workspace, "attachments", "answer.txt"), `${candidate}\n`, "utf8");
+  await writeFile(join(workspace, "challenge.md"), "workspace reproduction\n", "utf8");
+  const task = {
+    schema_version: 1 as const,
+    task_id: "WORKSPACE-REPRO",
+    mode: "ctf_solve" as const,
+    target_kind: "misc" as const,
+    target: "LOCAL_WORKSPACE:misc",
+    objective: "Derive the candidate from the attachment.",
+    inputs: [{ path: "attachments/answer.txt", sha256: sha256(candidate + "\n"), read_only: true }],
+    success_criteria: ["Task-owned command derives the candidate."],
+    verification: { kind: "reproduction" as const, command, required_reproductions: 1 },
+    scope: { allowed_hosts: [], allowed_ports: [], external_network: false, allowed_workspace: workspace },
+    pause_policy: [],
+    constraints: { deadline_ms: 300_000, max_cost_usd: 0, max_tool_calls: 40, max_submissions: 0 },
+  };
+  try {
+    const services = createServices(root, config);
+    const lane: AgentLaneFactory = async ({ claimVerifier, fixture, runId }) => ({
+      async prompt() {
+        await claimVerifier.record({ candidate, command, cwd: fixture.path, toolCallId: `${runId}-verify` });
+        return { text: `verified ${candidate}`, stopReason: "stop", usage: zeroUsage() };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({ runId: task.task_id, task, mode: "auto", maxTurns: 1 });
+    const snapshot = await services.control.snapshot(task.task_id);
+    assert.equal(result.status, "SUCCEEDED");
+    assert.equal(snapshot.domainPhase, "SUBMIT");
+    assert.equal(snapshot.finalResult?.completionId, result.completionId);
+    assert.ok(Object.values(snapshot.effects).some((effect) => effect.operation === "claim_reproduction" && effect.producerLane === "verifier"));
+    assert.equal(Object.values(snapshot.effects).some((effect) => effect.operation === "fixture_score"), false);
+    assert.ok(Object.values(snapshot.artifacts).some((artifact) => artifact.path.endsWith("report.md")));
+    assert.ok(Object.values(snapshot.evidence).every((evidence) => evidence.provenance.generation === snapshot.generation));
+    await services.sandbox.close();
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -199,6 +199,25 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("maxTurns must be a positive integer");
     return sendJson(response, 202, await data.startSolve({ runId: string(body.runId, "runId"), fixtureId: string(body.fixtureId, "fixtureId"), mode, maxTurns }));
   }
+  if (method === "POST" && url.pathname === "/api/ctf-solve") {
+    const body = await readBody(request);
+    const mode = body.mode === "auto" ? "auto" : "assist";
+    const maxTurns = body.maxTurns === undefined ? undefined : Number(body.maxTurns);
+    if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 20)) throw new Error("maxTurns must be an integer between 1 and 20");
+    const targetKind = optionalString(body.targetKind);
+    if (targetKind !== undefined && !["unknown", "web", "reverse", "pwn", "crypto", "misc", "mixed"].includes(targetKind)) throw new Error("targetKind is invalid");
+    const workspacePath = await requireDirectory(string(body.workspacePath, "workspacePath"));
+    return sendJson(response, 202, await data.startCtfSolve({
+      runId: string(body.runId, "runId"),
+      objective: string(body.objective, "objective"),
+      workspacePath,
+      attachmentPaths: stringArray(body.attachmentPaths),
+      ...(targetKind === undefined ? {} : { targetKind: targetKind as import("@proofblade/materials").TargetKind }),
+      verificationCommand: string(body.verificationCommand, "verificationCommand"),
+      mode,
+      maxTurns,
+    }));
+  }
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
