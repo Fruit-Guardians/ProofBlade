@@ -1,12 +1,17 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-24T22:00:00+08:00
+> 状态更新时间：2026-08-25T13:20:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-005 | 2026-08-25T13:20:00+08:00 | PLAN-200 | codex/proofblade-agent-foundation | 本条记录所在提交 |
+| UPDATE-20260825-004 | 2026-08-25T13:05:00+08:00 | PLAN-200, PLAN-210 | codex/proofblade-agent-foundation | 本条记录所在提交 |
+| UPDATE-20260825-003 | 2026-08-25T12:50:00+08:00 | PLAN-110, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
+| UPDATE-20260825-002 | 2026-08-25T12:45:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
+| UPDATE-20260825-001 | 2026-08-25T12:30:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260824-001 | 2026-08-24T22:00:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260823-001 | 2026-08-23T12:00:00+08:00 | PLAN-002 | feat/api-index-onboarding | 本条记录所在提交 |
 | UPDATE-20260820-002 | 2026-08-20T12:15:00+08:00 | PLAN-220, PLAN-120 | codex/request-epoch-audit | 本条记录所在提交 |
@@ -40,6 +45,107 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-005
+
+时间：2026-08-25T13:20:00+08:00
+
+摘要：补齐真实评测的无密钥 Provider 配置模板和启动说明，降低 eval-real 配置错误风险。
+
+### 变更
+
+- 新增 OpenAI-compatible 与 Anthropic 两份可复制的 real-evaluation Provider 配置模板，显式包含 apiKeyEnv、预算字段和占位模型/价格
+- 在 .env.example 中增加真实评测专用环境变量名，不写入任何密钥
+- 评测文档明确模板中的价格是占位值，真实运行前必须替换为已发布价格并先执行 preflight
+
+### 验证
+
+- [x] loadConfig successfully validated both example Provider configs
+- [x] change-contract and project-report checks passed
+- [x] npm run api:index:check passed
+
+## UPDATE-20260825-004
+
+时间：2026-08-25T13:05:00+08:00
+
+摘要：把 P2 的 20+ holdout 管线交付与真实 Provider 能力门槛拆开记录，避免将 provider-free 结果误报为模型解题率。
+
+### 变更
+
+- 确认 fixtures/holdout/manifest.json 为 27 个 hash-bound case：Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1
+- 通过 eval-holdout 实跑两个本地变体各 27/27，记录 Evidence、Replay Parity、首次 Evidence、提交次数和候选脱敏指标，Provider 请求保持为 0
+- 保留真实 eval-real 的严格门槛：至少两个 Variant、20+ case、Web/Pwn 覆盖、真实 Provider telemetry、明确 token pricing 和 baseline/regression gate
+- 历史 24-case Web/Pwn 真实报告仍未通过 strict gate，因此 Planner/Refiner 继续停留在策略层，不引入第二条解题 lane
+
+### 验证
+
+- [x] npm run cli -- eval-holdout fixtures/holdout/manifest.json --attempts 1 --max-turns 1 --enforce-gate passed: both local variants 27/27
+- [x] holdout report passed candidate_leaks=0, replay/evidence parity=1 and providerRequests=0
+- [x] PR #77 GitHub CI passed: contracts, npm run verify, 583/583 tests and audit
+
+## UPDATE-20260825-003
+
+时间：2026-08-25T12:50:00+08:00
+
+摘要：把 Competition 的真实可见输入与统一提示边界接入 TaskContract，阻止模型从安装根或历史 runs 中寻找题目答案。
+
+### 变更
+
+- 平台附件和 connection-info.txt 以相对路径、只读标记和 SHA-256 写入 Competition TaskContract.inputs，任务哈希和 replay 绑定实际工作区输入
+- Competition solver 在动态 flag 与 Coding 路径都传递附件清单，避免两条路径生成不同的任务输入投影
+- Competition 首轮 prompt 显式列出只读输入并禁止搜索 ProofBlade 安装根、skills library、runs 和父目录
+- Sandbox 拒绝附件路径穿越，并增加 TaskContract 输入哈希与 Competition prompt 边界回归测试
+- 交接文档记录 583/583 回归结果和真实模型评测仍待凭据的边界
+
+### 验证
+
+- [x] Materials build passed
+- [x] Competition convergence, sandbox and solver tests: 39/39 passed
+- [x] component and change-contract gates passed
+- [x] npm run api:index:check passed
+- [x] npm run check:project-reports -- --base 7e00ead passed
+
+## UPDATE-20260825-002
+
+时间：2026-08-25T12:45:00+08:00
+
+摘要：修复真实评测中 verify_claim 成功后仍在同一 Provider 回合继续探索，导致 hidden scorer 未被外层 RunCoordinator 调用并最终超时。
+
+### 变更
+
+- 将 deferClaimAcceptance 接入 CodingResourceContext；Fixture/GUI 延迟验收模式下 verify_claim 返回 Pi terminate，立即交回统一 verifier-first 状态机
+- 保留 Competition 同回合 verify_claim 后继续 submit_flag 的行为，避免改变平台提交契约
+- 在 executor turn prompt 中显式列出只读输入并禁止搜索 ProofBlade 安装根、skills library、runs 和父目录，减少真实题目工作区漂移
+- 增加普通 Coding 与延迟验收两种 verify_claim 终止语义回归测试，并同步 API 索引
+
+### 验证
+
+- [x] npm run build --workspace=@proofblade/materials passed
+- [x] Coding resources + SingleAgentCtfLoop tests: 36/36 passed
+- [x] component and change-contract gates passed
+- [x] npm run api:index:check passed
+- [x] npm run verify passed: 582/582 repository tests, provider-free evaluation 30/30, npm audit 0 vulnerabilities
+
+## UPDATE-20260825-001
+
+时间：2026-08-25T12:30:00+08:00
+
+摘要：把 GUI 的题目描述与附件输入接入统一的 durable CTF Run，并修复暂停后对话续解的活动状态竞态。
+
+### 变更
+
+- 新增 CTF 解题输入对话框与 /api/ctf-solve，校验工作区、附件边界、哈希和不可变验证命令
+- GUI CTF、Fixture 和 Competition 继续共用 SingleAgentCtfLoop、RunCoordinator 与 verifier-first 完成路径
+- 工作区附件使用 LOCAL_WORKSPACE 目标和持久化 staging，避免依赖 fixture scorer；接受 claim 后补齐 reproduction/report/submission
+- 修复 assist CTF 暂停后聊天续解等待旧 Solve promise 清理的竞态，并增加 GUI/Materials 端到端回归测试
+
+### 验证
+
+- [x] npm run verify passed
+- [x] CI gates: 10/10 passed
+- [x] Repository tests: 582/582 passed
+- [x] Provider-free evaluation: 30/30 passed
+- [x] npm audit --omit=dev: 0 vulnerabilities
 
 ## UPDATE-20260824-001
 

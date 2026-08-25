@@ -27,6 +27,7 @@
 - `fixture-catalog.ts` 描述可见 Fixture。
 - `fixture.ts` 管理生命周期和目标执行。
 - 模型看到的是不可信 Observation，不直接拥有 Sandbox 实例或控制状态。
+- `LOCAL_WORKSPACE:*` 任务使用 Run 专属的已复制附件目录，并以 `requiresScorer=false` 进入任务绑定的 reproduction verifier；合成 Fixture 仍保留 hidden scorer 与 generation 健康检查。
 - Sandbox 暴露幂等 `close()` 生命周期钩子；HTTP-backed 实现必须释放所有 Fixture Server，本地实现无进程资源时允许为空操作。
 
 ## 开发规则与验证

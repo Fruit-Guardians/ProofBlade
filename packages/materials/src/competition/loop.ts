@@ -379,6 +379,8 @@ export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: stri
     lines.push(`\nLive target: ${task.target.slice("REMOTE:".length)} (also in connection-info.txt).`);
   }
   lines.push(`\nChallenge files are in ${workspaceRoot.replace(/\\/g, "/")}. Solve it and submit the flag with submit_flag.`);
+  lines.push(`Task inputs (read-only, relative to this challenge workspace): ${task.inputs.map((input) => input.path).join(", ") || "none listed; inspect only the current workspace"}.`);
+  lines.push("Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.");
   return lines.join("\n");
 }
 

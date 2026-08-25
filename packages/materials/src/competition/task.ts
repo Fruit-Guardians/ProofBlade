@@ -2,8 +2,9 @@ import { join } from "node:path";
 import { isIP } from "node:net";
 import type { ProofBladeConfig } from "../config.js";
 import type { TargetKind, TaskContract } from "../domain/types.js";
-import { CompetitionChallengeError, type CompetitionChallengeSummary, type CompetitionEnvironment } from "./api.js";
+import { CompetitionChallengeError, type CompetitionAttachment, type CompetitionChallengeSummary, type CompetitionEnvironment } from "./api.js";
 import type { ContainerTarget, ContainerTargetProtocol } from "../container/contracts.js";
+import { sha256 } from "../domain/utils.js";
 
 /** Map a normalized competition category onto the harness TargetKind. */
 function targetKindForCategory(summary: CompetitionChallengeSummary): TargetKind {
@@ -38,6 +39,7 @@ export function competitionTask(
   env: CompetitionEnvironment,
   root: string,
   config: ProofBladeConfig,
+  attachments: readonly CompetitionAttachment[] = [],
 ): TaskContract {
   const workspace = join(root, config.storage.fixturesDir, runId);
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
@@ -52,7 +54,7 @@ export function competitionTask(
     target_kind: targetKindForCategory(summary),
     target: connection ? `REMOTE:${connection}` : `CHALLENGE:${summary.challengeId}`,
     objective,
-    inputs: [],
+    inputs: competitionInputs(attachments, env.connectionInfo),
     success_criteria: [
       "Submit a flag the platform accepts.",
       "The submitted flag is anchored by a recorded observation or a platform-provided value.",
@@ -81,6 +83,21 @@ export function competitionTask(
       max_submissions: 5,
     },
   };
+}
+
+/**
+ * Bind platform-visible files to the immutable task contract without keeping
+ * their contents in the control projection. The sandbox creates
+ * `connection-info.txt` from the same value, so it is included as an input too.
+ */
+function competitionInputs(attachments: readonly CompetitionAttachment[], connectionInfo?: string): TaskContract["inputs"] {
+  const inputs = attachments.map((attachment) => ({
+    path: attachment.name,
+    sha256: sha256(Buffer.from(attachment.base64, "base64")),
+    read_only: true,
+  }));
+  if (connectionInfo?.trim()) inputs.push({ path: "connection-info.txt", sha256: sha256(`${connectionInfo}\n`), read_only: true });
+  return inputs.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 /** Extract concrete remote endpoints from platform connection text. */

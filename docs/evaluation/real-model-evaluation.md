@@ -16,6 +16,8 @@ Each corpus file path is relative to the Manifest directory. The loader rejects 
 
 Create one ordinary ProofBlade config per provider/model. API keys remain environment variables referenced by each config. Real evaluation requires a published USD token price for every Variant; without it, `eval-real` refuses to start. Prices are per one million tokens and should include the Provider's cache-read and cache-write rates when it reports them:
 
+Ready-to-copy config skeletons are available at `examples/real-evaluation-provider.openai.example.json` and `examples/real-evaluation-provider.anthropic.example.json`. Copy them into the ignored `.proofblade/evaluation/` directory, replace the model names and published prices, and export the two referenced environment variables. The numeric prices in the examples are placeholders and must not be treated as provider pricing.
+
 ```json
 {
   "modelProfiles": {

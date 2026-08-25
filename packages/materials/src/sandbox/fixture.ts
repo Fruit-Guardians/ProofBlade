@@ -18,6 +18,8 @@ export interface FixtureRef {
   generation: number;
   path: string;
   privatePath: string;
+  /** Workspace-backed CTF runs use a task-owned reproduction command instead of a hidden scorer. */
+  requiresScorer?: boolean;
 }
 
 export type FixtureHealthStatus = "healthy" | "missing" | "unhealthy" | "generation-drift";
@@ -60,19 +62,21 @@ export class LocalFixtureSandbox implements SandboxPort {
 
   public async build(task: TaskContract): Promise<FixtureRef> {
     const fixtureId = task.task_id;
-    const path = join(this.root, fixtureId);
+    const workspacePath = localWorkspacePath(task);
+    const path = workspacePath ?? join(this.root, fixtureId);
     const privatePath = join(path, ".proofblade");
     await mkdir(path, { recursive: true });
     await mkdir(privatePath, { recursive: true });
     const profile = fixtureProfileFromTarget(task.target);
     if (profile) await writeProfile(path, privatePath, profile);
-    else if (!(await exists(join(path, "challenge.txt")))) await writeFile(join(path, "challenge.txt"), "ProofBlade demo target\nFLAG=PB{evidence_first}\n", "utf8");
-    if (!profile && !(await exists(join(privatePath, "scorer.json")))) {
+    else if (!workspacePath && !(await exists(join(path, "challenge.txt")))) await writeFile(join(path, "challenge.txt"), "ProofBlade demo target\nFLAG=PB{evidence_first}\n", "utf8");
+    const requiresScorer = workspacePath === undefined;
+    if (requiresScorer && !(await exists(join(privatePath, "scorer.json")))) {
       await writeFile(join(privatePath, "scorer.json"), JSON.stringify({ expected: "PB{evidence_first}" }), "utf8");
     }
     const generation = await readGeneration(path);
     this.generations.set(fixtureId, generation);
-    return { fixtureId, profileId: profile?.id, generation, path, privatePath };
+    return { fixtureId, profileId: profile?.id, generation, path, privatePath, requiresScorer };
   }
 
   public async reset(fixture: FixtureRef): Promise<number> {
@@ -124,7 +128,7 @@ export class LocalFixtureSandbox implements SandboxPort {
     const actualGeneration = await readGeneration(fixture.path);
     const files = await visibleFiles(fixture.path).catch(() => []);
     const scorerPresent = await exists(join(fixture.privatePath, "scorer.json"));
-    if (files.length === 0 || !scorerPresent || actualGeneration < 1) {
+    if (files.length === 0 || (fixture.requiresScorer !== false && !scorerPresent) || actualGeneration < 1) {
       return { status: "unhealthy", expectedGeneration, actualGeneration, reason: "fixture files, scorer, or generation marker are incomplete" };
     }
     if (actualGeneration !== expectedGeneration) {
@@ -135,12 +139,14 @@ export class LocalFixtureSandbox implements SandboxPort {
 
   public async reconcileFixture(task: TaskContract, expectedGeneration: number, beforeReset?: () => Promise<void>): Promise<FixtureReconcileResult> {
     const profile = fixtureProfileFromTarget(task.target);
+    const path = localWorkspacePath(task) ?? join(this.root, task.task_id);
     const fixture: FixtureRef = {
       fixtureId: task.task_id,
       profileId: profile?.id,
       generation: expectedGeneration,
-      path: join(this.root, task.task_id),
-      privatePath: join(this.root, task.task_id, ".proofblade"),
+      path,
+      privatePath: join(path, ".proofblade"),
+      requiresScorer: localWorkspacePath(task) === undefined,
     };
     const health = await this.health(fixture, expectedGeneration);
     if (health.status === "healthy") return { fixture, health, action: "none", generation: expectedGeneration };
@@ -199,6 +205,14 @@ export class LocalFixtureSandbox implements SandboxPort {
     }
     return undefined;
   }
+}
+
+const LOCAL_WORKSPACE_TARGET_PREFIX = "LOCAL_WORKSPACE:";
+
+function localWorkspacePath(task: TaskContract): string | undefined {
+  if (!task.target.startsWith(LOCAL_WORKSPACE_TARGET_PREFIX)) return undefined;
+  const workspace = task.scope.allowed_workspace.trim();
+  return workspace.length > 0 ? resolve(workspace) : undefined;
 }
 
 async function writeProfile(path: string, privatePath: string, profile: ReturnType<typeof getFixtureProfile>): Promise<void> {

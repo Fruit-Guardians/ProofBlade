@@ -228,6 +228,7 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
     const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const details = result.details as Record<string, unknown>;
     assert.equal(details.verified, true);
+    assert.equal(result.terminate, undefined, "ordinary claim verification keeps the coding turn interactive");
     const snapshot = await services.control.snapshot(runId);
     assert.equal(Object.keys(snapshot.evidence).length, 2);
     assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction" && item.dependsOn?.includes(evidenceId)).length, 1);
@@ -239,6 +240,11 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
     assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
     assert.equal((await verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`)).status, "verified");
     assert.equal((await verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042")).status, "unverified");
+    const deferred = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+      ...context,
+      deferClaimAcceptance: true,
+    });
+    assert.equal(deferred.terminate, true, "deferred claim acceptance must return control to the outer verifier");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });

@@ -317,6 +317,7 @@ export class PiCodingLane implements AgentLanePort {
       enabledSkills,
       enabledMcpServers,
       claimVerifier,
+      ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
       evidenceGraph,
       evidenceCurationGate,
       runtime,
