@@ -245,6 +245,12 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       deferClaimAcceptance: true,
     });
     assert.equal(deferred.terminate, true, "deferred claim acceptance must return control to the outer verifier");
+    const continuous = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+      ...context,
+      deferClaimAcceptance: true,
+      continuousRecovery: true,
+    });
+    assert.equal(continuous.terminate, undefined, "continuous recovery keeps claim verification in the same lane");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });

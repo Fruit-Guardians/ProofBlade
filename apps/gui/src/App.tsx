@@ -445,11 +445,11 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
           <label title="本对话使用的模型"><Bot size={13} /><select aria-label="本对话模型" value={preferences.model} onChange={(event) => void savePreferences({ model: event.target.value })}>{modelOptions(providers, preferences).map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
           <label title="思考等级"><select aria-label="本对话思考等级" value={preferences.thinkingLevel} onChange={(event) => void savePreferences({ thinkingLevel: event.target.value as ProviderThinkingLevel })}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
           <button type="button" className="capability-button" onClick={onCapabilities}><ListChecks size={13} />能力 <span>{preferences.enabledTools.length + preferences.enabledSkills.length + preferences.enabledMcpServers.length}</span></button>
-          <button type="button" className="context-button" title="当前 Pi Session 的累计 Provider token 与缓存命中率" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{formatNumber(sessionTokenTotal(session))} · {formatPercent(projectCacheUsage(session?.usage ?? emptySessionUsage()).hitRate)}</span></button>
+           <button type="button" className="context-button" title="当前请求已用上下文、距离窗口上限和缓存命中率" onClick={() => setContextOpen((value) => !value)}><Database size={13} />上下文 <span>{detail.context ? `${formatNumber(detail.context.remainingTokens)} 剩余` : `${formatNumber(sessionTokenTotal(session))} tokens`} · {formatPercent(projectCacheUsage(session?.usage ?? emptySessionUsage()).hitRate)}</span></button>
           <button type="button" className="workspace-button" title={preferences.workspacePath} onClick={() => setDirectoryOpen(true)}><FolderOpen size={13} />目录 <span>{shortPath(preferences.workspacePath)}</span></button>
           <label title="将对话归档到文件夹"><Folder size={13} /><select aria-label="对话文件夹" value={preferences.folderId ?? ""} onChange={(event) => void savePreferences({ folderId: event.target.value || undefined })}><option value="">未分类</option>{workspace?.folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
         </div>}
-        {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} />}
+        {contextOpen && <ContextBreakdown session={session} snapshot={contextSnapshot} context={detail.context} threshold={preferences?.contextCompactionThreshold ?? 40} onThreshold={(value) => void savePreferences({ contextCompactionThreshold: value })} />}
         <div className="composer"><textarea aria-label="发送消息" value={draft} disabled={runInFlight || terminal} rows={2} placeholder={terminal ? "" : "给 ProofBlade 发送消息"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} /><div className="composer-footer"><SessionUsageSummary session={session} kind={detail.kind} phase={detail.snapshot.phase} /><button type="button" className={`send-button ${runInFlight ? "stop-button" : ""}`} title={runInFlight ? "暂停运行" : "发送"} aria-label={runInFlight ? "暂停运行" : "发送"} disabled={terminal || (runInFlight ? pausePending : !draft.trim())} onClick={() => runInFlight ? void stop() : void submit()}>{runInFlight ? <Pause size={16} /> : <Send size={16} />}</button></div></div>
       </div>
     </div>
@@ -490,11 +490,13 @@ function modelOptions(providers: ProviderSettings | undefined, preferences: Conv
   return [...new Set([preferences.model, ...(profile?.models ?? [])].filter(Boolean))];
 }
 
-function ContextBreakdown({ session, snapshot }: { session?: PiSessionDebug; snapshot?: Extract<ChatStreamEvent, { type: "context_snapshot" }> }) {
+function ContextBreakdown({ session, snapshot, context, threshold, onThreshold }: { session?: PiSessionDebug; snapshot?: Extract<ChatStreamEvent, { type: "context_snapshot" }>; context?: RunDetail["context"]; threshold: number; onThreshold(value: number): void }) {
   const usage = session && session.usage.requests > 0 ? session.usage : session ? { ...session.usage, input: session.stats.uncachedTokens, totalTokens: session.stats.totalTokens } : undefined;
   const cache = projectCacheUsage(usage ?? emptySessionUsage());
   return <div className="context-breakdown">
-    <div className="context-breakdown-head"><strong>本会话上下文</strong><span>Provider usage 为上游实际计数</span></div>
+    <div className="context-breakdown-head"><strong>本会话上下文</strong><span>{context ? `${formatNumber(context.remainingTokens)} tokens 剩余` : "等待首个 Provider 请求"}</span></div>
+    {context && <div className="context-meter"><span style={{ width: `${Math.min(100, context.utilization * 100)}%` }} /></div>}
+    {context && <div className="context-distance"><strong>{formatNumber(context.usedTokens)} / {formatNumber(context.contextWindow)}</strong><span>已用 · {formatPercent(context.utilization)} · 剩余 {formatNumber(context.remainingTokens)}</span></div>}
     <div className="context-breakdown-grid">
       <MetricLine label="输入侧总量" value={`${formatNumber(cache.inputBasis)} tokens`} />
       <MetricLine label="累计未命中" value={`${formatNumber(cache.uncachedInput)} tokens`} />
@@ -505,6 +507,7 @@ function ContextBreakdown({ session, snapshot }: { session?: PiSessionDebug; sna
       <MetricLine label="推理" value={`${formatNumber(usage?.reasoning ?? 0)} tokens`} />
       <MetricLine label="请求次数" value={String(usage?.requests ?? 0)} />
     </div>
+    <label className="context-threshold"><span>主动压缩阈值</span><select aria-label="主动压缩阈值" value={threshold} onChange={(event) => onThreshold(Number(event.target.value))}>{[20, 30, 40, 50, 60, 70, 80].map((value) => <option value={value} key={value}>{value}% · 达到后压缩</option>)}</select></label>
     {snapshot && <div className="context-visible-detail"><span>当前请求可见消息 {snapshot.messages} 条</span><span>启用 Tool {snapshot.tools} 个</span><span>系统提示 {formatNumber(snapshot.systemPromptChars)} chars</span><span>消息 {formatNumber(snapshot.messageChars)} chars</span><span>Tool schema {formatNumber(snapshot.toolSchemaChars)} chars</span><span>可见估算 {formatNumber(snapshot.estimatedVisibleTokens)} tokens</span></div>}
     <div className="context-note">缓存由中转站返回的 usage 字段决定。缓存前缀通常按离散 token 块计量，相邻请求可能返回相同的“本次缓存读取”；累计读取、累计未命中、请求次数和命中率仍会随真实请求变化。Provider 不返回缓存字段时显示为 0。</div>
   </div>;

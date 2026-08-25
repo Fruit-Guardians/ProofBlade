@@ -126,6 +126,8 @@ export class PiCodingLane implements AgentLanePort {
     approvalPolicy?: ApprovalPolicy;
     /** Keep hidden-scorer completions proposed until the outer CTF verifier runs. */
     deferClaimAcceptance?: boolean;
+    /** Percentage of the available input budget used as the proactive compaction soft limit. */
+    contextCompactionThreshold?: number;
     /** Optional session id override for non-chat CTF runs. */
     sessionId?: string;
     /** Called when the submission path pauses on a pending approval. */
@@ -318,6 +320,7 @@ export class PiCodingLane implements AgentLanePort {
       enabledMcpServers,
       claimVerifier,
       ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
+      continuousRecovery: true,
       evidenceGraph,
       evidenceCurationGate,
       runtime,
@@ -371,10 +374,9 @@ export class PiCodingLane implements AgentLanePort {
       }
       : undefined;
     const termination: CodingTurnTermination = {};
-    // GUI chat lanes use the default `-chat` session and keep repeated reads
-    // advisory; CTF/Competition lanes pass an explicit `-coding` session and
-    // retain the outer loop's hard-stop/replan contract.
-    termination.softNoProgress = options.deferClaimAcceptance === true && options.sessionId === undefined;
+    // All lanes remain live: guard pressure becomes a recovery hint and the
+    // existing maintenance hook performs compaction/checkpoint work in-band.
+    termination.continuousRecovery = true;
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
@@ -393,9 +395,21 @@ export class PiCodingLane implements AgentLanePort {
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
     const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
-    const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.5));
+    const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.35));
+    const threshold = Math.min(80, Math.max(20, Math.round(options.contextCompactionThreshold ?? 40))) / 100;
+    // planContextMaintenance enters compact at 80% of its supplied budget.
+    // Scale the internal budget so the user's selected percentage is the
+    // actual compact trigger relative to the provider input budget.
+    const proactiveMaintenanceLimit = Math.min(contextBudget, Math.max(8_192, Math.floor(contextBudget * threshold / 0.8)));
+    let currentContextTokens = 0;
     harness.on("context", async ({ messages }) => {
-      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext.value), availableTokens: contextBudget, messageBudget: targetMessageBudget });
+      const prepared = prepareContextMaintenance({
+        messages: injectReasoningForestContext(messages, forestContext.value),
+        availableTokens: contextBudget,
+        maintenanceLimitTokens: proactiveMaintenanceLimit,
+        messageBudget: targetMessageBudget,
+      });
+      currentContextTokens = prepared.estimatedTokens;
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
         // so persist the bounded ledger checkpoint directly before Pi compacts.
@@ -422,6 +436,7 @@ export class PiCodingLane implements AgentLanePort {
         toolCatalogHash: sha256(canonicalJson(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
         toolNames: activeToolNames,
       },
+      estimateContextTokens: async () => currentContextTokens,
       scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);

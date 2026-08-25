@@ -38,6 +38,7 @@ import type {
   BootstrapData,
   ChatMessageDebug,
   ChatStreamEvent,
+  ContextRuntimeInfo,
   PiSessionDebug,
   RunDetail,
   RunKind,
@@ -246,7 +247,7 @@ export class DebugDataService {
       this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
     if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
@@ -400,9 +401,10 @@ export class DebugDataService {
     profile?: ModelProfileConfig,
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
+    contextCompactionThreshold?: number,
   ): Promise<void> {
     this.assertOpen();
-    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath);
+    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold);
     this.chatTasks.add(task);
     try {
       await task;
@@ -418,6 +420,7 @@ export class DebugDataService {
     profile?: ModelProfileConfig,
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
+    contextCompactionThreshold?: number,
   ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
@@ -489,6 +492,7 @@ export class DebugDataService {
           claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
           capabilities,
+          contextCompactionThreshold,
           ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
@@ -950,6 +954,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asContent(value: unknown): ContentLike[] {
   return Array.isArray(value) ? value.filter((item): item is ContentLike => Boolean(item && typeof item === "object")) : [];
+}
+
+function contextRuntimeInfo(events: readonly HarnessEvent[]): ContextRuntimeInfo | undefined {
+  const usageEvent = [...events].reverse().find((event) => event.type === "model_usage");
+  if (!usageEvent) return undefined;
+  const usage = usageEvent.payload?.usage as { input?: unknown; cacheRead?: unknown } | undefined;
+  const usageInput = Number(usage?.input ?? 0);
+  const cacheRead = Number(usage?.cacheRead ?? 0);
+  const epochEvent = [...events].reverse().find((event) => event.type === "request_epoch_started");
+  const contextWindow = Number((epochEvent?.payload?.epoch as { contextWindow?: unknown } | undefined)?.contextWindow ?? 0);
+  if (!Number.isFinite(contextWindow) || contextWindow <= 0) return undefined;
+  const usedTokens = Math.max(0, usageInput) + Math.max(0, cacheRead);
+  const estimatedTokens = Number(usageEvent.payload?.contextEstimatedTokens);
+  return {
+    contextWindow,
+    usedTokens,
+    remainingTokens: Math.max(0, contextWindow - usedTokens),
+    utilization: usedTokens / contextWindow,
+    ...(Number.isFinite(estimatedTokens) && estimatedTokens > 0 ? { estimatedTokens } : {}),
+    lastCacheRead: Math.max(0, cacheRead),
+    lastUpdatedAt: usageEvent.ts,
+  };
 }
 
 function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {

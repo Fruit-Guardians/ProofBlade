@@ -333,7 +333,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       const snapshot = await options.controlStore.snapshot(options.runId);
       const artifactIds = collectStringRefs(details, "artifact");
       const evidenceIds = collectStringRefs(details, "evidence");
-      const errorSignature = event.isError ? structuredErrorSignature(details) : undefined;
+      const errorSignature = event.isError ? structuredErrorSignature(details, event.result) : undefined;
       await append(options, "tool_result_recorded", "tool", {
         toolCallId: event.toolCallId,
         toolName: event.toolName,
@@ -389,12 +389,18 @@ function collectStringRefs(value: unknown, prefix: "artifact" | "evidence"): str
   return [...refs].sort();
 }
 
-function structuredErrorSignature(details: unknown): string {
+function structuredErrorSignature(details: unknown, result?: unknown): string {
   if (details && typeof details === "object") {
     const error = (details as { error?: unknown }).error;
     if (error && typeof error === "object" && typeof (error as { signature?: unknown }).signature === "string") return (error as { signature: string }).signature;
   }
-  return toToolFailure(new Error("Pi tool execution returned an error result")).error.signature;
+  const output = result && typeof result === "object" && "content" in result
+    ? (result as { content?: unknown }).content
+    : undefined;
+  const text = Array.isArray(output)
+    ? output.map((item) => item && typeof item === "object" && "text" in item ? String((item as { text?: unknown }).text ?? "") : "").join("\n").trim()
+    : typeof details === "string" ? details : "Pi tool execution returned an error result";
+  return toToolFailure(new Error(text || "Pi tool execution returned an error result")).error.signature;
 }
 
 function byteLength(value: unknown): number {

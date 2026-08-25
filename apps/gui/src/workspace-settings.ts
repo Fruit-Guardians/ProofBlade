@@ -5,6 +5,7 @@ import type { ConversationFolder, ConversationPreferences, ProviderThinkingLevel
 
 interface StoredConversationPreferences {
   title?: string;
+  contextCompactionThreshold?: number;
   folderId?: string;
   workspacePath?: string;
   profileId?: string;
@@ -51,6 +52,7 @@ export class WorkspaceSettingsStore {
     const next: ConversationPreferences = {
       ...current,
       ...input,
+      ...(input.contextCompactionThreshold === undefined ? {} : { contextCompactionThreshold: clampThreshold(input.contextCompactionThreshold) }),
       workspacePath: input.workspacePath?.trim() || current.workspacePath,
       enabledTools: normalizeList(input.enabledTools ?? current.enabledTools),
       enabledSkills: normalizeList(input.enabledSkills ?? current.enabledSkills),
@@ -100,6 +102,7 @@ export class WorkspaceSettingsStore {
       ...defaults,
       ...stored,
       ...(stored.title?.trim() || defaults.title ? { title: stored.title?.trim() || defaults.title } : {}),
+      ...(Number.isFinite(stored.contextCompactionThreshold) ? { contextCompactionThreshold: clampThreshold(stored.contextCompactionThreshold!) } : {}),
       enabledTools: normalizeList(stored.enabledTools ?? defaults.enabledTools),
       enabledSkills: normalizeList(stored.enabledSkills ?? defaults.enabledSkills),
       enabledMcpServers: normalizeList(stored.enabledMcpServers ?? defaults.enabledMcpServers),
@@ -145,6 +148,7 @@ function validatePreferences(value: unknown): StoredConversationPreferences {
   const input = value as StoredConversationPreferences;
   return {
     ...(typeof input.title === "string" && input.title.trim() ? { title: input.title.trim() } : {}),
+    ...(Number.isFinite(input.contextCompactionThreshold) ? { contextCompactionThreshold: clampThreshold(input.contextCompactionThreshold!) } : {}),
     ...(typeof input.folderId === "string" && input.folderId ? { folderId: input.folderId } : {}),
     ...(typeof input.workspacePath === "string" && input.workspacePath.trim() ? { workspacePath: input.workspacePath.trim() } : {}),
     ...(typeof input.profileId === "string" && input.profileId ? { profileId: input.profileId } : {}),
@@ -163,6 +167,10 @@ function normalizeList(values: string[]): string[] {
 function required(value: unknown, label: string): string {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label}不能为空`);
   return value.trim();
+}
+
+function clampThreshold(value: number): number {
+  return Math.min(80, Math.max(20, Math.round(value)));
 }
 
 function uniqueId(name: string, used: Set<string>): string {

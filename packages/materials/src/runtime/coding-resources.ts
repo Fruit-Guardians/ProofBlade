@@ -72,6 +72,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * preliminary observation in the same turn.
    */
   deferClaimAcceptance?: boolean;
+  /** Keep claim verification in the same continuous maintenance loop. */
+  continuousRecovery?: boolean;
   evidenceGraph: CodingEvidenceGraph;
   evidenceCurationGate?: EvidenceCurationGate;
   runtime: ProofBladeToolRuntime;
@@ -343,7 +345,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
-    return context.deferClaimAcceptance ? { ...result, terminate: true } : result;
+    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
   },
 };
 

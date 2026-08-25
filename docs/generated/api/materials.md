@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 108
-- Symbols: 953
+- Symbols: 955
 
 ## Public Symbols
 
@@ -364,7 +364,7 @@
 ### CodingEvidenceGraph
 - Kind: `class`
 - Signature: `CodingEvidenceGraph`
-- Source: [src/knowledge/evidence-graph.ts:64](../../../packages/materials/src/knowledge/evidence-graph.ts:64)
+- Source: [src/knowledge/evidence-graph.ts:72](../../../packages/materials/src/knowledge/evidence-graph.ts:72)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding evidence graph class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -872,7 +872,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:704](../../../packages/materials/src/runtime/coding-resources.ts:704)
+- Source: [src/runtime/coding-resources.ts:706](../../../packages/materials/src/runtime/coding-resources.ts:706)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -1181,7 +1181,7 @@
 ### contextText
 - Kind: `function`
 - Signature: `(output: ContextBuildOutput): string`
-- Source: [src/context/compiler.ts:300](../../../packages/materials/src/context/compiler.ts:300)
+- Source: [src/context/compiler.ts:308](../../../packages/materials/src/context/compiler.ts:308)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context text operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1190,7 +1190,7 @@
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:304](../../../packages/materials/src/context/compiler.ts:304)
+- Source: [src/context/compiler.ts:312](../../../packages/materials/src/context/compiler.ts:312)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1198,7 +1198,7 @@
 ### prepareContextMaintenance
 - Kind: `function`
 - Signature: `(input: ContextMaintenanceInput): ContextMaintenancePreparation`
-- Source: [src/context/maintenance-coordinator.ts:32](../../../packages/materials/src/context/maintenance-coordinator.ts:32)
+- Source: [src/context/maintenance-coordinator.ts:34](../../../packages/materials/src/context/maintenance-coordinator.ts:34)
 - Export: `@proofblade/materials`
 - Summary: Shared, hook-safe context preparation for every Pi lane.
 - Summary source: `tsdoc`
@@ -1401,7 +1401,7 @@
 ### buildReasoningForest
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot): ReasoningForestIndex`
-- Source: [src/knowledge/evidence-graph.ts:442](../../../packages/materials/src/knowledge/evidence-graph.ts:442)
+- Source: [src/knowledge/evidence-graph.ts:476](../../../packages/materials/src/knowledge/evidence-graph.ts:476)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build reasoning forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1409,7 +1409,7 @@
 ### formatReasoningForestContext
 - Kind: `function`
 - Signature: `(index: ReasoningForestIndex): string`
-- Source: [src/knowledge/evidence-graph.ts:486](../../../packages/materials/src/knowledge/evidence-graph.ts:486)
+- Source: [src/knowledge/evidence-graph.ts:520](../../../packages/materials/src/knowledge/evidence-graph.ts:520)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: format reasoning forest context operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -1603,7 +1603,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:831](../../../packages/materials/src/runtime/coding-lane.ts:831)
+- Source: [src/runtime/coding-lane.ts:846](../../../packages/materials/src/runtime/coding-lane.ts:846)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -1612,7 +1612,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:898](../../../packages/materials/src/runtime/coding-lane.ts:898)
+- Source: [src/runtime/coding-lane.ts:913](../../../packages/materials/src/runtime/coding-lane.ts:913)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1621,7 +1621,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:591](../../../packages/materials/src/runtime/coding-lane.ts:591)
+- Source: [src/runtime/coding-lane.ts:606](../../../packages/materials/src/runtime/coding-lane.ts:606)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -1630,7 +1630,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:681](../../../packages/materials/src/runtime/coding-lane.ts:681)
+- Source: [src/runtime/coding-lane.ts:696](../../../packages/materials/src/runtime/coding-lane.ts:696)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1639,7 +1639,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:724](../../../packages/materials/src/runtime/coding-lane.ts:724)
+- Source: [src/runtime/coding-lane.ts:739](../../../packages/materials/src/runtime/coding-lane.ts:739)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -1648,7 +1648,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:719](../../../packages/materials/src/runtime/coding-lane.ts:719)
+- Source: [src/runtime/coding-lane.ts:734](../../../packages/materials/src/runtime/coding-lane.ts:734)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -1657,7 +1657,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:663](../../../packages/materials/src/runtime/coding-resources.ts:663)
+- Source: [src/runtime/coding-resources.ts:665](../../../packages/materials/src/runtime/coding-resources.ts:665)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1666,7 +1666,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:679](../../../packages/materials/src/runtime/coding-resources.ts:679)
+- Source: [src/runtime/coding-resources.ts:681](../../../packages/materials/src/runtime/coding-resources.ts:681)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1675,7 +1675,7 @@
 ### codingToolCatalog
 - Kind: `function`
 - Signature: `(): CodingToolCatalogEntry[]`
-- Source: [src/runtime/coding-resources.ts:127](../../../packages/materials/src/runtime/coding-resources.ts:127)
+- Source: [src/runtime/coding-resources.ts:129](../../../packages/materials/src/runtime/coding-resources.ts:129)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1683,7 +1683,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:252](../../../packages/materials/src/runtime/coding-resources.ts:252)
+- Source: [src/runtime/coding-resources.ts:254](../../../packages/materials/src/runtime/coding-resources.ts:254)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -1692,7 +1692,7 @@
 ### createCodingTools
 - Kind: `function`
 - Signature: `(options?: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): AgentHarnessTool<CodingResourceContext>[]`
-- Source: [src/runtime/coding-resources.ts:135](../../../packages/materials/src/runtime/coding-resources.ts:135)
+- Source: [src/runtime/coding-resources.ts:137](../../../packages/materials/src/runtime/coding-resources.ts:137)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create coding tools operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1701,7 +1701,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:168](../../../packages/materials/src/runtime/coding-resources.ts:168)
+- Source: [src/runtime/coding-resources.ts:170](../../../packages/materials/src/runtime/coding-resources.ts:170)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -1710,7 +1710,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:718](../../../packages/materials/src/runtime/coding-resources.ts:718)
+- Source: [src/runtime/coding-resources.ts:720](../../../packages/materials/src/runtime/coding-resources.ts:720)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -1719,7 +1719,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:792](../../../packages/materials/src/runtime/coding-resources.ts:792)
+- Source: [src/runtime/coding-resources.ts:794](../../../packages/materials/src/runtime/coding-resources.ts:794)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -1728,7 +1728,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:782](../../../packages/materials/src/runtime/coding-resources.ts:782)
+- Source: [src/runtime/coding-resources.ts:784](../../../packages/materials/src/runtime/coding-resources.ts:784)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -1737,7 +1737,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:155](../../../packages/materials/src/runtime/coding-resources.ts:155)
+- Source: [src/runtime/coding-resources.ts:157](../../../packages/materials/src/runtime/coding-resources.ts:157)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -1745,7 +1745,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:226](../../../packages/materials/src/runtime/coding-resources.ts:226)
+- Source: [src/runtime/coding-resources.ts:228](../../../packages/materials/src/runtime/coding-resources.ts:228)
 - Export: `@proofblade/materials`
 - Summary: Keep decompiler schemas out of unrelated challenge contexts. The generic
 - Summary source: `tsdoc`
@@ -1859,7 +1859,7 @@
 ### configuredMaxConcurrentRequests
 - Kind: `function`
 - Signature: `(value: number | undefined): number`
-- Source: [src/runtime/provider-scheduler.ts:414](../../../packages/materials/src/runtime/provider-scheduler.ts:414)
+- Source: [src/runtime/provider-scheduler.ts:418](../../../packages/materials/src/runtime/provider-scheduler.ts:418)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: configured max concurrent requests operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1867,7 +1867,7 @@
 ### providerRequestScheduler
 - Kind: `function`
 - Signature: `(): ProviderRequestScheduler`
-- Source: [src/runtime/provider-scheduler.ts:410](../../../packages/materials/src/runtime/provider-scheduler.ts:410)
+- Source: [src/runtime/provider-scheduler.ts:414](../../../packages/materials/src/runtime/provider-scheduler.ts:414)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: provider request scheduler operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2013,7 +2013,7 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:431](../../../packages/materials/src/verification/claim-verification.ts:431)
+- Source: [src/verification/claim-verification.ts:438](../../../packages/materials/src/verification/claim-verification.ts:438)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2712,7 +2712,7 @@
 ### ContextMaintenancePreparation
 - Kind: `interface`
 - Signature: `ContextMaintenancePreparation`
-- Source: [src/context/maintenance-coordinator.ts:14](../../../packages/materials/src/context/maintenance-coordinator.ts:14)
+- Source: [src/context/maintenance-coordinator.ts:16](../../../packages/materials/src/context/maintenance-coordinator.ts:16)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context maintenance preparation type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3473,6 +3473,14 @@
 - Summary: Inferred summary: create reasoning tree input type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
+### LinkReasoningNodesInput
+- Kind: `interface`
+- Signature: `LinkReasoningNodesInput`
+- Source: [src/knowledge/evidence-graph.ts:61](../../../packages/materials/src/knowledge/evidence-graph.ts:61)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: link reasoning nodes input type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
 ### RecordCodingEvidenceInput
 - Kind: `interface`
 - Signature: `RecordCodingEvidenceInput`
@@ -3798,7 +3806,7 @@
 ### CodingToolCatalogEntry
 - Kind: `interface`
 - Signature: `CodingToolCatalogEntry`
-- Source: [src/runtime/coding-resources.ts:121](../../../packages/materials/src/runtime/coding-resources.ts:121)
+- Source: [src/runtime/coding-resources.ts:123](../../../packages/materials/src/runtime/coding-resources.ts:123)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog entry type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4936,7 +4944,7 @@
 - Export: `@proofblade/materials`
 - Summary: Load the durable ledger and return the currently active records.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`
 
 ### CompetitionEnvironmentJanitor.records
 - Kind: `method`
@@ -5778,7 +5786,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: recover operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### BackgroundJobRunner.start
 - Kind: `method`
@@ -5809,7 +5817,7 @@
 ### EvidenceCurationGate.assertInvestigationAllowed
 - Kind: `method`
 - Signature: `(): Promise<string | undefined>`
-- Source: [src/knowledge/evidence-curation-gate.ts:97](../../../packages/materials/src/knowledge/evidence-curation-gate.ts:97)
+- Source: [src/knowledge/evidence-curation-gate.ts:102](../../../packages/materials/src/knowledge/evidence-curation-gate.ts:102)
 - Export: `@proofblade/materials`
 - Summary: Advisory: report a "required" curation backlog as a nudge string instead of
 - Summary source: `tsdoc`
@@ -5818,7 +5826,7 @@
 ### EvidenceCurationGate.checkpointNotice
 - Kind: `method`
 - Signature: `(): Promise<string | undefined>`
-- Source: [src/knowledge/evidence-curation-gate.ts:103](../../../packages/materials/src/knowledge/evidence-curation-gate.ts:103)
+- Source: [src/knowledge/evidence-curation-gate.ts:108](../../../packages/materials/src/knowledge/evidence-curation-gate.ts:108)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: checkpoint notice operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5835,7 +5843,7 @@
 ### CodingEvidenceGraph.annotateArtifact
 - Kind: `method`
 - Signature: `(input: { artifactId: string; name: string; summary: string; tags?: string[]; role?: ArtifactRole; relatedIds?: string[]; }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata; reused: boolean; durableProgress: boolean; progressKey: string; }>`
-- Source: [src/knowledge/evidence-graph.ts:71](../../../packages/materials/src/knowledge/evidence-graph.ts:71)
+- Source: [src/knowledge/evidence-graph.ts:79](../../../packages/materials/src/knowledge/evidence-graph.ts:79)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: annotate artifact operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5844,7 +5852,7 @@
 ### CodingEvidenceGraph.createTree
 - Kind: `method`
 - Signature: `(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:300](../../../packages/materials/src/knowledge/evidence-graph.ts:300)
+- Source: [src/knowledge/evidence-graph.ts:334](../../../packages/materials/src/knowledge/evidence-graph.ts:334)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5853,7 +5861,7 @@
 ### CodingEvidenceGraph.inspectForest
 - Kind: `method`
 - Signature: `(): Promise<ReasoningForestIndex>`
-- Source: [src/knowledge/evidence-graph.ts:351](../../../packages/materials/src/knowledge/evidence-graph.ts:351)
+- Source: [src/knowledge/evidence-graph.ts:385](../../../packages/materials/src/knowledge/evidence-graph.ts:385)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -5862,7 +5870,7 @@
 ### CodingEvidenceGraph.inspectTree
 - Kind: `method`
 - Signature: `(treeId: string): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:355](../../../packages/materials/src/knowledge/evidence-graph.ts:355)
+- Source: [src/knowledge/evidence-graph.ts:389](../../../packages/materials/src/knowledge/evidence-graph.ts:389)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5870,17 +5878,25 @@
 
 ### CodingEvidenceGraph.linkNodes
 - Kind: `method`
-- Signature: `(input: { from: string; to: string; relation: ReasoningEdgeRelation; explanation?: string; confidence?: number; }): Promise<{ edge: ReasoningEdge; }>`
-- Source: [src/knowledge/evidence-graph.ts:276](../../../packages/materials/src/knowledge/evidence-graph.ts:276)
+- Signature: `(input: LinkReasoningNodesInput): Promise<{ edge: ReasoningEdge; }>`
+- Source: [src/knowledge/evidence-graph.ts:284](../../../packages/materials/src/knowledge/evidence-graph.ts:284)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: link nodes operation used to perform a durable write.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/reasoning-forest.test.ts`
 
+### CodingEvidenceGraph.linkNodesBatch
+- Kind: `method`
+- Signature: `(inputs: LinkReasoningNodesInput[]): Promise<{ edges: ReasoningEdge[]; }>`
+- Source: [src/knowledge/evidence-graph.ts:303](../../../packages/materials/src/knowledge/evidence-graph.ts:303)
+- Export: `@proofblade/materials`
+- Summary: Commit a graph expansion in one ControlStore transaction.
+- Summary source: `tsdoc`
+
 ### CodingEvidenceGraph.readArtifact
 - Kind: `method`
 - Signature: `(artifactId: string, maxChars?: number): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:408](../../../packages/materials/src/knowledge/evidence-graph.ts:408)
+- Source: [src/knowledge/evidence-graph.ts:442](../../../packages/materials/src/knowledge/evidence-graph.ts:442)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read artifact operation used to read or inspect state.
 - Summary source: `inferred`
@@ -5889,7 +5905,7 @@
 ### CodingEvidenceGraph.recordEvidence
 - Kind: `method`
 - Signature: `(input: RecordCodingEvidenceInput): Promise<RecordCodingEvidenceResult>`
-- Source: [src/knowledge/evidence-graph.ts:111](../../../packages/materials/src/knowledge/evidence-graph.ts:111)
+- Source: [src/knowledge/evidence-graph.ts:119](../../../packages/materials/src/knowledge/evidence-graph.ts:119)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record evidence operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5898,7 +5914,7 @@
 ### CodingEvidenceGraph.recordLeak
 - Kind: `method`
 - Signature: `(input: { leak: LeakRecord; tags?: string[]; explanation?: string; }): Promise<RecordLeakResult>`
-- Source: [src/knowledge/evidence-graph.ts:255](../../../packages/materials/src/knowledge/evidence-graph.ts:255)
+- Source: [src/knowledge/evidence-graph.ts:263](../../../packages/materials/src/knowledge/evidence-graph.ts:263)
 - Export: `@proofblade/materials`
 - Summary: Persist a parsed pwn leak as a replayable reasoning node for later replans.
 - Summary source: `tsdoc`
@@ -5907,7 +5923,7 @@
 ### CodingEvidenceGraph.search
 - Kind: `method`
 - Signature: `(query?: string, tags?: string[]): Promise<Array<Record<string, unknown>>>`
-- Source: [src/knowledge/evidence-graph.ts:371](../../../packages/materials/src/knowledge/evidence-graph.ts:371)
+- Source: [src/knowledge/evidence-graph.ts:405](../../../packages/materials/src/knowledge/evidence-graph.ts:405)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5916,7 +5932,7 @@
 ### CodingEvidenceGraph.updateTree
 - Kind: `method`
 - Signature: `(input: UpdateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:324](../../../packages/materials/src/knowledge/evidence-graph.ts:324)
+- Source: [src/knowledge/evidence-graph.ts:358](../../../packages/materials/src/knowledge/evidence-graph.ts:358)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: update tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6572,7 +6588,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: recover operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ToolPreflightService.prepare
 - Kind: `method`
@@ -6604,7 +6620,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:520](../../../packages/materials/src/runtime/coding-lane.ts:520)
+- Source: [src/runtime/coding-lane.ts:535](../../../packages/materials/src/runtime/coding-lane.ts:535)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6613,7 +6629,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:532](../../../packages/materials/src/runtime/coding-lane.ts:532)
+- Source: [src/runtime/coding-lane.ts:547](../../../packages/materials/src/runtime/coding-lane.ts:547)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6622,7 +6638,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:524](../../../packages/materials/src/runtime/coding-lane.ts:524)
+- Source: [src/runtime/coding-lane.ts:539](../../../packages/materials/src/runtime/coding-lane.ts:539)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6630,7 +6646,7 @@
 
 ### PiCodingLane.create
 - Kind: `method`
-- Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
+- Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
 - Source: [src/runtime/coding-lane.ts:93](../../../packages/materials/src/runtime/coding-lane.ts:93)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
@@ -6640,7 +6656,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:528](../../../packages/materials/src/runtime/coding-lane.ts:528)
+- Source: [src/runtime/coding-lane.ts:543](../../../packages/materials/src/runtime/coding-lane.ts:543)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6649,7 +6665,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:460](../../../packages/materials/src/runtime/coding-lane.ts:460)
+- Source: [src/runtime/coding-lane.ts:475](../../../packages/materials/src/runtime/coding-lane.ts:475)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6730,7 +6746,7 @@
 ### ProviderRequestScheduler.statuses
 - Kind: `method`
 - Signature: `(): ProviderRequestSchedulerStatus[]`
-- Source: [src/runtime/provider-scheduler.ts:131](../../../packages/materials/src/runtime/provider-scheduler.ts:131)
+- Source: [src/runtime/provider-scheduler.ts:130](../../../packages/materials/src/runtime/provider-scheduler.ts:130)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: statuses operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6739,7 +6755,7 @@
 ### ProviderRequestScheduler.wrap
 - Kind: `method`
 - Signature: `(streams: ProviderStreams, scope: ProviderRequestScope, observer?: ProviderRequestSchedulingObserver): ProviderStreams`
-- Source: [src/runtime/provider-scheduler.ts:123](../../../packages/materials/src/runtime/provider-scheduler.ts:123)
+- Source: [src/runtime/provider-scheduler.ts:122](../../../packages/materials/src/runtime/provider-scheduler.ts:122)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: wrap operation used to validate input or state.
 - Summary source: `inferred`
@@ -7398,7 +7414,7 @@
 ### CodingClaimVerifier.project
 - Kind: `method`
 - Signature: `(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection>`
-- Source: [src/verification/claim-verification.ts:316](../../../packages/materials/src/verification/claim-verification.ts:316)
+- Source: [src/verification/claim-verification.ts:323](../../../packages/materials/src/verification/claim-verification.ts:323)
 - Export: `@proofblade/materials`
 - Summary: Rebuild verification exclusively from durable current-generation state.
 - Summary source: `tsdoc`

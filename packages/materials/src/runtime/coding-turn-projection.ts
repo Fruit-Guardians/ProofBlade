@@ -35,6 +35,8 @@ export interface CodingTurnTermination {
   ctfMode?: boolean;
   /** Coding chat uses a nudge for repeated observations; Solver keeps hard stops. */
   softNoProgress?: boolean;
+  /** Keep the lane alive and turn guard pressure into an in-band recovery hint. */
+  continuousRecovery?: boolean;
 }
 
 export function projectCodingAssistantText(output: string, termination: CodingTurnTermination): string {
@@ -77,7 +79,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     if (firstActionBudget && !firstActionBudget.completed && !event.isError && matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
       firstActionBudget.completed = true;
     }
-    if (termination.reason === "tool_budget_exhausted") {
+    if (termination.reason === "tool_budget_exhausted" && !termination.continuousRecovery) {
       return {
         content: [{ type: "text" as const, text: termination.message ?? "[ProofBlade tool budget exhausted]" }],
         details: { toolBudget: true, count: toolBudget?.count ?? 0, max: toolBudget?.max ?? 0 },
@@ -96,6 +98,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       };
       const experiment = experimentBudgetBreaker?.observe(observation);
       if (experiment?.terminate) {
+        if (termination.continuousRecovery) {
+          experimentBudgetBreaker?.reset();
+          return {
+            content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: experimentBudgetNudge(experiment) }],
+            details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
+            isError: event.isError,
+          };
+        }
         if (termination.ctfMode) {
           termination.message = experimentBudgetMessage(experiment);
           termination.reason = "experiment_budget";
@@ -134,7 +144,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         const terminationMessage = preservesDeclaredTermination
           ? termination.message ?? noProgressToolMessage(event.toolName, progress.count)
           : noProgressToolMessage(event.toolName, progress.count);
-        if (termination.softNoProgress) {
+        if (termination.continuousRecovery || termination.softNoProgress) {
           progressBreaker?.reset();
           return {
             content: [
@@ -196,6 +206,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     const storm = failureStormBreaker?.observe(observation);
     const decision = repeatBreaker.observe(observation);
     if (storm?.terminate && !decision.terminate) {
+      if (termination.continuousRecovery) {
+        failureStormBreaker?.reset();
+        return {
+          content: [{ type: "text" as const, text: `${toolFailureStormMessage(storm.count)}\n${experimentBudgetNudge({ count: storm.count, terminate: false, key: "failure-storm", reason: "tool_calls" })}` }],
+          details: { failureStorm: true, advisory: true, count: storm.count, key: storm.key },
+          isError: true,
+        };
+      }
       termination.message = toolFailureStormMessage(storm.count);
       termination.reason = "tool_failure_storm";
       termination.requested = true;
@@ -207,6 +225,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       };
     }
     if (!decision.terminate) return undefined;
+    if (termination.continuousRecovery) {
+      repeatBreaker.reset();
+      return {
+        content: [{ type: "text" as const, text: `${repeatedToolFailureMessage(event.toolName, decision.count)}\n${experimentBudgetNudge({ count: decision.count, terminate: false, key: decision.key, reason: "tool_calls" })}` }],
+        details: { repeatedFailure: true, advisory: true, toolName: event.toolName, count: decision.count, key: decision.key },
+        isError: true,
+      };
+    }
     termination.message = repeatedToolFailureMessage(event.toolName, decision.count);
     termination.reason = "repeated_tool_failure";
     termination.requested = true;
@@ -235,11 +261,14 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         firstActionBudget.count += 1;
       }
     }
-    if (!toolBudget || termination.reason === "tool_budget_exhausted") {
+    if (!toolBudget || (termination.reason === "tool_budget_exhausted" && !termination.continuousRecovery)) {
       if (termination.reason === "tool_budget_exhausted") return { block: true, reason: termination.message };
       return undefined;
     }
     if (toolBudget.count >= toolBudget.max) {
+      if (termination.continuousRecovery) {
+        return { block: true, reason: `[ProofBlade tool budget advisory: ${toolBudget.max} calls reached] Continue only after consolidating current findings into one bounded next action.` };
+      }
       termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Stop probing and preserve the strongest evidence.`;
       termination.reason = "tool_budget_exhausted";
       termination.requested = true;

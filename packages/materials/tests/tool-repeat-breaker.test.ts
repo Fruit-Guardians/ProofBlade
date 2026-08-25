@@ -286,7 +286,7 @@ test("coding chat turns use a soft no-progress notice and keep the provider turn
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
     const session = await repo.create({ id: "no-progress-advisory", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [read], activeToolNames: ["read"], systemPrompt: "test" });
-    const termination: CodingTurnTermination = { softNoProgress: true };
+    const termination: CodingTurnTermination = { softNoProgress: true, continuousRecovery: true };
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), new NoProgressToolBreaker(3), termination, () => readOnlyEffect);
 
     const response = await harness.prompt("Continue the coding investigation.");

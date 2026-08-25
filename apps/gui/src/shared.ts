@@ -75,6 +75,8 @@ export interface ConversationFolder {
 
 export interface ConversationPreferences {
   title?: string;
+  /** Percentage of the available context budget at which proactive compression starts. */
+  contextCompactionThreshold?: number;
   folderId?: string;
   workspacePath: string;
   profileId: string;
@@ -258,6 +260,17 @@ export interface RunDetail {
   sessions: PiSessionDebug[];
   active?: ActiveRunInfo;
   updatedAt: string;
+  context?: ContextRuntimeInfo;
+}
+
+export interface ContextRuntimeInfo {
+  contextWindow: number;
+  usedTokens: number;
+  remainingTokens: number;
+  utilization: number;
+  estimatedTokens?: number;
+  lastCacheRead?: number;
+  lastUpdatedAt?: string;
 }
 
 export interface ArtifactContent {
