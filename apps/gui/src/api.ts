@@ -90,7 +90,7 @@ export async function startCtfSolve(input: {
   return await request("/api/ctf-solve", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string }): Promise<{ runId: string }> {
+export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string; verificationCommand?: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }
 

@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.15",
+  "version": "0.7.16",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-25T05:20:00.000Z",
+  "updatedAt": "2026-08-25T06:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 15,
-    "securityAuditCount": 15,
-    "lastBugAuditAt": "2026-08-25T05:20:00.000Z",
-    "lastSecurityAuditAt": "2026-08-25T05:20:00.000Z",
-    "sourceHash": "787bb0210c59de4174a46d6a96c091603e58808c6f77ab8ba538ed45fa3fd7d6",
+    "bugAuditCount": 16,
+    "securityAuditCount": 16,
+    "lastBugAuditAt": "2026-08-25T06:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T06:00:00.000Z",
+    "sourceHash": "bc13738e181e889582c5dbe2655f382098e9aa2e3df53d7891057a021dbe2d2e",
     "result": "passed"
   }
 }
@@ -20,7 +20,7 @@
 
 ## 职责
 
-提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
+提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
 
 ## 入口与依赖
 
@@ -42,6 +42,7 @@
 - Provider Profile 必须显示并保存实际 wire protocol；模型发现按 OpenAI Bearer 或 Anthropic `x-api-key`/版本头发送。能力面板按本对话 Profile 显示 Provider Native 状态：协议候选未接入时不可勾选，和受控 workspace 工具语义重合时显示被接管原因，不能把产品内置工具误展示为 ProofBlade 可执行能力。
 - Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 1）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
+- 上下文面板显示最近一次真实 Provider 请求的已用 tokens、窗口上限、剩余 tokens 和利用率；对话可选择 20%-80% 的主动压缩阈值，该偏好由服务端传入现有 Coding Lane 维护链，不能在 GUI 另建压缩流程。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 普通 Coding 对话的名称保存在用户本地 workspace metadata；删除必须由服务端校验 Run 类型和活动状态后删除完整持久目录，并同步移除本地对话偏好。Fixture Run 不提供删除入口，避免破坏复盘材料。
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。

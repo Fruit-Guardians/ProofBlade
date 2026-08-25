@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T13:20:00+08:00
+> 状态更新时间：2026-08-25T22:48:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-006 | 2026-08-25T22:48:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/stable-dynamic-context-tail | 90fc7a3 |
 | UPDATE-20260825-005 | 2026-08-25T13:20:00+08:00 | PLAN-200 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-004 | 2026-08-25T13:05:00+08:00 | PLAN-200, PLAN-210 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-003 | 2026-08-25T12:50:00+08:00 | PLAN-110, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
@@ -45,6 +46,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-006
+
+时间：2026-08-25T22:48:00+08:00
+
+摘要：统一普通 Chat、CTF Chat 和 Fixture 的 Coding Lane、任务验证与未验证候选输出路径。
+
+### 变更
+
+- 普通 Chat 可绑定不可变任务验证命令，并与 CTF/Fixture 共用 CodingClaimVerifier、verifier journal、Completion 和 Evidence 投影链
+- GUI Chat 和 CTF Chat 统一创建同一个 Coding Lane，移除模式专用的交互执行分支和自动再规划分支
+- 未验证候选的最终文本和历史投影统一显示未验证标记，并禁止保留确认式 Flag 标签
+- 同步 README、GUI 文档、组件说明、测试和生成 API 映射
+
+### 验证
+
+- [x] npm run typecheck passed
+- [x] npm run build --silent passed
+- [x] npm run api:index:check:all passed
+- [x] npm run check:components -- --base main passed
+- [x] GUI debug-data and materials verification regression tests passed
 
 ## UPDATE-20260825-005
 

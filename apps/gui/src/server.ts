@@ -160,10 +160,12 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     const capabilities = await capabilityCatalog();
     const defaults = defaultPreferences(capabilities);
     const workspacePath = await requireDirectory(optionalString(body.workspacePath) || projectRoot);
+    const verificationCommand = optionalString(body.verificationCommand);
     const snapshot = await data.createConversation({
       runId: string(body.runId, "runId"),
       title: typeof body.title === "string" ? body.title : "新对话",
       workspacePath,
+      ...(verificationCommand ? { verificationCommand } : {}),
     });
     await workspaceSettings.saveConversation(snapshot.runId, {
       title: typeof body.title === "string" ? body.title : "新对话",
@@ -266,6 +268,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
             enabledMcpServers: preferences.enabledMcpServers,
           },
           workspacePath,
+          preferences.contextCompactionThreshold,
         );
       } catch (error) {
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
@@ -459,6 +462,7 @@ function defaultPreferences(capabilities: WorkspaceSettings["capabilities"]): Co
   const profile = providers.profiles.find((item) => item.id === providers.activeProfileId) ?? providers.profiles[0]!;
   return {
     workspacePath: projectRoot,
+    contextCompactionThreshold: 40,
     profileId: profile.id,
     model: profile.model,
     thinkingLevel: profile.thinkingLevel,
@@ -478,6 +482,7 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
   const allowedMcp = new Set(capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name));
   return {
     ...(input.title ? { title: input.title } : {}),
+    ...(input.contextCompactionThreshold === undefined ? { contextCompactionThreshold: 40 } : { contextCompactionThreshold: Math.min(80, Math.max(20, Math.round(input.contextCompactionThreshold))) }),
     ...(input.folderId ? { folderId: input.folderId } : {}),
     workspacePath: input.workspacePath || projectRoot,
     profileId: profile.id,
@@ -497,6 +502,7 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
     ...(typeof body.profileId === "string" ? { profileId: body.profileId } : {}),
     ...(typeof body.model === "string" ? { model: body.model } : {}),
     ...(typeof body.thinkingLevel === "string" ? { thinkingLevel: body.thinkingLevel as ProviderThinkingLevel } : {}),
+    ...(typeof body.contextCompactionThreshold === "number" ? { contextCompactionThreshold: body.contextCompactionThreshold } : {}),
     ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
     ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
     ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),

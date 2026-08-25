@@ -110,6 +110,19 @@ test("idle watchdog aborts a stalled stream and frees the slot", async () => {
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-idle")?.active ?? 0, 0);
 });
 
+test("idle watchdog retries one stalled provider attempt before surfacing the result", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20, maxRetries: 1, retryBaseDelayMs: 1 });
+  let attempts = 0;
+  const source: ProviderStreams = {
+    stream: () => attempts++ === 0 ? createAssistantMessageEventStream() : delayedStream(1),
+    streamSimple: () => attempts++ === 0 ? createAssistantMessageEventStream() : delayedStream(1),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-idle-retry", maxConcurrentRequests: 1 });
+  const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "recover", timestamp: 1 }] }));
+  assert.equal(attempts, 2);
+  assert.equal(result.stopReason, "stop");
+});
+
 test("idle watchdog fires the terminal observer completion so telemetry does not leak", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20 });
   let completed = 0;

@@ -103,9 +103,8 @@ export class ProviderRequestScheduler {
    *   SAME provider request at the stream boundary — it never restarts the agent
    *   turn, so it cannot duplicate the user message or re-run tools. Only errors
    *   classified retryable by pi-ai (5xx, socket hang up, "provider returned
-   *   error", …) are retried; quota/billing fail fast and an idle stall is NOT
-   *   retried (its synthetic message does not match, bounding a hung endpoint to a
-   *   single idle window). 0 disables retries. Default 2.
+   *   error", …) are retried; one idle stall is also retried at the same stream
+   *   boundary, while quota/billing still fail fast. 0 disables retries. Default 2.
    * @param options.retryBaseDelayMs Base backoff; delay is baseDelayMs * 2^(n-1).
    */
   public constructor(options: { idleTimeoutMs?: number; maxRetries?: number; retryBaseDelayMs?: number } = {}) {
@@ -202,7 +201,8 @@ export class ProviderRequestScheduler {
         // A terminal error this attempt produced (either a real error event or a
         // synthetic one from an idle stall / iterator throw).
         const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
-        const retryable = errorMessage !== undefined && attempt < this.maxRetries && !options?.signal?.aborted && isRetryableAssistantError(errorMessage);
+        const retryable = errorMessage !== undefined && attempt < this.maxRetries && !options?.signal?.aborted
+          && (isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage));
         if (retryable) {
           attempt += 1;
           const delayMs = this.retryBaseDelayMs * 2 ** (attempt - 1);
@@ -372,6 +372,10 @@ export class ProviderRequestScheduler {
       });
     }
   }
+}
+
+function isIdleProviderError(message: { errorMessage?: string }): boolean {
+  return /provider stream idle for more than \d+ms/i.test(message.errorMessage ?? "");
 }
 
 /** Outcome of one buffered provider-stream attempt (see drainAttempt). */

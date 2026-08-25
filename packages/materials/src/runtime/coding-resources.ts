@@ -72,6 +72,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * preliminary observation in the same turn.
    */
   deferClaimAcceptance?: boolean;
+  /** Keep claim verification in the same continuous maintenance loop. */
+  continuousRecovery?: boolean;
   evidenceGraph: CodingEvidenceGraph;
   evidenceCurationGate?: EvidenceCurationGate;
   runtime: ProofBladeToolRuntime;
@@ -303,7 +305,7 @@ export function createCodingToolEffectPolicyResolver(
 const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
   name: "verify_claim",
   label: "verify_claim",
-  description: "Run a deterministic workspace command and journal its exact candidate output. Only a command pre-bound by the task verifier policy can create trusted reproduction Evidence and accept a Completion; model-supplied commands remain audited observations.",
+  description: "Run the task's deterministic workspace verifier and journal its exact candidate output. A task-bound command creates trusted reproduction Evidence and accepts a Completion; when a task has no verifier policy, the same call is retained as an explicitly unverified observation.",
   parameters: Type.Object({
     candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
     command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
@@ -343,7 +345,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
-    return context.deferClaimAcceptance ? { ...result, terminate: true } : result;
+    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
   },
 };
 

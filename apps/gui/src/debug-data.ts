@@ -7,7 +7,6 @@ import {
   CodingClaimVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
-  ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
   ApprovalPolicy,
@@ -19,8 +18,8 @@ import {
   fixtureTask,
   listFixtureProfiles,
   requiresClaimVerification,
-  isLikelyCtfPrompt,
   classifyChallengePrompt,
+  rewriteUnverifiedClaimText,
   type AppServices,
   type AgentLanePort,
   type AgentOutcome,
@@ -38,6 +37,7 @@ import type {
   BootstrapData,
   ChatMessageDebug,
   ChatStreamEvent,
+  ContextRuntimeInfo,
   PiSessionDebug,
   RunDetail,
   RunKind,
@@ -246,7 +246,7 @@ export class DebugDataService {
       this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
     if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
@@ -352,11 +352,11 @@ export class DebugDataService {
     }
   }
 
-  public async createConversation(input: { runId: string; title: string; workspacePath?: string }): Promise<RunSnapshot> {
+  public async createConversation(input: { runId: string; title: string; workspacePath?: string; verificationCommand?: string }): Promise<RunSnapshot> {
     this.assertOpen();
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
-    return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root));
+    return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root, input.verificationCommand));
   }
 
   public async deleteConversation(runId: string): Promise<void> {
@@ -400,9 +400,10 @@ export class DebugDataService {
     profile?: ModelProfileConfig,
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
+    contextCompactionThreshold?: number,
   ): Promise<void> {
     this.assertOpen();
-    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath);
+    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold);
     this.chatTasks.add(task);
     try {
       await task;
@@ -418,6 +419,7 @@ export class DebugDataService {
     profile?: ModelProfileConfig,
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
+    contextCompactionThreshold?: number,
   ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
@@ -439,78 +441,34 @@ export class DebugDataService {
     this.active.set(runId, info);
     this.streamEmitters.set(runId, emit);
     emit({ type: "started", runId });
-    let runtime: ProofBladeToolRuntime | undefined;
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
-      if (snapshot.task.mode === "ctf_solve") {
-        let ctfOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane);
-        const result = await loop.run({
-          runId,
-          task: snapshot.task,
-          mode: "assist",
-          maxTurns: 1,
-          userPrompt: text,
-          onTurn: (outcome) => { ctfOutcome = outcome; },
-          onEvent: (event) => emitAgentEvent(event, emit),
-          onLaneReady: async (activeLane) => {
-            this.activeLanes.set(runId, activeLane);
-            if (this.pauseRequests.has(runId)) {
-              await this.ensurePaused(runId, "Paused by user");
-              await activeLane.abort("Paused by user");
-            }
-          },
-        });
-        if (result.status === "PAUSED" || this.pauseRequests.has(runId)) {
-          emit({ type: "paused", runId });
-          return;
-        }
-        emit({
-          type: "done",
-          text: ctfOutcome?.text ?? `CTF turn finished with ${result.status}.`,
-          stopReason: ctfOutcome?.stopReason ?? result.status.toLowerCase(),
-          usage: normalizeUsage(ctfOutcome?.usage) ?? emptyUsage(),
-          claimVerification: ctfOutcome?.claimVerification,
-        });
-        return;
-      }
-      if (runKind(snapshot.task) === "chat") {
-        const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
-        const challengeClassification = classifyChallengePrompt(text, projectRoot);
-        lane = await this.createCodingLane({
-          projectRoot,
-          installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
-          config: runConfig,
-          capabilities,
-          ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      } else {
-        this.assertOpen();
-        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
-        runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-        lane = await PiCodingLane.create({
-          projectRoot: recovery.fixture.path,
-          installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
-          config: runConfig,
-          deferClaimAcceptance: true,
-          sessionId: `${runId}-coding`,
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      }
+      this.assertOpen();
+      const recovery = runKind(snapshot.task) === "chat"
+        ? undefined
+        : await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
+      const projectRoot = runKind(snapshot.task) === "chat"
+        ? codingWorkspace(snapshot.task, workspacePath, this.root)
+        : recovery!.fixture.path;
+      const challengeClassification = classifyChallengePrompt(`${text}\n${snapshot.task.objective}`, projectRoot);
+      lane = await this.createCodingLane({
+        projectRoot,
+        installRoot: this.root,
+        runId,
+        runDir: join(this.services.runsRoot, runId),
+        controlStore: this.services.control,
+        artifactStore: this.services.artifacts,
+        journal: this.services.journal,
+        claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
+        config: runConfig,
+        capabilities,
+        contextCompactionThreshold,
+        deferClaimAcceptance: true,
+        sessionId: `${runId}-${runKind(snapshot.task) === "chat" ? "chat" : "coding"}`,
+        ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
+        onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
+      });
       this.assertOpen();
       this.activeLanes.set(runId, lane);
       if (this.pauseRequests.has(runId)) {
@@ -519,20 +477,6 @@ export class DebugDataService {
         return;
       }
       let outcome = await lane.prompt(text);
-      // The fixture-backed CTF loop already has an outer replan loop. GUI chat
-      // historically did not: a guard termination was rendered to the user
-      // and the lane was closed, so a recoverable probe loop required a manual
-      // second message. Preserve ordinary coding semantics, but give an
-      // explicitly challenge-shaped prompt two bounded automatic replans so
-      // the evidence already collected can be turned into a solver.
-      for (let retry = 0; isLikelyCtfPrompt(text) && retry < 2 && isCtfReplanTermination(outcome.termination); retry += 1) {
-        if (this.pauseRequests.has(runId)) break;
-        outcome = await lane.prompt([
-          "[ProofBlade automatic CTF replan]",
-          "The previous bounded turn stopped because the current probe family or observation window did not converge.",
-          "Use the existing artifacts/evidence as memory, state one new hypothesis, and switch to a small solver or a materially different bounded test. Do not repeat the same probe.",
-        ].join("\n"));
-      }
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
@@ -553,7 +497,6 @@ export class DebugDataService {
       }
     } finally {
       await lane?.close().catch(() => undefined);
-      await runtime?.close().catch(() => undefined);
       this.activeLanes.delete(runId);
       this.pauseRequests.delete(runId);
       this.streamEmitters.delete(runId);
@@ -743,7 +686,9 @@ export function runKind(task: Pick<TaskContract, "mode">): RunKind {
   return task.mode === "coding_assistant" ? "chat" : "fixture";
 }
 
-export function codingConversationTask(runId: string, title: string, root: string): TaskContract {
+export function codingConversationTask(runId: string, title: string, root: string, verificationCommand?: string): TaskContract {
+  const normalizedVerificationCommand = verificationCommand?.trim();
+  if (normalizedVerificationCommand && normalizedVerificationCommand.length > 16_000) throw new Error("Verification command is too long (maximum 16,000 characters)");
   return {
     schema_version: 1,
     task_id: runId,
@@ -753,7 +698,11 @@ export function codingConversationTask(runId: string, title: string, root: strin
     objective: title.trim() || "新对话",
     inputs: [],
     success_criteria: [],
-    verification: { kind: "reproduction", required_reproductions: 0 },
+    verification: {
+      kind: "reproduction",
+      required_reproductions: normalizedVerificationCommand ? 1 : 0,
+      ...(normalizedVerificationCommand ? { command: normalizedVerificationCommand } : {}),
+    },
     scope: {
       allowed_hosts: ["*"],
       allowed_ports: [],
@@ -834,8 +783,16 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       }
     }
     if (!isRecord(event.payload?.claimVerification)) continue;
-    const message = [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
-    if (message) message.claimVerification = event.payload?.claimVerification as unknown as ChatMessageDebug["claimVerification"];
+    const claimVerification = event.payload?.claimVerification as unknown as ChatMessageDebug["claimVerification"];
+    const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
+    const message = (piEntryId ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId) : undefined)
+      ?? [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
+    if (message) {
+      message.claimVerification = claimVerification;
+      if (claimVerification?.status === "unverified") {
+        message.text = rewriteUnverifiedClaimText(message.text, claimVerification.reason);
+      }
+    }
   }
   let latestUserPrompt = "";
   for (const message of messages) {
@@ -850,16 +807,13 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
         status: "unverified",
         reason: "历史消息没有候选复现记录。",
       };
+      message.text = rewriteUnverifiedClaimText(message.text, message.claimVerification.reason);
     }
   }
   return messages;
 }
 
 function isRecoverableTermination(value: unknown): value is NonNullable<AgentOutcome["termination"]> {
-  return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm" || value === "experiment_budget";
-}
-
-function isCtfReplanTermination(value: unknown): boolean {
   return value === "repeated_tool_failure" || value === "no_progress" || value === "tool_failure_storm" || value === "experiment_budget";
 }
 
@@ -950,6 +904,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asContent(value: unknown): ContentLike[] {
   return Array.isArray(value) ? value.filter((item): item is ContentLike => Boolean(item && typeof item === "object")) : [];
+}
+
+function contextRuntimeInfo(events: readonly HarnessEvent[]): ContextRuntimeInfo | undefined {
+  const usageEvent = [...events].reverse().find((event) => event.type === "model_usage");
+  if (!usageEvent) return undefined;
+  const usage = usageEvent.payload?.usage as { input?: unknown; cacheRead?: unknown } | undefined;
+  const usageInput = Number(usage?.input ?? 0);
+  const cacheRead = Number(usage?.cacheRead ?? 0);
+  const epochEvent = [...events].reverse().find((event) => event.type === "request_epoch_started");
+  const contextWindow = Number((epochEvent?.payload?.epoch as { contextWindow?: unknown } | undefined)?.contextWindow ?? 0);
+  if (!Number.isFinite(contextWindow) || contextWindow <= 0) return undefined;
+  const usedTokens = Math.max(0, usageInput) + Math.max(0, cacheRead);
+  const estimatedTokens = Number(usageEvent.payload?.contextEstimatedTokens);
+  return {
+    contextWindow,
+    usedTokens,
+    remainingTokens: Math.max(0, contextWindow - usedTokens),
+    utilization: usedTokens / contextWindow,
+    ...(Number.isFinite(estimatedTokens) && estimatedTokens > 0 ? { estimatedTokens } : {}),
+    lastCacheRead: Math.max(0, cacheRead),
+    lastUpdatedAt: usageEvent.ts,
+  };
 }
 
 function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {

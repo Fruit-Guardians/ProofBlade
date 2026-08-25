@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.20",
+  "version": "0.10.22",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-25T05:00:00.000Z",
+  "updatedAt": "2026-08-25T06:20:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 18,
-    "securityAuditCount": 18,
-    "lastBugAuditAt": "2026-08-25T05:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-25T05:00:00.000Z",
-    "sourceHash": "f6e486cc2c844c856ae2fc064f295c81d6e486b40217505230134dff76de76a2",
+    "bugAuditCount": 20,
+    "securityAuditCount": 20,
+    "lastBugAuditAt": "2026-08-25T06:20:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T06:20:00.000Z",
+    "sourceHash": "a8777e5cb18ddb06698725c84f680bfa8c8a52af9ae96ae20c43b3325d8504f2",
     "result": "passed"
   }
 }
@@ -24,11 +24,11 @@
 
 ## 入口与边界
 
-- `coding-lane.ts` 是唯一生产 Agent lane：普通对话和 Fixture/CTF 任务都由它驱动；Fixture 只通过工作区、任务快照和 `deferClaimAcceptance` 改变边界。确定性 lane 仅由评测和单元测试注入。
+- `coding-lane.ts` 是唯一生产 Agent lane：普通 Chat、CTF Chat、Fixture 和 Competition 都由它驱动；差异只来自不可变 `TaskContract` 能力和外层是否需要多轮 Coordinator，不再分叉 Tool、上下文、Evidence 或 Completion 系统。确定性 lane 仅由评测和单元测试注入。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_claim` 是 Coding 结论复现门。
-- Fixture/GUI 的 `deferClaimAcceptance` 模式会让 `verify_claim` 通过 Pi 的 `terminate` 结束当前 Provider 回合，把控制权交回外层 `RunCoordinator` 做 hidden-scorer 或 task-owned verifier；Competition 不启用该模式，因此同一回合仍可先观察再调用 `submit_flag`。
+- `CodingClaimVerifier` 是唯一候选验证路径。任务绑定的 reproduction command 对所有模式都走同一 verifier journal；没有绑定命令的普通探索仍可继续，但只能写入明确标记的 observation，不能接受 Completion，最终文本也会统一标记为未验证。`deferClaimAcceptance` 只控制外层编排时机，不改变验证规则。
 - `ChallengeToolProfile.firstActionPlan` 将首个挑战动作结构化为允许的 Tool 集和有界调用次数；Preflight 结果与该计划一起写入 Run。Coding lane 在 Pi 的 `tool_call` 边界拒绝越过首探测的宽泛工具，首个成功 Observation 后解除限制；恢复时从当前代 Observation 推导已完成状态。
 - CTF 硬约束由持久化 `TaskContract` 的 `mode/target_kind` 判定，不能依赖 executor prompt 是否包含 “CTF/flag” 关键词；这样 Competition/Fixture 的实验预算和 evidence-first replan 不会因提示词投影变化而失效。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
@@ -45,13 +45,13 @@
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 
-Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再构造单调 Provider 视图并记录 compaction 请求；真正的 `harness.compact()` 必须等当前 Agent 回合结束、Harness 恢复 idle 后执行。`length` 响应使用机械检查点压缩后自动续跑，最多两次，超过上限必须显式报错而非返回空答案。Coding chat 的重复观察先追加软提示并保留当前 Provider 回合，Solver/Competition 仍由硬守卫停止并交给外层重规划。Provider idle/error 和人工暂停即使没有模型文本，也必须持久化可见的状态说明；错误或人工暂停的回合不启动普通摘要请求。
+Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固定开销和 Provider 安全余量，再以较低的主动维护阈值构造单调 Provider 视图；上下文达到软阈值时先 snip/prune，再在当前回合结束后由同一 `harness.compact()` 链完成压缩和 checkpoint。`length` 响应使用机械检查点压缩后自动续跑。重复观察、失败风暴、实验预算、Tool budget 和 claim verification 都进入同一 continuous-recovery 维护链，追加修复提示、集中 Evidence 整理和换策略要求，不强行结束 Agent 回合。Provider idle/error 和人工暂停即使没有模型文本，也必须持久化可见的状态说明；错误或人工暂停的回合不启动普通摘要请求。
 
 重复 Tool 失败断路器通过 Pi `terminate` 停止单一工具批次；无进展断路器在单回合滚动窗口内比较 Tool Contract 明确声明为只读且无副作用的工具参数和稳定 Artifact 内容哈希，第三次取回同一观察时停止。待处理终止携带窗口来源，同批 process 成功可取消 read-window 终止，但不能取消 declared-no-progress-window 终止；后续 read-window 终止也不得覆盖或降级已有的 declared-no-progress 终止。混合批次不满足 Pi 的全结果终止条件时，Runtime 必须在下一次 Provider 请求前停止；同批出现符合该窗口进展语义的观察则取消顺序相关的无进展停止。只有 Harness 最终以空文本 `toolUse/error` 确认终止后，恢复提示才能投影到 `AgentOutcome` 和持久化的 `assistant_message`；正常完成的回合不得标记为断路器终止，模型已经生成的非空文本优先保留。
 
 Evidence 变更操作返回 `durableProgress` 和基于 Artifact 内容哈希的稳定 `progressKey`；幂等复用、相同内容的新 Artifact 以及无关措辞变化不得被当作持久进展。显式 `durableProgress=false` 的 Evidence 观察在普通进程型 `bash` 之间继续累计，只由 `durableProgress=true` 或真实 workspace/network/platform 副作用清除，避免模型用重复读取穿插 Evidence 整理来重置收敛窗口。`no_progress` 终止记录其来源窗口：重复纯只读观察触发的 read-window 允许同批次成功的普通 process 取消，声明无进展触发的 declared-no-progress-window 仍拒绝 process；两者都接受显式 `durableProgress=true` 和真实 workspace/network/platform 副作用。未解析策略在 read-window 中也按潜在进展处理。单轮连续 12 次不同 Tool 失败且没有持久进展时触发 `tool_failure_storm`，避免通过变换错误参数绕过完全相同失败断路器。Windows Host 提示必须要求使用 `python`/`py` 并把中间文件保存在工作区相对目录。
 
-`evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息追加到现有 transcript 之后，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
+`evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。自动 bash/read observation 只进入检索和上下文索引，不自动清空 curation backlog；显式 `evidence record` 或 verifier Evidence 才算集中整理。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息追加到现有 transcript 之后，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 
 Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外层 Tool Schema 也返回配置允许的嵌套 Tool 策略摘要。
 

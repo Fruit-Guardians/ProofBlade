@@ -5,6 +5,8 @@ import { pruneAgentMessages, repairAgentMessages, type AgentContextPruneMode } f
 export interface ContextMaintenanceInput {
   messages: AgentMessage[];
   availableTokens: number;
+  /** Optional lower soft limit used to compact long-running lanes proactively. */
+  maintenanceLimitTokens?: number;
   /** Tokens occupied by the compiled L0-L5 context outside the Pi transcript. */
   baseTokens?: number;
   /** Maximum size for the returned transcript after deterministic pruning. */
@@ -32,7 +34,8 @@ export interface ContextMaintenancePreparation {
 export function prepareContextMaintenance(input: ContextMaintenanceInput): ContextMaintenancePreparation {
   const repaired = repairAgentMessages(input.messages);
   const baseTokens = Math.max(0, Math.floor(input.baseTokens ?? 0));
-  const plan = planContextMaintenance(baseTokens + repaired.estimatedTokens, input.availableTokens);
+  const maintenanceLimit = Math.min(input.availableTokens, Math.max(256, Math.floor(input.maintenanceLimitTokens ?? input.availableTokens)));
+  const plan = planContextMaintenance(baseTokens + repaired.estimatedTokens, maintenanceLimit);
   if (!plan.shouldSnip) {
     return {
       messages: repaired.messages,
@@ -47,12 +50,12 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
   }
   const messageBudget = Math.max(256, Math.floor(input.messageBudget ?? Math.max(256, input.availableTokens - baseTokens)));
   const snipped = pruneAgentMessages(repaired.messages, messageBudget, { mode: "snip" });
-  const snipPlan = planContextMaintenance(baseTokens + snipped.estimatedTokens, input.availableTokens);
+  const snipPlan = planContextMaintenance(baseTokens + snipped.estimatedTokens, maintenanceLimit);
   const mustEmergencyPrune = plan.shouldPrune && snipped.estimatedTokens > messageBudget;
   const pruned = mustEmergencyPrune
     ? pruneAgentMessages(snipped.messages, messageBudget, { mode: "emergency" satisfies AgentContextPruneMode })
     : snipped;
-  const postPlan = planContextMaintenance(baseTokens + pruned.estimatedTokens, input.availableTokens);
+  const postPlan = planContextMaintenance(baseTokens + pruned.estimatedTokens, maintenanceLimit);
   return {
     messages: pruned.messages,
     estimatedTokens: pruned.estimatedTokens,

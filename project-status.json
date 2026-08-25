@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-25T13:20:00+08:00",
+  "updatedAt": "2026-08-25T22:48:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -232,6 +232,32 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260825-006",
+      "occurredAt": "2026-08-25T22:48:00+08:00",
+      "summary": "统一普通 Chat、CTF Chat 和 Fixture 的 Coding Lane、任务验证与未验证候选输出路径。",
+      "branch": "codex/stable-dynamic-context-tail",
+      "commit": "90fc7a3",
+      "planIds": [
+        "PLAN-110",
+        "PLAN-120",
+        "PLAN-200",
+        "PLAN-220"
+      ],
+      "changes": [
+        "普通 Chat 可绑定不可变任务验证命令，并与 CTF/Fixture 共用 CodingClaimVerifier、verifier journal、Completion 和 Evidence 投影链",
+        "GUI Chat 和 CTF Chat 统一创建同一个 Coding Lane，移除模式专用的交互执行分支和自动再规划分支",
+        "未验证候选的最终文本和历史投影统一显示未验证标记，并禁止保留确认式 Flag 标签",
+        "同步 README、GUI 文档、组件说明、测试和生成 API 映射"
+      ],
+      "validation": [
+        "npm run typecheck passed",
+        "npm run build --silent passed",
+        "npm run api:index:check:all passed",
+        "npm run check:components -- --base main passed",
+        "GUI debug-data and materials verification regression tests passed"
+      ]
+    },
     {
       "id": "UPDATE-20260825-005",
       "occurredAt": "2026-08-25T13:20:00+08:00",

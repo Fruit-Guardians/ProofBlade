@@ -166,12 +166,17 @@ test("[contract:repeated-tool-failure-entry-link] an old breaker event cannot ov
 });
 
 test("projects durable claim verification onto the matching assistant message", () => {
-  const projected = conversationMessagesFromEntries(entries, [{
+  const projected = conversationMessagesFromEntries([
+    { type: "message", id: "claim-user", message: { role: "user", content: [{ type: "text", text: "find flag" }] } },
+    { type: "message", id: "assistant-claim", message: { role: "assistant", content: [{ type: "text", text: "Flag：PB{candidate}" }] } },
+  ], [{
     type: "assistant_message",
-    payload: { text: "checking", claimVerification: { required: true, status: "unverified", reason: "missing reproduction" } },
+    payload: { text: "Flag：PB{candidate}", piEntryId: "assistant-claim", claimVerification: { required: true, status: "unverified", reason: "missing reproduction" } },
   }] as HarnessEvent[]);
   assert.equal(projected[1]?.claimVerification?.status, "unverified");
   assert.equal(projected[1]?.claimVerification?.reason, "missing reproduction");
+  assert.doesNotMatch(projected[1]?.text ?? "", /\bflag\s*[:：]/i);
+  assert.match(projected[1]?.text ?? "", /本轮候选未验证/);
 });
 
 test("marks a legacy challenge answer without reproduction metadata as unverified", () => {
@@ -197,6 +202,9 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(task.target, "D:/workspace");
   assert.deepEqual(task.success_criteria, []);
   assert.equal(task.verification.required_reproductions, 0);
+  const verifierTask = codingConversationTask("CHAT-002", "带验证命令的普通对话", "D:/workspace", "node solve.mjs");
+  assert.equal(verifierTask.verification.command, "node solve.mjs");
+  assert.equal(verifierTask.verification.required_reproductions, 1);
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
@@ -506,7 +514,7 @@ test("[contract:no-progress-chat-done] streams a convergence stop as a normal as
   }
 });
 
-test("CTF chat automatically replans after a bounded guard termination", async () => {
+test("CTF-shaped chat uses the same continuous coding lane without a mode-specific replan", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-replan-"));
   const prompts: string[] = [];
   const lane: AgentLanePort = {
@@ -528,10 +536,9 @@ test("CTF chat automatically replans after a bounded guard termination", async (
     const events: ChatStreamEvent[] = [];
     await data.chat(runId, "题目描述：求解flag", (event) => events.push(event), undefined, undefined, root);
 
-    assert.equal(prompts.length, 2);
-    assert.match(prompts[1]!, /automatic CTF replan/);
+    assert.equal(prompts.length, 1);
     const done = events.find((event): event is Extract<ChatStreamEvent, { type: "done" }> => event.type === "done");
-    assert.equal(done?.text, "verified flag");
+    assert.equal(done?.text, "probe budget reached");
     assert.equal(done?.stopReason, "stop");
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -702,7 +709,7 @@ test("GUI CTF input stages attachments and completes through the shared reproduc
   }
 });
 
-test("GUI CTF chat resumes the same RunCoordinator loop with the latest user instruction", { timeout: 30_000 }, async () => {
+test("GUI CTF chat uses the same Coding Lane with the latest user instruction", { timeout: 30_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-chat-"));
   const source = join(root, "source");
   await mkdir(source, { recursive: true });
@@ -710,11 +717,11 @@ test("GUI CTF chat resumes the same RunCoordinator loop with the latest user ins
   let forwardedEvents = 0;
   let data: DebugDataService | undefined;
   try {
-    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async (options) => {
-      if (options.onEvent) forwardedEvents += 1;
-      options.onEvent?.({ type: "tool_execution_start", toolCallId: "ctf-tool-1", toolName: "read", args: {} });
+    const makeLane = (onEvent?: (event: HarnessEvent) => void): AgentLanePort => {
+      if (onEvent) forwardedEvents += 1;
+      onEvent?.({ type: "tool_execution_start", toolCallId: "ctf-tool-1", toolName: "read", args: {} });
       return {
-        async prompt(prompt) {
+        async prompt(prompt: string) {
           prompts.push(prompt);
           return { text: "本轮只完成了侦察", stopReason: "stop", usage: zeroUsage() };
         },
@@ -723,7 +730,8 @@ test("GUI CTF chat resumes the same RunCoordinator loop with the latest user ins
         async isIdle() { return true; },
         async close() {},
       };
-    });
+    };
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => makeLane(options.onEvent), async (options) => makeLane(options.onEvent));
     const runId = "GUI-CTF-CHAT-001";
     const command = process.platform === "win32" ? "type challenge.md" : "cat challenge.md";
     await data.startCtfSolve({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
@@ -738,7 +746,8 @@ test("GUI CTF chat resumes the same RunCoordinator loop with the latest user ins
     assert.match(prompts[1]!, /继续检查附件中的约束/);
     assert.equal(forwardedEvents, 1);
     assert.ok(events.some((event) => event.type === "tool_start" && event.toolCallId === "ctf-tool-1"));
-    assert.ok(events.some((event) => event.type === "paused"));
+    assert.ok(events.some((event) => event.type === "done"));
+    assert.equal(events.some((event) => event.type === "error"), false);
   } finally {
     await data?.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });

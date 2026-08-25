@@ -19,7 +19,15 @@ export class ContextCompiler {
     const observations = Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-12);
     const reasoningTrees = Object.values(snapshot.reasoningTrees).filter((item) => item.generation === snapshot.generation).sort((a, b) => b.updatedSeq - a.updatedSeq).slice(0, 24);
     const organizedNodeIds = new Set(reasoningTrees.flatMap((tree) => tree.nodeIds));
-    const evidence = Object.values(snapshot.evidence).filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation && !organizedNodeIds.has(item.id)).sort(bySeq).slice(-16);
+    // Automatic bash/read observations remain searchable through L4 and the
+    // artifact index. Keep only explicitly curated Evidence and verifier
+    // Evidence in the compact L3 ledger so routine output does not crowd out
+    // durable reasoning.
+    const evidence = Object.values(snapshot.evidence)
+      .filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation && !organizedNodeIds.has(item.id))
+      .filter((item) => item.source.tool === "evidence" || item.provenance?.recordedBy === "verifier" || !["bash", "bash:error", "read"].includes(item.source.tool ?? ""))
+      .sort(bySeq)
+      .slice(-16);
     const completions = Object.values(snapshot.completions).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-6);
     const jobs = Object.values(snapshot.jobs).filter((job) => job.generation === snapshot.generation && ["QUEUED", "RUNNING", "UNKNOWN"].includes(job.status)).sort(bySeq);
     const handoffs = Object.values(snapshot.handoffs).filter((handoff) => handoff.status === "PROPOSED" || handoff.status === "ACCEPTED").sort(bySeq).slice(-2);
