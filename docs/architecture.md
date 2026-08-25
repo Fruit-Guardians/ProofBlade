@@ -47,16 +47,24 @@ Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pu
 The single-agent path keeps active control outside the model:
 
 ```text
-Drive Loop -> Pi coding lane -> ProofBlade tools -> Effect Journal -> Sandbox
-     |                                  |               |
-     |                                  -> Observer -> Observation/Evidence
-     -> Phase machine -> Completion proposal -> Independent verifier
-                                              -> Report -> verifier-gated finish
+RunCoordinator -> Pi coding lane -> ProofBlade tools -> Effect Journal -> Sandbox
+      |                                  |               |
+      |                                  -> Observer -> Observation/Evidence
+      -> DomainPhase + WorkItem -> Completion proposal -> Independent verifier
+                                                     -> Report -> SUBMIT -> verifier-gated finish
 ```
 
 Pi owns the provider turn and its JSONL Session. The coding lane can inspect the target, propose intents/hypotheses/facts and submit a candidate for verification. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
 
-The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
+`RunCoordinator` is the sole active phase and WorkItem coordinator shared by
+Competition, GUI and Fixture/Evaluation entrypoints. In Auto mode a proposed
+candidate enters the verifier-owned Effect Journal path; in Assist mode it
+pauses with a durable proposal and resumes through the same path. Dynamic flag
+shortcuts use the same verifier-owned effect rather than bypassing the state
+machine. The verifier executes the configured number of reproduction attempts
+through the Effect Journal. Only the verifier lane can confirm a fact, verify a
+completion or commit `SUCCEEDED`; recovery also repairs a phase/WorkItem gap
+before the terminal event is appended.
 
 Before the first CTF model turn, the selected `ChallengeToolProfile` contributes a durable `firstActionPlan` to `RunToolPreparation`. It names the small set of tools allowed to establish the initial observation and caps those calls; `verify_claim`, platform submission and reproduction tools remain an explicit completion escape. The Coding lane enforces this at the Pi `tool_call` boundary, and a recovered lane treats the current-generation Observation ledger as the source of truth for whether the first action already completed. This is a coordinator/tool contract, not a prompt-only instruction, so a model cannot spend its initial turn rediscovering tools or launching an unrelated experiment.
 

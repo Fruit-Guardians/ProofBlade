@@ -12,7 +12,7 @@ ProofBlade 现在最有价值的部分已经不是“再增加一个 Agent 角�
 - Docker 运行时已经有按 Run 隔离的工作区、非 root 用户、资源上限和 target-only 出口网关；
 - `CompetitionChallengeSolver` 已完成平台取题、附件解包、启动环境、提交和清理的主流程。
 
-但真实 Web/Pwn 目前仍主要走 `Competition Loop -> PiCodingLane -> bash/read/edit/write`。源码注释也明确说明比赛路径暂时“删除了 phase/planner choreography 和 verifier orchestration”。这导致控制平面记录了很多 Artifact，却没有把解题过程约束成“目标模型 → 可证伪假设 → 单次实验 → 独立复现 → 提交”的闭环。
+下面的 Web/Pwn 诊断是本计划早期基线，保留用于解释为什么需要这轮改造；截至 2026-08-25，原先的缺口已经由共享 `RunCoordinator`、`RunWorkScheduler` 和 verifier-first 收尾路径补齐。Competition、GUI、Fixture/Evaluation 现在都通过同一个 `RunCoordinator` 投影 `INTAKE → RECON → TARGET_MODEL → HYPOTHESIS → EXPERIMENT → REPRODUCE → REPORT → SUBMIT`，而不是维护独立的比赛 Solver lane。平台提交、动态 flag 和本地复现都必须产生 verifier-owned Effect/Evidence，终态还绑定 WorkItem 并可从 replay 重建。
 
 最近 Run 可以直接验证这个问题：
 
