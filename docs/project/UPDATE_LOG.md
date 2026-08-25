@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T12:50:00+08:00
+> 状态更新时间：2026-08-25T13:05:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260825-004 | 2026-08-25T13:05:00+08:00 | PLAN-200, PLAN-210 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-003 | 2026-08-25T12:50:00+08:00 | PLAN-110, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-002 | 2026-08-25T12:45:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-001 | 2026-08-25T12:30:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/proofblade-agent-foundation | 本条记录所在提交 |
@@ -43,6 +44,25 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260825-004
+
+时间：2026-08-25T13:05:00+08:00
+
+摘要：把 P2 的 20+ holdout 管线交付与真实 Provider 能力门槛拆开记录，避免将 provider-free 结果误报为模型解题率。
+
+### 变更
+
+- 确认 fixtures/holdout/manifest.json 为 27 个 hash-bound case：Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1
+- 通过 eval-holdout 实跑两个本地变体各 27/27，记录 Evidence、Replay Parity、首次 Evidence、提交次数和候选脱敏指标，Provider 请求保持为 0
+- 保留真实 eval-real 的严格门槛：至少两个 Variant、20+ case、Web/Pwn 覆盖、真实 Provider telemetry、明确 token pricing 和 baseline/regression gate
+- 历史 24-case Web/Pwn 真实报告仍未通过 strict gate，因此 Planner/Refiner 继续停留在策略层，不引入第二条解题 lane
+
+### 验证
+
+- [x] npm run cli -- eval-holdout fixtures/holdout/manifest.json --attempts 1 --max-turns 1 --enforce-gate passed: both local variants 27/27
+- [x] holdout report passed candidate_leaks=0, replay/evidence parity=1 and providerRequests=0
+- [x] PR #77 GitHub CI passed: contracts, npm run verify, 583/583 tests and audit
 
 ## UPDATE-20260825-003
 

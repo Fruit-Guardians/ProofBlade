@@ -26,7 +26,7 @@ ProofBlade（证锋）是一个**参赛用**的 CTF 解题 Agent，不是研究�
 
 ```powershell
 npm install
-npm test                    # 561 个测试，全绿才算环境正常
+npm test                    # 583 个测试，全绿才算环境正常
 npm run gui                 # GUI 在 http://127.0.0.1:4172
 ```
 

@@ -1,13 +1,13 @@
 # 项目计划
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T12:50:00+08:00
+> 状态更新时间：2026-08-25T13:05:00+08:00
 
 ## 概览
 
 - 计划总数：9
-- 进行中：4
-- 待开始：2
+- 进行中：5
+- 待开始：1
 - 受阻：1
 - 已完成：2
 
@@ -20,7 +20,7 @@
 | PLAN-120 | P0 | Milestone 4 | 进行中 | 35% | unassigned | 2026-08-12T16:30:00+08:00 |
 | PLAN-220 | P0 | Milestone 2 / 5 | 进行中 | 45% | unassigned | 2026-08-20T12:15:00+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
-| PLAN-200 | P1 | Milestone 6 | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
+| PLAN-200 | P1 | Milestone 6 | 进行中 | 45% | unassigned | 2026-08-25T13:05:00+08:00 |
 | PLAN-210 | P3 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-24T22:00:00+08:00 |
 
 ## PLAN-100 二进制 Artifact 与 Reverse 能力包
