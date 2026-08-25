@@ -1603,7 +1603,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:828](../../../packages/materials/src/runtime/coding-lane.ts:828)
+- Source: [src/runtime/coding-lane.ts:827](../../../packages/materials/src/runtime/coding-lane.ts:827)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -1612,7 +1612,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:895](../../../packages/materials/src/runtime/coding-lane.ts:895)
+- Source: [src/runtime/coding-lane.ts:894](../../../packages/materials/src/runtime/coding-lane.ts:894)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1639,7 +1639,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:721](../../../packages/materials/src/runtime/coding-lane.ts:721)
+- Source: [src/runtime/coding-lane.ts:720](../../../packages/materials/src/runtime/coding-lane.ts:720)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -1648,7 +1648,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:716](../../../packages/materials/src/runtime/coding-lane.ts:716)
+- Source: [src/runtime/coding-lane.ts:715](../../../packages/materials/src/runtime/coding-lane.ts:715)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`

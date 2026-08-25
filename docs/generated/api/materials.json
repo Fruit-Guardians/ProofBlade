@@ -79,7 +79,7 @@
     "src/recovery/run-recovery.ts": "088038f7edc9bf890868bda39f56762e170188e10874e1f81efc997d90e5b0df",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "57db0f6e2a63b16265abfdaa4f7315fbda25204c5e59a8dfd680f4aed4d1b89c",
-    "src/runtime/coding-lane.ts": "5f733023709df023adfb0ca98214b0ef051b0e818c9ad477adad051bf71a7f33",
+    "src/runtime/coding-lane.ts": "9ac6a0d1ccffea415590ebe1c5bb3a70c6bebe0e0df60fe74594d90790dc6111",
     "src/runtime/coding-resources.ts": "2e0631bdbed07fa8e57b0ef3c731281995803bb7174ec74e5cdd9cca4a45d87f",
     "src/runtime/coding-turn-projection.ts": "7f153cee837835e60598ece5ba88e2e0e6659484e05b68730b2f99591ca52329",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -4659,7 +4659,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 828,
+      "line": 827,
       "signature": "(kind?: TaskContract[\"target_kind\"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string",
       "summary": "Category-specialized guidance for the CTF orchestrator.",
       "summarySource": "tsdoc",
@@ -4718,7 +4718,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 895,
+      "line": 894,
       "signature": "(platform?: NodeJS.Platform): string",
       "summary": "Inferred summary: coding host guidance operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -4887,7 +4887,7 @@
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ],
-      "structureHash": "de9ccfea8f2d4bd39f0aeb78f8d3cea478092a8c99292c0acb96d7487c81d156"
+      "structureHash": "2fd57261b50d99847ecd1711efe21464b1cbda3735645fe68573e24e6582daf7"
     },
     {
       "id": "@proofblade/materials::function::isChallengeTask",
@@ -4896,7 +4896,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 721,
+      "line": 720,
       "signature": "(task: Pick<TaskContract, \"mode\" | \"target_kind\">): boolean",
       "summary": "Durable task classification used when generated executor prompts omit CTF keywords.",
       "summarySource": "tsdoc",
@@ -4955,7 +4955,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-lane.ts",
       "exportPath": "@proofblade/materials",
-      "line": 716,
+      "line": 715,
       "signature": "(text: string): boolean",
       "summary": "Detect challenge-shaped prompts at the GUI boundary, where the durable chat",
       "summarySource": "tsdoc",

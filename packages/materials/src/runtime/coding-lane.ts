@@ -12,7 +12,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
-import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-anchor.js";
+import { latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
@@ -677,11 +677,10 @@ async function submissionCounters(
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {
   if (!forestContext) return messages;
   const output = [...messages];
-  let latestUserIndex = -1;
-  for (let index = output.length - 1; index >= 0; index -= 1) {
-    if (isRealUserTask(output[index])) { latestUserIndex = index; break; }
-  }
-  const insertionIndex = latestUserIndex >= 0 ? latestUserIndex : output.length;
+  // Keep changing context after the append-only transcript. This preserves the
+  // existing transcript prefix for provider prompt/KV-cache reuse while leaving
+  // tool-call/result pairs and the external user task untouched.
+  const insertionIndex = output.length;
   output.splice(insertionIndex, 0, createCustomMessage(
     "proofblade_reasoning_forest",
     forestContext,

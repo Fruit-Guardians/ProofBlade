@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.17",
+  "version": "0.10.18",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-13T04:00:00.000Z",
+  "updatedAt": "2026-08-25T04:30:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 15,
-    "securityAuditCount": 15,
-    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
-    "sourceHash": "5f9dac409e6001403ee62f26681d74918e506d336613ba0267eb92e77d9daf10",
+    "bugAuditCount": 16,
+    "securityAuditCount": 16,
+    "lastBugAuditAt": "2026-08-25T04:30:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T04:30:00.000Z",
+    "sourceHash": "a7ab65ae2804458ba8d64d93acf10cd8c12dbb0a8a748683eb6613544e247e3a",
     "result": "passed"
   }
 }
@@ -51,7 +51,7 @@ Coding Lane 的 context hook 按模型窗口扣除输出预算、System/Tool 固
 
 Evidence 变更操作返回 `durableProgress` 和基于 Artifact 内容哈希的稳定 `progressKey`；幂等复用、相同内容的新 Artifact 以及无关措辞变化不得被当作持久进展。显式 `durableProgress=false` 的 Evidence 观察在普通进程型 `bash` 之间继续累计，只由 `durableProgress=true` 或真实 workspace/network/platform 副作用清除，避免模型用重复读取穿插 Evidence 整理来重置收敛窗口。`no_progress` 终止记录其来源窗口：重复纯只读观察触发的 read-window 允许同批次成功的普通 process 取消，声明无进展触发的 declared-no-progress-window 仍拒绝 process；两者都接受显式 `durableProgress=true` 和真实 workspace/network/platform 副作用。未解析策略在 read-window 中也按潜在进展处理。单轮连续 12 次不同 Tool 失败且没有持久进展时触发 `tool_failure_storm`，避免通过变换错误参数绕过完全相同失败断路器。Windows Host 提示必须要求使用 `python`/`py` 并把中间文件保存在工作区相对目录。
 
-`evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息插在本轮用户输入前，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
+`evidence` 的 Artifact、Evidence、Graph、Tree 和 Forest 操作共用一个缓存稳定 Tool。Provider 可见 Schema 必须使用根级 `type: object` 和直接字符串枚举，以兼容严格的 OpenAI-compatible Function Calling 校验；每个 operation 的必需字段和互斥字段继续由确定性运行时分支校验。`curation_status` 返回准确的待整理 Artifact ID；`record` 只接受复数 `artifactIds`，`annotate` 只接受单数 `artifactId`。`inspect_forest` 用于方向回顾并返回有界的近期 orphan 名称与摘要，`inspect_tree` 用于局部溯源，`record/link/create_tree/update_tree` 由 Evidence Curator 整理知识。Forest 摘要在每个外部用户回合开始时刷新，作为隐藏动态消息追加到现有 transcript 之后，不进入 System/Tool 稳定前缀或会话持久历史。`load_skill` 和 `mcp_call` 每次执行都要校验当前对话的 enabled set。
 
 Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外层 Tool Schema 也返回配置允许的嵌套 Tool 策略摘要。
 
