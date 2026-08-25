@@ -269,6 +269,13 @@ export function noProgressToolMessage(toolName: string, count: number): string {
   ].join("\n");
 }
 
+export function noProgressToolNudge(toolName: string, count: number): string {
+  return [
+    `[ProofBlade no-progress notice: ${toolName} returned the same observation ${count} times]`,
+    "这是软提示，本轮继续；请先记录最强 Evidence，再改变假设、输入范围或工具。不要原样重复同一探测。",
+  ].join("\n");
+}
+
 export function toolFailureStormMessage(count: number): string {
   return [
     `[ProofBlade tool failure budget: ${count} failures occurred without durable progress]`,

@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.12",
+  "version": "0.7.15",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-13T04:00:00.000Z",
+  "updatedAt": "2026-08-25T05:20:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 12,
-    "securityAuditCount": 12,
-    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
-    "sourceHash": "285e754a3e2cef90ee4801ee3b088d43560771a374e0dfb7b0eb62af87f183dd",
+    "bugAuditCount": 15,
+    "securityAuditCount": 15,
+    "lastBugAuditAt": "2026-08-25T05:20:00.000Z",
+    "lastSecurityAuditAt": "2026-08-25T05:20:00.000Z",
+    "sourceHash": "787bb0210c59de4174a46d6a96c091603e58808c6f77ab8ba538ed45fa3fd7d6",
     "result": "passed"
   }
 }
@@ -20,7 +20,7 @@
 
 ## 职责
 
-提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、能力开关、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
+提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
 
 ## 入口与依赖
 
@@ -31,7 +31,7 @@
 ## 开发规则
 
 - API 响应只暴露 `hasApiKey`，不回传 Key。
-- SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换。
+- SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换；用户暂停或 Provider idle/error 造成的空 Assistant entry 必须由持久化 assistant_message 的可见恢复文本补回，不能留下无提示的空气泡。
 - Runtime 的 `repeated_tool_failure`、`no_progress` 与 `tool_failure_storm` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
 - Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
 - 对话运行时发送按钮切换为暂停按钮；`POST /api/runs/:runId/pause` 必须中止当前 Pi Lane、持久化 `PAUSED` 并经 SSE 回报 `stopping/paused`。下一次发送通过 Control Store 的 `resume` 继续原 Session。
@@ -43,10 +43,11 @@
 - Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 1）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
+- 普通 Coding 对话的名称保存在用户本地 workspace metadata；删除必须由服务端校验 Run 类型和活动状态后删除完整持久目录，并同步移除本地对话偏好。Fixture Run 不提供删除入口，避免破坏复盘材料。
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
 - 新控件必须覆盖运行中、空数据、错误和窄屏状态；Tool 原始 JSON 仍从 durable domain 投影，可读卡片不得替代原始记录。
 - 最终结论的 `verified/unverified` 状态来自 durable `assistant_message` 事件；已验证状态必须显示 Evidence 引用，缺少复现时必须给出醒目的未验证提示。
-- “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
+- “证据与结果”顶层展示可折叠的推理森林摘要；每棵树显示名称、结论、用途、状态、节点/关系/共享计数，展开后查看根节点、来源、类型边、AI 解释和关联树。没有推理树但已有 Evidence/Artifact reasoning node 时，必须展示尚未整理的图节点，不能只显示空的 Fact → Evidence → Artifact 兼容视图。共享节点显示被哪些树采用；旧对话保留 Fact → Evidence → Artifact 兼容视图。
 - `evidence` Tool 的 Forest/Tree/Link 操作必须显示中文动作名和对象 ID，原始 JSON 继续作为调试层保留。
 - 旧 Session 没有验证元数据时，只读投影可根据解题请求与非 ToolUse 最终消息补充 `unverified`；该兼容逻辑不得补造 Evidence 或改写原始消息。
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。

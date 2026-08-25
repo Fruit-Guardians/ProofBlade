@@ -1603,7 +1603,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:827](../../../packages/materials/src/runtime/coding-lane.ts:827)
+- Source: [src/runtime/coding-lane.ts:831](../../../packages/materials/src/runtime/coding-lane.ts:831)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -1612,7 +1612,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:894](../../../packages/materials/src/runtime/coding-lane.ts:894)
+- Source: [src/runtime/coding-lane.ts:898](../../../packages/materials/src/runtime/coding-lane.ts:898)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1621,7 +1621,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:587](../../../packages/materials/src/runtime/coding-lane.ts:587)
+- Source: [src/runtime/coding-lane.ts:591](../../../packages/materials/src/runtime/coding-lane.ts:591)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -1630,7 +1630,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:677](../../../packages/materials/src/runtime/coding-lane.ts:677)
+- Source: [src/runtime/coding-lane.ts:681](../../../packages/materials/src/runtime/coding-lane.ts:681)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -1639,7 +1639,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:720](../../../packages/materials/src/runtime/coding-lane.ts:720)
+- Source: [src/runtime/coding-lane.ts:724](../../../packages/materials/src/runtime/coding-lane.ts:724)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -1648,7 +1648,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:715](../../../packages/materials/src/runtime/coding-lane.ts:715)
+- Source: [src/runtime/coding-lane.ts:719](../../../packages/materials/src/runtime/coding-lane.ts:719)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -6604,16 +6604,16 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:516](../../../packages/materials/src/runtime/coding-lane.ts:516)
+- Source: [src/runtime/coding-lane.ts:520](../../../packages/materials/src/runtime/coding-lane.ts:520)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
+- Tests: `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:528](../../../packages/materials/src/runtime/coding-lane.ts:528)
+- Source: [src/runtime/coding-lane.ts:532](../../../packages/materials/src/runtime/coding-lane.ts:532)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6622,7 +6622,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:520](../../../packages/materials/src/runtime/coding-lane.ts:520)
+- Source: [src/runtime/coding-lane.ts:524](../../../packages/materials/src/runtime/coding-lane.ts:524)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6640,7 +6640,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:524](../../../packages/materials/src/runtime/coding-lane.ts:524)
+- Source: [src/runtime/coding-lane.ts:528](../../../packages/materials/src/runtime/coding-lane.ts:528)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6649,7 +6649,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:456](../../../packages/materials/src/runtime/coding-lane.ts:456)
+- Source: [src/runtime/coding-lane.ts:460](../../../packages/materials/src/runtime/coding-lane.ts:460)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -6662,7 +6662,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
+- Tests: `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### PiAgentLane.close
 - Kind: `method`

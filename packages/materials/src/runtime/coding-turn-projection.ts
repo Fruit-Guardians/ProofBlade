@@ -4,7 +4,7 @@ import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
 
@@ -33,6 +33,8 @@ export interface CodingTurnTermination {
   noProgressWindow?: NoProgressWindow;
   /** Set for a challenge prompt so experiment limits stop the turn, not just nudge it. */
   ctfMode?: boolean;
+  /** Coding chat uses a nudge for repeated observations; Solver keeps hard stops. */
+  softNoProgress?: boolean;
 }
 
 export function projectCodingAssistantText(output: string, termination: CodingTurnTermination): string {
@@ -132,6 +134,17 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         const terminationMessage = preservesDeclaredTermination
           ? termination.message ?? noProgressToolMessage(event.toolName, progress.count)
           : noProgressToolMessage(event.toolName, progress.count);
+        if (termination.softNoProgress) {
+          progressBreaker?.reset();
+          return {
+            content: [
+              ...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item),
+              { type: "text" as const, text: noProgressToolNudge(event.toolName, progress.count) },
+            ],
+            details: { noProgress: true, advisory: true, toolName: event.toolName, count: progress.count, key: progress.key, window: progress.window },
+            isError: false,
+          };
+        }
         if (!preservesDeclaredTermination) {
           termination.message = terminationMessage;
           termination.reason = "no_progress";
@@ -281,7 +294,8 @@ export async function finalizeCodingTurn(options: {
     && options.termination.reason !== undefined
     && (options.response.stopReason === "toolUse" || options.response.stopReason === "error");
   options.termination.confirmed = confirmed;
-  const output = projectCodingAssistantText(rawOutput, options.termination);
+  const output = projectCodingAssistantText(rawOutput, options.termination)
+    || interruptedTurnMessage(options.response.stopReason, options.response.errorMessage);
   const stopReason = confirmed ? "stop" : options.response.stopReason;
   const errorMessage = confirmed
     ? undefined
@@ -316,4 +330,18 @@ export async function finalizeCodingTurn(options: {
     claimVerification,
     termination: confirmed ? options.termination.reason : undefined,
   };
+}
+
+function interruptedTurnMessage(stopReason: AssistantMessage["stopReason"], errorMessage?: string): string {
+  if (stopReason === "aborted") {
+    return [
+      "[ProofBlade] 本轮已停止。",
+      "当前已完成的 Tool 结果、Artifact 和 Evidence 已保留；恢复后将从最近的完整工具交互继续。",
+    ].join("\n");
+  }
+  const reason = errorMessage?.trim() || "Provider 请求未完成";
+  return [
+    `[ProofBlade] 本轮未完成：${reason}`,
+    "当前已完成的 Tool 结果、Artifact 和 Evidence 已保留；请更换策略后继续。",
+  ].join("\n");
 }

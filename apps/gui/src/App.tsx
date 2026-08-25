@@ -2,12 +2,12 @@ import {
   Activity, Archive, Bot, Braces, BrainCircuit, Check, CheckCircle2, ChevronDown, ChevronRight,
   CircleAlert, Clock3, Code2, Database, FileCode2, FileJson2, FlaskConical, Folder, FolderOpen,
   FolderPlus, Gauge, GitBranch, History, KeyRound, Layers3, Link2, ListChecks, Menu, MessageSquare, PanelRight, Pause,
-  Play, Plus, RefreshCw, RotateCcw, Search, Send, ServerCog, Settings, ShieldCheck, TerminalSquare,
+  Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Send, ServerCog, Settings, ShieldCheck, TerminalSquare, Trash2,
   UserRound, Wrench, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startCtfSolve, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startCtfSolve, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
@@ -78,6 +78,7 @@ export function App() {
   const [providerOpen, setProviderOpen] = useState(false);
   const [capabilityOpen, setCapabilityOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const runIdRef = useRef(runId);
@@ -150,7 +151,8 @@ export function App() {
   }, [bootstrap, refreshPoller]);
 
   const filteredRuns = useMemo(() => runs.filter((run) => {
-    const matchesSearch = `${run.runId} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
+    const title = workspaceSettings?.conversations[run.runId]?.title ?? run.objective;
+    const matchesSearch = `${run.runId} ${title} ${run.objective} ${run.targetKind}`.toLowerCase().includes(search.toLowerCase());
     const conversationFolder = workspaceSettings?.conversations[run.runId]?.folderId;
     const matchesFolder = folderFilter === "ALL" || (folderFilter === "UNCATEGORIZED" ? !conversationFolder : conversationFolder === folderFilter);
     return run.kind === runKindFilter && matchesSearch && matchesFolder && (runKindFilter === "chat" || statusFilter === "ALL" || run.status === statusFilter);
@@ -205,7 +207,7 @@ export function App() {
       <div className="run-list">
         {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
           <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
-          <span className="run-item-body"><strong>{run.runId}</strong><small>{run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
+          <span className="run-item-body"><strong>{run.runId}</strong><small>{workspaceSettings?.conversations[run.runId]?.title ?? run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
           <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>
         </button>)}
         {!filteredRuns.length && !loading && <div className="empty-list">{runKindFilter === "chat" ? "还没有对话" : "没有匹配的 Fixture Run"}</div>}
@@ -218,13 +220,15 @@ export function App() {
         <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
           <div><h1>{fleetView ? "并行解题 (Fleet)" : (detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run"))}</h1>{!fleetView && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
-          <p>{fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.snapshot.task.objective ?? "")}</p>
+          <p>{fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
         </div>
         <div className="header-actions">
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
           {detail?.kind === "fixture" && <button className="command-button" title="创建机械 Checkpoint" disabled={refreshing} onClick={() => void action("checkpoint")}><Archive size={15} /><span className="hide-mobile">Checkpoint</span></button>}
           <button className="icon-button" title="Provider 设置" aria-label="Provider 设置" onClick={() => setProviderOpen(true)}><Settings size={17} /></button>
           {detail?.kind === "chat" && <button className="icon-button" title="Tool、Skill、MCP" aria-label="Tool、Skill、MCP" onClick={() => setCapabilityOpen(true)}><ListChecks size={17} /></button>}
+          {detail?.kind === "chat" && <button className="icon-button" title="重命名对话" aria-label="重命名对话" onClick={() => setRenameOpen(true)}><Pencil size={17} /></button>}
+          {detail?.kind === "chat" && <button className="icon-button" title="删除对话" aria-label="删除对话" onClick={() => void removeSelectedConversation()}><Trash2 size={17} /></button>}
           <button className="icon-button" title="立即刷新" disabled={!detail || refreshing} onClick={() => void refreshAll().catch((caught) => setError(message(caught)))}><RefreshCw size={17} className={refreshing ? "spin" : ""} /></button>
           <button className="icon-button right-toggle" title="运行指标" onClick={() => setRightOpen(true)}><PanelRight size={18} /></button>
         </div>
@@ -257,8 +261,27 @@ export function App() {
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
+    {renameOpen && detail?.kind === "chat" && <RenameConversationModal initialTitle={workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective} onClose={() => setRenameOpen(false)} onSaved={async (title) => { await renameConversation(detail.snapshot.runId, title); await refreshWorkspace(); setRenameOpen(false); setNotice("对话名称已更新"); }} />}
     {capabilityOpen && detail?.kind === "chat" && workspaceSettings && <CapabilityModal runId={detail.snapshot.runId} workspace={workspaceSettings} onClose={() => setCapabilityOpen(false)} onSaved={async () => { setWorkspaceSettings(await getWorkspaceSettings()); setNotice("本对话能力配置已保存"); }} />}
   </div>;
+
+  async function removeSelectedConversation(): Promise<void> {
+    if (!detail || detail.kind !== "chat" || !runId) return;
+    if (!window.confirm(`删除对话“${workspaceSettings?.conversations[runId]?.title ?? detail.snapshot.task.objective}”？此操作会删除该对话的持久记录。`)) return;
+    try {
+      setRefreshing(true);
+      await deleteConversation(runId);
+      localStorage.removeItem("proofblade.runId");
+      setRunId(undefined);
+      setDetail(undefined);
+      await Promise.all([refreshRuns(), refreshWorkspace()]);
+      setNotice("对话已删除");
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setRefreshing(false);
+    }
+  }
 }
 
 interface LiveToolCall {
@@ -675,7 +698,10 @@ function ReasoningForest({ detail }: { detail: RunDetail }) {
   for (const tree of trees) for (const nodeId of tree.nodeIds) usage.set(nodeId, [...(usage.get(nodeId) ?? []), tree.id]);
   const organized = new Set(trees.flatMap((tree) => tree.nodeIds));
   const orphaned = Object.values(detail.snapshot.reasoningNodes).filter((node) => !organized.has(node.id));
-  if (trees.length === 0) return <EvidenceChain detail={detail} />;
+  if (trees.length === 0) {
+    if (orphaned.length === 0) return <EvidenceChain detail={detail} />;
+    return <section className="reasoning-forest-section"><div className="section-head"><div><GitBranch size={14} /><strong>推理节点</strong><span>{orphaned.length} 个待整理节点</span></div></div><div className="reasoning-forest"><details className="forest-orphans" open><summary><Link2 size={13} /><span><strong>尚未整理的图节点</strong><small>这些节点来自已总结的 Artifact/Evidence，尚未形成推理树</small></span><em>{orphaned.length}</em><ChevronRight size={14} /></summary><div className="reasoning-node-list">{orphaned.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={new Set(orphaned.map((item) => item.id))} />)}</div></details></div></section>;
+  }
   return <section className="reasoning-forest-section"><div className="section-head"><div><GitBranch size={14} /><strong>推理森林</strong><span>{trees.length} 棵树 · {usage.size} 个节点 · {[...usage.values()].filter((ids) => ids.length > 1).length} 个共享节点</span></div></div><div className="reasoning-forest">
     {trees.map((tree) => <ReasoningTreeView key={tree.id} detail={detail} tree={tree} usage={usage} />)}
     {orphaned.length > 0 && <details className="forest-orphans"><summary><Link2 size={13} /><span><strong>尚未整理的图节点</strong><small>可由 Evidence Curator 纳入一棵或多棵推理树</small></span><em>{orphaned.length}</em><ChevronRight size={14} /></summary><div className="reasoning-node-list">{orphaned.map((node) => <ReasoningNodeView key={node.id} detail={detail} node={node} usage={usage} treeNodeIds={new Set(orphaned.map((item) => item.id))} />)}</div></details>}
@@ -1026,6 +1052,19 @@ function ProviderNativeCapabilitySection({ items }: { items: ProviderNativeCapab
 
 function CapabilitySection({ title, icon, items, onToggle }: { title: string; icon: ReactNode; items: Array<{ id: string; name: string; description: string; meta: string; reason?: string; enabled: boolean; disabled?: boolean }>; onToggle(id: string): void }) {
   return <section className="capability-section"><div className="section-head"><div>{icon}<strong>{title}</strong><span>{items.filter((item) => item.enabled).length}/{items.length}</span></div></div>{items.map((item) => <label className={`capability-row ${item.disabled ? "disabled" : ""}`} key={item.id} title={item.reason}><input type="checkbox" checked={item.enabled} disabled={item.disabled} onChange={() => onToggle(item.id)} /><span><strong>{item.name}</strong><small>{item.description}</small><em>{item.meta}</em></span></label>)}{!items.length && <div className="empty-list">当前项目没有可用项</div>}</section>;
+}
+
+function RenameConversationModal({ initialTitle, onClose, onSaved }: { initialTitle: string; onClose(): void; onSaved(title: string): Promise<void> }) {
+  const [title, setTitle] = useState(initialTitle);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    try { await onSaved(title.trim()); } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Pencil size={17} /><strong>重命名对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !title.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <Pencil size={14} />}保存名称</button></footer></form></div>;
 }
 
 function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }: { folders: ConversationFolder[]; defaultWorkspace: string; onClose(): void; onCreated(id: string): void }) {

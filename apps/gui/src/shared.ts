@@ -74,6 +74,7 @@ export interface ConversationFolder {
 }
 
 export interface ConversationPreferences {
+  title?: string;
   folderId?: string;
   workspacePath: string;
   profileId: string;

@@ -166,6 +166,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       workspacePath,
     });
     await workspaceSettings.saveConversation(snapshot.runId, {
+      title: typeof body.title === "string" ? body.title : "新对话",
       workspacePath,
       ...(typeof body.folderId === "string" && body.folderId ? { folderId: body.folderId } : {}),
     }, defaults);
@@ -181,6 +182,22 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       if (patch.workspacePath !== undefined) patch.workspacePath = await requireDirectory(patch.workspacePath);
       const next = normalizedPreferences({ ...workspaceSettings.preferences(parts[2], defaults), ...patch }, capabilities);
       return sendJson(response, 200, await workspaceSettings.saveConversation(parts[2], next, defaults));
+    }
+  }
+  if (parts[0] === "api" && parts[1] === "conversations" && parts[2] && parts.length === 3) {
+    const runId = parts[2];
+    const capabilities = await capabilityCatalog();
+    const defaults = defaultPreferences(capabilities);
+    const current = await data.getRun(runId);
+    if (current.kind !== "chat") throw new Error("只能操作普通对话");
+    if (method === "PUT") {
+      const body = await readBody(request);
+      return sendJson(response, 200, await workspaceSettings.renameConversation(runId, string(body.title, "title"), defaults));
+    }
+    if (method === "DELETE") {
+      await data.deleteConversation(runId);
+      await workspaceSettings.removeConversation(runId);
+      return sendJson(response, 200, { ok: true });
     }
   }
   if (method === "POST" && url.pathname === "/api/fixture-conversations") {
@@ -460,6 +477,7 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
   const allowedSkills = new Set(capabilities.skills.filter((skill) => !skill.disabled).map((skill) => skill.name));
   const allowedMcp = new Set(capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name));
   return {
+    ...(input.title ? { title: input.title } : {}),
     ...(input.folderId ? { folderId: input.folderId } : {}),
     workspacePath: input.workspacePath || projectRoot,
     profileId: profile.id,

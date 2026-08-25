@@ -1,4 +1,4 @@
-import { access, readdir, stat } from "node:fs/promises";
+import { access, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
@@ -357,6 +357,16 @@ export class DebugDataService {
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
     return await this.services.control.createRun(input.runId, codingConversationTask(input.runId, input.title, input.workspacePath ?? this.root));
+  }
+
+  public async deleteConversation(runId: string): Promise<void> {
+    assertRunId(runId);
+    if (this.active.has(runId) || this.activeLanes.has(runId)) throw new Error("运行中的对话不能删除，请先暂停");
+    const snapshot = await this.services.control.snapshot(runId);
+    if (runKind(snapshot.task) !== "chat") throw new Error("只能删除普通对话，Fixture Run 请保留用于复盘");
+    await rm(join(this.services.runsRoot, runId), { recursive: true, force: false });
+    this.runListCache.delete(runId);
+    this.runDetailCache.delete(runId);
   }
 
   public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
@@ -810,10 +820,12 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
   const assistantEvents = events.filter((event) => event.type === "assistant_message");
   for (const event of [...assistantEvents].reverse()) {
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
-    if (isRecoverableTermination(event.payload?.termination) && text) {
+    const providerStopReason = event.payload?.stopReason;
+    const isVisibleInterruptedTurn = providerStopReason === "error" || providerStopReason === "aborted" || providerStopReason === "toolUse";
+    if ((isRecoverableTermination(event.payload?.termination) || isVisibleInterruptedTurn) && text) {
       const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
       const interrupted = piEntryId
-        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && (item.stopReason === "error" || item.stopReason === "toolUse"))
+        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && (item.stopReason === "error" || item.stopReason === "aborted" || item.stopReason === "toolUse"))
         : undefined;
       if (interrupted) {
         interrupted.text = text;

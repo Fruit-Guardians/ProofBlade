@@ -45,6 +45,14 @@ export async function updateConversationPreferences(runId: string, input: Partia
   return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`, { method: "PUT", body: JSON.stringify(input) });
 }
 
+export async function renameConversation(runId: string, title: string): Promise<ConversationPreferences> {
+  return await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "PUT", body: JSON.stringify({ title }) });
+}
+
+export async function deleteConversation(runId: string): Promise<void> {
+  await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
 export async function createFolder(name: string): Promise<ConversationFolder> {
   return await request("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
 }
