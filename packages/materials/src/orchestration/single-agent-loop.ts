@@ -158,6 +158,7 @@ export class SingleAgentCtfLoop {
         services: Object.freeze({ control: this.services.control, artifacts: this.services.artifacts, journal: this.services.journal }),
         claimVerifier,
         config: this.config,
+        ...(options.onEvent ? { onEvent: options.onEvent } : {}),
       });
       const activeLane = lane;
       const onAbort = () => {

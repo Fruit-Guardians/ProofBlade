@@ -680,18 +680,23 @@ test("GUI CTF chat resumes the same RunCoordinator loop with the latest user ins
   const source = join(root, "source");
   await mkdir(source, { recursive: true });
   const prompts: string[] = [];
+  let forwardedEvents = 0;
   let data: DebugDataService | undefined;
   try {
-    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => ({
-      async prompt(prompt) {
-        prompts.push(prompt);
-        return { text: "本轮只完成了侦察", stopReason: "stop", usage: zeroUsage() };
-      },
-      async abort() {},
-      async compact() {},
-      async isIdle() { return true; },
-      async close() {},
-    }));
+    data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async (options) => {
+      if (options.onEvent) forwardedEvents += 1;
+      options.onEvent?.({ type: "tool_execution_start", toolCallId: "ctf-tool-1", toolName: "read", args: {} });
+      return {
+        async prompt(prompt) {
+          prompts.push(prompt);
+          return { text: "本轮只完成了侦察", stopReason: "stop", usage: zeroUsage() };
+        },
+        async abort() {},
+        async compact() {},
+        async isIdle() { return true; },
+        async close() {},
+      };
+    });
     const runId = "GUI-CTF-CHAT-001";
     const command = process.platform === "win32" ? "type challenge.md" : "cat challenge.md";
     await data.startCtfSolve({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
@@ -704,6 +709,8 @@ test("GUI CTF chat resumes the same RunCoordinator loop with the latest user ins
     await data.chat(runId, "继续检查附件中的约束", (event) => events.push(event));
     assert.equal(prompts.length, 2);
     assert.match(prompts[1]!, /继续检查附件中的约束/);
+    assert.equal(forwardedEvents, 1);
+    assert.ok(events.some((event) => event.type === "tool_start" && event.toolCallId === "ctf-tool-1"));
     assert.ok(events.some((event) => event.type === "paused"));
   } finally {
     await data?.close().catch(() => undefined);

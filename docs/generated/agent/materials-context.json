@@ -69,7 +69,7 @@
     "src/orchestration/run-coordinator.ts": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
     "src/orchestration/run-work-scheduler.ts": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+    "src/orchestration/single-agent-loop.ts": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -990,7 +990,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 73,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -6872,7 +6872,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 23,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": []
     },
     {
@@ -6886,7 +6886,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 40,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": []
     },
     {
@@ -6900,7 +6900,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 63,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": []
     },
     {
@@ -14411,7 +14411,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 81,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -19038,7 +19038,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 38,
-      "moduleHash": "6fd0075a1ec55c974e61675aa61e4f92aa9df6bc6e10944d1f95cefc1d4fb3ca",
+      "moduleHash": "b05b6f143df485d788e8e569ef0950ad63485280767a9cb7de6924fcd2568a25",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
