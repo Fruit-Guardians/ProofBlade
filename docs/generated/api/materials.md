@@ -329,7 +329,7 @@
 ### RealModelEvaluationRunner
 - Kind: `class`
 - Signature: `RealModelEvaluationRunner`
-- Source: [src/evaluation/real-model-evaluator.ts:260](../../../packages/materials/src/evaluation/real-model-evaluator.ts:260)
+- Source: [src/evaluation/real-model-evaluator.ts:268](../../../packages/materials/src/evaluation/real-model-evaluator.ts:268)
 - Export: `@proofblade/materials`
 - Summary: Runs real provider-backed Coding lanes only after an explicit caller opt-in.
 - Summary source: `tsdoc`
@@ -787,7 +787,7 @@
 ### REAL_MODEL_EVALUATION_PROTOCOL_VERSION
 - Kind: `constant`
 - Signature: `"real-model-eval-v2"`
-- Source: [src/evaluation/real-model-evaluator.ts:14](../../../packages/materials/src/evaluation/real-model-evaluator.ts:14)
+- Source: [src/evaluation/real-model-evaluator.ts:15](../../../packages/materials/src/evaluation/real-model-evaluator.ts:15)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation protocol version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1383,7 +1383,7 @@
 ### deriveProviderDiagnostics
 - Kind: `function`
 - Signature: `(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:687](../../../packages/materials/src/evaluation/real-model-evaluator.ts:687)
+- Source: [src/evaluation/real-model-evaluator.ts:701](../../../packages/materials/src/evaluation/real-model-evaluator.ts:701)
 - Export: `@proofblade/materials`
 - Summary: Projects provider traffic onto durable executor turns without relying on
 - Summary source: `tsdoc`
@@ -1392,7 +1392,7 @@
 ### preflightRealModelEvaluation
 - Kind: `function`
 - Signature: `(options: RealModelEvaluationPreflightOptions): Promise<RealModelEvaluationPreflightSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:95](../../../packages/materials/src/evaluation/real-model-evaluator.ts:95)
+- Source: [src/evaluation/real-model-evaluator.ts:100](../../../packages/materials/src/evaluation/real-model-evaluator.ts:100)
 - Export: `@proofblade/materials`
 - Summary: Validate a live evaluation setup without creating a Run or contacting a
 - Summary source: `tsdoc`
@@ -3314,7 +3314,7 @@
 ### RealEvaluationVariant
 - Kind: `interface`
 - Signature: `RealEvaluationVariant`
-- Source: [src/evaluation/real-model-evaluator.ts:18](../../../packages/materials/src/evaluation/real-model-evaluator.ts:18)
+- Source: [src/evaluation/real-model-evaluator.ts:19](../../../packages/materials/src/evaluation/real-model-evaluator.ts:19)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real evaluation variant type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3322,7 +3322,7 @@
 ### RealModelCategorySummary
 - Kind: `interface`
 - Signature: `RealModelCategorySummary`
-- Source: [src/evaluation/real-model-evaluator.ts:194](../../../packages/materials/src/evaluation/real-model-evaluator.ts:194)
+- Source: [src/evaluation/real-model-evaluator.ts:202](../../../packages/materials/src/evaluation/real-model-evaluator.ts:202)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model category summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3330,7 +3330,7 @@
 ### RealModelEvaluationCase
 - Kind: `interface`
 - Signature: `RealModelEvaluationCase`
-- Source: [src/evaluation/real-model-evaluator.ts:140](../../../packages/materials/src/evaluation/real-model-evaluator.ts:140)
+- Source: [src/evaluation/real-model-evaluator.ts:148](../../../packages/materials/src/evaluation/real-model-evaluator.ts:148)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation case type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3338,7 +3338,7 @@
 ### RealModelEvaluationGatePolicy
 - Kind: `interface`
 - Signature: `RealModelEvaluationGatePolicy`
-- Source: [src/evaluation/real-model-evaluator.ts:46](../../../packages/materials/src/evaluation/real-model-evaluator.ts:46)
+- Source: [src/evaluation/real-model-evaluator.ts:49](../../../packages/materials/src/evaluation/real-model-evaluator.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation gate policy type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3346,7 +3346,7 @@
 ### RealModelEvaluationOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:23](../../../packages/materials/src/evaluation/real-model-evaluator.ts:23)
+- Source: [src/evaluation/real-model-evaluator.ts:24](../../../packages/materials/src/evaluation/real-model-evaluator.ts:24)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3354,7 +3354,7 @@
 ### RealModelEvaluationPreflightOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:55](../../../packages/materials/src/evaluation/real-model-evaluator.ts:55)
+- Source: [src/evaluation/real-model-evaluator.ts:58](../../../packages/materials/src/evaluation/real-model-evaluator.ts:58)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3362,7 +3362,7 @@
 ### RealModelEvaluationPreflightSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:67](../../../packages/materials/src/evaluation/real-model-evaluator.ts:67)
+- Source: [src/evaluation/real-model-evaluator.ts:72](../../../packages/materials/src/evaluation/real-model-evaluator.ts:72)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3370,7 +3370,7 @@
 ### RealModelEvaluationSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:240](../../../packages/materials/src/evaluation/real-model-evaluator.ts:240)
+- Source: [src/evaluation/real-model-evaluator.ts:248](../../../packages/materials/src/evaluation/real-model-evaluator.ts:248)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3378,7 +3378,7 @@
 ### RealModelProviderDiagnostics
 - Kind: `interface`
 - Signature: `RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:186](../../../packages/materials/src/evaluation/real-model-evaluator.ts:186)
+- Source: [src/evaluation/real-model-evaluator.ts:194](../../../packages/materials/src/evaluation/real-model-evaluator.ts:194)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model provider diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3386,7 +3386,7 @@
 ### RealModelTurnDiagnostics
 - Kind: `interface`
 - Signature: `RealModelTurnDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:177](../../../packages/materials/src/evaluation/real-model-evaluator.ts:177)
+- Source: [src/evaluation/real-model-evaluator.ts:185](../../../packages/materials/src/evaluation/real-model-evaluator.ts:185)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model turn diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3394,7 +3394,7 @@
 ### RealModelVariantSummary
 - Kind: `interface`
 - Signature: `RealModelVariantSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:208](../../../packages/materials/src/evaluation/real-model-evaluator.ts:208)
+- Source: [src/evaluation/real-model-evaluator.ts:216](../../../packages/materials/src/evaluation/real-model-evaluator.ts:216)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model variant summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5721,7 +5721,7 @@
 ### RealModelEvaluationRunner.run
 - Kind: `method`
 - Signature: `(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:263](../../../packages/materials/src/evaluation/real-model-evaluator.ts:263)
+- Source: [src/evaluation/real-model-evaluator.ts:271](../../../packages/materials/src/evaluation/real-model-evaluator.ts:271)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -8025,7 +8025,7 @@
 ### RealEvaluationFailureCategory
 - Kind: `type`
 - Signature: `RealEvaluationFailureCategory`
-- Source: [src/evaluation/real-model-evaluator.ts:16](../../../packages/materials/src/evaluation/real-model-evaluator.ts:16)
+- Source: [src/evaluation/real-model-evaluator.ts:17](../../../packages/materials/src/evaluation/real-model-evaluator.ts:17)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real evaluation failure category type contract used to provide a reusable operation.
 - Summary source: `inferred`

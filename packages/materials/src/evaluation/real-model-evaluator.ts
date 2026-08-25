@@ -1,3 +1,4 @@
+import { createReadStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
@@ -41,6 +42,8 @@ export interface RealModelEvaluationOptions {
   maxBaselineSuccessRateDrop?: number;
   /** Target kinds that must occur in the corpus when a strict live gate is used. */
   requiredTargetKinds?: readonly TargetKind[];
+  /** Reject corpora whose target files contain the expected answer literally. */
+  requireAnswerLiteralsAbsent?: boolean;
 }
 
 export interface RealModelEvaluationGatePolicy {
@@ -62,6 +65,8 @@ export interface RealModelEvaluationPreflightOptions {
   maxTurns?: number;
   maxCostUsd?: number;
   deadlineMs?: number;
+  /** Reject corpora whose target files contain the expected answer literally. */
+  requireAnswerLiteralsAbsent?: boolean;
 }
 
 export interface RealModelEvaluationPreflightSummary {
@@ -101,11 +106,14 @@ export async function preflightRealModelEvaluation(options: RealModelEvaluationP
   const corpus = await loadRealEvaluationCorpus(options.corpusPath);
   const minimumCorpusCases = nonNegativeInteger(options.minimumCorpusCases ?? (options.requireProviderTraffic === true ? 20 : 0), "minimumCorpusCases");
   const requiredTargetKinds = normalizeRequiredTargetKinds(options.requiredTargetKinds ?? (options.requireProviderTraffic === true ? ["web", "pwn"] : []));
+  const requireAnswerLiteralsAbsent = options.requireAnswerLiteralsAbsent ?? options.requireProviderTraffic === true;
   const targetKinds = orderedCounts(corpus.cases.map((item) => item.targetKind)) as Record<string, number>;
+  const answerLiteralLeakCount = requireAnswerLiteralsAbsent ? await countAnswerLiteralLeaks(corpus.cases) : 0;
   const checks = [
     check("minimum_variants", variants.length >= 2, variants.length, ">=2"),
     ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
     ...requiredTargetKinds.map((targetKind) => check(`target_kind_coverage:${targetKind}`, targetKinds[targetKind] !== undefined, targetKinds[targetKind] ?? 0, ">=1")),
+    ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", answerLiteralLeakCount === 0, answerLiteralLeakCount, 0)] : []),
     ...variants.map((variant) => {
       const profile = variant.config.modelProfiles.executor;
       const envName = profile.apiKeyEnv.trim();
@@ -269,6 +277,11 @@ export class RealModelEvaluationRunner {
     const variants = normalizeVariants(options.variants);
     const corpus = await loadRealEvaluationCorpus(options.corpusPath);
     const minimumCorpusCases = nonNegativeInteger(options.minimumCorpusCases ?? (options.requireProviderTraffic === true ? 20 : 0), "minimumCorpusCases");
+    const requireAnswerLiteralsAbsent = options.requireAnswerLiteralsAbsent ?? options.requireProviderTraffic === true;
+    if (requireAnswerLiteralsAbsent) {
+      const answerLiteralLeakCount = await countAnswerLiteralLeaks(corpus.cases);
+      if (answerLiteralLeakCount > 0) throw new Error(`Real evaluation corpus contains ${answerLiteralLeakCount} expected answer literal(s) in target files; use a private non-leaking corpus`);
+    }
     const gatePolicy = gatePolicyFor(options, variants, minimumCorpusCases);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
@@ -298,6 +311,7 @@ export class RealModelEvaluationRunner {
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
       check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
       ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
+      ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", true, 0, 0)] : []),
       ...gatePolicy.requiredTargetKinds.map((targetKind) => check(
         `target_kind_coverage:${targetKind}`,
         corpus.cases.some((item) => item.targetKind === targetKind),
@@ -736,6 +750,35 @@ function aggregateProviderRequestsByPhase(cases: RealModelEvaluationCase[]): Rec
 
 function eventPhase(event: HarnessEvent, ordered: HarnessEvent[]): string | undefined {
   return typeof event.payload?.phase === "string" ? event.payload.phase : phaseAt(event.seq, ordered);
+}
+
+/** Count cases whose target input literally contains the hidden answer. */
+async function countAnswerLiteralLeaks(cases: readonly LoadedRealEvaluationCase[]): Promise<number> {
+  let leakedCases = 0;
+  for (const item of cases) {
+    let leaked = false;
+    for (const file of item.files) {
+      if (await fileContainsLiteral(file.sourcePath, item.expected)) {
+        leaked = true;
+        break;
+      }
+    }
+    if (leaked) leakedCases += 1;
+  }
+  return leakedCases;
+}
+
+/** Stream a corpus file so the quality gate does not load a large input into memory. */
+async function fileContainsLiteral(path: string, literal: string): Promise<boolean> {
+  if (literal.length === 0) return false;
+  let tail = "";
+  const stream = createReadStream(path, { encoding: "utf8" });
+  for await (const chunk of stream) {
+    const text = `${tail}${chunk}`;
+    if (text.includes(literal)) return true;
+    tail = text.slice(Math.max(0, text.length - literal.length + 1));
+  }
+  return false;
 }
 
 function phaseAt(seq: number, ordered: HarnessEvent[]): string | undefined {

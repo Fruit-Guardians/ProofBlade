@@ -115,7 +115,7 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
     assert.doesNotMatch(JSON.stringify(anonymous), /REAL-A|fixtures|expected|real_model_corpus/);
     assert.ok(anonymous.variants.every((variant) => variant.cases.every((candidate) => !Object.hasOwn(candidate, "runId") && !Object.hasOwn(candidate, "error"))));
 
-    const strict = await runner.run({ ...options, requireProviderTraffic: true, runPrefix: "REAL-STRICT" });
+    const strict = await runner.run({ ...options, requireProviderTraffic: true, requireAnswerLiteralsAbsent: false, runPrefix: "REAL-STRICT" });
     assert.equal(strict.gate.passed, false);
     assert.equal(strict.gate.policy.requireProviderTraffic, true);
     assert.equal(strict.gate.policy.minimumCorpusCases, 20);
@@ -159,6 +159,30 @@ test("real evaluation preflight validates Web/Pwn coverage and never contacts a 
     assert.deepEqual(ready.corpus.targetKinds, { pwn: 1, web: 1 });
     assert.ok(ready.variants.every((variant) => variant.credentialPresent && variant.pricingPresent));
     assert.ok(ready.checks.every((check) => check.passed));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("strict real evaluation preflight rejects an answer literal in target input", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-leak-"));
+  try {
+    const expected = "flag{answer_in_input}";
+    const source = `captured response\n${expected}\n`;
+    await writeFile(join(root, "web.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "answer-literal-corpus",
+      cases: [corpusCase("web-case", "web.txt", expected, source)],
+    }), "utf8");
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      requireProviderTraffic: true,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((item) => item.id === "answer_literals_absent")?.passed, false);
+    assert.equal(result.ready, false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

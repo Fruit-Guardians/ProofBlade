@@ -4,6 +4,11 @@
 
 The CLI's live gate also requires observable Provider traffic from every Variant, at least 20 corpus cases, and both Web and Pwn target kinds. A deterministic injected lane, a tiny corpus, or a run that fails before the first Provider request cannot satisfy `eval-real --enforce-gate`, even if it produces a locally accepted candidate. The provider-free local holdout explicitly disables these checks because its purpose is to exercise Run/verifier/replay plumbing.
 
+Strict live preflight also rejects a case when its expected answer appears
+literally in one of the target input files. Such a corpus can exercise the
+control plane, but it cannot measure model solving ability; keep those cases in
+the provider-free holdout or replace them with private, non-leaking inputs.
+
 The checked-in multi-direction holdout is intentionally separate: `proofblade eval-holdout fixtures/holdout/manifest.json --enforce-gate` runs 27 deterministic cases without Provider traffic (12 Web, 12 Pwn, and Reverse/Crypto/Forensics smoke cases). It validates the shared Run, verifier, replay, and metric pipeline; it does not establish real model solving quality. Use `eval-real` for that measurement only after configuring two priced model variants.
 
 Keep the corpus, samples, and expected values under `.proofblade/evaluation/`; that directory is ignored by Git. Copy `examples/real-evaluation-corpus.example.json` there, replace every placeholder, and calculate each sample hash in PowerShell:
