@@ -67,7 +67,7 @@
     "src/orchestration/intent-scorer.ts": "ccee923e3ff918933ef5443989a60df835710e83384843b9ab8f0d484f298bf9",
     "src/orchestration/planner.ts": "1af2274f0cd0d164fdc6754ff675133d6d55213862a19b31e1b2384671c771b1",
     "src/orchestration/refiner.ts": "38858c61f8bc343c11ddef52a1b602c0f788af49209752add8a80e9ed31c8229",
-    "src/orchestration/run-coordinator.ts": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+    "src/orchestration/run-coordinator.ts": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
     "src/orchestration/run-work-scheduler.ts": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
     "src/orchestration/single-agent-loop.ts": "7c36030ccf7b5cf5df5e83d2551eb44da45fb9f031d94c86934cd0932124625e",
@@ -1987,6 +1987,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -9097,6 +9098,7 @@
         "@proofblade/atoms"
       ],
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts"
@@ -12449,6 +12451,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -12668,6 +12671,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -13000,6 +13004,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -13219,6 +13224,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -13438,6 +13444,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -13657,6 +13664,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -15354,6 +15362,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -16952,6 +16961,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -17938,6 +17948,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -18028,6 +18039,7 @@
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -18819,6 +18831,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -20501,6 +20514,7 @@
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -20690,6 +20704,7 @@
       "testRefs": [
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-store.test.ts",
@@ -20816,8 +20831,10 @@
         "../verification/verifier.js",
         "./run-work-scheduler.js"
       ],
-      "testRefs": [],
-      "structureHash": "5c0a8e0fd6e9977a17d2fc9b8a52cab5e123682e9bd245ce1c020c619e430282",
+      "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts"
+      ],
+      "structureHash": "26afcc0d4399cdd0aa1ac3b8b0ad609ad9d1f2904c43a11cc751167af2551bb5",
       "parentId": "@proofblade/materials::class::RunCoordinator"
     },
     {
@@ -21034,6 +21051,7 @@
       "testRefs": [
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-store.test.ts",
@@ -21925,6 +21943,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -22978,6 +22997,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -25451,6 +25471,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -25866,6 +25887,7 @@
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",

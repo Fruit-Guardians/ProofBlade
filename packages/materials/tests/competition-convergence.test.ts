@@ -87,7 +87,10 @@ test("finishAccepted repairs a SUBMIT recovery gap before closing the Run", asyn
   try {
     const services = createServices(root, config);
     const runId = "SUBMIT-RECOVERY";
-    const task = demoTask(runId, root, config);
+    const task = {
+      ...demoTask(runId, root, config),
+      verification: { kind: "platform_submission" as const, required_reproductions: 2 },
+    };
     await services.control.createRun(runId, task);
     const coordinator = new RunCoordinator(services.control, services.verifier);
     await coordinator.setDomainPhase(runId, "EXPERIMENT");

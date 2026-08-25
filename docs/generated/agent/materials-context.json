@@ -66,7 +66,7 @@
     "src/orchestration/intent-scorer.ts": "ccee923e3ff918933ef5443989a60df835710e83384843b9ab8f0d484f298bf9",
     "src/orchestration/planner.ts": "1af2274f0cd0d164fdc6754ff675133d6d55213862a19b31e1b2384671c771b1",
     "src/orchestration/refiner.ts": "38858c61f8bc343c11ddef52a1b602c0f788af49209752add8a80e9ed31c8229",
-    "src/orchestration/run-coordinator.ts": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+    "src/orchestration/run-coordinator.ts": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
     "src/orchestration/run-work-scheduler.ts": "61e0635989ed34ead2eac756c5844f1045e4da31e82c626fb80e89e44d3f54c1",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
     "src/orchestration/single-agent-loop.ts": "7c36030ccf7b5cf5df5e83d2551eb44da45fb9f031d94c86934cd0932124625e",
@@ -957,7 +957,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 32,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -1374,6 +1374,7 @@
       "line": 17,
       "moduleHash": "b9ed75f3269445776370a0efe58fe6e2bc1a82879fec87c2594d24b2132f1b32",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -6038,6 +6039,7 @@
       "line": 350,
       "moduleHash": "5a30939ce79941ebf0048feac55944eed673e899516f26e558fcd8f2412a5e5b",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts"
@@ -6858,7 +6860,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 19,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -8066,6 +8068,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -8213,6 +8216,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -8437,6 +8441,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -8584,6 +8589,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -8731,6 +8737,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -8878,6 +8885,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -10214,6 +10222,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -11425,6 +11434,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -12107,6 +12117,7 @@
       "moduleHash": "f0ea314d23e5e482d9801d18b70c3d82a9e1261bbb98da9607ed29776a7f2b8c",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -12170,6 +12181,7 @@
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -12790,6 +12802,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -13922,6 +13935,7 @@
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -14005,7 +14019,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 99,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -14033,7 +14047,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 103,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -14047,10 +14061,11 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 87,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-store.test.ts",
@@ -14076,7 +14091,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 72,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -14090,7 +14105,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 95,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -14140,8 +14155,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 128,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
-      "testRefs": []
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
+      "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::RunCoordinator.moveToPhase",
@@ -14154,7 +14171,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 64,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -14168,7 +14185,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 80,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -14182,7 +14199,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 47,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -14198,7 +14215,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 91,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": [
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -14215,7 +14232,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 111,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
@@ -14275,6 +14292,7 @@
       "testRefs": [
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/control-store.test.ts",
@@ -14939,6 +14957,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -15575,6 +15594,7 @@
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -17199,6 +17219,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
@@ -17469,6 +17490,7 @@
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -19027,7 +19049,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 17,
-      "moduleHash": "ff2f443fb585c97959a25bd918f946571a1eb39d521db6f79bbeca0fcda5583b",
+      "moduleHash": "236ef89409b322611f34999edc2f06d19dfb41e363ec50f8203df1208e130449",
       "testRefs": []
     },
     {
