@@ -43,7 +43,7 @@
     "test:molecules": "npm run build --workspace=@proofblade/atoms && npm run build --workspace=@proofblade/molecules && npm run test --workspace=@proofblade/molecules",
     "test:materials": "npm run build && npm run test --workspace=@proofblade/materials",
     "test:platform-fault-matrix": "node --import tsx --test packages/materials/tests/competition-remote-query-matrix.test.ts",
-  "verify": "npm run check:components && npm run check:change-contracts && npm run check:project-reports && npm run api:index:test && npm run api:index:check && npm run test:ci-gates && npm run test:platform-fault-matrix && npm run test:staged && npm run eval -- --enforce-gate && npm audit --omit=dev",
+  "verify": "npm run build && npm run check:components && npm run check:change-contracts && npm run check:project-reports && npm run api:index:test && npm run api:index:check && npm run test:ci-gates && npm run test:platform-fault-matrix && npm run test:staged && npm run eval -- --enforce-gate && npm audit --omit=dev",
     "cli": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts",
     "eval": "npm run build --workspace=@proofblade/atoms --silent && npm run build --workspace=@proofblade/molecules --silent && npm run build --workspace=@proofblade/materials --silent && tsx apps/cli/src/main.ts eval",
     "demo": "npm run cli -- run demo",
