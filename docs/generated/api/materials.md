@@ -2493,7 +2493,7 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:705](../../../packages/materials/src/verification/claim-verification.ts:705)
+- Source: [src/verification/claim-verification.ts:706](../../../packages/materials/src/verification/claim-verification.ts:706)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10423,7 +10423,7 @@
 ### CodingClaimVerifier.project
 - Kind: `method`
 - Signature: `(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection>`
-- Source: [src/verification/claim-verification.ts:526](../../../packages/materials/src/verification/claim-verification.ts:526)
+- Source: [src/verification/claim-verification.ts:527](../../../packages/materials/src/verification/claim-verification.ts:527)
 - Export: `@proofblade/materials`
 - Summary: Rebuild verification exclusively from durable current-generation state.
 - Summary source: `tsdoc`

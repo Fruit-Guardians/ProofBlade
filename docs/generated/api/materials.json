@@ -125,7 +125,7 @@
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
     "src/tools/runtime.ts": "d4563aa1d3fbd6a70394fadf5f7dc7c4f4943fe3d550c62b49693ad4f6505b21",
     "src/verification/browser-reproducer.ts": "a301b521c533914d1447064d8a3319e8ac2a3e1da7482d80ec0b6ffbeb66bb06",
-    "src/verification/claim-verification.ts": "b70fac021b5b1b2e0aab8e93f7bf5d57c91e0d9cc08b16347f64333beab3a2eb",
+    "src/verification/claim-verification.ts": "631482934af21e68a5cdb25967437da4aebd18402475e923dced87bfa7381f4d",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
     "src/verification/pwn-replay-recovery.ts": "f1cedc20c4d53e992659c4b80cf970c3bf2ac917e68c7da5bd89fcd4fb7c6213",
     "src/verification/pwn-reproducer.ts": "56578671a8a249cda6a80af971a32b9f5779e889535713203c638e9a886b77b5",
@@ -7671,7 +7671,7 @@
       "visibility": "public",
       "module": "src/verification/claim-verification.ts",
       "exportPath": "@proofblade/materials",
-      "line": 705,
+      "line": 706,
       "signature": "(userPrompt: string, assistantText?: string): boolean",
       "summary": "Inferred summary: requires claim verification operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -38111,7 +38111,7 @@
       "visibility": "public",
       "module": "src/verification/claim-verification.ts",
       "exportPath": "@proofblade/materials",
-      "line": 526,
+      "line": 527,
       "signature": "(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection>",
       "summary": "Rebuild verification exclusively from durable current-generation state.",
       "summarySource": "tsdoc",
@@ -38222,7 +38222,7 @@
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ],
-      "structureHash": "9cc17e1d54d5798d30c3e40091d8bad0ba4ac2452720fbf2eb349cbccc143aa4",
+      "structureHash": "80fd26adfb38e68c0ae68574a2409d896953b494079eb9102ff320a635b2e997",
       "parentId": "@proofblade/materials::class::CodingClaimVerifier"
     },
     {

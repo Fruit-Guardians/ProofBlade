@@ -3,11 +3,12 @@ import { mkdtemp, rm, symlink } from "node:fs/promises";
 import test from "node:test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { collectApi } from "../scripts/collector.mjs";
 import { findDuplicateCandidates } from "../scripts/duplicates.mjs";
 import { renderAgentContext, renderMarkdown } from "../scripts/renderer.mjs";
 
-const repoRoot = new URL("../../../", import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/, (value) => value.slice(1)).replaceAll("/", "\\");
+const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 
 test("collects deterministic atoms exports with signatures, comments, tests, and no absolute paths", () => {
   const index = collectApi({ repoRoot, packageId: "atoms" });
