@@ -9,7 +9,9 @@ import { competitionTask } from "../src/competition/task.js";
 import { normalizeCategory, type CompetitionApi, type CompetitionChallengeSummary } from "../src/competition/api.js";
 import { createServices } from "../src/app/demo.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
+import { beginSubmissionVerificationRequest } from "../src/verification/verification-key.js";
 import type { ProofBladeConfig } from "../src/config.js";
+import type { VerifierControlPort } from "../src/control/control-store.js";
 
 const CONFIG: ProofBladeConfig = {
   schemaVersion: 1,
@@ -275,6 +277,7 @@ test("a crash after a competition submit never replays fixture_score", async () 
       filename: "candidate.txt",
       sensitivity: "flag_candidate",
     });
+    const verificationRequest = await beginSubmissionVerificationRequest(services.control, runId, { candidateHash: candidateArtifact.sha256, candidateArtifactId: candidateArtifact.id });
     await services.control.dispatch(runId, {
       type: "completion_proposed",
       completion: {
@@ -282,6 +285,7 @@ test("a crash after a competition submit never replays fixture_score", async () 
         purpose: "submission",
         candidateHash: candidateArtifact.sha256,
         artifactId: candidateArtifact.id,
+        verificationKey: verificationRequest.request.key,
       },
       lane: "executor",
     });
@@ -305,8 +309,82 @@ test("a crash after a competition submit never replays fixture_score", async () 
     assert.equal(reconciled.effects[effect.id]?.status, "UNKNOWN", "an ambiguous platform result must fail closed");
     assert.deepEqual(api.submissions, ["flag{ok}"], "recovery must not submit the flag a second time");
 
-    await assert.rejects(verifier.verify(runId, fixture, "C-REMOTE"), /idempotency key already exists/);
+    await assert.rejects(verifier.verify(runId, fixture, "C-REMOTE"), /UNKNOWN; reconcile it before retrying/);
     assert.deepEqual(api.submissions, ["flag{ok}"], "a later verifier call cannot bypass the ambiguous durable Effect");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a verifier retry after terminal evidence commit replays the durable outcome", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-comp-verifier-retry-"));
+  try {
+    const runId = "RUN-VERIFIER-RETRY";
+    const api = new FakeCompetitionApi("flag{ok}");
+    const sandbox = new CompetitionSandbox({
+      api,
+      challengeId: "CH-1",
+      workspaceRoot: join(root, CONFIG.storage.fixturesDir),
+      attachments: [],
+      environment: {},
+    });
+    const services = createServices(root, CONFIG, { sandbox });
+    const task = competitionTask(runId, summary(), {}, root, CONFIG);
+    await services.control.createRun(runId, task);
+    const fixture = await sandbox.build(task);
+    const candidateArtifact = await services.artifacts.putText(runId, "flag{ok}", {
+      mime: "text/plain",
+      filename: "candidate.txt",
+      sensitivity: "flag_candidate",
+    });
+    const verificationRequest = await beginSubmissionVerificationRequest(services.control, runId, { candidateHash: candidateArtifact.sha256, candidateArtifactId: candidateArtifact.id });
+    await services.control.dispatch(runId, {
+      type: "completion_proposed",
+      completion: {
+        id: "C-VERIFIER-RETRY",
+        purpose: "submission",
+        candidateHash: candidateArtifact.sha256,
+        artifactId: candidateArtifact.id,
+        verificationKey: verificationRequest.request.key,
+      },
+      lane: "executor",
+    });
+    let injected = true;
+    const verifierControl: VerifierControlPort = {
+      dispatch: services.verifier.dispatch,
+      dispatchBatch: async (batchRunId, commands) => {
+        const events = await services.verifier.dispatchBatch(batchRunId, commands);
+        if (injected && commands.some((command) => command.type === "evidence" || command.type === "completion_verified")) {
+          injected = false;
+          throw new Error("injected:after-verifier-batch");
+        }
+        return events;
+      },
+      finish: services.verifier.finish,
+    };
+    const verifier = new IndependentVerifier(
+      services.control,
+      services.artifacts,
+      services.verifierJournal,
+      services.runsRoot,
+      verifierControl,
+    );
+
+    await assert.rejects(verifier.verify(runId, fixture, "C-VERIFIER-RETRY"), /injected:after-verifier-batch/);
+    assert.deepEqual(api.submissions, ["flag{ok}"], "the first verifier attempt submits exactly once");
+    const committed = await services.control.snapshot(runId);
+    const completion = committed.completions["C-VERIFIER-RETRY"]!;
+    assert.equal(completion.status, "ACCEPTED");
+    assert.equal(completion.evidenceIds.length, 1);
+    assert.equal(Object.values(committed.evidence).length, 1);
+
+    const retried = await verifier.verify(runId, fixture, "C-VERIFIER-RETRY");
+    assert.equal(retried.accepted, true);
+    assert.deepEqual(retried.evidenceIds, completion.evidenceIds);
+    assert.deepEqual(api.submissions, ["flag{ok}"], "a terminal verifier retry must not resubmit or append Evidence");
+    const events = await services.control.events(runId);
+    assert.equal(events.filter((event) => event.type === "completion_verified").length, 1);
+    assert.equal(events.filter((event) => event.type === "evidence_added").length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

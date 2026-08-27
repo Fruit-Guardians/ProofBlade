@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,11 +21,14 @@ import {
   FleetScheduler,
   JsonlControlStore,
   normalizeCategory,
+  competitionTask,
   type CompetitionApi,
   type CompetitionAttachment,
   type CompetitionChallengeSummary,
   type CompetitionEnvironment,
+  type CompetitionEnvironmentInspection,
 } from "../src/index.js";
+import type { BrowserVerifierFactory } from "../src/web/browser-session.js";
 
 const CONFIG: ProofBladeConfig = {
   schemaVersion: 1,
@@ -154,6 +158,7 @@ interface FakeChallengeSpec {
   id: string;
   value: number;
   flag: string;
+  category?: string;
   /** When set, startEnvironment returns it as teamFlag (dynamic-flag path). */
   dynamic?: boolean;
   /** Put a DIFFERENT flag in the attachment, so the lane derives a wrong answer. */
@@ -166,39 +171,67 @@ interface FakeChallengeSpec {
   detailError?: Error;
   /** Optional short environment expiry used by deadline/abort regression tests. */
   expiresAt?: number;
+  /** Compute the expiry when the platform environment is actually created. */
+  expiresInMs?: number;
   /** Number of initial stop calls that should fail before cleanup recovers. */
   stopFailures?: number;
 }
 
 class FakeApi implements CompetitionApi {
+  /** The fake exposes the same stable key that inspectEnvironment echoes. */
+  public readonly environmentIdentity = { strategy: "idempotency-key" as const, stableAcrossRestart: true };
   public submitted: Array<{ id: string; flag: string }> = [];
   public started: string[] = [];
+  public startKeys: Array<{ id: string; key?: string }> = [];
   public stopped: string[] = [];
+  private readonly environmentExpiries = new Map<string, number>();
   public constructor(private readonly specs: FakeChallengeSpec[]) {}
   private spec(id: string): FakeChallengeSpec {
     const found = this.specs.find((s) => s.id === id);
     if (!found) throw new Error(`unknown challenge ${id}`);
     return found;
   }
+  private expiry(spec: FakeChallengeSpec): number | undefined {
+    if (spec.expiresInMs === undefined) return spec.expiresAt;
+    const existing = this.environmentExpiries.get(spec.id);
+    if (existing !== undefined) return existing;
+    const expiry = Date.now() + spec.expiresInMs;
+    this.environmentExpiries.set(spec.id, expiry);
+    return expiry;
+  }
   async listChallenges(): Promise<CompetitionChallengeSummary[]> {
-    return this.specs.map((s) => ({ challengeId: s.id, title: `T-${s.id}`, category: "Misc", normalizedCategory: normalizeCategory("Misc"), value: s.value }));
+    return this.specs.map((s) => ({ challengeId: s.id, title: `T-${s.id}`, category: s.category ?? "Misc", normalizedCategory: normalizeCategory(s.category ?? "Misc"), value: s.value }));
   }
   async getChallenge(id: string): Promise<{ summary: CompetitionChallengeSummary; attachments: CompetitionAttachment[] }> {
     const s = this.spec(id);
     if (s.detailError) throw s.detailError;
     const attachments = s.dynamic ? [] : [{ name: "flag.txt", base64: Buffer.from(`the flag is ${s.attachmentFlag ?? s.flag}`).toString("base64") }];
     return {
-      summary: { challengeId: s.id, title: `T-${s.id}`, category: "Misc", normalizedCategory: normalizeCategory("Misc"), value: s.value },
+      summary: { challengeId: s.id, title: `T-${s.id}`, category: s.category ?? "Misc", normalizedCategory: normalizeCategory(s.category ?? "Misc"), value: s.value },
       attachments,
     };
   }
-  async startEnvironment(id: string): Promise<CompetitionEnvironment> {
+  async startEnvironment(id: string, options: { idempotencyKey?: string } = {}): Promise<CompetitionEnvironment> {
     const s = this.spec(id);
+    const expiresAt = this.expiry(s);
     this.started.push(id);
+    this.startKeys.push({ id, ...(options.idempotencyKey ? { key: options.idempotencyKey } : {}) });
     if (s.startError) throw new Error(s.startError);
     return s.dynamic
-      ? { instanceId: `inst-${id}`, teamFlag: s.flag, ...(s.expiresAt ? { expiresAt: s.expiresAt } : {}) }
-      : { instanceId: `inst-${id}`, connectionInfo: "nc host 1337", ...(s.expiresAt ? { expiresAt: s.expiresAt } : {}) };
+      ? { instanceId: `inst-${id}`, ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}), teamFlag: s.flag, ...(expiresAt === undefined ? {} : { expiresAt }) }
+      : { instanceId: `inst-${id}`, ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}), connectionInfo: "nc host 1337", ...(expiresAt === undefined ? {} : { expiresAt }) };
+  }
+  async inspectEnvironment(id: string, instanceId?: string, options: { idempotencyKey?: string } = {}): Promise<CompetitionEnvironmentInspection> {
+    const s = this.spec(id);
+    const expiresAt = this.expiry(s);
+    if (this.stopped.includes(id)) return { status: "ABSENT", challengeId: id, instanceId };
+    return {
+      status: "ACTIVE",
+      challengeId: id,
+      instanceId: instanceId ?? `inst-${id}`,
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+      ...(expiresAt === undefined ? {} : { expiresAt }),
+    };
   }
   async submitFlag(id: string, flag: string) {
     this.submitted.push({ id, flag });
@@ -225,6 +258,7 @@ test("real solver drives a challenge to SOLVED on the coding lane via submit_fla
     assert.equal(result.solved, true, result.status);
     assert.equal(result.status, "SOLVED");
     assert.equal(result.submissions, 1, "exactly one submission may be spent on a first-try solve");
+    assert.match(api.startKeys[0]?.key ?? "", /^proofblade-env-/);
     assert.ok(api.submitted.some((s) => s.id === "CH1" && s.flag === "flag{solver_ok}"));
     assert.ok(api.stopped.includes("CH1"), "environment must be released");
     const runIds = await readdir(join(root, "runs"));
@@ -321,7 +355,7 @@ test("competition deadline aborts a prompt already inside the Pi loop", async ()
   const root = await mkdtemp(join(tmpdir(), "pb-solver-deadline-"));
   let aborted = false;
   try {
-    const api = new FakeApi([{ id: "DEADLINE", value: 100, flag: "flag{never_reached}", expiresAt: Date.now() + 1_000 }]);
+    const api = new FakeApi([{ id: "DEADLINE", value: 100, flag: "flag{never_reached}", expiresInMs: 3_000 }]);
     const hangingLane: CompetitionLaneFactory = async () => {
       let resolvePrompt: ((outcome: { text: string; stopReason: string; usage: ReturnType<typeof zeroUsage> }) => void) | undefined;
       return {
@@ -335,13 +369,13 @@ test("competition deadline aborts a prompt already inside the Pi loop", async ()
         close: async () => undefined,
       };
     };
-    const started = Date.now();
     const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 4, createLane: hangingLane });
+    const started = Date.now();
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
     assert.equal(result.solved, false);
     assert.equal(result.status, "DEADLINE");
     assert.equal(aborted, true);
-    assert.ok(Date.now() - started < 3_000, "in-flight prompt must not outlive the challenge deadline");
+    assert.ok(Date.now() - started < 5_000, "in-flight prompt must not outlive the challenge deadline");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -425,6 +459,171 @@ test("dynamic-flag challenge skips the model turn but keeps a journaled run", as
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("competition solver forwards the Browser verifier and required runtime flag to its lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-browser-runtime-"));
+  const browserVerifierFactory: BrowserVerifierFactory = {
+    name: "test-browser-runtime",
+    async createContext() {
+      throw new Error("browser context is not needed by this forwarding test");
+    },
+  };
+  let received: Parameters<CompetitionLaneFactory>[0] | undefined;
+  const lane: CompetitionLaneFactory = async (options) => {
+    received = options;
+    return await flagLane(options);
+  };
+  const config = {
+    ...CONFIG,
+    runtime: {
+      ...CONFIG.runtime,
+      browserBroker: { baseUrl: "http://127.0.0.1:43121", tokenEnv: "TEST_BROWSER_RUNTIME_TOKEN" },
+    },
+  } satisfies ProofBladeConfig;
+  try {
+    const api = new FakeApi([{ id: "BROWSER-RUNTIME", value: 100, flag: "flag{browser_runtime}" }]);
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: lane, browserVerifierFactory });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.status);
+    assert.equal(received?.browserVerifierFactory, browserVerifierFactory);
+    assert.equal(received?.browserRuntimeRequired, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("competition solver preflights only the runtime required by the challenge direction", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-"));
+  try {
+    const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT", value: 100, flag: "flag{runtime_preflight}", category: "Pwn" }]);
+    const config = {
+      ...CONFIG,
+      runtime: {
+        ...CONFIG.runtime,
+        sessionBroker: { baseUrl: "http://127.0.0.1:1", tokenEnv: "PATH" },
+      },
+    } satisfies ProofBladeConfig;
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: flagLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "PLATFORM_ERROR");
+    assert.match(result.reason ?? "", /runtime preflight/i);
+    assert.deepEqual(api.started, ["RUNTIME-PREFLIGHT"], "the platform must be provisioned before dynamic-vs-model-solvable is known");
+    assert.deepEqual(api.stopped, ["RUNTIME-PREFLIGHT"], "runtime failure must release the already-provisioned environment");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("competition solver probes one required broker and forwards that result to the lane", async () => {
+  let healthRequests = 0;
+  const requestUrls: string[] = [];
+  const server = createServer((request, response) => {
+    requestUrls.push(request.url ?? "");
+    if (request.url !== "/v1/session/health") {
+      response.writeHead(404).end();
+      return;
+    }
+    healthRequests += 1;
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({
+      schemaVersion: 1,
+      operation: "health",
+      status: "READY",
+      capabilities: {
+        kinds: ["pwn-session", "http-session"],
+        maxRequestBytes: 1_048_576,
+        maxResponseBytes: 1_048_576,
+        stableAcrossRestart: true,
+      },
+    }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-once-"));
+  let received: Parameters<CompetitionLaneFactory>[0] | undefined;
+  const lane: CompetitionLaneFactory = async (options) => {
+    received = options;
+    return await flagLane(options);
+  };
+  try {
+    const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT-ONCE", value: 100, flag: "flag{runtime_preflight_once}", category: "Pwn" }]);
+    // The broker only needs a non-empty test credential. PATH can contain
+    // non-ByteString characters on Windows, so use the platform's stable ASCII
+    // shell path there and PATH elsewhere.
+    const tokenEnv = process.platform === "win32" ? "ComSpec" : "PATH";
+    const config = {
+      ...CONFIG,
+      runtime: {
+        ...CONFIG.runtime,
+        sessionBroker: { baseUrl: `http://127.0.0.1:${address.port}`, tokenEnv },
+      },
+    } satisfies ProofBladeConfig;
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: lane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, `${result.reason ?? result.status}; healthRequests=${healthRequests}; urls=${requestUrls.join(",")}`);
+    assert.equal(healthRequests, 1, "the direction-scoped preflight must make one health request");
+    assert.deepEqual(received?.sessionRuntimePreflight?.brokers.map((broker) => broker.kind), ["pwn-session"]);
+    assert.deepEqual(received?.sessionRuntimeBrokers?.map((broker) => broker.kind), ["pwn-session"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("competition solver ignores an unrelated unavailable session kind", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-unrelated-"));
+  try {
+    const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT-CRYPTO", value: 100, flag: "flag{runtime_preflight_crypto}", category: "Crypto" }]);
+    const config = {
+      ...CONFIG,
+      runtime: {
+        ...CONFIG.runtime,
+        sessionBroker: { baseUrl: "http://127.0.0.1:1", tokenEnv: "PATH" },
+      },
+    } satisfies ProofBladeConfig;
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: flagLane });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.deepEqual(api.submitted, [{ id: "RUNTIME-PREFLIGHT-CRYPTO", flag: "flag{runtime_preflight_crypto}" }]);
+    assert.deepEqual(api.stopped, ["RUNTIME-PREFLIGHT-CRYPTO"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dynamic flag submission does not require an unused session broker", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-dynamic-"));
+  try {
+    const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT-DYNAMIC", value: 100, flag: "flag{runtime_preflight_dynamic}", dynamic: true }]);
+    const config = {
+      ...CONFIG,
+      runtime: {
+        ...CONFIG.runtime,
+        sessionBroker: { baseUrl: "http://127.0.0.1:1", tokenEnv: "PATH" },
+      },
+    } satisfies ProofBladeConfig;
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1 });
+    const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
+    assert.equal(result.solved, true, result.reason ?? result.status);
+    assert.deepEqual(api.submitted, [{ id: "RUNTIME-PREFLIGHT-DYNAMIC", flag: "flag{runtime_preflight_dynamic}" }]);
+    assert.deepEqual(api.stopped, ["RUNTIME-PREFLIGHT-DYNAMIC"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("an expired competition environment receives an immediate deadline", () => {
+  const task = competitionTask(
+    "EXPIRED",
+    { challengeId: "EXPIRED", title: "Expired", category: "Misc", normalizedCategory: "misc", value: 1 },
+    { instanceId: "inst-expired", connectionInfo: "nc host 1337", expiresAt: Date.now() - 1_000 },
+    ".",
+    CONFIG,
+  );
+  assert.equal(task.constraints.deadline_ms, 1);
 });
 
 test("solver default janitor retries a failed platform stop on the next fleet reconcile", async () => {

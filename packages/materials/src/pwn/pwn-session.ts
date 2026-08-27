@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Lane, SessionRecord } from "../domain/types.js";
-import type { ContainerRef } from "../container/contracts.js";
-import type { SessionRegistry } from "../container/session-registry.js";
+import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle } from "../container/contracts.js";
+import type { ExternalSessionBinding, SessionRegistry } from "../container/session-registry.js";
 import { matchFlagBounded } from "./pattern.js";
 
 /**
@@ -56,6 +56,50 @@ export class PwnSession {
   public static async openRemote(registry: SessionRegistry, options: PwnSessionOpenOptions): Promise<PwnSession> {
     if (!options.endpoint) throw new Error("openRemote requires an endpoint");
     const record = await registry.open({ ref: options.ref, kind: "pwn-remote", ownerLane: options.ownerLane, command: options.command, endpoint: options.endpoint, ...(options.env ? { env: options.env } : {}), ...(options.idleSilenceMs ? { idleSilenceMs: options.idleSilenceMs } : {}), ...(options.waitTimeoutMs ? { waitTimeoutMs: options.waitTimeoutMs } : {}) });
+    return new PwnSession(registry, options.ownerLane, record);
+  }
+
+  /** Wrap a broker-reconnected handle without creating a new process. */
+  public static async adopt(
+    registry: SessionRegistry,
+    options: {
+      ownerLane: Lane;
+      sessionId: string;
+      handle: ContainerSessionHandle;
+      runtime: Pick<ContainerRuntimePort, "sessionWrite" | "sessionRead" | "sessionSignal" | "closeSession">;
+    },
+  ): Promise<PwnSession> {
+    const record = await registry.adopt(options.ownerLane, options.sessionId, options.handle, options.runtime);
+    return new PwnSession(registry, options.ownerLane, record);
+  }
+
+  /** Bind a broker-created process without opening a replacement process. */
+  public static async openExternal(
+    registry: SessionRegistry,
+    options: PwnSessionOpenOptions & { sessionId: string; externalId: string; handle: ContainerSessionHandle; runtime: Pick<ContainerRuntimePort, "sessionWrite" | "sessionRead" | "sessionSignal" | "closeSession">; requestKey?: string; policyHash?: string; recipeHash?: string; scopeHash?: string; bindingTxnId?: string; externalRelease?: ExternalSessionBinding["externalRelease"] },
+  ): Promise<PwnSession> {
+    const record = await registry.openExternal({
+      ref: options.ref,
+      kind: options.endpoint ? "pwn-remote" : "pwn-local",
+      ownerLane: options.ownerLane,
+      command: options.command,
+      ...(options.endpoint ? { endpoint: options.endpoint } : {}),
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+      ...(options.env ? { env: options.env } : {}),
+      ...(options.idleSilenceMs ? { idleSilenceMs: options.idleSilenceMs } : {}),
+      ...(options.waitTimeoutMs ? { waitTimeoutMs: options.waitTimeoutMs } : {}),
+    }, {
+      sessionId: options.sessionId,
+      externalId: options.externalId,
+      handle: options.handle,
+      runtime: options.runtime,
+      ...(options.requestKey ? { requestKey: options.requestKey } : {}),
+      ...(options.policyHash ? { policyHash: options.policyHash } : {}),
+      ...(options.recipeHash ? { recipeHash: options.recipeHash } : {}),
+      ...(options.scopeHash ? { scopeHash: options.scopeHash } : {}),
+      ...(options.bindingTxnId ? { bindingTxnId: options.bindingTxnId } : {}),
+      externalRelease: options.externalRelease,
+    });
     return new PwnSession(registry, options.ownerLane, record);
   }
 

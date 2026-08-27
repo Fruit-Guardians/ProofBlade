@@ -15,6 +15,7 @@ import {
   type CompetitionHttpEndpoints,
   type ContainerRuntimePort,
   type ProofBladeConfig,
+  tryCreateConfiguredBrowserVerifierFactory,
 } from "@proofblade/materials";
 import { DemoChallengeSolver, DemoCompetitionApi } from "./fleet.js";
 
@@ -117,7 +118,8 @@ export class CompetitionSettingsStore {
       const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
       const environmentJanitor = this.createEnvironmentJanitor(journaledApi);
       const approvalPolicy = this.createApprovalPolicy();
-      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
+      const browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(this.config);
+      const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}), ...(browserVerifierFactory ? { browserVerifierFactory } : {}) });
       return { api: journaledApi, solver, kind: "http", baseUrl: serverHost, source: this.source, journalPath, ...(containerRuntime ? { containerRuntime } : {}) };
     }
     const baseUrl = this.stored.baseUrl?.trim();
@@ -138,7 +140,8 @@ export class CompetitionSettingsStore {
     const containerRuntime = execution.backend === "docker" ? new DockerContainerRuntime(execution) : undefined;
     const environmentJanitor = this.createEnvironmentJanitor(journaledApi);
     const approvalPolicy = this.createApprovalPolicy();
-    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}) });
+    const browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(this.config);
+    const solver = new CompetitionChallengeSolver({ root: this.root, config: this.config, api: journaledApi, mode: "auto", environmentJanitor, ...(approvalPolicy ? { approvalPolicy } : {}), ...(containerRuntime ? { containerRuntime } : {}), ...(browserVerifierFactory ? { browserVerifierFactory } : {}) });
     return { api: journaledApi, solver, kind: "http", baseUrl, source: this.source, journalPath, ...(containerRuntime ? { containerRuntime } : {}) };
   }
 
@@ -152,6 +155,7 @@ export class CompetitionSettingsStore {
       api,
       ledgerPath: join(this.root, this.config.storage.runsDir, "competition-environments.json"),
       maxActive: this.stored.maxActiveEnvironments ?? 8,
+      requireRemoteInspectionForSweep: true,
     });
   }
 

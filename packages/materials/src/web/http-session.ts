@@ -3,7 +3,9 @@ import type { Lane } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
+import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import { DeterministicObserver } from "../knowledge/observer.js";
+import { BindingTransactionCoordinator } from "../recovery/binding-transaction-coordinator.js";
 
 export interface HttpSessionResponse {
   status: number;
@@ -38,17 +40,36 @@ export interface HttpSessionOptions {
   runId: string;
   baseUrl: string;
   ownerLane: Lane;
+  /** Broker-minted durable id; omitted for a process-local session. */
+  sessionId?: string;
+  /** Broker-owned state identity when cookies live outside this process. */
+  stateHashHint?: string;
   controlStore: ControlStore;
   artifactStore: ArtifactStore;
   fetchImpl?: typeof fetch;
   allowedHosts?: string[];
   allowedPorts?: number[];
   experimentGate?: ExperimentGate;
+  externalResources?: ExternalResourceRegistry;
+  /** Opaque id minted by a durable HTTP session broker, when available. */
+  externalId?: string;
+  /** Immutable broker binding fields persisted alongside the external handle. */
+  requestKey?: string;
+  policyHash?: string;
+  recipeHash?: string;
+  scopeHash?: string;
+  bindingTxnId?: string;
+  /**
+   * Release a broker-owned session when the local Control Store owner cannot
+   * be committed or when the session is closed.  The callback must be
+   * idempotent and must only release the exact opaque externalId it receives.
+   */
+  externalRelease?: (externalId: string, reason: string, signal?: AbortSignal) => Promise<{ released: boolean; summary?: string }>;
 }
 
 /** Per-run HTTP session with a bounded cookie jar and CSRF token reuse. */
 export class HttpSessionBackend {
-  public readonly sessionId = id("HTTP");
+  public readonly sessionId: string;
   private readonly base: URL;
   private readonly cookies = new Map<string, string>();
   private readonly observer: DeterministicObserver;
@@ -56,23 +77,127 @@ export class HttpSessionBackend {
   private closed = false;
   private exchangeCount = 0;
   private generation?: number;
+  /** Broker-provided state identity for cookies that are not present locally. */
+  private readonly stateHashHint?: string;
 
-  private constructor(private readonly options: HttpSessionOptions) {
+  private constructor(private readonly options: HttpSessionOptions, sessionId = id("HTTP"), stateHashHint?: string) {
+    this.sessionId = sessionId;
     this.base = new URL(options.baseUrl);
     this.observer = new DeterministicObserver(options.controlStore);
+    this.stateHashHint = stateHashHint;
   }
 
   public static async open(options: HttpSessionOptions): Promise<HttpSessionBackend> {
-    const session = new HttpSessionBackend(options);
+    const session = new HttpSessionBackend(options, options.sessionId, options.stateHashHint);
     if (!/^https?:$/.test(session.base.protocol)) throw new Error("HTTP session requires an http(s) base URL");
     assertHttpScope(session.base, options.allowedHosts, options.allowedPorts);
     const snapshot = await options.controlStore.snapshot(options.runId);
     session.generation = snapshot.generation;
-    await options.controlStore.dispatch(options.runId, {
-      type: "session_opened",
-      session: { id: session.sessionId, runId: options.runId, kind: "http", ownerLane: options.ownerLane, generation: snapshot.generation, endpoint: session.base.origin, stateHash: session.stateHash() },
-      lane: options.ownerLane,
+    const resourceId = `session:${session.sessionId}`;
+    const externalId = options.externalId ?? session.sessionId;
+    const coordinator = options.externalResources ? new BindingTransactionCoordinator(options.controlStore, options.externalResources) : undefined;
+    const registration = {
+      id: resourceId,
+      kind: "http-session",
+      runId: options.runId,
+      generation: snapshot.generation,
+      ownerLane: options.ownerLane,
+      externalId,
+      ...(options.requestKey ? { requestKey: options.requestKey } : {}),
+      ...(options.policyHash ? { policyHash: options.policyHash } : {}),
+      ...(options.recipeHash ? { recipeHash: options.recipeHash } : {}),
+      ...(options.scopeHash ? { scopeHash: options.scopeHash } : {}),
+      ...(options.bindingTxnId ? { bindingTxnId: options.bindingTxnId } : {}),
+    } as const;
+    const prepared = coordinator ? await coordinator.prepare({ sessionId: session.sessionId, resource: registration }) : undefined;
+    const started = prepared ?? await options.externalResources?.registerStarted(registration);
+    let controlSessionCommitted = false;
+    try {
+      const openedSession = {
+        id: session.sessionId,
+        runId: options.runId,
+        kind: "http" as const,
+        ownerLane: options.ownerLane,
+        generation: snapshot.generation,
+        endpoint: session.base.origin,
+        externalId,
+        stateHash: session.stateHash(),
+        ...(options.requestKey ? { requestKey: options.requestKey } : {}),
+        ...(options.policyHash ? { policyHash: options.policyHash } : {}),
+        ...(options.recipeHash ? { recipeHash: options.recipeHash } : {}),
+        ...(options.scopeHash ? { scopeHash: options.scopeHash } : {}),
+        ...(started?.bindingTxnId ? { bindingTxnId: started.bindingTxnId } : {}),
+        ...(prepared ? { bindingIdentityHash: prepared.identityHash } : {}),
+      };
+      if (coordinator && prepared) await coordinator.commitControl(prepared, openedSession);
+      else await options.controlStore.dispatch(options.runId, { type: "session_opened", session: openedSession, lane: options.ownerLane });
+      controlSessionCommitted = true;
+      if (coordinator && prepared) await coordinator.finalize(prepared);
+      else await options.externalResources?.markControlBound(resourceId, session.sessionId, started?.bindingTxnId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      if (started && controlSessionCommitted) {
+        // The Control Store owner is durable.  A failed binding marker must
+        // remain adoptable; releasing here could destroy a session whose owner
+        // recovery can still reconcile safely.
+        await options.externalResources?.markUnknown(resourceId, reason).catch(() => undefined);
+      } else if (started) {
+        if (options.externalRelease) {
+          try {
+            const released = await options.externalRelease(externalId, "HTTP session owner commit failed");
+            if (released.released) await options.externalResources?.markReleased(resourceId, released.summary ?? "HTTP session owner commit failed");
+            else await options.externalResources?.markUnknown(resourceId, released.summary ?? reason);
+          } catch (releaseError) {
+            await options.externalResources?.markUnknown(resourceId, releaseError instanceof Error ? releaseError.message : String(releaseError)).catch(() => undefined);
+          }
+        } else {
+          // A generated session id is process-local and has no external owner.
+          // It is safe to close its registry record immediately. Explicit
+          // broker handles remain UNKNOWN until their broker can be reconciled.
+          if (options.externalId === undefined) await options.externalResources?.markReleased(resourceId, "HTTP session owner commit failed");
+          else await options.externalResources?.markUnknown(resourceId, reason).catch(() => undefined);
+        }
+      }
+      throw error;
+    }
+    return session;
+  }
+
+  /**
+   * Adopt an already-open broker session. The broker transport is required so
+   * requests continue through the same cookie/session authority; this method
+   * never emits session_opened or creates a replacement HTTP session.
+   */
+  public static async adopt(options: HttpSessionOptions, sessionId: string, stateHash?: string): Promise<HttpSessionBackend> {
+    if (!options.externalId) throw new Error("HTTP session adoption requires an opaque externalId");
+    if (!options.fetchImpl) throw new Error("HTTP session adoption requires a broker-owned fetchImpl");
+    const session = new HttpSessionBackend(options, sessionId, stateHash);
+    if (!/^https?:$/.test(session.base.protocol)) throw new Error("HTTP session requires an http(s) base URL");
+    assertHttpScope(session.base, options.allowedHosts, options.allowedPorts);
+    const snapshot = await options.controlStore.snapshot(options.runId);
+    const record = snapshot.sessions[sessionId];
+    if (!record || record.kind !== "http") throw new Error(`Unknown HTTP session: ${sessionId}`);
+    if (record.status !== "OPEN") throw new Error(`HTTP session is ${record.status}: ${sessionId}`);
+    if (record.ownerLane !== options.ownerLane) throw new Error(`HTTP session is owned by ${record.ownerLane}, not ${options.ownerLane}`);
+    if (record.runId !== options.runId || record.generation !== snapshot.generation) throw new Error(`HTTP session generation drift: ${sessionId}`);
+    if (record.externalId !== options.externalId) throw new Error(`HTTP session opaque handle mismatch: ${sessionId}`);
+    if (record.endpoint && record.endpoint !== session.base.origin) throw new Error(`HTTP session endpoint mismatch: ${sessionId}`);
+    const resourceId = `session:${sessionId}`;
+    const started = await options.externalResources?.registerStarted({
+      id: resourceId,
+      kind: "http-session",
+      runId: record.runId,
+      generation: record.generation,
+      ownerLane: record.ownerLane,
+      externalId: record.externalId,
+      ...(record.requestKey ? { requestKey: record.requestKey } : {}),
+      ...(record.policyHash ? { policyHash: record.policyHash } : {}),
+      ...(record.recipeHash ? { recipeHash: record.recipeHash } : {}),
+      ...(record.scopeHash ? { scopeHash: record.scopeHash } : {}),
+      ...(record.bindingTxnId ? { bindingTxnId: record.bindingTxnId } : {}),
     });
+    await options.externalResources?.markControlBound(resourceId, sessionId, started?.bindingTxnId ?? record.bindingTxnId);
+    session.generation = snapshot.generation;
     return session;
   }
 
@@ -140,17 +265,38 @@ export class HttpSessionBackend {
     if (this.closed) return;
     this.closed = true;
     const snapshot = await this.options.controlStore.snapshot(this.options.runId);
-    if (!snapshot.sessions[this.sessionId] || ["CLOSED", "SUPERSEDED"].includes(snapshot.sessions[this.sessionId]!.status)) return;
-    await this.options.controlStore.dispatch(this.options.runId, { type: "session_closed", sessionId: this.sessionId, reason, exitCode: 0, lane: this.options.ownerLane });
+    if (!snapshot.sessions[this.sessionId] || ["CLOSED", "SUPERSEDED"].includes(snapshot.sessions[this.sessionId]!.status)) {
+      await this.releaseExternalResource(`session:${this.sessionId}`, reason);
+      return;
+    }
+    try {
+      await this.options.controlStore.dispatch(this.options.runId, { type: "session_closed", sessionId: this.sessionId, reason, exitCode: 0, lane: this.options.ownerLane });
+    } finally {
+      await this.releaseExternalResource(`session:${this.sessionId}`, reason);
+    }
   }
 
   public stateHash(): string {
-    return sha256(canonicalJson({ cookies: [...this.cookies].sort(([a], [b]) => a.localeCompare(b)), csrfToken: this.csrfToken ?? "" }));
+    return this.stateHashHint ?? sha256(canonicalJson({ cookies: [...this.cookies].sort(([a], [b]) => a.localeCompare(b)), csrfToken: this.csrfToken ?? "" }));
   }
 
   /** A clean reproducer must start before any cookie or CSRF state is observed. */
   public isPristine(): boolean {
-    return this.cookies.size === 0 && this.csrfToken === undefined;
+    return this.stateHashHint === undefined && this.cookies.size === 0 && this.csrfToken === undefined;
+  }
+
+  private async releaseExternalResource(resourceId: string, reason: string): Promise<void> {
+    if (this.options.externalRelease && this.options.externalId) {
+      try {
+        const released = await this.options.externalRelease(this.options.externalId, reason);
+        if (released.released) await this.options.externalResources?.markReleased(resourceId, released.summary ?? reason);
+        else await this.options.externalResources?.markUnknown(resourceId, released.summary ?? "HTTP broker did not confirm release");
+      } catch (error) {
+        await this.options.externalResources?.markUnknown(resourceId, error instanceof Error ? error.message : String(error)).catch(() => undefined);
+      }
+      return;
+    }
+    await this.options.externalResources?.markReleased(resourceId, reason).catch(() => undefined);
   }
 
   private captureCookies(headers: Headers): void {

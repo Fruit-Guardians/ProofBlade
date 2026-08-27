@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
 import test from "node:test";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { collectApi } from "../scripts/collector.mjs";
 import { findDuplicateCandidates } from "../scripts/duplicates.mjs";
 import { renderAgentContext, renderMarkdown } from "../scripts/renderer.mjs";
@@ -41,6 +44,21 @@ test("normalizes imported type signatures to package-relative paths", () => {
   const intentWeights = index.symbols.find((symbol) => symbol.name === "IntentScheduler.getScoringWeights");
   assert.ok(intentWeights);
   assert.match(intentWeights.signature, /import\("\.\/src\/domain\/intent"\)/);
+});
+
+test("API indexes are identical when the same checkout is opened through another workspace path", async () => {
+  const aliasRoot = await mkdtemp(join(tmpdir(), "proofblade-api-index-alias-"));
+  const alias = join(aliasRoot, "checkout");
+  try {
+    await symlink(repoRoot, alias, "junction");
+    for (const packageId of ["atoms", "molecules", "materials"]) {
+      const canonical = collectApi({ repoRoot, packageId });
+      const aliased = collectApi({ repoRoot: alias, packageId });
+      assert.deepEqual(aliased, canonical, `${packageId} output must not depend on the checkout path`);
+    }
+  } finally {
+    await rm(aliasRoot, { recursive: true, force: true });
+  }
 });
 
 test("duplicate detector separates exact duplicates from structural candidates", () => {

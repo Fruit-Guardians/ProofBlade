@@ -13,6 +13,7 @@ import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { PiCodingLane } from "../src/runtime/coding-lane.js";
 import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtime/lmstudio-provider.js";
+import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
 const apiKeyEnv = "PROOFBLADE_MOCK_PROVIDER_KEY";
 
@@ -141,10 +142,45 @@ test("PiCodingLane persists tool preparation before the first Provider request a
   };
   let lane: PiCodingLane | undefined;
   let resumedLane: PiCodingLane | undefined;
+  let browserLane: PiCodingLane | undefined;
+  let pwnHealthCalls = 0;
+  let httpHealthCalls = 0;
+  const pwnBroker = {
+    name: "unrelated-pwn",
+    kind: "pwn-session",
+    health: async () => {
+      pwnHealthCalls += 1;
+      throw new Error("a Web task must not probe the unrelated Pwn broker");
+    },
+    inspect: async () => ({ status: "UNKNOWN" as const, binding: "UNKNOWN" as const }),
+    adopt: async () => ({ state: "UNKNOWN" as const }),
+    release: async () => ({ released: false }),
+    create: async () => ({ schemaVersion: 1 as const, operation: "create" as const, state: "UNKNOWN" as const }),
+    createBinding: async () => { throw new Error("not used by this smoke test"); },
+  } satisfies SessionRuntimeCreateBroker;
+  const httpBroker = {
+    name: "preflight-http",
+    kind: "http-session",
+    health: async () => {
+      httpHealthCalls += 1;
+      return {
+        status: "READY" as const,
+        capabilities: { kinds: ["http-session"] as const, maxRequestBytes: 1_048_576, maxResponseBytes: 1_048_576, stableAcrossRestart: true },
+      };
+    },
+    inspect: async () => ({ status: "UNKNOWN" as const, binding: "UNKNOWN" as const }),
+    adopt: async () => ({ state: "UNKNOWN" as const }),
+    release: async () => ({ released: false }),
+    create: async () => ({ schemaVersion: 1 as const, operation: "create" as const, state: "UNKNOWN" as const }),
+    createBinding: async () => { throw new Error("not used by this smoke test"); },
+  } satisfies SessionRuntimeCreateBroker;
   try {
     services = createServices(root, config);
     const runId = "PI-HTTP-PREFLIGHT";
-    await services.control.createRun(runId, fixtureTask(runId, "web-source-1", root, config));
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    task.target = `REMOTE:http://127.0.0.1:${address.port}`;
+    task.verification.web = { flag_pattern: "^flag\\{" };
+    await services.control.createRun(runId, task);
     const claimVerifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
     const laneOptions = {
       runId,
@@ -156,15 +192,18 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       journal: services.journal,
       claimVerifier,
       config,
+      sessionRuntimeBrokers: [pwnBroker, httpBroker],
     };
     lane = await PiCodingLane.create(laneOptions);
     const afterCreate = await services.control.snapshot(runId);
     assert.equal(afterCreate.toolPreparation?.profileId, "web");
     assert.equal(afterCreate.toolPreparation?.runtime, "host");
     assert.equal((await services.control.events(runId)).filter((event) => event.type === "tool_preparation_recorded").length, 1);
+    assert.equal(pwnHealthCalls, 0, "a Web task must not probe the unrelated Pwn broker");
+    assert.equal(httpHealthCalls, 1, "the Web task should probe its required HTTP broker once");
 
     const outcome = await lane.prompt("Inspect the prepared challenge and report readiness.");
-    assert.equal(outcome.stopReason, "stop");
+    assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
     assert.equal(requests, 1);
     assert.match(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
     assert.match(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
@@ -174,9 +213,30 @@ test("PiCodingLane persists tool preparation before the first Provider request a
 
     await lane.close();
     lane = undefined;
-    resumedLane = await PiCodingLane.create(laneOptions);
+    resumedLane = await PiCodingLane.create({
+      ...laneOptions,
+      sessionRuntimePreflight: { brokers: [httpBroker], unavailableKinds: [] },
+    });
     assert.equal((await services.control.events(runId)).filter((event) => event.type === "tool_preparation_recorded").length, 1);
+    assert.equal(pwnHealthCalls, 0, "session resume must still avoid the unrelated Pwn broker");
+    assert.equal(httpHealthCalls, 1, "session resume must reuse the caller-owned preflight too");
+
+    const browserRunId = "PI-BROWSER-PREFLIGHT";
+    const browserTask = fixtureTask(browserRunId, "web-source-1", root, config);
+    browserTask.target = `REMOTE:http://127.0.0.1:${address.port}`;
+    browserTask.verification.web = { flag_pattern: "^flag\\{", transport: "browser" };
+    await services.control.createRun(browserRunId, browserTask);
+    const browserClaims = new CodingClaimVerifier(browserRunId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    browserLane = await PiCodingLane.create({
+      ...laneOptions,
+      runId: browserRunId,
+      runDir: join(services.runsRoot, browserRunId),
+      claimVerifier: browserClaims,
+    });
+    assert.equal(pwnHealthCalls, 0, "a Browser task must not probe the unrelated Pwn broker");
+    assert.equal(httpHealthCalls, 1, "a Browser task must not require an HTTP session broker");
   } finally {
+    await browserLane?.close();
     await resumedLane?.close();
     await lane?.close();
     await services?.sandbox.close();

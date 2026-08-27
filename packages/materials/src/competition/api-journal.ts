@@ -6,6 +6,7 @@ import type {
   CompetitionAttachment,
   CompetitionChallengeSummary,
   CompetitionEnvironment,
+  CompetitionEnvironmentStartOptions,
   CompetitionSubmitResult,
 } from "./api.js";
 
@@ -13,7 +14,7 @@ import type {
 export interface CompetitionApiJournalRecord {
   schemaVersion: 1;
   sequence: number;
-  operation: "listChallenges" | "getChallenge" | "startEnvironment" | "submitFlag" | "stopEnvironment";
+  operation: "listChallenges" | "getChallenge" | "startEnvironment" | "inspectEnvironment" | "submitFlag" | "stopEnvironment";
   /** Only a digest is retained for request arguments so flags are not written to the journal. */
   argsHash: string;
   ok: boolean;
@@ -81,6 +82,7 @@ export class CompetitionApiJournal implements CompetitionApi {
       listChallenges: 0,
       getChallenge: 0,
       startEnvironment: 0,
+      inspectEnvironment: 0,
       submitFlag: 0,
       stopEnvironment: 0,
     } satisfies Record<CompetitionApiJournalRecord["operation"], number>;
@@ -102,8 +104,15 @@ export class CompetitionApiJournal implements CompetitionApi {
     return this.call("getChallenge", { challengeId }, (api) => api.getChallenge(challengeId));
   }
 
-  public startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
-    return this.call("startEnvironment", { challengeId }, (api) => api.startEnvironment(challengeId));
+  public startEnvironment(challengeId: string, options: CompetitionEnvironmentStartOptions = {}): Promise<CompetitionEnvironment> {
+    return this.call("startEnvironment", { challengeId, ...options }, (api) => api.startEnvironment(challengeId, options));
+  }
+
+  public inspectEnvironment(challengeId: string, instanceId?: string, options: import("./api.js").CompetitionEnvironmentInspectOptions = {}): Promise<import("./api.js").CompetitionEnvironmentInspection> {
+    return this.call("inspectEnvironment", { challengeId, instanceId, ...options }, async (api) => {
+      if (!api.inspectEnvironment) return { status: "UNKNOWN" as const, challengeId, summary: "competition API delegate has no inspection endpoint" };
+      return await api.inspectEnvironment(challengeId, instanceId, options);
+    });
   }
 
   public submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {

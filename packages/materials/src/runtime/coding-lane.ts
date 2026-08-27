@@ -30,7 +30,7 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { PwnReproductionContract, RunSnapshot, TaskContract } from "../domain/types.js";
+import type { PwnReproductionContract, RunSnapshot, RunToolPreparation, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
@@ -38,14 +38,25 @@ import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination,
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
+import type { ContainerRef, ContainerRuntimePort } from "../container/contracts.js";
 import { PwnReproducer } from "../verification/pwn-reproducer.js";
+import { PwnReproductionVerifier } from "../verification/pwn-reproduction-verifier.js";
 import { PwnToolHandler, type PwnReproductionPolicy } from "../pwn/pwn-tools.js";
+import { PwnSession } from "../pwn/pwn-session.js";
 import { ExperimentGate } from "../competition/experiment-gate.js";
 import { HttpSessionBackend } from "../web/http-session.js";
-import { WebReproducer, type WebExploitStep } from "../verification/web-reproducer.js";
+import { WebReproducer, type BrowserWebExploitStep, type WebExploitRecipe, type HttpWebExploitRecipe } from "../verification/web-reproducer.js";
+import { BrowserReproducer, type BrowserCleanSessionFactory } from "../verification/browser-reproducer.js";
+import { adoptVerifierBrowserSession, openVerifierBrowserSession, type BrowserVerifierFactory } from "../web/browser-session.js";
+import type { BrowserRuntimeHandoff } from "../web/browser-resource-adapter.js";
 import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
+import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
+import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
+import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
+import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
+import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -86,6 +97,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
+    /** Separate owner-scoped registry for trusted clean-process Pwn reproduction. */
+    private readonly pwnVerifierRegistry?: SessionRegistry,
     /** Exploratory HTTP sessions are lane-owned and must be closed with the lane. */
     private readonly webSession?: WebToolHandler,
   ) {}
@@ -108,6 +121,22 @@ export class PiCodingLane implements AgentLanePort {
     config: ProofBladeConfig;
     /** Optional process backend. Files remain on the host; bash/exec runs here. */
     executionEnv?: ExecutionEnv;
+    /** Optional application-owned browser runtime; it never enters model context. */
+    browserVerifierFactory?: BrowserVerifierFactory;
+    /** Durable ledger for Pwn/Web/Browser external session ownership. */
+    externalResources?: ExternalResourceRegistry;
+    /** Broker clients for sessions that must outlive this process. */
+    sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[];
+    /** A caller-owned preflight result for these exact broker clients. */
+    sessionRuntimePreflight?: SessionRuntimePreflight;
+    /** Set when runtime.sessionBroker is configured but unavailable. */
+    sessionRuntimeRequired?: boolean;
+    /** Set when runtime.browserBroker is configured but unavailable. */
+    browserRuntimeRequired?: boolean;
+    /** Runtime bindings recovered before this lane was constructed. */
+    sessionHandoffs?: readonly SessionRuntimeHandoff[];
+    /** Browser bindings recovered before this lane was constructed. */
+    browserHandoffs?: readonly BrowserRuntimeHandoff[];
     /** Path visible to commands inside the execution backend (normally /workspace). */
     workspaceRootForPrompt?: string;
     /** Skill library path visible to commands inside the execution backend. */
@@ -166,10 +195,20 @@ export class PiCodingLane implements AgentLanePort {
     const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
     const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
     const snapshot = await options.controlStore.snapshot(options.runId);
+    const sessionPreflight = options.sessionRuntimePreflight
+      ?? await preflightSessionRuntimeBrokers(sessionRuntimeBrokersForTask(snapshot.task, options.sessionRuntimeBrokers ?? []));
+    const sessionRuntimeBrokers = sessionPreflight.brokers;
+    const sessionRuntimeRequired = Boolean(options.sessionRuntimeRequired);
+    const pwnRuntimeRequired = sessionRuntimeRequired || sessionPreflight.unavailableKinds.includes("pwn-session");
+    const httpRuntimeRequired = sessionRuntimeRequired || sessionPreflight.unavailableKinds.includes("http-session");
+    if (options.browserRuntimeRequired && snapshot.task.verification.web?.transport === "browser" && !options.browserVerifierFactory) {
+      throw new Error("Browser runtime broker is configured but unavailable for browser verification");
+    }
     const challengeMode = isChallengeTask(snapshot.task);
     const challengeProfile = options.challengeProfile ?? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
     let preflight: ChallengeToolPreflight | undefined;
+    let preparation: RunToolPreparation | undefined;
     if (challengeProfile) {
       const existing = snapshot.toolPreparation;
       const reusable = existing
@@ -182,10 +221,11 @@ export class PiCodingLane implements AgentLanePort {
         : inContainer
           ? await new ToolPreflightService(installRoot).prepareInExecution(challengeProfile, env, mcp, { runtimeKey })
           : await new ToolPreflightService(installRoot).prepare(challengeProfile, toolCatalog, mcp);
+      preparation = runToolPreparationFromPreflight(preflight, challengeProfile, snapshot.generation);
       if (!reusable) {
-        const preparation = runToolPreparationFromPreflight(preflight, challengeProfile, snapshot.generation);
-        await options.controlStore.dispatch(options.runId, { type: "record_tool_preparation", preparation, lane: "executor" });
+        await new RunCoordinator(options.controlStore).recordToolPreparation(options.runId, preparation);
       }
+      assertToolPreparationPublished(await options.controlStore.snapshot(options.runId), preparation);
     }
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
     const enabledSkills = new Set(options.capabilities?.enabledSkills ?? challengeProfile?.skillNames ?? skills.list().map((skill) => skill.name));
@@ -233,37 +273,127 @@ export class PiCodingLane implements AgentLanePort {
       // objdump-level static analysis. The mcp_call proxy is already enabled.
       { includeMcp: true },
     );
-    // When the process backend is a Docker pwn/pwn-kernel container, wire the
-    // persistent tube tools: build a SessionRegistry over that container runtime
-    // and a PwnToolHandler bound to this run. Without a container (GUI chat /
-    // NodeExecutionEnv) pwnTools stays undefined and the pwn_* tools are neither
-    // active nor callable.
-    const pwnRegistry = env instanceof ContainerExecutionEnv && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
-      ? new SessionRegistry(options.runId, env.containerRuntime, options.controlStore)
-      : undefined;
+    // Wire persistent tube tools either over the per-run Docker runtime or over
+    // a configured durable session broker. Without either backend (ordinary
+    // GUI chat / NodeExecutionEnv), pwn_* tools stay inactive and uncallable.
+    const pwnBroker = sessionRuntimeBrokers.find((broker) => broker.kind === "pwn-session");
+    const containerPwn = env instanceof ContainerExecutionEnv
+      && (env.containerRef.profile === "pwn" || env.containerRef.profile === "pwn-kernel")
+      && !pwnBroker
+      && !pwnRuntimeRequired;
+    const pwnRegistry = containerPwn
+      ? new SessionRegistry(options.runId, (env as ContainerExecutionEnv).containerRuntime, options.controlStore, options.externalResources)
+      : pwnBroker
+        ? new SessionRegistry(options.runId, brokerOnlySessionRuntime(), options.controlStore, options.externalResources)
+        : undefined;
+    const pwnRef = containerPwn ? (env as ContainerExecutionEnv).containerRef : brokerSessionRef(options.runId, snapshot.generation, options.projectRoot);
+    const recoveredPwnSessions = pwnRegistry
+      ? await Promise.all((options.sessionHandoffs ?? [])
+        .filter((handoff) => handoff.binding.kind === "pwn-session")
+        .map(async (handoff) => {
+          if (handoff.binding.kind !== "pwn-session") throw new Error(`Recovered Pwn session ${handoff.resourceId} has the wrong binding kind`);
+          return await PwnSession.adopt(pwnRegistry, {
+            ownerLane: handoff.record.ownerLane,
+            sessionId: sessionIdFromResourceId(handoff.resourceId),
+            handle: handoff.binding.handle,
+            runtime: handoff.binding.runtime,
+          });
+        }))
+      : [];
     const experimentGate = new ExperimentGate(options.controlStore);
     const pwnReproductionPolicy = pwnReproductionPolicyFor(snapshot.task.verification.pwn);
+    const pwnVerifierRegistry = containerPwn && pwnReproductionPolicy
+      ? new SessionRegistry(options.runId, (env as ContainerExecutionEnv).containerRuntime, options.controlStore, options.externalResources)
+      : undefined;
+    const pwnTrustedReproducer = pwnVerifierRegistry && pwnReproductionPolicy
+      ? new PwnReproductionVerifier(options.controlStore, artifactStore, {
+        prepareReplay: async (input) => await options.claimVerifier.prepareReplay(input),
+        startReplay: async (effectId, sessionId, externalId) => await options.claimVerifier.startReplay(effectId, sessionId, externalId),
+        finishReplay: async (effectId, result) => await options.claimVerifier.finishReplay(effectId, result),
+        executeEffect: async (input, signal) => await options.claimVerifier.executePwnReproductionEffect(input, signal),
+        recordEvidence: async (_runId, evidence) => await options.claimVerifier.recordVerifierEvidence(evidence),
+        finalize: async (_runId, completionId, accepted, evidenceIds) => await options.claimVerifier.finalizePwnReproduction(completionId, accepted, evidenceIds),
+      }, pwnVerifierRegistry, () => (env as ContainerExecutionEnv).containerRef, pwnReproductionPolicy)
+      : undefined;
     const pwnTools = pwnRegistry
       ? new PwnToolHandler(
         options.runId,
         pwnRegistry,
         new PwnReproducer(options.controlStore),
-        () => (env as ContainerExecutionEnv).containerRef,
+        () => pwnRef,
         "main",
         // Enforce the task's target boundary at the app layer too, not just the
         // Docker egress gateway (a bridge/none policy has no gateway).
         { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
         pwnReproductionPolicy,
         experimentGate,
+        artifactStore,
+        options.controlStore,
+        pwnTrustedReproducer,
+        pwnBroker,
+        pwnRuntimeRequired,
       )
       : undefined;
+    for (const session of recoveredPwnSessions) pwnTools?.adopt(session);
     const webPolicy = snapshot.task.verification.web;
+    const webTransport = webPolicy?.transport ?? "http";
     const webBaseUrl = webBaseUrlFromTarget(snapshot.task.target);
-    const webReproducer = webPolicy && webBaseUrl
+    const recoveredHttpSessions = webBaseUrl
+      ? await Promise.all((options.sessionHandoffs ?? [])
+        .filter((handoff) => handoff.binding.kind === "http-session")
+        .map(async (handoff) => {
+          const sessionId = sessionIdFromResourceId(handoff.resourceId);
+          const sessionRecord = snapshot.sessions[sessionId];
+          if (handoff.record.ownerLane !== "main") throw new Error(`Recovered HTTP session ${handoff.resourceId} is not owned by the coding lane`);
+          if (!sessionRecord?.endpoint) throw new Error(`Recovered HTTP session ${handoff.resourceId} has no durable endpoint`);
+          const binding = handoff.binding;
+          if (binding.kind !== "http-session") throw new Error(`Recovered HTTP session ${handoff.resourceId} has the wrong binding kind`);
+          const backend = await HttpSessionBackend.adopt({
+            runId: options.runId,
+            baseUrl: sessionRecord.endpoint,
+            ownerLane: "main",
+            controlStore: options.controlStore,
+            artifactStore,
+            fetchImpl: binding.fetchImpl,
+            externalId: binding.externalId,
+            allowedHosts: snapshot.task.scope.allowed_hosts,
+            allowedPorts: snapshot.task.scope.allowed_ports,
+            experimentGate,
+            ...(options.externalResources ? { externalResources: options.externalResources } : {}),
+          }, sessionId, binding.stateHash);
+          return { backend, baseUrl: sessionRecord.endpoint };
+        }))
+      : [];
+    const webReproducer = webPolicy && webTransport === "http" && webBaseUrl
       ? new WebReproducer(options.controlStore, artifactStore, {
+        prepareReplay: async (input) => await options.claimVerifier.prepareReplay(input),
+        startReplay: async (effectId, sessionId, externalId) => await options.claimVerifier.startReplay(effectId, sessionId, externalId),
+        finishReplay: async (effectId, result) => await options.claimVerifier.finishReplay(effectId, result),
         executeEffect: async (input, signal) => await options.claimVerifier.executeWebReproductionEffect(input, signal),
         recordEvidence: async (_runId, evidence) => await options.claimVerifier.recordVerifierEvidence(evidence),
+        recordDomainRecords: async (_runId, records) => await options.claimVerifier.recordVerifierDomainRecords(records),
         finalize: async (_runId, completionId, accepted, evidenceIds) => await options.claimVerifier.finalizeWebReproduction(completionId, accepted, evidenceIds),
+      })
+      : undefined;
+    const browserCleanSessionFactory: BrowserCleanSessionFactory | undefined = webPolicy && webTransport === "browser" && options.browserVerifierFactory
+      ? async (request, signal) => await openVerifierBrowserSession(options.browserVerifierFactory!, request, options.controlStore, artifactStore, signal, options.externalResources)
+      : undefined;
+    const browserReproducer = webPolicy && webTransport === "browser" && browserCleanSessionFactory
+      ? new BrowserReproducer(options.controlStore, artifactStore, {
+        prepareReplay: async (input) => await options.claimVerifier.prepareReplay(input),
+        startReplay: async (effectId, sessionId, externalId) => await options.claimVerifier.startReplay(effectId, sessionId, externalId),
+        finishReplay: async (effectId, result) => await options.claimVerifier.finishReplay(effectId, result),
+        executeEffect: async (input, signal) => await options.claimVerifier.executeBrowserReproductionEffect(input, signal),
+        recordEvidence: async (_runId, evidence) => await options.claimVerifier.recordVerifierEvidence(evidence),
+        recordDomainRecords: async (_runId, records) => await options.claimVerifier.recordVerifierDomainRecords(records),
+        finalize: async (_runId, completionId, accepted, evidenceIds) => await options.claimVerifier.finalizeBrowserReproduction(completionId, accepted, evidenceIds),
+      }, {
+        handoffs: options.browserHandoffs,
+        createRecoveredSession: async (handoff, request) => {
+          const sessionId = handoff.resourceId.startsWith("session:") ? handoff.resourceId.slice("session:".length) : "";
+          if (!sessionId) throw new Error(`Recovered Browser resource ${handoff.resourceId} has no session id`);
+          return await adoptVerifierBrowserSession(handoff.binding, request, sessionId, options.controlStore, artifactStore, options.externalResources);
+        },
       })
       : undefined;
     // Interactive web session tools: available whenever the task has a resolvable
@@ -277,10 +407,14 @@ export class PiCodingLane implements AgentLanePort {
         artifactStore,
         ownerLane: "main",
         scope: { allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports },
+        ...(recoveredHttpSessions.length > 0 ? { recoveredSessions: recoveredHttpSessions } : {}),
         ...(experimentGate ? { experimentGate } : {}),
+        ...(options.externalResources ? { externalResources: options.externalResources } : {}),
+        ...(sessionRuntimeBrokers.find((broker) => broker.kind === "http-session") ? { sessionBroker: sessionRuntimeBrokers.find((broker) => broker.kind === "http-session") } : {}),
+        sessionRuntimeRequired: httpRuntimeRequired,
       })
       : undefined;
-    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
+    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -289,7 +423,7 @@ export class PiCodingLane implements AgentLanePort {
         platformJudged,
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
-        webReproductionEnabled: Boolean(webReproducer),
+        webReproductionEnabled: Boolean(webReproducer || browserReproducer),
         webSessionEnabled: Boolean(webSession),
       }),
       ...activeMcpTools.map((tool) => tool.name),
@@ -322,8 +456,19 @@ export class PiCodingLane implements AgentLanePort {
       evidenceCurationGate,
       runtime,
       experimentGate,
-      ...(webReproducer ? {
-        webReproduce: async (steps: WebExploitStep[], signal?: AbortSignal) => await webReproducer.reproduce(options.runId, { steps }, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl!, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports, experimentGate }), signal),
+      ...(webReproducer || browserReproducer ? {
+        webReproduce: async (recipe: WebExploitRecipe, signal?: AbortSignal) => {
+          const transport = recipe.transport ?? webTransport;
+          if (transport !== webTransport) throw new Error(`web_reproduce transport ${transport} does not match the immutable task policy ${webTransport}`);
+          if (transport === "browser") {
+            if (!browserReproducer || !browserCleanSessionFactory) throw new Error("web_reproduce browser transport is unavailable: no trusted browser verifier backend is configured");
+            const browserRecipe = recipe.transport === "browser" ? recipe : { transport: "browser" as const, steps: recipe.steps as BrowserWebExploitStep[] };
+          return browserReproducer.reproduce(options.runId, browserRecipe, browserCleanSessionFactory, signal);
+          }
+          if (!webReproducer || !webBaseUrl) throw new Error("web_reproduce HTTP transport is unavailable: no immutable HTTP target is configured");
+          const httpRecipe: HttpWebExploitRecipe = recipe.transport === "http" || recipe.transport === undefined ? recipe : { transport: "http", steps: recipe.steps as HttpWebExploitRecipe["steps"] };
+          return webReproducer.reproduce(options.runId, httpRecipe, async () => await HttpSessionBackend.open({ runId: options.runId, baseUrl: webBaseUrl, ownerLane: "verifier", controlStore: options.controlStore, artifactStore, allowedHosts: snapshot.task.scope.allowed_hosts, allowedPorts: snapshot.task.scope.allowed_ports, experimentGate, ...(options.externalResources ? { externalResources: options.externalResources } : {}) }), signal);
+        },
       } : {}),
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
@@ -449,6 +594,7 @@ export class PiCodingLane implements AgentLanePort {
         return undefined;
       },
       pwnRegistry,
+      pwnVerifierRegistry,
       webSession,
     );
   }
@@ -535,6 +681,7 @@ export class PiCodingLane implements AgentLanePort {
         // sessions would stay OPEN until the container is destroyed. Best-effort
         // so a session cleanup failure never blocks the rest of teardown.
         if (this.pwnRegistry) await this.pwnRegistry.disposeAll("lane shutdown").catch(() => undefined);
+        if (this.pwnVerifierRegistry) await this.pwnVerifierRegistry.disposeAll("lane shutdown").catch(() => undefined);
         if (this.webSession) await this.webSession.disposeAll("lane shutdown");
         await this.env.cleanup();
       } finally {
@@ -808,7 +955,11 @@ function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?
     : "";
   const firstAction = profile.firstActionPlan;
   const firstActionBudget = ` First action budget: at most ${firstAction.maxCalls} calls through ${firstAction.allowedToolNames.join(", ")}; completion tools may be used immediately when a verifier-ready candidate exists.`;
-  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight is authoritative and has already classified this challenge. Do not spend a model turn reclassifying the task, reading unrelated playbooks, discovering tools, installing packages, or retrying a missing binary. Use the selected direction directly. First action contract: ${profile.firstAction}${firstActionBudget} Otherwise persist the new fact before choosing the next action. Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}. ${required}${optional}${readiness}${mcp}`;
+  const actionBundles = preflight?.actionBundles ?? profile.actionBundles;
+  const actionBundleBlock = actionBundles.length > 0
+    ? `\nPhase action bundles (select the bundle matching the durable phase; do not mix phases):\n${actionBundles.map((bundle) => `- ${bundle.domainPhase} / ${bundle.id}: ${bundle.objective} Tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Max calls: ${bundle.maxCalls}.`).join("\n")}`
+    : "";
+  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight is authoritative and has already classified this challenge. Do not spend a model turn reclassifying the task, reading unrelated playbooks, discovering tools, installing packages, or retrying a missing binary. Use the selected direction directly. First action contract: ${profile.firstAction}${firstActionBudget} Otherwise persist the new fact before choosing the next action. Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}.${actionBundleBlock} ${required}${optional}${readiness}${mcp}`;
 }
 
 /**
@@ -836,13 +987,13 @@ export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], ta
     // script and blocks again. State the interaction model up front so the
     // exploit is driven turn-by-turn, not one monolithic blocking script.
     const interactionRule = pwnToolsAvailable
-      ? `- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with \`pwn_open\` (kind=remote, endpoint=host:port for an \`nc\` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with \`pwn_send\` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and \`pwn_recv\` (until=<anchor>). This is how you avoid the #1 pwn failure: a full \`from pwn import *\` script run in one \`bash\` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection.${pwnReproductionAvailable ? " Confirm a solve with \`pwn_reproduce\` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell." : " The immutable task verifier is not configured for \`pwn_reproduce\`; validate the exploit through the live session and submit through the platform workflow."}`
+      ? `- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with \`pwn_open\` (kind=remote, endpoint=host:port for an \`nc\` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with \`pwn_send\` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and \`pwn_recv\` (until=<anchor>). After a bounded observation, persist the primitive hypothesis with \`pwn_record_primitive\` and its Artifact/Evidence ids; confidence is always below 1 and it is never a shell claim. This is how you avoid the #1 pwn failure: a full \`from pwn import *\` script run in one \`bash\` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection.${pwnReproductionAvailable ? " Confirm a solve with \`pwn_reproduce\` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell." : " The immutable task verifier is not configured for \`pwn_reproduce\`; validate the exploit through the live session and submit through the platform workflow."}`
       : "- INTERACTION MODEL — never hold a live interactive connection inside one foreground `bash` call: an exploit that calls `recvuntil`/`interactive`/`p.recv()` will block until the command timeout kills it, and rewriting the whole script and re-running it is the #1 way pwn turns are lost. Run any long or interactive exploit under `shell_background` and poll with `shell_job`, so a stall costs one bounded poll instead of the whole command budget. Keep each foreground `bash` short: compute offsets/gadgets/payloads, do a single bounded probe (`timeout 20 python solve.py`), inspect, iterate — do not launch the full interactive solve in the foreground.";
     return [
       "\n\n## Pwn category specifics",
       "- Use the exact paths in the prepared `<tool-catalog>` profile for `pwntools`, `gdb`, `qemu`, `patchelf`, `ropgadget`, or `one_gadget` when present. Optional tools may be absent; do not install or rediscover them during the solve. `context.log_level = 'debug'` when protocol sync is unclear.",
       interactionRule,
-      "- Always run `file` and `checksec` on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
+      "- Always run `file` and `checksec` (or the prepared `capability` proofblade.binary identify/inspect_elf operation) on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
       "- Chinese CTF services often speak GBK, not UTF-8. Never hand-type non-ASCII prompt bytes into a script from what you see in a tool-result echo, because that echo has already been round-tripped through a locale that may not match the wire. Instead: (1) do one probe run, save `p.recv(4096)` to a file, (2) inspect the raw bytes with `xxd`, (3) reference those exact bytes in your parser (`recvuntil(b\"\\xc7\\xeb\\xd1\\xa1\\xd4\\xf1...\")` or a stable ASCII substring/suffix that co-occurs with the prompt). If the banner is confusing, decode with `.decode('gbk', errors='replace')` and `.decode('utf-8', errors='replace')` side by side — whichever produces readable Chinese is the wire encoding, and encoding future sends with the same codec is mandatory.",
       "- Prefer stable synchronization anchors that appear in a single state, not generic suffixes like `b': '` that appear in every prompt. Log the step name, timeout, and last received bytes on every failed recv so a stall is legible.",
       "- After a suspected shell hijack, send `echo PB_READY_$RANDOM$RANDOM` and wait for that exact marker. EOF, connection reset, or a timeout is NOT shell success.",
@@ -912,6 +1063,52 @@ function webBaseUrlFromTarget(target: string): string | undefined {
       : undefined;
   if (!value) return undefined;
   try { return new URL(value).toString().replace(/\/$/, ""); } catch { return undefined; }
+}
+
+/**
+ * Keep the lane's broker health check scoped to the capabilities the task can
+ * actually use. A configured deployment may expose both Pwn and HTTP brokers,
+ * but a fixture Web task without a web verification contract has no reason to
+ * probe either durable transport during lane startup.
+ */
+function sessionRuntimeBrokersForTask(
+  task: TaskContract,
+  brokers: readonly SessionRuntimeCreateBroker[],
+): readonly SessionRuntimeCreateBroker[] {
+  const requiredKinds = new Set<SessionRuntimeCreateBroker["kind"]>();
+  if (task.target_kind === "pwn" || task.verification.pwn) requiredKinds.add("pwn-session");
+  const webTransport = task.verification.web?.transport ?? "http";
+  if (webTransport === "http" && (task.verification.web || webBaseUrlFromTarget(task.target))) requiredKinds.add("http-session");
+  return brokers.filter((broker) => requiredKinds.has(broker.kind));
+}
+
+function sessionIdFromResourceId(resourceId: string): string {
+  if (!resourceId.startsWith("session:") || resourceId.length <= "session:".length) throw new Error(`Invalid recovered session resource id: ${resourceId}`);
+  return resourceId.slice("session:".length);
+}
+
+function brokerOnlySessionRuntime(): ContainerRuntimePort {
+  return new Proxy({} as ContainerRuntimePort, {
+    get() {
+      return async () => { throw new Error("This lane has no local container runtime; use the configured session broker"); };
+    },
+  });
+}
+
+function brokerSessionRef(runId: string, generation: number, workspaceHostPath: string): ContainerRef {
+  const digest = sha256(`${runId}:${generation}:session-runtime`);
+  return {
+    runId,
+    generation,
+    containerId: `session-runtime-${digest.slice(0, 24)}`,
+    name: `session-runtime-${digest.slice(24, 40)}`,
+    profile: "pwn",
+    image: "proofblade/session-runtime",
+    imageDigest: `sha256:${sha256("proofblade/session-runtime")}`,
+    workspaceHostPath,
+    workspaceContainerPath: "/workspace",
+    networkPolicy: "target-only",
+  };
 }
 
 function firstClassMcpServers(targetKind: TaskContract["target_kind"], target: string, enabledServers: Set<string>, profileId?: string): string[] {

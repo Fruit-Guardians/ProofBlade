@@ -9,6 +9,8 @@
  * that have not supplied a live endpoint.
  */
 
+import { readBoundedResponseText } from "./http-body.js";
+
 export type CompetitionCategory =
   | "web"
   | "misc"
@@ -42,6 +44,8 @@ export interface CompetitionAttachment {
 export interface CompetitionEnvironment {
   /** Opaque handle used to stop the environment; absent for static challenges. */
   instanceId?: string;
+  /** Stable key echoed by platforms that support idempotent environment creation. */
+  idempotencyKey?: string;
   /** Connection string for the live target, e.g. "nc host 1337" or a URL. */
   connectionInfo?: string;
   /**
@@ -53,6 +57,85 @@ export interface CompetitionEnvironment {
   expiresAt?: number;
   /** Full platform payload, retained for the debug GUI. */
   raw?: Record<string, unknown>;
+}
+
+/**
+ * Conservative remote observation used during recovery. Platforms that do
+ * not expose a query-by-idempotency contract may omit this capability; callers
+ * must then keep an owned ledger record but cannot prove a remote resource is
+ * still present.
+ */
+export interface CompetitionEnvironmentInspection {
+  status: "ACTIVE" | "ABSENT" | "UNKNOWN";
+  challengeId?: string;
+  instanceId?: string;
+  /** Stable key returned by a query-by-idempotency-key endpoint, when supported. */
+  idempotencyKey?: string;
+  connectionInfo?: string;
+  expiresAt?: number;
+  summary?: string;
+  raw?: Record<string, unknown>;
+}
+
+/**
+ * Stable remote identity that a competition platform can prove after a
+ * ProofBlade process restart. `challenge-only` is intentionally not an
+ * ownership proof: two workers can observe the same challenge while owning
+ * different environment leases.
+ */
+export type CompetitionEnvironmentIdentityStrategy = "idempotency-key" | "instance-id" | "challenge-only" | "none";
+
+/** Capability declaration for the platform's environment query contract. */
+export interface CompetitionEnvironmentIdentityCapabilities {
+  readonly strategy: CompetitionEnvironmentIdentityStrategy;
+  /** Whether the selected identity remains valid across client restarts. */
+  readonly stableAcrossRestart: boolean;
+}
+
+export type CompetitionEnvironmentIdentityMatch = "MATCH" | "MISMATCH" | "UNKNOWN";
+
+/**
+ * Compare a durable local reservation with one normalized remote observation.
+ * Missing identity is unknown, never a match; a mismatch is safe to expose as
+ * such because callers must not release a foreign environment.
+ */
+export function classifyCompetitionEnvironmentIdentity(
+  expected: { challengeId: string; instanceId?: string; idempotencyKey?: string },
+  observed: CompetitionEnvironmentInspection,
+  capabilities?: CompetitionEnvironmentIdentityCapabilities,
+): CompetitionEnvironmentIdentityMatch {
+  // Recovery requires an explicit platform contract; undocumented matching
+  // fields do not prove identity survives a client restart.
+  if (!capabilities) return "UNKNOWN";
+  if (observed.status !== "ACTIVE") return "UNKNOWN";
+  if (observed.challengeId === undefined) return "UNKNOWN";
+  if (observed.challengeId !== expected.challengeId) return "MISMATCH";
+
+  if (!capabilities.stableAcrossRestart) return "UNKNOWN";
+  switch (capabilities.strategy) {
+    case "idempotency-key":
+      if (expected.idempotencyKey === undefined || observed.idempotencyKey === undefined) return "UNKNOWN";
+      if (observed.idempotencyKey !== expected.idempotencyKey) return "MISMATCH";
+      if (expected.instanceId !== undefined && observed.instanceId !== undefined && observed.instanceId !== expected.instanceId) return "MISMATCH";
+      return "MATCH";
+    case "instance-id":
+      if (expected.instanceId === undefined || observed.instanceId === undefined) return "UNKNOWN";
+      return observed.instanceId === expected.instanceId ? "MATCH" : "MISMATCH";
+    case "challenge-only":
+    case "none":
+      return "UNKNOWN";
+  }
+}
+
+/** Durable identity supplied when starting a remotely provisioned environment. */
+export interface CompetitionEnvironmentStartOptions {
+  /** Must be persisted before the non-idempotent request is sent. */
+  idempotencyKey?: string;
+}
+
+/** Query hint used by platforms that can find an environment by its stable key. */
+export interface CompetitionEnvironmentInspectOptions {
+  idempotencyKey?: string;
 }
 
 export interface CompetitionSubmitResult {
@@ -67,6 +150,8 @@ export interface CompetitionSubmitResult {
 }
 
 export interface CompetitionApi {
+  /** Optional platform declaration used by recovery and orphan cleanup. */
+  readonly environmentIdentity?: CompetitionEnvironmentIdentityCapabilities;
   /** List every currently open challenge. */
   listChallenges(): Promise<CompetitionChallengeSummary[]>;
   /** Fetch one challenge's detail plus its (decoded-by-caller) attachments. */
@@ -75,7 +160,9 @@ export interface CompetitionApi {
     attachments: CompetitionAttachment[];
   }>;
   /** Provision the challenge environment. No-op-friendly for static challenges. */
-  startEnvironment(challengeId: string): Promise<CompetitionEnvironment>;
+  startEnvironment(challengeId: string, options?: CompetitionEnvironmentStartOptions): Promise<CompetitionEnvironment>;
+  /** Optional idempotent remote lookup used by orphan recovery. */
+  inspectEnvironment?(challengeId: string, instanceId?: string, options?: CompetitionEnvironmentInspectOptions): Promise<CompetitionEnvironmentInspection>;
   /** Submit a flag and return the platform's verdict. */
   submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult>;
   /** Release the challenge environment. Safe to call when none is running. */
@@ -84,13 +171,15 @@ export interface CompetitionApi {
 
 export type CompetitionHttpMethod = "GET" | "POST" | "DELETE";
 
-/** Endpoint templates use `{challengeId}` and `{instanceId}` placeholders. */
+/** Endpoint templates use `{challengeId}`, `{instanceId}` and `{idempotencyKey}` placeholders. */
 export interface CompetitionHttpEndpoints {
   listChallenges: string;
   getChallenge: string;
   startEnvironment: string;
   submitFlag: string;
   stopEnvironment: string;
+  /** Optional GET endpoint used for exact remote recovery. */
+  inspectEnvironment?: string;
 }
 
 export interface CompetitionHttpApiOptions {
@@ -104,10 +193,14 @@ export interface CompetitionHttpApiOptions {
   tokenHeader?: string;
   /** Request timeout. Defaults to 30 seconds. */
   timeoutMs?: number;
+  /** Maximum UTF-8 response body size. Defaults to 8 MiB. */
+  maxResponseBytes?: number;
   /** Dependency injection seam for tests or a platform-specific fetch wrapper. */
   fetch?: typeof globalThis.fetch;
   /** Override platform paths without changing the response normalization. */
   endpoints?: Partial<CompetitionHttpEndpoints>;
+  /** Explicitly declare which remote environment identity the platform proves. */
+  environmentIdentity?: CompetitionEnvironmentIdentityCapabilities;
 }
 
 export class CompetitionHttpError extends Error {
@@ -165,11 +258,13 @@ const DEFAULT_HTTP_ENDPOINTS: CompetitionHttpEndpoints = {
  * challenge or an empty attachment set.
  */
 export class HttpCompetitionApi implements CompetitionApi {
+  public readonly environmentIdentity?: CompetitionEnvironmentIdentityCapabilities;
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
   private readonly token?: string;
   private readonly tokenHeader: string;
   private readonly timeoutMs: number;
+  private readonly maxResponseBytes: number;
   private readonly requestFetch: typeof globalThis.fetch;
   private readonly endpoints: CompetitionHttpEndpoints;
 
@@ -179,9 +274,11 @@ export class HttpCompetitionApi implements CompetitionApi {
     this.token = options.token;
     this.tokenHeader = options.tokenHeader?.trim() || "Authorization";
     this.timeoutMs = normalizeTimeout(options.timeoutMs);
+    this.maxResponseBytes = normalizeResponseBytes(options.maxResponseBytes);
     this.requestFetch = options.fetch ?? globalThis.fetch;
     if (typeof this.requestFetch !== "function") throw new Error("Competition API requires a fetch implementation");
     this.endpoints = { ...DEFAULT_HTTP_ENDPOINTS, ...options.endpoints };
+    this.environmentIdentity = options.environmentIdentity;
   }
 
   public async listChallenges(): Promise<CompetitionChallengeSummary[]> {
@@ -207,13 +304,50 @@ export class HttpCompetitionApi implements CompetitionApi {
     }
   }
 
-  public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
-    const payload = await this.request("POST", this.endpoints.startEnvironment, { challengeId });
+  public async startEnvironment(challengeId: string, options: CompetitionEnvironmentStartOptions = {}): Promise<CompetitionEnvironment> {
+    const payload = await this.request("POST", this.endpoints.startEnvironment, { challengeId }, undefined, idempotencyHeaders(options.idempotencyKey));
     const environment = parseEnvironment(unwrap(payload, ["environment", "instance", "data", "result"]));
     if (environment.connectionInfo && !environment.instanceId && this.endpoints.stopEnvironment.includes("{instanceId}")) {
       throw payloadError("startEnvironment.instanceId", "an instanceId for live environment teardown");
     }
     return environment;
+  }
+
+  public async inspectEnvironment(challengeId: string, instanceId?: string, options: CompetitionEnvironmentInspectOptions = {}): Promise<CompetitionEnvironmentInspection> {
+    const endpoint = this.endpoints.inspectEnvironment;
+    if (!endpoint) return { status: "UNKNOWN", challengeId, summary: "competition platform has no environment inspection endpoint" };
+    if (endpoint.includes("{instanceId}") && !instanceId) return { status: "UNKNOWN", challengeId, summary: "environment inspection requires an instance id" };
+    try {
+      const payload = await this.request("GET", endpoint, { challengeId, instanceId, idempotencyKey: options.idempotencyKey }, undefined, idempotencyHeaders(options.idempotencyKey));
+      const environment = parseEnvironment(unwrap(payload, ["environment", "instance", "data", "result"]));
+      const envelope = asRecord(unwrap(payload, ["data", "result"])) ?? asRecord(payload) ?? {};
+      const returnedChallengeId = optionalStringField(envelope, ["challengeId", "challenge_id", "exerciseId", "exercise_id"])
+        ?? optionalStringField(environment.raw ?? {}, ["challengeId", "challenge_id", "exerciseId", "exercise_id"]);
+      const state = optionalStringField(envelope, ["status", "state"])?.toLowerCase()
+        ?? optionalStringField(environment.raw ?? {}, ["status", "state"])?.toLowerCase();
+      if (["absent", "stopped", "not_found", "not-found", "missing"].includes(state ?? "")) {
+        return { status: "ABSENT", challengeId: returnedChallengeId ?? challengeId, summary: "platform query reports an absent environment", raw: environment.raw };
+      }
+      if (["unknown", "pending", "building", "starting"].includes(state ?? "")) {
+        return { status: "UNKNOWN", challengeId: returnedChallengeId ?? challengeId, summary: `platform query reports environment state ${state}`, raw: environment.raw };
+      }
+      if (!environment.connectionInfo && !environment.instanceId && environment.expiresAt === undefined && !environment.idempotencyKey) {
+        return { status: "UNKNOWN", challengeId: returnedChallengeId ?? challengeId, summary: "platform query returned no environment identity", raw: environment.raw };
+      }
+      return {
+        status: "ACTIVE",
+        challengeId: returnedChallengeId ?? challengeId,
+        ...(environment.instanceId ? { instanceId: environment.instanceId } : {}),
+        ...(environment.idempotencyKey ? { idempotencyKey: environment.idempotencyKey } : {}),
+        ...(environment.connectionInfo ? { connectionInfo: environment.connectionInfo } : {}),
+        ...(environment.expiresAt === undefined ? {} : { expiresAt: environment.expiresAt }),
+        summary: "platform query confirms an active environment",
+        raw: environment.raw,
+      };
+    } catch (error) {
+      if (error instanceof CompetitionHttpError && error.status === 404) return { status: "ABSENT", challengeId, summary: "platform query returned HTTP 404 (absent)" };
+      throw error;
+    }
   }
 
   public async submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {
@@ -232,12 +366,14 @@ export class HttpCompetitionApi implements CompetitionApi {
   private async request(
     method: CompetitionHttpMethod,
     endpoint: string,
-    params: { challengeId?: string; instanceId?: string } = {},
+    params: { challengeId?: string; instanceId?: string; idempotencyKey?: string } = {},
     body?: unknown,
+    extraHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     const url = expandEndpoint(this.baseUrl, endpoint, params);
     const headers = new Headers(this.headers);
     headers.set("Accept", "application/json");
+    for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
     if (body !== undefined) headers.set("Content-Type", "application/json");
     if (this.token) headers.set(this.tokenHeader, this.tokenHeader.toLowerCase() === "authorization" ? `Bearer ${this.token}` : this.token);
     let response: Response;
@@ -255,7 +391,7 @@ export class HttpCompetitionApi implements CompetitionApi {
     }
     let text: string;
     try {
-      text = await response.text();
+      text = await readBoundedResponseText(response, this.maxResponseBytes, `Competition API ${method} ${url}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new CompetitionHttpError(method, url, response.status, message, sensitiveValues(this.headers, this.token, body));
@@ -341,8 +477,16 @@ function normalizeTimeout(value: number | undefined): number {
   return value;
 }
 
-function expandEndpoint(baseUrl: string, template: string, params: { challengeId?: string; instanceId?: string }): string {
-  const path = template.replace(/\{(challengeId|instanceId)\}/g, (_match, key: "challengeId" | "instanceId") => {
+function normalizeResponseBytes(value: number | undefined): number {
+  if (value === undefined) return 8 * 1024 * 1024;
+  if (!Number.isInteger(value) || value < 1_024 || value > 256 * 1024 * 1024) {
+    throw new Error("Competition API maxResponseBytes must be an integer between 1024 and 268435456");
+  }
+  return value;
+}
+
+function expandEndpoint(baseUrl: string, template: string, params: { challengeId?: string; instanceId?: string; idempotencyKey?: string }): string {
+  const path = template.replace(/\{(challengeId|instanceId|idempotencyKey)\}/g, (_match, key: "challengeId" | "instanceId" | "idempotencyKey") => {
     const value = params[key];
     if (!value) throw new Error(`Competition API endpoint requires ${key}`);
     return encodeURIComponent(value);
@@ -377,10 +521,16 @@ function parseEnvironment(value: unknown): CompetitionEnvironment {
   const record = asRecord(value);
   if (!record) throw payloadError("startEnvironment", "an environment object");
   const instanceId = optionalStringField(record, ["instanceId", "instance_id", "id"]);
+  const idempotencyKey = optionalStringField(record, ["idempotencyKey", "idempotency_key", "requestKey", "request_key"]);
   const connectionInfo = optionalStringField(record, ["connectionInfo", "connection_info", "connection", "target"]);
   const teamFlag = optionalStringField(record, ["teamFlag", "team_flag", "flag"]);
   const expiresAt = numberField(record, ["expiresAt", "expires_at", "expiry"]);
-  return { ...(instanceId === undefined ? {} : { instanceId }), ...(connectionInfo === undefined ? {} : { connectionInfo }), ...(teamFlag === undefined ? {} : { teamFlag }), ...(expiresAt === undefined ? {} : { expiresAt }), raw: record };
+  return { ...(instanceId === undefined ? {} : { instanceId }), ...(idempotencyKey === undefined ? {} : { idempotencyKey }), ...(connectionInfo === undefined ? {} : { connectionInfo }), ...(teamFlag === undefined ? {} : { teamFlag }), ...(expiresAt === undefined ? {} : { expiresAt }), raw: record };
+}
+
+function idempotencyHeaders(key: string | undefined): Record<string, string> {
+  const normalized = key?.trim();
+  return normalized ? { "Idempotency-Key": normalized } : {};
 }
 
 function parseSubmitResult(value: unknown): CompetitionSubmitResult {

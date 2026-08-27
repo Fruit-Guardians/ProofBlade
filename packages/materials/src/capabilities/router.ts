@@ -30,6 +30,8 @@ export interface CapabilityInvocationResult {
   backendVersion: string;
   observationId?: string;
   evidenceId?: string;
+  /** Domain records emitted from structured capability output, if any. */
+  domainRecordIds?: string[];
   /** Stable content-based key used by no-progress guards and telemetry. */
   progressKey?: string;
 }

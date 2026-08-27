@@ -3,7 +3,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { CompetitionEnvironmentJanitor } from "../src/competition/environment-janitor.js";
+import { CompetitionEnvironmentJanitor, CompetitionEnvironmentResourceAdapter } from "../src/competition/environment-janitor.js";
+import type { CompetitionEnvironmentInspection } from "../src/competition/api.js";
+import { ExternalResourceRegistry } from "../src/recovery/external-resource-registry.js";
 
 class FakeStopApi {
   public readonly stopped: Array<{ challengeId: string; instanceId?: string }> = [];
@@ -12,6 +14,17 @@ class FakeStopApi {
   public async stopEnvironment(challengeId: string, instanceId?: string): Promise<void> {
     if (this.fail) throw new Error("platform stop unavailable");
     this.stopped.push({ challengeId, ...(instanceId ? { instanceId } : {}) });
+  }
+}
+
+class FakeInspectApi extends FakeStopApi {
+  public environmentIdentity?: { strategy: "instance-id" | "idempotency-key"; stableAcrossRestart: boolean };
+  public inspection: CompetitionEnvironmentInspection = { status: "ACTIVE", challengeId: "CH-QUERY", instanceId: "INST-QUERY" };
+  public inspectCalls: Array<{ challengeId: string; instanceId?: string }> = [];
+
+  public async inspectEnvironment(challengeId: string, instanceId?: string): Promise<CompetitionEnvironmentInspection> {
+    this.inspectCalls.push({ challengeId, ...(instanceId ? { instanceId } : {}) });
+    return this.inspection;
   }
 }
 
@@ -167,6 +180,235 @@ test("an interrupted pre-start reservation expires and does not starve a restart
     const ledger = JSON.parse(await readFile(ledgerPath, "utf8")) as { reservations: Array<{ ownerId: string }> };
     assert.deepEqual(ledger.reservations.map((item) => item.ownerId), ["RUN-RECOVERED"]);
     await restarted.releaseReservation(recovered);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("platform environments share the external registry and adopt only janitor-owned records", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-resource-registry-"));
+  try {
+    const api = new FakeStopApi();
+    const external = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath: join(root, "ledger.json"), externalResources: external, pollMs: 10, allowLedgerOnlyRecovery: true });
+    const reservation = await janitor.acquire("RUN-PLATFORM");
+    const record = await janitor.register(reservation, "CH-PLATFORM", { instanceId: "INST-PLATFORM", connectionInfo: "nc host 1" });
+    assert.ok(record);
+    const adapter = new CompetitionEnvironmentResourceAdapter(janitor);
+    const reconciled = await external.reconcileRun("RUN-PLATFORM", 0, [adapter]);
+    assert.deepEqual(reconciled, { examined: 1, adopted: ["platform:" + record!.leaseId], released: [], unknown: [], failed: [] });
+    assert.equal((await external.get("platform:" + record!.leaseId))?.state, "CONFIRMED");
+    assert.equal(await external.release("platform:" + record!.leaseId, adapter, "test release"), true);
+    assert.equal((await external.get("platform:" + record!.leaseId))?.state, "RELEASED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("platform adapter requires an optional remote query to agree on the exact instance", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-remote-inspect-"));
+  try {
+    const api = new FakeInspectApi();
+    api.environmentIdentity = { strategy: "instance-id", stableAcrossRestart: true };
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath: join(root, "ledger.json"), pollMs: 10 });
+    const reservation = await janitor.acquire("RUN-QUERY");
+    const managed = await janitor.register(reservation, "CH-QUERY", { instanceId: "INST-QUERY", connectionInfo: "nc host 1" });
+    assert.ok(managed);
+    const adapter = new CompetitionEnvironmentResourceAdapter(janitor);
+    const match = await adapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.deepEqual(match.binding, "MATCH");
+    assert.deepEqual(api.inspectCalls, [{ challengeId: "CH-QUERY", instanceId: "INST-QUERY" }]);
+
+    api.inspection = { status: "ACTIVE", challengeId: "CH-QUERY", instanceId: "INST-FOREIGN" };
+    const mismatch = await adapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.equal(mismatch.binding, "MISMATCH");
+    assert.equal((await adapter.release({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    }, "foreign cleanup")).released, false);
+    assert.deepEqual(api.stopped, []);
+
+    api.inspection = { status: "UNKNOWN", challengeId: "CH-QUERY", summary: "query timed out" };
+    const unknown = await adapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.equal(unknown.status, "UNKNOWN");
+    assert.equal((await adapter.release({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    }, "unknown cleanup")).released, false);
+    assert.deepEqual(api.stopped, []);
+
+    api.inspection = { status: "ABSENT", challengeId: "CH-QUERY", summary: "gone" };
+    const absent = await adapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.equal(absent.status, "ABSENT");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("platform adapter fails closed when no remote identity query exists", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-no-remote-query-"));
+  try {
+    const api = new FakeStopApi();
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath: join(root, "ledger.json"), pollMs: 10 });
+    const reservation = await janitor.acquire("RUN-NO-QUERY");
+    const managed = await janitor.register(reservation, "CH-NO-QUERY", { instanceId: "INST-NO-QUERY", connectionInfo: "nc host 1" });
+    const adapter = new CompetitionEnvironmentResourceAdapter(janitor);
+    const inspection = await adapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${managed!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-NO-QUERY",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-NO-QUERY",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.deepEqual(inspection, { status: "UNKNOWN", binding: "UNKNOWN", externalId: "INST-NO-QUERY", summary: "platform has no remote identity query; ledger-only recovery is disabled" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a crashed STARTING reservation is adopted only after an exact remote idempotency match", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-idempotency-recovery-"));
+  try {
+    const ledgerPath = join(root, "ledger.json");
+    const api = new FakeInspectApi();
+    const first = new CompetitionEnvironmentJanitor({ api, ledgerPath, pollMs: 10 });
+    const reservation = await first.acquireForChallenge("RUN-START", "CH-START");
+    assert.match(reservation.idempotencyKey ?? "", /^proofblade-env-/);
+    await first.markStarting(reservation);
+    api.environmentIdentity = { strategy: "idempotency-key", stableAcrossRestart: true };
+
+    api.inspection = {
+      status: "ACTIVE",
+      challengeId: "CH-START",
+      instanceId: "INST-START",
+      idempotencyKey: reservation.idempotencyKey,
+      connectionInfo: "nc target 9001",
+      expiresAt: 9_999,
+    };
+    const restarted = new CompetitionEnvironmentJanitor({ api, ledgerPath, pollMs: 10 });
+    assert.deepEqual(await restarted.reconcilePending(), { examined: 1, adopted: 1, unknown: 0 });
+    const [record] = await restarted.active();
+    assert.equal(record?.challengeId, "CH-START");
+    assert.equal(record?.idempotencyKey, reservation.idempotencyKey);
+    assert.equal(record?.instanceId, "INST-START");
+
+    api.inspection = { status: "ACTIVE", challengeId: "CH-START", instanceId: "INST-FOREIGN", idempotencyKey: "different-key" };
+    const foreign = new CompetitionEnvironmentJanitor({ api, ledgerPath, pollMs: 10 });
+    const foreignAdapter = new CompetitionEnvironmentResourceAdapter(foreign);
+    const inspection = await foreignAdapter.inspect({
+      schemaVersion: 1,
+      id: `platform:${record!.leaseId}`,
+      kind: "platform-environment",
+      runId: "RUN-START",
+      generation: 0,
+      ownerLane: "executor",
+      state: "CONFIRMED",
+      externalId: "INST-START",
+      requestKey: reservation.idempotencyKey,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      inspectCount: 0,
+    });
+    assert.equal(inspection.binding, "MISMATCH");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("challenge environment idempotency is stable and duplicate reservations fail closed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-env-stable-key-"));
+  try {
+    const ledgerPath = join(root, "ledger.json");
+    const api = new FakeStopApi();
+    const janitor = new CompetitionEnvironmentJanitor({ api, ledgerPath, pollMs: 10 });
+    const first = await janitor.acquireForChallenge("RUN-STABLE", "CH-STABLE");
+    assert.match(first.idempotencyKey ?? "", /^proofblade-env-[a-f0-9]{48}$/);
+    await assert.rejects(
+      janitor.acquireForChallenge("RUN-STABLE", "CH-STABLE"),
+      /Environment reservation already exists for owner RUN-STABLE and challenge CH-STABLE/,
+    );
+    await janitor.releaseReservation(first);
+
+    const restarted = new CompetitionEnvironmentJanitor({ api, ledgerPath, pollMs: 10 });
+    const retry = await restarted.acquireForChallenge("RUN-STABLE", "CH-STABLE");
+    assert.equal(retry.idempotencyKey, first.idempotencyKey);
+    await restarted.register(retry, "CH-STABLE", { instanceId: "INST-STABLE", connectionInfo: "nc target 9001" });
+    await assert.rejects(
+      restarted.acquireForChallenge("RUN-STABLE", "CH-STABLE"),
+      /Active environment already exists for owner RUN-STABLE and challenge CH-STABLE/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

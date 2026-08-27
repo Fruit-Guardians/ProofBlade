@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "platform": "dasctf",
+  "operation": "inspectEnvironment",
+  "redaction": "synthetic host and port; no access key, token, cookie, or flag",
+  "cases": [
+    {
+      "id": "active-challenge-only",
+      "response": {
+        "code": "00000",
+        "message": "",
+        "data": {
+          "id": 1001,
+          "isNeedInit": true,
+          "isNeedCheck": false,
+          "endpoints": [
+            {
+              "isProxy": false,
+              "exposeIps": ["198.51.100.10"],
+              "ports": ["31337"],
+              "expireTime": 4102444800000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": "ACTIVE",
+        "challengeId": "1001",
+        "connectionInfo": "198.51.100.10:31337",
+        "identity": "challenge-only"
+      }
+    },
+    {
+      "id": "building",
+      "response": {
+        "code": "00000",
+        "message": "",
+        "data": {
+          "id": 1001,
+          "isNeedInit": true,
+          "isNeedCheck": true
+        }
+      },
+      "expected": {
+        "status": "UNKNOWN",
+        "challengeId": "1001"
+      }
+    },
+    {
+      "id": "absent",
+      "response": {
+        "code": "00000",
+        "message": "",
+        "data": {
+          "id": 1001,
+          "isNeedInit": true,
+          "isNeedCheck": false,
+          "endpoints": []
+        }
+      },
+      "expected": {
+        "status": "ABSENT",
+        "challengeId": "1001"
+      }
+    }
+  ]
+}

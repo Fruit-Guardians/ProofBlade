@@ -151,8 +151,10 @@ export function parseCompetitionTargets(connectionInfo: string | undefined): Con
 /** Derive a run deadline from the environment expiry, with a sane default. */
 function deadlineFromExpiry(expiresAt: number | undefined): number {
   const fallback = 600_000;
-  if (!expiresAt || !Number.isFinite(expiresAt)) return fallback;
-  const remaining = expiresAt - Date.now();
-  if (remaining <= 0) return fallback;
-  return Math.min(remaining, 3_600_000);
+  if (expiresAt === undefined || !Number.isFinite(expiresAt)) return fallback;
+  // An already expired platform environment must not silently receive the
+  // fallback deadline. Keep a one-millisecond window so the Run can be
+  // durably created and immediately terminate through the normal deadline
+  // path instead of entering an effectively unbounded solve.
+  return Math.min(Math.max(1, expiresAt - Date.now()), 3_600_000);
 }

@@ -5,6 +5,8 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { lookup } from "node:dns/promises";
 import type { ResolvedExecutionConfig } from "../config.js";
 import { ContainerExecutionEnv } from "./execution-env.js";
+import { ExternalResourceRegistry, externalResourceBindingTransactionId } from "../recovery/external-resource-registry.js";
+import { DockerContainerResourceAdapter } from "./docker-resource-adapter.js";
 import type {
   ContainerCommandOptions,
   ContainerCommandResult,
@@ -130,10 +132,22 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   private readonly runner: DockerCommandRunner;
   private readonly sessions = new Map<string, LiveSession>();
   private readonly sessionSpawner: SessionProcessSpawner;
+  private externalResources?: ExternalResourceRegistry;
 
-  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner, sessionSpawner?: SessionProcessSpawner) {
+  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner, sessionSpawner?: SessionProcessSpawner, externalResources?: ExternalResourceRegistry) {
     this.runner = runner ?? new SpawnDockerCommandRunner(config.dockerCommand);
     this.sessionSpawner = sessionSpawner ?? defaultSessionSpawner;
+    this.externalResources = externalResources;
+  }
+
+  /** Bind the shared recovery ledger when a runtime is supplied by an app shell. */
+  public bindExternalResourceRegistry(registry: ExternalResourceRegistry): void {
+    this.externalResources = registry;
+  }
+
+  /** Build the label-verifying adapter used by RunRecoveryService. */
+  public externalResourceAdapter(): DockerContainerResourceAdapter {
+    return new DockerContainerResourceAdapter(this.runner, configTimeout(this.config), this.config.outputPreviewBytes);
   }
 
   public async doctor(profile?: ContainerRef["profile"]): Promise<ContainerDoctorReport> {
@@ -160,7 +174,9 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       const skills = await fs.stat(request.skillLibraryHostPath);
       if (!skills.isDirectory()) throw new Error(`Container skill library is not a directory: ${request.skillLibraryHostPath}`);
     }
-    await this.ensureImage(request.image);
+    const resourceId = dockerContainerResourceId(request.runId, request.generation, request.profile);
+    const bindingTxnId = externalResourceBindingTransactionId({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor" });
+    await this.externalResources?.register({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor", bindingTxnId });
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
     const identityLabels = {
@@ -168,6 +184,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       "proofblade.run_id": request.runId,
       "proofblade.generation": String(request.generation),
       "proofblade.profile": request.profile,
+      "proofblade.binding_txn": bindingTxnId,
     };
     const ownerLabels = {
       ...identityLabels,
@@ -188,6 +205,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     let gatewayCreateAttempted = false;
     let solverCreateAttempted = false;
     try {
+      await this.ensureImage(request.image);
       if (request.networkPolicy === "target-only") {
         networkCandidate = `proofblade-${slug}-g${request.generation}-net`;
         // A name conflict must never turn cleanup into a delete of a network
@@ -242,8 +260,21 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       solverCreateAttempted = true;
       const created = await this.runChecked(args);
       containerId = created.stdout.trim();
+      // Persist the exact container handle before any further probe or image
+      // inspection. A process crash after `docker run` must leave recovery an
+      // inspectable STARTED resource, never a PROPOSED record that could be
+      // discarded without checking Docker labels.
+      await this.externalResources?.registerStarted({
+        id: resourceId,
+        kind: "container",
+        runId: request.runId,
+        generation: request.generation,
+        ownerLane: "executor",
+        externalId: containerId,
+      });
       await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
+      await this.externalResources?.markConfirmed(resourceId, "Docker container created and workspace probe passed");
       return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
     } catch (error) {
       const cleanupNetworkName = networkName ?? (!networkPreexisted && networkCandidate
@@ -261,6 +292,12 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // gateway created by a different attempt.
         ownerLabels,
       );
+      if (containerId) {
+        if (cleanupErrors.length > 0) await this.externalResources?.markUnknown(resourceId, "Docker create cleanup was incomplete").catch(() => undefined);
+        else await this.externalResources?.markReleased(resourceId, "Docker create rolled back").catch(() => undefined);
+      } else {
+        await this.externalResources?.markReleased(resourceId, "Docker create did not start a container").catch(() => undefined);
+      }
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
     }
@@ -445,9 +482,20 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       ref.networkName,
       ref.name,
       ref.networkName ? `${ref.name}-gateway` : undefined,
-      { "proofblade.managed": "true", "proofblade.run_id": ref.runId, "proofblade.generation": String(ref.generation), "proofblade.profile": ref.profile },
+      {
+        "proofblade.managed": "true",
+        "proofblade.run_id": ref.runId,
+        "proofblade.generation": String(ref.generation),
+        "proofblade.profile": ref.profile,
+        "proofblade.binding_txn": externalResourceBindingTransactionId({ id: dockerContainerResourceId(ref.runId, ref.generation, ref.profile), kind: "container", runId: ref.runId, generation: ref.generation, ownerLane: "executor" }),
+      },
     );
-    if (failures.length > 0) throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
+    const resourceId = dockerContainerResourceId(ref.runId, ref.generation, ref.profile);
+    if (failures.length > 0) {
+      await this.externalResources?.markUnknown(resourceId, "Docker cleanup failed").catch(() => undefined);
+      throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
+    }
+    await this.externalResources?.markReleased(resourceId, "Docker container destroyed").catch(() => undefined);
   }
 
   public async reapStale(options: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean } = {}): Promise<number> {
@@ -582,6 +630,11 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       return undefined;
     }
   }
+}
+
+/** Stable registry key for one per-run Docker container generation. */
+export function dockerContainerResourceId(runId: string, generation: number, profile: ContainerRef["profile"]): string {
+  return `container:${runId}:${generation}:${profile}`;
 }
 
 function configTimeout(config: ResolvedExecutionConfig): number { return Math.min(config.commandWaitMs, config.commandHardTimeoutMs); }

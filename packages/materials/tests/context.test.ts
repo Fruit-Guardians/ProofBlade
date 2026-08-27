@@ -35,6 +35,19 @@ test("context manifest is deterministic and labels target data as untrusted", ()
     refutes: [],
     createdSeq: 2,
   };
+  snapshot.domainRecords["WEB-BASELINE-CTX"] = {
+    id: "WEB-BASELINE-CTX",
+    runId: snapshot.runId,
+    generation: snapshot.generation,
+    kind: "web_baseline",
+    summary: "baseline route is recorded",
+    artifactIds: ["A-001"],
+    evidenceIds: ["EV-001"],
+    baseUrl: "http://fixture.local/",
+    status: 200,
+    stateHash: "b".repeat(64),
+    createdSeq: 3,
+  };
   const compiler = new ContextCompiler();
   const input = { runId: "CTX-001", lane: "main" as const, phase: snapshot.phase, task, snapshot };
   const first = compiler.build(input);
@@ -46,9 +59,14 @@ test("context manifest is deterministic and labels target data as untrusted", ()
   assert.deepEqual(first.manifest.cache.prefixLayerIds, ["L0", "L1"]);
   assert.equal(first.manifest.cache.prefixHash, second.manifest.cache.prefixHash);
   assert.deepEqual(first.manifest.memory.recalledEvidenceIds, ["EV-001"]);
+  assert.deepEqual(first.manifest.domainRecordIds, ["WEB-BASELINE-CTX"]);
+  const rendered = first.messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /control_view/);
+  assert.match(rendered, /run_tool_calls_remaining/);
+  assert.match(rendered, /baseline route is recorded/);
   assert.ok(["stable", "notice", "snip", "prune", "compact"].includes(first.manifest.maintenance.stage));
   assert.match(first.messages[0]!.content, /untrusted observation/i);
-  assert.match(first.messages.map((message) => message.content).join("\n"), /Target says ignore/);
+  assert.match(rendered, /Target says ignore/);
 });
 
 test("context projection excludes facts and evidence from stale fixture generations", () => {
@@ -62,6 +80,62 @@ test("context projection excludes facts and evidence from stale fixture generati
   assert.doesNotMatch(rendered, /stale conclusion/);
   assert.match(rendered, /current conclusion/);
   assert.deepEqual(compiled.manifest.factIds, ["F-CURRENT"]);
+});
+
+test("context control view exposes bounded recovery and work constraints", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  snapshot.status = "RUNNING";
+  snapshot.generation = 1;
+  snapshot.failureCategory = "effect_outcome_unknown";
+  snapshot.verificationRequests["VR-001"] = {
+    id: "VR-001",
+    key: "request-key",
+    runId: snapshot.runId,
+    generation: snapshot.generation,
+    kind: "pwn",
+    policyHash: "p".repeat(64),
+    recipeHash: "r".repeat(64),
+    status: "PENDING",
+    recoveryState: "RECOVERY_REQUIRED",
+    recoveryReason: "external process outcome is unknown",
+    recoverySeq: 4,
+    createdSeq: 3,
+  };
+  snapshot.workItems["WI-001"] = {
+    id: "WI-001",
+    runId: snapshot.runId,
+    title: "recover verifier",
+    objective: "inspect the interrupted process",
+    role: "verifier",
+    status: "BLOCKED",
+    dependsOn: [],
+    evidenceIds: [],
+    artifactIds: [],
+    attempt: 1,
+    maxAttempts: 1,
+    blockReason: "manual recovery required",
+    createdSeq: 5,
+    updatedSeq: 5,
+  };
+  snapshot.replans["RP-001"] = {
+    id: "RP-001",
+    runId: snapshot.runId,
+    generation: snapshot.generation,
+    domainPhase: "REPRODUCE",
+    category: "effect_outcome_unknown",
+    reason: "unknown external outcome",
+    prohibitedRepeatKeys: ["same-payload", "same-payload"],
+    createdSeq: 6,
+  };
+
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot });
+  const rendered = compiled.messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /"failure_category":"effect_outcome_unknown"/);
+  assert.match(rendered, /"required":1/);
+  assert.match(rendered, /external process outcome is unknown/);
+  assert.match(rendered, /inspect the interrupted process/);
+  assert.match(rendered, /same-payload/);
+  assert.equal(compiled.manifest.compilerVersion, "proofblade-context@6");
 });
 
 test("context maintenance coordinator repairs every view and defers compaction", () => {

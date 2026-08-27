@@ -215,6 +215,58 @@ test("real evaluation preflight reports missing credentials and direction covera
   }
 });
 
+test("real evaluation rejects two ids that point to the same provider profile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-duplicate-profile-"));
+  try {
+    const source = "private reverse marker";
+    await writeFile(join(root, "target.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "duplicate-profile-corpus",
+      cases: [corpusCase("reverse-case", "target.txt", "flag{reverse}", source)],
+    }), "utf8");
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("same") }, { id: "beta", config: config("same") }],
+      requireProviderTraffic: false,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((check) => check.id === "distinct_profile_variants")?.passed, false);
+    assert.equal(result.ready, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation keeps separately provisioned credential profiles distinct without exposing secrets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-credential-profiles-"));
+  try {
+    const source = "private reverse marker";
+    await writeFile(join(root, "target.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "credential-profile-corpus",
+      cases: [corpusCase("reverse-case", "target.txt", "flag{reverse}", source)],
+    }), "utf8");
+    const base = config("same");
+    const variants = [
+      { id: "account-a", config: { ...base, modelProfiles: { executor: { ...base.modelProfiles.executor, apiKeyEnv: "PROOFBLADE_KEY_A" } } } },
+      { id: "account-b", config: { ...base, modelProfiles: { executor: { ...base.modelProfiles.executor, apiKeyEnv: "PROOFBLADE_KEY_B" } } } },
+    ];
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants,
+      requireProviderTraffic: false,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((check) => check.id === "distinct_profile_variants")?.passed, true);
+    assert.equal(result.variants[0]?.profileFingerprint === result.variants[1]?.profileFingerprint, false);
+    assert.doesNotMatch(JSON.stringify(result), /sk-[A-Za-z0-9]/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("real model evaluator aborts a provider turn when the case deadline expires", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-deadline-"));
   try {

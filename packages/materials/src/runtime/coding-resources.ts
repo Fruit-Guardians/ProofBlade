@@ -22,7 +22,7 @@ import type { RawEffectResult, TargetKind } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
-import type { WebExploitStep } from "../verification/web-reproducer.js";
+import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
 
@@ -31,7 +31,7 @@ export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill"
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
-export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"] as const;
+export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
 
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
@@ -77,7 +77,7 @@ export interface CodingResourceContext extends ExecutionToolContext {
   runtime: ProofBladeToolRuntime;
   /** Durable per-run gate for repeated process/network experiments. */
   experimentGate?: ExperimentGate;
-  webReproduce?: (steps: WebExploitStep[], signal?: AbortSignal) => Promise<unknown>;
+  webReproduce?: (recipe: WebExploitRecipe, signal?: AbortSignal) => Promise<unknown>;
   /**
    * Present only when the task has a resolvable web target. Drives interactive
    * HTTP session tools (web_open/request/replay/close/list); absent for non-web
@@ -89,7 +89,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
   /**
-   * Present only when a Docker-backed pwn/pwn-kernel container is available.
+   * Present only when a Docker-backed pwn/pwn-kernel container or durable
+   * session-runtime broker is available.
    * Absent for GUI chat and no-container runs, in which case the pwn_* tools
    * fail closed with a clear message instead of pretending to have a tube.
    */
@@ -641,13 +642,22 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
 const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "web_reproduce",
   label: "web_reproduce",
-  description: "Replay bounded HTTP exploit steps in a clean session. The immutable task verifier supplies the flag format; callers cannot provide a flag pattern.",
+  description: "Replay bounded HTTP or browser exploit steps in a verifier-owned clean context. The immutable task verifier supplies the transport and flag format; callers cannot provide either policy.",
   parameters: Type.Object({
+    transport: Type.Optional(Type.Union([Type.Literal("http"), Type.Literal("browser")], { description: "Transport selected by the immutable Web verification policy; omit for the default HTTP transport." })),
     steps: Type.Array(Type.Object({
-      path: Type.String({ minLength: 1, maxLength: 2_048 }),
+      action: Type.Optional(Type.Union([Type.Literal("navigate"), Type.Literal("click"), Type.Literal("fill"), Type.Literal("submit"), Type.Literal("wait")], { description: "Browser-only action; omitted means navigate for backwards compatibility." })),
+      path: Type.Optional(Type.String({ minLength: 1, maxLength: 2_048, description: "HTTP path or browser navigation path; the verifier resolves it against the immutable target origin." })),
       method: Type.Optional(Type.String({ maxLength: 12 })),
       headers: Type.Optional(Type.Record(Type.String(), Type.String({ maxLength: 4_096 }))),
       body: Type.Optional(Type.String({ maxLength: 1_048_576 })),
+      selector: Type.Optional(Type.Object({
+        kind: Type.Union([Type.Literal("role"), Type.Literal("label"), Type.Literal("test_id"), Type.Literal("css")]),
+        value: Type.String({ minLength: 1, maxLength: 256 }),
+        name: Type.Optional(Type.String({ maxLength: 256 })),
+      }, { additionalProperties: false })),
+      value: Type.Optional(Type.String({ maxLength: 4_096 })),
+      wait_ms: Type.Optional(Type.Integer({ minimum: 1, maximum: 10_000 })),
       expectStatus: Type.Optional(Type.Integer({ minimum: 100, maximum: 599 })),
       expectPattern: Type.Optional(Type.String({ maxLength: 256 })),
     }, { additionalProperties: false }), { minItems: 1, maxItems: 64 }),
@@ -655,8 +665,8 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (!context.webReproduce) throw new Error("web_reproduce is unavailable because this task has no immutable web verifier");
-    const input = params as { steps: WebExploitStep[] };
-    return toolResult(await context.webReproduce(input.steps, signal));
+    const input = params as WebExploitRecipe;
+    return toolResult(await context.webReproduce(input, signal));
   },
 };
 
@@ -664,8 +674,9 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
-  // Only expose the tube tools when a Docker-backed pwn container is attached,
-  // so a GUI chat run does not advertise seven tools that would fail closed.
+  // Only expose the tube tools when a Docker-backed pwn container or durable
+  // session-runtime broker is attached, so a GUI chat run does not advertise
+  // seven tools that would fail closed.
   if (input.pwnEnabled) {
     active.push(...CODING_PWN_TOOL_NAMES.filter((name) => name !== "pwn_reproduce" || input.pwnReproductionEnabled));
   }
@@ -797,6 +808,24 @@ export function interactiveCommandHint(command: string, pwnToolsAvailable: boole
     : "[guard] Foreground bash contains an interactive connection. Use shell_background and shell_job, or split the probe into bounded commands.";
 }
 
+/**
+ * Bash is intentionally an analysis escape hatch, not a second control-plane
+ * writer.  The real authority boundary is ControlStore validation, but a
+ * cheap preflight catches the common `node -e`/Python/redirect attempts to
+ * append trusted domain records or bypass the journal.  Read-only inspection
+ * commands remain allowed; this is a loop-prevention guard, not a shell
+ * sandbox, and must never be treated as verifier authority.
+ */
+export function bashEscapeHatchViolation(command: string): string | undefined {
+  const executable = /(?:^|[;&|()\s])(?:node|nodejs|tsx|ts-node|bun|deno|python(?:3)?|py|ruby|perl|php|npm|pnpm|yarn)(?:\s|$)/i.test(command);
+  const trustedWriter = /(?:dispatch(?:Transaction|Batch)?\s*\(|domain_record_added|type\s*[:=]\s*["']domain_record["']|JsonlControlStore|control-store\.js|(?:events|projection|control)\.jsonl)/i.test(command);
+  const writeOperation = /(?:>>?|tee\s|Set-Content|Out-File|writeFile|appendFile|fs\.(?:write|append)File|open\s*\([^)]*,\s*["']a)/i.test(command);
+  if ((executable && trustedWriter) || (writeOperation && /(?:events|projection|control)\.jsonl/i.test(command))) {
+    return "Bash is an analysis escape hatch and cannot write ProofBlade control records. Use the structured Web/Pwn tools or ControlStore-owned verifier path; bash output remains untrusted Artifact/Observation data.";
+  }
+  return undefined;
+}
+
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createBashTool<CodingResourceContext>();
   return {
@@ -811,6 +840,8 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
+      const escapeHatchViolation = bashEscapeHatchViolation(input.command);
+      if (escapeHatchViolation) throw new Error(escapeHatchViolation);
       const preflightHint = interactiveCommandHint(input.command, Boolean(context.pwnTools));
       if (preflightHint) throw new Error(preflightHint);
       await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout } });

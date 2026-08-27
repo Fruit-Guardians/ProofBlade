@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { resolveAuditTimestamp } from "../audit-time.mjs";
 import { canonicalComponentContent } from "../component-audit-lib.mjs";
@@ -133,6 +133,14 @@ test("changed-test matrix rejects uncovered production source", () => {
   const selected = selectTestCommands({ root: process.cwd(), manifest: { schemaVersion: 1, rules: [] }, changedFiles: new Set(["packages/materials/src/unknown/new.ts"]) });
   assert.deepEqual(selected.commands, []);
   assert.deepEqual(selected.errors, ["packages/materials/src/unknown/new.ts: no test-matrix rule covers this source file"]);
+});
+
+test("CI always archives staged watchdog logs", () => {
+  const workflow = readFileSync(resolve(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  assert.match(workflow, /name: Upload staged test logs/);
+  assert.match(workflow, /if: always\(\)/);
+  assert.match(workflow, /uses: actions\/upload-artifact@v4/);
+  assert.match(workflow, /path: \.proofblade\/test-logs\/\*\*\/\*\.log/);
 });
 
 test("[contract:component-audit-time-fallback] resolves audit time from explicit, environment, commit, then clock", () => {

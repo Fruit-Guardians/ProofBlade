@@ -109,8 +109,10 @@ export async function preflightRealModelEvaluation(options: RealModelEvaluationP
   const requireAnswerLiteralsAbsent = options.requireAnswerLiteralsAbsent ?? options.requireProviderTraffic === true;
   const targetKinds = orderedCounts(corpus.cases.map((item) => item.targetKind)) as Record<string, number>;
   const answerLiteralLeakCount = requireAnswerLiteralsAbsent ? await countAnswerLiteralLeaks(corpus.cases) : 0;
+  const distinctProfiles = new Set(variants.map((variant) => fingerprint(variant.config))).size;
   const checks = [
     check("minimum_variants", variants.length >= 2, variants.length, ">=2"),
+    check("distinct_profile_variants", distinctProfiles >= 2, distinctProfiles, ">=2"),
     ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
     ...requiredTargetKinds.map((targetKind) => check(`target_kind_coverage:${targetKind}`, targetKinds[targetKind] !== undefined, targetKinds[targetKind] ?? 0, ">=1")),
     ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", answerLiteralLeakCount === 0, answerLiteralLeakCount, 0)] : []),
@@ -307,8 +309,10 @@ export class RealModelEvaluationRunner {
     }
     const comparisons = compareVariants(results, gatePolicy.baselineVariantId);
     const baseline = results.find((item) => item.id === gatePolicy.baselineVariantId)!;
+    const distinctProfiles = new Set(results.map((variant) => variant.profileFingerprint)).size;
     const checks = [
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
+      check("distinct_profile_variants", distinctProfiles >= 2, distinctProfiles, ">=2"),
       check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
       ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
       ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", true, 0, 0)] : []),
@@ -806,6 +810,12 @@ function fingerprint(config: ProofBladeConfig): string {
     api: profile.api,
     baseUrl: profile.baseUrl,
     model: profile.model,
+    // Keep the credential value out of reports, but include its declared
+    // identity so two separately provisioned accounts are not silently
+    // collapsed into one comparison profile.
+    apiKeyEnv: profile.apiKeyEnv,
+    endpointMode: profile.endpointMode,
+    proxyUrl: profile.proxyUrl,
     contextWindow: profile.contextWindow,
     maxTokens: profile.maxTokens,
     requestTimeoutMs: profile.requestTimeoutMs,

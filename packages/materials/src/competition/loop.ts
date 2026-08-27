@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AppServices } from "../app/demo.js";
-import type { ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
+import type { ActionBundle, ExecutionMode, RunSnapshot, TargetKind, TaskContract } from "../domain/types.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
@@ -9,9 +9,16 @@ import { isTerminal } from "../domain/utils.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { RunWorkScheduler } from "../orchestration/run-work-scheduler.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import { shouldReplanAfterTurnGuard, turnGuardFailureCategory } from "../domain/failure-policy.js";
 import { remainingRunDeadlineMs } from "../domain/utils.js";
+import { RunRecoveryService } from "../recovery/run-recovery.js";
+import type { VerificationRecoveryAdapterSource } from "../recovery/verification-recovery.js";
+import type { ExternalResourceAdapterSource } from "../recovery/external-resource-registry.js";
+import { withSessionResourceAdapters } from "../recovery/session-resource-adapter.js";
+import type { SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
+import { withBrowserResourceAdapter } from "../web/browser-resource-adapter.js";
+import type { BrowserVerifierFactory } from "../web/browser-session.js";
 
 /** Factory override so tests can inject a deterministic lane. */
 export type CompetitionLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
@@ -40,6 +47,14 @@ export interface CompetitionLoopOptions {
   signal?: AbortSignal;
   /** Optional durable approval gate for platform effects. */
   approvalPolicy?: ApprovalPolicy;
+  /** Backend adapters used when this loop is resumed after a process restart. */
+  verificationRecoveryAdapters?: VerificationRecoveryAdapterSource;
+  /** Adapters used to inspect/adopt/release external resources during recovery. */
+  externalResourceAdapters?: ExternalResourceAdapterSource;
+  /** Verifier-owned Browser runtime for browser transport tasks. */
+  browserVerifierFactory?: BrowserVerifierFactory;
+  /** Session broker health already checked before the lane is created. */
+  sessionRuntimePreflight?: SessionRuntimePreflight;
 }
 
 export interface CompetitionLoopOutcome {
@@ -95,6 +110,20 @@ export async function runCompetitionLoop(
   let approvalRequiredId: string | undefined;
 
   try {
+    const recovery = await new RunRecoveryService(
+      services.control,
+      services.journal,
+      services.sandbox,
+      services.fixtureControl,
+      undefined,
+      services.verificationRecovery,
+      options.verificationRecoveryAdapters ?? services.verificationRecoveryAdapters,
+      services.externalResources,
+      withSessionResourceAdapters(
+        withBrowserResourceAdapter(options.externalResourceAdapters ?? services.externalResourceAdapters, options.browserVerifierFactory),
+        services.sessionRuntimeBrokers ?? [],
+      ),
+    ).recover(options.runId, options.task);
     const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
     const platformVerifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
     const coordinator = new RunCoordinator(services.control, services.verifier, { verifier: platformVerifier });
@@ -123,6 +152,13 @@ export async function runCompetitionLoop(
       ...(options.skillsLibraryPathForPrompt ? { skillsLibraryPathForPrompt: options.skillsLibraryPathForPrompt } : {}),
       ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
       ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
+      externalResources: services.externalResources,
+      ...(services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: services.sessionRuntimeBrokers } : {}),
+      ...(options.sessionRuntimePreflight ? { sessionRuntimePreflight: options.sessionRuntimePreflight } : {}),
+      ...(services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: services.sessionRuntimeRequired }),
+      ...(services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: services.browserRuntimeRequired }),
+      ...(options.browserVerifierFactory ? { browserVerifierFactory: options.browserVerifierFactory } : {}),
+      sessionHandoffs: recovery.sessionHandoffs,
     });
     const activeLane = lane;
     const remainingDeadlineMs = Math.max(0, deadlineMs - (Date.now() - startedAt));
@@ -156,6 +192,7 @@ export async function runCompetitionLoop(
         domainPhase: preTurnSnapshot.domainPhase,
         remainingToolCalls: options.task.constraints.max_tool_calls - Object.keys(preTurnSnapshot.effects).length,
         remainingDeadlineMs: remainingRunDeadlineMs(new Date(startedAt).toISOString(), deadlineMs),
+        actionBundle: preTurnSnapshot.toolPreparation?.actionBundles?.find((bundle) => bundle.domainPhase === preTurnSnapshot.domainPhase),
         forceReplan,
         previousTermination: replanReason,
       });
@@ -219,7 +256,7 @@ export async function runCompetitionLoop(
         break;
       }
       if (outcome.termination) {
-        if (isRecoverableTurnGuard(outcome.termination) && guardReplans < MAX_GUARD_REPLANS) {
+        if (shouldReplanAfterTurnGuard(outcome.termination) && guardReplans < MAX_GUARD_REPLANS) {
           // A guard only stopped the current provider turn. Keep the same lane
           // and durable session, but make the next prompt an explicit evidence-
           // summary/replan instead of the generic "continue" nudge.
@@ -274,7 +311,7 @@ export async function runCompetitionLoop(
  * create duplicate work nodes.
  */
 export async function claimCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, turn: number): Promise<string> {
-  return (await new RunWorkScheduler(control).claim(runId, task, turn)).id;
+  return (await new RunCoordinator(control).claim(runId, task, turn)).id;
 }
 
 export async function commitCompetitionSuccess(control: AppServices["control"], verifier: AppServices["verifier"], runId: string, workItemId: string | undefined, snapshot: RunSnapshot): Promise<void> {
@@ -285,15 +322,14 @@ export async function commitCompetitionSuccess(control: AppServices["control"], 
 }
 
 async function failCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  await new RunWorkScheduler(control).fail(runId, workItemId, reason);
+  await new RunCoordinator(control).fail(runId, workItemId, reason);
 }
-
 async function blockCompetitionWorkItem(control: AppServices["control"], runId: string, workItemId: string | undefined, reason: string): Promise<void> {
-  await new RunWorkScheduler(control).block(runId, workItemId, reason);
+  await new RunCoordinator(control).block(runId, workItemId, reason);
 }
 
 async function blockAndQueueCompetitionWorkItem(control: AppServices["control"], runId: string, task: TaskContract, workItemId: string | undefined, reason: string, turn: number): Promise<void> {
-  await new RunWorkScheduler(control).blockAndQueue(runId, task, workItemId, reason);
+  await new RunCoordinator(control).blockAndQueue(runId, task, workItemId, reason, turnGuardFailureCategory(reason) ?? "wrong_hypothesis");
   void turn;
 }
 
@@ -358,7 +394,7 @@ const MAX_GUARD_REPLANS = 2;
  * a model that has run twelve turns of the same failing approach won't
  * self-correct from a generic "continue".
  */
-export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string; domainPhase?: string; remainingToolCalls?: number; remainingDeadlineMs?: number } = { submissionsSoFar: 0 }): string {
+export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string; domainPhase?: string; remainingToolCalls?: number; remainingDeadlineMs?: number; actionBundle?: ActionBundle } = { submissionsSoFar: 0 }): string {
   const phaseLine = progress.domainPhase
     ? `Durable phase: ${progress.domainPhase}. Treat this as a bounded phase step; do not restart the entire analysis.`
     : "Treat this as one bounded phase step; do not restart the entire analysis.";
@@ -368,13 +404,16 @@ export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: stri
   const deadlineLine = progress.remainingDeadlineMs === undefined
     ? undefined
     : `Remaining deadline: ${Math.ceil(Math.max(0, progress.remainingDeadlineMs) / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`;
+  const actionBundleLine = progress.actionBundle
+    ? `Action bundle ${progress.actionBundle.id}: ${progress.actionBundle.objective} Tools: ${progress.actionBundle.toolNames.join(", ")}. Preconditions: ${progress.actionBundle.preconditions.join("; ")}. Success: ${progress.actionBundle.successCriteria.join("; ")}. Failure: ${progress.actionBundle.failureCriteria.join("; ")}. Max calls: ${progress.actionBundle.maxCalls}.`
+    : undefined;
   if (turn > 1) {
     if (progress.forceReplan || (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS)) {
-      return [phaseLine, deadlineLine, budgetLine, replanNudge(task.target_kind, turn, progress.previousTermination)].filter((line): line is string => Boolean(line)).join("\n");
+      return [phaseLine, actionBundleLine, deadlineLine, budgetLine, replanNudge(task.target_kind, turn, progress.previousTermination)].filter((line): line is string => Boolean(line)).join("\n");
     }
-    return [phaseLine, deadlineLine, budgetLine, "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag."].filter((line): line is string => Boolean(line)).join("\n");
+    return [phaseLine, actionBundleLine, deadlineLine, budgetLine, "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag."].filter((line): line is string => Boolean(line)).join("\n");
   }
-  const lines = [phaseLine, deadlineLine, budgetLine, task.objective.trim()].filter((line): line is string => Boolean(line));
+  const lines = [phaseLine, actionBundleLine, deadlineLine, budgetLine, task.objective.trim()].filter((line): line is string => Boolean(line));
   if (task.target.startsWith("REMOTE:")) {
     lines.push(`\nLive target: ${task.target.slice("REMOTE:".length)} (also in connection-info.txt).`);
   }
@@ -383,7 +422,6 @@ export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: stri
   lines.push("Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.");
   return lines.join("\n");
 }
-
 function replanNudge(kind: TargetKind, turn: number, previousTermination?: string): string {
   const lines = [
     `[ProofBlade replan checkpoint — turn ${turn}${previousTermination ? ` after ${previousTermination}` : " without a submit_flag call"}]`,
@@ -407,7 +445,4 @@ function replanNudge(kind: TargetKind, turn: number, previousTermination?: strin
   }
   return lines.join("\n");
 }
-
-function isRecoverableTurnGuard(reason: string): boolean {
-  return reason === "experiment_budget" || reason === "no_progress" || reason === "repeated_tool_failure" || reason === "tool_failure_storm";
-}
+// Failure recovery policy is centralized in domain/failure-policy.ts.

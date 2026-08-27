@@ -8,6 +8,7 @@ import { projectionHash } from "../src/control/reducer.js";
 import { demoTask } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { SessionRegistry, SessionRegistryError } from "../src/container/session-registry.js";
+import { ExternalResourceRegistry } from "../src/recovery/external-resource-registry.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type {
   ContainerRef,
@@ -231,6 +232,62 @@ test("supersedeOrphans marks same-generation OPEN sessions dead after a process 
     const live = await second.open({ ref: refAt(1), kind: "pwn-local", ownerLane: "executor", command: ["sh"] });
     assert.equal(await second.supersedeOrphans(), 0);
     assert.equal((await control.snapshot(runId)).sessions[live.id]?.status, "OPEN");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("adopt installs a broker runtime without opening a replacement session", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-session-adopt-"));
+  try {
+    const runId = "SES-ADOPT";
+    const control = await makeControl(root, runId);
+    const firstRuntime = new FakeRuntime();
+    const first = new SessionRegistry(runId, firstRuntime as unknown as ContainerRuntimePort, control);
+    const generation = (await control.snapshot(runId)).generation;
+    const opened = await first.open({ ref: { ...refAt(generation), runId }, kind: "pwn-remote", ownerLane: "executor", command: ["tube"] });
+
+    const brokerRuntime = new FakeRuntime();
+    const externalResources = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const second = new SessionRegistry(runId, new FakeRuntime() as unknown as ContainerRuntimePort, control, externalResources);
+    const handle: ContainerSessionHandle = {
+      sessionId: "broker-session-1",
+      externalId: opened.externalId,
+      ref: { ...refAt(generation), runId },
+    };
+    const adopted = await second.adopt("executor", opened.id, handle, brokerRuntime);
+    assert.equal(adopted.id, opened.id);
+    assert.equal((await control.snapshot(runId)).sessions[opened.id]?.status, "OPEN");
+    assert.equal((await externalResources.get(`session:${opened.id}`))?.controlSessionId, opened.id);
+    await second.write("executor", opened.id, "whoami\n");
+    assert.deepEqual(brokerRuntime.writes, [{ id: "broker-session-1", data: "whoami\n" }]);
+    assert.equal(firstRuntime.opened.length, 1, "adoption must not call openSession");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("openExternal binds a broker-created session without calling the local opener", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-session-external-open-"));
+  try {
+    const runId = "SES-EXTERNAL-OPEN";
+    const control = await makeControl(root, runId);
+    const localRuntime = new FakeRuntime();
+    const registry = new SessionRegistry(runId, localRuntime as unknown as ContainerRuntimePort, control);
+    const brokerRuntime = new FakeRuntime();
+    const generation = (await control.snapshot(runId)).generation;
+    const ref = { ...refAt(generation), runId };
+    const handle: ContainerSessionHandle = { sessionId: "broker-session-1", externalId: "opaque-broker", ref };
+    const opened = await registry.openExternal(
+      { ref, kind: "pwn-remote", ownerLane: "executor", command: ["tube"], endpoint: "127.0.0.1:31337" },
+      { sessionId: "SES-BROKER-1", externalId: "opaque-broker", handle, runtime: brokerRuntime },
+    );
+    assert.equal(opened.id, "SES-BROKER-1");
+    assert.equal(opened.status, "OPEN");
+    assert.equal(opened.externalId, "opaque-broker");
+    assert.equal(localRuntime.opened.length, 0);
+    await registry.write("executor", opened.id, "hello\n");
+    assert.deepEqual(brokerRuntime.writes, [{ id: "broker-session-1", data: "hello\n" }]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -4,11 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ControlStore } from "../src/control/control-store.js";
-import { demoTask } from "../src/app/demo.js";
+import { ArtifactStore } from "../src/effects/artifact-store.js";
+import { createServices, demoTask } from "../src/app/demo.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnReproducer } from "../src/verification/pwn-reproducer.js";
+import { PwnReproductionVerifier } from "../src/verification/pwn-reproduction-verifier.js";
+import { PwnReplayRecoveryAdapter } from "../src/verification/pwn-replay-recovery.js";
+import { VerificationRecoveryService } from "../src/recovery/verification-recovery.js";
+import { beginVerificationRequest } from "../src/verification/verification-key.js";
+import { canonicalJson, sha256 } from "../src/domain/utils.js";
 import { PwnToolHandler } from "../src/pwn/pwn-tools.js";
+import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { createPwnCodingTools } from "../src/runtime/pwn-coding-tools.js";
 import { codingActiveToolNames, CODING_PWN_TOOL_NAMES } from "../src/runtime/coding-resources.js";
 import type { CodingResourceContext } from "../src/runtime/coding-resources.js";
@@ -43,7 +50,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private pending = new Map<string, string>();
   private count = 0;
   public lastWriteBytes: Uint8Array | undefined;
-  public constructor(private readonly flag: string, private readonly flagPath: string) {}
+  public constructor(private readonly flag: string, private readonly flagPath: string, private readonly exitOnWrite = false) {}
   public async openSession(ref: ContainerRef): Promise<ContainerSessionHandle> {
     const sessionId = `dxs-${++this.count}`;
     this.pending.set(sessionId, "");
@@ -66,7 +73,7 @@ class EchoTubeRuntime implements Partial<ContainerRuntimePort> {
   private drain(sessionId: string): ContainerSessionResult {
     const buffered = this.pending.get(sessionId) ?? "";
     this.pending.set(sessionId, "");
-    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited: false, exitCode: null, truncated: false };
+    return { delta: buffered, waitReason: buffered ? "idle" : "timeout", exited: this.exitOnWrite, exitCode: this.exitOnWrite ? 0 : null, truncated: false };
   }
 }
 
@@ -167,21 +174,311 @@ test("pwn_open then pwn_send route through the real handler and durable registry
   }
 });
 
+test("pwn_record_primitive persists a bounded hypothesis with provenance", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-primitive-"));
+  try {
+    const runId = "PWN-PRIMITIVE";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const source = await artifacts.putText(runId, "checksec: no canary; input reaches printf", { filename: "recon.txt" });
+    await control.dispatch(runId, {
+      type: "evidence",
+      evidence: { id: "EV-PWN-PRIMITIVE", kind: "observation", summary: "printf receives attacker-controlled input", source: { artifactId: source.id, generation: 0 }, confidence: 0.8, supports: [], refutes: [] },
+      lane: "executor",
+    });
+    const registry = new SessionRegistry(runId, new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, undefined, undefined, artifacts, control);
+    const result = await toolByName("pwn_record_primitive").execute!("t-primitive", {
+      primitive: "format-string write to a GOT entry",
+      confidence: 0.72,
+      artifactIds: [source.id],
+      evidenceIds: ["EV-PWN-PRIMITIVE"],
+    }, new AbortController().signal, () => {}, contextWith(handler));
+    const recordId = (result.details as { recordId: string }).recordId;
+    const record = (await control.replay(runId)).domainRecords[recordId];
+    assert.equal(record?.kind, "pwn_primitive");
+    assert.equal(record?.confidence, 0.72);
+    await assert.rejects(
+      () => toolByName("pwn_record_primitive").execute!("t-primitive-bad", { primitive: "certain shell", confidence: 1, artifactIds: [source.id] }, new AbortController().signal, () => {}, contextWith(handler)),
+      /confidence must be in \[0,1\)/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("pwn_reproduce routes to the barrier-gated verifier", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-pwn-ct-repro-"));
   try {
     const runId = "PWN-CT-REPRO";
     const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
-    await control.createRun(runId, demoTask(runId, root, config));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "REMOTE:tube" });
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
     const runtime = new EchoTubeRuntime("flag{ct-repro}", "/flag") as unknown as ContainerRuntimePort;
     const registry = new SessionRegistry(runId, runtime, control);
-    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, undefined, artifacts, control);
     const result = await toolByName("pwn_reproduce").execute!("t1", {
       stages: [{ name: "trigger", send: "payload", line: true, expect: "payload" }],
     }, new AbortController().signal, () => {}, contextWith(handler));
     assert.equal(result.isError, false);
     assert.equal((result.details as { reproduced: boolean; flag?: string }).reproduced, true);
     assert.equal((result.details as { flag?: string }).flag, "flag{ct-repro}");
+    const details = result.details as { domainRecordIds?: string[] };
+    assert.ok(details.domainRecordIds && details.domainRecordIds.length >= 3);
+    const snapshot = await control.replay(runId);
+    assert.ok(Object.values(snapshot.domainRecords).some((record) => record.kind === "pwn_exploit_stage" && record.status === "passed"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Pwn replay recovery resumes only a PROPOSED replay and keeps STARTED fail-closed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-replay-recovery-"));
+  try {
+    const runId = "PWN-REPLAY-RECOVERY";
+    const services = createServices(root, config);
+    const policy = REPRODUCTION_POLICY;
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "REMOTE:tube",
+      verification: { kind: "reproduction" as const, command: "proofblade-pwn-verifier-policy", required_reproductions: 1, pwn: policy },
+      scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+    };
+    await services.control.createRun(runId, task);
+    const stages = [{ name: "trigger", send: "payload", line: true, expect: "payload" }];
+    const policyHash = sha256(canonicalJson(policy));
+    const request = await beginVerificationRequest(services.control, runId, { kind: "pwn", policyHash, recipeHash: sha256(canonicalJson({ stages })) });
+    const prepared = await services.journal.prepareVerifierReplay(runId, {
+      verificationRequestId: request.request.id,
+      verificationKey: request.request.key,
+      kind: "pwn",
+      policyHash,
+      recipeHash: request.request.recipeHash,
+      attemptId: sha256("pwn-replay-attempt"),
+      cwd: root,
+      recoveryInput: { content: JSON.stringify({ schemaVersion: 1, kind: "pwn", stages }), filename: "pwn-replay.json", mime: "application/json", sensitivity: "secret" },
+    });
+    const runtime = new EchoTubeRuntime("flag{pwn-recovery}", "/flag");
+    const ref = { ...REF, runId, generation: 0 };
+    const adapter = new PwnReplayRecoveryAdapter({
+      runId,
+      controlStore: services.control,
+      registry: new SessionRegistry(runId, runtime as unknown as ContainerRuntimePort, services.control),
+      refProvider: () => ref,
+      policy,
+      readRecipe: async (effectId) => await services.journal.readVerifierReplayInput(runId, effectId),
+    });
+    const recovery = new VerificationRecoveryService(services.control, services.journal, [adapter], services.verificationRecovery);
+    const first = await recovery.reconcile(runId);
+    assert.equal(first.items[0]?.status, "AMBIGUOUS");
+    const snapshot = await services.control.snapshot(runId);
+    const effect = snapshot.effects[prepared.effectId]!;
+    assert.equal(effect.status, "FINISHED");
+    assert.equal(effect.verification, undefined);
+    assert.ok(effect.externalId);
+    const resultArtifact = snapshot.artifacts[effect.artifactId!];
+    assert.ok(resultArtifact);
+    const stored = JSON.parse(await services.artifacts.readText(runId, resultArtifact!)) as { stdout: string };
+    const envelope = JSON.parse(stored.stdout) as { terminal: boolean; accepted?: boolean; stageSummary?: { reproduced?: boolean } };
+    assert.equal(envelope.terminal, false);
+    assert.equal(envelope.accepted, undefined);
+    assert.equal(envelope.stageSummary?.reproduced, true);
+    assert.equal(Object.values(snapshot.sessions).filter((session) => session.kind === "pwn-remote" && session.status === "CLOSED").length, 1);
+    const seq = snapshot.lastSeq;
+    const second = await recovery.reconcile(runId);
+    assert.equal(second.items[0]?.status, "AMBIGUOUS");
+    assert.equal((await services.control.snapshot(runId)).lastSeq, seq);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("trusted Pwn reproduction binds clean-process verdicts to a Completion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-trusted-repro-"));
+  try {
+    const runId = "PWN-TRUSTED-REPRO";
+    const services = createServices(root, config);
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "REMOTE:tube",
+      verification: {
+        kind: "reproduction" as const,
+        command: "proofblade-pwn-verifier-policy",
+        required_reproductions: 2,
+        pwn: REPRODUCTION_POLICY,
+      },
+      scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+    };
+    await services.control.createRun(runId, task);
+    const runtime = new EchoTubeRuntime("flag{trusted-pwn}", "/flag") as unknown as ContainerRuntimePort;
+    const ref = { ...REF, runId, generation: 0 };
+    const mainRegistry = new SessionRegistry(runId, runtime, services.control);
+    const verifierRegistry = new SessionRegistry(runId, runtime, services.control);
+    const claims = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const trusted = new PwnReproductionVerifier(services.control, services.artifacts, {
+      prepareReplay: (input) => claims.prepareReplay(input),
+      startReplay: (effectId, sessionId, externalId) => claims.startReplay(effectId, sessionId, externalId),
+      finishReplay: (effectId, result) => claims.finishReplay(effectId, result),
+      executeEffect: async (input, signal) => await claims.executePwnReproductionEffect(input, signal),
+      recordEvidence: async (_id, evidence) => await claims.recordVerifierEvidence(evidence),
+      finalize: async (_id, completionId, accepted, evidenceIds) => await claims.finalizePwnReproduction(completionId, accepted, evidenceIds),
+    }, verifierRegistry, () => ref, REPRODUCTION_POLICY);
+    const handler = new PwnToolHandler(runId, mainRegistry, new PwnReproducer(services.control), () => ref, "executor", { allowedHosts: ["1.2.3.4"], allowedPorts: [1337] }, REPRODUCTION_POLICY, undefined, services.artifacts, services.control, trusted);
+    const outcome = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(outcome.reproduced, true);
+    assert.equal(outcome.flag, "flag{trusted-pwn}");
+    assert.ok(outcome.completionId);
+    const snapshot = await services.control.snapshot(runId);
+    const completion = snapshot.completions[outcome.completionId!];
+    assert.equal(completion?.status, "ACCEPTED");
+    const effects = Object.values(snapshot.effects).filter((effect) => effect.operation === "pwn_reproduce");
+    assert.equal(effects.length, 2);
+    const replayEffects = Object.values(snapshot.effects).filter((effect) => effect.operation === "verification_replay");
+    assert.equal(replayEffects.length, 2);
+    assert.ok(replayEffects.every((effect) => effect.producerLane === "verifier" && effect.status === "FINISHED" && effect.verification === undefined));
+    assert.ok(effects.every((effect) => effect.producerLane === "verifier" && effect.verification?.valid && effect.verification.accepted));
+    assert.ok(effects.every((effect) => !Object.hasOwn(effect.args, "stages") && !Object.hasOwn(effect.args, "targetCommand")));
+    const evidence = Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction" && item.source.tool === "pwn_reproduce");
+    assert.equal(evidence.length, 2);
+    assert.ok(evidence.every((item) => item.provenance.recordedBy === "verifier"));
+    const resultArtifact = snapshot.artifacts[effects[0]!.artifactId!];
+    assert.equal(resultArtifact?.origin.registeredBy, "verifier");
+    const payload = JSON.parse(await services.artifacts.readText(runId, resultArtifact!)) as { stdout: string };
+    assert.match(payload.stdout, /trusted-pwn/);
+
+    const replayed = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(replayed.reproduced, true);
+    assert.equal(replayed.shellConfirmed, true);
+    assert.deepEqual(replayed.stages.map(({ name, ok }) => ({ name, ok })), [
+      { name: "trigger", ok: true },
+      { name: "shell_probe", ok: true },
+      { name: "flag_extract", ok: true },
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("trusted Pwn reproduction matrix covers the core exploit archetype stage contracts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-trusted-matrix-"));
+  try {
+    const services = createServices(root, config);
+    const scenarios = [
+      { id: "ret2libc", payload: "ret2libc-rop" },
+      { id: "format-string", payload: "format-string-write" },
+      { id: "heap-uaf", payload: "heap-uaf-reclaim" },
+      { id: "stack-pivot", payload: "stack-pivot-rop" },
+    ] as const;
+    for (const scenario of scenarios) {
+      const runId = `PWN-MATRIX-${scenario.id.toUpperCase().replaceAll("-", "_")}`;
+      const task = {
+        ...demoTask(runId, root, config),
+        target_kind: "pwn" as const,
+        target: "REMOTE:tube",
+        verification: {
+          kind: "reproduction" as const,
+          command: "proofblade-pwn-verifier-policy",
+          required_reproductions: 1,
+          pwn: REPRODUCTION_POLICY,
+        },
+        scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+      };
+      await services.control.createRun(runId, task);
+      const runtime = new EchoTubeRuntime(`flag{matrix-${scenario.id}}`, "/flag") as unknown as ContainerRuntimePort;
+      const ref = { ...REF, runId, generation: 0 };
+      const claims = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+      const trusted = new PwnReproductionVerifier(services.control, services.artifacts, {
+        prepareReplay: (input) => claims.prepareReplay(input),
+        startReplay: (effectId, sessionId, externalId) => claims.startReplay(effectId, sessionId, externalId),
+        finishReplay: (effectId, result) => claims.finishReplay(effectId, result),
+        executeEffect: async (input, signal) => await claims.executePwnReproductionEffect(input, signal),
+        recordEvidence: async (_id, evidence) => await claims.recordVerifierEvidence(evidence),
+        finalize: async (_id, completionId, accepted, evidenceIds) => await claims.finalizePwnReproduction(completionId, accepted, evidenceIds),
+      }, new SessionRegistry(runId, runtime, services.control), () => ref, REPRODUCTION_POLICY);
+      const handler = new PwnToolHandler(runId, new SessionRegistry(runId, runtime, services.control), new PwnReproducer(services.control), () => ref, "executor", { allowedHosts: ["1.2.3.4"], allowedPorts: [1337] }, REPRODUCTION_POLICY, undefined, services.artifacts, services.control, trusted);
+      const outcome = await handler.reproduce([{ name: scenario.id, send: scenario.payload, line: true, expect: scenario.payload }]);
+      assert.equal(outcome.reproduced, true, scenario.id);
+      assert.equal(outcome.flag, `flag{matrix-${scenario.id}}`);
+      const snapshot = await services.control.replay(runId);
+      const stage = Object.values(snapshot.domainRecords).find((record) => record.kind === "pwn_exploit_stage");
+      assert.equal(stage?.kind, "pwn_exploit_stage");
+      assert.equal(stage?.stageName, scenario.id);
+      assert.equal(stage?.status, "passed");
+      assert.equal(snapshot.completions[outcome.completionId!]?.status, "ACCEPTED");
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("trusted Pwn reproduction rejects a clean-process failure with negative Evidence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-trusted-negative-"));
+  try {
+    const runId = "PWN-TRUSTED-NEGATIVE";
+    const services = createServices(root, config);
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "REMOTE:tube",
+      verification: { kind: "reproduction" as const, command: "proofblade-pwn-verifier-policy", required_reproductions: 2, pwn: REPRODUCTION_POLICY },
+      scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+    };
+    await services.control.createRun(runId, task);
+    const runtime = new EchoTubeRuntime("flag{never-reached}", "/flag", true) as unknown as ContainerRuntimePort;
+    const ref = { ...REF, runId, generation: 0 };
+    const verifierRegistry = new SessionRegistry(runId, runtime, services.control);
+    const claims = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const trusted = new PwnReproductionVerifier(services.control, services.artifacts, {
+      executeEffect: async (input, signal) => await claims.executePwnReproductionEffect(input, signal),
+      recordEvidence: async (_id, evidence) => await claims.recordVerifierEvidence(evidence),
+      finalize: async (_id, completionId, accepted, evidenceIds) => await claims.finalizePwnReproduction(completionId, accepted, evidenceIds),
+    }, verifierRegistry, () => ref, REPRODUCTION_POLICY);
+    const handler = new PwnToolHandler(runId, new SessionRegistry(runId, runtime, services.control), new PwnReproducer(services.control), () => ref, "executor", { allowedHosts: ["1.2.3.4"], allowedPorts: [1337] }, REPRODUCTION_POLICY, undefined, services.artifacts, services.control, trusted);
+    const outcome = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(outcome.reproduced, false);
+    assert.equal(outcome.flag, undefined);
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(snapshot.completions[outcome.completionId!]?.status, "REJECTED");
+    const effects = Object.values(snapshot.effects).filter((effect) => effect.operation === "pwn_reproduce");
+    assert.equal(effects.length, 1, "a failed first reproduction does not burn later attempts");
+    assert.equal(effects[0]?.verification?.valid, true);
+    assert.equal(effects[0]?.verification?.accepted, false);
+    assert.ok(Object.values(snapshot.evidence).some((item) => item.kind === "negative" && item.provenance.recordedBy === "verifier"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("trusted Pwn reproduction rejects a stale container generation before proposing a Completion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-trusted-stale-"));
+  try {
+    const runId = "PWN-TRUSTED-STALE";
+    const services = createServices(root, config);
+    const task = {
+      ...demoTask(runId, root, config),
+      target_kind: "pwn" as const,
+      target: "REMOTE:tube",
+      verification: { kind: "reproduction" as const, command: "proofblade-pwn-verifier-policy", required_reproductions: 1, pwn: REPRODUCTION_POLICY },
+      scope: { allowed_hosts: ["1.2.3.4"], allowed_ports: [1337], external_network: true, allowed_workspace: root },
+    };
+    await services.control.createRun(runId, task);
+    const runtime = new EchoTubeRuntime("flag{stale}", "/flag") as unknown as ContainerRuntimePort;
+    const ref = { ...REF, runId, generation: 0 };
+    const claims = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const trusted = new PwnReproductionVerifier(services.control, services.artifacts, {
+      executeEffect: async (input, signal) => await claims.executePwnReproductionEffect(input, signal),
+      recordEvidence: async (_id, evidence) => await claims.recordVerifierEvidence(evidence),
+      finalize: async (_id, completionId, accepted, evidenceIds) => await claims.finalizePwnReproduction(completionId, accepted, evidenceIds),
+    }, new SessionRegistry(runId, runtime, services.control), () => ref, REPRODUCTION_POLICY);
+    const handler = new PwnToolHandler(runId, new SessionRegistry(runId, runtime, services.control), new PwnReproducer(services.control), () => ref, "executor", { allowedHosts: ["1.2.3.4"], allowedPorts: [1337] }, REPRODUCTION_POLICY, undefined, services.artifacts, services.control, trusted);
+    await services.fixtureControl.reset(runId, 1);
+    await assert.rejects(() => handler.reproduce([{ name: "trigger", send: "payload" }]), /stale generation/);
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(Object.keys(snapshot.completions).length, 0);
+    assert.equal(Object.values(snapshot.effects).filter((effect) => effect.operation === "pwn_reproduce").length, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

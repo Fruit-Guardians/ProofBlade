@@ -7,6 +7,7 @@ export type ExecutionMode = "auto" | "assist";
 export type Phase =
   | "intake"
   | "reconnaissance"
+  | "target_model"
   | "hypothesis"
   | "experiment"
   | "verification"
@@ -28,6 +29,21 @@ export interface ExperimentRecord {
   inputHash: string;
   outcome: ExperimentOutcome;
   summary: string;
+  createdSeq: number;
+}
+
+/** Durable record of an actual recovery replan. Retries that stay within the
+ * same experiment do not create one of these records. */
+export interface ReplanRecord {
+  id: string;
+  runId: string;
+  generation: number;
+  domainPhase: DomainPhase;
+  category: PrimaryFailureCategory;
+  reason: string;
+  sourceWorkItemId?: string;
+  nextWorkItemId?: string;
+  prohibitedRepeatKeys: string[];
   createdSeq: number;
 }
 
@@ -98,6 +114,24 @@ export interface FirstActionPlan {
   maxCalls: number;
 }
 
+/**
+ * A phase-scoped, preflighted unit of work for a challenge direction.  The
+ * bundle is a bounded tool contract: it tells the lane which prepared tools
+ * are relevant now, what must already be true, and what counts as success or
+ * failure before the next phase can be selected.
+ */
+export interface ActionBundle {
+  id: string;
+  domainPhase: Extract<DomainPhase, "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE">;
+  objective: string;
+  toolNames: string[];
+  capabilityIds: string[];
+  preconditions: string[];
+  successCriteria: string[];
+  failureCriteria: string[];
+  maxCalls: number;
+}
+
 export interface RunToolPreparation {
   schemaVersion: 1;
   generation: number;
@@ -118,6 +152,8 @@ export interface RunToolPreparation {
   fallbackStrategies: string[];
   /** Added after schema 1 was introduced; old preparations remain replayable. */
   firstActionPlan?: FirstActionPlan;
+  /** Added after schema 1 was introduced; old preparations remain replayable. */
+  actionBundles?: ActionBundle[];
   hash: string;
 }
 
@@ -133,8 +169,29 @@ export interface PwnReproductionContract {
   flag_pattern: string;
 }
 
+export type BrowserActionKind = "navigate" | "click" | "fill" | "submit" | "wait";
+
+export interface BrowserSelector {
+  kind: "role" | "label" | "test_id" | "css";
+  value: string;
+  name?: string;
+}
+
+/** Optional limits for a verifier-owned browser replay. */
+export interface BrowserVerificationPolicy {
+  /** Actions that a future browser recipe may use; navigation is the current baseline. */
+  allowed_actions?: BrowserActionKind[];
+  max_steps?: number;
+  max_duration_ms?: number;
+  max_response_bytes?: number;
+}
+
 export interface WebReproductionContract {
   flag_pattern: string;
+  /** Select the clean verifier transport; omitted keeps the HTTP default. */
+  transport?: "http" | "browser";
+  /** Browser-only immutable action and resource limits. */
+  browser?: BrowserVerificationPolicy;
 }
 
 export interface TaskContract {
@@ -168,6 +225,8 @@ export interface TaskContract {
     max_cost_usd: number;
     max_tool_calls: number;
     max_submissions: number;
+    /** Optional schema-1 override; old tasks use the target-kind default. */
+    max_replans?: number;
   };
 }
 
@@ -205,6 +264,119 @@ export interface Evidence {
   refutes: string[];
   createdSeq: number;
 }
+
+/**
+ * Structured, append-only domain facts emitted by Web/Pwn capabilities.
+ * Records carry only bounded metadata and references to durable Artifacts and
+ * Evidence; raw bodies, transcripts, payloads, and secrets remain in those
+ * referenced artifacts rather than in the control projection.
+ */
+export type DomainRecordKind =
+  | "web_baseline"
+  | "web_endpoint"
+  | "web_request"
+  | "web_exploit_chain"
+  | "pwn_binary_profile"
+  | "pwn_protocol_transcript"
+  | "pwn_primitive"
+  | "pwn_leak"
+  | "pwn_exploit_stage";
+
+export interface DomainRecordBase {
+  id: string;
+  runId: string;
+  generation: number;
+  summary: string;
+  artifactIds: string[];
+  evidenceIds: string[];
+  effectId?: string;
+  createdSeq: number;
+}
+
+export interface WebBaselineRecord extends DomainRecordBase {
+  kind: "web_baseline";
+  baseUrl: string;
+  status: number;
+  stateHash: string;
+}
+
+export interface WebEndpointRecord extends DomainRecordBase {
+  kind: "web_endpoint";
+  method: string;
+  path: string;
+  sourceRecordIds: string[];
+}
+
+export interface WebRequestRecord extends DomainRecordBase {
+  kind: "web_request";
+  method: string;
+  path: string;
+  status: number;
+  sessionId: string;
+  stateHash: string;
+}
+
+export interface WebExploitChainRecord extends DomainRecordBase {
+  kind: "web_exploit_chain";
+  stepRecordIds: string[];
+  status: "proposed" | "observed" | "reproduced";
+}
+
+export interface PwnBinaryProfileRecord extends DomainRecordBase {
+  kind: "pwn_binary_profile";
+  format: string;
+  architecture: string;
+  bits: number;
+  protections: string[];
+}
+
+export interface PwnProtocolTranscriptRecord extends DomainRecordBase {
+  kind: "pwn_protocol_transcript";
+  sessionId: string;
+  interactionCount: number;
+  anchors: string[];
+}
+
+export interface PwnPrimitiveRecord extends DomainRecordBase {
+  kind: "pwn_primitive";
+  primitive: string;
+  confidence: number;
+  preconditionRecordIds: string[];
+}
+
+export interface PwnLeakRecord extends DomainRecordBase {
+  kind: "pwn_leak";
+  sourceHex: string;
+  format: "le64" | "le32" | "be64" | "be32";
+  value: string;
+  addressKind: "stack" | "heap" | "libc" | "pie" | "code" | "unknown";
+  symbol?: string;
+  derivation?: { expression: string; sourceRecordIds: string[] };
+}
+
+export interface PwnExploitStageRecord extends DomainRecordBase {
+  kind: "pwn_exploit_stage";
+  stageIndex: number;
+  stageName: string;
+  status: "proposed" | "observed" | "passed" | "failed";
+  inputArtifactId?: string;
+  expectedAnchor?: string;
+}
+
+export type DomainRecord =
+  | WebBaselineRecord
+  | WebEndpointRecord
+  | WebRequestRecord
+  | WebExploitChainRecord
+  | PwnBinaryProfileRecord
+  | PwnProtocolTranscriptRecord
+  | PwnPrimitiveRecord
+  | PwnLeakRecord
+  | PwnExploitStageRecord;
+
+export type DomainRecordInput = {
+  [K in DomainRecord["kind"]]: Omit<Extract<DomainRecord, { kind: K }>, "createdSeq" | "runId" | "generation">
+}[DomainRecord["kind"]];
 
 export interface Observation {
   id: string;
@@ -422,6 +594,29 @@ export interface CompletionProposal {
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
   evidenceIds: string[];
   createdSeq: number;
+  /** Stable request identity; random Completion IDs remain references only. */
+  verificationKey?: string;
+}
+
+export type VerificationRequestKind = "web" | "browser" | "pwn" | "claim";
+
+/** Durable recovery marker for a verifier request after an interrupted run. */
+export type VerificationRecoveryState = "READY" | "RECOVERY_REQUIRED" | "RECOVERED";
+
+export interface VerificationRequest {
+  id: string;
+  key: string;
+  runId: string;
+  generation: number;
+  kind: VerificationRequestKind;
+  policyHash: string;
+  recipeHash: string;
+  status: "PENDING" | "BOUND";
+  recoveryState?: VerificationRecoveryState;
+  recoveryReason?: string;
+  recoverySeq?: number;
+  completionId?: string;
+  createdSeq: number;
 }
 
 export interface CheckpointRef {
@@ -471,6 +666,12 @@ export type SessionKind = "pwn-local" | "pwn-remote" | "http" | "browser";
 
 export type SessionStatus = "OPEN" | "CLOSED" | "EXITED" | "ERROR" | "SUPERSEDED";
 
+/**
+ * Cross-ledger binding phase for broker-owned sessions.  It is optional so
+ * legacy session records replay as READY without a migration event.
+ */
+export type SessionBindingState = "FINALIZING" | "BOUND";
+
 export type SessionWaitReason = "idle" | "timeout" | "exit";
 
 export interface SessionRecord {
@@ -484,6 +685,17 @@ export interface SessionRecord {
   endpoint?: string;
   /** Runtime handle id (e.g. the docker-exec session id) reused as JobRecord.externalId. */
   externalId?: string;
+  /** Stable cross-ledger marker shared with ExternalResourceRegistry. */
+  bindingTxnId?: string;
+  /** Hash of the immutable session/resource handoff identity. */
+  bindingIdentityHash?: string;
+  /** Durable fence for the final Control Store ↔ external-ledger handoff. */
+  bindingState?: SessionBindingState;
+  /** Immutable broker request identity needed to rebuild a wire resource after restart. */
+  requestKey?: string;
+  policyHash?: string;
+  recipeHash?: string;
+  scopeHash?: string;
   /** Full transcript accumulates here; the model reads a bounded window only. */
   transcriptArtifactId?: string;
   /** cookie/storage/session state hash used for clean-reproduce comparison. */
@@ -572,7 +784,7 @@ export interface VerificationVerdict {
   schemaVersion: 1;
   valid: boolean;
   accepted: boolean;
-  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce" | "web_reproduce";
+  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce" | "web_reproduce" | "browser_reproduce";
   runId: string;
   taskId: string;
   taskHash: string;
@@ -634,6 +846,7 @@ export interface RunSnapshot {
   facts: Record<string, Fact>;
   observations: Record<string, Observation>;
   evidence: Record<string, Evidence>;
+  domainRecords: Record<string, DomainRecord>;
   reasoningNodes: Record<string, ReasoningNode>;
   reasoningEdges: Record<string, ReasoningEdge>;
   reasoningTrees: Record<string, ReasoningTree>;
@@ -641,6 +854,7 @@ export interface RunSnapshot {
   intents: Record<string, Intent>;
   schedulerIntents: Record<string, import("./intent.js").Intent>;
   completions: Record<string, CompletionProposal>;
+  verificationRequests: Record<string, VerificationRequest>;
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;
   handoffs: Record<string, HandoffRecord>;
@@ -648,6 +862,9 @@ export interface RunSnapshot {
   sessions: Record<string, SessionRecord>;
   requestEpochs: Record<string, RequestEpoch>;
   experiments: Record<string, ExperimentRecord>;
+  /** Replans are durable control decisions, not an in-memory turn counter. */
+  replans: Record<string, ReplanRecord>;
+  replanCount: number;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
   effects: Record<string, Effect>;
@@ -690,6 +907,7 @@ export type EventType =
   | "scheduler_intent_changed"
   | "hypothesis_added"
   | "evidence_added"
+  | "domain_record_added"
   | "reasoning_node_upserted"
   | "reasoning_edge_added"
   | "reasoning_tree_upserted"
@@ -717,6 +935,7 @@ export type EventType =
   | "work_item_cancelled"
   | "work_item_superseded"
   | "session_opened"
+  | "session_binding_completed"
   | "session_interacted"
   | "session_signaled"
   | "session_closed"
@@ -725,6 +944,9 @@ export type EventType =
   | "request_epoch_context"
   | "context_overflow_recovered"
   | "completion_proposed"
+  | "verification_requested"
+  | "verification_recovery_required"
+  | "verification_recovery_resolved"
   | "completion_verified"
   | "provider_request_started"
   | "provider_request_queued"
@@ -735,6 +957,7 @@ export type EventType =
   | "tool_call_recorded"
   | "tool_result_recorded"
   | "experiment_recorded"
+  | "replan_requested"
   | "compaction_recorded"
   | "model_usage"
   | "run_paused"
@@ -781,6 +1004,7 @@ export interface ContextManifest {
   hypothesisIds: string[];
   observationIds: string[];
   evidenceIds: string[];
+  domainRecordIds: string[];
   reasoningTreeIds: string[];
   completionIds: string[];
   jobIds: string[];

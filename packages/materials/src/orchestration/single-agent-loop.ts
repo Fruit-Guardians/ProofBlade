@@ -19,6 +19,10 @@ import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { IntentScheduler } from "./intent-scheduler.js";
 import { buildSchedulingContext } from "./scheduling-context.js";
 import { RunCoordinator } from "./run-coordinator.js";
+import { probeBrowserVerifierFactory, type BrowserVerifierFactory } from "../web/browser-session.js";
+import { withBrowserResourceAdapter, type BrowserRuntimeHandoff } from "../web/browser-resource-adapter.js";
+import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
+import { withSessionResourceAdapters, type SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 
 export interface AgentLaneCreateInput {
   projectRoot: string;
@@ -28,10 +32,17 @@ export interface AgentLaneCreateInput {
   fixture: Awaited<ReturnType<AppServices["sandbox"]["build"]>>;
   runtime: ProofBladeToolRuntime;
   /** Deliberately excludes verifier and fixture lifecycle capabilities. */
-  services: Pick<AppServices, "control" | "artifacts" | "journal">;
+  services: Pick<AppServices, "control" | "artifacts" | "journal" | "sessionRuntimeBrokers" | "sessionRuntimeRequired" | "browserRuntimeRequired">;
   /** Safe claim service; the lane never receives verifier control directly. */
   claimVerifier: CodingClaimVerifier;
   config: ProofBladeConfig;
+  /** Optional application-owned browser verifier; never exposed to the model. */
+  browserVerifierFactory?: BrowserVerifierFactory;
+  externalResources?: ExternalResourceRegistry;
+  /** Runtime bindings confirmed during recovery and safe to adopt in the lane. */
+  sessionHandoffs?: readonly SessionRuntimeHandoff[];
+  /** Browser bindings confirmed during recovery and safe for verifier replay. */
+  browserHandoffs?: readonly BrowserRuntimeHandoff[];
   onEvent?: Parameters<typeof PiCodingLane.create>[0]["onEvent"];
 }
 
@@ -76,6 +87,7 @@ export class SingleAgentCtfLoop {
     private readonly config: ProofBladeConfig,
     private readonly services: AppServices,
     private readonly createLane: AgentLaneFactory = defaultLaneFactory,
+    private readonly browserVerifierFactory?: BrowserVerifierFactory,
   ) {}
 
   public async run(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome> {
@@ -95,12 +107,21 @@ export class SingleAgentCtfLoop {
     // A fresh registry for recovery: any session still durably OPEN belongs to a
     // dead prior process (its docker-exec child died with it), so it is an orphan
     // to supersede rather than revive.
+    const browserVerifierFactory = await probeBrowserVerifierFactory(this.browserVerifierFactory, options.signal);
+    const recoveryAdapters = withSessionResourceAdapters(
+      withBrowserResourceAdapter(this.services.externalResourceAdapters, browserVerifierFactory),
+      this.services.sessionRuntimeBrokers ?? [],
+    );
     const recovery = await new RunRecoveryService(
       this.services.control,
       this.services.journal,
       this.services.sandbox,
       this.services.fixtureControl,
-      SessionRegistry.forRecovery(options.runId, this.services.control),
+      SessionRegistry.forRecovery(options.runId, this.services.control, this.services.externalResources),
+      this.services.verificationRecovery,
+      this.services.verificationRecoveryAdapters,
+      this.services.externalResources,
+      recoveryAdapters,
     ).recover(options.runId, snapshot.task);
     throwIfAborted(options.signal);
     const fixture = recovery.fixture;
@@ -155,9 +176,22 @@ export class SingleAgentCtfLoop {
         runDir,
         runtime,
         fixture,
-        services: Object.freeze({ control: this.services.control, artifacts: this.services.artifacts, journal: this.services.journal }),
+        services: Object.freeze({
+          control: this.services.control,
+          artifacts: this.services.artifacts,
+          journal: this.services.journal,
+          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
+          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
+          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
+        }),
         claimVerifier,
         config: this.config,
+        ...(browserVerifierFactory ? { browserVerifierFactory } : {}),
+        externalResources: this.services.externalResources,
+        ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
+        ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
+        sessionHandoffs: recovery.sessionHandoffs,
+        browserHandoffs: recovery.browserHandoffs,
         ...(options.onEvent ? { onEvent: options.onEvent } : {}),
       });
       const activeLane = lane;
@@ -199,7 +233,7 @@ export class SingleAgentCtfLoop {
             await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });
             break;
           }
-          await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery");
+          await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery", "context_overflow");
           activeWorkItemId = undefined;
           const checkpoint = await checkpoints.create(options.runId, "context-overflow-recovery");
           await this.services.control.dispatch(options.runId, { type: "context_recovery", checkpointId: checkpoint.checkpointId });
@@ -480,6 +514,13 @@ async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLan
     journal: input.services.journal,
     claimVerifier: input.claimVerifier,
     config: input.config,
+    ...(input.browserVerifierFactory ? { browserVerifierFactory: input.browserVerifierFactory } : {}),
+    externalResources: input.externalResources,
+    ...(input.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: input.services.sessionRuntimeBrokers } : {}),
+    ...(input.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: input.services.sessionRuntimeRequired }),
+    ...(input.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: input.services.browserRuntimeRequired }),
+    sessionHandoffs: input.sessionHandoffs,
+    browserHandoffs: input.browserHandoffs,
     deferClaimAcceptance: true,
     sessionId: `${input.runId}-coding`,
     ...(input.onEvent ? { onEvent: input.onEvent } : {}),
@@ -499,9 +540,11 @@ function latestAcceptedClaim(snapshot: RunSnapshot, task: TaskContract) {
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
   const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
+  const bundle = snapshot.toolPreparation?.actionBundles?.find((item) => item.domainPhase === snapshot.domainPhase);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
     `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. Treat this phase as a bounded step, not an invitation to restart the whole analysis.`,
+    ...(bundle ? [`Current action bundle ${bundle.id}: ${bundle.objective} Tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Max calls: ${bundle.maxCalls}.`] : []),
     `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`,
     `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),

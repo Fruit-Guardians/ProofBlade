@@ -123,6 +123,35 @@
       "status": "candidate",
       "symbols": [
         {
+          "id": "@proofblade/materials::method::CompetitionEnvironmentResourceAdapter.adopt",
+          "package": "@proofblade/materials",
+          "name": "CompetitionEnvironmentResourceAdapter.adopt",
+          "kind": "method",
+          "signature": "(_record: ExternalResourceRecord, inspection: ExternalResourceInspection): Promise<{ state: \"CONFIRMED\" | \"UNKNOWN\"; summary?: string; }>",
+          "module": "src/competition/environment-janitor.ts",
+          "line": 570,
+          "summary": "Adopt only a PRESENT/MATCH resource. UNKNOWN is a deliberate fail-closed result."
+        },
+        {
+          "id": "@proofblade/materials::method::DockerContainerResourceAdapter.adopt",
+          "package": "@proofblade/materials",
+          "name": "DockerContainerResourceAdapter.adopt",
+          "kind": "method",
+          "signature": "(_record: ExternalResourceRecord, inspection: ExternalResourceInspection, _signal?: AbortSignal): Promise<{ state: \"CONFIRMED\" | \"UNKNOWN\"; summary?: string; }>",
+          "module": "src/container/docker-resource-adapter.ts",
+          "line": 61,
+          "summary": "Adopt only a PRESENT/MATCH resource. UNKNOWN is a deliberate fail-closed result."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
           "id": "@proofblade/materials::method::CompetitionSandbox.close",
           "package": "@proofblade/materials",
           "name": "CompetitionSandbox.close",
@@ -152,13 +181,42 @@
       "status": "candidate",
       "symbols": [
         {
+          "id": "@proofblade/materials::method::ControlStore.dispatchBindingTransaction",
+          "package": "@proofblade/materials",
+          "name": "ControlStore.dispatchBindingTransaction",
+          "kind": "method",
+          "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
+          "module": "src/control/control-store.ts",
+          "line": 278,
+          "summary": "Commit the final Control Store fence for a broker-owned session binding."
+        },
+        {
+          "id": "@proofblade/materials::method::ControlStore.dispatchTransaction",
+          "package": "@proofblade/materials",
+          "name": "ControlStore.dispatchTransaction",
+          "kind": "method",
+          "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
+          "module": "src/control/control-store.ts",
+          "line": 261,
+          "summary": "Inferred summary: dispatch transaction operation used to perform a durable write."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
           "id": "@proofblade/materials::method::ControlStore.replay",
           "package": "@proofblade/materials",
           "name": "ControlStore.replay",
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 204,
+          "line": 230,
           "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
@@ -168,7 +226,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 199,
+          "line": 225,
           "summary": "Inferred summary: snapshot operation used to read or inspect state."
         }
       ],
@@ -187,7 +245,7 @@
           "kind": "method",
           "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
           "module": "src/orchestration/run-work-scheduler.ts",
-          "line": 166,
+          "line": 167,
           "summary": "Blocks a running item while retaining it for a later recovery decision."
         },
         {
@@ -197,8 +255,66 @@
           "kind": "method",
           "signature": "(runId: string, workItemId: string | undefined, reason: string): Promise<void>",
           "module": "src/orchestration/run-work-scheduler.ts",
-          "line": 158,
+          "line": 159,
           "summary": "Marks a running item failed without mutating an already-settled item."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::SessionResourceAdapter.takeBinding",
+          "package": "@proofblade/materials",
+          "name": "SessionResourceAdapter.takeBinding",
+          "kind": "method",
+          "signature": "(resourceId: string): SessionRuntimeBinding | undefined",
+          "module": "src/recovery/session-resource-adapter.ts",
+          "line": 111,
+          "summary": "Take the binding produced by the last successful adopt for one resource."
+        },
+        {
+          "id": "@proofblade/materials::method::BrowserContextResourceAdapter.takeBinding",
+          "package": "@proofblade/materials",
+          "name": "BrowserContextResourceAdapter.takeBinding",
+          "kind": "method",
+          "signature": "(resourceId: string): BrowserRuntimeBinding | undefined",
+          "module": "src/web/browser-resource-adapter.ts",
+          "line": 64,
+          "summary": "Take the binding produced by the last successful adopt for one resource."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::DurableSessionRuntimeService.reconcile",
+          "package": "@proofblade/materials",
+          "name": "DurableSessionRuntimeService.reconcile",
+          "kind": "method",
+          "signature": "(signal?: AbortSignal): Promise<SessionRuntimeReconcileReport>",
+          "module": "src/recovery/session-runtime-service.ts",
+          "line": 173,
+          "summary": "Reconcile interrupted create reservations after a service restart. The"
+        },
+        {
+          "id": "@proofblade/materials::method::DurableBrowserRuntimeService.reconcile",
+          "package": "@proofblade/materials",
+          "name": "DurableBrowserRuntimeService.reconcile",
+          "kind": "method",
+          "signature": "(signal?: AbortSignal): Promise<BrowserRuntimeReconcileReport>",
+          "module": "src/web/browser-runtime-service.ts",
+          "line": 170,
+          "summary": "Reconcile interrupted create reservations after a service restart. Only an"
         }
       ],
       "signals": [
@@ -216,7 +332,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 516,
+          "line": 662,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -245,7 +361,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 520,
+          "line": 666,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -292,10 +408,107 @@
         "same-structure-hash"
       ],
       "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::CodingClaimVerifier.executeBrowserReproductionEffect",
+          "package": "@proofblade/materials",
+          "name": "CodingClaimVerifier.executeBrowserReproductionEffect",
+          "kind": "method",
+          "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 131,
+          "summary": "Execute a verifier-owned browser clean-context attestation."
+        },
+        {
+          "id": "@proofblade/materials::method::CodingClaimVerifier.executeWebReproductionEffect",
+          "package": "@proofblade/materials",
+          "name": "CodingClaimVerifier.executeWebReproductionEffect",
+          "kind": "method",
+          "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 97,
+          "summary": "Execute a verifier-owned web attestation without exposing the verifier port to the lane."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeBrowserReproduction",
+          "package": "@proofblade/materials",
+          "name": "CodingClaimVerifier.finalizeBrowserReproduction",
+          "kind": "method",
+          "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 210,
+          "summary": "Mark a browser verifier Completion accepted/rejected after its Evidence is recorded."
+        },
+        {
+          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizePwnReproduction",
+          "package": "@proofblade/materials",
+          "name": "CodingClaimVerifier.finalizePwnReproduction",
+          "kind": "method",
+          "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 215,
+          "summary": "Mark a Pwn verifier Completion accepted/rejected after its bound Evidence."
+        },
+        {
+          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeWebReproduction",
+          "package": "@proofblade/materials",
+          "name": "CodingClaimVerifier.finalizeWebReproduction",
+          "kind": "method",
+          "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 205,
+          "summary": "Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::HttpBrowserRuntimeContextPort.click",
+          "package": "@proofblade/materials",
+          "name": "HttpBrowserRuntimeContextPort.click",
+          "kind": "method",
+          "signature": "(selector: BrowserSelector, signal?: AbortSignal): Promise<BrowserDriverResponse>",
+          "module": "src/web/browser-runtime-actions.ts",
+          "line": 165,
+          "summary": "Inferred summary: click operation used to provide a reusable operation."
+        },
+        {
+          "id": "@proofblade/materials::method::HttpBrowserRuntimeContextPort.submit",
+          "package": "@proofblade/materials",
+          "name": "HttpBrowserRuntimeContextPort.submit",
+          "kind": "method",
+          "signature": "(selector: BrowserSelector, signal?: AbortSignal): Promise<BrowserDriverResponse>",
+          "module": "src/web/browser-runtime-actions.ts",
+          "line": 173,
+          "summary": "Inferred summary: submit operation used to provide a reusable operation."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
     }
   ],
   "counts": {
     "exact": 0,
-    "candidates": 9
+    "candidates": 16
   }
 }

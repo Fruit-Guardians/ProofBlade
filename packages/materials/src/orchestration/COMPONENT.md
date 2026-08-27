@@ -38,6 +38,7 @@ plan-only、等待确认和验证边界 fail-closed。引入新模型角色前�
 - 暂停不是终态或预算耗尽；Auto 模式不得把暂停中的运行改写成 `EXHAUSTED`。
 - Provider 的 `length` stop reason 与显式 maximum-context 错误进入同一单次恢复状态机：先持久化检查点并压缩，再继续下一 Executor turn；重复溢出必须明确失败。
 - Task-owned reproduction 已由 Loop 统一收口：`CodingClaimVerifier` 已接受的 Completion 直接经过 `REPORT → SUBMIT`，不再错误地重复走 hidden scorer；崩溃恢复不得从 `SUBMIT` 回退到 `REPORT`。
+- `RunWorkScheduler.blockAndQueue` 将失败 WorkItem、下一项 READY WorkItem 和 `replan_requested` 放进同一 ControlStore 事务；`phaseBudget` 从 durable Experiment/Effect/Replan 投影推导阶段、工具、提交和恢复余量，重启后不依赖进程内计数。
 
 ```powershell
 npm run test:materials

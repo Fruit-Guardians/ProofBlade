@@ -10,8 +10,11 @@ import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-reproducer.js";
 import { PwnToolHandler } from "../src/pwn/pwn-tools.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
+import { ArtifactStore } from "../src/effects/artifact-store.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle, ContainerSessionResult } from "../src/container/contracts.js";
+import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
+import type { ExternalResourceRecord } from "../src/recovery/external-resource-registry.js";
 
 const REPRODUCTION_POLICY = {
   target: { kind: "remote" as const, command: ["tube"], endpoint: "10.0.0.9:1337" },
@@ -76,6 +79,10 @@ class UndeliveredSignalRuntime extends EchoTubeRuntime {
   public async sessionSignal(): Promise<boolean> { return false; }
 }
 
+class NoOpenRuntime extends EchoTubeRuntime {
+  public async openSession(): Promise<ContainerSessionHandle> { throw new Error("local opener must not be called"); }
+}
+
 async function makeHandler(root: string, runId: string, flag = "flag{tool}", experimentGate?: ExperimentGate, runtimeOverride?: ContainerRuntimePort): Promise<{ handler: PwnToolHandler; control: ControlStore }> {
   const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
   await control.createRun(runId, demoTask(runId, root, config));
@@ -107,6 +114,79 @@ test("handler opens, sends, lists and closes a tube through the durable registry
     await handler.close(opened.sessionId);
     assert.equal(handler.list().length, 0);
     assert.equal((await control.snapshot("PWN-TOOL")).sessions[opened.sessionId]?.status, "CLOSED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("handler opens a broker-owned tube without invoking the local container opener", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-broker-"));
+  try {
+    const runId = "PWN-BROKER";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "nc://10.0.0.9:1337" });
+    const localRuntime = new NoOpenRuntime("flag{broker}", "/flag");
+    const brokerRuntime = new EchoTubeRuntime("flag{broker}", "/flag");
+    const generation = (await control.snapshot(runId)).generation;
+    const ref = { ...REF, runId, generation };
+    const registry = new SessionRegistry(runId, localRuntime as unknown as ContainerRuntimePort, control);
+    let creates = 0;
+    const requestKeys: string[] = [];
+    const broker: SessionRuntimeCreateBroker = {
+      name: "test-session-broker",
+      kind: "pwn-session",
+      async create(request) {
+        creates += 1;
+        requestKeys.push(request.requestKey);
+        assert.equal(request.kind, "pwn-session");
+        assert.equal(request.pwn?.mode, "remote");
+        return { schemaVersion: 1, operation: "create", state: "CREATED", sessionId: `SES-BROKER-${creates}`, externalId: `opaque-broker-${creates}`, stateHash: "a".repeat(64) };
+      },
+      async createBinding(record: ExternalResourceRecord) {
+        const handle: ContainerSessionHandle = { sessionId: `runtime-${record.externalId}`, externalId: record.externalId, ref };
+        return { kind: "pwn-session" as const, externalId: record.externalId!, handle, runtime: brokerRuntime };
+      },
+      async inspect(record) { return { status: "PRESENT" as const, binding: "MATCH" as const, externalId: record.externalId }; },
+      async adopt(record) { return { state: "CONFIRMED" as const, externalId: record.externalId }; },
+      async release() { return { released: true }; },
+    };
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => ref, "executor", { allowedHosts: ["10.0.0.9"], allowedPorts: [1337] }, REPRODUCTION_POLICY, undefined, undefined, control, undefined, broker);
+    const opened = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    assert.equal(opened.sessionId, "SES-BROKER-1");
+    assert.equal(creates, 1);
+    await handler.send(opened.sessionId, "PING", true);
+    assert.deepEqual(brokerRuntime.lastWriteBytes && [...brokerRuntime.lastWriteBytes], [...new TextEncoder().encode("PING\n")]);
+    const reproduced = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(reproduced.reproduced, true);
+    assert.equal(reproduced.flag, "flag{broker}");
+    assert.equal(creates, 2, "clean reproduction must allocate a fresh broker session");
+    const repeated = await handler.reproduce([{ name: "trigger", send: "payload", line: true, expect: "payload" }]);
+    assert.equal(repeated.reproduced, true);
+    assert.equal(creates, 3, "each clean reproduction must allocate a fresh broker session");
+    assert.notEqual(requestKeys[1], requestKeys[2], "clean reproductions must not reuse the exploration idempotency key");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("pwn interactions archive a bounded transcript domain record when the target is pwn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-domain-records-"));
+  try {
+    const runId = "PWN-DOMAIN-RECORDS";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "nc://10.0.0.9:1337" });
+    const artifactStore = new ArtifactStore(join(root, "runs"), control);
+    const runtime = new EchoTubeRuntime("flag{recorded}", "/flag") as unknown as ContainerRuntimePort;
+    const registry = new SessionRegistry(runId, runtime, control);
+    const handler = new PwnToolHandler(runId, registry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, undefined, artifactStore, control);
+    const opened = await handler.open({ kind: "remote", command: ["tube"], endpoint: "10.0.0.9:1337" });
+    await handler.send(opened.sessionId, "MENU", true);
+    const snapshot = await control.replay(runId);
+    const transcript = Object.values(snapshot.domainRecords).find((record) => record.kind === "pwn_protocol_transcript");
+    assert.ok(transcript);
+    assert.equal(transcript.sessionId, opened.sessionId);
+    assert.equal(transcript.artifactIds.length, 1);
+    assert.ok(snapshot.artifacts[transcript.artifactIds[0]!]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -274,6 +354,15 @@ test("pwn experiment failures are durable, session-independent, and gate all pro
     const experiments = Object.values((await control.snapshot(runId)).experiments).filter((item) => item.action === "pwn_recv");
     assert.equal(experiments.length, 2);
     assert.equal(new Set(experiments.map((item) => item.repeatKey)).size, 1, "session ids must not distinguish the same recv experiment");
+
+    const failingRuntime = new EchoTubeRuntime("flag{x}", "/flag", true);
+    const failingRegistry = new SessionRegistry(runId, failingRuntime as unknown as ContainerRuntimePort, control);
+    const failingHandler = new PwnToolHandler(runId, failingRegistry, new PwnReproducer(control), () => REF, "executor", undefined, REPRODUCTION_POLICY, gate);
+    const recipe = [{ name: "trigger", send: "payload", line: true, expect: "payload" }];
+    assert.equal((await failingHandler.reproduce(recipe)).reproduced, false);
+    assert.equal((await failingHandler.reproduce(recipe)).reproduced, false);
+    await assert.rejects(failingHandler.reproduce(recipe), /blocked action/);
+    assert.equal(Object.values((await control.snapshot(runId)).experiments).filter((item) => item.action === "pwn_reproduce").length, 2);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

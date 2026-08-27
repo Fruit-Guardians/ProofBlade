@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
   ToolPreflightService,
+  actionBundleForPhase,
+  assertToolPreparationPublished,
   challengeToolProfile,
   challengeToolProfiles,
   challengeToolCatalogSpecs,
@@ -42,10 +44,14 @@ test("profiles keep direction-specific tools and fallback order bounded", () => 
     assert.ok(candidate.firstAction.length > 40, `${candidate.id} needs a concrete first action contract`);
     assert.ok(candidate.firstActionPlan.maxCalls >= 1 && candidate.firstActionPlan.maxCalls <= 16);
     assert.ok(candidate.firstActionPlan.allowedToolNames.length > 0);
+    assert.deepEqual(candidate.actionBundles.map((bundle) => bundle.domainPhase), ["RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE"]);
+    assert.ok(candidate.actionBundles.every((bundle) => bundle.maxCalls >= 1 && bundle.toolNames.length > 0), `${candidate.id} action bundles must be bounded and executable`);
     assert.ok(candidate.requiredToolIds.every((id) => candidate.hostToolIds.includes(id)), `${candidate.id} required tools must be prepared`);
     assert.ok(candidate.requiredToolIds.every((id) => !candidate.optionalToolIds.includes(id)), `${candidate.id} required tools cannot be optional`);
   }
   assert.match(profile.firstAction, /file.*strings/i);
+  assert.equal(actionBundleForPhase(challengeToolProfile("pwn"), "EXPERIMENT")?.id, "pwn-experiment");
+  assert.ok(actionBundleForPhase(challengeToolProfile("web"), "REPRODUCE")?.toolNames.includes("web_reproduce"));
 });
 
 test("every profile tool id has a reviewed bootstrap definition", () => {
@@ -77,6 +83,7 @@ test("preflight probes only the selected profile and reuses its cache", async ()
     assert.equal(first.toolCatalogHash, catalog.catalogHash());
     assert.equal(first.mcpCatalogHash, "mcp-hash");
     assert.deepEqual(first.firstActionPlan, profile.firstActionPlan);
+    assert.deepEqual(first.actionBundles, profile.actionBundles);
     assert.deepEqual(first.tools.map((tool) => tool.id), ["file"]);
     assert.deepEqual(first.missingRequiredTools, []);
     const second = await service.prepare(profile, catalog, mcp);
@@ -120,7 +127,56 @@ test("container preflight probes the execution backend and reuses an image-bound
     const preparation = runToolPreparationFromPreflight(first, profile, 1);
     assert.equal(preparation.health, "ready");
     assert.deepEqual(preparation.firstActionPlan, profile.firstActionPlan);
+    assert.deepEqual(preparation.actionBundles, profile.actionBundles);
+    assert.deepEqual(preflightFromRunToolPreparation(preparation).actionBundles, profile.actionBundles);
     assert.equal(preflightFromRunToolPreparation(preparation).runtimeKey, preparation.runtimeKey);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("preflight publication is a durable gate, not a local cache hint", () => {
+  const profile = challengeToolProfile("web");
+  const preflight = {
+    profileId: profile.id,
+    targetKind: profile.targetKind,
+    runtime: "host" as const,
+    runtimeKey: "host",
+    cacheKey: "cache-key",
+    toolCatalogHash: "catalog-hash",
+    mcpCatalogHash: "mcp-hash",
+    cacheHit: false,
+    checkedAt: 1,
+    tools: [],
+    mcpServers: [],
+    missingRequiredTools: [],
+    missingOptionalTools: [],
+    fallbackStrategies: profile.fallbackStrategies,
+    firstActionPlan: profile.firstActionPlan,
+    actionBundles: profile.actionBundles,
+  };
+  const preparation = runToolPreparationFromPreflight(preflight, profile, 2);
+  assert.throws(() => assertToolPreparationPublished({ generation: 2 }, preparation), /not durably published/);
+  assert.doesNotThrow(() => assertToolPreparationPublished({ generation: 2, toolPreparation: preparation }, preparation));
+  assert.throws(() => assertToolPreparationPublished({ generation: 3, toolPreparation: preparation }, preparation), /generation is stale/);
+  assert.throws(() => assertToolPreparationPublished({ generation: 2, toolPreparation: { ...preparation, hash: "f".repeat(64) } }, preparation), /does not match/);
+});
+
+test("concurrent preflight writers preserve every cache entry", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-preflight-concurrent-"));
+  try {
+    const existing = join(root, "file.exe");
+    await writeFile(existing, "placeholder", "utf8");
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), JSON.stringify({ schemaVersion: 1, tools: [
+      { id: "file", name: "file", path: existing, description: "file" },
+    ] }), "utf8");
+    const catalog = await ProofBladeToolCatalogRegistry.load(root);
+    const mcp = { catalogHash: () => "mcp-concurrent", summaries: () => [] } as never;
+    const profiles = ["web", "pwn", "crypto", "reverse"].map((id) => ({ ...challengeToolProfile(id as "web" | "pwn" | "crypto" | "reverse"), hostToolIds: ["file"], requiredToolIds: ["file"], optionalToolIds: [] }));
+    const service = new ToolPreflightService(root);
+    await Promise.all(profiles.map((profile) => service.prepare(profile, catalog, mcp)));
+    const cache = JSON.parse(await readFile(join(root, ".proofblade", "tool-health.json"), "utf8")) as { entries: Record<string, unknown> };
+    assert.equal(Object.keys(cache.entries).length, profiles.length);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

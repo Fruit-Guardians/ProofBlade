@@ -10,6 +10,7 @@ import {
   ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
+  RunCoordinator,
   ApprovalPolicy,
   ProofBladeAppServer,
   SingleAgentCtfLoop,
@@ -30,7 +31,13 @@ import {
   type RunSnapshot,
   type AgentLaneFactory,
   type TaskContract,
+  type BrowserVerifierFactory,
+  tryCreateConfiguredBrowserVerifierFactory,
+  withBrowserResourceAdapter,
+  tryCreateConfiguredSessionRuntimeBrokers,
+  withSessionResourceAdapters,
 } from "@proofblade/materials";
+import { buildRunControlView } from "./control-view.js";
 import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
 import type {
   ActiveRunInfo,
@@ -85,6 +92,8 @@ type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) =>
 
 export class DebugDataService {
   private readonly services: AppServices;
+  private readonly browserVerifierFactory?: BrowserVerifierFactory;
+  private readonly createCodingLane: CodingLaneFactory;
   public readonly appServer: ProofBladeAppServer;
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
@@ -108,11 +117,19 @@ export class DebugDataService {
     private readonly root: string,
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
-    private readonly createCodingLane: CodingLaneFactory = (options) => PiCodingLane.create(options),
+    createCodingLane?: CodingLaneFactory,
     private readonly createCtfLane?: AgentLaneFactory,
   ) {
+    this.browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(config);
+    const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(config);
+    this.createCodingLane = createCodingLane ?? ((options) => PiCodingLane.create({ ...options, ...(options.browserVerifierFactory ? {} : { browserVerifierFactory: this.browserVerifierFactory }) }));
     const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
-    this.services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
+    this.services = createServices(root, config, {
+      ...(authoritySecret ? { authoritySecret } : {}),
+      ...(sessionRuntime.brokers.length > 0 ? { sessionRuntimeBrokers: sessionRuntime.brokers } : {}),
+      ...(sessionRuntime.configured ? { sessionRuntimeRequired: !sessionRuntime.tokenAvailable } : {}),
+      ...(config.runtime.browserBroker ? { browserRuntimeRequired: true } : {}),
+    });
     this.appServer = new ProofBladeAppServer({
       control: this.services.control,
       approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
@@ -246,7 +263,7 @@ export class DebugDataService {
       this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString() } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
     if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
@@ -281,7 +298,7 @@ export class DebugDataService {
 
   public async recover(runId: string): Promise<unknown> {
     assertRunId(runId);
-    return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
+    return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
   }
 
   public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
@@ -309,7 +326,7 @@ export class DebugDataService {
     this.assertOpen();
     const info: ActiveRunInfo = { runId: task.task_id, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(task.task_id, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane);
+    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane, this.browserVerifierFactory);
     const controller = new AbortController();
     const runPromise = loop.run({
       runId: task.task_id,
@@ -370,7 +387,7 @@ export class DebugDataService {
     await this.services.fixtureControl.assertResetAllowed(input.runId);
     const generation = await this.services.sandbox.reset(fixture);
     await this.services.fixtureControl.reset(input.runId, generation);
-    await this.services.control.dispatch(input.runId, { type: "start_phase", phase: "reconnaissance" });
+    await new RunCoordinator(this.services.control, this.services.verifier).setDomainPhase(input.runId, "RECON");
     return await this.services.control.snapshot(input.runId);
   }
 
@@ -435,7 +452,7 @@ export class DebugDataService {
     try {
       if (snapshot.task.mode === "ctf_solve") {
         let ctfOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane);
+        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
         const result = await loop.run({
           runId,
           task: snapshot.task,
@@ -478,13 +495,16 @@ export class DebugDataService {
           journal: this.services.journal,
           claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
+          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
+          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
+          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
           capabilities,
           ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       } else {
         this.assertOpen();
-        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl).recover(runId);
+        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
         runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
         lane = await PiCodingLane.create({
           projectRoot: recovery.fixture.path,
@@ -496,8 +516,13 @@ export class DebugDataService {
           journal: this.services.journal,
           claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
+          browserVerifierFactory: this.browserVerifierFactory,
+          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
+          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
+          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
           deferClaimAcceptance: true,
           sessionId: `${runId}-coding`,
+          sessionHandoffs: recovery.sessionHandoffs,
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       }

@@ -11,6 +11,7 @@ import { canonicalJson, sha256 } from "../domain/utils.js";
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
+import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import {
   NoProgressToolBreaker,
   RepeatedToolFailureBreaker,
@@ -360,10 +361,12 @@ async function evaluateConcurrentEvidenceDeduplication(context: RuntimeScenarioC
 async function evaluatePauseResumeReplay(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {
   const services = createServices(context.root, context.config);
   const runId = `${context.runPrefix}-scenario-pause-replay`;
-  await services.control.createRun(runId, demoTask(runId, context.root, context.config));
-  await services.control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
+  const task = demoTask(runId, context.root, context.config);
+  await services.control.createRun(runId, task);
+  const coordinator = new RunCoordinator(services.control, services.verifier);
+  await coordinator.setDomainPhase(runId, "RECON");
   await services.control.dispatch(runId, { type: "pause", reason: "scenario pause" });
-  await services.control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
+  await coordinator.setDomainPhase(runId, "HYPOTHESIS");
   requireCondition((await services.control.snapshot(runId)).status === "PAUSED", "phase transition implicitly resumed a paused run");
   await services.control.dispatch(runId, { type: "resume" });
   const replayed = await services.control.replay(runId);

@@ -152,3 +152,81 @@ for (const faultPoint of ["after_proposed", "after_started", "after_execute", "a
     }
   });
 }
+
+test("a retry after proposal persistence resumes the same Effect without a duplicate", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-effect-retry-proposed-"));
+  try {
+    let injected = true;
+    const services = createServices(root, config, (point) => {
+      if (injected && point === "after_proposed") {
+        injected = false;
+        throw new Error("injected:retry-after-proposed");
+      }
+    });
+    const runId = "RETRY-PROPOSED";
+    const task = demoTask(runId, root, config);
+    task.constraints = { ...task.constraints, max_tool_calls: 1 };
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    const input = {
+      operation: "fixture_read",
+      args: { path: "challenge.txt", generation },
+      replayPolicy: "pure" as const,
+      command: process.platform === "win32" ? "type challenge.txt" : "cat challenge.txt",
+      cwd: fixture.path,
+    };
+
+    await assert.rejects(services.journal.execute(runId, input), /injected:retry-after-proposed/);
+    const interrupted = await services.control.snapshot(runId);
+    const interruptedEffect = Object.values(interrupted.effects)[0]!;
+    assert.equal(interruptedEffect.status, "PROPOSED");
+
+    const retried = await services.journal.execute(runId, input);
+    const recovered = await services.control.snapshot(runId);
+    assert.equal(retried.effectId, interruptedEffect.id);
+    assert.equal(Object.keys(recovered.effects).length, 1);
+    assert.equal(recovered.effects[interruptedEffect.id]?.status, "FINISHED");
+    assert.equal(Object.values(recovered.artifacts).filter((artifact) => artifact.sourceEffectId === interruptedEffect.id).length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a retry after external execution started requires reconciliation instead of guessing", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-effect-retry-started-"));
+  try {
+    let injected = true;
+    const services = createServices(root, config, (point) => {
+      if (injected && point === "after_started") {
+        injected = false;
+        throw new Error("injected:retry-after-started");
+      }
+    });
+    const runId = "RETRY-STARTED";
+    const task = demoTask(runId, root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    const input = {
+      operation: "fixture_read",
+      args: { path: "challenge.txt", generation },
+      replayPolicy: "pure" as const,
+      command: process.platform === "win32" ? "type challenge.txt" : "cat challenge.txt",
+      cwd: fixture.path,
+    };
+
+    await assert.rejects(services.journal.execute(runId, input), /injected:retry-after-started/);
+    const beforeRetry = await services.control.snapshot(runId);
+    const effectId = Object.values(beforeRetry.effects)[0]!.id;
+    assert.equal(beforeRetry.effects[effectId]?.status, "STARTED");
+    await assert.rejects(services.journal.execute(runId, input), new RegExp(`Effect ${effectId} is STARTED; reconcile it before retrying`));
+    const afterRetry = await services.control.snapshot(runId);
+    assert.equal(afterRetry.lastSeq, beforeRetry.lastSeq, "a guarded retry must not append another lifecycle event");
+    assert.equal(afterRetry.effects[effectId]?.status, "STARTED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

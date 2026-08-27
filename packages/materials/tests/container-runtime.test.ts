@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRunner, type DockerProcessResult, type SessionProcessSpawner } from "../src/container/docker.js";
 import type { ContainerRef } from "../src/container/contracts.js";
 import { parseCompetitionTargets } from "../src/competition/task.js";
+import { ExternalResourceRegistry } from "../src/recovery/external-resource-registry.js";
 
 test("competition target parser extracts URL and nc endpoints without leaking connection text into scope", () => {
   const targets = parseCompetitionTargets("nc 1.14.76.59 20996; nc -v -u 1.14.76.60 5353; nc -w 3 -u 1.14.76.61 5354; web: http://example.test:8080/path");
@@ -60,7 +61,8 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
       pullPolicy: "never",
       networkPolicy: "target-only",
     };
-    const runtime = new DockerContainerRuntime(config, runner);
+    const externalResources = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const runtime = new DockerContainerRuntime(config, runner, undefined, externalResources);
     const ref = await runtime.create({ runId: "RUN/42", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, skillLibraryHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" });
     assert.equal(ref.containerId, "solver-id");
     assert.ok(ref.gatewayContainerId);
@@ -69,6 +71,9 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     assert.ok(calls.some((args) => args[0] === "exec" && args.some((arg) => arg.includes("pb-egress-init"))));
     const gatewayInit = calls.find((args) => args[0] === "exec" && args.some((arg) => arg.includes("pb-egress-init")));
     assert.ok(gatewayInit?.includes("tcp:127.0.0.1:31337"));
+    const resourceId = "container:RUN/42:1:pwn";
+    assert.equal((await externalResources.get(resourceId))?.state, "CONFIRMED");
+    assert.equal((await externalResources.get(resourceId))?.externalId, "solver-id");
     const command = await runtime.exec(ref, "python3 -c 'print(42)'", { cwd: root, timeoutMs: 2000 });
     assert.equal(command.exitCode, 0);
     const execCall = calls.find((args) => args[0] === "exec" && args.includes("python3 -c 'print(42)'"));
@@ -77,6 +82,7 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     assert.ok(execCall.includes("PYTHONIOENCODING=utf-8"));
     await runtime.destroy(ref);
     await runtime.destroy(ref);
+    assert.equal((await externalResources.get(resourceId))?.state, "RELEASED");
     assert.ok(calls.filter((args) => args[0] === "rm").length >= 2);
   } finally {
     await rm(root, { recursive: true, force: true });

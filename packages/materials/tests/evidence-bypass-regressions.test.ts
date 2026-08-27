@@ -299,6 +299,42 @@ test("fixture-score verdict direction is immutable: rejected output cannot repro
   }
 });
 
+test("trusted verifier result retries are exact no-ops and mismatches remain rejected", async () => {
+  const harness = await createHarness("VERIFIER-RESULT-RETRY");
+  try {
+    const candidate = await proposeCandidate(harness, "C-VERIFIER-RESULT-RETRY", "PB{verifier_result_retry}");
+    const effect = await runFixtureScore(harness, candidate, 1, true);
+    const generation = (await harness.services.control.snapshot(harness.runId)).generation;
+    const evidence = scorerEvidence("EV-VERIFIER-RESULT-RETRY", candidate.completionId, effect, generation, "reproduction");
+    const batch = [
+      { type: "evidence" as const, evidence },
+      { type: "completion_verified" as const, completionId: candidate.completionId, accepted: true, evidenceIds: [evidence.id] },
+    ];
+    await harness.services.verifier.dispatchBatch(harness.runId, batch);
+    const before = await harness.services.control.snapshot(harness.runId);
+    const beforeEvents = await harness.services.control.events(harness.runId);
+
+    assert.deepEqual(await harness.services.verifier.dispatchBatch(harness.runId, batch), []);
+    const after = await harness.services.control.snapshot(harness.runId);
+    assert.equal(after.lastSeq, before.lastSeq, "an exact verifier retry must not append another event");
+    assert.deepEqual(await harness.services.control.events(harness.runId), beforeEvents);
+
+    await assert.rejects(harness.services.verifier.dispatch(harness.runId, {
+      type: "evidence",
+      evidence: { ...evidence, summary: "mismatched durable conclusion" },
+    }), /does not match durable Evidence/);
+    await assert.rejects(harness.services.verifier.dispatch(harness.runId, {
+      type: "completion_verified",
+      completionId: candidate.completionId,
+      accepted: false,
+      evidenceIds: [evidence.id],
+    }), /does not match durable Completion/);
+    assert.equal((await harness.services.control.snapshot(harness.runId)).lastSeq, before.lastSeq);
+  } finally {
+    await destroyHarness(harness);
+  }
+});
+
 test("effect_proposed rejects terminal status and every preloaded result field", async () => {
   const harness = await createHarness("EFFECT-PROPOSAL");
   try {

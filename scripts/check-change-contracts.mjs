@@ -51,7 +51,11 @@ function sourceFiles() {
 }
 
 function git(args, allowFailure = false) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  // Generated API indexes can legitimately produce a multi-megabyte unified
+  // diff. Node's small spawnSync default buffer turns that into ENOBUFS and
+  // masks the actual change-contract result, especially on Windows where Git
+  // may also emit an autocrlf warning to stderr.
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (result.status !== 0) {
     if (allowFailure) return "";
     throw new Error(`git ${args.join(" ")} failed: ${result.stderr.trim()}`);

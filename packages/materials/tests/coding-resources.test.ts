@@ -12,6 +12,7 @@ import {
   selectFirstClassMcpTools,
   interactiveTimeoutHint,
   interactiveCommandHint,
+  bashEscapeHatchViolation,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
 import { codingCtfCategoryGuidance, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
@@ -33,11 +34,11 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "dcd7a1d1475bcd610c40af98ea86fbb5d4690d0b0d219d8b058696184fca45a2";
+const CODING_TOOL_CONTRACT_HASH = "d81ced0d7129d744842ae85d80046dd76731ce729fd799d3923ef504003df7f1";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
@@ -594,6 +595,13 @@ test("CTF-shaped prompts opt into the bounded challenge path without matching or
   assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
   assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
   assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
+});
+
+test("bash remains an untrusted escape hatch and cannot write the control ledger", () => {
+  assert.match(bashEscapeHatchViolation("node -e 'controlStore.dispatchTransaction(run, { type: \\\"domain_record\\\" })'") ?? "", /cannot write ProofBlade control records/);
+  assert.match(bashEscapeHatchViolation("python -c 'open(\\\"runs/CONTROL/events.jsonl\\\", \\\"a\\\").write(\\\"fake\\\")'") ?? "", /cannot write ProofBlade control records/);
+  assert.equal(bashEscapeHatchViolation("rg -n domain_record packages/materials/src"), undefined);
+  assert.equal(bashEscapeHatchViolation("python -c 'print(2 + 2)'"), undefined);
 });
 
 test("durable CTF task classification enables challenge guards without prompt keywords", () => {

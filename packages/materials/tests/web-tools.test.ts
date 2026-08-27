@@ -7,6 +7,8 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { WebToolHandler, type WebScope } from "../src/web/web-tools.js";
+import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
+import type { ExternalResourceRecord } from "../src/recovery/external-resource-registry.js";
 
 const config = { schemaVersion: 1, runtime: { piVersion: "0.83.0" }, storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" }, modelProfiles: { executor: { thinkingLevel: "off" } } } as unknown as ProofBladeConfig;
 
@@ -72,6 +74,74 @@ test("handler opens, requests, lists and closes a session; cookies persist acros
     await handler.close(opened.sessionId);
     assert.equal(handler.list().length, 0);
     assert.equal((await services.control.replay(runId)).sessions[opened.sessionId]?.status, "CLOSED");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("handler opens an HTTP session through a durable broker binding", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-tool-broker-"));
+  try {
+    const runId = "WEB-BROKER";
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "web", target: "http://target.test/" });
+    let creates = 0;
+    const broker: SessionRuntimeCreateBroker = {
+      name: "test-http-broker",
+      kind: "http-session",
+      async create(request) {
+        creates += 1;
+        assert.equal(request.kind, "http-session");
+        assert.equal(request.http?.baseUrl, "http://target.test/");
+        return { schemaVersion: 1, operation: "create", state: "CREATED", sessionId: "HTTP-BROKER-1", externalId: "opaque-http-1", stateHash: "b".repeat(64) };
+      },
+      async createBinding(record: ExternalResourceRecord) {
+        return { kind: "http-session" as const, externalId: record.externalId!, fetchImpl: async () => new Response("broker response", { status: 200 }) };
+      },
+      async inspect(record) { return { status: "PRESENT" as const, binding: "MATCH" as const, externalId: record.externalId }; },
+      async adopt(record) { return { state: "CONFIRMED" as const, externalId: record.externalId }; },
+      async release() { return { released: true }; },
+    };
+    const handler = new WebToolHandler({ runId, controlStore: services.control, artifactStore: services.artifacts, ownerLane: "main", sessionBroker: broker });
+    const opened = await handler.open({ baseUrl: "http://target.test/" });
+    assert.equal(opened.sessionId, "HTTP-BROKER-1");
+    assert.equal(creates, 1);
+    const response = await handler.request({ sessionId: opened.sessionId, path: "/status" });
+    assert.equal(response.status, 200);
+    assert.equal(response.bodyViewport, "broker response");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("web exchanges create replayable baseline and request domain records", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-domain-records-"));
+  const { server, baseUrl } = await startTarget("flag{recorded}");
+  try {
+    const runId = "WEB-DOMAIN-RECORDS";
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "web", target: baseUrl });
+    const handler = new WebToolHandler({ runId, controlStore: services.control, artifactStore: services.artifacts, ownerLane: "main" });
+    const opened = await handler.open({ baseUrl });
+    const response = await handler.request({ sessionId: opened.sessionId, path: "/login", method: "POST" });
+    assert.equal(response.status, 200);
+    const snapshot = await services.control.replay(runId);
+    const records = Object.values(snapshot.domainRecords);
+    assert.equal(records.filter((record) => record.kind === "web_baseline").length, 1);
+    const endpoint = records.find((record) => record.kind === "web_endpoint");
+    assert.ok(endpoint);
+    assert.equal(endpoint.method, "POST");
+    assert.deepEqual(endpoint.sourceRecordIds, [records.find((record) => record.kind === "web_baseline")!.id]);
+    const request = records.find((record) => record.kind === "web_request");
+    assert.ok(request);
+    assert.deepEqual(request.artifactIds, [response.artifactId]);
+    assert.deepEqual(request.evidenceIds, [response.evidenceId]);
+    const chain = records.find((record) => record.kind === "web_exploit_chain");
+    assert.ok(chain);
+    assert.equal(chain.status, "observed");
+    assert.deepEqual(chain.stepRecordIds, [request.id]);
+    assert.equal((await services.control.replay(runId)).domainRecords[request.id]?.summary, request.summary);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(root, { recursive: true, force: true });

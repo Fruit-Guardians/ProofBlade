@@ -42,6 +42,17 @@ export interface PwnReproduceOutcome {
   flag?: string;
   stages: StageResult[];
   evidenceId: string;
+  /** Present when a trusted verifier bound the attempt to a Completion. */
+  completionId?: string;
+  candidateHash?: string;
+  /** Observed stage records, never verifier evidence or a success claim. */
+  domainRecordIds?: string[];
+}
+
+/** Internal verifier result which retains the bounded transcript for attestation. */
+export interface PwnReproduceExecution extends PwnReproduceOutcome {
+  sessionId: string;
+  transcript: string;
 }
 
 /**
@@ -58,13 +69,32 @@ export class PwnReproducer {
     runId: string,
     recipe: ExploitRecipe,
     openSession: () => Promise<PwnSession>,
+    onSessionOpened?: (session: PwnSession) => Promise<void>,
   ): Promise<PwnReproduceOutcome> {
+    const execution = await this.reproduceCaptured(runId, recipe, openSession, onSessionOpened);
+    const { sessionId: _sessionId, transcript: _transcript, ...outcome } = execution;
+    return outcome;
+  }
+
+  /**
+   * Execute a recipe and retain the bounded session transcript for the trusted
+   * verifier. The public model-facing path deliberately strips this field so a
+   * verifier receipt is not confused with ordinary tool output.
+   */
+  public async reproduceCaptured(
+    runId: string,
+    recipe: ExploitRecipe,
+    openSession: () => Promise<PwnSession>,
+    onSessionOpened?: (session: PwnSession) => Promise<void>,
+  ): Promise<PwnReproduceExecution> {
+    validateRecipe(recipe);
     const flagPattern = compileSafeFlagPattern(recipe.flagPattern);
     const stages: StageResult[] = [];
     let shellConfirmed = false;
     let flag: string | undefined;
     const session = await openSession();
     try {
+      await onSessionOpened?.(session);
       for (const stage of recipe.stages) {
         const result = await runStage(session, stage);
         stages.push(result);
@@ -86,13 +116,30 @@ export class PwnReproducer {
     }
 
     const reproduced = shellConfirmed && flag !== undefined;
-    // Deliberately not promoted into Evidence: this recipe and its success
-    // barriers remain model-driven and have no task-owned verifier Effect or
-    // immutable result Artifact. The durable Session events remain available
-    // for audit; only a platform/hidden scorer may create trusted Evidence.
     const evidenceId = id("LOCAL-PWN");
 
-    return { reproduced, shellConfirmed, ...(flag !== undefined ? { flag } : {}), stages, evidenceId };
+    return {
+      reproduced,
+      shellConfirmed,
+      ...(flag !== undefined ? { flag } : {}),
+      stages,
+      evidenceId,
+      sessionId: session.sessionId,
+      transcript: session.log.slice(-65_536),
+    };
+  }
+}
+
+function validateRecipe(recipe: ExploitRecipe): void {
+  if (!Array.isArray(recipe.stages) || recipe.stages.length < 1 || recipe.stages.length > 64) throw new Error("Pwn reproduction requires 1-64 stages");
+  if (typeof recipe.flagPath !== "string" || recipe.flagPath.length === 0 || recipe.flagPath.length > 512) throw new Error("Pwn reproduction flag path is invalid");
+  if (typeof recipe.flagPattern !== "string" || recipe.flagPattern.length === 0 || recipe.flagPattern.length > 256) throw new Error("Pwn reproduction flag pattern is invalid");
+  for (const [index, stage] of recipe.stages.entries()) {
+    if (!stage || typeof stage.name !== "string" || stage.name.trim().length === 0 || stage.name.length > 160 || /[\u0000\r\n]/.test(stage.name)) throw new Error(`Pwn reproduction stage ${index} name is invalid`);
+    if (stage.send !== undefined && (typeof stage.send !== "string" || stage.send.length > 131_072)) throw new Error(`Pwn reproduction stage ${index} payload is too large`);
+    if (stage.expect !== undefined && (typeof stage.expect !== "string" || stage.expect.length > 512 || /[\u0000\r\n]/.test(stage.expect))) throw new Error(`Pwn reproduction stage ${index} anchor is invalid`);
+    if (stage.maxReads !== undefined && (!Number.isInteger(stage.maxReads) || stage.maxReads < 1 || stage.maxReads > 64)) throw new Error(`Pwn reproduction stage ${index} read budget is invalid`);
+    if (stage.encoding !== undefined && stage.encoding !== "utf8" && stage.encoding !== "base64") throw new Error(`Pwn reproduction stage ${index} encoding is invalid`);
   }
 }
 

@@ -38,10 +38,16 @@ import {
   replayCompetitionApiScript,
   RunTelemetry,
   RunRecoveryService,
+  RunCoordinator,
   CodingClaimVerifier,
   IndependentVerifier,
   IntentScheduler,
   LeaseManager,
+  tryCreateConfiguredBrowserVerifierFactory,
+  withBrowserResourceAdapter,
+  tryCreateConfiguredSessionRuntimeBrokers,
+  preflightConfiguredRuntimes,
+  withSessionResourceAdapters,
 } from "@proofblade/materials";
 import type { CompetitionApiReplayStep } from "@proofblade/materials";
 
@@ -54,7 +60,20 @@ async function main(): Promise<void> {
   const [command = "help", arg, ...rest] = args;
   const config = await loadConfig(root, configPath);
   const authoritySecret = process.env.PROOFBLADE_CONTROL_AUTHORITY;
-  const services = createServices(root, config, authoritySecret ? { authoritySecret } : {});
+  const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(config);
+  const services = createServices(root, config, {
+    ...(authoritySecret ? { authoritySecret } : {}),
+    ...(sessionRuntime.brokers.length > 0 ? { sessionRuntimeBrokers: sessionRuntime.brokers } : {}),
+    ...(sessionRuntime.configured ? { sessionRuntimeRequired: !sessionRuntime.tokenAvailable } : {}),
+    ...(config.runtime.browserBroker ? { browserRuntimeRequired: true } : {}),
+  });
+  // Playwright is an optional verifier runtime. Missing package/binary keeps
+  // browser reproduction disabled instead of weakening the trust boundary.
+  const browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(config);
+  const recoveryAdapters = withSessionResourceAdapters(
+    withBrowserResourceAdapter(services.externalResourceAdapters, browserVerifierFactory),
+    services.sessionRuntimeBrokers ?? [],
+  );
   switch (command) {
     case "init": {
       const runId = required(arg, "task id");
@@ -71,6 +90,13 @@ async function main(): Promise<void> {
     }
     case "fixtures": {
       print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+      break;
+    }
+    case "runtime": {
+      if (arg !== "selfcheck") throw new Error("The runtime command only supports selfcheck");
+      const report = await preflightConfiguredRuntimes(config);
+      print(report);
+      if (!report.ready) process.exitCode = 2;
       break;
     }
     case "eval": {
@@ -266,7 +292,7 @@ async function main(): Promise<void> {
       const maxTurnsValue = option(rest, "--max-turns") ?? positionals[2];
       const maxTurns = maxTurnsValue === undefined ? undefined : Number(maxTurnsValue);
       if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("--max-turns must be a positive integer");
-      const loop = new SingleAgentCtfLoop(root, config, services);
+      const loop = new SingleAgentCtfLoop(root, config, services, undefined, browserVerifierFactory);
       print(await loop.run({ runId, task: fixtureTask(runId, profileId, root, config), mode: modeValue, maxTurns }));
       break;
     }
@@ -305,11 +331,12 @@ async function main(): Promise<void> {
     }
     case "reconcile": {
       const runId = required(arg, "run id");
-      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl).recover(runId);
+      const recovery = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl, undefined, services.verificationRecovery, services.verificationRecoveryAdapters, services.externalResources, recoveryAdapters).recover(runId);
       print({
         runId,
         fixtureHealth: recovery.fixtureHealth,
         fixtureAction: recovery.fixtureAction,
+        projectionRepaired: recovery.projectionRepaired,
         expiredLeases: recovery.expiredLeases.map((lease) => lease.resourceKey),
         reconciledEffects: recovery.reconciledEffects,
         reconciledJobs: recovery.reconciledJobs,
@@ -330,7 +357,7 @@ async function main(): Promise<void> {
       const runId = required(arg, "run id");
       const compactSnapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(compactSnapshot.task);
-      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, deferClaimAcceptance: true, sessionId: `${runId}-coding` });
+      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, browserVerifierFactory, ...(services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: services.sessionRuntimeBrokers } : {}), ...(services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: services.sessionRuntimeRequired }), ...(services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: services.browserRuntimeRequired }), deferClaimAcceptance: true, sessionId: `${runId}-coding` });
       try {
         await lane.compact(rest.join(" ").trim() || "Manual ProofBlade compaction");
       } finally {
@@ -347,7 +374,7 @@ async function main(): Promise<void> {
       await access(runDir);
       const skillSnapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(skillSnapshot.task);
-      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir, controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, deferClaimAcceptance: true, sessionId: `${runId}-coding` });
+      const lane = await PiCodingLane.create({ projectRoot: fixture.path, installRoot: root, runId, runDir, controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier), config, browserVerifierFactory, ...(services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: services.sessionRuntimeBrokers } : {}), ...(services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: services.sessionRuntimeRequired }), ...(services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: services.browserRuntimeRequired }), deferClaimAcceptance: true, sessionId: `${runId}-coding` });
       try {
         print(await lane.prompt(`Load and apply the ProofBlade skill \"${skillName}\". ${rest.slice(1).join(" ").trim()}`));
       } finally {
@@ -414,6 +441,8 @@ async function main(): Promise<void> {
       const candidate = required(rest[0], "candidate");
       const snapshot = await services.control.snapshot(runId);
       const fixture = await services.sandbox.build(snapshot.task);
+      const verifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
+      const coordinator = new RunCoordinator(services.control, services.verifier, { verifier });
       const normalized = candidate.trim();
       const candidateArtifact = await services.artifacts.putText(runId, normalized, {
         filename: "cli-fixture-score-candidate.txt",
@@ -430,9 +459,18 @@ async function main(): Promise<void> {
         },
         lane: "executor",
       });
-      const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
-        .verify(runId, fixture, completionId);
-      print({ completionId, accepted: verified.accepted, candidateHash: verified.candidateHash, evidenceIds: verified.evidenceIds });
+      const workItem = await coordinator.claim(runId, snapshot.task, 0);
+      try {
+        const verified = await coordinator.verifyCompletion(runId, fixture, completionId);
+        // `fixture-score` is a verifier-backed diagnostic, not the terminal
+        // solve command. Still settle its WorkItem through the shared durable
+        // scheduler so a later finish/replay can account for this evidence.
+        await coordinator.settle(runId, workItem.id, true, verified.evidenceIds, [candidateArtifact.id]);
+        print({ completionId, accepted: verified.accepted, candidateHash: verified.candidateHash, evidenceIds: verified.evidenceIds, workItemId: workItem.id });
+      } catch (error) {
+        await coordinator.fail(runId, workItem.id, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
       break;
     }
     case "agent": {

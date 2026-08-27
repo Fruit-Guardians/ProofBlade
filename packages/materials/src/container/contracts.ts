@@ -90,6 +90,8 @@ export type { SessionWaitReason };
 export interface ContainerSessionHandle {
   /** Runtime-facing id for this live process, minted by the runtime. */
   readonly sessionId: string;
+  /** Optional opaque id owned by a durable external session broker. */
+  readonly externalId?: string;
   readonly ref: ContainerRef;
 }
 

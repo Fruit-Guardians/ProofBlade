@@ -3,7 +3,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { CompletionProposal, JobRecord, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
+import type { CompletionProposal, DomainRecordInput, JobRecord, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver, type ObservationOutcome } from "../knowledge/observer.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
@@ -13,6 +13,7 @@ import { listBundledCapabilities } from "../capabilities/catalog.js";
 import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, FirmwareCapabilityBackend, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
+import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
 
 export interface InspectTargetResult {
   output: string;
@@ -88,12 +89,57 @@ export class ProofBladeToolRuntime {
       generation: snapshot.generation,
       result: stored,
     });
+    const domainRecordIds = await this.recordBinaryProfile(input, result, stored, observed.evidenceId);
     return {
       ...result,
       observationId: observed.observationId,
       evidenceId: observed.evidenceId,
+      ...(domainRecordIds.length > 0 ? { domainRecordIds } : {}),
       progressKey: progressKey(`capability:${input.capabilityId}.${input.operation}`, artifact.sha256),
     };
+  }
+
+  /**
+   * Binary identify/inspect output is the one trustworthy, structured source
+   * for a native target profile.  Persist only bounded metadata; the raw
+   * output remains in the Effect Artifact and the profile references it.
+   */
+  private async recordBinaryProfile(
+    input: { capabilityId: string; operation: string; input: Record<string, unknown> },
+    result: CapabilityInvocationResult,
+    stored: RawEffectResult,
+    evidenceId: string,
+  ): Promise<string[]> {
+    if (input.capabilityId !== "proofblade.binary" || !["identify", "inspect_elf"].includes(input.operation)) return [];
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) return [];
+    const parsed = parseJsonRecord(stored.stdout);
+    const identity = input.operation === "inspect_elf" && isRecord(parsed.identity) ? parsed.identity : parsed;
+    const bits = numberField(identity.bits);
+    const architecture = stringField(identity.architecture) ?? "unknown";
+    const format = stringField(identity.format) ?? "unknown";
+    if (bits !== 32 && bits !== 64) return [];
+    const checksec = input.operation === "inspect_elf" && isRecord(parsed.checksec) ? parsed.checksec : undefined;
+    const protections = checksecProtections(checksec);
+    const path = typeof input.input.path === "string" ? input.input.path : "target";
+    const recordId = `PWN-BINARY-${snapshot.generation}-${sha256(`${path}:${input.operation}`).slice(0, 32)}`;
+    const record: Extract<DomainRecordInput, { kind: "pwn_binary_profile" }> = {
+      id: recordId,
+      kind: "pwn_binary_profile",
+      summary: `${format} ${architecture} ${bits}-bit binary profile; protections=${protections.join(",") || "unknown"}.`,
+      artifactIds: [result.artifactId],
+      evidenceIds: [evidenceId],
+      effectId: result.effectId,
+      format,
+      architecture,
+      bits,
+      protections,
+    };
+    await this.controlStore.dispatchTransaction(this.runId, (current) => {
+      if (current.domainRecords[recordId]) return { commands: [], project: () => undefined };
+      return { commands: [{ type: "domain_record" as const, record, lane: "executor" as const }], project: () => undefined };
+    });
+    return [recordId];
   }
 
   /**
@@ -273,9 +319,12 @@ export class ProofBladeToolRuntime {
       sensitivity: "flag_candidate",
     });
     const completionId = id("C");
+    const verificationRequest = platformJudged
+      ? await beginSubmissionVerificationRequest(this.controlStore, this.runId, { candidateHash, candidateArtifactId: artifact.id })
+      : undefined;
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id },
+      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id, ...(verificationRequest ? { verificationKey: verificationRequest.request.key } : {}) },
       lane: "executor",
     });
     return { completionId, candidateHash };
@@ -366,6 +415,39 @@ const MAX_AUTOMATIC_OBSERVATION_CHARS = 64_000;
 
 function progressKey(operation: string, contentKey: string): string {
   return sha256(canonicalJson({ operation, contentKey }));
+}
+
+function parseJsonRecord(value: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringField(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().replace(/[\u0000\r\n]/g, " ");
+  return trimmed.length > 0 ? trimmed.slice(0, 128) : undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
+function checksecProtections(value: Record<string, unknown> | undefined): string[] {
+  if (!value) return [];
+  return ["pie", "nx", "relro", "canary"].flatMap((key) => {
+    const state = value[key];
+    if (state === true) return [key.toUpperCase()];
+    if (state === false) return [`${key.toUpperCase()}=disabled`];
+    return state === null ? [`${key.toUpperCase()}=unknown`] : [];
+  });
 }
 
 /**

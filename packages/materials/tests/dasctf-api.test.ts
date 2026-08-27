@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { DasctfCompetitionApi } from "../src/competition/dasctf-api.js";
 import { CompetitionChallengeError } from "../src/competition/api.js";
@@ -49,6 +50,15 @@ function makeFetch(routes: Record<string, (url: string, init?: RequestInit) => {
 
 const ok = (data: unknown) => ({ body: { code: "00000", message: "", data } });
 
+test("serverHost rejects URL userinfo so credentials cannot enter requests or self-check output", () => {
+  assert.throws(() => new DasctfCompetitionApi({ serverHost: "https://user:pass@gcsis.dasctf.com", accessKey: KEY, fetch: (async () => { throw new Error("must not fetch"); }) as typeof globalThis.fetch }), /must not contain URL credentials/);
+});
+
+test("DASCTF declares challenge-only environment identity and stays fail-closed across restarts", () => {
+  const { client } = api({});
+  assert.deepEqual(client.environmentIdentity, { strategy: "challenge-only", stableAcrossRestart: false });
+});
+
 function api(routes: Parameters<typeof makeFetch>[0], overrides: Record<string, unknown> = {}) {
   const { fetchImpl, calls, peak } = makeFetch(routes);
   const client = new DasctfCompetitionApi({ serverHost: HOST, accessKey: KEY, fetch: fetchImpl, sleep: async () => {}, envPollIntervalMs: 100, minRequestIntervalMs: 0, ...overrides });
@@ -78,6 +88,28 @@ test("the X-Agent-AccessKey header is sent and success requires code 00000", asy
 test("a non-00000 envelope on a normal call throws (business/transport failure)", async () => {
   const { client } = api({ "GET /ctf/exercise-list": () => ({ body: { code: "A0401", message: "unauthorized", data: null } }) });
   await assert.rejects(() => client.listChallenges(), /code A0401/);
+});
+
+test("DASCTF response envelopes cancel a streaming response at the configured byte bound", async () => {
+  let cancelled = false;
+  const client = new DasctfCompetitionApi({
+    serverHost: HOST,
+    accessKey: KEY,
+    maxResponseBytes: 1_024,
+    minRequestIntervalMs: 0,
+    fetch: (async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      body: new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new Uint8Array(2_048)); },
+        cancel() { cancelled = true; },
+      }),
+      text: async () => { throw new Error("text() must not be used for a streaming response"); },
+    } as unknown as Response)) as typeof globalThis.fetch,
+  });
+  await assert.rejects(() => client.listChallenges(), /response exceeds 1024 bytes/);
+  assert.equal(cancelled, true);
 });
 
 test("getChallenge downloads attachment URLs and encodes them as base64", async () => {
@@ -292,6 +324,41 @@ test("startEnvironment is a no-op for a static (isNeedInit:false) challenge", as
   const env = await client.startEnvironment("1001");
   assert.equal(env.connectionInfo, undefined);
   assert.equal(calls.filter((c) => c.url.includes("build-exercise-env")).length, 0);
+});
+
+test("inspectEnvironment exposes only a bounded remote observation", async () => {
+  let detail: Record<string, unknown> = { id: 1001, isNeedInit: true, isNeedCheck: false, endpoints: [{ exposeIps: ["10.0.0.10"], ports: ["80"], isProxy: false }] };
+  const { client } = api({ "GET /ctf/exercise": () => ok(detail) });
+  const active = await client.inspectEnvironment!("1001");
+  assert.deepEqual(active.status, "ACTIVE");
+  assert.equal(active.challengeId, "1001");
+  assert.match(active.summary ?? "", /active environment/);
+
+  const keyed = await client.inspectEnvironment!("1001", undefined, { idempotencyKey: "proofblade-env-key" });
+  assert.equal(keyed.status, "UNKNOWN", "DASCTF must not claim ownership without echoing the stable key");
+  assert.match(keyed.summary ?? "", /stable idempotency key/);
+
+  detail = { id: 1001, isNeedInit: true, isNeedCheck: true };
+  const building = await client.inspectEnvironment!("1001");
+  assert.equal(building.status, "UNKNOWN");
+
+  detail = { id: 1001, isNeedInit: false, isNeedCheck: false };
+  const absent = await client.inspectEnvironment!("1001");
+  assert.equal(absent.status, "ABSENT");
+});
+
+test("DASCTF inspection wire fixture preserves ACTIVE/UNKNOWN/ABSENT semantics", async () => {
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/competition/dasctf-environment-wire.json", import.meta.url), "utf8")) as {
+    cases: Array<{ id: string; response: unknown; expected: { status: string; challengeId: string; connectionInfo?: string; identity?: string } }>;
+  };
+  for (const item of fixture.cases) {
+    const { client } = api({ "GET /ctf/exercise": () => ({ body: item.response }) });
+    const observed = await client.inspectEnvironment("1001");
+    assert.equal(observed.status, item.expected.status, item.id);
+    assert.equal(observed.challengeId, item.expected.challengeId, item.id);
+    if (item.expected.connectionInfo !== undefined) assert.equal(observed.connectionInfo, item.expected.connectionInfo, item.id);
+    if (item.expected.identity === "challenge-only") assert.equal(client.environmentIdentity?.strategy, "challenge-only", item.id);
+  }
 });
 
 test("proxy endpoints use portMappings + proxyIps for the connection string", async () => {
