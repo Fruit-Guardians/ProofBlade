@@ -45,6 +45,14 @@ export async function updateConversationPreferences(runId: string, input: Partia
   return await request(`/api/conversations/${encodeURIComponent(runId)}/preferences`, { method: "PUT", body: JSON.stringify(input) });
 }
 
+export async function renameConversation(runId: string, title: string): Promise<ConversationPreferences> {
+  return await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "PUT", body: JSON.stringify({ title }) });
+}
+
+export async function deleteConversation(runId: string): Promise<void> {
+  await request(`/api/conversations/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
 export async function createFolder(name: string): Promise<ConversationFolder> {
   return await request("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
 }
@@ -82,7 +90,7 @@ export async function startCtfSolve(input: {
   return await request("/api/ctf-solve", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string }): Promise<{ runId: string }> {
+export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string; verificationCommand?: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }
 

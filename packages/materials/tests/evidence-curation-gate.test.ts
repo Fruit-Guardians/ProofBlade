@@ -49,7 +49,7 @@ test("evidence curation gate keeps agent annotations pending and clears only tru
     // Advisory now: returns the nudge string instead of throwing, so a required
     // backlog no longer hard-stops the next read/bash.
     const requiredNotice = await gate.assertInvestigationAllowed();
-    assert.match(requiredNotice ?? "", /Further read\/bash calls are paused/);
+    assert.match(requiredNotice ?? "", /集中用一次 evidence record/);
 
     for (const artifactId of ids) {
       await graph.annotateArtifact({

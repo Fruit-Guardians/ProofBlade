@@ -39,10 +39,15 @@ export class EvidenceCurationGate {
     const [snapshot, events] = await Promise.all([this.controlStore.snapshot(this.runId), this.controlStore.events(this.runId)]);
     const currentEvidence = Object.values(snapshot.evidence).filter((evidence) => evidence.provenance?.runId === snapshot.runId && evidence.provenance.generation === snapshot.generation);
     const currentArtifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation);
-    const promoted = new Set(currentEvidence.flatMap((evidence) => [
+    // Automatic bash/read observations are retrieval indexes, not curation.
+    // Only an explicit evidence record or verifier-owned Evidence promotes its
+    // source artifacts; otherwise a noisy run clears its own backlog.
+    const promoted = new Set(currentEvidence
+      .filter((evidence) => evidence.provenance?.recordedBy === "verifier" || evidence.source.tool === "evidence")
+      .flatMap((evidence) => [
       ...(evidence.source.artifactIds ?? []),
       ...(evidence.source.artifactId ? [evidence.source.artifactId] : []),
-    ]));
+      ]));
     const promotedHashes = new Set([...promoted].flatMap((artifactId) => snapshot.artifacts[artifactId]?.sha256 ? [snapshot.artifacts[artifactId]!.sha256] : []));
     // Registration metadata is not a review. Only an explicit trusted
     // artifact_annotated event from the harness/user can move bytes to reviewed.
@@ -111,7 +116,7 @@ export class EvidenceCurationGate {
       `[ProofBlade evidence curation ${required ? "required" : "checkpoint"}: ${status.pendingCount} unreviewed investigation artifacts]`,
       `Curate: ${artifacts || "use evidence search"}. Viewed=${status.viewedCount}; reviewed=${status.reviewedCount}; promoted=${status.promotedCount}; unviewed=${status.unviewedCount}.`,
       "Use evidence record to promote findings that advance or refute a hypothesis. Agent annotation marks an artifact viewed but does not clear this gate; routine/noise output requires trusted user/harness review.",
-      required ? "Further read/bash calls are paused until at least one pending artifact is curated." : "Curate these artifacts before the exploration backlog reaches the hard limit.",
+      required ? "当前探索仍可继续；在出现新思路前，集中用一次 evidence record 整理最有价值的几个 Artifact。" : "有空时集中整理这些 Artifact；不要为了文书工作打断当前有效路径。",
     ].join("\n");
   }
 }

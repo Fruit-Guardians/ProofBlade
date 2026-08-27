@@ -152,6 +152,22 @@ test("context maintenance coordinator repairs every view and defers compaction",
   assert.equal(prepared.messages.some((message) => message.role === "toolResult"), true);
 });
 
+test("context maintenance compacts proactively below the provider hard limit", () => {
+  const messages = Array.from({ length: 10 }, (_, index) => [
+    { role: "assistant", content: [{ type: "toolCall", id: `call-${index}`, name: "bash", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: index * 2 },
+    { role: "toolResult", toolCallId: `call-${index}`, toolName: "bash", content: [{ type: "text", text: `turn-${index} ${"x".repeat(1_200)}` }], isError: false, timestamp: index * 2 + 1 },
+  ]).flat();
+  const prepared = prepareContextMaintenance({
+    messages: messages as never[],
+    availableTokens: 10_000,
+    maintenanceLimitTokens: 3_000,
+    messageBudget: 2_000,
+  });
+  assert.equal(prepared.plan.shouldSnip, true);
+  assert.equal(prepared.nextAction, "compact");
+  assert.ok(prepared.dropped.length > 0);
+});
+
 test("context maintenance snips before pruning and remeasures before compaction", () => {
   const messages = [
     { role: "assistant", content: [{ type: "toolCall", id: "call-old", name: "inspect_target", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 1 },

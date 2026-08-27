@@ -34,7 +34,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "d81ced0d7129d744842ae85d80046dd76731ce729fd799d3923ef504003df7f1";
+const CODING_TOOL_CONTRACT_HASH = "3096bff39cf42133b8b36ed0562b2aef251a4d81c1978e2ca07e560baf1cc533";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -172,6 +172,7 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
   const services = createServices(dir, config);
   const runId = "CODING-CLAIM-TEST";
   const claimTask = demoTask(runId, dir, config);
+  claimTask.mode = "coding_assistant";
   claimTask.scope.allowed_workspace = dir;
   claimTask.verification.required_reproductions = 1;
   claimTask.verification.command = "node solve.mjs";
@@ -226,6 +227,10 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       () => executeTool("verify_claim", { candidate, command: `echo ${candidate}` }, context),
       /embeds the candidate literal/,
     );
+    await assert.rejects(
+      () => executeTool("verify_claim", { candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context),
+      /exact immutable task-bound verification command/,
+    );
     const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const details = result.details as Record<string, unknown>;
     assert.equal(details.verified, true);
@@ -246,6 +251,12 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       deferClaimAcceptance: true,
     });
     assert.equal(deferred.terminate, true, "deferred claim acceptance must return control to the outer verifier");
+    const continuous = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+      ...context,
+      deferClaimAcceptance: true,
+      continuousRecovery: true,
+    });
+    assert.equal(continuous.terminate, undefined, "continuous recovery keeps claim verification in the same lane");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });

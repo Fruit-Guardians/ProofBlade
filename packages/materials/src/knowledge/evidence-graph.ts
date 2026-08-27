@@ -58,6 +58,14 @@ export interface UpdateReasoningTreeInput extends Partial<Omit<CreateReasoningTr
   nodeIds?: string[];
 }
 
+export interface LinkReasoningNodesInput {
+  from: string;
+  to: string;
+  relation: ReasoningEdgeRelation;
+  explanation?: string;
+  confidence?: number;
+}
+
 /** Cap on artifact text pulled into a content search, per artifact. */
 const MAX_SEARCHED_ARTIFACT_BYTES = 512_000;
 
@@ -306,13 +314,7 @@ export class CodingEvidenceGraph {
     });
   }
 
-  public async linkNodes(input: {
-    from: string;
-    to: string;
-    relation: ReasoningEdgeRelation;
-    explanation?: string;
-    confidence?: number;
-  }): Promise<{ edge: ReasoningEdge }> {
+  public async linkNodes(input: LinkReasoningNodesInput): Promise<{ edge: ReasoningEdge }> {
     await this.ensureDomainNode(input.from);
     await this.ensureDomainNode(input.to);
     const snapshot = await this.controlStore.snapshot(this.runId);
@@ -328,6 +330,38 @@ export class CodingEvidenceGraph {
     await this.controlStore.dispatch(this.runId, { type: "reasoning_edge", edge, lane: "main" });
     const updated = await this.controlStore.snapshot(this.runId);
     return { edge: updated.reasoningEdges[edge.id]! };
+  }
+
+  /** Commit a graph expansion in one ControlStore transaction. */
+  public async linkNodesBatch(inputs: LinkReasoningNodesInput[]): Promise<{ edges: ReasoningEdge[] }> {
+    const requested = inputs.filter((input) => input.from !== input.to);
+    for (const input of requested) {
+      await this.ensureDomainNode(input.from);
+      await this.ensureDomainNode(input.to);
+    }
+    return await this.controlStore.dispatchTransaction(this.runId, (snapshot) => {
+      const existing = new Set(Object.values(snapshot.reasoningEdges).map((edge) => `${edge.from}\u0000${edge.to}\u0000${edge.relation}`));
+      const edges: Array<Omit<ReasoningEdge, "createdSeq">> = [];
+      for (const input of requested) {
+        const key = `${input.from}\u0000${input.to}\u0000${input.relation}`;
+        if (existing.has(key)) continue;
+        const edge: Omit<ReasoningEdge, "createdSeq"> = {
+          id: id("RE"),
+          from: input.from,
+          to: input.to,
+          relation: input.relation,
+          explanation: optionalText(input.explanation, "Reasoning edge explanation", 1_000) ?? "",
+          confidence: input.confidence ?? 0.8,
+          generation: snapshot.generation,
+        };
+        edges.push(edge);
+        existing.add(key);
+      }
+      return {
+        commands: edges.map((edge) => ({ type: "reasoning_edge" as const, edge, lane: "main" as const })),
+        project: (after) => ({ edges: edges.map((edge) => after.reasoningEdges[edge.id]!).filter(Boolean) }),
+      };
+    });
   }
 
   public async createTree(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree }> {

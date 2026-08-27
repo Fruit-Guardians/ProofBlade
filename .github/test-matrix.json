@@ -193,7 +193,7 @@
     },
     {
       "id": "gui-server-control",
-      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts", "apps/gui/src/App.tsx", "apps/gui/src/shared.ts", "apps/gui/src/control-view.ts"],
+      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts", "apps/gui/src/App.tsx", "apps/gui/src/shared.ts", "apps/gui/src/control-view.ts", "apps/gui/src/workspace-settings.ts"],
       "testGlobs": [
         "packages/materials/tests/app-server.test.ts",
         "apps/gui/tests/competition-settings.test.ts",

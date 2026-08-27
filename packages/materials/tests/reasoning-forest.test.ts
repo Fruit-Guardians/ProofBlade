@@ -95,7 +95,7 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
   }
 });
 
-test("forest context is hidden dynamic memory immediately before the latest user message", () => {
+test("forest context is hidden dynamic memory appended after the transcript", () => {
   const messages = [
     { role: "user", content: "old", timestamp: 1 },
     { role: "assistant", content: [{ type: "text", text: "answer" }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "stop", timestamp: 2 },
@@ -104,9 +104,15 @@ test("forest context is hidden dynamic memory immediately before the latest user
   const injected = injectReasoningForestContext(messages, "<reasoning-forest>summary</reasoning-forest>");
   assert.equal(messages.length, 3);
   assert.equal(injected.length, 4);
-  assert.equal(injected[2]!.role, "custom");
-  assert.equal(injected[3]!.role, "user");
-  assert.equal((injected[2] as { display: boolean }).display, false);
+  assert.equal(injected[2]!.role, "user");
+  assert.equal(injected[3]!.role, "custom");
+  assert.equal((injected[3] as { display: boolean }).display, false);
+  assert.equal((injected[3] as { customType: string }).customType, "proofblade_reasoning_forest");
+  assert.equal(injected[2], messages[2]);
+
+  const refreshed = injectReasoningForestContext(messages, "<reasoning-forest>new summary</reasoning-forest>");
+  assert.deepEqual(refreshed.slice(0, messages.length), messages);
+  assert.notEqual((injected[3] as { content: string }).content, (refreshed[3] as { content: string }).content);
 });
 
 function zeroUsage() {

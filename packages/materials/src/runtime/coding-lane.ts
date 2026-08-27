@@ -12,7 +12,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
-import { isRealUserTask, latestExternalUserMessage } from "../context/user-task-anchor.js";
+import { latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
@@ -155,6 +155,8 @@ export class PiCodingLane implements AgentLanePort {
     approvalPolicy?: ApprovalPolicy;
     /** Keep hidden-scorer completions proposed until the outer CTF verifier runs. */
     deferClaimAcceptance?: boolean;
+    /** Percentage of the available input budget used as the proactive compaction soft limit. */
+    contextCompactionThreshold?: number;
     /** Optional session id override for non-chat CTF runs. */
     sessionId?: string;
     /** Called when the submission path pauses on a pending approval. */
@@ -452,6 +454,7 @@ export class PiCodingLane implements AgentLanePort {
       enabledMcpServers,
       claimVerifier,
       ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
+      continuousRecovery: true,
       evidenceGraph,
       evidenceCurationGate,
       runtime,
@@ -488,6 +491,9 @@ export class PiCodingLane implements AgentLanePort {
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
+        ...(snapshot.task.verification.kind === "reproduction" && snapshot.task.verification.command
+          ? { verificationCommand: snapshot.task.verification.command }
+          : {}),
         targetKind: effectiveTargetKind,
         target: snapshot.task.target,
         challengeProfile,
@@ -516,6 +522,9 @@ export class PiCodingLane implements AgentLanePort {
       }
       : undefined;
     const termination: CodingTurnTermination = {};
+    // All lanes remain live: guard pressure becomes a recovery hint and the
+    // existing maintenance hook performs compaction/checkpoint work in-band.
+    termination.continuousRecovery = true;
     const harness = new AgentHarness<CodingResourceContext>({
       session,
       models,
@@ -534,9 +543,21 @@ export class PiCodingLane implements AgentLanePort {
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
     const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
-    const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.5));
+    const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.35));
+    const threshold = Math.min(80, Math.max(20, Math.round(options.contextCompactionThreshold ?? 40))) / 100;
+    // planContextMaintenance enters compact at 80% of its supplied budget.
+    // Scale the internal budget so the user's selected percentage is the
+    // actual compact trigger relative to the provider input budget.
+    const proactiveMaintenanceLimit = Math.min(contextBudget, Math.max(8_192, Math.floor(contextBudget * threshold / 0.8)));
+    let currentContextTokens = 0;
     harness.on("context", async ({ messages }) => {
-      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext.value), availableTokens: contextBudget, messageBudget: targetMessageBudget });
+      const prepared = prepareContextMaintenance({
+        messages: injectReasoningForestContext(messages, forestContext.value),
+        availableTokens: contextBudget,
+        maintenanceLimitTokens: proactiveMaintenanceLimit,
+        messageBudget: targetMessageBudget,
+      });
+      currentContextTokens = prepared.estimatedTokens;
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
         // so persist the bounded ledger checkpoint directly before Pi compacts.
@@ -563,6 +584,7 @@ export class PiCodingLane implements AgentLanePort {
         toolCatalogHash: sha256(canonicalJson(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
         toolNames: activeToolNames,
       },
+      estimateContextTokens: async () => currentContextTokens,
       scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
@@ -824,11 +846,10 @@ async function submissionCounters(
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {
   if (!forestContext) return messages;
   const output = [...messages];
-  let latestUserIndex = -1;
-  for (let index = output.length - 1; index >= 0; index -= 1) {
-    if (isRealUserTask(output[index])) { latestUserIndex = index; break; }
-  }
-  const insertionIndex = latestUserIndex >= 0 ? latestUserIndex : output.length;
+  // Keep changing context after the append-only transcript. This preserves the
+  // existing transcript prefix for provider prompt/KV-cache reuse while leaving
+  // tool-call/result pairs and the external user task untouched.
+  const insertionIndex = output.length;
   output.splice(insertionIndex, 0, createCustomMessage(
     "proofblade_reasoning_forest",
     forestContext,
@@ -891,7 +912,7 @@ function codingSystemPrompt(
   skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; verificationCommand?: string; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -931,10 +952,13 @@ function codingSystemPrompt(
   const submissionBlock = options.platformJudged
     ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
     : "";
+  const verificationBlock = options.verificationCommand
+    ? `\n\n## Task-bound candidate verification\nThis run has one immutable verifier command. When reporting a deterministic candidate, call \`verify_claim\` with the exact command below; do not substitute a model-invented command:\n\n\`${options.verificationCommand}\``
+    : "\n\n## Candidate verification\nThis run has no immutable verifier command. You may continue investigating and record observations, but any candidate conclusion remains unverified until the task is created with a verifier policy.";
   const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
   const profileBlock = options.challengeProfile ? preparedChallengeProfileBlock(options.challengeProfile, options.preflight) : "";
   const webAwareCategoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${verificationBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {

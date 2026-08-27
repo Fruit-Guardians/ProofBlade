@@ -116,7 +116,7 @@ npm run gui -- --port 4173
 npm run gui -- --config proofblade.config.json --port 4173
 ```
 
-打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”可输入或浏览选择绝对工作目录，创建不绑定 Fixture 的普通 Coding Agent 会话；每轮都以该目录启动 Coding Lane，并按需使用 `read`、`bash`、`edit` 和 `write`。“Fixture 测试”是独立入口，可选择交互调试或自动执行；只有该路径会加载靶场、证据验证和恢复流程。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
+打开 `http://127.0.0.1:4173` 后默认进入 Agent 对话。“新建对话”可输入或浏览选择绝对工作目录，并可选填任务验证命令；填写后该命令会写入不可变 `TaskContract`，与 CTF/Fixture 使用同一 `CodingClaimVerifier`、verifier journal、Completion 和 Evidence 投影链。未填写时仍可继续普通探索，但候选只会显示为未验证，不能产生可信 Completion。“Fixture 测试”使用相同 Coding Lane 和验证链，自动模式只是在外层增加多轮 Coordinator 编排；不再存在普通 Chat 与 CTF 的第二套执行或完成判定系统。模型文本、思考与 Tool start/end 会边生成边显示，结束后由持久化 Pi Session 接管。
 
 右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表、默认思考等级和并发请求上限（1-32，默认 1）；模型发现和真实对话共用该代理。相同 Provider/模型的对话共用 FIFO 并发槽，排队请求可暂停取消且不会先占用成本预算。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
 
@@ -155,7 +155,7 @@ RTK 只包装普通 Coding Agent 的 `bash`；`read/edit/write` 和 Solver 的 E
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
 - 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
-- 普通 Coding Agent 与 Fixture 测试分离；两者都可查看产物，Fixture 模式额外提供恢复核对、机械 Checkpoint 和验证账本；
+- Chat、CTF 和 Fixture 共用 Coding Lane、上下文维护、Tool 调用、Evidence、Completion 和恢复路径；Fixture 仅额外提供恢复核对、机械 Checkpoint 和验证账本视图；
 - 多中转站 Profile、会话级模型切换、对话文件夹，以及 Tool/Skill/MCP 能力开关；
 - Provider Token、可见上下文和缓存字段的独立统计。
 

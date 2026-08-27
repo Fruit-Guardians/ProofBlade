@@ -6,6 +6,7 @@ import type { EffectJournal, VerifierEffectJournal, VerifierReplayHandle, Verifi
 import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { beginVerificationRequest, readDurableVerificationResult } from "./verification-key.js";
 import { parseVerifierOutcomeEnvelope, serializeVerifierOutcomeEnvelope, type VerifierOutcomeEnvelope } from "./outcome-envelope.js";
+import { type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
 
 export interface ClaimReproduction {
   verified: boolean;
@@ -33,6 +34,13 @@ export interface ClaimVerificationProjection {
   outcomeArtifactId?: string;
   toolCallId?: string;
   reason?: string;
+}
+
+/** Keep candidate-shaped output visibly non-authoritative until projection verifies it. */
+export function rewriteUnverifiedClaimText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
+  const rewritten = assistantText.replace(/\bflag\s*[:：]/gi, "候选（未验证）：");
+  if (rewritten.startsWith("[ProofBlade] 本轮候选未验证：")) return rewritten;
+  return [`[ProofBlade] 本轮候选未验证：${reason}`, rewritten].filter((value) => value.length > 0).join("\n");
 }
 
 interface ClaimReceipt {
@@ -235,9 +243,14 @@ export class CodingClaimVerifier {
     const candidateHash = sha256(candidate);
     const commandHash = sha256(command);
     const supportingEvidenceIds = [...new Set(input.supportingEvidenceIds ?? [])];
-    const verifierDefinedCommand = snapshot.task.verification.kind === "reproduction"
+    const taskBoundCommand = snapshot.task.verification.kind === "reproduction"
       && typeof snapshot.task.verification.command === "string"
-      && snapshot.task.verification.command.trim() === command;
+      ? snapshot.task.verification.command.trim()
+      : undefined;
+    const verifierDefinedCommand = taskBoundCommand === command;
+    if (taskBoundCommand && !verifierDefinedCommand) {
+      throw new Error("verify_claim must use the exact immutable task-bound verification command");
+    }
     const missingEvidence = supportingEvidenceIds.filter((evidenceId) => !snapshot.evidence[evidenceId]);
     if (missingEvidence.length > 0) throw new Error(`Unknown supporting evidence ids: ${missingEvidence.join(", ")}`);
     for (const evidenceId of supportingEvidenceIds) {
@@ -477,22 +490,29 @@ export class CodingClaimVerifier {
     else await this.controlStore.dispatch(this.runId, { ...factCommand, lane: "executor" });
 
     const graph = new CodingEvidenceGraph(this.runId, this.controlStore, this.artifactStore);
-    await graph.linkNodes({ from: candidateArtifact.id, to: completionId, relation: "derived_from", explanation: "The exact candidate Artifact is hash-bound to this Completion.", confidence: 1 });
+    const graphLinks: LinkReasoningNodesInput[] = [{ from: candidateArtifact.id, to: completionId, relation: "derived_from", explanation: "The exact candidate Artifact is hash-bound to this Completion.", confidence: 1 }];
     for (const attempt of attempts) {
-      await graph.linkNodes({ from: attempt.execution.artifactId, to: attempt.evidenceId, relation: "derived_from", explanation: "Journaled execution Artifact generated verifier Evidence.", confidence: 1 });
-      await graph.linkNodes({ from: attempt.receiptArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "Immutable verifier receipt anchors the reproduction provenance.", confidence: 1 });
-      await graph.linkNodes({ from: outcomeArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "The bounded outcome envelope indexes the final claim attestation.", confidence: 1 });
-      for (const supportingEvidenceId of supportingEvidenceIds) await graph.linkNodes({ from: supportingEvidenceId, to: attempt.evidenceId, relation: "depends_on", explanation: "Final reproduction uses this upstream Evidence.", confidence: 1 });
-      await graph.linkNodes({ from: attempt.evidenceId, to: factId, relation: "supports", explanation: "Reproduction Evidence confirms the hash-bound claim.", confidence: 1 });
-      await graph.linkNodes({ from: attempt.evidenceId, to: completionId, relation: "reproduces", explanation: "Reproduction Evidence verifies this exact Completion.", confidence: 1 });
+      graphLinks.push(
+        { from: attempt.execution.artifactId, to: attempt.evidenceId, relation: "derived_from", explanation: "Journaled execution Artifact generated verifier Evidence.", confidence: 1 },
+        { from: attempt.receiptArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "Immutable verifier receipt anchors the reproduction provenance.", confidence: 1 },
+        { from: outcomeArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "The bounded outcome envelope indexes the final claim attestation.", confidence: 1 },
+        ...supportingEvidenceIds.map((supportingEvidenceId) => ({ from: supportingEvidenceId, to: attempt.evidenceId, relation: "depends_on" as const, explanation: "Final reproduction uses this upstream Evidence.", confidence: 1 })),
+        { from: attempt.evidenceId, to: factId, relation: "supports", explanation: "Reproduction Evidence confirms the hash-bound claim.", confidence: 1 },
+        { from: attempt.evidenceId, to: completionId, relation: "reproduces", explanation: "Reproduction Evidence verifies this exact Completion.", confidence: 1 },
+      );
     }
+    await graph.linkNodesBatch(graphLinks);
     const graphSnapshot = await this.controlStore.snapshot(this.runId);
     const relatedTreeIds = Object.values(graphSnapshot.reasoningTrees).filter((tree) => supportingEvidenceIds.some((value) => tree.nodeIds.includes(value))).map((tree) => tree.id);
     await graph.createTree({
-      name: "最终候选复现",
-      summary: `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`,
+      name: locallyJudged ? "最终候选复现" : "候选观察链",
+      summary: locallyJudged
+        ? `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`
+        : `候选 ${candidateHash.slice(0, 12)}... 来自模型命令观察，等待任务绑定的 verifier 规则。`,
       purpose: "汇总最终结论、上游分析依据与可重复验证结果。",
-      explanation: "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。",
+      explanation: locallyJudged
+        ? "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
+        : "该树只记录模型命令观察，不代表候选已通过受信 verifier。",
       rootNodeId: completionId,
       nodeIds: [candidateArtifact.id, outcomeArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId],
       relatedTreeIds,

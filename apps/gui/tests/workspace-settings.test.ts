@@ -6,6 +6,7 @@ import type { ConversationPreferences, WorkspaceSettings } from "../src/shared.j
 import { WorkspaceSettingsStore } from "../src/workspace-settings.js";
 
 const defaults: ConversationPreferences = {
+  title: "新对话",
   workspacePath: "D:/workspace",
   profileId: "default",
   model: "model-a",
@@ -37,6 +38,8 @@ test("persists folders and per-conversation provider and capability choices", as
     assert.equal(duplicate.id, "research-2");
 
     const saved = await store.saveConversation("CHAT-1", {
+      title: "研究会话",
+      contextCompactionThreshold: 60,
       folderId: folder.id,
       workspacePath: "D:/cases/research",
       profileId: "relay-b",
@@ -54,11 +57,15 @@ test("persists folders and per-conversation provider and capability choices", as
     assert.equal(publicSettings.conversations["CHAT-1"]?.profileId, "relay-b");
     assert.equal(publicSettings.conversations["CHAT-1"]?.model, "model-b");
     assert.equal(publicSettings.conversations["CHAT-1"]?.workspacePath, "D:/cases/research");
+    assert.equal(publicSettings.conversations["CHAT-1"]?.title, "研究会话");
+    assert.equal(publicSettings.conversations["CHAT-1"]?.contextCompactionThreshold, 60);
     assert.deepEqual(publicSettings.conversations["CHAT-1"]?.enabledMcpServers, ["local"]);
 
     assert.equal((await reloaded.renameFolder(folder.id, "Cases")).name, "Cases");
     await reloaded.removeFolder(folder.id);
     assert.equal(reloaded.preferences("CHAT-1", defaults).folderId, undefined);
+    await reloaded.removeConversation("CHAT-1");
+    assert.equal(reloaded.preferences("CHAT-1", defaults).title, "新对话");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
