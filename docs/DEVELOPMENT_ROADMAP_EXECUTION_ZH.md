@@ -56,9 +56,9 @@
 - roadmap 相关定向回归：42/42 通过。
 - `npm test`：561/561 通过；本次完整运行未出现既有 `coding-resources` 时序或目录锁定失败。
 
-## 最新审计（2026-08-24）
+## 最新审计（2026-08-27）
 
-- `npm run api:index:check`：atoms、molecules、materials 全部通过，生成物跨工作区路径可重复。
+- `npm run api:index:test` 与 `npm run api:index:check`：atoms、molecules、materials 全部通过，生成物跨工作区路径可重复。
 - `npm run typecheck`：atoms、molecules、materials、CLI、GUI 全部通过。
 - `npm run check:components`：26 个组件、8 个受影响组件通过。
 - `npm run check:change-contracts`：8 个契约、65 个变更文件通过。
@@ -66,6 +66,7 @@
 - 本地 27 案例多方向 holdout 通过（Web 12、Pwn 12、Reverse/Crypto/Forensics 各 1），且无 Provider 请求；这验证的是 Run/Verifier/replay 管道，不代表真实模型解题率。
 - 严格 `eval-real` 已增加至少 20 个 corpus case、每个 Variant 必须产生 Provider telemetry 的门禁；provider-free holdout 明确关闭这两个条件。
 - 真实 Provider 评测仍待配置可用的 Provider 和两组显式 token pricing；本机 `127.0.0.1:1234` 当前不可用。
+- Windows 同路径并发原子替换的 `EPERM` 已在 `packages/atoms/src/storage/atomic.ts` 内按目标路径串行化，并补充 64 路并发回归；完整 `npm run test:staged` 已通过 fast 648/648、slow 20/20、integration 70/70，共 738/738。
 
 ## P0/P1/P2 执行记录（2026-08-22）
 
@@ -92,3 +93,11 @@
 - WebReproducer 不再接受调用方 `flagPattern`，只读取 `TaskContract.verification.web.flag_pattern`；拒绝 `.*`、`^.*$` 等无约束模式，并注册 `web_reproduce` active tool（仅 immutable web policy 存在时启用）。
 - 新增并发 Gate、wildcard policy、Web tool 路径回归测试。
 - 复审回归：`npm run build`、定向 13/13、competition/capability 23/23、`check:change-contracts` 均通过。
+
+## 当前交付审计（2026-08-27）
+
+- 统一 Run/Verifier/Control Store 路径继续保持单一 coding lane；Browser verifier 的可选 Playwright runtime、Pwn 四类阶段契约矩阵和 GUI control-view 已接入，缺 runtime 时保持 fail-closed。
+- 平台接入增加只读 `npm run platform:selfcheck`：只检查 DASCTF 题目列表与详情/附件，不创建环境、不恢复环境、不提交 flag；缺少 AccessKey 返回非零状态，URL userinfo 被拒绝并且输出脱敏。
+- 当前验证基线：session wire/service 定向、`npm run test:integration` 79/79、DASCTF adapter targeted 33/33、offline eval 30/30、API index check、组件/变更契约/changed-tests/CI-gates 全部通过；Windows projection 原子 rename `EPERM` 已通过按目标路径串行化 `atomicWriteFile`、短暂错误有界退避和 64 路并发回归修复，最新已记录的 staged 三阶段分别执行为 fast 663/663、slow 22/22、integration 79/79（764/764）；本轮 `EXTERNAL_CONFIRMED` 协调器状态的定向恢复组合为 44/44、绑定事务为 12/12。P0 新增多命令批次原子替换、`reconcileProjection()` 恢复测试和跨进程 Run 锁/双进程序号回归，P1 新增 PROPOSED Effect 安全重试、结果 Artifact 无外部重跑接管、Pwn 终态 stage summary 重建、STARTED/UNKNOWN 显式 reconcile 拒绝、终态 Verifier 重试、可信结果批次幂等、稳定 `VerificationRequest` 重启回归、verifier-owned Effect 恢复诊断和 `RECOVERY_REQUIRED` 持久化标记，以及有界 Context `control_view` 恢复/WorkItem 约束摘要；本轮又完成 Claim final `VerifierOutcomeEnvelope` 和外部资源 registry 第一垂直切片，收紧 Browser broker 响应字段白名单，接入可复用的 Node HTTP transport handler，冻结 Browser action/context proxy 的有界动作协议及 resolver-owned action service，并增加幂等 Browser create/open wire、client factory、持久化 Durable Browser Runtime Service、health/capability probe、heartbeat wire 和可注入 Playwright host 模块；HTTP session 新增 broker 句柄回滚与 Control Store 绑定失败恢复回归；新增 Pwn/HTTP `DurableSessionRuntimeService`、create/open/health wire、跨重启 STARTING 对账和动作 kind 门禁；Coding lane 已增加并发 broker health/capability preflight，配置失败时按 kind fail-closed，不再静默回退本地实现。
+- 2026-08-27 continuation：Pwn supervisor 适配器契约新增并发 create、STARTING 对账不盲建、release 失败重试三条故障回归（7/7），并落地 detached-worker 过程级重启接管与 HTTP 服务边界回归（4/4、3/3）；API index 重新生成并通过；随后修复了 host 对账期间已被并发 release 的 STARTING reservation 被旧查询结果复活的竞态，并增加跨窗口回归测试；补上 `SingleAgentCtfLoop` 到默认 lane 的 session broker/required handoff，避免 CTF 入口丢失已配置的 Pwn/HTTP runtime；本轮又加入 detached worker 重放拒绝、release 失败/恢复重试和 token 私有文件传递回归；最新 `npm run verify` 的 staged fast/slow/integration 为 678/678、22/22、80/80（780/780）。该矩阵仍是注入式 supervisor 证据，不等同于真实 DASCTF tube 或 Docker supervisor 的跨环境证明。
+- 未纳入自动化的边界保持不变：真实 Provider 评测需要私有 corpus 和显式 `--allow-live`；真实 DASCTF 运行、远程 tube 和 Docker Pwn smoke 只作为用户授权后的独立运维/发布动作。

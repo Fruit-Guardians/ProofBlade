@@ -1,7 +1,8 @@
 import type { ControlStore } from "../control/control-store.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
-import type { RunSnapshot, TaskContract, WorkItem } from "../domain/types.js";
+import type { PrimaryFailureCategory, RunSnapshot, TaskContract, WorkItem } from "../domain/types.js";
 import { id } from "../domain/utils.js";
+import { maxReplansFor } from "../domain/phase-budget.js";
 
 /**
  * Durable execution lifecycle shared by every ProofBlade run entrypoint.
@@ -171,10 +172,27 @@ export class RunWorkScheduler {
   }
 
   /** Blocks the current item and atomically queues its child replan item. */
-  public async blockAndQueue(runId: string, task: TaskContract, workItemId: string | undefined, reason: string): Promise<void> {
+  public async blockAndQueue(
+    runId: string,
+    task: TaskContract,
+    workItemId: string | undefined,
+    reason: string,
+    category: PrimaryFailureCategory = "wrong_hypothesis",
+  ): Promise<void> {
     if (!workItemId) return;
     const snapshot = await this.control.snapshot(runId);
     if (snapshot.workItems[workItemId]?.status !== "RUNNING") return;
+    if (snapshot.replanCount >= maxReplansFor(snapshot.task.target_kind, snapshot.task.constraints.max_replans)) {
+      await this.control.dispatchBatch(runId, [
+        { type: "work_item_failed", workItemId, reason: `Replan budget exhausted: ${reason}`, lane: "executor" },
+        { type: "exhaust", reason: `Replan budget exhausted after ${snapshot.replanCount} replans.`, lane: "executor" },
+      ]);
+      return;
+    }
+    const previousRepeatKeys = Object.values(snapshot.experiments)
+      .filter((experiment) => experiment.generation === snapshot.generation && experiment.domainPhase === snapshot.domainPhase)
+      .slice(-16)
+      .map((experiment) => experiment.repeatKey);
     const created: Omit<WorkItem, "createdSeq" | "updatedSeq"> = {
       id: id("WI"),
       runId,
@@ -189,9 +207,23 @@ export class RunWorkScheduler {
       attempt: 0,
       maxAttempts: 3,
     };
+    const replanId = id("RP");
     await this.control.dispatchBatch(runId, [
       { type: "work_item_blocked", workItemId, reason, lane: "executor" },
       { type: "work_item_created", workItem: created, lane: "executor" },
+      {
+        type: "replan_requested",
+        replan: {
+          id: replanId,
+          domainPhase: snapshot.domainPhase,
+          category,
+          reason,
+          sourceWorkItemId: workItemId,
+          nextWorkItemId: created.id,
+          prohibitedRepeatKeys: previousRepeatKeys,
+        },
+        lane: "executor",
+      },
     ]);
   }
 }

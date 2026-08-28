@@ -47,16 +47,24 @@ Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pu
 The single-agent path keeps active control outside the model:
 
 ```text
-Drive Loop -> Pi coding lane -> ProofBlade tools -> Effect Journal -> Sandbox
-     |                                  |               |
-     |                                  -> Observer -> Observation/Evidence
-     -> Phase machine -> Completion proposal -> Independent verifier
-                                              -> Report -> verifier-gated finish
+RunCoordinator -> Pi coding lane -> ProofBlade tools -> Effect Journal -> Sandbox
+      |                                  |               |
+      |                                  -> Observer -> Observation/Evidence
+      -> DomainPhase + WorkItem -> Completion proposal -> Independent verifier
+                                                     -> Report -> SUBMIT -> verifier-gated finish
 ```
 
 Pi owns the provider turn and its JSONL Session. The coding lane can inspect the target, propose intents/hypotheses/facts and submit a candidate for verification. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
 
-The Drive Loop is the sole active phase coordinator. In Auto mode it sends a proposed candidate directly to the hidden scorer. In Assist mode it pauses with a durable proposal and verifies it when the same run is resumed. The verifier executes the configured number of reproduction attempts through the Effect Journal. Only the verifier lane can confirm a fact, verify a completion or commit `SUCCEEDED`.
+`RunCoordinator` is the sole active phase and WorkItem coordinator shared by
+Competition, GUI and Fixture/Evaluation entrypoints. In Auto mode a proposed
+candidate enters the verifier-owned Effect Journal path; in Assist mode it
+pauses with a durable proposal and resumes through the same path. Dynamic flag
+shortcuts use the same verifier-owned effect rather than bypassing the state
+machine. The verifier executes the configured number of reproduction attempts
+through the Effect Journal. Only the verifier lane can confirm a fact, verify a
+completion or commit `SUCCEEDED`; recovery also repairs a phase/WorkItem gap
+before the terminal event is appended.
 
 Before the first CTF model turn, the selected `ChallengeToolProfile` contributes a durable `firstActionPlan` to `RunToolPreparation`. It names the small set of tools allowed to establish the initial observation and caps those calls; `verify_claim`, platform submission and reproduction tools remain an explicit completion escape. The Coding lane enforces this at the Pi `tool_call` boundary, and a recovered lane treats the current-generation Observation ledger as the source of truth for whether the first action already completed. This is a coordinator/tool contract, not a prompt-only instruction, so a model cannot spend its initial turn rediscovering tools or launching an unrelated experiment.
 
@@ -67,6 +75,13 @@ For Competition and Fixture Runs, challenge mode is derived from the durable `Ta
 The provider sees a fixed `invoke_capability` schema rather than a changing list of every plugin operation. `list_capabilities` returns the bundled manifest and canonical catalog hash; the router validates the capability id, operation, argument keys and replay policy before mapping it to a journaled sandbox operation. Target results are wrapped as untrusted observations and linked to deterministic Observation/Evidence records; artifact reads remain retrieval-only.
 
 The ordinary Coding lane follows the same stable-surface principle without pretending to own CTF evidence. Its Provider tool list always contains one `load_skill` proxy and one `mcp_call` proxy. Conversation settings change the runtime allowlists and one-line resource summaries, not the proxy schemas or ordering. `mcp_call` multiplexes `list`, `describe` and `call`: list is configuration-only, describe starts one enabled Server lazily, and call revalidates both the enabled Server and its allowed Tool. Coding calls remain in Pi Session and Tool telemetry; Solver calls additionally pass through the Capability Router, Effect Journal and Artifact/Evidence boundary.
+
+Browser verification has the same boundary when the browser lives in another process. `HttpBrowserRuntimeBroker` uses a versioned create/lifecycle wire (`create`, `inspect`, `adopt`, `release`, `heartbeat`) plus a `health` capability probe: `create` is an idempotent create/open handshake bound to the target, run/generation, policy/recipe/scope and verification key, and returns only broker-owned session/external ids, the initial URL and a state hash. `HttpBrowserVerifierFactory` converts that response into the same verifier-owned `BrowserContextBackend` input shape, preserving the broker session id and using the immutable request hash as the retry key; its probe must report `READY` and `stableAcrossRestart=true` before Browser replay is registered. `DurableBrowserRuntimeService` persists the create reservation and exact binding, refuses to revive an expired lease without host reconciliation, exposes bounded capabilities and renews leases only after exact binding, and delegates the actual browser to an injected host. Lifecycle requests carry only the immutable resource binding and an opaque external id. `HttpBrowserRuntimeContextPort` uses the matching action wire (`navigate`, `click`, `fill`, `submit`, `wait`) and returns bounded content, current URL and a state hash; it never transports cookies, storage values, `Page`/`BrowserContext` objects or arbitrary script evaluation. `createBrowserRuntimeHttpHandler` owns request limits, abort propagation, route/field validation and redacted status mapping; `BrowserRuntimeContextActionService` is the small server-side adapter that invokes a resolver-owned context and derives the redacted state hash. Without a create service, an action service, a health probe, or an exact broker match, recovery remains `UNKNOWN`/`RECOVERY_REQUIRED` rather than creating a replacement context. The reference `scripts/session-runtime-combined-host.ts` can multiplex durable HTTP and Pwn hosts behind one session service; it dispatches by immutable `request.kind` and reports `READY` only when both underlying hosts are complete and restart-stable.
+Pwn and stateful HTTP sessions use the same remote-runtime boundary. `HttpSessionRuntimeBroker` exposes versioned create/lifecycle/action routes plus a lease `heartbeat`; `DurableSessionRuntimeService` persists a STARTING reservation, exact immutable binding and a bounded renewable lease while an injected `SessionRuntimeHost` owns the real tube/process or HTTP client. Every brokered Pwn/HTTP action first refreshes and verifies the exact unexpired lease; an expired or ambiguous handle is rejected before touching the host, while release remains allowed to inspect and reclaim that exact handle. The service still requires `inspectByIdempotency()` before advertising `stableAcrossRestart=true`, so a protocol-compatible fake cannot be mistaken for a restart-safe production host.
+
+If a session host has no dedicated heartbeat endpoint, the durable service uses an exact `inspect` of the same opaque handle as the renewal proof. A host may advertise `READY` only when it implements every action required by its declared session kinds; missing action capabilities force `DEGRADED` and keep the broker out of the Coding lane.
+
+Session handoff across the Control Store and external-resource ledger is coordinated by a durable `BindingTransactionCoordinator`. `prepare` records an immutable identity and `STARTED` external handle in a companion intent journal, `commitControl` writes one `session_opened` event carrying `bindingTxnId` and `bindingIdentityHash`, and `finalize` records the owner marker before moving the intent to `BOUND`. Recovery replays the intent first: an exact open owner can repair a missing marker and then go through the broker's `inspect/adopt`; missing, stale, or mismatched identities never create a replacement session. The coordinator owns metadata only and never carries sockets, cookies, tokens, command lines, or response bodies.
 
 `run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; forbidden replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
 

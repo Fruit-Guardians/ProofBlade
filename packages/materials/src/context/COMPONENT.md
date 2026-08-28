@@ -27,6 +27,7 @@
 - `compiler.ts` 产出 ContextManifest；`maintenance-coordinator.ts` 决定维护阶段。
 - `agent-pruner.ts` 处理消息对；`checkpoint.ts` 与 `durable-compaction.ts` 保证压缩可恢复。
 - 本组件编译状态，不成为 Fact 或历史的权威来源。
+- `<phase>` 中的 `control_view` 是有界只读摘要：Gate、ActionBundle、预算、失败分类、active WorkItem、Verifier 恢复请求和禁止重复 key 均来自当前 generation 的 Projection；它不包含原始日志，也不能写回 Control Store。
 
 ## 开发规则与验证
 

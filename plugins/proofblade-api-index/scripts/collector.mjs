@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import * as ts from "typescript";
 
@@ -12,20 +12,29 @@ export const PACKAGE_CONFIGS = {
 export function collectApi({ repoRoot, packageId = "atoms" }) {
   const config = PACKAGE_CONFIGS[packageId];
   if (!config) throw new Error(`Unknown package: ${packageId}`);
-  const packageRoot = resolve(repoRoot, config.root);
-  const tsconfigPath = ts.findConfigFile(packageRoot, ts.sys.fileExists, "tsconfig.json");
+  // TypeScript's module/documentation resolution can retain the path spelling
+  // used to open a checkout.  On Windows a junction therefore makes the same
+  // source file appear under a second identity, which changes documentation
+  // lookup (for example tsdoc versus inferred summaries).  Resolve every
+  // filesystem root before creating the Program so canonical and junction
+  // workspaces share one source identity.
+  const canonicalRepoRoot = canonicalPath(repoRoot);
+  const packageRoot = canonicalPath(resolve(canonicalRepoRoot, config.root));
+  const foundTsconfigPath = ts.findConfigFile(packageRoot, ts.sys.fileExists, "tsconfig.json");
+  const tsconfigPath = foundTsconfigPath ? canonicalPath(foundTsconfigPath) : undefined;
   if (!tsconfigPath) throw new Error(`Missing tsconfig.json for ${packageId}`);
   const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
   if (configFile.error) throw new Error(formatDiagnostics([configFile.error]));
   const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, packageRoot);
-  const program = ts.createProgram(parsed.fileNames, parsed.options);
+  const fileNames = [...new Set(parsed.fileNames.map((file) => canonicalPath(file)))];
+  const program = ts.createProgram(fileNames, parsed.options);
   const checker = program.getTypeChecker();
   const indexPath = resolve(packageRoot, "src/index.ts");
   const indexSource = program.getSourceFile(indexPath);
   if (!indexSource) throw new Error(`Missing public entry: ${config.root}/src/index.ts`);
   const moduleSymbol = checker.getSymbolAtLocation(indexSource);
   if (!moduleSymbol) throw new Error(`Unable to resolve public entry: ${indexPath}`);
-  const testFiles = findTestFiles(join(packageRoot, "tests"), repoRoot);
+  const testFiles = findTestFiles(join(packageRoot, "tests"), canonicalRepoRoot);
   const symbols = [];
   for (const exported of checker.getExportsOfModule(moduleSymbol)) {
     const symbol = exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
@@ -41,7 +50,7 @@ export function collectApi({ repoRoot, packageId = "atoms" }) {
     package: config.name,
     packageId,
     sourceRoot: config.root,
-    moduleHashes: moduleHashes(packageRoot, parsed.fileNames),
+    moduleHashes: moduleHashes(packageRoot, fileNames),
     symbols,
   };
 }
@@ -221,6 +230,16 @@ function sha256(value) {
 
 function normalize(value) {
   return value.replaceAll("\\", "/");
+}
+
+function canonicalPath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    // Keep diagnostics useful for virtual/non-existent compiler inputs while
+    // still normalizing relative spellings.
+    return resolve(path);
+  }
 }
 
 function isInside(root, file) {

@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { atomicWriteFile, withFileLock } from "@proofblade/atoms";
 import type { McpProjectRegistry, McpServerSummary, McpToolchainState } from "../mcp/registry.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { FirstActionPlan, RunToolPreparation, TargetKind, ToolPreparationRuntime } from "../domain/types.js";
+import type { ActionBundle, FirstActionPlan, RunSnapshot, RunToolPreparation, TargetKind, ToolPreparationRuntime } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { ToolCatalogBootstrapSpec } from "../tools/catalog.js";
@@ -35,6 +36,7 @@ export interface ChallengeToolProfile {
   mcpServers: string[];
   capabilities: string[];
   fallbackStrategies: string[];
+  actionBundles: ActionBundle[];
 }
 
 export interface ChallengeClassification {
@@ -48,7 +50,7 @@ const COMMON_HOST_TOOLS = ["python311", "python", "jq", "xxd"];
 const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
   reverse: { id: "reverse-recon", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
   mobile: { id: "mobile-manifest", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
-  pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "pwn_open", "pwn_recv"], maxCalls: 2 },
+  pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "capability", "pwn_open", "pwn_recv"], maxCalls: 2 },
   web: { id: "web-request-or-artifact", allowedToolNames: ["read", "bash", "web_open", "web_request"], maxCalls: 2 },
   crypto: { id: "crypto-normalize", allowedToolNames: ["read", "bash"], maxCalls: 2 },
   forensics: { id: "forensics-container", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
@@ -57,7 +59,191 @@ const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
   misc: { id: "misc-input", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 2 },
 };
 
-const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> = {
+function genericActionBundles(toolNames: string[], capabilityIds: string[]): ActionBundle[] {
+  return [
+    {
+      id: "recon-surface",
+      domainPhase: "RECON",
+      objective: "Establish the input format, execution boundary, and one reliable observation.",
+      toolNames: [...toolNames],
+      capabilityIds: [...capabilityIds],
+      preconditions: ["The challenge workspace and task inputs are available."],
+      successCriteria: ["A bounded observation identifies the target format or surface."],
+      failureCriteria: ["The tool is missing, times out, or returns an untrusted/no-signal observation."],
+      maxCalls: 3,
+    },
+    {
+      id: "target-model",
+      domainPhase: "TARGET_MODEL",
+      objective: "Turn the recon observation into one structured hypothesis with a falsifiable risk.",
+      toolNames: ["read", "bash", ...toolNames.filter((name) => name !== "read" && name !== "bash")],
+      capabilityIds: [...capabilityIds],
+      preconditions: ["A RECON observation exists in the current generation."],
+      successCriteria: ["A hypothesis names its supporting evidence and a counterexample to test."],
+      failureCriteria: ["The hypothesis only restates the prompt or has no falsifiable prediction."],
+      maxCalls: 2,
+    },
+    {
+      id: "hypothesis-plan",
+      domainPhase: "HYPOTHESIS",
+      objective: "Choose one experiment with explicit inputs, expected evidence, and a stop condition.",
+      toolNames: ["read", "bash"],
+      capabilityIds: [...capabilityIds],
+      preconditions: ["A target model and at least one supporting Evidence item exist."],
+      successCriteria: ["The next probe has a bounded input and both success and failure predicates."],
+      failureCriteria: ["The plan only changes payload syntax or has no new observation it can produce."],
+      maxCalls: 2,
+    },
+    {
+      id: "bounded-experiment",
+      domainPhase: "EXPERIMENT",
+      objective: "Run one bounded probe that can add evidence or reject the active hypothesis.",
+      toolNames: [...toolNames, "read", "bash"].filter((name, index, all) => all.indexOf(name) === index),
+      capabilityIds: [...capabilityIds],
+      preconditions: ["An open hypothesis and a concrete success/failure predicate exist."],
+      successCriteria: ["The probe produces new evidence or a durable negative result."],
+      failureCriteria: ["The probe repeats a prior input, has no predicate, or produces no durable observation."],
+      maxCalls: 4,
+    },
+    {
+      id: "clean-reproduce",
+      domainPhase: "REPRODUCE",
+      objective: "Re-run the candidate path from clean state and bind the result to verifier-owned evidence.",
+      toolNames: ["verify_claim", "read", "bash"],
+      capabilityIds: ["verifier.reproduce"],
+      preconditions: ["A candidate is derived from current-generation evidence."],
+      successCriteria: ["A clean reproduction produces verifier-accepted evidence."],
+      failureCriteria: ["The candidate depends on stale state, prompt text, or a non-reproducible side effect."],
+      maxCalls: 2,
+    },
+  ];
+}
+
+const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
+  pwn: [
+    {
+      id: "pwn-recon",
+      domainPhase: "RECON",
+      objective: "Record binary protections and one complete protocol prompt before crafting a payload.",
+      toolNames: ["read", "bash", "capability", "pwn_open", "pwn_recv"],
+      capabilityIds: ["pwn.tube", "proofblade.binary"],
+      preconditions: ["The binary or scoped remote endpoint is available."],
+      successCriteria: ["Architecture/protections and a state-specific prompt anchor are persisted."],
+      failureCriteria: ["EOF, timeout, or a generic prompt suffix is mistaken for a valid protocol state."],
+      maxCalls: 4,
+    },
+    {
+      id: "pwn-target-model",
+      domainPhase: "TARGET_MODEL",
+      objective: "Model the vulnerable primitive, protocol state, and address/offset assumptions from durable evidence.",
+      toolNames: ["read", "bash", "pwn_recv", "pwn_record_primitive", "capability", "mcp_call"],
+      capabilityIds: ["pwn.tube", "reverse.binary"],
+      preconditions: ["RECON contains protections and a transcript anchor."],
+      successCriteria: ["One primitive and one falsifiable address/protocol assumption are recorded."],
+      failureCriteria: ["The model assumes a shell, leak, or libc without an observed marker."],
+      maxCalls: 3,
+    },
+    {
+      id: "pwn-hypothesis",
+      domainPhase: "HYPOTHESIS",
+      objective: "Select one synchronized payload experiment and define its expected leak or state transition.",
+      toolNames: ["read", "bash", "pwn_list", "pwn_record_primitive"],
+      capabilityIds: ["pwn.tube"],
+      preconditions: ["A primitive, protocol anchor, and address assumption are recorded."],
+      successCriteria: ["The payload input, expected bytes, and failure boundary are explicit."],
+      failureCriteria: ["The plan relies on a guessed offset, generic recv suffix, or shell claim."],
+      maxCalls: 2,
+    },
+    {
+      id: "pwn-experiment",
+      domainPhase: "EXPERIMENT",
+      objective: "Drive one synchronized tube step or bounded local probe and classify its result.",
+      toolNames: ["pwn_send", "pwn_recv", "pwn_signal", "pwn_list", "read", "bash"],
+      capabilityIds: ["pwn.tube"],
+      preconditions: ["A protocol anchor and explicit payload success/failure predicate exist."],
+      successCriteria: ["A new leak, primitive, state transition, or negative result is persisted."],
+      failureCriteria: ["Timeout/EOF, unsynchronized input, or repeated payload is treated as success."],
+      maxCalls: 6,
+    },
+    {
+      id: "pwn-reproduce",
+      domainPhase: "REPRODUCE",
+      objective: "Use a fresh tube and verifier barriers to confirm shell control and extract the candidate.",
+      toolNames: ["pwn_reproduce", "verify_claim", "read"],
+      capabilityIds: ["pwn.reproduce", "verifier.reproduce"],
+      preconditions: ["A current-generation exploit path and task-owned pwn verifier contract exist."],
+      successCriteria: ["Fresh-session shell marker and flag extraction both pass."],
+      failureCriteria: ["A proposal, EOF, or one-shot shell guess is treated as reproduction."],
+      maxCalls: 2,
+    },
+  ],
+  web: [
+    {
+      id: "web-recon",
+      domainPhase: "RECON",
+      objective: "Capture one baseline request/response and persist origin, route, cookies, and CSRF state.",
+      toolNames: ["web_open", "web_request", "web_list", "read", "bash"],
+      capabilityIds: ["web.http-session"],
+      preconditions: ["The target URL is inside the immutable host/port scope."],
+      successCriteria: ["Status, headers, body summary, and session state are recorded."],
+      failureCriteria: ["A redirect, error page, or empty response is misclassified as an exploit signal."],
+      maxCalls: 4,
+    },
+    {
+      id: "web-target-model",
+      domainPhase: "TARGET_MODEL",
+      objective: "Map an input trust boundary and select one minimal primitive with a falsifiable response predicate.",
+      toolNames: ["web_request", "web_replay", "web_list", "read", "bash"],
+      capabilityIds: ["web.http-session", "web.browser"],
+      preconditions: ["RECON contains a baseline route and state summary."],
+      successCriteria: ["One sink, variable, or auth boundary is linked to supporting evidence."],
+      failureCriteria: ["The hypothesis is only a payload list without a route or observable difference."],
+      maxCalls: 3,
+    },
+    {
+      id: "web-hypothesis",
+      domainPhase: "HYPOTHESIS",
+      objective: "Choose one minimal request mutation and define the response difference that would confirm it.",
+      toolNames: ["web_list", "web_replay", "read", "bash"],
+      capabilityIds: ["web.http-session"],
+      preconditions: ["A route, trust boundary, and baseline response are recorded."],
+      successCriteria: ["The mutation, session state, and positive/negative response predicates are explicit."],
+      failureCriteria: ["The plan sprays payload variants or treats reflection/status changes as proof."],
+      maxCalls: 2,
+    },
+    {
+      id: "web-experiment",
+      domainPhase: "EXPERIMENT",
+      objective: "Send one controlled request or replay and compare the response against the predicate.",
+      toolNames: ["web_request", "web_replay", "web_list", "read", "bash"],
+      capabilityIds: ["web.http-session", "web.browser"],
+      preconditions: ["An in-scope route, input, and success/failure predicate exist."],
+      successCriteria: ["A new response difference or durable negative result is recorded."],
+      failureCriteria: ["A timeout, 500, reflection, or stale cookie is treated as proof of impact."],
+      maxCalls: 5,
+    },
+    {
+      id: "web-reproduce",
+      domainPhase: "REPRODUCE",
+      objective: "Replay the complete exploit chain in a clean HTTP session and bind the extracted candidate to evidence.",
+      toolNames: ["web_reproduce", "verify_claim", "read"],
+      capabilityIds: ["web.reproduce", "verifier.reproduce"],
+      preconditions: ["A complete chain and immutable web flag policy exist."],
+      successCriteria: ["Every chain assertion passes in a clean session and the candidate is extracted from its response."],
+      failureCriteria: ["The candidate comes from prompt text, stale cookies, or an unverified partial step."],
+      maxCalls: 2,
+    },
+  ],
+  reverse: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["reverse.binary", "mcp.reverse"]),
+  mobile: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["reverse.android", "mcp.reverse"]),
+  crypto: genericActionBundles(["read", "bash"], ["crypto.python", "crypto.solver"]),
+  forensics: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["forensics.files", "forensics.pcap", "forensics.memory"]),
+  malware: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["malware.static", "malware.memory"]),
+  osint: genericActionBundles(["read", "bash", "web_open", "web_request"], ["osint.web", "osint.artifact"]),
+  misc: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["misc.solver"]),
+};
+
+const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id" | "actionBundles">> = {
   reverse: {
     targetKind: "reverse",
     firstAction: "Identify the artifact once with file/headers/strings and one targeted entrypoint or decompiler probe; persist format, architecture, and mitigations before following xrefs.",
@@ -84,14 +270,14 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
   },
   pwn: {
     targetKind: "pwn",
-    firstAction: "Run file/checksec and one bounded protocol probe (pwn_open plus pwn_recv when a tube is ready); persist architecture, mitigations, prompt anchor, and interaction state before crafting a payload.",
+    firstAction: "Run file/checksec or the prepared proofblade.binary identify capability and one bounded protocol probe (pwn_open plus pwn_recv when a tube is ready); persist architecture, mitigations, prompt anchor, and interaction state before crafting a payload.",
     firstActionPlan: FIRST_ACTION_PLANS.pwn,
     skillNames: ["ctf-pwn"],
     hostToolIds: ["checksec", "gdb", "pwntools", "ropgadget", "one_gadget", "patchelf", "qemu", ...COMMON_HOST_TOOLS],
     requiredToolIds: ["checksec", "python"],
     optionalToolIds: ["gdb", "pwntools", "ropgadget", "one_gadget", "patchelf", "qemu", "jq", "xxd"],
     mcpServers: [],
-    capabilities: ["pwn.tube", "pwn.reproduce"],
+    capabilities: ["pwn.tube", "proofblade.binary", "pwn.reproduce"],
     fallbackStrategies: ["local:checksec-gdb-reproducer", "remote:pwn-tube-with-bounded-recv", "rop:libc-search-then-ropgadget"],
   },
   web: {
@@ -171,7 +357,7 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id">> 
 /** Return a fresh immutable-by-convention profile object for a category. */
 export function challengeToolProfile(category: ChallengeCategory): ChallengeToolProfile {
   const data = PROFILE_DATA[category];
-  return { id: category, ...data, firstActionPlan: copyFirstActionPlan(data.firstActionPlan), skillNames: [...data.skillNames], hostToolIds: [...data.hostToolIds], requiredToolIds: [...data.requiredToolIds], optionalToolIds: [...data.optionalToolIds], mcpServers: [...data.mcpServers], capabilities: [...data.capabilities], fallbackStrategies: [...data.fallbackStrategies] };
+  return { id: category, ...data, firstActionPlan: copyFirstActionPlan(data.firstActionPlan), skillNames: [...data.skillNames], hostToolIds: [...data.hostToolIds], requiredToolIds: [...data.requiredToolIds], optionalToolIds: [...data.optionalToolIds], mcpServers: [...data.mcpServers], capabilities: [...data.capabilities], fallbackStrategies: [...data.fallbackStrategies], actionBundles: copyActionBundles(ACTION_BUNDLES[category]) };
 }
 
 /** Return every built-in profile in deterministic order for one-time setup/doctor commands. */
@@ -257,6 +443,11 @@ export function profileForTargetKind(targetKind: TargetKind, target = ""): Chall
   return undefined;
 }
 
+/** Return the phase-scoped action contract selected by a prepared profile. */
+export function actionBundleForPhase(profile: ChallengeToolProfile, domainPhase: string): ActionBundle | undefined {
+  return profile.actionBundles.find((bundle) => bundle.domainPhase === domainPhase);
+}
+
 /**
  * Conservative prompt/workspace classifier used before a GUI lane is created.
  * Ordinary coding requests return undefined; challenge-shaped requests receive
@@ -310,6 +501,7 @@ export interface ChallengeToolPreflight {
   missingOptionalTools: string[];
   fallbackStrategies: string[];
   firstActionPlan?: FirstActionPlan;
+  actionBundles?: ActionBundle[];
 }
 
 interface PersistedPreflight {
@@ -327,6 +519,7 @@ interface PersistedPreflight {
   /** Added after the initial cache format; old health entries remain readable. */
   missingOptionalTools?: string[];
   firstActionPlan?: FirstActionPlan;
+  actionBundles?: ActionBundle[];
   checkedAt: number;
 }
 
@@ -354,6 +547,7 @@ export class ToolPreflightService {
         optionalToolIds: profile.optionalToolIds,
         mcpServers: profile.mcpServers,
         firstActionPlan: profile.firstActionPlan,
+        actionBundles: profile.actionBundles,
       },
       catalog: catalog.catalogHash(),
       mcp: mcp.catalogHash(),
@@ -362,7 +556,7 @@ export class ToolPreflightService {
       tools: selected.map((entry) => entry.id),
     }));
     const cached = await this.readCached(cacheKey);
-    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
+    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), actionBundles: copyActionBundles(cached.actionBundles ?? profile.actionBundles), runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
     const checkedAt = Date.now();
     const diagnostics = await catalog.probeEntries(selected);
     const missingPaths = new Set(diagnostics.filter((item) => item.code === "path_missing").map((item) => item.id));
@@ -371,9 +565,9 @@ export class ToolPreflightService {
     const missingRequiredTools = profile.requiredToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const missingOptionalTools = profile.optionalToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const mcpServers = mcp.summaries().filter((server) => profile.mcpServers.includes(server.name) && !server.disabled).map((server) => ({ name: server.name, status: server.status, ...(server.toolchain ? { toolchainState: server.toolchain.state } : {}) }));
-    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), checkedAt };
+    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), actionBundles: copyActionBundles(profile.actionBundles), checkedAt };
     await this.writeCached(persisted);
-    return { ...persisted, runtime: "host", runtimeKey: "host", toolCatalogHash: persisted.toolCatalogHash!, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), cacheHit: false };
+    return { ...persisted, runtime: "host", runtimeKey: "host", toolCatalogHash: persisted.toolCatalogHash!, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), actionBundles: copyActionBundles(profile.actionBundles), cacheHit: false };
   }
 
   /**
@@ -391,9 +585,9 @@ export class ToolPreflightService {
     const specs = challengeToolCatalogSpecs().filter((spec) => profile.hostToolIds.includes(spec.id));
     const toolCatalogHash = sha256(canonicalJson(specs.map(({ id, name, kind, candidates }) => ({ id, name, kind, candidates }))));
     const runtimeKey = options.runtimeKey.trim() || "container";
-    const cacheKey = sha256(canonicalJson({ profile: profile.id, targetKind: profile.targetKind, firstActionPlan: profile.firstActionPlan, runtime: "container", runtimeKey, catalog: toolCatalogHash, mcp: mcp.catalogHash(), tools: specs.map((entry) => entry.id) }));
+    const cacheKey = sha256(canonicalJson({ profile: profile.id, targetKind: profile.targetKind, firstActionPlan: profile.firstActionPlan, actionBundles: profile.actionBundles, runtime: "container", runtimeKey, catalog: toolCatalogHash, mcp: mcp.catalogHash(), tools: specs.map((entry) => entry.id) }));
     const cached = options.force ? undefined : await this.readCached(cacheKey);
-    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
+    if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), actionBundles: copyActionBundles(cached.actionBundles ?? profile.actionBundles), runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
     const checkedAt = Date.now();
     const tools: ToolHealthRecord[] = [];
     for (const spec of specs) {
@@ -404,9 +598,9 @@ export class ToolPreflightService {
     const missingRequiredTools = profile.requiredToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const missingOptionalTools = profile.optionalToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const mcpServers = mcp.summaries().filter((server) => profile.mcpServers.includes(server.name) && !server.disabled).map((server) => ({ name: server.name, status: server.status, ...(server.toolchain ? { toolchainState: server.toolchain.state } : {}) }));
-    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), checkedAt };
+    const persisted: PersistedPreflight = { schemaVersion: 1, cacheKey, profileId: profile.id, targetKind: profile.targetKind, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: mcp.catalogHash(), tools, mcpServers, missingRequiredTools, missingOptionalTools, firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), actionBundles: copyActionBundles(profile.actionBundles), checkedAt };
     await this.writeCached(persisted);
-    return { ...persisted, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), cacheHit: false };
+    return { ...persisted, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), actionBundles: copyActionBundles(profile.actionBundles), cacheHit: false };
   }
 
   public async prepareAll(profiles: readonly ChallengeToolProfile[], catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight[]> {
@@ -431,6 +625,7 @@ export class ToolPreflightService {
         mcpCatalogHash: cached.mcpCatalogHash ?? "",
         missingOptionalTools: cached.missingOptionalTools ?? [],
         firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan),
+        actionBundles: copyActionBundles(cached.actionBundles ?? profile.actionBundles),
         fallbackStrategies: [...profile.fallbackStrategies],
         cacheHit: true,
       };
@@ -444,17 +639,20 @@ export class ToolPreflightService {
     try {
       const directory = join(this.cacheRoot, ".proofblade");
       await mkdir(directory, { recursive: true });
-      let cache: PersistedPreflightCache = { schemaVersion: 1, entries: {} };
-      try {
-        const existing = JSON.parse(await readFile(join(directory, "tool-health.json"), "utf8")) as PersistedPreflightCache;
-        if (existing.schemaVersion === 1 && existing.entries && typeof existing.entries === "object") cache = existing;
-      } catch {
-        // Start a fresh cache when the optional local file is absent or corrupt.
-      }
-      cache.entries[value.cacheKey] = value;
-      const keys = Object.keys(cache.entries);
-      for (const key of keys.slice(0, Math.max(0, keys.length - 32))) delete cache.entries[key];
-      await writeFile(join(directory, "tool-health.json"), `${JSON.stringify(cache, null, 2)}\n`, "utf8");
+      const cachePath = join(directory, "tool-health.json");
+      await withFileLock(`${cachePath}.lock`, async () => {
+        let cache: PersistedPreflightCache = { schemaVersion: 1, entries: {} };
+        try {
+          const existing = JSON.parse(await readFile(cachePath, "utf8")) as PersistedPreflightCache;
+          if (existing.schemaVersion === 1 && existing.entries && typeof existing.entries === "object") cache = existing;
+        } catch {
+          // Start a fresh cache when the optional local file is absent or corrupt.
+        }
+        cache.entries[value.cacheKey] = value;
+        const keys = Object.keys(cache.entries);
+        for (const key of keys.slice(0, Math.max(0, keys.length - 32))) delete cache.entries[key];
+        await atomicWriteFile(cachePath, `${JSON.stringify(cache, null, 2)}\n`);
+      }, { timeoutMs: 5_000, staleMs: 30_000 });
     } catch {
       // Readiness must never make a lane fail; a later run can simply probe again.
     }
@@ -481,8 +679,24 @@ export function runToolPreparationFromPreflight(preflight: ChallengeToolPrefligh
     missingOptionalTools: [...preflight.missingOptionalTools],
     fallbackStrategies: [...preflight.fallbackStrategies],
     firstActionPlan: copyFirstActionPlan(profile.firstActionPlan),
+    actionBundles: copyActionBundles(preflight.actionBundles ?? profile.actionBundles),
   };
   return { ...base, hash: sha256(canonicalJson(base)) };
+}
+
+/**
+ * Assert that a preflight result was durably published before a Provider turn.
+ * The local health cache is only an optimization; the Run projection is the
+ * publication boundary that survives restart and fences generation changes.
+ */
+export function assertToolPreparationPublished(
+  snapshot: Pick<RunSnapshot, "generation" | "toolPreparation">,
+  preparation: RunToolPreparation,
+): void {
+  const published = snapshot.toolPreparation;
+  if (!published) throw new Error("Tool preflight was not durably published before the Provider turn");
+  if (published.generation !== snapshot.generation || published.generation !== preparation.generation) throw new Error("Published tool preflight generation is stale");
+  if (published.hash !== preparation.hash) throw new Error("Published tool preflight does not match the selected runtime profile");
 }
 
 /** Rehydrate the prompt-facing preflight view from a persisted Run state. */
@@ -504,11 +718,23 @@ export function preflightFromRunToolPreparation(preparation: RunToolPreparation)
     missingOptionalTools: [...preparation.missingOptionalTools],
     fallbackStrategies: [...preparation.fallbackStrategies],
     firstActionPlan: copyFirstActionPlan(preparation.firstActionPlan ?? profile.firstActionPlan),
+    actionBundles: copyActionBundles(preparation.actionBundles ?? profile.actionBundles),
   };
 }
 
 function copyFirstActionPlan(plan: FirstActionPlan): FirstActionPlan {
   return { id: plan.id, allowedToolNames: [...plan.allowedToolNames], maxCalls: plan.maxCalls };
+}
+
+function copyActionBundles(bundles: readonly ActionBundle[]): ActionBundle[] {
+  return bundles.map((bundle) => ({
+    ...bundle,
+    toolNames: [...bundle.toolNames],
+    capabilityIds: [...bundle.capabilityIds],
+    preconditions: [...bundle.preconditions],
+    successCriteria: [...bundle.successCriteria],
+    failureCriteria: [...bundle.failureCriteria],
+  }));
 }
 
 const PYTHON_MODULES: Record<string, string> = {

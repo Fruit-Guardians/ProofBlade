@@ -34,8 +34,8 @@ export class LocalHoldoutEvaluationRunner {
     }
     const localConfig = withLocalPricing(this.config);
     const variants = options.variants ?? [
-      { id: "local-baseline", config: localConfig },
-      { id: "local-candidate", config: localConfig },
+      { id: "local-baseline", config: withLocalVariantIdentity(localConfig, "local-holdout-baseline") },
+      { id: "local-candidate", config: withLocalVariantIdentity(localConfig, "local-holdout-candidate") },
     ];
     const runner = new RealModelEvaluationRunner(this.root, this.createLane);
     const runnerOptions: RealModelEvaluationOptions = {
@@ -49,8 +49,8 @@ export class LocalHoldoutEvaluationRunner {
       maxCostUsd: 0.01,
       // The deterministic lane itself is cheap, but verifier/effect replay is
       // deliberately exercised for every case. Keep a hard per-run bound while
-      // leaving enough wall-clock headroom for a fully parallel CI test worker.
-      deadlineMs: 60_000,
+      // allowing slower Windows CI workers to finish the same bounded workflow.
+      deadlineMs: 120_000,
       runPrefix: options.runPrefix ?? `LOCAL-HOLDOUT-${Date.now()}`,
       minimumSuccessRate: options.minimumSuccessRate ?? 1,
       baselineVariantId: variants[0]!.id,
@@ -92,6 +92,16 @@ function withLocalPricing(config: ProofBladeConfig): ProofBladeConfig {
 
 function zeroUsage(): AgentOutcome["usage"] {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function withLocalVariantIdentity(config: ProofBladeConfig, model: string): ProofBladeConfig {
+  return {
+    ...config,
+    modelProfiles: {
+      ...config.modelProfiles,
+      executor: { ...config.modelProfiles.executor, model },
+    },
+  };
 }
 
 function isLocalHoldoutTargetKind(targetKind: string): boolean {

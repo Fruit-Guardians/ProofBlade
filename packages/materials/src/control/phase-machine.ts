@@ -2,7 +2,10 @@ import type { Phase, RunSnapshot } from "../domain/types.js";
 
 const transitions: Record<Phase, readonly Phase[]> = {
   intake: ["reconnaissance"],
-  reconnaissance: ["hypothesis"],
+  // Keep the direct edge for legacy events/reopened Runs. New Coordinator
+  // paths prefer target_model before hypothesis.
+  reconnaissance: ["target_model", "hypothesis"],
+  target_model: ["hypothesis"],
   hypothesis: ["reconnaissance", "experiment"],
   experiment: ["hypothesis", "verification"],
   verification: ["experiment", "report"],

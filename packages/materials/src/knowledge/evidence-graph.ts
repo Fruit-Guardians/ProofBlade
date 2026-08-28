@@ -264,18 +264,51 @@ export class CodingEvidenceGraph {
     leak: LeakRecord;
     tags?: string[];
     explanation?: string;
+    artifactIds?: string[];
+    evidenceIds?: string[];
   }): Promise<RecordLeakResult> {
     return await this.controlStore.dispatchTransaction<RecordLeakResult>(this.runId, (snapshot) => {
       const node = leakReasoningNode(input.leak, snapshot.generation, input.tags, input.explanation);
+      const domainRecordId = `PWN-LEAK-${input.leak.id}`;
+      const domainRecord = {
+        id: domainRecordId,
+        kind: "pwn_leak" as const,
+        summary: node.summary,
+        artifactIds: [...(input.artifactIds ?? [])],
+        evidenceIds: [...(input.evidenceIds ?? [])],
+        sourceHex: input.leak.sourceHex,
+        format: input.leak.format,
+        value: input.leak.value,
+        addressKind: input.leak.addressKind,
+        ...(input.leak.symbol ? { symbol: input.leak.symbol } : {}),
+        ...(input.leak.derivation ? {
+          derivation: {
+            expression: input.leak.derivation.expression,
+            sourceRecordIds: input.leak.derivation.sourceLeakIds.map((sourceId) => `PWN-LEAK-${sourceId}`).filter((sourceId) => snapshot.domainRecords[sourceId]),
+          },
+        } : {}),
+      };
       const existing = snapshot.reasoningNodes[node.id];
       if (existing) {
         if (existing.kind !== "inference" || existing.summary !== node.summary || existing.tags.join("\u0000") !== node.tags.join("\u0000")) {
           throw new Error(`Leak node already exists with different contents: ${node.id}`);
         }
-        return { commands: [], project: () => ({ node: existing, reused: true }) };
+        return {
+          commands: [
+            ...(["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind) && !snapshot.domainRecords[domainRecordId]
+              ? [{ type: "domain_record" as const, record: domainRecord, lane: "main" as const }]
+              : []),
+          ],
+          project: () => ({ node: existing, reused: true }),
+        };
       }
       return {
-        commands: [{ type: "reasoning_node", node, lane: "main" }],
+        commands: [
+          { type: "reasoning_node", node, lane: "main" },
+          ...(["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind) && !snapshot.domainRecords[domainRecordId]
+            ? [{ type: "domain_record" as const, record: domainRecord, lane: "main" as const }]
+            : []),
+        ],
         project: (after) => ({ node: after.reasoningNodes[node.id]!, reused: false }),
       };
     });

@@ -36,6 +36,8 @@ test("claim verification rebuilds from durable state, matches the exact final ca
       toolCallId: "claim-recovery-call-1",
     });
     assert.equal(reproduction.verified, true);
+    assert.ok(reproduction.outcomeArtifactId);
+    assert.match(await services.artifacts.readText(runId, (await services.control.snapshot(runId)).artifacts[reproduction.outcomeArtifactId]!), /"accepted":true/);
 
     const live = await verifier.project("完成这道题并找出 flag", `最终结果：${candidate}`);
     assert.equal(live.status, "verified");

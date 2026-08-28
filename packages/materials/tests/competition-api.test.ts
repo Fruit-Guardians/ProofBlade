@@ -8,13 +8,13 @@ import {
   HttpCompetitionApi,
 } from "../src/competition/api.js";
 
-async function withServer(handler: (request: IncomingMessage, response: ServerResponse, body: string) => void | Promise<void>, run: (baseUrl: string, requests: Array<{ method: string; path: string; body: string; authorization?: string }>) => Promise<void>): Promise<void> {
-  const requests: Array<{ method: string; path: string; body: string; authorization?: string }> = [];
+async function withServer(handler: (request: IncomingMessage, response: ServerResponse, body: string) => void | Promise<void>, run: (baseUrl: string, requests: Array<{ method: string; path: string; body: string; authorization?: string; idempotencyKey?: string }>) => Promise<void>): Promise<void> {
+  const requests: Array<{ method: string; path: string; body: string; authorization?: string; idempotencyKey?: string }> = [];
   const server = createServer(async (request, response) => {
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const body = Buffer.concat(chunks).toString("utf8");
-    requests.push({ method: request.method ?? "", path: request.url ?? "", body, authorization: request.headers.authorization });
+    requests.push({ method: request.method ?? "", path: request.url ?? "", body, authorization: request.headers.authorization, ...(request.headers["idempotency-key"] ? { idempotencyKey: String(request.headers["idempotency-key"]) } : {}) });
     await handler(request, response, body);
   });
   server.listen(0, "127.0.0.1");
@@ -182,6 +182,26 @@ test("HttpCompetitionApi redacts credentials and flags from response body read f
   });
 });
 
+test("HttpCompetitionApi cancels a streaming response at the configured byte bound", async () => {
+  let cancelled = false;
+  const api = new HttpCompetitionApi({
+    baseUrl: "https://competition.example/api",
+    maxResponseBytes: 1_024,
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      body: new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new Uint8Array(2_048)); },
+        cancel() { cancelled = true; },
+      }),
+      text: async () => { throw new Error("text() must not be used for a streaming response"); },
+    } as unknown as Response),
+  });
+  await assert.rejects(() => api.listChallenges(), /response exceeds 1024 bytes/);
+  assert.equal(cancelled, true);
+});
+
 test("HttpCompetitionApi rejects challenge details without an explicit attachments array", async () => {
   await withServer(async (_request, response) => send(response, 200, {
     challenge: { id: "c-1", title: "Missing files", category: "Misc" },
@@ -254,6 +274,101 @@ test("HttpCompetitionApi rejects malformed attachment base64", async () => {
       assert.ok(error instanceof CompetitionChallengeError);
       assert.match(error.message, /valid base64 content/);
       return true;
+    });
+  });
+});
+
+test("HttpCompetitionApi carries a stable start key and performs exact remote inspection", async () => {
+  await withServer(async (request, response, body) => {
+    if (request.method === "POST" && request.url === "/api/challenges/c-1/environment") {
+      assert.equal(body, "");
+      assert.equal(request.headers["idempotency-key"], "env-key-1");
+      send(response, 200, { result: { instance_id: "i-1", idempotency_key: "env-key-1", connection_info: "nc target 9001", expires_at: 1234 } });
+      return;
+    }
+    if (request.method === "GET" && request.url === "/api/challenges/c-1/environment") {
+      assert.equal(request.headers["idempotency-key"], "env-key-1");
+      send(response, 200, { result: { status: "ACTIVE", challenge_id: "c-1", instance_id: "i-1", idempotency_key: "env-key-1", connection_info: "nc target 9001", expires_at: 1234 } });
+      return;
+    }
+    send(response, 404, { error: "not found" });
+  }, async (baseUrl, requests) => {
+    const api = new HttpCompetitionApi({ baseUrl, endpoints: { inspectEnvironment: "/challenges/{challengeId}/environment" } });
+    const environment = await api.startEnvironment("c-1", { idempotencyKey: "env-key-1" });
+    assert.equal(environment.idempotencyKey, "env-key-1");
+    assert.deepEqual(await api.inspectEnvironment("c-1", undefined, { idempotencyKey: "env-key-1" }), {
+      status: "ACTIVE",
+      challengeId: "c-1",
+      instanceId: "i-1",
+      idempotencyKey: "env-key-1",
+      connectionInfo: "nc target 9001",
+      expiresAt: 1234,
+      summary: "platform query confirms an active environment",
+      raw: { status: "ACTIVE", challenge_id: "c-1", instance_id: "i-1", idempotency_key: "env-key-1", connection_info: "nc target 9001", expires_at: 1234 },
+    });
+    assert.deepEqual(requests.map((item) => ({ method: item.method, idempotencyKey: item.idempotencyKey })), [
+      { method: "POST", idempotencyKey: "env-key-1" },
+      { method: "GET", idempotencyKey: "env-key-1" },
+    ]);
+  });
+});
+
+test("HttpCompetitionApi supports query-by-idempotency endpoints and nested environment state", async () => {
+  await withServer(async (request, response) => {
+    if (request.method !== "GET" || request.url !== "/api/environments/by-key/env%2Fkey-1") {
+      send(response, 404, { error: "not found" });
+      return;
+    }
+    send(response, 200, {
+      environment: {
+        status: "ACTIVE",
+        challenge_id: "c-1",
+        instance_id: "i-1",
+        idempotency_key: "env/key-1",
+        connection_info: "nc target 9001",
+      },
+    });
+  }, async (baseUrl, requests) => {
+    const api = new HttpCompetitionApi({
+      baseUrl,
+      endpoints: { inspectEnvironment: "/environments/by-key/{idempotencyKey}" },
+    });
+    assert.deepEqual(await api.inspectEnvironment("c-1", undefined, { idempotencyKey: "env/key-1" }), {
+      status: "ACTIVE",
+      challengeId: "c-1",
+      instanceId: "i-1",
+      idempotencyKey: "env/key-1",
+      connectionInfo: "nc target 9001",
+      summary: "platform query confirms an active environment",
+      raw: {
+        status: "ACTIVE",
+        challenge_id: "c-1",
+        instance_id: "i-1",
+        idempotency_key: "env/key-1",
+        connection_info: "nc target 9001",
+      },
+    });
+    assert.deepEqual(requests.map((item) => ({ method: item.method, path: item.path, idempotencyKey: item.idempotencyKey })), [
+      { method: "GET", path: "/api/environments/by-key/env%2Fkey-1", idempotencyKey: "env/key-1" },
+    ]);
+  });
+
+  await withServer(async (request, response) => {
+    if (request.url === "/api/environments/by-key/env-key-2") {
+      send(response, 200, { environment: { status: "STOPPED", challenge_id: "c-1", instance_id: "i-2" } });
+      return;
+    }
+    send(response, 404, { error: "not found" });
+  }, async (baseUrl) => {
+    const api = new HttpCompetitionApi({
+      baseUrl,
+      endpoints: { inspectEnvironment: "/environments/by-key/{idempotencyKey}" },
+    });
+    assert.deepEqual(await api.inspectEnvironment("c-1", undefined, { idempotencyKey: "env-key-2" }), {
+      status: "ABSENT",
+      challengeId: "c-1",
+      summary: "platform query reports an absent environment",
+      raw: { status: "STOPPED", challenge_id: "c-1", instance_id: "i-2" },
     });
   });
 });

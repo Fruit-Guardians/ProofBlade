@@ -115,7 +115,7 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
     assert.doesNotMatch(JSON.stringify(anonymous), /REAL-A|fixtures|expected|real_model_corpus/);
     assert.ok(anonymous.variants.every((variant) => variant.cases.every((candidate) => !Object.hasOwn(candidate, "runId") && !Object.hasOwn(candidate, "error"))));
 
-    const strict = await runner.run({ ...options, requireProviderTraffic: true, runPrefix: "REAL-STRICT" });
+    const strict = await runner.run({ ...options, requireProviderTraffic: true, requireAnswerLiteralsAbsent: false, runPrefix: "REAL-STRICT" });
     assert.equal(strict.gate.passed, false);
     assert.equal(strict.gate.policy.requireProviderTraffic, true);
     assert.equal(strict.gate.policy.minimumCorpusCases, 20);
@@ -164,6 +164,30 @@ test("real evaluation preflight validates Web/Pwn coverage and never contacts a 
   }
 });
 
+test("strict real evaluation preflight rejects an answer literal in target input", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-leak-"));
+  try {
+    const expected = "flag{answer_in_input}";
+    const source = `captured response\n${expected}\n`;
+    await writeFile(join(root, "web.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "answer-literal-corpus",
+      cases: [corpusCase("web-case", "web.txt", expected, source)],
+    }), "utf8");
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      requireProviderTraffic: true,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((item) => item.id === "answer_literals_absent")?.passed, false);
+    assert.equal(result.ready, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("real evaluation preflight reports missing credentials and direction coverage", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-fail-"));
   try {
@@ -186,6 +210,58 @@ test("real evaluation preflight reports missing credentials and direction covera
     assert.equal(result.checks.find((check) => check.id === "target_kind_coverage:pwn")?.passed, false);
     assert.equal(result.checks.find((check) => check.id === "credential:alpha")?.passed, false);
     assert.equal(result.checks.find((check) => check.id === "credential:beta")?.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation rejects two ids that point to the same provider profile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-duplicate-profile-"));
+  try {
+    const source = "private reverse marker";
+    await writeFile(join(root, "target.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "duplicate-profile-corpus",
+      cases: [corpusCase("reverse-case", "target.txt", "flag{reverse}", source)],
+    }), "utf8");
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("same") }, { id: "beta", config: config("same") }],
+      requireProviderTraffic: false,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((check) => check.id === "distinct_profile_variants")?.passed, false);
+    assert.equal(result.ready, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real evaluation keeps separately provisioned credential profiles distinct without exposing secrets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-credential-profiles-"));
+  try {
+    const source = "private reverse marker";
+    await writeFile(join(root, "target.txt"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "credential-profile-corpus",
+      cases: [corpusCase("reverse-case", "target.txt", "flag{reverse}", source)],
+    }), "utf8");
+    const base = config("same");
+    const variants = [
+      { id: "account-a", config: { ...base, modelProfiles: { executor: { ...base.modelProfiles.executor, apiKeyEnv: "PROOFBLADE_KEY_A" } } } },
+      { id: "account-b", config: { ...base, modelProfiles: { executor: { ...base.modelProfiles.executor, apiKeyEnv: "PROOFBLADE_KEY_B" } } } },
+    ];
+    const result = await preflightRealModelEvaluation({
+      corpusPath: join(root, "corpus.json"),
+      variants,
+      requireProviderTraffic: false,
+      minimumCorpusCases: 1,
+    });
+    assert.equal(result.checks.find((check) => check.id === "distinct_profile_variants")?.passed, true);
+    assert.equal(result.variants[0]?.profileFingerprint === result.variants[1]?.profileFingerprint, false);
+    assert.doesNotMatch(JSON.stringify(result), /sk-[A-Za-z0-9]/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

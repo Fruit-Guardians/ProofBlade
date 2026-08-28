@@ -72,7 +72,10 @@ test("phase transitions do not implicitly resume a paused run", async () => {
     await control.dispatch(runId, { type: "start_phase", phase: "reconnaissance" });
     await control.dispatch(runId, { type: "pause", reason: "test pause" });
     await control.dispatch(runId, { type: "start_phase", phase: "hypothesis" });
-    assert.equal((await control.snapshot(runId)).status, "PAUSED");
+    const legacySnapshot = await control.snapshot(runId);
+    assert.equal(legacySnapshot.status, "PAUSED");
+    assert.equal(legacySnapshot.phase, "hypothesis");
+    assert.equal((await control.replay(runId)).phase, "hypothesis");
     await control.dispatch(runId, { type: "resume" });
     assert.equal((await control.snapshot(runId)).status, "RUNNING");
   } finally {
@@ -140,6 +143,17 @@ test("tool preparation is a bounded durable Run projection and replays exactly",
       missingRequiredTools: ["python"],
       missingOptionalTools: [],
       fallbackStrategies: ["solver:bounded-fallback"],
+      actionBundles: [{
+        id: "misc-recon",
+        domainPhase: "RECON" as const,
+        objective: "Identify the input format.",
+        toolNames: ["read", "bash"],
+        capabilityIds: ["misc.solver"],
+        preconditions: ["workspace is available"],
+        successCriteria: ["format is recorded"],
+        failureCriteria: ["probe has no signal"],
+        maxCalls: 2,
+      }],
       hash: "",
     };
     const { hash: _hash, ...unsigned } = preparation;
@@ -387,6 +401,61 @@ test("dispatchBatch validates every command before persisting any event", async 
     assert.equal(after.artifacts["A-BATCH"], undefined);
     assert.equal(after.lastSeq, before.lastSeq);
     assert.equal((await control.events(runId)).length, eventCount);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("recovery repairs a stale projection after a durable event batch survives a crash", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-projection-recovery-"));
+  try {
+    const eventStore = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(eventStore);
+    const runId = "PROJECTION-RECOVERY-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const before = await control.snapshot(runId);
+    const originalWithRunLock = eventStore.withRunLock.bind(eventStore);
+    let crash = true;
+    eventStore.withRunLock = async (lockedRunId, operation) => await originalWithRunLock(lockedRunId, async (writer) => {
+      const crashingWriter = {
+        ...writer,
+        saveProjection: async (...args: Parameters<JsonlControlStore["saveProjection"]>): Promise<void> => {
+          if (crash) {
+            crash = false;
+            throw new Error("simulated process exit after event commit");
+          }
+          await writer.saveProjection(...args);
+        },
+      };
+      return await operation(crashingWriter);
+    });
+
+    await assert.rejects(
+      control.dispatchBatch(runId, [
+        { type: "pause", reason: "crash boundary", lane: "executor" },
+        { type: "resume", lane: "executor" },
+      ]),
+      /simulated process exit after event commit/,
+    );
+    const staleProjection = await eventStore.loadProjection(runId);
+    assert.equal(staleProjection?.lastSeq, before.lastSeq, "projection must remain at the pre-crash checkpoint");
+
+    // A fresh process sees the complete committed batch in the event stream,
+    // then repairs the stale materialized view before accepting new work.
+    const reopenedStore = new JsonlControlStore(join(root, "runs"));
+    const reopened = new ControlStore(reopenedStore);
+    const replayed = await reopened.replay(runId);
+    assert.equal(replayed.status, "RUNNING");
+    assert.equal(replayed.lastSeq, before.lastSeq + 2);
+    const repaired = await reopened.reconcileProjection(runId);
+    assert.equal(repaired.repaired, true);
+    assert.equal(repaired.replayHash, projectionHash(replayed));
+    const persisted = await reopenedStore.loadProjection(runId);
+    assert.ok(persisted);
+    assert.equal(projectionHash(persisted), projectionHash(replayed));
+
+    const second = await reopened.reconcileProjection(runId);
+    assert.equal(second.repaired, false, "reconciliation is idempotent after repair");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

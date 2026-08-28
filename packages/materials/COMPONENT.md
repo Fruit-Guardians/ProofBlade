@@ -55,6 +55,12 @@
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
 - 确定性 `baseline-v3` 默认执行六个 Fixture 各三次，并追加 12 个缓存、上下文、收敛、证据和持久化场景；子集可用于诊断，但合并门禁必须满足完整 30 项覆盖。报告哈希必须包含执行预算、规范化 Fixture Catalog 和 Runtime Scenario Catalog 内容哈希。
+- Browser broker 的 HTTP wire 由 `HttpBrowserRuntimeBroker` 固定为版本化 `/v1/browser/{create|inspect|adopt|release|bind|heartbeat}` 生命周期与 `/v1/browser/action` 动作请求，另提供 `GET /v1/browser/health` 能力探针。`create` 是绑定 target/run/generation/policy/recipe/scope/verification key 的幂等 create/open 握手，成功只返回服务端 session/external id、初始 URL 和 state hash；`bind` 使用同一 immutable `bindingTxnId` 把 Control Store owner marker 写入 broker ledger，重复调用必须是 no-op；`dispatchBrowserRuntimeCreateWire`、`dispatchBrowserRuntimeWire`、health/heartbeat dispatcher 提供可复用的服务端严格校验。`HttpBrowserVerifierFactory` 已把 create 响应转换为带同一 session id、opaque handle、初始 state hash 和 release callback 的 `BrowserContextPort`，create key 从不可变请求派生，客户端重试不会换 key。`DurableBrowserRuntimeService` 已提供服务端 ledger、原子 STARTING reservation、exact-key reconcile、lease/heartbeat、binding 校验、health/capability probe 和 resolver-owned action service；它要求部署方注入真正的 browser host，不会自行伪造 context。生命周期只发送 run/generation/owner、opaque externalId、bindingTxnId 和 Effect/request/policy/recipe/scope hash，不发送 cookie、页面正文或 driver；客户端同样拒绝响应中的未知字段，防止服务端误把运行时数据带过 wire。`createBrowserRuntimeHttpHandler` 统一处理 Node HTTP 路由、请求体上限、Content-Type、abort 和脱敏状态码，真实服务可分别实现 `BrowserRuntimeCreateService`、`BrowserRuntimeBrokerService`、health 和 heartbeat service。只有服务端回显精确 handle 且应用提供 context connector 时才允许 adopt；响应体上限、超时、非法响应和 connector 失败均保持 `UNKNOWN`，由外部资源账本重试，不新建 context。已冻结的 action wire 复用同一资源绑定，当前支持 navigate/click/fill/submit/wait，并通过 `HttpBrowserRuntimeContextPort` 返回有上限的页面结果、当前 URL 与 state hash；`BrowserRuntimeContextActionService` 可把解析后的 action 转发给部署方 resolver-owned context，storageState 只返回空的脱敏形状，真实部署仍需把 host 接到持久 Playwright 服务进程并完成 registry 崩溃窗口收敛，不能把 Playwright 对象或 cookie 跨进程传输。配置 Broker 的 CLI/GUI/Competition 统一把缺失 factory/凭据视为 Browser-required 条件，不静默退回进程内 Playwright。
+
+Browser Runtime 服务启动时会先扫描并对账 `STARTING` reservation：只有 Host 的精确
+`inspectByIdempotency` 返回完整身份才提升为 `ACTIVE`，`ABSENT` 进入 `UNKNOWN`，
+查询失败保持 `pending`；不会因重启或服务成功监听而重新创建 Browser context。发布入口
+再由 `--require-ready` 强制要求 `READY + stableAcrossRestart=true`。
 
 ## 验证
 

@@ -77,6 +77,30 @@ export interface ModelPricingConfig {
   cacheWriteUsdPerMillion: number;
 }
 
+/** Non-secret client configuration for an optional durable Browser broker. */
+export interface BrowserRuntimeBrokerConfig {
+  /** Absolute HTTP(S) endpoint of the broker service. */
+  baseUrl: string;
+  /** Environment variable containing a Bearer token (defaults to PROOFBLADE_BROWSER_RUNTIME_TOKEN). */
+  tokenEnv?: string;
+  /** Stable name used in diagnostics and broker capability composition. */
+  name?: string;
+  /** Per-request timeout for lifecycle and action calls. */
+  timeoutMs?: number;
+}
+
+/** Non-secret client configuration for the optional durable Pwn/HTTP broker. */
+export interface SessionRuntimeBrokerConfig {
+  /** Absolute HTTP(S) endpoint of the session runtime service. */
+  baseUrl: string;
+  /** Environment variable containing the Bearer token. */
+  tokenEnv?: string;
+  /** Stable name used in diagnostics and recovery composition. */
+  name?: string;
+  /** Per-request timeout for lifecycle and action calls. */
+  timeoutMs?: number;
+}
+
 export interface ExecutionConfig {
   /** Keep host as the backwards-compatible default; competition profiles can opt into Docker. */
   backend?: ExecutionBackend;
@@ -107,7 +131,7 @@ export interface ResolvedExecutionConfig {
 
 export interface ProofBladeConfig {
   schemaVersion: 1;
-  runtime: { piVersion: string };
+  runtime: { piVersion: string; browserBroker?: BrowserRuntimeBrokerConfig; sessionBroker?: SessionRuntimeBrokerConfig };
   storage: { runsDir: string; fixturesDir: string };
   tools?: { outputRewrite?: OutputRewriteConfig };
   intentScheduler?: IntentSchedulerConfig;
@@ -167,6 +191,22 @@ export function resolveExecutionConfig(config: ProofBladeConfig): ResolvedExecut
 function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (config.schemaVersion !== 1) throw new Error(`Unsupported config schema in ${path}`);
   if (config.runtime?.piVersion !== "0.83.0") throw new Error(`Config ${path} must lock Pi to 0.83.0`);
+  const browserBroker = config.runtime?.browserBroker;
+  if (browserBroker !== undefined) {
+    if (!isRecord(browserBroker)) throw new Error(`Invalid runtime.browserBroker in ${path}`);
+    validateHttpUrl(browserBroker.baseUrl, `runtime.browserBroker.baseUrl in ${path}`);
+    if (browserBroker.name !== undefined && (typeof browserBroker.name !== "string" || browserBroker.name.trim().length === 0 || browserBroker.name.length > 128)) throw new Error(`Invalid runtime.browserBroker.name in ${path}`);
+    if (browserBroker.tokenEnv !== undefined && (typeof browserBroker.tokenEnv !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(browserBroker.tokenEnv))) throw new Error(`Invalid runtime.browserBroker.tokenEnv in ${path}`);
+    if (browserBroker.timeoutMs !== undefined && (!Number.isInteger(browserBroker.timeoutMs) || browserBroker.timeoutMs < 100 || browserBroker.timeoutMs > 120_000)) throw new Error(`Invalid runtime.browserBroker.timeoutMs in ${path}`);
+  }
+  const sessionBroker = config.runtime?.sessionBroker;
+  if (sessionBroker !== undefined) {
+    if (!isRecord(sessionBroker)) throw new Error(`Invalid runtime.sessionBroker in ${path}`);
+    validateHttpUrl(sessionBroker.baseUrl, `runtime.sessionBroker.baseUrl in ${path}`);
+    if (sessionBroker.name !== undefined && (typeof sessionBroker.name !== "string" || sessionBroker.name.trim().length === 0 || sessionBroker.name.length > 128)) throw new Error(`Invalid runtime.sessionBroker.name in ${path}`);
+    if (sessionBroker.tokenEnv !== undefined && (typeof sessionBroker.tokenEnv !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(sessionBroker.tokenEnv))) throw new Error(`Invalid runtime.sessionBroker.tokenEnv in ${path}`);
+    if (sessionBroker.timeoutMs !== undefined && (!Number.isInteger(sessionBroker.timeoutMs) || sessionBroker.timeoutMs < 100 || sessionBroker.timeoutMs > 120_000)) throw new Error(`Invalid runtime.sessionBroker.timeoutMs in ${path}`);
+  }
   const profile = config.modelProfiles?.executor;
   if (!profile) throw new Error(`Config ${path} is missing modelProfiles.executor`);
   if (!(["openai-completions", "openai-responses", "anthropic-messages"] as const).includes(profile.api)) throw new Error(`Unsupported provider API: ${String(profile.api)}`);

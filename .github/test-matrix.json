@@ -2,6 +2,12 @@
   "schemaVersion": 1,
   "rules": [
     {
+      "id": "atoms-storage",
+      "sourceGlobs": ["packages/atoms/src/**"],
+      "testGlobs": ["packages/atoms/tests/atoms.test.ts"],
+      "command": "node --import tsx --test packages/atoms/tests/atoms.test.ts"
+    },
+    {
       "id": "mcp-registry",
       "sourceGlobs": ["packages/materials/src/mcp/**"],
       "testGlobs": ["packages/materials/tests/mcp.test.ts"],
@@ -22,9 +28,10 @@
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
-        "packages/materials/tests/environment-janitor.test.ts"
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/competition-remote-query-matrix.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/competition-api.test.ts packages/materials/tests/dasctf-api.test.ts packages/materials/tests/competition-fleet.test.ts packages/materials/tests/competition-control-plane.test.ts packages/materials/tests/competition-solver.test.ts packages/materials/tests/environment-janitor.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/competition-api.test.ts packages/materials/tests/dasctf-api.test.ts packages/materials/tests/competition-fleet.test.ts packages/materials/tests/competition-control-plane.test.ts packages/materials/tests/competition-solver.test.ts packages/materials/tests/environment-janitor.test.ts packages/materials/tests/competition-remote-query-matrix.test.ts"
     },
     {
       "id": "runtime-recovery",
@@ -40,11 +47,20 @@
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/session-resource-adapter.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/durability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/durability.test.ts packages/materials/tests/provider-pi-http-smoke.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/coding-resources.test.ts packages/materials/tests/context.test.ts packages/materials/tests/context-recovery.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/verification-recovery.test.ts packages/materials/tests/binding-transaction.test.ts packages/materials/tests/external-resource-registry.test.ts packages/materials/tests/session-resource-adapter.test.ts packages/materials/tests/pwn-session-runtime-host.test.ts packages/materials/tests/pwn-session-supervisor.test.ts packages/materials/tests/browser-resource-adapter.test.ts packages/materials/tests/runtime-preflight.test.ts packages/materials/tests/session-runtime-combined-host.test.ts packages/materials/tests/observability.test.ts packages/materials/tests/durability.test.ts packages/materials/tests/provider-pi-http-smoke.test.ts"
     },
     {
       "id": "agent-orchestration",
@@ -61,36 +77,51 @@
     {
       "id": "web-pwn-verification",
       "sourceGlobs": [
+        "packages/materials/src/config.ts",
         "packages/materials/src/web/**",
         "packages/materials/src/pwn/**",
         "packages/materials/src/verification/**",
-        "packages/materials/src/container/**"
+        "packages/materials/src/container/**",
+        "packages/materials/src/recovery/session-runtime-wire.ts",
+        "packages/materials/src/recovery/session-runtime-service.ts"
       ],
       "testGlobs": [
         "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
-        "packages/materials/tests/container-runtime.test.ts"
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/web-session.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/pwn-tools.test.ts packages/materials/tests/pwn-coding-tools.test.ts packages/materials/tests/competition-pwn-e2e.test.ts packages/materials/tests/container-runtime.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/web-session.test.ts packages/materials/tests/web-tools.test.ts packages/materials/tests/pwn-layer.test.ts packages/materials/tests/pwn-tools.test.ts packages/materials/tests/pwn-coding-tools.test.ts packages/materials/tests/competition-pwn-e2e.test.ts packages/materials/tests/container-runtime.test.ts packages/materials/tests/session-registry.test.ts packages/materials/tests/browser-resource-adapter.test.ts packages/materials/tests/browser-runtime-broker.test.ts packages/materials/tests/browser-runtime-playwright-host.test.ts packages/materials/tests/browser-runtime-service.test.ts packages/materials/tests/session-runtime-wire.test.ts packages/materials/tests/session-runtime-service.test.ts"
     },
     {
       "id": "control-and-evidence",
       "sourceGlobs": [
         "packages/materials/src/control/**",
         "packages/materials/src/domain/**",
-        "packages/materials/src/knowledge/**"
+        "packages/materials/src/knowledge/**",
+        "packages/materials/src/storage/**"
       ],
       "testGlobs": [
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
-        "packages/materials/tests/interruption-recovery.test.ts"
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/control-store.test.ts packages/materials/tests/control-store-concurrency.test.ts packages/materials/tests/competition-convergence.test.ts packages/materials/tests/handoff.test.ts packages/materials/tests/evidence-curation-gate.test.ts packages/materials/tests/interruption-recovery.test.ts packages/materials/tests/domain-records.test.ts packages/materials/tests/pwn-layer.test.ts"
     },
     {
       "id": "evaluation",
@@ -140,6 +171,15 @@
       "command": "node --import tsx --test packages/materials/tests/demo.test.ts"
     },
     {
+      "id": "services-composition",
+      "sourceGlobs": ["packages/materials/src/app/**"],
+      "testGlobs": [
+        "packages/materials/tests/demo.test.ts",
+        "packages/materials/tests/control-store.test.ts"
+      ],
+      "command": "node --import tsx --test packages/materials/tests/demo.test.ts packages/materials/tests/control-store.test.ts"
+    },
+    {
       "id": "app-server-security",
       "sourceGlobs": [
         "packages/materials/src/control/app-server.ts",
@@ -153,13 +193,14 @@
     },
     {
       "id": "gui-server-control",
-      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts", "apps/gui/src/App.tsx", "apps/gui/src/shared.ts", "apps/gui/src/workspace-settings.ts"],
+      "sourceGlobs": ["apps/gui/src/server.ts", "apps/gui/src/debug-data.ts", "apps/gui/src/App.tsx", "apps/gui/src/shared.ts", "apps/gui/src/control-view.ts", "apps/gui/src/workspace-settings.ts"],
       "testGlobs": [
         "packages/materials/tests/app-server.test.ts",
         "apps/gui/tests/competition-settings.test.ts",
-        "apps/gui/tests/debug-data.test.ts"
+        "apps/gui/tests/debug-data.test.ts",
+        "apps/gui/tests/control-view.test.ts"
       ],
-      "command": "node --import tsx --test packages/materials/tests/app-server.test.ts apps/gui/tests/competition-settings.test.ts apps/gui/tests/debug-data.test.ts"
+      "command": "node --import tsx --test packages/materials/tests/app-server.test.ts apps/gui/tests/competition-settings.test.ts apps/gui/tests/debug-data.test.ts apps/gui/tests/control-view.test.ts"
     },
     {
       "id": "cli-entrypoint",

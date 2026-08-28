@@ -3,23 +3,31 @@ import { dirname, join } from "node:path";
 import type { HarnessEvent, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createInitialSnapshot, projectionHash, reduce } from "../control/reducer.js";
-import { atomicWriteFile, durableAppendFile, KeyedOperationQueue } from "@proofblade/atoms";
+import { atomicWriteFile, durableAppendFile, KeyedOperationQueue, withFileLock } from "@proofblade/atoms";
+import type { FileLockOptions } from "@proofblade/atoms";
 import { EventProjector } from "@proofblade/molecules";
+
+export interface JsonlRunWriter {
+  append(events: HarnessEvent[], authoritySecret: string): Promise<void>;
+  saveProjection(snapshot: RunSnapshot, authoritySecret: string): Promise<void>;
+}
 
 export class JsonlControlStore {
   private readonly runsRoot: string;
   private readonly writes = new KeyedOperationQueue();
   private readonly authorityHashes = new Map<string, string>();
+  private readonly lockOptions: FileLockOptions;
 
-  public constructor(runsRoot: string) {
+  public constructor(runsRoot: string, options: { lock?: FileLockOptions } = {}) {
     this.runsRoot = runsRoot;
+    this.lockOptions = options.lock ?? {};
   }
 
   public runPath(runId: string): string {
     return join(this.runsRoot, runId, "events.jsonl");
   }
 
-  public async create(runId: string, task: RunSnapshot["task"], versionSnapshot: RunVersionSnapshot | undefined, authorityHash: string): Promise<RunSnapshot> {
+  public async create(runId: string, task: RunSnapshot["task"], versionSnapshot: RunVersionSnapshot | undefined, authorityHash: string, authoritySecret?: string): Promise<RunSnapshot> {
     const path = this.runPath(runId);
     await mkdir(this.runsRoot, { recursive: true });
     try {
@@ -30,12 +38,32 @@ export class JsonlControlStore {
       if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`Run already exists: ${runId}`);
       throw error;
     }
-    const initial = createInitialSnapshot(runId, task);
-    await this.#persistTask(runId, task);
-    await atomicWriteFile(path, "");
-    await this.#appendUnchecked([makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0, taskHash: sha256(canonicalJson(task)), authorityHash, versionSnapshot })]);
-    this.authorityHashes.set(runId, authorityHash);
-    return (await this.snapshot(runId)) ?? initial;
+    return await this.writes.run(runId, async () => await withFileLock(join(dirname(path), ".control.lock"), async () => {
+      await this.#persistTask(runId, task);
+      await atomicWriteFile(path, "");
+      await this.#appendUnchecked([makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0, taskHash: sha256(canonicalJson(task)), authorityHash, versionSnapshot })]);
+      this.authorityHashes.set(runId, authorityHash);
+      const snapshot = await this.replayWithTask(runId, task, await this.events(runId));
+      if (authoritySecret !== undefined) await this.#saveProjectionUnlocked(snapshot, authoritySecret);
+      return snapshot;
+    }, this.lockOptions));
+  }
+
+  /**
+   * Execute a complete read/validate/append/projection transaction while
+   * holding the cross-process Run lock. Callers must reread the event stream
+   * inside this callback; an in-memory ControlStore queue is not sufficient
+   * when another process owns the same Run.
+   */
+  public async withRunLock<T>(runId: string, operation: (writer: JsonlRunWriter) => Promise<T>): Promise<T> {
+    const lockPath = join(this.runsRoot, runId, ".control.lock");
+    return await this.writes.run(runId, async () => await withFileLock(lockPath, async () => {
+      const writer: JsonlRunWriter = {
+        append: async (events, authoritySecret) => await this.#appendAuthorizedUnlocked(events, authoritySecret),
+        saveProjection: async (snapshot, authoritySecret) => await this.#saveProjectionUnlocked(snapshot, authoritySecret),
+      };
+      return await operation(writer);
+    }, this.lockOptions));
   }
 
   public async events(runId: string): Promise<HarnessEvent[]> {
@@ -68,11 +96,7 @@ export class JsonlControlStore {
     if (events.some((event) => event.runId !== runId || event.streamId !== runId)) {
       throw new Error("A JSONL append cannot mix Run event streams");
     }
-    const anchored = await this.#authorityHashFor(runId);
-    if (sha256(authoritySecret) !== anchored) {
-      throw new Error("JSONL write authority does not match the immutable Run anchor");
-    }
-    await this.#appendUnchecked(events);
+    await this.withRunLock(runId, async (writer) => await writer.append(events, authoritySecret));
   }
 
   public async snapshot(runId: string): Promise<RunSnapshot | undefined> {
@@ -104,7 +128,7 @@ export class JsonlControlStore {
    */
   public async migrateLegacyRun(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only"> {
     if (!/^[a-f0-9]{64}$/i.test(authorityHash)) throw new Error("Legacy Run migration requires a valid authority hash");
-    return await this.writes.run(runId, async () => {
+    return await this.withRunLock(runId, async () => {
       const events = await this.events(runId);
       const first = events[0];
       if (!first || first.type !== "run_started" || first.seq !== 1) throw new Error(`Run ${runId} has no valid first run_started event`);
@@ -142,7 +166,8 @@ export class JsonlControlStore {
       });
       // Defense-in-depth: reducer validation happens before the durable append.
       reduce(legacy, migration);
-      await durableAppendFile(this.runPath(runId), `${canonicalJson(migration)}\n`);
+      const current = await readFile(this.runPath(runId), "utf8");
+      await atomicWriteFile(this.runPath(runId), `${current}${canonicalJson(migration)}\n`);
       this.authorityHashes.set(runId, authorityHash);
       return "migrated";
     });
@@ -164,6 +189,10 @@ export class JsonlControlStore {
   }
 
   public async saveProjection(snapshot: RunSnapshot, authoritySecret: string): Promise<void> {
+    await this.withRunLock(snapshot.runId, async (writer) => await writer.saveProjection(snapshot, authoritySecret));
+  }
+
+  async #saveProjectionUnlocked(snapshot: RunSnapshot, authoritySecret: string): Promise<void> {
     const anchored = await this.#authorityHashFor(snapshot.runId);
     if (sha256(authoritySecret) !== anchored || snapshot.authorityHash !== anchored) {
       throw new Error("Projection write authority does not match the immutable Run anchor");
@@ -186,13 +215,39 @@ export class JsonlControlStore {
     return sha256(canonicalJson(await this.replay(runId)));
   }
 
+  async #appendAuthorizedUnlocked(events: HarnessEvent[], authoritySecret: string): Promise<void> {
+    if (events.length === 0) return;
+    const runId = events[0]!.runId;
+    if (events.some((event) => event.runId !== runId || event.streamId !== runId)) {
+      throw new Error("A JSONL append cannot mix Run event streams");
+    }
+    const anchored = await this.#authorityHashFor(runId);
+    if (sha256(authoritySecret) !== anchored) {
+      throw new Error("JSONL write authority does not match the immutable Run anchor");
+    }
+    await this.#appendUnchecked(events);
+  }
+
   async #appendUnchecked(events: HarnessEvent[]): Promise<void> {
     if (events.length === 0) return;
     const path = this.runPath(events[0]!.runId);
     await mkdir(dirname(path), { recursive: true });
-    await this.writes.run(events[0]!.runId, async () => {
-      await durableAppendFile(path, events.map((event) => `${canonicalJson(event)}\n`).join(""));
+    const serialized = events.map((event) => `${canonicalJson(event)}\n`).join("");
+    if (events.length === 1) {
+      // The common single-event path keeps append-only throughput and the
+      // established one-event-per-line JSONL format.
+      await durableAppendFile(path, serialized);
+      return;
+    }
+    // Replacing the complete JSONL file makes a multi-command dispatchBatch
+    // atomic from the replayer's perspective. A process may die before the
+    // rename, in which case the previous complete stream remains; it cannot
+    // expose a half of a multi-event batch.
+    const current = await readFile(path, "utf8").catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+      throw error;
     });
+    await atomicWriteFile(path, `${current}${serialized}`);
   }
 
   async #authorityHashFor(runId: string): Promise<string> {

@@ -569,6 +569,22 @@ test("GUI selects a prepared challenge profile before creating the coding lane",
   }
 });
 
+test("GUI fixture conversations enter RECON through RunCoordinator", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-conversation-phase-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "GUI-FIXTURE-CONVERSATION-001";
+    const snapshot = await data.createFixtureConversation({ runId, fixtureId: "web-source-1", objective: "检查题目并保留第一条证据。" });
+    assert.equal(snapshot.domainPhase, "RECON");
+    assert.equal(snapshot.phase, "reconnaissance");
+    const events = await new JsonlControlStore(join(root, config.storage.runsDir)).events(runId);
+    assert.ok(events.some((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "RECON"));
+    assert.ok(events.some((event) => event.type === "phase_started" && event.payload?.phase === "reconnaissance"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("persists a solve run before returning so an immediate pause aborts its coding lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-solve-pause-"));
   let releaseFactory!: () => void;

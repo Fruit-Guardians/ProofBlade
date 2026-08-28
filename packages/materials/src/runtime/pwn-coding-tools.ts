@@ -7,9 +7,10 @@ import type { ExploitRecipe } from "../verification/pwn-reproducer.js";
 import { decodeBase64Strict } from "../pwn/bytes.js";
 
 /**
- * Model-facing pwn interaction tools.  They all route to `context.pwnTools`,
- * which exists only when a Docker-backed pwn container is attached; without it
- * they fail closed with a clear message instead of pretending a tube exists.
+ * Model-facing pwn interaction tools. They all route to `context.pwnTools`,
+ * which exists only when a Docker-backed pwn container or durable session
+ * broker is attached; without either they fail closed instead of pretending a
+ * tube exists.
  *
  * These are structured session tools (open returns a sessionId; later calls
  * carry it) — the persistent-interaction shape a one-shot `bash` cannot provide.
@@ -18,11 +19,11 @@ import { decodeBase64Strict } from "../pwn/bytes.js";
  * the same as claiming a shell.
  */
 export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
-  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnReproduceTool];
+  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnRecordPrimitiveTool, pwnReproduceTool];
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
-  if (!context.pwnTools) throw new Error("pwn tools are unavailable: this run has no Docker-backed pwn container. Use bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
+  if (!context.pwnTools) throw new Error("pwn tools are unavailable: this run has no Docker-backed pwn container or durable session broker. Use bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
   return context.pwnTools;
 }
 
@@ -123,6 +124,24 @@ const pwnListTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, _params, _signal, _onUpdate, context) {
     return pwnResult({ sessions: requireHandler(context).list() });
+  },
+};
+
+const pwnRecordPrimitiveTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_record_primitive",
+  label: "pwn_record_primitive",
+  description: "Record one bounded pwn primitive hypothesis with supporting Artifact/Evidence ids. This is an untrusted model hypothesis, never a shell or verifier claim; confidence must stay below 1.",
+  parameters: Type.Object({
+    primitive: Type.String({ minLength: 1, maxLength: 256, description: "Short primitive hypothesis, e.g. format-string write or off-by-one size corruption." }),
+    confidence: Type.Number({ minimum: 0, maximum: 0.9999 }),
+    preconditionRecordIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as { primitive: string; confidence: number; preconditionRecordIds?: string[]; artifactIds?: string[]; evidenceIds?: string[] };
+    return pwnResult(await requireHandler(context).recordPrimitive(input));
   },
 };
 

@@ -36,7 +36,17 @@ test("local holdout evaluates Web/Pwn plus Reverse/Crypto/Forensics without Prov
       corpusPath: join(fixtureRoot, "manifest.json"),
       runPrefix: "LOCAL-HOLDOUT-TEST",
     });
-    assert.equal(summary.gate.passed, true, JSON.stringify(summary.gate.checks));
+    assert.equal(summary.gate.passed, true, JSON.stringify({
+      checks: summary.gate.checks,
+      failedCases: summary.variants.flatMap((variant) => variant.cases.filter((item) => !item.success).map((item) => ({
+        variant: variant.id,
+        case: item.corpusCaseId,
+        status: item.status,
+        phase: item.phase,
+        error: item.error,
+        failureCategory: item.failureCategory,
+      }))),
+    }));
     assert.deepEqual(summary.variants.map((variant) => variant.id), ["local-baseline", "local-candidate"]);
     assert.equal(summary.corpus.cases.length, 27);
     assert.equal(summary.corpus.cases.filter((item) => item.targetKind === "web").length, 12);

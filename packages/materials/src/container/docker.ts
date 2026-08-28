@@ -5,6 +5,8 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { lookup } from "node:dns/promises";
 import type { ResolvedExecutionConfig } from "../config.js";
 import { ContainerExecutionEnv } from "./execution-env.js";
+import { ExternalResourceRegistry, externalResourceBindingTransactionId } from "../recovery/external-resource-registry.js";
+import { DockerContainerResourceAdapter } from "./docker-resource-adapter.js";
 import type {
   ContainerCommandOptions,
   ContainerCommandResult,
@@ -47,6 +49,19 @@ interface LiveSession {
   /** In-container path holding the target process PID for precise signalling. */
   pidfile: string;
 }
+
+interface NetworkCleanupTarget {
+  id?: string;
+  name?: string;
+}
+
+type NetworkCleanupMode = "create-rollback" | "destroy";
+
+type NetworkOwnership =
+  | { status: "owned"; removeTarget: string }
+  | { status: "absent" }
+  | { status: "mismatch"; reason: string }
+  | { status: "unknown"; reason: string };
 
 export interface DockerProcessResult {
   stdout: string;
@@ -130,10 +145,22 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   private readonly runner: DockerCommandRunner;
   private readonly sessions = new Map<string, LiveSession>();
   private readonly sessionSpawner: SessionProcessSpawner;
+  private externalResources?: ExternalResourceRegistry;
 
-  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner, sessionSpawner?: SessionProcessSpawner) {
+  public constructor(private readonly config: ResolvedExecutionConfig, runner?: DockerCommandRunner, sessionSpawner?: SessionProcessSpawner, externalResources?: ExternalResourceRegistry) {
     this.runner = runner ?? new SpawnDockerCommandRunner(config.dockerCommand);
     this.sessionSpawner = sessionSpawner ?? defaultSessionSpawner;
+    this.externalResources = externalResources;
+  }
+
+  /** Bind the shared recovery ledger when a runtime is supplied by an app shell. */
+  public bindExternalResourceRegistry(registry: ExternalResourceRegistry): void {
+    this.externalResources = registry;
+  }
+
+  /** Build the label-verifying adapter used by RunRecoveryService. */
+  public externalResourceAdapter(): DockerContainerResourceAdapter {
+    return new DockerContainerResourceAdapter(this.runner, configTimeout(this.config), this.config.outputPreviewBytes);
   }
 
   public async doctor(profile?: ContainerRef["profile"]): Promise<ContainerDoctorReport> {
@@ -160,27 +187,47 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       const skills = await fs.stat(request.skillLibraryHostPath);
       if (!skills.isDirectory()) throw new Error(`Container skill library is not a directory: ${request.skillLibraryHostPath}`);
     }
-    await this.ensureImage(request.image);
+    const resourceId = dockerContainerResourceId(request.runId, request.generation, request.profile);
+    const bindingTxnId = externalResourceBindingTransactionId({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor" });
+    const attemptToken = createOwnerToken();
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
+    const networkHint = request.networkPolicy === "target-only" ? `proofblade-${slug}-g${request.generation}-net` : undefined;
+    const gatewayHint = request.networkPolicy === "target-only" ? `${name}-gateway` : undefined;
+    await this.externalResources?.register({
+      id: resourceId,
+      kind: "container",
+      runId: request.runId,
+      generation: request.generation,
+      ownerLane: "executor",
+      bindingTxnId,
+      externalRefs: {
+        attempt: attemptToken,
+        solver: name,
+        ...(networkHint ? { network: networkHint } : {}),
+        ...(gatewayHint ? { gateway: gatewayHint } : {}),
+      },
+    });
     const identityLabels = {
       "proofblade.managed": "true",
       "proofblade.run_id": request.runId,
       "proofblade.generation": String(request.generation),
       "proofblade.profile": request.profile,
+      "proofblade.binding_txn": bindingTxnId,
     };
     const ownerLabels = {
       ...identityLabels,
       "proofblade.owner_pid": String(process.pid),
       "proofblade.owner_started_at": String(PROCESS_STARTED_AT),
       // PID/start-time identify the process, not this individual create()
-      // attempt.  A unique token prevents a losing concurrent creator from
-      // claiming the winner's deterministically named network.
-      "proofblade.owner_token": createOwnerToken(),
+      // attempt. Keep the same unique token in the ledger and backend labels
+      // so rollback authority can be compared atomically after a race.
+      "proofblade.owner_token": attemptToken,
     };
     const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
     let networkName: string | undefined;
+    let networkId: string | undefined;
     let networkCandidate: string | undefined;
     let networkPreexisted = false;
     let gatewayContainerId: string | undefined;
@@ -188,26 +235,37 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     let gatewayCreateAttempted = false;
     let solverCreateAttempted = false;
     try {
+      await this.ensureImage(request.image);
       if (request.networkPolicy === "target-only") {
-        networkCandidate = `proofblade-${slug}-g${request.generation}-net`;
+        const networkNameForCreate = networkHint;
+        if (!networkNameForCreate) throw new Error("target-only Docker network is missing its recovery name");
+        networkCandidate = networkNameForCreate;
         // A name conflict must never turn cleanup into a delete of a network
         // that existed before this attempt. Remember matching ownership before
         // create; if create fails, only a newly observed, owned network may be
         // used as a partial-create fallback.
         networkPreexisted = (await this.ownedNetworkName(networkCandidate, ownerLabels)) !== undefined;
-        await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkCandidate]);
-        networkName = networkCandidate;
+        const network = await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkNameForCreate]);
+        networkName = networkNameForCreate;
+        // Docker prints the immutable network ID on successful creation. Keep
+        // the deterministic name only as a recovery fallback for a crash before
+        // this checkpoint is persisted; an absent stdout ID must not be treated
+        // as a durable ID because a later same-name network could be reused.
+        networkId = network.stdout.trim() || undefined;
+        await this.externalResources?.markStarted(resourceId, undefined, { network: networkId ?? networkNameForCreate });
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
-        const gatewayName = `${name}-gateway`;
+        const gatewayName = gatewayHint ?? `${name}-gateway`;
         gatewayCreateAttempted = true;
-        const gateway = await this.runChecked(["run", "-d", "--name", gatewayName, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
-        gatewayContainerId = gateway.stdout.trim();
+        const gateway = await this.runChecked(["run", "-d", "--name", gatewayName, ...labels, "--network", networkNameForCreate, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
+        const gatewayId = gateway.stdout.trim();
+        gatewayContainerId = gatewayId;
+        await this.externalResources?.markStarted(resourceId, undefined, { gateway: gatewayId });
         const targets = await resolveTargets(request.targets);
         // Invoke through /bin/sh instead of relying on the script's shebang;
         // this remains robust if a host checkout rewrites executable bits or
         // line endings before the image build.
-        await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
+        await this.runChecked(["exec", gatewayId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
       }
       const limits = request.limits;
       const isPwn = request.profile === "pwn" || request.profile === "pwn-kernel";
@@ -242,17 +300,37 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       solverCreateAttempted = true;
       const created = await this.runChecked(args);
       containerId = created.stdout.trim();
+      // Persist the exact container handle before any further probe or image
+      // inspection. A process crash after `docker run` must leave recovery an
+      // inspectable STARTED resource, never a PROPOSED record that could be
+      // discarded without checking Docker labels.
+      await this.externalResources?.registerStarted({
+        id: resourceId,
+        kind: "container",
+        runId: request.runId,
+        generation: request.generation,
+        ownerLane: "executor",
+        externalId: containerId,
+        externalRefs: {
+          attempt: attemptToken,
+          solver: name,
+          ...(gatewayContainerId ? { gateway: gatewayContainerId } : {}),
+          ...(networkName ? { network: networkId ?? networkName } : {}),
+        },
+      });
       await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
-      return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
+      await this.externalResources?.markConfirmed(resourceId, "Docker container created and workspace probe passed");
+      return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}), ...(networkId ? { networkId } : {}) };
     } catch (error) {
       const cleanupNetworkName = networkName ?? (!networkPreexisted && networkCandidate
         ? await this.ownedNetworkName(networkCandidate, ownerLabels)
         : undefined);
+      const cleanupNetwork = cleanupNetworkName || networkId ? { id: networkId, name: cleanupNetworkName } : undefined;
       const cleanupErrors = await this.cleanupResources(
         containerId,
         gatewayContainerId,
-        cleanupNetworkName,
+        cleanupNetwork,
         solverCreateAttempted ? name : undefined,
         gatewayCreateAttempted ? `${name}-gateway` : undefined,
         // The deterministic fallback names are shared by attempts with the
@@ -260,7 +338,17 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // identityLabels alone would let a name-conflicting attempt delete a
         // gateway created by a different attempt.
         ownerLabels,
+        "create-rollback",
       );
+      const terminalGuard = {
+        attemptToken,
+        ...(containerId ? { externalId: containerId } : {}),
+      };
+      if (cleanupErrors.length > 0) {
+        await this.externalResources?.markUnknownIfOwned(resourceId, "Docker create cleanup was incomplete", terminalGuard).catch(() => undefined);
+      } else if (containerId) {
+        await this.externalResources?.markReleasedIfOwned(resourceId, "Docker create rolled back", terminalGuard).catch(() => undefined);
+      }
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;
     }
@@ -442,12 +530,24 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const failures = await this.cleanupResources(
       ref.containerId,
       ref.gatewayContainerId,
-      ref.networkName,
+      ref.networkId || ref.networkName ? { id: ref.networkId, name: ref.networkName } : undefined,
       ref.name,
-      ref.networkName ? `${ref.name}-gateway` : undefined,
-      { "proofblade.managed": "true", "proofblade.run_id": ref.runId, "proofblade.generation": String(ref.generation), "proofblade.profile": ref.profile },
+      ref.networkId || ref.networkName ? `${ref.name}-gateway` : undefined,
+      {
+        "proofblade.managed": "true",
+        "proofblade.run_id": ref.runId,
+        "proofblade.generation": String(ref.generation),
+        "proofblade.profile": ref.profile,
+        "proofblade.binding_txn": externalResourceBindingTransactionId({ id: dockerContainerResourceId(ref.runId, ref.generation, ref.profile), kind: "container", runId: ref.runId, generation: ref.generation, ownerLane: "executor" }),
+      },
+      "destroy",
     );
-    if (failures.length > 0) throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
+    const resourceId = dockerContainerResourceId(ref.runId, ref.generation, ref.profile);
+    if (failures.length > 0) {
+      await this.externalResources?.markUnknown(resourceId, "Docker cleanup failed").catch(() => undefined);
+      throw new AggregateError(failures, `Docker cleanup failed for run ${ref.runId}`);
+    }
+    await this.externalResources?.markReleased(resourceId, "Docker container destroyed").catch(() => undefined);
   }
 
   public async reapStale(options: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean } = {}): Promise<number> {
@@ -530,7 +630,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>): Promise<Error[]> {
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, network?: NetworkCleanupTarget, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>, networkMode: NetworkCleanupMode = "destroy"): Promise<Error[]> {
     const failures: Error[] = [];
     const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
       try { await operation(); } catch (error) { failures.push(toError(error, label)); }
@@ -539,7 +639,16 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const gatewayTarget = gatewayContainerId ?? await this.ownedContainerName(gatewayName, expectedLabels);
     if (solverTarget) await attempt(`solver container ${solverTarget}`, () => this.removeContainer(solverTarget));
     if (gatewayTarget) await attempt(`gateway container ${gatewayTarget}`, () => this.removeContainer(gatewayTarget));
-    if (networkName) await attempt(`network ${networkName}`, () => this.removeNetwork(networkName));
+    if (network?.id || network?.name) {
+      const locator = network.id ?? network.name;
+      if (!locator) return failures;
+      await attempt(`network ${locator}`, async () => {
+        const ownership = await this.inspectOwnedNetwork(network, expectedLabels, networkMode);
+        if (ownership.status === "absent") return;
+        if (ownership.status !== "owned") throw new Error(ownership.reason);
+        await this.removeNetwork(ownership.removeTarget);
+      });
+    }
     return failures;
   }
 
@@ -551,6 +660,54 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   private async removeNetwork(name: string): Promise<void> {
     const result = await this.runner.run(["network", "rm", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
     assertCleanupResult(result, `docker network rm ${name}`);
+  }
+
+  /**
+   * Re-inspect a network immediately before cleanup and return an immutable
+   * Docker ID only after all ownership labels still match. A mutable name may
+   * have been deleted and reused by another workflow while this process was
+   * down; in that case cleanup must fail closed and leave the ledger UNKNOWN.
+   */
+  private async inspectOwnedNetwork(target: NetworkCleanupTarget, expectedLabels: Record<string, string> | undefined, mode: NetworkCleanupMode): Promise<NetworkOwnership> {
+    if (!expectedLabels) return { status: "unknown", reason: "network cleanup is missing expected ownership labels" };
+    const id = target.id?.trim() || undefined;
+    const name = target.name?.trim() || undefined;
+    const locator = id ?? name;
+    if (!locator) return { status: "unknown", reason: "network cleanup is missing a Docker locator" };
+    if (!id && mode !== "create-rollback") return { status: "unknown", reason: "network cleanup has no persisted ID; refusing name-only deletion" };
+    if (!id && expectedLabels["proofblade.owner_token"] === undefined) return { status: "unknown", reason: "name-only network rollback is missing its owner token" };
+    const result = await this.runner.run(["network", "inspect", "--format", "{{json .}}", locator], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.spawnError) return { status: "unknown", reason: `docker network inspect ${locator} failed: ${result.spawnError.message}` };
+    if (result.exitCode !== 0) {
+      const message = result.stderr || result.stdout;
+      if (/\b(no such|not found)\b/i.test(message)) {
+        return id
+          ? { status: "mismatch", reason: `persisted network ID ${id} is absent; refusing name fallback` }
+          : { status: "absent" };
+      }
+      return { status: "unknown", reason: `docker network inspect ${locator} failed: ${compactError(message, `exit ${String(result.exitCode)}`)}` };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(result.stdout.trim());
+    } catch (error) {
+      return { status: "unknown", reason: `docker network inspect ${locator} returned malformed JSON: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { status: "unknown", reason: `docker network inspect ${locator} returned a non-object` };
+    }
+    const details = parsed as { Id?: unknown; Labels?: unknown };
+    const actualId = typeof details.Id === "string" ? details.Id.trim() : "";
+    if (!actualId) return { status: "unknown", reason: `network ${locator} inspect did not return an immutable ID` };
+    if (id && actualId !== id) return { status: "mismatch", reason: `network inspect for ${locator} returned ID ${actualId}, not the persisted ID` };
+    const labels = details.Labels;
+    if (labels === null || typeof labels !== "object" || Array.isArray(labels)) {
+      return { status: "mismatch", reason: `network ${locator} has no valid ownership labels` };
+    }
+    const actualLabels = labels as Record<string, unknown>;
+    const mismatch = Object.entries(expectedLabels).find(([key, value]) => actualLabels[key] !== value);
+    if (mismatch) return { status: "mismatch", reason: `network ${locator} ownership label ${mismatch[0]} does not match` };
+    return { status: "owned", removeTarget: actualId };
   }
 
   /** Resolve a deterministic fallback name only after proving ownership. */
@@ -582,6 +739,11 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       return undefined;
     }
   }
+}
+
+/** Stable registry key for one per-run Docker container generation. */
+export function dockerContainerResourceId(runId: string, generation: number, profile: ContainerRef["profile"]): string {
+  return `container:${runId}:${generation}:${profile}`;
 }
 
 function configTimeout(config: ResolvedExecutionConfig): number { return Math.min(config.commandWaitMs, config.commandHardTimeoutMs); }

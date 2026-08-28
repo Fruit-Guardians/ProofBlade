@@ -36,11 +36,18 @@
 
 - `PAUSED` 状态下的 `finish`、`fail`、`exhaust` 必须在 ControlStore 单写者临界区内统一拒绝，Reducer 重放执行相同策略；只有显式 `resume` 可以解除暂停。
 - 需要共同成立的一组领域命令必须通过 `dispatchBatch` 在同一单写者临界区内预验证和投影；任一命令失败时不得追加部分事件或保存部分投影。
+- Verifier 结果端口允许精确重试已持久化的 Evidence/终态 Completion，但只做严格内容匹配后的 no-op；同一 ID 的内容、方向、引用或 Evidence 集合发生变化会拒绝，不能借幂等语义覆盖旧结论。
 - 依赖最新 RunSnapshot 的幂等写入必须通过 `dispatchTransaction` 完成；同步 prepare 中的读取、判重、ID 生成和命令构造与批量提交共享同一按 Run 串行的临界区，禁止在回调中重入 ControlStore。
 - 新 `job_queued` 命令在领域层强制携带 `backendId` 与 `backendVersion`；`job_queued_legacy` 只用于读取/迁移没有 Backend 绑定的历史事件，最终仍投影为 `job_queued`。
 - Evidence ID、Artifact ID、Effect ID 与 Completion ID 都是不可覆盖的；Evidence 必须绑定当前 run/generation 的既有 Artifact，并校验所有 `dependsOn/supports/refutes` 引用。`reproduction`、`negative`、`confidence: 1`、Completion 终态和成功 finish 只能经私有 Verifier capability 提交，伪造 `lane: "verifier"` 没有权限效果。
+- Verification request 的 `RECOVERY_REQUIRED/RECOVERED` 标记只能经 recovery-only capability 写入；它们是事件流中的审计状态，不授予模型或 GUI 任何完成权限，且恢复标记不能跨 generation 延续。
+- `evaluatePhaseGate(snapshot, phase)` 是可重放的阶段门禁纯函数；它只依据当前 generation 的 Observation/Evidence/Hypothesis/Experiment、Verifier verdict 和 Executor WorkItem 判断缺口，并把旧 generation 标为 `stale`。`SUBMIT` 的成功 finish 必须再次通过该门禁，GUI/Context 只读展示其缺口与 `phaseBudget` 的剩余额度，不能把展示值写回 Run。
 - Completion 只能从 `PROPOSED` 原子转换一次；接受时 Evidence 必须逐条支持该 Completion，并以不同 Effect、session、attempt 与 transcript 满足 reproduction 数量。Verifier Effect 必须从纯 `PROPOSED` 初态启动，终态携带与 Task/Run/Generation/Completion/Candidate/Artifact 精确绑定的结构化 verdict；仅有 `exitCode: 0` 不能表示验证通过。成功 finish 必须显式指定 ACCEPTED Completion，最终 candidate hash、Artifact 和完整 Evidence 集合均从该 Completion 派生并写入 `finalResult`。
 - `append()` 仅允许 Provider/Tool/Turn/usage telemetry；领域事件必须走命令校验，避免绕过引用和终态不变量。
+- 多命令领域批次写入使用同步临时文件加原子替换，而不是直接追加半个 JSONL 批次；常见单事件写入保持同步追加吞吐。进程在提交后、Projection 写入前退出时，事件流仍可完整重放。`ControlStore.reconcileProjection()` 以事件流为事实来源修复过期或损坏的 Projection，且对 `LEGACY-UNTRUSTED` Run 保持只读。
+- Control Store 的完整读-校验-事件-Projection 事务还必须持有 Run 目录下的跨进程文件锁；锁使用 create-exclusive token、owner PID 和 stale reclaim，活跃 owner 不得被抢占。单个进程内的 `KeyedOperationQueue` 只负责降噪，不能替代跨进程协调。所有基于最新快照构造序号的写入必须在锁内重新读取事件流，避免两个进程生成相同 `seq` 或用旧 Projection 覆盖新状态。
+- Web/Pwn 领域记录通过 `domain_record_added` 进入同一 Control Store；记录只保存有界结构化元数据和 Artifact/Evidence/Effect 引用，必须匹配当前 generation 与任务方向，不能用模型权限写入 Web `reproduced` 结论。
+- Broker-owned session 的 Control Store owner 使用可选 `bindingState` fence：`session_opened` 只能由 binding authority 写入 `FINALIZING`，external ledger marker 成功后再由同一 Run 锁内的 `session_binding_completed` 转为 `BOUND`；旧记录默认无 fence。关闭或恢复不能跳过该事件，也不能凭 marker 单独伪造 BOUND。
 - Run 目录采用 create-exclusive 锚点；重复 `runId` 不得重写 `task.json` 或截断 `events.jsonl`。Reducer 只允许 seq=1 的唯一 `run_started`，authority hash 一经锚定不可替换；公开 JSONL reader 的 append/projection write 原语还必须提交创建者 secret。`fixture_reset` 只能由 Fixture capability 单独提交，Sandbox 在实际 reset 前必须调用 `assertResetAllowed` preflight；终态、错误 authority 及 verification/report 阶段不得先改变外部 fixture 再被 ControlStore 拒绝。submission 配额按整个 Run 计数，不能用 generation bump 清零。
 
 ```powershell

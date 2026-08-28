@@ -9,6 +9,7 @@ import { CompetitionApiJournal } from "../src/competition/api-journal.js";
 import { replayCompetitionApiScript } from "../src/competition/api-replay.js";
 import { createServices } from "../src/app/demo.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
+import { beginSubmissionVerificationRequest } from "../src/verification/verification-key.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type {
   CompetitionApi,
@@ -22,7 +23,8 @@ import { NotConfiguredCompetitionApi } from "../src/competition/api.js";
 type LifecycleCall =
   | { method: "listChallenges" }
   | { method: "getChallenge"; challengeId: string }
-  | { method: "startEnvironment"; challengeId: string }
+  | { method: "startEnvironment"; challengeId: string; idempotencyKey?: string }
+  | { method: "inspectEnvironment"; challengeId: string; instanceId?: string; idempotencyKey?: string }
   | { method: "submitFlag"; challengeId: string; flag: string }
   | { method: "stopEnvironment"; challengeId: string; instanceId?: string };
 
@@ -58,9 +60,14 @@ class ScriptedCompetitionApi implements CompetitionApi {
     return { summary: structuredClone(challenge), attachments: [{ name: "flag.txt", base64: Buffer.from("PB{replay_flag}\n").toString("base64") }] };
   }
 
-  public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
-    this.expect({ method: "startEnvironment", challengeId });
-    return { instanceId: "instance-replay-1", connectionInfo: "nc replay 31337" };
+  public async startEnvironment(challengeId: string, options: { idempotencyKey?: string } = {}): Promise<CompetitionEnvironment> {
+    this.expect({ method: "startEnvironment", challengeId, ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}) });
+    return { instanceId: "instance-replay-1", ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}), connectionInfo: "nc replay 31337" };
+  }
+
+  public async inspectEnvironment(challengeId: string, instanceId?: string, options: { idempotencyKey?: string } = {}) {
+    this.expect({ method: "inspectEnvironment", challengeId, ...(instanceId ? { instanceId } : {}), ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}) });
+    return { status: "ACTIVE" as const, challengeId, instanceId: instanceId ?? "instance-replay-1", ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}), connectionInfo: "nc replay 31337" };
   }
 
   public async submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {
@@ -164,9 +171,20 @@ test("competition scoring is verifier-owned and leaves replayable Evidence", asy
     const artifact = await services.artifacts.putText(runId, candidate, { filename: "candidate.txt", sensitivity: "flag_candidate" });
     const completionId = "C-VERIFIER-OWNED";
     const candidateHash = createHash("sha256").update(candidate).digest("hex");
+    const verificationRequest = await beginSubmissionVerificationRequest(services.control, runId, {
+      candidateHash,
+      candidateArtifactId: artifact.id,
+    });
     await services.control.dispatch(runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id },
+      completion: {
+        id: completionId,
+        purpose: "submission",
+        candidateHash,
+        artifactId: artifact.id,
+        verificationRequestId: verificationRequest.request.id,
+        verificationKey: verificationRequest.request.key,
+      },
       lane: "executor",
     });
     const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
@@ -196,10 +214,11 @@ test("durable CompetitionApiJournal replays requests, responses, and failures of
     assert.deepEqual(await recorder.listChallenges(), [challenge]);
     assert.deepEqual((await recorder.getChallenge("REPLAY-1")).summary, challenge);
     assert.deepEqual(await recorder.startEnvironment("REPLAY-1"), { instanceId: "instance-replay-1", connectionInfo: "nc replay 31337" });
+    assert.equal((await recorder.inspectEnvironment("REPLAY-1", "instance-replay-1", { idempotencyKey: "env-replay" })).status, "ACTIVE");
     assert.deepEqual(await recorder.submitFlag("REPLAY-1", "PB{replay_flag}"), { correct: true, message: "offline verdict" });
     await recorder.stopEnvironment("REPLAY-1", "instance-replay-1");
     const summary = await CompetitionApiJournal.inspect(path);
-    assert.deepEqual(summary.operations, { listChallenges: 1, getChallenge: 1, startEnvironment: 1, submitFlag: 1, stopEnvironment: 1 });
+    assert.deepEqual(summary.operations, { listChallenges: 1, getChallenge: 1, startEnvironment: 1, inspectEnvironment: 1, submitFlag: 1, stopEnvironment: 1 });
     assert.equal(summary.failed, 0);
 
     const replay = await CompetitionApiJournal.replay(path);
@@ -207,10 +226,11 @@ test("durable CompetitionApiJournal replays requests, responses, and failures of
       { operation: "listChallenges" },
       { operation: "getChallenge", challengeId: "REPLAY-1" },
       { operation: "startEnvironment", challengeId: "REPLAY-1" },
+      { operation: "inspectEnvironment", challengeId: "REPLAY-1", instanceId: "instance-replay-1", idempotencyKey: "env-replay" },
       { operation: "submitFlag", challengeId: "REPLAY-1", flag: "PB{replay_flag}" },
       { operation: "stopEnvironment", challengeId: "REPLAY-1", instanceId: "instance-replay-1" },
     ]);
-    assert.deepEqual(scripted.map((item) => item.operation), ["listChallenges", "getChallenge", "startEnvironment", "submitFlag", "stopEnvironment"]);
+    assert.deepEqual(scripted.map((item) => item.operation), ["listChallenges", "getChallenge", "startEnvironment", "inspectEnvironment", "submitFlag", "stopEnvironment"]);
     assert.deepEqual(scripted[0]?.result, [challenge]);
     await assert.rejects(() => replay.listChallenges(), /replay exhausted/);
     await assert.rejects(() => CompetitionApiJournal.replay(path).then((journal) => journal.submitFlag("REPLAY-1", "different")), /replay mismatch/);
@@ -229,7 +249,7 @@ test("CompetitionApiJournal records an API failure and replays the same failure 
     assert.equal(summary.schemaVersion, 1);
     assert.equal(summary.count, 1);
     assert.equal(summary.failed, 1);
-    assert.deepEqual(summary.operations, { listChallenges: 1, getChallenge: 0, startEnvironment: 0, submitFlag: 0, stopEnvironment: 0 });
+    assert.deepEqual(summary.operations, { listChallenges: 1, getChallenge: 0, startEnvironment: 0, inspectEnvironment: 0, submitFlag: 0, stopEnvironment: 0 });
     const replay = await CompetitionApiJournal.replay(path);
     await assert.rejects(() => replay.listChallenges(), /offline test platform/);
   } finally {

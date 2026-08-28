@@ -33,6 +33,8 @@ export interface ContainerRef {
   networkPolicy: ContainerNetworkPolicy;
   gatewayContainerId?: string;
   networkName?: string;
+  /** Docker's immutable network handle, preferred over the mutable name during cleanup. */
+  networkId?: string;
 }
 
 export interface ContainerCreateRequest {
@@ -90,6 +92,8 @@ export type { SessionWaitReason };
 export interface ContainerSessionHandle {
   /** Runtime-facing id for this live process, minted by the runtime. */
   readonly sessionId: string;
+  /** Optional opaque id owned by a durable external session broker. */
+  readonly externalId?: string;
   readonly ref: ContainerRef;
 }
 

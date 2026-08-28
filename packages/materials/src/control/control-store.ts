@@ -17,6 +17,7 @@ import type {
   PrimaryFailureCategory,
   RunVersionSnapshot,
   ArtifactSemanticMetadata,
+  ActionBundle,
   ReasoningEdge,
   ReasoningNode,
   ReasoningTree,
@@ -27,22 +28,30 @@ import type {
   ExperimentRecord,
   VerificationVerdict,
   RunToolPreparation,
+  DomainRecord,
+  DomainRecordInput,
+  VerificationRequest,
 } from "../domain/types.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { redactCtfCandidates } from "../domain/candidate.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
-import { JsonlControlStore, makeEvent } from "../storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent, type JsonlRunWriter } from "../storage/jsonl-store.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
-import { reduce } from "./reducer.js";
+import { projectionHash, reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
 import { assertPhaseTransition } from "./phase-machine.js";
 import { isAbsolute, relative, resolve } from "node:path";
+import { completedWorkItemForCompletion } from "../domain/work-item.js";
+import { maxReplansFor, phaseBudget } from "../domain/phase-budget.js";
+import { evaluatePhaseGate } from "../domain/phase-gate.js";
+import { isPwnDomainRecord, isWebDomainRecord, validateDomainRecordShape } from "../domain/records.js";
 
 type WithoutLane<T> = T extends unknown ? Omit<T, "lane"> : never;
-type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "fixture";
-type VerifierResultCommand = Extract<WithoutLane<DomainCommand>, { type: "evidence" | "completion_verified" | "fact" | "artifact_annotation" }>;
+type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "verifier_input" | "fixture" | "recovery" | "binding";
+type VerifierResultCommand = Extract<WithoutLane<DomainCommand>, { type: "evidence" | "completion_verified" | "fact" | "artifact_annotation" | "domain_record" }>;
+type VerifierEvidenceCommand = Extract<VerifierResultCommand, { type: "evidence" }>;
 type VerifierEffectCommand = Extract<WithoutLane<DomainCommand>, { type: "effect_proposed" | "effect_started" | "effect_finished" | "effect_reconciled" }>;
 type VerifierResultArtifactCommand = Extract<WithoutLane<DomainCommand>, { type: "artifact" }>;
 
@@ -59,6 +68,8 @@ export interface VerifierEffectControlPort {
   dispatch(runId: string, command: VerifierEffectCommand): Promise<HarnessEvent[]>;
   /** Register one immutable result Artifact for a STARTED verifier Effect. */
   registerResultArtifact(runId: string, command: VerifierResultArtifactCommand): Promise<HarnessEvent[]>;
+  /** Register one verifier-owned recovery input before its Effect is proposed. */
+  registerInputArtifact(runId: string, command: VerifierResultArtifactCommand): Promise<HarnessEvent[]>;
 }
 
 export interface FixtureControlPort {
@@ -68,11 +79,18 @@ export interface FixtureControlPort {
   reset(runId: string, generation: number): Promise<HarnessEvent[]>;
 }
 
+/** Recovery-only mutations for verifier requests. No generic event write is exposed. */
+export interface VerificationRecoveryControlPort {
+  markRequired(runId: string, input: { requestId: string; reason: string }): Promise<HarnessEvent[]>;
+  markResolved(runId: string, input: { requestId: string; reason: string }): Promise<HarnessEvent[]>;
+}
+
 export interface ControlPlane {
   control: ControlStore;
   verifier: VerifierControlPort;
   verifierEffects: VerifierEffectControlPort;
   fixtureControl: FixtureControlPort;
+  verificationRecovery: VerificationRecoveryControlPort;
 }
 
 const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
@@ -91,8 +109,11 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "compaction_recorded",
   "model_usage",
 ]);
-const VERIFIER_RESULT_COMMAND_TYPES = new Set(["evidence", "completion_verified", "fact", "artifact_annotation"]);
+const VERIFIER_RESULT_COMMAND_TYPES = new Set(["evidence", "completion_verified", "fact", "artifact_annotation", "domain_record"]);
 const VERIFIER_EFFECT_COMMAND_TYPES = new Set(["effect_proposed", "effect_started", "effect_finished", "effect_reconciled"]);
+const FAILURE_CATEGORIES = new Set<PrimaryFailureCategory>([
+  "model_no_tool_call", "bad_tool_args", "tool_timeout", "tool_schema_mismatch", "context_overflow", "context_amnesia", "wrong_hypothesis", "verification_missing", "permission_or_environment", "budget_exhausted", "effect_outcome_unknown", "environment_drift", "prompt_injection_followed", "duplicate_submission", "verifier_disagreement",
+]);
 
 export type DomainCommand =
   | { type: "start_phase"; phase: Phase; lane?: Lane }
@@ -109,7 +130,9 @@ export type DomainCommand =
   | { type: "fact"; fact: Omit<Fact, "createdSeq" | "runId" | "generation">; lane?: Lane }
   | { type: "observation"; observation: Omit<Observation, "createdSeq" | "runId" | "generation">; lane?: Lane }
   | { type: "evidence"; evidence: Omit<Evidence, "createdSeq" | "provenance">; lane?: Lane }
+  | { type: "domain_record"; record: DomainRecordInput; lane?: Lane }
   | { type: "experiment"; experiment: Omit<ExperimentRecord, "createdSeq">; lane?: Lane }
+  | { type: "replan_requested"; replan: Omit<RunSnapshot["replans"][string], "createdSeq" | "runId" | "generation">; lane?: Lane }
   | { type: "reasoning_node"; node: Omit<ReasoningNode, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "reasoning_edge"; edge: Omit<ReasoningEdge, "createdSeq">; lane?: Lane }
   | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
@@ -117,11 +140,14 @@ export type DomainCommand =
   | { type: "intent"; intent: Omit<Intent, "createdSeq">; lane?: Lane }
   | { type: "scheduler_intent"; intent: SchedulerIntent; lane?: Lane }
   | { type: "completion_proposed"; completion: Omit<CompletionProposal, "createdSeq" | "status" | "evidenceIds" | "runId" | "generation">; lane?: Lane }
+  | { type: "verification_requested"; request: Omit<VerificationRequest, "createdSeq" | "status" | "recoveryState" | "recoveryReason" | "recoverySeq" | "runId" | "generation" | "completionId">; lane?: Lane }
+  | { type: "verification_recovery_required"; requestId: string; reason: string; lane?: Lane }
+  | { type: "verification_recovery_resolved"; requestId: string; reason: string; lane?: Lane }
   | { type: "completion_verified"; completionId: string; accepted: boolean; evidenceIds: string[]; lane?: Lane }
   | { type: "artifact"; generation: number; artifact: Omit<RunSnapshot["artifacts"][string], "runId" | "generation" | "origin">; lane?: Lane }
   | { type: "artifact_annotation"; artifactId: string; semantic: Omit<ArtifactSemanticMetadata, "updatedSeq">; lane?: Lane }
   | { type: "effect_proposed"; effect: Omit<RunSnapshot["effects"][string], "createdSeq" | "runId" | "generation" | "producerLane">; lane?: Lane }
-  | { type: "effect_started"; effectId: string; lane?: Lane }
+  | { type: "effect_started"; effectId: string; sessionId?: string; externalId?: string; lane?: Lane }
   | { type: "effect_finished"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; artifactId?: string; externalId?: string; durationMs?: number; outputBytes?: number; exitCode?: number | null; errorSignature?: string; verification?: VerificationVerdict; lane?: Lane }
   | { type: "effect_reconciled"; effectId: string; outcome: "success" | "error" | "timeout" | "unknown"; lane?: Lane }
   | { type: "lease_acquired"; lease: RunSnapshot["leases"][string]; lane?: Lane }
@@ -148,6 +174,7 @@ export type DomainCommand =
   | { type: "work_item_superseded"; workItemId: string; reason: string; lane?: Lane }
   | { type: "request_epoch_started"; epoch: Omit<RequestEpoch, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "session_opened"; session: Omit<SessionRecord, "createdSeq" | "updatedSeq" | "status" | "interactions"> & { interactions?: number }; lane?: Lane }
+  | { type: "session_binding_completed"; sessionId: string; bindingTxnId: string; bindingIdentityHash: string; lane?: Lane }
   | { type: "session_interacted"; sessionId: string; waitReason?: SessionRecord["lastWaitReason"]; transcriptArtifactId?: string; stateHash?: string; exited?: boolean; exitCode?: number | null; lane?: Lane }
   | { type: "session_signaled"; sessionId: string; signal: string; delivered?: boolean; lane?: Lane }
   | { type: "session_closed"; sessionId: string; reason?: string; exitCode?: number | null; lane?: Lane }
@@ -172,6 +199,7 @@ export class ControlStore {
       verifier: control.#createVerifierPort(),
       verifierEffects: control.#createVerifierEffectPort(),
       fixtureControl: control.#createFixtureControlPort(),
+      verificationRecovery: control.#createVerificationRecoveryPort(),
     };
   }
 
@@ -190,9 +218,7 @@ export class ControlStore {
   public async createRun(runId: string, task: TaskContract): Promise<RunSnapshot> {
     validateTaskContract(task);
     return await this.operations.run(runId, async () => {
-      const snapshot = await this.eventStore.create(runId, task, await this.versionProvider?.(), this.#authorityHash);
-      await this.eventStore.saveProjection(snapshot, this.#authoritySecret);
-      return snapshot;
+      return await this.eventStore.create(runId, task, await this.versionProvider?.(), this.#authorityHash, this.#authoritySecret);
     });
   }
 
@@ -226,28 +252,43 @@ export class ControlStore {
 
   public async dispatchBatch(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]> {
     if (commands.length === 0) return [];
-    return await this.operations.run(runId, async () => {
-      const { events } = await this.#commitCommands(runId, await this.snapshot(runId), commands, "public");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const { events } = await this.#commitCommands(runId, before, commands, "public", writer);
       return events;
-    });
+    }));
   }
 
   public async dispatchTransaction<TResult>(
     runId: string,
     prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult },
   ): Promise<TResult> {
-    return await this.operations.run(runId, async () => {
-      const before = await this.snapshot(runId);
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
       const transaction = prepare(before);
       if (transaction.commands.length === 0) return transaction.project(before);
-      const { after } = await this.#commitCommands(runId, before, transaction.commands, "public");
+      const { after } = await this.#commitCommands(runId, before, transaction.commands, "public", writer);
       return transaction.project(after);
-    });
+    }));
+  }
+
+  /**
+   * Commit the final Control Store fence for a broker-owned session binding.
+   * This capability is intentionally separate from public lane dispatch so a
+   * model cannot forge a BOUND session marker.
+   */
+  public async dispatchBindingTransaction<TResult>(
+    runId: string,
+    prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult },
+  ): Promise<TResult> {
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const transaction = prepare(before);
+      if (transaction.commands.length === 0) return transaction.project(before);
+      const { after } = await this.#commitCommands(runId, before, transaction.commands, "binding", writer);
+      return transaction.project(after);
+    }));
   }
 
   public async append(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<void> {
-    await this.operations.run(runId, async () => {
-      const snapshot = await this.snapshot(runId);
+    await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
       const forbidden = events.filter((event) => !TELEMETRY_EVENT_TYPES.has(event.type));
       if (forbidden.length > 0) {
         throw new Error(`Raw append is restricted to telemetry events; use a validated command for ${forbidden.map((event) => event.type).join(", ")}`);
@@ -263,9 +304,9 @@ export class ControlStore {
       ));
       let validated = snapshot;
       for (const event of materialized) validated = reduce(validated, event);
-      await this.eventStore.append(materialized, this.#authoritySecret);
-      await this.eventStore.saveProjection(validated, this.#authoritySecret);
-    });
+      await writer.append(materialized, this.#authoritySecret);
+      await writer.saveProjection(validated, this.#authoritySecret);
+    }));
   }
 
   public async runHash(runId: string): Promise<string> {
@@ -273,11 +314,44 @@ export class ControlStore {
     return sha256(canonicalJson(snapshot));
   }
 
+  /**
+   * Rebuild the materialized projection after a process interruption. The
+   * event stream is authoritative; a stale or corrupt projection is replaced
+   * only after a complete replay succeeds. Legacy untrusted Runs remain
+   * read-only and are never rewritten with a trusted projection.
+   */
+  public async reconcileProjection(runId: string): Promise<{ repaired: boolean; replayHash: string }> {
+    return await this.operations.run(runId, async () => {
+      await this.#migrateLegacyRunBestEffort(runId);
+      return await this.eventStore.withRunLock(runId, async (writer) => {
+        const replayed = await this.eventStore.replay(runId);
+        const replayHash = projectionHash(replayed);
+        if (replayed.authorityHash === "LEGACY-UNTRUSTED") return { repaired: false, replayHash };
+        let persisted: RunSnapshot | undefined;
+        try {
+          persisted = await this.eventStore.loadProjection(runId);
+        } catch {
+          // A malformed projection is disposable because the event stream has
+          // already replayed successfully and remains the source of truth.
+        }
+        if (persisted && projectionHash(persisted) === replayHash) return { repaired: false, replayHash };
+        await writer.saveProjection(replayed, this.#authoritySecret);
+        return { repaired: true, replayHash };
+      });
+    });
+  }
+
+  async #withWrite<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T> {
+    await this.#migrateLegacyRunBestEffort(runId);
+    return await this.eventStore.withRunLock(runId, async (writer) => await operation(await this.eventStore.replay(runId), writer));
+  }
+
   async #commitCommands(
     runId: string,
     before: RunSnapshot,
     commands: DomainCommand[],
     authority: ControlAuthority,
+    writer: JsonlRunWriter,
   ): Promise<{ after: RunSnapshot; events: HarnessEvent[] }> {
     if (authority !== "public" && before.authorityHash !== this.#authorityHash) {
       throw new Error("Trusted control authority does not match the immutable Run anchor");
@@ -298,26 +372,27 @@ export class ControlStore {
       after = reduce(after, event);
       events.push(event);
     }
-    await this.eventStore.append(events, this.#authoritySecret);
-    await this.eventStore.saveProjection(after, this.#authoritySecret);
+    await writer.append(events, this.#authoritySecret);
+    await writer.saveProjection(after, this.#authoritySecret);
     return { after, events };
   }
 
   #createVerifierPort(): VerifierControlPort {
     const dispatchBatch = async (runId: string, commands: VerifierResultCommand[]): Promise<HarnessEvent[]> => {
       if (commands.length === 0) return [];
-      if (commands.some((command) => !VERIFIER_RESULT_COMMAND_TYPES.has(command.type))) throw new Error("Verifier result capability only accepts Evidence, Completion, Fact, and trusted annotation commands");
-      return await this.operations.run(runId, async () => {
-        const trusted = commands.map((command) => ({ ...command, lane: "verifier" }) as DomainCommand);
-        const { events } = await this.#commitCommands(runId, await this.snapshot(runId), trusted, "verifier");
+      if (commands.some((command) => !VERIFIER_RESULT_COMMAND_TYPES.has(command.type))) throw new Error("Verifier result capability only accepts Evidence, Completion, Fact, Domain Record, and trusted annotation commands");
+      return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+        const pending = filterIdempotentVerifierCommands(before, commands);
+        if (pending.length === 0) return [];
+        const trusted = pending.map((command) => ({ ...command, lane: "verifier" }) as DomainCommand);
+        const { events } = await this.#commitCommands(runId, before, trusted, "verifier", writer);
         return events;
-      });
+      }));
     };
     return Object.freeze({
       dispatch: async (runId: string, command: VerifierResultCommand) => await dispatchBatch(runId, [command]),
       dispatchBatch,
-      finish: async (runId: string, input: { completionId: string; reason: string }) => await this.operations.run(runId, async () => {
-        const snapshot = await this.snapshot(runId);
+      finish: async (runId: string, input: { completionId: string; reason: string }) => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
         const completion = snapshot.completions[input.completionId];
         if (!completion) throw new Error(`Unknown completion ${input.completionId}`);
         const command: DomainCommand = {
@@ -328,26 +403,32 @@ export class ControlStore {
           reason: input.reason,
           lane: "verifier",
         };
-        const { events } = await this.#commitCommands(runId, snapshot, [command], "verifier");
+        const { events } = await this.#commitCommands(runId, snapshot, [command], "verifier", writer);
         return events;
-      }),
+      })),
     });
   }
 
   #createVerifierEffectPort(): VerifierEffectControlPort {
     return Object.freeze({
-      dispatch: async (runId: string, command: VerifierEffectCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => {
+      dispatch: async (runId: string, command: VerifierEffectCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
         if (!VERIFIER_EFFECT_COMMAND_TYPES.has(command.type)) throw new Error("Verifier Effect capability only accepts Effect lifecycle commands");
         const trusted = { ...command, lane: "verifier" } as DomainCommand;
-        const { events } = await this.#commitCommands(runId, await this.snapshot(runId), [trusted], "verifier");
+        const { events } = await this.#commitCommands(runId, snapshot, [trusted], "verifier", writer);
         return events;
-      }),
-      registerResultArtifact: async (runId: string, command: VerifierResultArtifactCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => {
+      })),
+      registerResultArtifact: async (runId: string, command: VerifierResultArtifactCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
         if (command.type !== "artifact") throw new Error("Verifier Artifact capability only accepts Artifact registration commands");
         const trusted = { ...command, lane: "verifier" } as DomainCommand;
-        const { events } = await this.#commitCommands(runId, await this.snapshot(runId), [trusted], "verifier_artifact");
+        const { events } = await this.#commitCommands(runId, snapshot, [trusted], "verifier_artifact", writer);
         return events;
-      }),
+      })),
+      registerInputArtifact: async (runId: string, command: VerifierResultArtifactCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
+        if (command.type !== "artifact") throw new Error("Verifier input capability only accepts Artifact registration commands");
+        const trusted = { ...command, lane: "verifier" } as DomainCommand;
+        const { events } = await this.#commitCommands(runId, snapshot, [trusted], "verifier_input", writer);
+        return events;
+      })),
     });
   }
 
@@ -358,12 +439,30 @@ export class ControlStore {
         if (snapshot.authorityHash !== this.#authorityHash) throw new Error("Trusted control authority does not match the immutable Run anchor");
         validateFixtureResetState(snapshot);
       }),
-      reset: async (runId: string, generation: number) => await this.operations.run(runId, async () => {
-        const snapshot = await this.snapshot(runId);
+      reset: async (runId: string, generation: number) => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
         const command: DomainCommand = { type: "fixture_reset", generation, lane: "main" };
-        const { events } = await this.#commitCommands(runId, snapshot, [command], "fixture");
+        const { events } = await this.#commitCommands(runId, snapshot, [command], "fixture", writer);
         return events;
-      }),
+      })),
+    });
+  }
+
+  #createVerificationRecoveryPort(): VerificationRecoveryControlPort {
+    const mark = async (
+      runId: string,
+      command: Extract<DomainCommand, { type: "verification_recovery_required" | "verification_recovery_resolved" }>,
+    ): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
+      const request = snapshot.verificationRequests[command.requestId];
+      if (!request) throw new Error(`Unknown verification request ${command.requestId}`);
+      if ((command.type === "verification_recovery_required" && request.recoveryState === "RECOVERY_REQUIRED")
+        || (command.type === "verification_recovery_resolved" && request.recoveryState === "RECOVERED")) return [];
+      const trusted = { ...command, lane: "verifier" } as DomainCommand;
+      const { events } = await this.#commitCommands(runId, snapshot, [trusted], "recovery", writer);
+      return events;
+    }));
+    return Object.freeze({
+      markRequired: async (runId: string, input: { requestId: string; reason: string }) => await mark(runId, { type: "verification_recovery_required", ...input }),
+      markResolved: async (runId: string, input: { requestId: string; reason: string }) => await mark(runId, { type: "verification_recovery_resolved", ...input }),
     });
   }
 }
@@ -383,7 +482,9 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "fact": return "fact_added";
     case "observation": return "observation_added";
     case "evidence": return "evidence_added";
+    case "domain_record": return "domain_record_added";
     case "experiment": return "experiment_recorded";
+    case "replan_requested": return "replan_requested";
     case "reasoning_node": return "reasoning_node_upserted";
     case "reasoning_edge": return "reasoning_edge_added";
     case "reasoning_tree": return "reasoning_tree_upserted";
@@ -391,6 +492,9 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "intent": return "intent_changed";
     case "scheduler_intent": return "scheduler_intent_changed";
     case "completion_proposed": return "completion_proposed";
+    case "verification_requested": return "verification_requested";
+    case "verification_recovery_required": return "verification_recovery_required";
+    case "verification_recovery_resolved": return "verification_recovery_resolved";
     case "completion_verified": return "completion_verified";
     case "artifact": return "artifact_registered";
     case "artifact_annotation": return "artifact_annotated";
@@ -422,6 +526,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "work_item_superseded": return "work_item_superseded";
     case "request_epoch_started": return "request_epoch_started";
     case "session_opened": return "session_opened";
+    case "session_binding_completed": return "session_binding_completed";
     case "session_interacted": return "session_interacted";
     case "session_signaled": return "session_signaled";
     case "session_closed": return "session_closed";
@@ -508,7 +613,17 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
         },
       };
     }
+    case "domain_record": return { record: { ...command.record, runId: snapshot.runId, generation: snapshot.generation, createdSeq: seq } };
     case "experiment": return { experiment: { ...command.experiment, createdSeq: seq } };
+    case "replan_requested": return {
+      replan: {
+        ...command.replan,
+        runId: snapshot.runId,
+        generation: snapshot.generation,
+        createdSeq: seq,
+        prohibitedRepeatKeys: [...command.replan.prohibitedRepeatKeys],
+      },
+    };
     case "reasoning_node": return { node: command.node };
     case "reasoning_edge": return { edge: command.edge };
     case "reasoning_tree": return { tree: command.tree };
@@ -516,6 +631,9 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
     case "intent": return { intent: { ...command.intent, createdSeq: seq } };
     case "scheduler_intent": return { intent: command.intent };
     case "completion_proposed": return { completion: { ...command.completion, runId: snapshot.runId, generation: snapshot.generation, status: "PROPOSED", evidenceIds: [], createdSeq: seq } };
+    case "verification_requested": return { request: { ...command.request, runId: snapshot.runId, generation: snapshot.generation, status: "PENDING", createdSeq: seq } };
+    case "verification_recovery_required": return { requestId: command.requestId, reason: command.reason };
+    case "verification_recovery_resolved": return { requestId: command.requestId, reason: command.reason };
     case "completion_verified": return { completionId: command.completionId, accepted: command.accepted, evidenceIds: command.evidenceIds };
     case "artifact": return {
       artifact: {
@@ -524,7 +642,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
         generation: command.generation,
         origin: {
           schemaVersion: 1,
-          registeredBy: authority === "verifier_artifact" ? "verifier" : "agent",
+          registeredBy: authority === "verifier_artifact" || authority === "verifier_input" ? "verifier" : "agent",
           operation: command.artifact.sourceEffectId ? snapshot.effects[command.artifact.sourceEffectId]?.operation : undefined,
           tags: [...(command.artifact.semantic?.tags ?? [])],
         },
@@ -542,7 +660,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
         createdSeq: seq,
       },
     };
-    case "effect_started": return { effectId: command.effectId };
+    case "effect_started": return { effectId: command.effectId, sessionId: command.sessionId, externalId: command.externalId };
     case "effect_finished": return { effectId: command.effectId, outcome: command.outcome, artifactId: command.artifactId, externalId: command.externalId, durationMs: command.durationMs, outputBytes: command.outputBytes, exitCode: command.exitCode, errorSignature: command.errorSignature, verification: command.verification };
     case "effect_reconciled": return { effectId: command.effectId, outcome: command.outcome };
     case "lease_acquired": return { lease: command.lease };
@@ -569,6 +687,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
     case "work_item_superseded": return { workItemId: command.workItemId, reason: command.reason };
     case "request_epoch_started": return { epoch: { ...command.epoch, createdSeq: seq, updatedSeq: seq } };
     case "session_opened": return { session: { ...command.session, status: "OPEN", interactions: command.session.interactions ?? 0, createdSeq: seq, updatedSeq: seq } };
+    case "session_binding_completed": return { sessionId: command.sessionId, bindingTxnId: command.bindingTxnId, bindingIdentityHash: command.bindingIdentityHash };
     case "session_interacted": return { sessionId: command.sessionId, waitReason: command.waitReason, transcriptArtifactId: command.transcriptArtifactId, stateHash: command.stateHash, exited: command.exited, exitCode: command.exitCode };
     case "session_signaled": return { sessionId: command.sessionId, signal: command.signal, delivered: command.delivered ?? false };
     case "session_closed": return { sessionId: command.sessionId, reason: command.reason, exitCode: command.exitCode };
@@ -580,14 +699,23 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
 function validateCommand(snapshot: RunSnapshot, command: DomainCommand, references: BatchReferences, authority: ControlAuthority): void {
   const trustedVerifier = authority === "verifier";
   const trustedVerifierArtifact = authority === "verifier_artifact";
+  const trustedVerifierInput = authority === "verifier_input";
+  const trustedRecovery = authority === "recovery";
+  const bindingAuthority = authority === "binding";
+  if (bindingAuthority && command.type !== "session_opened" && command.type !== "session_binding_completed") {
+    throw new Error("Binding authority is restricted to session binding commands");
+  }
   if (snapshot.status === "PAUSED" && (command.type === "finish" || command.type === "fail" || command.type === "exhaust")) {
     throw new Error(`Cannot ${command.type} a paused run; resume it first`);
   }
   if (requiresVerifierAuthority(command) && !trustedVerifier) {
     throw new Error(`${protectedCommandLabel(command)} is restricted to the trusted verifier service`);
   }
-  if ((trustedVerifier || trustedVerifierArtifact) && command.lane !== "verifier") throw new Error("Trusted verifier commands must use the verifier lane");
+  if ((trustedVerifier || trustedVerifierArtifact || trustedVerifierInput) && command.lane !== "verifier") throw new Error("Trusted verifier commands must use the verifier lane");
   if (trustedVerifierArtifact && command.type !== "artifact") throw new Error("Verifier Artifact authority is restricted to Artifact registration");
+  if (trustedVerifierInput && command.type !== "artifact") throw new Error("Verifier input authority is restricted to Artifact registration");
+  if (trustedRecovery && command.lane !== "verifier") throw new Error("Recovery commands must use the verifier lane");
+  if (trustedRecovery && command.type !== "verification_recovery_required" && command.type !== "verification_recovery_resolved") throw new Error("Recovery authority is restricted to verifier request recovery markers");
   if (command.type === "fixture_reset") {
     if (authority !== "fixture") throw new Error("fixture_reset is restricted to the trusted fixture lifecycle service");
     validateFixtureResetState(snapshot);
@@ -600,6 +728,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (command.generation !== snapshot.generation) throw new Error(`Artifact generation must equal current generation ${snapshot.generation}`);
     if (snapshot.artifacts[command.artifact.id]) throw new Error(`Artifact already exists: ${command.artifact.id}`);
     if (trustedVerifierArtifact && !command.artifact.sourceEffectId) throw new Error("A verifier result Artifact must bind a verifier Effect");
+    if (trustedVerifierInput && command.artifact.sourceEffectId) throw new Error("A verifier recovery input cannot bind an Effect");
     if (command.artifact.sourceEffectId) {
       const effect = snapshot.effects[command.artifact.sourceEffectId];
       if (!effect) throw new Error(`Unknown source effect ${command.artifact.sourceEffectId}`);
@@ -638,6 +767,8 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!effect) throw new Error(`Unknown effect: ${command.effectId}`);
     if (effect.status !== "PROPOSED") throw new Error(`Cannot start effect in ${effect.status}`);
     if (effect.producerLane === "verifier" && !trustedVerifier) throw new Error("Verifier effects require trusted verifier authority");
+    if (command.sessionId !== undefined && !command.sessionId.trim()) throw new Error("Started effect session id cannot be empty");
+    if (command.externalId !== undefined && !command.externalId.trim()) throw new Error("Started effect external id cannot be empty");
   }
   if (command.type === "effect_finished") {
     const effect = snapshot.effects[command.effectId];
@@ -650,11 +781,19 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (artifact.sourceEffectId !== effect.id) throw new Error(`Artifact ${artifact.id} is not bound to effect ${effect.id}`);
     if (artifact.generation !== snapshot.generation || effect.generation !== snapshot.generation) throw new Error("Effect result provenance is from a stale generation");
     if (effect.producerLane === "verifier") {
-      if (!command.verification) throw new Error("A verifier Effect requires a structured verification verdict");
-      if (artifact.origin.registeredBy !== "verifier") throw new Error(`Verifier Effect Artifact ${artifact.id} was not registered by verifier authority`);
-      const boundArtifacts = Object.values(snapshot.artifacts).filter((value) => value.sourceEffectId === effect.id);
-      if (boundArtifacts.length !== 1 || boundArtifacts[0]?.id !== artifact.id) throw new Error(`Verifier Effect ${effect.id} requires exactly one trusted result Artifact`);
-      validateVerificationVerdict(snapshot, effect, artifact, command.verification);
+      if (isVerifierReplayOperation(effect.operation)) {
+        if (command.verification) throw new Error("A verification replay Effect cannot carry a completion verdict");
+      } else if (!command.verification) {
+        throw new Error("A verifier Effect requires a structured verification verdict");
+      }
+      if (!isVerifierReplayOperation(effect.operation)) {
+        if (artifact.origin.registeredBy !== "verifier") throw new Error(`Verifier Effect Artifact ${artifact.id} was not registered by verifier authority`);
+        const boundArtifacts = Object.values(snapshot.artifacts).filter((value) => value.sourceEffectId === effect.id);
+        if (boundArtifacts.length !== 1 || boundArtifacts[0]?.id !== artifact.id) throw new Error(`Verifier Effect ${effect.id} requires exactly one trusted result Artifact`);
+        validateVerificationVerdict(snapshot, effect, artifact, command.verification!);
+      } else if (artifact.origin.registeredBy !== "verifier") {
+        throw new Error(`Verification replay Artifact ${artifact.id} was not registered by verifier authority`);
+      }
     } else if (command.verification) {
       throw new Error("Only a verifier Effect may carry a verification verdict");
     }
@@ -675,8 +814,63 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!artifact) throw new Error(`Unknown completion artifact ${command.completion.artifactId}`);
     if (artifact.generation !== snapshot.generation) throw new Error(`Completion artifact is from generation ${artifact.generation}`);
     if (artifact.sha256 !== command.completion.candidateHash) throw new Error(`Candidate hash mismatch for completion ${command.completion.id}`);
+    if (command.completion.verificationKey !== undefined) {
+      const request = Object.values(snapshot.verificationRequests).find((value) => value.key === command.completion.verificationKey);
+      if (!request) throw new Error(`Completion ${command.completion.id} references an unknown verification request`);
+      if (request.generation !== snapshot.generation || request.status !== "PENDING" || request.completionId) throw new Error(`Verification request ${request.id} is not available for Completion binding`);
+    }
+  }
+  if (command.type === "session_opened") {
+    const session = command.session;
+    if (session.runId !== snapshot.runId) throw new Error("Session binding must match the current run");
+    if (!session.id.trim()) throw new Error("Session open requires a durable session identity");
+    if (session.kind !== "browser" && !session.externalId?.trim()) throw new Error("Session open requires an external runtime identity");
+    if (session.requestKey !== undefined && !isSafeSessionBindingText(session.requestKey)) throw new Error("Session request key is invalid");
+    if (session.policyHash !== undefined && !/^[a-f0-9]{64}$/i.test(session.policyHash)) throw new Error("Session policy hash must be a sha256 hash");
+    if (session.recipeHash !== undefined && !/^[a-f0-9]{64}$/i.test(session.recipeHash)) throw new Error("Session recipe hash must be a sha256 hash");
+    if (session.scopeHash !== undefined && !/^[a-f0-9]{64}$/i.test(session.scopeHash)) throw new Error("Session scope hash must be a sha256 hash");
+    if (session.bindingTxnId !== undefined && !/^[a-f0-9]{64}$/i.test(session.bindingTxnId)) throw new Error("Session binding transaction id must be a sha256 hash");
+    if (session.bindingIdentityHash !== undefined && !/^[a-f0-9]{64}$/i.test(session.bindingIdentityHash)) throw new Error("Session binding identity hash must be a sha256 hash");
+    if (session.bindingState !== undefined) {
+      if (!bindingAuthority || session.bindingState !== "FINALIZING") throw new Error("Only binding authority may open a FINALIZING session");
+      if (session.bindingTxnId === undefined || session.bindingIdentityHash === undefined) throw new Error("A FINALIZING session requires binding markers");
+    }
+  }
+  if (command.type === "session_binding_completed") {
+    if (!bindingAuthority) throw new Error("Session binding completion requires binding authority");
+    if (!/^[a-f0-9]{64}$/i.test(command.bindingTxnId) || !/^[a-f0-9]{64}$/i.test(command.bindingIdentityHash)) {
+      throw new Error("Session binding completion markers must be sha256 hashes");
+    }
+    const session = snapshot.sessions[command.sessionId];
+    if (!session) throw new Error(`Unknown session ${command.sessionId}`);
+    if (session.status !== "OPEN") throw new Error(`Session ${command.sessionId} is ${session.status}, not OPEN`);
+    if (session.bindingTxnId !== command.bindingTxnId || session.bindingIdentityHash !== command.bindingIdentityHash) {
+      throw new Error(`Session ${command.sessionId} binding identity mismatch`);
+    }
+    if (session.bindingState !== "FINALIZING") throw new Error(`Session ${command.sessionId} is not FINALIZING`);
+  }
+  if (command.type === "verification_requested") {
+    if (!/^VR-[a-f0-9]{24}$/i.test(command.request.id)) throw new Error("Verification request id is invalid");
+    if (!/^[a-f0-9]{64}$/i.test(command.request.key)) throw new Error("Verification request key is invalid");
+    if (!/^[a-f0-9]{64}$/i.test(command.request.policyHash) || !/^[a-f0-9]{64}$/i.test(command.request.recipeHash)) throw new Error("Verification request hashes are invalid");
+    if (!["web", "browser", "pwn", "claim"].includes(command.request.kind)) throw new Error("Verification request kind is invalid");
+    if (snapshot.verificationRequests[command.request.id] || Object.values(snapshot.verificationRequests).some((value) => value.key === command.request.key)) throw new Error(`Verification request already exists: ${command.request.id}`);
+  }
+  if (command.type === "verification_recovery_required" || command.type === "verification_recovery_resolved") {
+    const request = snapshot.verificationRequests[command.requestId];
+    if (!trustedRecovery) throw new Error(`${command.type} is restricted to the recovery service`);
+    if (!request) throw new Error(`Unknown verification request ${command.requestId}`);
+    if (request.runId !== snapshot.runId || request.generation !== snapshot.generation) throw new Error(`Verification request ${command.requestId} is stale`);
+    if (command.reason.trim().length === 0 || command.reason.length > 512) throw new Error("Verification recovery reason must contain 1..512 characters");
+    if (command.type === "verification_recovery_required" && request.recoveryState === "RECOVERED") throw new Error(`Verification request ${request.id} is already recovered`);
+    if (command.type === "verification_recovery_resolved") {
+      if (request.recoveryState !== "RECOVERY_REQUIRED") throw new Error(`Verification request ${request.id} is not awaiting recovery`);
+      const completion = request.completionId ? snapshot.completions[request.completionId] : undefined;
+      if (!completion || (completion.status !== "ACCEPTED" && completion.status !== "REJECTED")) throw new Error(`Verification request ${request.id} has no terminal Completion`);
+    }
   }
   if (command.type === "evidence") validateEvidence(snapshot, command.evidence, command.lane ?? "main", references, trustedVerifier);
+  if (command.type === "domain_record") validateDomainRecord(snapshot, command.record, references, trustedVerifier);
   if (command.type === "fact") {
     const previous = snapshot.facts[command.fact.id];
     if (previous && (previous.runId !== snapshot.runId || previous.generation !== snapshot.generation)) throw new Error(`Fact ${command.fact.id} is from another run or generation`);
@@ -748,6 +942,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   if (command.type === "set_domain_phase") validateDomainPhaseTransition(snapshot, command.domainPhase);
   if (command.type === "record_tool_preparation") validateToolPreparation(snapshot, command.preparation);
   if (command.type === "experiment") validateExperimentCommand(snapshot, command);
+  if (command.type === "replan_requested") validateReplanCommand(snapshot, command);
   if (command.type === "completion_verified") validateCompletionVerification(snapshot, command);
   if (command.type === "fact" && command.fact.status === "CONFIRMED" && command.lane !== "verifier") {
     throw new Error("Confirmed facts are restricted to the verifier lane");
@@ -770,6 +965,13 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
       throw new Error(`Final evidence ${evidenceId} has no accepted verdict for the selected completion`);
     }
   }
+  if (!completedWorkItemForCompletion(snapshot, completion, command.evidenceIds)) {
+    throw new Error("A successful run requires a completed executor WorkItem bound to the accepted completion");
+  }
+  const submitGate = evaluatePhaseGate(snapshot, "SUBMIT");
+  if (submitGate.status !== "pass") {
+    throw new Error(`Cannot finish accepted completion: SUBMIT gate ${submitGate.status}; missing ${[...submitGate.missing, ...submitGate.stale].join(", ")}`);
+  }
 }
 
 function validateFixtureResetState(snapshot: RunSnapshot): void {
@@ -785,6 +987,7 @@ interface BatchReferences {
   hypotheses: Set<string>;
   completions: Set<string>;
   observations: Set<string>;
+  domainRecords: Set<string>;
 }
 
 function buildBatchReferences(snapshot: RunSnapshot, commands: DomainCommand[]): BatchReferences {
@@ -796,6 +999,7 @@ function buildBatchReferences(snapshot: RunSnapshot, commands: DomainCommand[]):
     hypotheses: new Set(Object.values(snapshot.hypotheses).filter((value) => value.runId === snapshot.runId && value.generation === snapshot.generation).map((value) => value.id)),
     completions: new Set(Object.values(snapshot.completions).filter((value) => value.runId === snapshot.runId && value.generation === snapshot.generation).map((value) => value.id)),
     observations: new Set(Object.values(snapshot.observations).filter((value) => value.runId === snapshot.runId && value.generation === snapshot.generation).map((value) => value.id)),
+    domainRecords: new Set(Object.values(snapshot.domainRecords ?? {}).filter((value) => value.runId === snapshot.runId && value.generation === snapshot.generation).map((value) => value.id)),
   };
   const addImmutable = (values: Set<string>, value: string, label: string): void => {
     if (values.has(value)) throw new Error(`${label} already exists: ${value}`);
@@ -809,6 +1013,7 @@ function buildBatchReferences(snapshot: RunSnapshot, commands: DomainCommand[]):
     else if (command.type === "fact") references.facts.add(command.fact.id);
     else if (command.type === "hypothesis") references.hypotheses.add(command.hypothesis.id);
     else if (command.type === "observation") references.observations.add(command.observation.id);
+    else if (command.type === "domain_record") addImmutable(references.domainRecords, command.record.id, "Domain record");
   }
   return references;
 }
@@ -819,12 +1024,14 @@ function requiresVerifierAuthority(command: DomainCommand): boolean {
   if (command.type === "fact" && command.fact.status === "CONFIRMED") return true;
   if (command.type === "artifact_annotation" && command.semantic.annotatedBy !== "agent") return true;
   if (command.type === "evidence") return command.evidence.kind === "reproduction" || command.evidence.kind === "negative" || command.evidence.confidence === 1;
+  if (command.type === "domain_record") return command.record.kind === "web_exploit_chain" && command.record.status === "reproduced";
   return command.lane === "verifier" && (command.type === "effect_proposed" || command.type === "effect_started" || command.type === "effect_finished" || command.type === "effect_reconciled");
 }
 
 function protectedCommandLabel(command: DomainCommand): string {
   if (command.type === "evidence") return `${command.evidence.kind} evidence`;
   if (command.type === "finish" && command.verified) return "Successful finish";
+  if (command.type === "domain_record") return `${command.record.kind} domain record`;
   return command.type;
 }
 
@@ -952,6 +1159,10 @@ function validateCompletionVerification(snapshot: RunSnapshot, command: Extract<
   }
 }
 
+function isSafeSessionBindingText(value: string): boolean {
+  return value.length > 0 && value.length <= 512 && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
 function validateVerifierEffectProposal(
   snapshot: RunSnapshot,
   effect: Omit<RunSnapshot["effects"][string], "createdSeq" | "runId" | "generation" | "producerLane">,
@@ -959,6 +1170,10 @@ function validateVerifierEffectProposal(
 ): void {
   if (!trustedVerifier) throw new Error("Verifier effects require trusted verifier authority");
   if (!VERIFIER_EFFECT_OPERATIONS.has(effect.operation)) throw new Error(`Untrusted verifier effect operation: ${effect.operation}`);
+  if (isVerifierReplayOperation(effect.operation)) {
+    validateVerifierReplayBinding(snapshot, effect);
+    return;
+  }
   const completionId = String(effect.args.completionId ?? "");
   const completion = snapshot.completions[completionId];
   if (!completion) throw new Error(`Verifier effect requires a known completion: ${completionId || "missing"}`);
@@ -990,12 +1205,28 @@ function validateVerifierEffectProposal(
   if (effect.operation === "web_reproduce" && !snapshot.task.verification.web?.flag_pattern) {
     throw new Error("web_reproduce is restricted to tasks with an immutable web verification policy");
   }
+  if (effect.operation === "web_reproduce" && snapshot.task.verification.web?.transport === "browser") {
+    throw new Error("browser transport must use browser_reproduce");
+  }
+  if (effect.operation === "browser_reproduce" && snapshot.task.verification.web?.transport !== "browser") {
+    throw new Error("browser_reproduce is restricted to tasks with an immutable browser Web verification policy");
+  }
+  if (effect.operation === "fixture_score" && snapshot.task.verification.kind === "platform_submission") {
+    const requestId = String(effect.args.verificationRequestId ?? "");
+    const request = snapshot.verificationRequests[requestId];
+    if (!request || request.status !== "BOUND" || request.completionId !== completion.id || request.key !== completion.verificationKey) {
+      throw new Error("fixture_score requires a bound platform verification request");
+    }
+    if (effect.args.verificationKey !== request.key || effect.args.policyHash !== request.policyHash || effect.args.recipeHash !== request.recipeHash) {
+      throw new Error("fixture_score does not match the immutable platform verification request");
+    }
+  }
   if (effect.operation === "pwn_reproduce") validatePwnVerifierBinding(snapshot, effect);
 }
 
 function validateTrustedVerificationEffect(snapshot: RunSnapshot, effect: RunSnapshot["effects"][string]): void {
   if (effect.producerLane !== "verifier") throw new Error(`Evidence effect ${effect.id} was not produced by the verifier service`);
-  if (!VERIFIER_EFFECT_OPERATIONS.has(effect.operation)) throw new Error(`Evidence effect ${effect.id} uses an untrusted verifier operation`);
+  if (!VERIFIER_ATTESTATION_OPERATIONS.has(effect.operation)) throw new Error(`Evidence effect ${effect.id} uses an untrusted verifier operation`);
   if (effect.outcome !== "success" || effect.exitCode !== 0) throw new Error(`Evidence effect ${effect.id} did not complete successfully`);
   if (!effect.sessionId?.trim()) throw new Error(`Evidence effect ${effect.id} has no auditable session id`);
   const verdict = effect.verification;
@@ -1020,7 +1251,47 @@ function validateTrustedVerificationEffect(snapshot: RunSnapshot, effect: RunSna
   }
 }
 
-const VERIFIER_EFFECT_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce", "web_reproduce"]);
+const VERIFIER_REPLAY_OPERATION = "verification_replay";
+const VERIFIER_ATTESTATION_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce", "web_reproduce", "browser_reproduce"]);
+const VERIFIER_EFFECT_OPERATIONS = new Set([...VERIFIER_ATTESTATION_OPERATIONS, VERIFIER_REPLAY_OPERATION]);
+
+function isVerifierReplayOperation(operation: string): boolean {
+  return operation === VERIFIER_REPLAY_OPERATION;
+}
+
+function validateVerifierReplayBinding(
+  snapshot: RunSnapshot,
+  effect: Omit<RunSnapshot["effects"][string], "createdSeq" | "runId" | "generation" | "producerLane">,
+): void {
+  const requestId = String(effect.args.verificationRequestId ?? "");
+  const request = snapshot.verificationRequests[requestId];
+  if (!request || request.runId !== snapshot.runId || request.generation !== snapshot.generation) {
+    throw new Error(`Verification replay Effect requires a current request: ${requestId || "missing"}`);
+  }
+  if (effect.args.verificationKey !== request.key || effect.args.kind !== request.kind
+    || effect.args.policyHash !== request.policyHash || effect.args.recipeHash !== request.recipeHash) {
+    throw new Error(`Verification replay Effect ${effect.id} does not match the immutable request policy`);
+  }
+  const expected = {
+    runId: snapshot.runId,
+    taskId: snapshot.task.task_id,
+    generation: snapshot.generation,
+    taskHash: sha256(canonicalJson(snapshot.task)),
+    targetHash: sha256(snapshot.task.target),
+    verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (effect.args[key] !== value) throw new Error(`Verification replay Effect ${key} does not match the immutable task binding`);
+  }
+  if (typeof effect.args.attemptId !== "string" || !effect.args.attemptId.trim()) throw new Error("Verification replay Effect requires an immutable attempt id");
+  if (typeof effect.args.recoveryArtifactSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(effect.args.recoveryArtifactSha256)) {
+    throw new Error("Verification replay Effect requires a hashed recovery input");
+  }
+  if (!effect.sessionId?.trim()) throw new Error("Verification replay Effect requires a stable attempt session id");
+  if (!effect.cwd?.trim()) throw new Error("Verification replay Effect requires an auditable cwd");
+  if (!pathIsWithin(effect.cwd, snapshot.task.scope.allowed_workspace)) throw new Error(`Verifier cwd escapes allowed_workspace: ${effect.cwd}`);
+  if (request.status !== "PENDING" && request.status !== "BOUND") throw new Error(`Verification request ${request.id} is not replayable in ${request.status} state`);
+}
 
 function validatePwnVerifierBinding(
   snapshot: RunSnapshot,
@@ -1082,6 +1353,53 @@ function validateVerificationVerdict(
   if (!verdict.valid && verdict.accepted) throw new Error("An invalid verifier verdict cannot be accepted");
 }
 
+function validateDomainRecord(
+  snapshot: RunSnapshot,
+  input: DomainRecordInput,
+  references: BatchReferences,
+  trustedVerifier: boolean,
+): void {
+  const record = { ...input, runId: snapshot.runId, generation: snapshot.generation, createdSeq: 0 } as DomainRecord;
+  if (snapshot.domainRecords?.[record.id]) throw new Error(`Domain record already exists: ${record.id}`);
+  validateDomainRecordShape(record);
+  if (record.kind.startsWith("web_") && !isWebDomainRecord(record)) throw new Error(`Invalid Web domain record kind: ${record.kind}`);
+  if (record.kind.startsWith("pwn_") && !isPwnDomainRecord(record)) throw new Error(`Invalid Pwn domain record kind: ${record.kind}`);
+  const targetKind = snapshot.task.target_kind;
+  if (isWebDomainRecord(record) && targetKind !== "web" && targetKind !== "mixed" && targetKind !== "unknown") {
+    throw new Error(`Web domain record is not allowed for target kind ${targetKind}`);
+  }
+  if (isPwnDomainRecord(record) && targetKind !== "pwn" && targetKind !== "mixed" && targetKind !== "unknown") {
+    throw new Error(`Pwn domain record is not allowed for target kind ${targetKind}`);
+  }
+  assertKnownReferences(record.artifactIds, references.artifacts, `domain record ${record.id} artifacts`);
+  assertKnownReferences(record.evidenceIds, references.evidence, `domain record ${record.id} evidence`);
+  if (record.kind === "pwn_exploit_stage" && record.inputArtifactId !== undefined) {
+    assertKnownReferences([record.inputArtifactId], references.artifacts, `domain record ${record.id} input artifact`);
+    if (!record.artifactIds.includes(record.inputArtifactId)) throw new Error(`Domain record ${record.id} input artifact must be included in artifacts`);
+  }
+  const linkedRecordIds = domainRecordLinks(record);
+  assertKnownReferences(linkedRecordIds, references.domainRecords, `domain record ${record.id} related records`);
+  if (record.effectId !== undefined) {
+    const effect = snapshot.effects[record.effectId];
+    if (!effect) throw new Error(`Unknown domain record effect ${record.effectId}`);
+    if (effect.generation !== snapshot.generation || effect.status !== "FINISHED") throw new Error(`Domain record effect ${record.effectId} is not a finished current-generation Effect`);
+    if (!effect.artifactId || !record.artifactIds.includes(effect.artifactId)) throw new Error(`Domain record ${record.id} must include its Effect artifact`);
+  }
+  if (record.kind === "web_exploit_chain" && record.status === "reproduced" && !trustedVerifier) {
+    throw new Error("A reproduced Web exploit chain requires trusted verifier authority");
+  }
+}
+
+function domainRecordLinks(record: DomainRecord): string[] {
+  switch (record.kind) {
+    case "web_endpoint": return record.sourceRecordIds;
+    case "web_exploit_chain": return record.stepRecordIds;
+    case "pwn_primitive": return record.preconditionRecordIds;
+    case "pwn_leak": return record.derivation?.sourceRecordIds ?? [];
+    default: return [];
+  }
+}
+
 function evidenceArtifactIds(evidence: Pick<Evidence, "source">): string[] {
   return [...new Set([...(evidence.source.artifactIds ?? []), ...(evidence.source.artifactId ? [evidence.source.artifactId] : [])])];
 }
@@ -1126,7 +1444,30 @@ function validateTaskContract(task: TaskContract): void {
   if (!Number.isInteger(task.verification.required_reproductions) || task.verification.required_reproductions < 0) {
     throw new Error("Task verification required_reproductions must be a non-negative integer");
   }
+  if (task.verification.web?.transport !== undefined && !["http", "browser"].includes(task.verification.web.transport)) {
+    throw new Error("Task Web verification transport must be http or browser");
+  }
+  const browserPolicy = task.verification.web?.browser;
+  if (browserPolicy) {
+    if (task.verification.web?.transport !== "browser") throw new Error("Browser verification limits require browser transport");
+    const allowedActions = browserPolicy.allowed_actions ?? ["navigate"];
+    if (!Array.isArray(allowedActions) || allowedActions.length === 0 || new Set(allowedActions).size !== allowedActions.length || allowedActions.some((action) => !["navigate", "click", "fill", "submit", "wait"].includes(action))) {
+      throw new Error("Browser verification allowed_actions must contain unique supported actions");
+    }
+    if (browserPolicy.max_steps !== undefined && (!Number.isInteger(browserPolicy.max_steps) || browserPolicy.max_steps < 1 || browserPolicy.max_steps > 64)) {
+      throw new Error("Browser verification max_steps must be an integer between 1 and 64");
+    }
+    if (browserPolicy.max_duration_ms !== undefined && (!Number.isInteger(browserPolicy.max_duration_ms) || browserPolicy.max_duration_ms < 100 || browserPolicy.max_duration_ms > 600_000)) {
+      throw new Error("Browser verification max_duration_ms must be an integer between 100 and 600000");
+    }
+    if (browserPolicy.max_response_bytes !== undefined && (!Number.isInteger(browserPolicy.max_response_bytes) || browserPolicy.max_response_bytes < 1 || browserPolicy.max_response_bytes > 8 * 1_048_576)) {
+      throw new Error("Browser verification max_response_bytes must be an integer between 1 and 8388608");
+    }
+  }
   if (!task.scope.allowed_workspace.trim()) throw new Error("Task allowed_workspace is required");
+  if (task.constraints.max_replans !== undefined && (!Number.isInteger(task.constraints.max_replans) || task.constraints.max_replans < 0 || task.constraints.max_replans > 16)) {
+    throw new Error("Task constraints max_replans must be an integer between 0 and 16 when provided");
+  }
   for (const endpoint of task.scope.allowed_endpoints ?? []) {
     if (!endpoint.host.trim() || !Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65_535) {
       throw new Error("Task allowed_endpoints must contain valid host/port tuples");
@@ -1165,6 +1506,7 @@ function validateToolPreparation(snapshot: RunSnapshot, preparation: RunToolPrep
     if (!Number.isInteger(plan.maxCalls) || plan.maxCalls < 1 || plan.maxCalls > 16) throw new Error("Tool preparation first action maxCalls is invalid");
     validateBoundedStringList(plan.allowedToolNames, "first action tools", 128, 32);
   }
+  if (preparation.actionBundles !== undefined) validateActionBundles(preparation.actionBundles);
   if (!Array.isArray(preparation.tools) || preparation.tools.length > 128) throw new Error("Tool preparation tool list is invalid");
   for (const tool of preparation.tools) {
     if (!tool.id || tool.id.length > 64 || !tool.name || tool.name.length > 128 || !tool.path || tool.path.length > 512) throw new Error("Tool preparation entry is invalid");
@@ -1177,6 +1519,27 @@ function validateToolPreparation(snapshot: RunSnapshot, preparation: RunToolPrep
   }
 }
 
+function validateActionBundles(bundles: ActionBundle[]): void {
+  if (!Array.isArray(bundles) || bundles.length > 16) throw new Error("Tool preparation action bundle list is invalid");
+  const ids = new Set<string>();
+  const phases = new Set<string>();
+  for (const bundle of bundles) {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(bundle.id) || ids.has(bundle.id)) throw new Error(`Tool preparation action bundle id is invalid: ${bundle.id}`);
+    ids.add(bundle.id);
+    if (!(["RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE"] as string[]).includes(bundle.domainPhase) || phases.has(bundle.domainPhase)) {
+      throw new Error(`Tool preparation action bundle phase is invalid: ${bundle.domainPhase}`);
+    }
+    phases.add(bundle.domainPhase);
+    if (!bundle.objective.trim() || bundle.objective.length > 1_000) throw new Error(`Tool preparation action bundle objective is invalid: ${bundle.id}`);
+    if (!Number.isInteger(bundle.maxCalls) || bundle.maxCalls < 1 || bundle.maxCalls > 16) throw new Error(`Tool preparation action bundle maxCalls is invalid: ${bundle.id}`);
+    validateBoundedStringList(bundle.toolNames, "action bundle tools", 128, 32);
+    validateBoundedStringList(bundle.capabilityIds, "action bundle capabilities", 128, 32);
+    validateBoundedStringList(bundle.preconditions, "action bundle preconditions", 512, 16);
+    validateBoundedStringList(bundle.successCriteria, "action bundle success criteria", 512, 16);
+    validateBoundedStringList(bundle.failureCriteria, "action bundle failure criteria", 512, 16);
+  }
+}
+
 function validateBoundedStringList(values: unknown, label: string, maxItemLength: number, maxItems: number): void {
   if (!Array.isArray(values) || values.length > maxItems || values.some((value) => typeof value !== "string" || value.length === 0 || value.length > maxItemLength)) throw new Error(`Tool preparation ${label} is invalid`);
 }
@@ -1186,11 +1549,36 @@ function validateExperimentCommand(snapshot: RunSnapshot, command: Extract<Domai
   if (snapshot.experiments[experiment.id]) throw new Error(`Experiment already exists: ${experiment.id}`);
   if (experiment.runId !== snapshot.runId) throw new Error(`Experiment run identity mismatch: ${experiment.id}`);
   if (experiment.generation !== snapshot.generation) throw new Error(`Experiment generation mismatch: ${experiment.id}`);
+  if (experiment.domainPhase !== snapshot.domainPhase) throw new Error(`Experiment phase ${experiment.domainPhase} does not match current phase ${snapshot.domainPhase}`);
   if (!experiment.repeatKey.trim() || experiment.repeatKey.length > 256) throw new Error("Experiment repeatKey must contain 1-256 characters");
   if (!experiment.action.trim() || experiment.action.length > 1_000) throw new Error("Experiment action must contain 1-1000 characters");
   if (!experiment.inputHash.trim() || experiment.inputHash.length > 256) throw new Error("Experiment inputHash must contain 1-256 characters");
   if (!experiment.summary.trim() || experiment.summary.length > 1_000) throw new Error("Experiment summary must contain 1-1000 characters");
   if (experiment.hypothesisId && !snapshot.hypotheses[experiment.hypothesisId]) throw new Error(`Unknown experiment hypothesis: ${experiment.hypothesisId}`);
+  const budget = phaseBudget(snapshot);
+  if (budget.phaseActionsRemaining !== undefined && budget.phaseActionsRemaining <= 0) {
+    throw new Error(`Phase action budget exhausted: ${snapshot.domainPhase}`);
+  }
+}
+
+function validateReplanCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "replan_requested" }>): void {
+  if (isTerminal(snapshot.status)) throw new Error(`Cannot replan terminal run ${snapshot.status}`);
+  const replan = command.replan;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(replan.id)) throw new Error("Replan id is invalid");
+  if (!replan.reason.trim() || replan.reason.length > 1_000) throw new Error("Replan reason must contain 1-1000 characters");
+  if (replan.domainPhase !== snapshot.domainPhase) throw new Error(`Replan phase ${replan.domainPhase} does not match current phase ${snapshot.domainPhase}`);
+  if (!FAILURE_CATEGORIES.has(replan.category)) throw new Error(`Unknown replan failure category: ${String(replan.category)}`);
+  if (snapshot.replanCount >= maxReplansFor(snapshot.task.target_kind, snapshot.task.constraints.max_replans)) {
+    throw new Error(`Replan budget exhausted: ${snapshot.replanCount}`);
+  }
+  if (!replan.sourceWorkItemId || !replan.nextWorkItemId || replan.sourceWorkItemId === replan.nextWorkItemId) {
+    throw new Error("Replan must bind distinct source and next WorkItems");
+  }
+  if (snapshot.workItems[replan.sourceWorkItemId]?.status !== "BLOCKED") throw new Error("Replan source WorkItem must already be BLOCKED");
+  if (snapshot.workItems[replan.nextWorkItemId]?.status !== "READY") throw new Error("Replan next WorkItem must already be READY");
+  if (!Array.isArray(replan.prohibitedRepeatKeys) || replan.prohibitedRepeatKeys.length > 16 || replan.prohibitedRepeatKeys.some((key) => typeof key !== "string" || key.length === 0 || key.length > 256)) {
+    throw new Error("Replan prohibited repeat keys are invalid");
+  }
 }
 
 function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<ArtifactSemanticMetadata, "updatedSeq"> | ArtifactSemanticMetadata): void {
@@ -1289,6 +1677,55 @@ function reachesWorkItem(snapshot: RunSnapshot, fromId: string, targetId: string
   if (seen.has(fromId)) return false;
   seen.add(fromId);
   return (snapshot.workItems[fromId]?.dependsOn ?? []).some((dependency) => reachesWorkItem(snapshot, dependency, targetId, seen));
+}
+
+/**
+ * Make an exact retry of a trusted verifier result batch a no-op. The
+ * comparison is intentionally strict: a reused id may only replay the same
+ * Evidence or terminal Completion, never overwrite a different conclusion.
+ */
+function filterIdempotentVerifierCommands(snapshot: RunSnapshot, commands: VerifierResultCommand[]): VerifierResultCommand[] {
+  return commands.filter((command) => {
+    if (command.type === "evidence") {
+      const existing = snapshot.evidence[command.evidence.id];
+      if (!existing) return true;
+      if (existing.provenance.recordedBy !== "verifier" || canonicalJson(verifierEvidenceShape(existing)) !== canonicalJson(verifierEvidenceShape(command.evidence))) {
+        throw new Error(`Verifier Evidence retry does not match durable Evidence ${command.evidence.id}`);
+      }
+      return false;
+    }
+    if (command.type === "completion_verified") {
+      const existing = snapshot.completions[command.completionId];
+      if (!existing || existing.status === "PROPOSED") return true;
+      const missingEvidence = command.evidenceIds.filter((evidenceId) => !snapshot.evidence[evidenceId]);
+      if (missingEvidence.length > 0) throw new Error(`Terminal Completion retry references missing Evidence: ${missingEvidence.join(", ")}`);
+      const accepted = existing.status === "ACCEPTED";
+      if (accepted !== command.accepted || !sameStringArray(existing.evidenceIds, command.evidenceIds)) {
+        throw new Error(`Verifier Completion retry does not match durable Completion ${existing.id}`);
+      }
+      return false;
+    }
+    return true;
+  });
+}
+
+function verifierEvidenceShape(value: RunSnapshot["evidence"][string] | VerifierEvidenceCommand["evidence"]): Record<string, unknown> {
+  return {
+    id: value.id,
+    kind: value.kind,
+    name: value.name,
+    summary: value.summary,
+    tags: value.tags ?? [],
+    dependsOn: value.dependsOn ?? [],
+    source: value.source,
+    confidence: value.confidence,
+    supports: value.supports,
+    refutes: value.refutes,
+  };
+}
+
+function sameStringArray(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function createEffectInput(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string } {

@@ -3,6 +3,7 @@ import type { ControlStore, VerifierControlPort } from "../control/control-store
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { VerifierEffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
+import type { RunSnapshot } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 
 export interface VerificationOutcome {
@@ -30,11 +31,24 @@ export class IndependentVerifier {
       ? snapshot.completions[completionId]
       : Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
     if (!completion) throw new Error("No completion proposal is waiting for verification");
-    if (completion.status !== "PROPOSED") throw new Error(`Completion ${completion.id} is already ${completion.status}`);
+    if (completion.runId !== runId || completion.generation !== snapshot.generation) throw new Error(`Completion ${completion.id} is from another run or generation`);
     const artifact = snapshot.artifacts[completion.artifactId];
     if (!artifact) throw new Error(`Candidate artifact is missing: ${completion.artifactId}`);
     const candidate = (await this.artifactStore.readText(runId, artifact)).trim();
     if (sha256(candidate) !== completion.candidateHash) throw new Error(`Candidate hash mismatch: ${completion.id}`);
+    if (completion.status !== "PROPOSED") return durableTerminalOutcome(snapshot, completion, candidate);
+    const platformSubmission = snapshot.task.verification.kind === "platform_submission";
+    const verificationRequest = platformSubmission
+      ? completion.verificationKey
+        ? Object.values(snapshot.verificationRequests).find((request) => request.key === completion.verificationKey)
+        : undefined
+      : undefined;
+    if (platformSubmission && (!verificationRequest || verificationRequest.status !== "BOUND" || verificationRequest.completionId !== completion.id)) {
+      throw new Error(`Platform Completion ${completion.id} is missing its bound verifier request; refusing to submit`);
+    }
+    if (verificationRequest?.recoveryState === "RECOVERY_REQUIRED") {
+      throw new Error(`Verification request ${verificationRequest.id} requires recovery before another external attempt`);
+    }
     const candidatePath = join(this.runsRoot, runId, artifact.path);
     const evidenceIds: string[] = [];
     const evidenceCommands: Array<Parameters<VerifierControlPort["dispatch"]>[1]> = [];
@@ -57,6 +71,7 @@ export class IndependentVerifier {
           candidatePath,
           attempt,
           attemptId,
+          ...(verificationRequest ? { verificationRequestId: verificationRequest.id, verificationKey: verificationRequest.key, policyHash: verificationRequest.policyHash, recipeHash: verificationRequest.recipeHash } : {}),
         },
         replayPolicy: "pure",
         cwd: fixture.path,
@@ -108,4 +123,49 @@ async function ensureVerifierActive(controlStore: ControlStore, runId: string, s
   if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error("Run aborted");
   const snapshot = await controlStore.snapshot(runId);
   if (snapshot.status === "PAUSED") throw new Error("Run paused during verification");
+}
+
+function durableTerminalOutcome(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string): VerificationOutcome {
+  const accepted = completion.status === "ACCEPTED";
+  const evidence = completion.evidenceIds.map((evidenceId) => snapshot.evidence[evidenceId]);
+  if (evidence.length === 0 || evidence.some((item) => !item)) {
+    throw new Error(`Completion ${completion.id} is already ${completion.status} but has incomplete durable verifier evidence`);
+  }
+  for (const item of evidence) {
+    const effectId = item!.provenance?.effect?.id;
+    const effect = effectId ? snapshot.effects[effectId] : undefined;
+    const resultArtifact = effect?.artifactId ? snapshot.artifacts[effect.artifactId] : undefined;
+    const verdict = effect?.verification;
+    const related = accepted
+      ? item!.kind === "reproduction" && item!.supports.includes(completion.id)
+      : item!.kind === "negative" && item!.refutes.includes(completion.id);
+    if (item!.provenance.recordedBy !== "verifier"
+      || item!.provenance.runId !== snapshot.runId
+      || item!.provenance.generation !== snapshot.generation
+      || item!.source.generation !== snapshot.generation
+      || item!.source.effectId !== effectId
+      || !effect
+      || effect.status !== "FINISHED"
+      || effect.producerLane !== "verifier"
+      || !resultArtifact
+      || resultArtifact.sourceEffectId !== effect.id
+      || item!.source.artifactId !== resultArtifact.id
+      || !verdict?.valid
+      || verdict.accepted !== accepted
+      || verdict.completionId !== completion.id
+      || verdict.candidateHash !== completion.candidateHash
+      || verdict.candidateArtifactId !== completion.artifactId
+      || !related) {
+      throw new Error(`Completion ${completion.id} is already ${completion.status} but its durable verifier evidence is invalid`);
+    }
+  }
+  const fact = Object.values(snapshot.facts).find((item) => completion.evidenceIds.every((evidenceId) => item.evidenceIds.includes(evidenceId)));
+  return {
+    completionId: completion.id,
+    accepted,
+    candidate,
+    candidateHash: completion.candidateHash,
+    evidenceIds: [...completion.evidenceIds],
+    ...(fact ? { factId: fact.id } : {}),
+  };
 }

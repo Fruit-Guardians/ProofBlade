@@ -1,6 +1,8 @@
 import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
+import { validateDomainRecordShape } from "../domain/records.js";
+import { completedWorkItemForCompletion } from "../domain/work-item.js";
 
 export function createInitialSnapshot(runId: string, task: TaskContract): RunSnapshot {
   return {
@@ -16,6 +18,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     facts: {},
     observations: {},
     evidence: {},
+    domainRecords: {},
     reasoningNodes: {},
     reasoningEdges: {},
     reasoningTrees: {},
@@ -23,6 +26,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     intents: {},
     schedulerIntents: {},
     completions: {},
+    verificationRequests: {},
     checkpoints: {},
     jobs: {},
     handoffs: {},
@@ -30,6 +34,8 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     sessions: {},
     requestEpochs: {},
     experiments: {},
+    replans: {},
+    replanCount: 0,
     contextOverflowRecoveries: 0,
     artifacts: {},
     effects: {},
@@ -51,6 +57,9 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
   const next = structuredClone(snapshot);
   next.schedulerIntents ??= {};
   next.leaseEpochs ??= {};
+  next.replans ??= {};
+  next.domainRecords ??= {};
+  next.replanCount ??= Object.keys(next.replans).length;
   next.lastSeq = event.seq;
   const p = event.payload ?? {};
 
@@ -163,6 +172,14 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
             throw new Error(`Successful run contains evidence without a bound accepted verdict: ${evidenceId}`);
           }
         }
+        if (!completedWorkItemForCompletion(next, completion, evidenceIds)) {
+          ensureNotTerminal(next.status);
+          next.status = "NEED_HUMAN";
+          next.finishedAt = event.ts;
+          next.terminalReason = "Successful run lacks a completed executor WorkItem bound to its completion";
+          next.failureCategory = "verification_missing";
+          break;
+        }
         next.finalResult = {
           completionId: completion.id,
           candidateHash: completion.candidateHash,
@@ -229,11 +246,40 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       next.evidence[evidence.id] = evidence;
       break;
     }
+    case "domain_record_added": {
+      const raw = p.record as RunSnapshot["domainRecords"][string];
+      const record = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+      };
+      if (!record?.id) throw new Error("domain_record_added requires record");
+      if (record.runId !== next.runId || record.generation !== next.generation) throw new Error(`Domain record ${record.id} provenance is stale or invalid`);
+      if (next.domainRecords[record.id]) throw new Error(`Domain record already exists: ${record.id}`);
+      validateDomainRecordShape(record);
+      next.domainRecords[record.id] = { ...record, createdSeq: event.seq };
+      break;
+    }
     case "experiment_recorded": {
       const experiment = p.experiment as RunSnapshot["experiments"][string];
       if (!experiment?.id) throw new Error("experiment_recorded requires experiment");
       if (next.experiments[experiment.id]) throw new Error(`Experiment already exists: ${experiment.id}`);
       next.experiments[experiment.id] = experiment;
+      break;
+    }
+    case "replan_requested": {
+      const raw = p.replan as RunSnapshot["replans"][string];
+      const replan = {
+        ...raw,
+        runId: raw?.runId ?? next.runId,
+        generation: raw?.generation ?? next.generation,
+      };
+      if (!replan?.id) throw new Error("replan_requested requires replan");
+      if (replan.runId !== next.runId || replan.generation !== next.generation) throw new Error(`Replan ${replan.id} provenance is stale or invalid`);
+      if (next.replans[replan.id]) throw new Error(`Replan already exists: ${replan.id}`);
+      if (!Array.isArray(replan.prohibitedRepeatKeys)) throw new Error(`Replan ${replan.id} requires prohibited repeat keys`);
+      next.replans[replan.id] = { ...replan, createdSeq: event.seq };
+      next.replanCount += 1;
       break;
     }
     case "reasoning_node_upserted": {
@@ -344,6 +390,8 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const effect = getEffect(next, String(p.effectId));
       if (effect.status !== "PROPOSED") throw new Error(`Cannot start effect in ${effect.status}`);
       effect.status = "STARTED";
+      if (typeof p.sessionId === "string" && p.sessionId.trim()) effect.sessionId = p.sessionId;
+      if (typeof p.externalId === "string" && p.externalId.trim()) effect.externalId = p.externalId;
       break;
     }
     case "effect_finished": {
@@ -398,7 +446,44 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (!completion?.id) throw new Error("completion_proposed requires completion");
       if (!["submission", "claim_reproduction", "harness_verification", "legacy_unclassified"].includes(completion.purpose)) throw new Error("completion_proposed requires an immutable purpose");
       if (next.completions[completion.id]) throw new Error(`Completion already exists: ${completion.id}`);
+      if (completion.verificationKey !== undefined) {
+        const request = Object.values(next.verificationRequests).find((value) => value.key === completion.verificationKey);
+        if (!request || request.status !== "PENDING" || request.completionId) throw new Error(`Completion ${completion.id} cannot bind its verification request`);
+        request.status = "BOUND";
+        request.completionId = completion.id;
+      }
       next.completions[completion.id] = completion;
+      break;
+    }
+    case "verification_requested": {
+      const raw = p.request as RunSnapshot["verificationRequests"][string];
+      if (!raw?.id || !raw.key) throw new Error("verification_requested requires a request");
+      if (next.verificationRequests[raw.id] || Object.values(next.verificationRequests).some((value) => value.key === raw.key)) throw new Error(`Verification request already exists: ${raw.id}`);
+      next.verificationRequests[raw.id] = {
+        ...raw,
+        runId: raw.runId ?? next.runId,
+        generation: raw.generation ?? next.generation,
+        status: raw.status ?? "PENDING",
+        recoveryState: raw.recoveryState ?? "READY",
+      };
+      break;
+    }
+    case "verification_recovery_required": {
+      const request = next.verificationRequests[String(p.requestId)];
+      if (!request) throw new Error(`Unknown verification request ${String(p.requestId)}`);
+      if (request.runId !== next.runId || request.generation !== next.generation) throw new Error(`Verification request ${request.id} is stale`);
+      request.recoveryState = "RECOVERY_REQUIRED";
+      request.recoveryReason = String(p.reason ?? "Verifier recovery requires explicit reconciliation.");
+      request.recoverySeq = event.seq;
+      break;
+    }
+    case "verification_recovery_resolved": {
+      const request = next.verificationRequests[String(p.requestId)];
+      if (!request) throw new Error(`Unknown verification request ${String(p.requestId)}`);
+      if (request.runId !== next.runId || request.generation !== next.generation) throw new Error(`Verification request ${request.id} is stale`);
+      request.recoveryState = "RECOVERED";
+      request.recoveryReason = String(p.reason ?? "Verifier recovery completed.");
+      request.recoverySeq = event.seq;
       break;
     }
     case "completion_verified": {
@@ -407,6 +492,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (completion.status !== "PROPOSED") throw new Error(`Completion ${completion.id} is already ${completion.status}`);
       completion.status = p.accepted === true ? "ACCEPTED" : "REJECTED";
       completion.evidenceIds = Array.isArray(p.evidenceIds) ? p.evidenceIds.map(String) : [];
+      for (const request of Object.values(next.verificationRequests)) {
+        if (request.completionId === completion.id && request.recoveryState === "RECOVERY_REQUIRED") {
+          request.recoveryState = "RECOVERED";
+          request.recoveryReason = "Completion was durably verified after recovery.";
+          request.recoverySeq = event.seq;
+        }
+      }
       break;
     }
     case "checkpoint_created": {
@@ -574,6 +666,17 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
         createdSeq: Number.isInteger(session.createdSeq) && session.createdSeq > 0 ? session.createdSeq : event.seq,
         updatedSeq: event.seq,
       };
+      break;
+    }
+    case "session_binding_completed": {
+      const session = getSession(next, String(p.sessionId));
+      if (session.status !== "OPEN") throw new Error(`Session ${session.id} is not OPEN`);
+      if (session.bindingTxnId !== String(p.bindingTxnId) || session.bindingIdentityHash !== String(p.bindingIdentityHash)) {
+        throw new Error(`Session ${session.id} binding identity mismatch`);
+      }
+      if (session.bindingState !== "FINALIZING") throw new Error(`Session ${session.id} is not FINALIZING`);
+      session.bindingState = "BOUND";
+      session.updatedSeq = event.seq;
       break;
     }
     case "session_interacted": {

@@ -15,11 +15,11 @@
 
 ## 一、当前状态的精确诊断（带代码位置）
 
-### 1.1 比赛执行路径：一次性 nudge，无领域闭环
+### 1.1 比赛执行路径：历史基线与当前修订
 
-`packages/materials/src/competition/loop.ts` 的 `runCompetitionLoop`：每个 provider turn 就是给 `PiCodingLane` 发一句 `turnPrompt`（turn 1 是题面，之后是 "Continue from where you left off"）。源码注释（loop.ts:60-62）明确写着比赛路径 **"Dropped: phase/planner choreography and verifier orchestration"**。
+早期版本的 `runCompetitionLoop` 确实主要是给 `PiCodingLane` 发送 `turnPrompt`，只靠文本 nudge 推进；以下两段护栏和历史 Run 仍保留作问题基线。当前实现已经改为：每个 turn 先由共享 `RunCoordinator` 设置 `DomainPhase` 并 claim `WorkItem`，候选经独立 verifier 产生 Evidence/Effect 后才允许 `REPORT → SUBMIT` 和终态提交；Competition、GUI、Fixture/Evaluation 共用这条路径。
 
-结果就是架构规划里描述的现象：控制平面记录了大量 Artifact，却没有把过程约束成"目标模型 → 假设 → 实验 → 复现 → 提交"的闭环。已有的护栏只有：
+历史版本的结果就是架构规划里描述的现象：控制平面记录了大量 Artifact，却没有把过程约束成"目标模型 → 假设 → 实验 → 复现 → 提交"的闭环。历史版本已有的护栏只有：
 - `REPLAN_NUDGE_AFTER_TURNS = 12`（loop.ts:352）：12 turn 没提交就插一句硬重规划提示；
 - `MAX_GUARD_REPLANS = 2`（loop.ts:353）+ `isRecoverableTurnGuard`（loop.ts:406）：experiment_budget / no_progress / repeated_tool_failure / tool_failure_storm 时阻塞旧 WorkItem 并新建重规划项。
 

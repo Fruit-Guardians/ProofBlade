@@ -157,6 +157,32 @@ export interface ActiveRunInfo {
   error?: string;
 }
 
+export interface RunControlView {
+  domainPhase: RunSnapshot["domainPhase"];
+  gate: { status: "pass" | "blocked" | "stale"; missing: string[]; stale: string[] };
+  budget: {
+    phaseActionsUsed: number;
+    phaseActionsRemaining?: number;
+    runToolCallsUsed: number;
+    runToolCallsRemaining: number;
+    submissionsUsed: number;
+    submissionsRemaining: number;
+    replansUsed: number;
+    replanLimit: number;
+    replansRemaining: number;
+  };
+  recovery: {
+    required: number;
+    items: Array<{
+      requestId: string;
+      kind: string;
+      state: "READY" | "RECOVERY_REQUIRED" | "RECOVERED";
+      reason?: string;
+    }>;
+  };
+  nextAction?: { id: string; objective: string; toolNames: string[]; maxCalls: number };
+}
+
 export interface RunListItem {
   runId: string;
   kind: RunKind;
@@ -258,6 +284,7 @@ export interface RunDetail {
   events: HarnessEvent[];
   telemetry: RunTelemetryReport;
   sessions: PiSessionDebug[];
+  controlView: RunControlView;
   active?: ActiveRunInfo;
   updatedAt: string;
   context?: ContextRuntimeInfo;

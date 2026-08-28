@@ -7,9 +7,14 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
+import { projectionHash } from "../src/control/reducer.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
 import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
+import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
+import { PiCodingLane } from "../src/runtime/coding-lane.js";
+import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -89,6 +94,71 @@ test("local Run prompt carries the remaining deadline into the single coding lan
   }
 });
 
+test("single-agent CTF loop forwards configured session runtime brokers to its lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-loop-session-runtime-"));
+  const services = createServices(root, config, { sessionRuntimeBrokers: [sessionRuntimeBroker()], sessionRuntimeRequired: true, browserRuntimeRequired: true });
+  let received: unknown;
+  const lane: AgentLaneFactory = async ({ services: laneServices }) => {
+    received = laneServices;
+    return {
+      async prompt() { return { text: "bounded turn", stopReason: "stop", usage: zeroUsage() }; },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    };
+  };
+  try {
+    const runId = "SESSION-RUNTIME-FORWARD-web-source-1";
+    await new SingleAgentCtfLoop(root, config, services, lane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 1,
+    });
+    assert.equal(received && "sessionRuntimeRequired" in received, true);
+    assert.equal((received as { sessionRuntimeRequired: boolean }).sessionRuntimeRequired, true);
+    assert.equal((received as { browserRuntimeRequired: boolean }).browserRuntimeRequired, true);
+    assert.equal((received as { sessionRuntimeBrokers: readonly SessionRuntimeCreateBroker[] }).sessionRuntimeBrokers[0]?.name, "test-runtime");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("required Browser runtime fails closed before creating a browser task lane", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-loop-browser-runtime-required-"));
+  const services = createServices(root, config, { browserRuntimeRequired: true });
+  const runId = "BROWSER-RUNTIME-REQUIRED-web-source-1";
+  const baseTask = fixtureTask(runId, "web-source-1", root, config);
+  const task = {
+    ...baseTask,
+    verification: {
+      ...baseTask.verification,
+      web: { flag_pattern: "PB\\{[^}]+\\}", transport: "browser" as const },
+    },
+  };
+  try {
+    await services.control.createRun(runId, task);
+    const claimVerifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    await assert.rejects(() => PiCodingLane.create({
+      runId,
+      projectRoot: root,
+      installRoot: root,
+      runDir: join(services.runsRoot, runId),
+      controlStore: services.control,
+      artifactStore: services.artifacts,
+      journal: services.journal,
+      claimVerifier,
+      config,
+      browserRuntimeRequired: true,
+    }), /Browser runtime broker is configured but unavailable/);
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("auto mode solves all three web and three reverse fixtures through the verifier gate", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-fixtures-"));
   try {
@@ -104,6 +174,8 @@ test("auto mode solves all three web and three reverse fixtures through the veri
       assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction").length, 2, profile.id);
       assert.equal(Object.values(snapshot.completions)[0]?.status, "ACCEPTED", profile.id);
       assert.ok(Object.values(snapshot.artifacts).some((item) => item.path.endsWith("report.md")), profile.id);
+      const replayed = await services.control.replay(runId);
+      assert.equal(projectionHash(snapshot), projectionHash(replayed), `${profile.id} replay projection must match the live snapshot`);
       const events = await readFile(join(root, "runs", runId, "events.jsonl"), "utf8");
       const domainPhases = events.trim().split(/\r?\n/)
         .map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } })
@@ -500,6 +572,9 @@ test("terminal reopen projects the exact finalResult completion instead of a new
     const verified = await new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier)
       .verify(runId, { ...fixture, generation }, "C-FINAL");
     assert.equal(verified.accepted, true);
+    const coordinator = new RunCoordinator(services.control, services.verifier);
+    const workItem = await coordinator.claim(runId, task, 1);
+    await coordinator.settle(runId, workItem.id, true, verified.evidenceIds, [acceptedArtifact.id]);
     await services.verifier.finish(runId, { completionId: "C-FINAL", reason: "terminal reopen projection regression" });
 
     const neverCreateLane: AgentLaneFactory = async () => { throw new Error("terminal reopen must not create a lane"); };
@@ -521,4 +596,20 @@ function escapeRegExp(value: string): string {
 
 function zeroUsage() {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function sessionRuntimeBroker(): SessionRuntimeCreateBroker {
+  return {
+    name: "test-runtime",
+    kind: "pwn-session",
+    inspect: async () => ({ status: "UNKNOWN", binding: "UNKNOWN" }),
+    adopt: async () => ({ state: "UNKNOWN" }),
+    release: async () => ({ released: false }),
+    health: async () => ({
+      status: "READY",
+      capabilities: { kinds: ["pwn-session"], maxRequestBytes: 1_048_576, maxResponseBytes: 1_048_576, stableAcrossRestart: true },
+    }),
+    create: async () => ({ schemaVersion: 1, operation: "create", state: "UNKNOWN", summary: "test broker" }),
+    createBinding: async () => { throw new Error("test broker does not create bindings"); },
+  };
 }

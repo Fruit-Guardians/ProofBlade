@@ -22,9 +22,13 @@ import type {
   CompetitionAttachment,
   CompetitionChallengeSummary,
   CompetitionEnvironment,
+  CompetitionEnvironmentInspection,
+  CompetitionEnvironmentInspectOptions,
+  CompetitionEnvironmentStartOptions,
   CompetitionSubmitResult,
 } from "./api.js";
 import { CompetitionChallengeError, normalizeCategory } from "./api.js";
+import { readBoundedResponseText } from "./http-body.js";
 
 /** Platform success envelope code. */
 const OK_CODE = "00000";
@@ -68,6 +72,8 @@ export interface DasctfCompetitionApiOptions {
   wrongFlagCodes?: string[];
   /** Max bytes to download for a single attachment. Defaults to 64 MiB. */
   maxAttachmentBytes?: number;
+  /** Maximum UTF-8 response envelope size. Defaults to 8 MiB. */
+  maxResponseBytes?: number;
   /**
    * Minimum spacing between platform API calls. The platform rate-limits bursts
    * (concurrent requests return HTTP 429 Retry-After), so calls are serialized
@@ -87,6 +93,8 @@ export interface DasctfCompetitionApiOptions {
 }
 
 export class DasctfCompetitionApi implements CompetitionApi {
+  /** DASCTF detail is challenge-scoped and currently exposes no stable lease identity. */
+  public readonly environmentIdentity = { strategy: "challenge-only", stableAcrossRestart: false } as const;
   private readonly baseUrl: string;
   private readonly accessKey: string;
   private readonly timeoutMs: number;
@@ -94,6 +102,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
   private readonly envPollIntervalMs: number;
   private readonly wrongFlagCodes: Set<string>;
   private readonly maxAttachmentBytes: number;
+  private readonly maxResponseBytes: number;
   private readonly minRequestIntervalMs: number;
   private readonly maxRateLimitRetries: number;
   private readonly maxEnvironmentBuildRetries: number;
@@ -120,6 +129,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
     this.envPollIntervalMs = intOption(options.envPollIntervalMs, 3_000, "envPollIntervalMs");
     this.wrongFlagCodes = new Set((options.wrongFlagCodes ?? DEFAULT_WRONG_FLAG_CODES).map((code) => code.trim()).filter(Boolean));
     this.maxAttachmentBytes = byteOption(options.maxAttachmentBytes, 64 * 1024 * 1024, "maxAttachmentBytes");
+    this.maxResponseBytes = byteOption(options.maxResponseBytes, 8 * 1024 * 1024, "maxResponseBytes");
     this.minRequestIntervalMs = nonNegIntOption(options.minRequestIntervalMs, 350, "minRequestIntervalMs");
     const retries = options.maxRateLimitRetries ?? 4;
     if (!Number.isInteger(retries) || retries < 0 || retries > 10) throw new Error("DasctfCompetitionApi maxRateLimitRetries must be an integer in [0, 10]");
@@ -168,7 +178,7 @@ export class DasctfCompetitionApi implements CompetitionApi {
     return { summary, attachments };
   }
 
-  public async startEnvironment(challengeId: string): Promise<CompetitionEnvironment> {
+  public async startEnvironment(challengeId: string, options: CompetitionEnvironmentStartOptions = {}): Promise<CompetitionEnvironment> {
     // The platform permits only one build decision at a time. Without this
     // gate, two Fleet lanes can both observe isNeedInit=true/isNeedCheck=false
     // before either POST is processed; the second POST is then rejected with
@@ -179,11 +189,34 @@ export class DasctfCompetitionApi implements CompetitionApi {
       // isNeedInit:true AND isNeedCheck:true at once (build already in flight); in
       // that state we must only poll, never POST build again.
       if (initial.isNeedCheck === true || initial.isNeedInit !== true) return initial;
-      return await this.postEnvironmentBuildWithRecovery(challengeId, initial);
+      return await this.postEnvironmentBuildWithRecovery(challengeId, initial, options.idempotencyKey);
     });
     if (detail.isNeedCheck === true) detail = await this.pollUntilReady(challengeId);
     // else: static challenge (attachment-only), no environment to provision.
     return this.parseEnvironment(detail);
+  }
+
+  /**
+   * Best-effort remote observation for recovery. DASCTF keys teardown by
+   * exercise id and does not currently expose a stable environment instance
+   * handle; therefore an active detail without an explicit instance id can be
+   * observed, but it cannot prove ownership of a different local instance id.
+   */
+  public async inspectEnvironment(challengeId: string, _instanceId?: string, options: CompetitionEnvironmentInspectOptions = {}): Promise<CompetitionEnvironmentInspection> {
+    const detail = await this.exerciseDetail(challengeId);
+    const returnedChallengeId = optionalString(detail, ["exerciseId", "challengeId"]);
+    if (returnedChallengeId !== undefined && returnedChallengeId !== challengeId) {
+      return { status: "UNKNOWN", challengeId: returnedChallengeId, summary: "DASCTF returned a different challenge id while inspecting the environment", raw: detail };
+    }
+    if (detail.isNeedCheck === true) return { status: "UNKNOWN", challengeId, summary: "DASCTF environment is still building", raw: detail };
+    const environment = this.parseEnvironment(detail);
+    if (!environment.connectionInfo) return { status: "ABSENT", challengeId, summary: "DASCTF detail has no active environment endpoint", raw: detail };
+    const instanceId = optionalString(detail, ["instanceId", "environmentId", "envId"]);
+    const remoteKey = environment.idempotencyKey ?? optionalString(detail, ["idempotencyKey", "idempotency_key", "requestKey", "request_key"]);
+    if (options.idempotencyKey && remoteKey !== options.idempotencyKey) {
+      return { status: "UNKNOWN", challengeId, ...(instanceId ? { instanceId } : {}), summary: "DASCTF does not expose the requested stable idempotency key", raw: detail };
+    }
+    return { status: "ACTIVE", challengeId, ...(instanceId ? { instanceId } : {}), ...(remoteKey ? { idempotencyKey: remoteKey } : {}), ...(environment.connectionInfo ? { connectionInfo: environment.connectionInfo } : {}), ...(environment.expiresAt === undefined ? {} : { expiresAt: environment.expiresAt }), summary: "DASCTF detail confirms an active environment endpoint", raw: detail };
   }
 
   public async submitFlag(challengeId: string, flag: string): Promise<CompetitionSubmitResult> {
@@ -244,11 +277,11 @@ export class DasctfCompetitionApi implements CompetitionApi {
    * challenge: if it is already building/ready, only polling is required;
    * otherwise the POST can be attempted again within the bounded budget.
    */
-  private async postEnvironmentBuildWithRecovery(challengeId: string, initial: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async postEnvironmentBuildWithRecovery(challengeId: string, initial: Record<string, unknown>, idempotencyKey?: string): Promise<Record<string, unknown>> {
     let observed = initial;
     for (let attempt = 0; ; attempt += 1) {
       try {
-        await this.post("/ctf/build-exercise-env", { exerciseId: toExerciseId(challengeId) });
+        await this.post("/ctf/build-exercise-env", { exerciseId: toExerciseId(challengeId) }, idempotencyKey);
         return { ...observed, isNeedCheck: true };
       } catch (error) {
         if (!(error instanceof DasctfRateLimitError) || attempt >= this.maxEnvironmentBuildRetries) throw error;
@@ -395,6 +428,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
       if (expiry !== undefined) expiresAt = expiresAt === undefined ? expiry : Math.min(expiresAt, expiry);
     }
     return {
+      ...(optionalString(detail, ["instanceId", "environmentId", "envId"]) ? { instanceId: optionalString(detail, ["instanceId", "environmentId", "envId"]) } : {}),
+      ...(optionalString(detail, ["idempotencyKey", "idempotency_key", "requestKey", "request_key"]) ? { idempotencyKey: optionalString(detail, ["idempotencyKey", "idempotency_key", "requestKey", "request_key"]) } : {}),
       ...(lines.length > 0 ? { connectionInfo: lines.join("\n") } : {}),
       ...(expiresAt === undefined ? {} : { expiresAt }),
       raw: detail,
@@ -405,8 +440,8 @@ export class DasctfCompetitionApi implements CompetitionApi {
     return (await this.requestEnvelope("GET", path)).data;
   }
 
-  private async post(path: string, body: unknown): Promise<unknown> {
-    return (await this.requestEnvelope("POST", path, body)).data;
+  private async post(path: string, body: unknown, idempotencyKey?: string): Promise<unknown> {
+    return (await this.requestEnvelope("POST", path, body, {}, idempotencyKey)).data;
   }
 
   private async postEnvelope(path: string, body: unknown): Promise<Envelope> {
@@ -421,13 +456,14 @@ export class DasctfCompetitionApi implements CompetitionApi {
    * is non-idempotent and the platform provides no idempotency key, so every
    * POST response returns immediately and the request is never re-sent.
    */
-  private async gatedFetch(method: "GET" | "POST", url: string, body: unknown): Promise<Response> {
+  private async gatedFetch(method: "GET" | "POST", url: string, body: unknown, idempotencyKey?: string): Promise<Response> {
     const run = this.gate.then(async () => {
       const wait = Math.max(0, this.minRequestIntervalMs - (this.now() - this.lastRequestAt));
       if (wait > 0) await this.sleep(wait);
       for (let attempt = 0; ; attempt += 1) {
         this.lastRequestAt = this.now();
         const headers = new Headers({ Accept: "application/json", "X-Agent-AccessKey": this.accessKey });
+        if (idempotencyKey?.trim()) headers.set("Idempotency-Key", idempotencyKey.trim());
         if (body !== undefined) headers.set("Content-Type", "application/json");
         let response: Response;
         try {
@@ -456,17 +492,22 @@ export class DasctfCompetitionApi implements CompetitionApi {
     return run;
   }
 
-  private async requestEnvelope(method: "GET" | "POST", path: string, body?: unknown, options: { allowNonOk?: boolean } = {}): Promise<Envelope> {
+  private async requestEnvelope(method: "GET" | "POST", path: string, body?: unknown, options: { allowNonOk?: boolean } = {}, idempotencyKey?: string): Promise<Envelope> {
     const url = `${this.baseUrl}${path}`;
     // Serialize + rate-limit-retry: the platform 429s concurrent bursts (with
     // Retry-After), so every platform call chains through a single gate that
     // spaces requests. GET can back off on 429/503; non-idempotent POST is never
     // retried without a platform-supported idempotency key.
-    const response = await this.gatedFetch(method, url, body);
-    const text = await response.text();
+    const response = await this.gatedFetch(method, url, body, idempotencyKey);
     if (!response.ok) {
       if (response.status === 429) throw new DasctfRateLimitError(method, url, parseRetryAfter(response.headers.get("retry-after")));
       throw new Error(`DASCTF API ${method} ${redact(url)} failed with HTTP ${response.status}`);
+    }
+    let text: string;
+    try {
+      text = await readBoundedResponseText(response, this.maxResponseBytes, `DASCTF API ${method} ${redact(url)}`);
+    } catch (error) {
+      throw new Error(`DASCTF API ${method} ${redact(url)} response body read failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     let parsed: unknown;
     try {
@@ -499,6 +540,7 @@ function normalizeHost(value: string): string {
   let parsed: URL;
   try { parsed = new URL(trimmed); } catch { throw new Error("DasctfCompetitionApi serverHost must be an absolute HTTP(S) URL"); }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("DasctfCompetitionApi serverHost must use HTTP or HTTPS");
+  if (parsed.username || parsed.password) throw new Error("DasctfCompetitionApi serverHost must not contain URL credentials");
   return trimmed;
 }
 

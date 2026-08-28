@@ -1,11 +1,12 @@
 import type { ControlStore, VerifierControlPort } from "../control/control-store.js";
 import { pathToPhase } from "../control/phase-machine.js";
-import type { DomainPhase, Phase, RunSnapshot, RunToolPreparation, TaskContract, WorkItem } from "../domain/types.js";
+import type { DomainPhase, Phase, PrimaryFailureCategory, RunSnapshot, RunToolPreparation, TaskContract, WorkItem } from "../domain/types.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import { isTerminal } from "../domain/utils.js";
 import type { IndependentVerifier, VerificationOutcome } from "../verification/verifier.js";
 import { RunWorkScheduler } from "./run-work-scheduler.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
+import { completedWorkItemForCompletion } from "../domain/work-item.js";
 
 /**
  * The verifier capability needed by the shared run state machine.
@@ -34,7 +35,7 @@ export class RunCoordinator {
 
   public constructor(
     private readonly control: ControlStore,
-    private readonly verifierControl: VerifierControlPort,
+    private readonly verifierControl?: VerifierControlPort,
     options: RunCoordinatorOptions = {},
   ) {
     this.scheduler = options.scheduler ?? new RunWorkScheduler(control);
@@ -100,8 +101,8 @@ export class RunCoordinator {
     await this.scheduler.block(runId, workItemId, reason);
   }
 
-  public async blockAndQueue(runId: string, task: TaskContract, workItemId: string | undefined, reason: string): Promise<void> {
-    await this.scheduler.blockAndQueue(runId, task, workItemId, reason);
+  public async blockAndQueue(runId: string, task: TaskContract, workItemId: string | undefined, reason: string, category?: PrimaryFailureCategory): Promise<void> {
+    await this.scheduler.blockAndQueue(runId, task, workItemId, reason, category);
   }
 
   /**
@@ -123,14 +124,27 @@ export class RunCoordinator {
   /**
    * Commit an already verifier-accepted completion.  The WorkItem and domain
    * projection are settled before the verifier-only finish command makes the
-   * Run terminal, because terminal Runs reject further graph mutations.
-   */
+  * Run terminal, because terminal Runs reject further graph mutations.
+  */
   public async finishAccepted(runId: string, workItemId: string | undefined, completionId: string, reason: string): Promise<void> {
-    const snapshot = await this.control.snapshot(runId);
+    if (!this.verifierControl) throw new Error("RunCoordinator cannot finish an accepted completion without verifier control");
+    let snapshot = await this.control.snapshot(runId);
     if (snapshot.status === "SUCCEEDED") return;
     if (isTerminal(snapshot.status)) throw new Error(`Cannot finish accepted completion in terminal run ${snapshot.status}`);
     const completion = snapshot.completions[completionId];
     if (!completion || completion.status !== "ACCEPTED") throw new Error(`Completion ${completionId} is not ACCEPTED`);
+    // Recovery may be called without the in-memory WorkItem id. Reconnect to
+    // the current executor item, or to an already-settled item whose artifact
+    // and Evidence prove that it belongs to this completion. Never allow a
+    // verifier terminal event with no durable WorkItem edge.
+    let resolvedWorkItemId = workItemId;
+    if (!resolvedWorkItemId) {
+      const active = Object.values(snapshot.workItems)
+        .filter((item) => item.status === "RUNNING" && item.ownerLane === "executor")
+        .sort((left, right) => right.updatedSeq - left.updatedSeq)[0];
+      resolvedWorkItemId = active?.id ?? completedWorkItemForCompletion(snapshot, completion, completion.evidenceIds)?.id;
+    }
+    if (!resolvedWorkItemId) throw new Error("Cannot finish an accepted completion without a durable executor WorkItem");
     // A crash can occur after the SUBMIT projection and WorkItem settlement but
     // before verifier.finish.  SUBMIT is monotonic, so do not backtrack to
     // REPORT during recovery; the verifier finish is the only missing edge.
@@ -140,10 +154,21 @@ export class RunCoordinator {
       if (snapshot.task.verification.kind === "platform_submission") {
         // completeForSubmission includes the phase change in the same durable
         // transaction as WorkItem completion; do not emit a duplicate event.
-        await this.scheduler.completeForSubmission(runId, workItemId);
+        await this.scheduler.completeForSubmission(runId, resolvedWorkItemId);
       } else {
         await this.setDomainPhase(runId, "SUBMIT");
-        await this.scheduler.complete(runId, workItemId, await this.control.snapshot(runId));
+        await this.scheduler.complete(runId, resolvedWorkItemId, await this.control.snapshot(runId));
+      }
+    }
+    // Recovery may observe SUBMIT after the phase projection was committed but
+    // before WorkItem settlement. Repair that durable graph edge before the
+    // verifier closes the Run; terminal Runs reject all later graph mutations.
+    snapshot = await this.control.snapshot(runId);
+    if (snapshot.workItems[resolvedWorkItemId]?.status === "RUNNING") {
+      if (snapshot.task.verification.kind === "platform_submission") {
+        await this.scheduler.completeForSubmission(runId, resolvedWorkItemId);
+      } else {
+        await this.scheduler.complete(runId, resolvedWorkItemId, snapshot);
       }
     }
     await this.verifierControl.finish(runId, { completionId, reason });
@@ -152,16 +177,16 @@ export class RunCoordinator {
 
 /**
  * Project the CTF-specific phase into the generic harness phase.  The generic
- * projection intentionally has fewer states: TARGET_MODEL remains part of
- * reconnaissance, and SUBMIT is the terminal edge of report.  Keeping this
- * mapping in the coordinator prevents local and Competition callers from
- * maintaining divergent phase projections.
+ * projection keeps TARGET_MODEL explicit so GUI, metrics and replay can
+ * distinguish target modeling from raw reconnaissance. SUBMIT remains the
+ * terminal edge of report. Keeping this mapping in the coordinator prevents
+ * local and Competition callers from maintaining divergent projections.
  */
 function genericPhaseForDomain(domainPhase: DomainPhase): Phase {
   switch (domainPhase) {
     case "INTAKE": return "intake";
-    case "RECON":
-    case "TARGET_MODEL": return "reconnaissance";
+    case "RECON": return "reconnaissance";
+    case "TARGET_MODEL": return "target_model";
     case "HYPOTHESIS": return "hypothesis";
     case "EXPERIMENT": return "experiment";
     case "REPRODUCE": return "verification";

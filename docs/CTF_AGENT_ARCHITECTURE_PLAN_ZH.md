@@ -12,7 +12,7 @@ ProofBlade 现在最有价值的部分已经不是“再增加一个 Agent 角�
 - Docker 运行时已经有按 Run 隔离的工作区、非 root 用户、资源上限和 target-only 出口网关；
 - `CompetitionChallengeSolver` 已完成平台取题、附件解包、启动环境、提交和清理的主流程。
 
-但真实 Web/Pwn 目前仍主要走 `Competition Loop -> PiCodingLane -> bash/read/edit/write`。源码注释也明确说明比赛路径暂时“删除了 phase/planner choreography 和 verifier orchestration”。这导致控制平面记录了很多 Artifact，却没有把解题过程约束成“目标模型 → 可证伪假设 → 单次实验 → 独立复现 → 提交”的闭环。
+下面的 Web/Pwn 诊断是本计划早期基线，保留用于解释为什么需要这轮改造；截至 2026-08-25，原先的缺口已经由共享 `RunCoordinator`、`RunWorkScheduler` 和 verifier-first 收尾路径补齐。Competition、GUI、Fixture/Evaluation 现在都通过同一个 `RunCoordinator` 投影 `INTAKE → RECON → TARGET_MODEL → HYPOTHESIS → EXPERIMENT → REPRODUCE → REPORT → SUBMIT`，而不是维护独立的比赛 Solver lane。平台提交、动态 flag 和本地复现都必须产生 verifier-owned Effect/Evidence，终态还绑定 WorkItem 并可从 replay 重建。
 
 最近 Run 可以直接验证这个问题：
 
@@ -86,7 +86,7 @@ ProofBlade 现在最有价值的部分已经不是“再增加一个 Agent 角�
 
 ### 2.1 统一阶段机
 
-保留现有 `intake / reconnaissance / hypothesis / experiment / verification / report`，但给比赛 Run 增加领域门禁和更明确的终态：
+统一阶段机现在显式包含 `intake / reconnaissance / target_model / hypothesis / experiment / verification / report`，并给比赛 Run 增加领域门禁和更明确的终态：
 
 ```text
 INTAKE
@@ -99,7 +99,7 @@ INTAKE
   -> ACCEPTED | REJECTED_REPLAN | EXHAUSTED | NEED_HUMAN
 ```
 
-现有 `Phase` 可以兼容这一设计：`TARGET_MODEL` 可先映射到 `hypothesis`，`REPRODUCE/SUBMIT` 映射到 `verification/report`，但快照里必须保存 `domainPhase`，避免所有比赛 Run 永远显示 `intake`。
+`TARGET_MODEL` 已是通用 `Phase` 的正式阶段，GUI、上下文编译、事件投影和 replay 都使用同一名称。为兼容历史 Run，阶段机仍接受旧的 `RECONNAISSANCE -> HYPOTHESIS` 直连；新 Run 优先经过 `TARGET_MODEL`。`REPRODUCE/SUBMIT` 继续映射到 `verification/report`，快照仍保存 `domainPhase`，避免所有比赛 Run 永远显示 `intake`。
 
 每个阶段都由确定性 Gate 检查，而不是让模型在文本里声称“已经完成”：
 
@@ -111,6 +111,21 @@ INTAKE
 | Experiment | Effect、原始 Artifact、结果分类 | 获得新 Evidence 或明确否决假设 |
 | Reproduce | 独立进程/清洁 Session 的复现 Artifact | Candidate 从当前代次结果中提取 |
 | Submit | candidate hash、提交次数、平台 verdict | 接受则终态；拒绝则回到 hypothesis |
+
+### 2.4 统一失败分类与恢复策略
+
+失败原因不能通过解析自然语言 `reason` 来决定控制流。运行时统一写入
+`PrimaryFailureCategory`，由 `domain/failure-policy.ts` 映射为四种动作：
+
+- `retry`：当前操作可在同一假设下有限重试，例如单次超时或上下文溢出；
+- `replan`：保留已有 Evidence，回到下一轮假设重规划，例如参数错误、无进展或验证缺失；
+- `stop`：本 Run 的预算或提交安全边界已到，禁止继续调用 Provider/平台；
+- `escalate`：环境、权限、未知 Effect 或提示注入需要人工/恢复流程，不能盲目重试。
+
+Turn Guard 的短生命周期原因（重复工具失败、无进展、实验预算）先映射到上述分类，
+再决定是否只结束当前 Provider turn；只有 Run 最终终止时才把分类写入快照。这样
+Competition、GUI、Fixture/Evaluation 的重规划策略共享同一张表，Telemetry 和 replay
+在终止场景看到的分类一致；人类可读的错误文本只用于展示，不再承担状态机语义。
 
 ### 2.2 领域无关的 `ExperimentRecord`
 

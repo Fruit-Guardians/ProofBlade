@@ -4,8 +4,9 @@
   "sourceRoot": "packages/atoms",
   "moduleHashes": {
     "src/contracts.ts": "e6f2bbeddebf3f63a85ccbea1959f59de404e34f41e67d256688fc34a5f58470",
-    "src/index.ts": "018ea5543b77959ac5e12e29354ab3cd9043e78806eb0bfbfb65f0a4d7bbb4da",
-    "src/storage/atomic.ts": "11e7b2a982a977f6390f62e6c39acc6e37199f450454d33401b56bf024162345",
+    "src/index.ts": "7be043bc1a554d9cf66d12f906446c2292e58d4fd2b2c638abe4e0a29ba88935",
+    "src/storage/atomic.ts": "19bad46fb1c1bdc500c6e9bcacf98d1c92a5327e8956b8522729f5150ba798f9",
+    "src/storage/file-lock.ts": "3827a3b482b9519cfd5157fb508fe72c2ca8293202825cdcc9b6979b138908e2",
     "src/storage/operation-queue.ts": "f90a7e642c7fea1d157d2301dc1854118828d5ebe4005cd593dfdd4723297f3a",
     "src/value.ts": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b"
   },
@@ -15,6 +16,22 @@
     "Treat duplicate candidates as evidence, not as an automatic refactor command."
   ],
   "symbols": [
+    {
+      "id": "@proofblade/atoms::class::FileLockTimeoutError",
+      "name": "FileLockTimeoutError",
+      "kind": "class",
+      "signature": "FileLockTimeoutError",
+      "summary": "Inferred summary: file lock timeout error class used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/atoms",
+      "module": "src/storage/file-lock.ts",
+      "line": 12,
+      "moduleHash": "3827a3b482b9519cfd5157fb508fe72c2ca8293202825cdcc9b6979b138908e2",
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
+    },
     {
       "id": "@proofblade/atoms::class::KeyedOperationQueue",
       "name": "KeyedOperationQueue",
@@ -46,9 +63,11 @@
       ],
       "exportPath": "@proofblade/atoms",
       "module": "src/storage/atomic.ts",
-      "line": 9,
-      "moduleHash": "11e7b2a982a977f6390f62e6c39acc6e37199f450454d33401b56bf024162345",
-      "testRefs": []
+      "line": 14,
+      "moduleHash": "19bad46fb1c1bdc500c6e9bcacf98d1c92a5327e8956b8522729f5150ba798f9",
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
     },
     {
       "id": "@proofblade/atoms::function::durableAppendFile",
@@ -65,9 +84,25 @@
       ],
       "exportPath": "@proofblade/atoms",
       "module": "src/storage/atomic.ts",
-      "line": 30,
-      "moduleHash": "11e7b2a982a977f6390f62e6c39acc6e37199f450454d33401b56bf024162345",
+      "line": 49,
+      "moduleHash": "19bad46fb1c1bdc500c6e9bcacf98d1c92a5327e8956b8522729f5150ba798f9",
       "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::function::withFileLock",
+      "name": "withFileLock",
+      "kind": "function",
+      "signature": "<T>(lockPath: string, operation: () => Promise<T>, options?: FileLockOptions): Promise<T>",
+      "summary": "Serialize mutations that may be issued by more than one Node process.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/atoms",
+      "module": "src/storage/file-lock.ts",
+      "line": 51,
+      "moduleHash": "3827a3b482b9519cfd5157fb508fe72c2ca8293202825cdcc9b6979b138908e2",
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
     },
     {
       "id": "@proofblade/atoms::function::canonicalJson",
@@ -275,6 +310,20 @@
       "module": "src/contracts.ts",
       "line": 23,
       "moduleHash": "e6f2bbeddebf3f63a85ccbea1959f59de404e34f41e67d256688fc34a5f58470",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/atoms::interface::FileLockOptions",
+      "name": "FileLockOptions",
+      "kind": "interface",
+      "signature": "FileLockOptions",
+      "summary": "Inferred summary: file lock options type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/atoms",
+      "module": "src/storage/file-lock.ts",
+      "line": 6,
+      "moduleHash": "3827a3b482b9519cfd5157fb508fe72c2ca8293202825cdcc9b6979b138908e2",
       "testRefs": []
     },
     {

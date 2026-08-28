@@ -17,7 +17,7 @@ jobs:
   verify:
     name: Build, test, evaluate, audit
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -38,5 +38,13 @@ jobs:
           npm run check:components -- --base "$COMPONENT_BASE_SHA"
           npm run check:change-contracts -- --base "$COMPONENT_BASE_SHA"
           npm run check:project-reports -- --base "$COMPONENT_BASE_SHA"
-      - name: Run repository verification
+      - name: Run staged repository verification
         run: npm run verify
+      - name: Upload staged test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proofblade-test-logs-${{ github.run_id }}
+          path: .proofblade/test-logs/**/*.log
+          if-no-files-found: warn
+          retention-days: 14

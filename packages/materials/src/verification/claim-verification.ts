@@ -1,9 +1,12 @@
 import type { ControlStore, VerifierControlPort } from "../control/control-store.js";
-import type { ArtifactRef, Evidence, RawEffectResult, RunSnapshot } from "../domain/types.js";
+import type { ArtifactRef, DomainRecordInput, Evidence, RawEffectResult, RunSnapshot } from "../domain/types.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
-import type { EffectJournal, VerifierEffectJournal } from "../effects/effect-journal.js";
-import { CodingEvidenceGraph, type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
+import type { EffectJournal, VerifierEffectJournal, VerifierReplayHandle, VerifierReplayInput } from "../effects/effect-journal.js";
+import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
+import { beginVerificationRequest, readDurableVerificationResult } from "./verification-key.js";
+import { parseVerifierOutcomeEnvelope, serializeVerifierOutcomeEnvelope, type VerifierOutcomeEnvelope } from "./outcome-envelope.js";
+import { type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
 
 export interface ClaimReproduction {
   verified: boolean;
@@ -13,6 +16,7 @@ export interface ClaimReproduction {
   artifactId: string;
   candidateArtifactId: string;
   executionArtifactId: string;
+  outcomeArtifactId: string;
   evidenceId: string;
   completionId: string;
   toolCallId: string;
@@ -27,6 +31,7 @@ export interface ClaimVerificationProjection {
   artifactId?: string;
   evidenceId?: string;
   completionId?: string;
+  outcomeArtifactId?: string;
   toolCallId?: string;
   reason?: string;
 }
@@ -75,6 +80,27 @@ export class CodingClaimVerifier {
     await this.verifierControl.dispatch(this.runId, { type: "evidence", evidence });
   }
 
+  /** Commit verifier-owned Web/Pwn domain records after their Evidence is durable. */
+  public async recordVerifierDomainRecords(records: DomainRecordInput[]): Promise<void> {
+    if (records.length === 0) return;
+    await this.verifierControl.dispatchBatch(this.runId, records.map((record) => ({ type: "domain_record", record })));
+  }
+
+  /** Persist an external verifier replay before opening its clean resource. */
+  public async prepareReplay(input: VerifierReplayInput): Promise<VerifierReplayHandle> {
+    return await this.journal.prepareVerifierReplay(this.runId, input);
+  }
+
+  /** Bind a clean session to a prepared verifier replay. */
+  public async startReplay(effectId: string, sessionId: string, externalId?: string): Promise<void> {
+    await this.journal.startVerifierReplay(this.runId, effectId, sessionId, externalId);
+  }
+
+  /** Persist a replay result without claiming a candidate verdict. */
+  public async finishReplay(effectId: string, result: RawEffectResult): Promise<{ effectId: string; artifactId: string }> {
+    return await this.journal.finishVerifierReplay(this.runId, effectId, result);
+  }
+
   /** Execute a verifier-owned web attestation without exposing the verifier port to the lane. */
   public async executeWebReproductionEffect(input: {
     completionId: string;
@@ -104,12 +130,97 @@ export class CodingClaimVerifier {
       cwd: input.cwd,
       sessionId: input.sessionId,
       artifactSensitivity: "flag_candidate",
+      recoveryInput: { content: input.payload, filename: `web-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+    }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
+    return { effectId: execution.effectId, artifactId: execution.artifactId };
+  }
+
+  /** Execute a verifier-owned browser clean-context attestation. */
+  public async executeBrowserReproductionEffect(input: {
+    completionId: string;
+    candidateHash: string;
+    candidateArtifactId: string;
+    attemptId: string;
+    sessionId: string;
+    cwd: string;
+    payload: string;
+  }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const execution = await this.journal.executeVerifierWith(this.runId, {
+      operation: "browser_reproduce",
+      args: {
+        runId: this.runId,
+        taskId: snapshot.task.task_id,
+        generation: snapshot.generation,
+        completionId: input.completionId,
+        candidateHash: input.candidateHash,
+        candidateArtifactId: input.candidateArtifactId,
+        taskHash: snapshot.taskHash,
+        targetHash: sha256(snapshot.task.target),
+        verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
+        attemptId: input.attemptId,
+      },
+      replayPolicy: "pure",
+      cwd: input.cwd,
+      sessionId: input.sessionId,
+      artifactSensitivity: "flag_candidate",
+      recoveryInput: { content: input.payload, filename: `browser-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+    }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
+    return { effectId: execution.effectId, artifactId: execution.artifactId };
+  }
+
+  /** Execute a verifier-owned Pwn attestation over a fresh session transcript. */
+  public async executePwnReproductionEffect(input: {
+    completionId: string;
+    candidateHash: string;
+    candidateArtifactId: string;
+    attemptId: string;
+    sessionId: string;
+    cwd: string;
+    payload: string;
+  }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string }> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const pwnEndpoint = snapshot.task.verification.pwn?.target.kind === "remote"
+      ? parsePwnEndpoint(snapshot.task.verification.pwn.target.endpoint)
+      : undefined;
+    const execution = await this.journal.executeVerifierWith(this.runId, {
+      operation: "pwn_reproduce",
+      args: {
+        runId: this.runId,
+        taskId: snapshot.task.task_id,
+        generation: snapshot.generation,
+        completionId: input.completionId,
+        candidateHash: input.candidateHash,
+        candidateArtifactId: input.candidateArtifactId,
+        taskHash: snapshot.taskHash,
+        targetHash: sha256(snapshot.task.target),
+        verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
+        commandHash: sha256(snapshot.task.verification.command ?? ""),
+        attemptId: input.attemptId,
+        ...(pwnEndpoint ? { endpoint: pwnEndpoint } : {}),
+      },
+      replayPolicy: "pure",
+      command: snapshot.task.verification.command,
+      cwd: input.cwd,
+      sessionId: input.sessionId,
+      artifactSensitivity: "flag_candidate",
+      recoveryInput: { content: input.payload, filename: `pwn-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
 
   /** Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded. */
   public async finalizeWebReproduction(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void> {
+    await this.verifierControl.dispatch(this.runId, { type: "completion_verified", completionId, accepted, evidenceIds });
+  }
+
+  /** Mark a browser verifier Completion accepted/rejected after its Evidence is recorded. */
+  public async finalizeBrowserReproduction(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void> {
+    await this.verifierControl.dispatch(this.runId, { type: "completion_verified", completionId, accepted, evidenceIds });
+  }
+
+  /** Mark a Pwn verifier Completion accepted/rejected after its bound Evidence. */
+  public async finalizePwnReproduction(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void> {
     await this.verifierControl.dispatch(this.runId, { type: "completion_verified", completionId, accepted, evidenceIds });
   }
 
@@ -147,6 +258,42 @@ export class CodingClaimVerifier {
       if (evidence.provenance?.runId !== this.runId || evidence.provenance?.generation !== snapshot.generation) throw new Error(`Supporting evidence is stale: ${evidenceId}`);
     }
 
+    const request = await beginVerificationRequest(this.controlStore, this.runId, {
+      kind: "claim",
+      policyHash: sha256(canonicalJson({ taskHash: snapshot.taskHash, verification: snapshot.task.verification })),
+      recipeHash: sha256(canonicalJson({ candidateHash, commandHash })),
+      sourceIds: supportingEvidenceIds,
+    });
+    if (!request.created) {
+      const durable = await readDurableVerificationResult(this.controlStore, this.runId, request.request);
+      if (!durable) throw new Error(`Claim verification request ${request.request.id} requires durable recovery; refusing to execute another command`);
+      const durableSnapshot = await this.controlStore.snapshot(this.runId);
+      const candidateArtifact = durableSnapshot.artifacts[durable.completion.artifactId];
+      if (!candidateArtifact) throw new Error(`Durable claim candidate is missing: ${durable.completion.artifactId}`);
+      const durableCandidate = (await this.artifactStore.readText(this.runId, candidateArtifact)).trim();
+      const projection = await this.projectCompletion(durableSnapshot, durable.completion, durableCandidate);
+      if (!projection || !projection.evidenceId) throw new Error(`Durable claim verification ${durable.completion.id} is incomplete`);
+      const evidence = durableSnapshot.evidence[projection.evidenceId];
+      const effect = evidence?.source.effectId ? durableSnapshot.effects[evidence.source.effectId] : undefined;
+      if (!evidence || !effect) throw new Error(`Durable claim verification ${durable.completion.id} has no bound Effect`);
+      const receipt = await this.findClaimReceipt(durableSnapshot, durable.completion, durableCandidate, evidence, effect);
+      if (!receipt) throw new Error(`Durable claim verification ${durable.completion.id} has no valid receipt`);
+      return {
+        verified: true,
+        candidate: durableCandidate,
+        candidateHash: durable.completion.candidateHash,
+        commandHash: receipt.commandHash,
+        artifactId: receiptArtifactId(durableSnapshot, evidence, receipt),
+        candidateArtifactId: durable.completion.artifactId,
+        executionArtifactId: receipt.executionArtifactId,
+        outcomeArtifactId: projection.outcomeArtifactId ?? receiptArtifactId(durableSnapshot, evidence, receipt),
+        evidenceId: projection.evidenceId,
+        completionId: durable.completion.id,
+        toolCallId: receipt.sessionId,
+        supportingEvidenceIds,
+      };
+    }
+
     const completionId = id("C");
     const factId = id("F");
     const candidateArtifact = await this.artifactStore.putText(this.runId, candidate, {
@@ -164,7 +311,7 @@ export class CodingClaimVerifier {
     });
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "claim_reproduction", candidateHash, artifactId: candidateArtifact.id },
+      completion: { id: completionId, purpose: "claim_reproduction", candidateHash, artifactId: candidateArtifact.id, verificationKey: request.request.key },
       lane: "main",
     });
 
@@ -277,6 +424,51 @@ export class CodingClaimVerifier {
     }));
     const evidenceIds = attempts.map((attempt) => attempt.evidenceId);
     const locallyJudged = verifierDefinedCommand;
+    const primary = attempts[0]!;
+    const outcomeEnvelope = serializeVerifierOutcomeEnvelope({
+      schemaVersion: 1,
+      requestKey: request.request.key,
+      runId: this.runId,
+      generation: boundSnapshot.generation,
+      kind: "claim",
+      policyHash: request.request.policyHash,
+      recipeHash: request.request.recipeHash,
+      candidateHash,
+      externalStatus: "CONFIRMED",
+      attempts: attempts.map((attempt, index) => ({
+        id: attempt.attemptId,
+        phase: verifierDefinedCommand ? "claim_reproduction" : "claim_observation",
+        status: "PASSED",
+        artifactId: attempt.execution.artifactId,
+        summary: verifierDefinedCommand
+          ? `Verifier attempt ${index + 1} derived the exact candidate.`
+          : `Audited observation ${index + 1} contained the exact candidate.`,
+      })),
+      primaryArtifactId: primary.execution.artifactId,
+      transcriptArtifactIds: attempts.map((attempt) => attempt.execution.artifactId),
+      stageSummary: {
+        attemptCount: attempts.length,
+        requiredAttempts,
+        verifierDefinedCommand,
+      },
+      accepted: locallyJudged,
+      evidenceIds,
+      terminal: true,
+    });
+    const outcomeArtifact = await this.artifactStore.putText(this.runId, outcomeEnvelope, {
+      filename: `claim-outcome-${input.toolCallId}.json`,
+      mime: "application/json",
+      sensitivity: "flag_candidate",
+      semantic: {
+        name: "最终候选验证结果索引",
+        summary: `Claim outcome envelope for candidate sha256=${candidateHash}.`,
+        tags: ["verification", "candidate", "outcome", "attestation"],
+        role: "result",
+        relatedIds: [...supportingEvidenceIds, completionId, candidateArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id])],
+        annotatedBy: "harness",
+      },
+    });
+    for (const evidenceCommand of evidenceCommands) evidenceCommand.evidence.source.artifactIds.push(outcomeArtifact.id);
     if (verifierDefinedCommand) {
       await this.verifierControl.dispatchBatch(this.runId, [
         ...evidenceCommands,
@@ -303,6 +495,7 @@ export class CodingClaimVerifier {
       graphLinks.push(
         { from: attempt.execution.artifactId, to: attempt.evidenceId, relation: "derived_from", explanation: "Journaled execution Artifact generated verifier Evidence.", confidence: 1 },
         { from: attempt.receiptArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "Immutable verifier receipt anchors the reproduction provenance.", confidence: 1 },
+        { from: outcomeArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "The bounded outcome envelope indexes the final claim attestation.", confidence: 1 },
         ...supportingEvidenceIds.map((supportingEvidenceId) => ({ from: supportingEvidenceId, to: attempt.evidenceId, relation: "depends_on" as const, explanation: "Final reproduction uses this upstream Evidence.", confidence: 1 })),
         { from: attempt.evidenceId, to: factId, relation: "supports", explanation: "Reproduction Evidence confirms the hash-bound claim.", confidence: 1 },
         { from: attempt.evidenceId, to: completionId, relation: "reproduces", explanation: "Reproduction Evidence verifies this exact Completion.", confidence: 1 },
@@ -321,14 +514,13 @@ export class CodingClaimVerifier {
         ? "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
         : "该树只记录模型命令观察，不代表候选已通过受信 verifier。",
       rootNodeId: completionId,
-      nodeIds: [candidateArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId],
+      nodeIds: [candidateArtifact.id, outcomeArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId],
       relatedTreeIds,
       tags: ["verification", "candidate", "reproduction"],
       status: locallyJudged ? "SUPPORTED" : "ACTIVE",
     });
 
-    const primary = attempts[0]!;
-    return { verified: locallyJudged, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
+    return { verified: locallyJudged, candidate, candidateHash, commandHash, artifactId: primary.receiptArtifact.id, candidateArtifactId: candidateArtifact.id, executionArtifactId: primary.execution.artifactId, outcomeArtifactId: outcomeArtifact.id, evidenceId: primary.evidenceId, completionId, toolCallId: input.toolCallId, supportingEvidenceIds };
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
@@ -392,9 +584,58 @@ export class CodingClaimVerifier {
       receipts.push(receipt);
     }
     if (effectIds.size !== evidence.length || sessionIds.size !== evidence.length || attemptIds.size !== evidence.length || transcriptHashes.size !== evidence.length) return undefined;
+    const request = completion.verificationKey
+      ? Object.values(snapshot.verificationRequests).find((value) => value.key === completion.verificationKey)
+      : undefined;
+    if (!request || request.kind !== "claim" || request.runId !== this.runId || request.generation !== snapshot.generation
+      || request.status !== "BOUND" || request.completionId !== completion.id) return undefined;
+    const outcome = await this.findClaimOutcome(snapshot, completion, evidence, request);
+    if (!outcome) return undefined;
     const primary = evidence[0]!;
     const receipt = receipts[0];
-    return { required: true, status: "verified", candidateHash: completion.candidateHash, commandHash: receipt?.commandHash, artifactId: completion.artifactId, evidenceId: primary.id, completionId: completion.id, toolCallId: receipt?.sessionId };
+    return { required: true, status: "verified", candidateHash: completion.candidateHash, commandHash: receipt?.commandHash, artifactId: completion.artifactId, evidenceId: primary.id, completionId: completion.id, outcomeArtifactId: outcome.artifactId, toolCallId: receipt?.sessionId };
+  }
+
+  private async findClaimOutcome(
+    snapshot: RunSnapshot,
+    completion: RunSnapshot["completions"][string],
+    evidence: Evidence[],
+    request: RunSnapshot["verificationRequests"][string],
+  ): Promise<{ artifactId: string; envelope: VerifierOutcomeEnvelope } | undefined> {
+    const evidenceIds = evidence.map((item) => item.id);
+    const executionArtifactIds = evidence.map((item) => item.source.artifactId).filter((value): value is string => typeof value === "string");
+    if (executionArtifactIds.length !== evidence.length) return undefined;
+    for (const artifactId of new Set(evidence.flatMap((item) => item.provenance.artifactIds))) {
+      const artifact = snapshot.artifacts[artifactId];
+      if (!artifact || artifact.sourceEffectId !== undefined || artifact.mime !== "application/json"
+        || artifact.runId !== this.runId || artifact.generation !== snapshot.generation) continue;
+      try {
+        const envelope = parseVerifierOutcomeEnvelope(JSON.parse(await this.artifactStore.readText(this.runId, artifact)));
+        if (envelope.kind !== "claim"
+          || envelope.requestKey !== request.key
+          || envelope.runId !== this.runId
+          || envelope.generation !== snapshot.generation
+          || envelope.policyHash !== request.policyHash
+          || envelope.recipeHash !== request.recipeHash
+          || envelope.candidateHash !== completion.candidateHash
+          || envelope.externalStatus !== "CONFIRMED"
+          || envelope.accepted !== true
+          || !envelope.terminal
+          || !sameIds(envelope.evidenceIds, evidenceIds)
+          || envelope.attempts.length !== evidence.length
+          || envelope.attempts.some((attempt) => attempt.status !== "PASSED" || !attempt.artifactId || !executionArtifactIds.includes(attempt.artifactId))
+          || !sameIds(envelope.transcriptArtifactIds, executionArtifactIds)
+          || envelope.primaryArtifactId !== executionArtifactIds[0]) continue;
+        const attemptArtifactIds = envelope.attempts.map((attempt) => attempt.artifactId).filter((value): value is string => typeof value === "string");
+        if (attemptArtifactIds.length !== evidence.length || !sameIds(attemptArtifactIds, executionArtifactIds)
+          || evidence.some((item) => !item.provenance.artifactIds.includes(artifact.id))) continue;
+        return { artifactId: artifact.id, envelope };
+      } catch {
+        // Receipt and execution Artifacts are also JSON; only a valid, bound
+        // final envelope is allowed to attest the Completion.
+      }
+    }
+    return undefined;
   }
 
   private async findClaimReceipt(
@@ -447,6 +688,21 @@ export class CodingClaimVerifier {
   }
 }
 
+function parsePwnEndpoint(endpoint: string | undefined): { host: string; port: number } | undefined {
+  if (!endpoint) return undefined;
+  const match = /^([^:]+):(\d+)$/.exec(endpoint.trim());
+  if (!match) return undefined;
+  const port = Number(match[2]);
+  return Number.isInteger(port) && port > 0 && port <= 65_535 ? { host: match[1]!.toLowerCase(), port } : undefined;
+}
+
+function receiptArtifactId(snapshot: RunSnapshot, evidence: Evidence, receipt: ClaimReceipt): string {
+  return evidence.provenance.artifactIds.find((artifactId) => {
+    const artifact = snapshot.artifacts[artifactId];
+    return artifact?.mime === "application/json" && artifact.sourceEffectId === undefined;
+  }) ?? receipt.executionArtifactId;
+}
+
 export function requiresClaimVerification(userPrompt: string, assistantText = ""): boolean {
   const prompt = userPrompt.toLowerCase();
   const answer = assistantText.toLowerCase();
@@ -472,4 +728,8 @@ function extractFinalCandidate(assistantText: string): string | undefined {
 
 function stdoutContainsExactCandidate(stdout: string, candidate: string): boolean {
   return stdout.split(/\r?\n/).some((line) => line.trim() === candidate);
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

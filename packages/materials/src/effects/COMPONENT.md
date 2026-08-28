@@ -32,6 +32,8 @@
 
 所有非纯操作必须声明 replay policy 和资源键。Artifact 先落盘再引用，敏感内容只进入 Artifact，不进入事件正文；后续命名或用途变化只更新 Control 语义投影，不改写内容哈希。
 
+`PROPOSED` 已落盘但外部执行尚未开始时，重复请求复用原 Effect 和原始参数，只补一次 `STARTED`，不会制造第二个 idempotency key；Verifier attestation 的输入先写入独立 verifier-owned recovery Artifact，恢复只按其稳定哈希读取，不把候选明文塞进 Effect 事件；`STARTED`、`UNKNOWN`、`RECONCILED` 或缺少结果 Artifact 的记录必须先走 reconcile，禁止调用方猜测性重跑。
+
 调用方可以为 Effect 结果提供 Artifact sensitivity；显式分类优先于内容形状启发式，未提供时继续检测 flag candidate 并默认使用 `public`。
 
 ```powershell

@@ -9,6 +9,7 @@ import { canonicalJson, sha256 } from "../src/domain/utils.js";
 import { createServicesForTesting, demoTask, type TestAppServices } from "../src/app/demo.js";
 import { createEffectInput } from "../src/control/control-store.js";
 import { makeEvent } from "../src/storage/jsonl-store.js";
+import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -176,6 +177,9 @@ async function acceptCandidate(harness: Harness, completionId: string, candidate
     { type: "evidence", evidence: verifierEvidence(evidenceIds[1]!, candidate, second, generation) },
     { type: "completion_verified", completionId, accepted: true, evidenceIds },
   ]);
+  const coordinator = new RunCoordinator(harness.services.control, harness.services.verifier);
+  const workItem = await coordinator.claim(harness.runId, (await harness.services.control.snapshot(harness.runId)).task, attemptBase);
+  await coordinator.settle(harness.runId, workItem.id, true, evidenceIds, [candidate.artifactId]);
   return { candidate, evidenceIds };
 }
 
@@ -605,17 +609,21 @@ test("completion verification rejects empty, unknown, wrong-kind, insufficient, 
     ]);
     assert.equal((await harness.services.control.snapshot(harness.runId)).completions[candidate.completionId]?.status, "ACCEPTED");
 
-    for (const accepted of [true, false]) {
-      await assert.rejects(
-        harness.services.verifier.dispatch(harness.runId, {
-          type: "completion_verified",
-          completionId: candidate.completionId,
-          accepted,
-          evidenceIds: ["EV-COMP-1", "EV-COMP-2"],
-        }),
-        /already ACCEPTED/,
-      );
-    }
+    assert.deepEqual(await harness.services.verifier.dispatch(harness.runId, {
+      type: "completion_verified",
+      completionId: candidate.completionId,
+      accepted: true,
+      evidenceIds: ["EV-COMP-1", "EV-COMP-2"],
+    }), []);
+    await assert.rejects(
+      harness.services.verifier.dispatch(harness.runId, {
+        type: "completion_verified",
+        completionId: candidate.completionId,
+        accepted: false,
+        evidenceIds: ["EV-COMP-1", "EV-COMP-2"],
+      }),
+      /does not match durable Completion/,
+    );
     const snapshot = await harness.services.control.snapshot(harness.runId);
     assert.equal(snapshot.completions[candidate.completionId]?.status, "ACCEPTED");
     assert.deepEqual(snapshot.completions[candidate.completionId]?.evidenceIds, ["EV-COMP-1", "EV-COMP-2"]);
@@ -628,12 +636,21 @@ test("completion verification rejects empty, unknown, wrong-kind, insufficient, 
       { type: "completion_verified", completionId: rejectedCandidate.completionId, accepted: false, evidenceIds: [rejectedEvidenceId] },
     ]);
     assert.equal((await harness.services.control.snapshot(harness.runId)).completions[rejectedCandidate.completionId]?.status, "REJECTED");
-    for (const accepted of [false, true]) {
-      await assert.rejects(
-        harness.services.verifier.dispatch(harness.runId, { type: "completion_verified", completionId: rejectedCandidate.completionId, accepted, evidenceIds: [rejectedEvidenceId] }),
-        /already REJECTED/,
-      );
-    }
+    assert.deepEqual(await harness.services.verifier.dispatch(harness.runId, {
+      type: "completion_verified",
+      completionId: rejectedCandidate.completionId,
+      accepted: false,
+      evidenceIds: [rejectedEvidenceId],
+    }), []);
+    await assert.rejects(
+      harness.services.verifier.dispatch(harness.runId, {
+        type: "completion_verified",
+        completionId: rejectedCandidate.completionId,
+        accepted: true,
+        evidenceIds: [rejectedEvidenceId],
+      }),
+      /does not match durable Completion/,
+    );
   } finally {
     await destroyHarness(harness);
   }

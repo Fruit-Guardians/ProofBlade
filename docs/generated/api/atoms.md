@@ -3,10 +3,19 @@
 # @proofblade/atoms API Index
 
 - Package: `@proofblade/atoms`
-- Module hashes: 5
-- Symbols: 24
+- Module hashes: 6
+- Symbols: 27
 
 ## Public Symbols
+
+### FileLockTimeoutError
+- Kind: `class`
+- Signature: `FileLockTimeoutError`
+- Source: [src/storage/file-lock.ts:12](../../../packages/atoms/src/storage/file-lock.ts:12)
+- Export: `@proofblade/atoms`
+- Summary: Inferred summary: file lock timeout error class used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/atoms/tests/atoms.test.ts`
 
 ### KeyedOperationQueue
 - Kind: `class`
@@ -20,20 +29,30 @@
 ### atomicWriteFile
 - Kind: `function`
 - Signature: `(path: string, content: string | Uint8Array): Promise<void>`
-- Source: [src/storage/atomic.ts:9](../../../packages/atoms/src/storage/atomic.ts:9)
+- Source: [src/storage/atomic.ts:14](../../../packages/atoms/src/storage/atomic.ts:14)
 - Export: `@proofblade/atoms`
 - Summary: Write content through a synced temporary file followed by an atomic rename.
 - Summary source: `tsdoc`
 - Tags: `invariant`
+- Tests: `packages/atoms/tests/atoms.test.ts`
 
 ### durableAppendFile
 - Kind: `function`
 - Signature: `(path: string, content: string): Promise<void>`
-- Source: [src/storage/atomic.ts:30](../../../packages/atoms/src/storage/atomic.ts:30)
+- Source: [src/storage/atomic.ts:49](../../../packages/atoms/src/storage/atomic.ts:49)
 - Export: `@proofblade/atoms`
 - Summary: Append UTF-8 content and sync the file before returning.
 - Summary source: `tsdoc`
 - Tags: `invariant`
+
+### withFileLock
+- Kind: `function`
+- Signature: `<T>(lockPath: string, operation: () => Promise<T>, options?: FileLockOptions): Promise<T>`
+- Source: [src/storage/file-lock.ts:51](../../../packages/atoms/src/storage/file-lock.ts:51)
+- Export: `@proofblade/atoms`
+- Summary: Serialize mutations that may be issued by more than one Node process.
+- Summary source: `tsdoc`
+- Tests: `packages/atoms/tests/atoms.test.ts`
 
 ### canonicalJson
 - Kind: `function`
@@ -144,6 +163,14 @@
 - Source: [src/contracts.ts:23](../../../packages/atoms/src/contracts.ts:23)
 - Export: `@proofblade/atoms`
 - Summary: Inferred summary: tool failure atom type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### FileLockOptions
+- Kind: `interface`
+- Signature: `FileLockOptions`
+- Source: [src/storage/file-lock.ts:6](../../../packages/atoms/src/storage/file-lock.ts:6)
+- Export: `@proofblade/atoms`
+- Summary: Inferred summary: file lock options type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### KeyedOperationQueue.run

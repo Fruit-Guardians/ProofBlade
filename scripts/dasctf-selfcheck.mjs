@@ -21,13 +21,21 @@ if (!accessKey) {
   process.exit(2);
 }
 
-console.log(`serverHost : ${serverHost}`);
+let displayHost = "[invalid URL]";
+try { displayHost = new URL(serverHost).origin; } catch {}
+console.log(`serverHost : ${displayHost}`);
 console.log(`accessKey  : set (${accessKey.length} chars, value hidden)`);
 console.log("mode       : READ-ONLY (no submit, no env build/recover, no writes)\n");
 
-const api = new DasctfCompetitionApi({ serverHost, accessKey });
-
 let failed = false;
+let api;
+try {
+  api = new DasctfCompetitionApi({ serverHost, accessKey });
+} catch (error) {
+  console.error(`✖ adapter configuration failed: ${error instanceof Error ? error.message : String(error)}`);
+  console.log("\nRESULT: FAIL — no platform request was sent.");
+  process.exit(1);
+}
 
 // 1. Challenge list — exercises the {code:00000} envelope + X-Agent-AccessKey auth.
 try {

@@ -29,8 +29,12 @@
 - Solver/Planner 只能提出 candidate，不能确认成功。
 - 生产 `AppServices.verifierJournal` 只暴露由配置 Sandbox 执行的 `execute()`；任意 executor callback 仅存在于未从 package root 导出的 test composition，模型 lane 与普通 Solver lane 均拿不到 Verifier/Fixture capability。
 - 候选明文放在敏感 Artifact，事件只保留哈希和引用。
-- `pwn_reproduce` 只能是 harness 内部的受信 Verifier operation，不是模型可直接选择成功规则的普通 Tool。模型不得提供或覆盖 target command、remote endpoint、flag path、flag rule/regex、shell marker 或 confidence；这些必须来自已绑定当前 run/generation 的 Task Contract 或 Verifier 私有策略，并经 Effect Journal 和不可变 Artifact 留下完整执行来源。
-- 当前仓库中尚不存在 `runtime/pwn-coding-tools.ts` 和 `verification/pwn-reproducer.ts`，因此 `pwn_reproduce` 能力保持未接入；不得将未追踪的 `capabilities/pwn.ts` 或模型执行输出提升为受信 reproduction Evidence。
+- `pwn_reproduce` 的输入仍只有模型提出的 ordered stages；target command、remote endpoint、flag path、flag rule/regex、shell marker 和 confidence 来自当前 Run 的 Task Contract/Verifier 私有策略。模型侧的 `PwnReproducer` 只产生观察，配置了容器 verifier 时由 `PwnReproductionVerifier` 在 owner=`verifier` 的新 session/process 中重新执行，并通过 `CodingClaimVerifier.executePwnReproductionEffect` 生成受信 Effect、transcript Artifact、Evidence 和 Completion verdict。
+- Web clean replay 同样由 verifier capability 写入 replay `web_request` 记录；只有完整复现通过时才写入 `web_exploit_chain=reproduced`，失败重放只保留 `observed` 链与 negative Evidence。普通 lane 不能直接发出 verifier result command。
+- 当 Task Contract 的 `verification.web.transport` 冻结为 `browser` 时，`BrowserReproducer` 通过应用注入的 `BrowserVerifierFactory` 获取全新、空 storage 的 BrowserContext；factory 只接收当前 run/generation、target、policy hash、scope 和响应上限，模型不能接触 driver。Replay 支持由 policy allowlist 控制的 navigation/click/fill/submit/wait；driver 未实现某动作时产生 negative verifier Evidence，`evaluate` 永不开放。`browser.max_steps/max_duration_ms/max_response_bytes` 由 verifier 约束，未配置可信 runtime 时保持 fail-closed，并复用同一 Effect/Evidence/Completion 与 domain-record 绑定。带 `BrowserRuntimeBroker` 时，资源记录额外绑定稳定 `verificationKey`；恢复服务只把精确匹配的 context handoff 交给 `BrowserReproducer`，由其复用原 replay Effect/session id，并从 durable interaction count 继续 recipe。顺序多 attempt 恢复会读取已完成 replay Artifact，再接管唯一 STARTED attempt；多个同时 in-flight 或结果不明确时保持 `RECOVERY_REQUIRED`，不新建 context。`playwright-browser-verifier.ts` 提供可选的动态 Playwright adapter：它只使用受限 page/context API，强制空 storage、headless、同源复核和幂等 close；Playwright 包或浏览器二进制缺失时应用组合层不注入 factory。
+- Pwn verdict 必须同时满足结构化 stage 状态、shell marker、live flag read、candidate hash 一致性和当前 generation；失败也写入 verifier-owned negative Evidence，不能被当作成功。未配置容器或 immutable Pwn policy 时，工具保持 fail-closed，模型侧结果不会提升为受信 reproduction Evidence。
+- Web/Browser/Pwn/Claim 复现开始前先写入由 `runId + generation + verifier kind + policy hash + recipe hash + source ids` 派生的 `VerificationRequest`。Web/Browser/Pwn 随后先写不绑定候选的 `verification_replay` Effect 和 immutable recipe Artifact，再创建 clean session/process；最终 `*_reproduce` Effect 才绑定 Completion、candidate 和 verifier verdict。Claim 也在最终受信命令前固定 request，并把最终 attestation 写入同一结果索引。重启后同一 key 若已绑定终态 Completion，则只重放 durable candidate/Evidence；若仍是 PENDING 或 Completion 仍为 PROPOSED，则拒绝再次打开外部 session/process，等待统一 recovery service reconcile，避免用随机 session 绕过一次性复现实验。恢复入口会把缺少 durable Effect 的请求标为 `RECOVERY_REQUIRED`，该状态只有受控 recovery capability 可写入，完成终态后才推进为 `RECOVERED`。
+- Pwn/Web/Browser replay 与 Claim final attestation 统一使用有界 `VerifierOutcomeEnvelope`。信封只包含 request/generation/policy/recipe 绑定、外部状态、attempt 摘要、阶段摘要和 Artifact 索引；原始响应、tube transcript、截图和 body 仍保存在 Artifact。`replay` 信封禁止 candidate、accepted、terminal verdict 和 Evidence ID；Claim 只有在受信 Evidence/Completion 已经准备好后才生成 terminal envelope，`EffectJournal`/投影会再次校验这些绑定，防止观察结果被误当作最终证明。
 
 ## 开发规则与验证
 
@@ -43,6 +47,8 @@ Coding 复现命令不得包含候选明文，任务绑定命令的 stdout 必�
 历史事件流可以确定性补齐注册时的 run/generation/origin 以继续回放，但缺少新 provenance/verdict 的 reproduction 不会被升级为可信结论；旧式未绑定成功状态会投影为 `NEED_HUMAN / verification_missing`。
 
 Competition 的 solved 投影只接受 `purpose: submission` 的当前 generation Completion，并逐条回查其 Evidence、`fixture_score` Effect 及 accepted verdict 的 completion/candidate/artifact 绑定；平台接受后还必须经 `verifier.finish(completionId)` 写入 `SUCCEEDED + finalResult`。任意 ACCEPTED Completion 与任意 scorer Effect 的宽松组合不能表示平台已接受，Single-agent/GUI 的终态消费也只能读取 canonical `finalResult`。
+
+Verifier 在 `evidence + completion_verified` 已经持久化、但后续 Fact/投影步骤尚未完成时可以安全重试：对已终态 Completion，服务只从当前 generation 的受信 Evidence、完成的 verifier Effect 和绑定 verdict 重建 `VerificationOutcome`，不会再次访问平台、追加 Evidence 或重复提交。终态 Evidence 缺失、跨代、跨 Run、Artifact 未绑定或 verdict 不一致时仍 fail-closed。
 
 ```powershell
 npm run eval
