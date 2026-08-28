@@ -176,9 +176,23 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     }
     const resourceId = dockerContainerResourceId(request.runId, request.generation, request.profile);
     const bindingTxnId = externalResourceBindingTransactionId({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor" });
-    await this.externalResources?.register({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor", bindingTxnId });
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
+    const networkHint = request.networkPolicy === "target-only" ? `proofblade-${slug}-g${request.generation}-net` : undefined;
+    const gatewayHint = request.networkPolicy === "target-only" ? `${name}-gateway` : undefined;
+    await this.externalResources?.register({
+      id: resourceId,
+      kind: "container",
+      runId: request.runId,
+      generation: request.generation,
+      ownerLane: "executor",
+      bindingTxnId,
+      externalRefs: {
+        solver: name,
+        ...(networkHint ? { network: networkHint } : {}),
+        ...(gatewayHint ? { gateway: gatewayHint } : {}),
+      },
+    });
     const identityLabels = {
       "proofblade.managed": "true",
       "proofblade.run_id": request.runId,
@@ -207,25 +221,30 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     try {
       await this.ensureImage(request.image);
       if (request.networkPolicy === "target-only") {
-        networkCandidate = `proofblade-${slug}-g${request.generation}-net`;
+        const networkNameForCreate = networkHint;
+        if (!networkNameForCreate) throw new Error("target-only Docker network is missing its recovery name");
+        networkCandidate = networkNameForCreate;
         // A name conflict must never turn cleanup into a delete of a network
         // that existed before this attempt. Remember matching ownership before
         // create; if create fails, only a newly observed, owned network may be
         // used as a partial-create fallback.
         networkPreexisted = (await this.ownedNetworkName(networkCandidate, ownerLabels)) !== undefined;
-        await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkCandidate]);
-        networkName = networkCandidate;
+        await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkNameForCreate]);
+        networkName = networkNameForCreate;
+        await this.externalResources?.markStarted(resourceId, undefined, { network: networkName });
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
-        const gatewayName = `${name}-gateway`;
+        const gatewayName = gatewayHint ?? `${name}-gateway`;
         gatewayCreateAttempted = true;
-        const gateway = await this.runChecked(["run", "-d", "--name", gatewayName, ...labels, "--network", networkName, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
-        gatewayContainerId = gateway.stdout.trim();
+        const gateway = await this.runChecked(["run", "-d", "--name", gatewayName, ...labels, "--network", networkNameForCreate, "--cap-drop", "ALL", "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW", "--security-opt", "no-new-privileges", gatewayImage, "sleep", "infinity"]);
+        const gatewayId = gateway.stdout.trim();
+        gatewayContainerId = gatewayId;
+        await this.externalResources?.markStarted(resourceId, undefined, { gateway: gatewayId });
         const targets = await resolveTargets(request.targets);
         // Invoke through /bin/sh instead of relying on the script's shebang;
         // this remains robust if a host checkout rewrites executable bits or
         // line endings before the image build.
-        await this.runChecked(["exec", gatewayContainerId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
+        await this.runChecked(["exec", gatewayId, "/bin/sh", "/usr/local/bin/pb-egress-init", ...targets.map((target) => `${target.protocol}:${target.address}:${target.port}`)]);
       }
       const limits = request.limits;
       const isPwn = request.profile === "pwn" || request.profile === "pwn-kernel";
@@ -271,6 +290,11 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         generation: request.generation,
         ownerLane: "executor",
         externalId: containerId,
+        externalRefs: {
+          solver: name,
+          ...(gatewayContainerId ? { gateway: gatewayContainerId } : {}),
+          ...(networkName ? { network: networkName } : {}),
+        },
       });
       await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
@@ -292,9 +316,10 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // gateway created by a different attempt.
         ownerLabels,
       );
-      if (containerId) {
-        if (cleanupErrors.length > 0) await this.externalResources?.markUnknown(resourceId, "Docker create cleanup was incomplete").catch(() => undefined);
-        else await this.externalResources?.markReleased(resourceId, "Docker create rolled back").catch(() => undefined);
+      if (cleanupErrors.length > 0) {
+        await this.externalResources?.markUnknown(resourceId, "Docker create cleanup was incomplete").catch(() => undefined);
+      } else if (containerId) {
+        await this.externalResources?.markReleased(resourceId, "Docker create rolled back").catch(() => undefined);
       } else {
         await this.externalResources?.markReleased(resourceId, "Docker create did not start a container").catch(() => undefined);
       }

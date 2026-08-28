@@ -181,6 +181,37 @@ test("Docker create removes a gateway by deterministic name when docker run fail
   }
 });
 
+test("Docker create keeps an incomplete resource unknown when partial cleanup fails", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-partial-cleanup-failure-"));
+  try {
+    const cleanupCalls: string[][] = [];
+    const runner: DockerCommandRunner = {
+      async run(args): Promise<DockerProcessResult> {
+        if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "network" && args[1] === "create") return processResult("network-id\n");
+        if (args[0] === "run" && args.includes("-d")) {
+          const name = args[args.indexOf("--name") + 1] ?? "";
+          return name.endsWith("-gateway") ? processResult("gateway-id\n") : processResult("solver failed", 1);
+        }
+        if (args[0] === "inspect") return processResult(JSON.stringify({}));
+        if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) {
+          cleanupCalls.push(args);
+          return args[0] === "network" ? processResult("daemon denied", 1) : processResult("");
+        }
+        return processResult("");
+      },
+    };
+    const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
+    const externalResources = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const runtime = new DockerContainerRuntime(config, runner, undefined, externalResources);
+    await assert.rejects(runtime.create({ runId: "PARTIAL/FAIL", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
+    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm"));
+    assert.equal((await externalResources.get("container:PARTIAL/FAIL:1:pwn"))?.state, "UNKNOWN");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Docker create does not remove a pre-existing same-name gateway on conflict", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-name-conflict-"));
   try {

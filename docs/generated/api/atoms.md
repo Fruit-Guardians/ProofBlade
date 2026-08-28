@@ -11,7 +11,7 @@
 ### FileLockTimeoutError
 - Kind: `class`
 - Signature: `FileLockTimeoutError`
-- Source: [src/storage/file-lock.ts:11](../../../packages/atoms/src/storage/file-lock.ts:11)
+- Source: [src/storage/file-lock.ts:12](../../../packages/atoms/src/storage/file-lock.ts:12)
 - Export: `@proofblade/atoms`
 - Summary: Inferred summary: file lock timeout error class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -48,7 +48,7 @@
 ### withFileLock
 - Kind: `function`
 - Signature: `<T>(lockPath: string, operation: () => Promise<T>, options?: FileLockOptions): Promise<T>`
-- Source: [src/storage/file-lock.ts:37](../../../packages/atoms/src/storage/file-lock.ts:37)
+- Source: [src/storage/file-lock.ts:51](../../../packages/atoms/src/storage/file-lock.ts:51)
 - Export: `@proofblade/atoms`
 - Summary: Serialize mutations that may be issued by more than one Node process.
 - Summary source: `tsdoc`
@@ -168,7 +168,7 @@
 ### FileLockOptions
 - Kind: `interface`
 - Signature: `FileLockOptions`
-- Source: [src/storage/file-lock.ts:5](../../../packages/atoms/src/storage/file-lock.ts:5)
+- Source: [src/storage/file-lock.ts:6](../../../packages/atoms/src/storage/file-lock.ts:6)
 - Export: `@proofblade/atoms`
 - Summary: Inferred summary: file lock options type contract used to provide a reusable operation.
 - Summary source: `inferred`

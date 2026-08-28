@@ -143,14 +143,15 @@ test("stale generation releases only a backend-confirmed matching resource", asy
   }
 });
 
-test("proposed resources are abandoned safely and release failures remain retryable", async () => {
+test("proposed resources stay unknown without an adapter and release failures remain retryable", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-resource-failure-"));
   try {
     const ledgerPath = join(root, "external-resources.json");
     const registry = new ExternalResourceRegistry(ledgerPath);
     await registry.register(registration("session:PROPOSED"));
     const proposed = await registry.reconcileRun("RUN-RESOURCE", 2);
-    assert.deepEqual(proposed, { examined: 1, adopted: [], released: ["session:PROPOSED"], unknown: [], failed: [] });
+    assert.deepEqual(proposed, { examined: 1, adopted: [], released: [], unknown: ["session:PROPOSED"], failed: [] });
+    assert.equal((await registry.get("session:PROPOSED"))?.state, "UNKNOWN");
 
     await registry.register(registration("session:RETRY"));
     await registry.markStarted("session:RETRY", "docker-exec-retry");
@@ -161,6 +162,34 @@ test("proposed resources are abandoned safely and release failures remain retrya
     adapter.failRelease = false;
     assert.equal(await registry.release("session:RETRY", adapter, "cleanup retry"), true);
     assert.equal((await registry.get("session:RETRY"))?.state, "RELEASED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("proposed resources are inspected and released through the adapter", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-resource-proposed-recovery-"));
+  try {
+    const registry = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    await registry.register({ ...registration("session:PROPOSED-STARTED"), externalId: "opaque-proposed" });
+    const adapter = new FakeResourceAdapter();
+    const result = await registry.reconcileRun("RUN-RESOURCE", 2, [adapter]);
+    assert.deepEqual(result, { examined: 1, adopted: [], released: ["session:PROPOSED-STARTED"], unknown: [], failed: [] });
+    assert.deepEqual(adapter.released, ["session:PROPOSED-STARTED"]);
+    assert.equal((await registry.get("session:PROPOSED-STARTED"))?.state, "RELEASED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("external resource locators are cloned before entering the durable ledger", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-resource-ref-clone-"));
+  try {
+    const refs = { solver: "solver-name" };
+    const registry = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    await registry.register({ ...registration("session:REFS"), externalRefs: refs });
+    refs.solver = "mutated-name";
+    assert.deepEqual((await registry.get("session:REFS"))?.externalRefs, { solver: "solver-name" });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

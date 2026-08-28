@@ -24,6 +24,12 @@ export interface ExternalResourceRecord {
   ownerLane: Lane;
   state: ExternalResourceState;
   externalId?: string;
+  /**
+   * Bounded backend locators persisted before an opaque handle is known.
+   * Values are discovery hints only; adapters must still prove ownership
+   * before adopting or releasing anything.
+   */
+  externalRefs?: Record<string, string>;
   effectId?: string;
   requestKey?: string;
   policyHash?: string;
@@ -49,6 +55,8 @@ export interface ExternalResourceRegistration {
   generation: number;
   ownerLane: Lane;
   externalId?: string;
+  /** Stable names/keys that let an adapter inspect a partial external create. */
+  externalRefs?: Record<string, string>;
   effectId?: string;
   requestKey?: string;
   policyHash?: string;
@@ -168,8 +176,10 @@ export class ExternalResourceRegistry {
       if (existing) {
         assertSameBinding(existing, input);
         const bindingTxnId = input.bindingTxnId ?? externalResourceBindingTransactionId(input);
-        if (existing.bindingTxnId === undefined) {
-          existing.bindingTxnId = bindingTxnId;
+        const mergedExternalRefs = mergeExternalRefs(existing.externalRefs, input.externalRefs);
+        if (existing.bindingTxnId === undefined || !sameExternalRefs(existing.externalRefs, mergedExternalRefs)) {
+          if (existing.bindingTxnId === undefined) existing.bindingTxnId = bindingTxnId;
+          if (mergedExternalRefs) existing.externalRefs = mergedExternalRefs;
           existing.updatedAt = new Date(this.now()).toISOString();
           await this.persist();
         }
@@ -179,6 +189,7 @@ export class ExternalResourceRegistry {
       const record: ExternalResourceRecord = {
         schemaVersion: LEDGER_SCHEMA_VERSION,
         ...input,
+        ...(input.externalRefs ? { externalRefs: cloneExternalRefs(input.externalRefs) } : {}),
         bindingTxnId: input.bindingTxnId ?? externalResourceBindingTransactionId(input),
         state: "PROPOSED",
         createdAt: timestamp,
@@ -212,12 +223,19 @@ export class ExternalResourceRegistry {
         } else if (existing.bindingTxnId !== bindingTxnId) throw new Error(`External resource ${input.id} binding transaction mismatch`);
         if (existing.externalId !== undefined && existing.externalId !== input.externalId) throw new Error(`External resource ${input.id} binding mismatch for externalId`);
         if (existing.state === "RELEASED") throw new Error(`External resource ${input.id} is already released`);
-        if (existing.state === "PROPOSED" || existing.state === "UNKNOWN") {
+        if (existing.state === "PROPOSED" || existing.state === "UNKNOWN" || (existing.state === "STARTED" && existing.externalId === undefined)) {
           existing.externalId = boundedText(input.externalId, "externalId");
+          existing.externalRefs = mergeExternalRefs(existing.externalRefs, input.externalRefs);
           existing.state = "STARTED";
           existing.updatedAt = new Date(this.now()).toISOString();
           delete existing.lastError;
           changed = true;
+        } else {
+          const mergedExternalRefs = mergeExternalRefs(existing.externalRefs, input.externalRefs);
+          if (!sameExternalRefs(existing.externalRefs, mergedExternalRefs)) {
+            existing.externalRefs = mergedExternalRefs;
+            changed = true;
+          }
         }
         if (changed) {
           existing.updatedAt = new Date(this.now()).toISOString();
@@ -232,6 +250,7 @@ export class ExternalResourceRegistry {
         ...input,
         bindingTxnId: input.bindingTxnId ?? externalResourceBindingTransactionId(input),
         externalId: boundedText(input.externalId, "externalId"),
+        ...(input.externalRefs ? { externalRefs: cloneExternalRefs(input.externalRefs) } : {}),
         state: "STARTED",
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -265,8 +284,8 @@ export class ExternalResourceRegistry {
     }));
   }
 
-  public async markStarted(id: string, externalId?: string): Promise<ExternalResourceRecord> {
-    return await this.transition(id, "STARTED", { externalId });
+  public async markStarted(id: string, externalId?: string, externalRefs?: Record<string, string>): Promise<ExternalResourceRecord> {
+    return await this.transition(id, "STARTED", { externalId, externalRefs });
   }
 
   public async markConfirmed(id: string, summary?: string): Promise<ExternalResourceRecord> {
@@ -323,14 +342,11 @@ export class ExternalResourceRegistry {
     for (const record of candidates) {
       throwIfAborted(signal);
       if (skipped.has(record.id)) continue;
-      if (record.state === "PROPOSED") {
-        await this.markReleased(record.id, "proposal never started an external action");
-        result.released.push(record.id);
-        continue;
-      }
       const adapter = adapterByKind.get(record.kind);
       if (!adapter) {
-        await this.markUnknown(record.id, `No adapter is registered for ${record.kind}`);
+        await this.markUnknown(record.id, record.state === "PROPOSED"
+          ? `No adapter is registered to inspect the proposed ${record.kind} resource`
+          : `No adapter is registered for ${record.kind}`);
         result.unknown.push(record.id);
         continue;
       }
@@ -343,6 +359,14 @@ export class ExternalResourceRegistry {
       if (inspection.status !== "PRESENT" || inspection.binding !== "MATCH") {
         await this.markUnknown(record.id, inspection.summary ?? "backend could not confirm the exact resource binding");
         result.unknown.push(record.id);
+        continue;
+      }
+      if (record.state === "PROPOSED") {
+        // A proposal may have crossed the external side-effect boundary just
+        // before the process died.  Inspect first, then release through the
+        // adapter; never mark the ledger terminal without touching the backend.
+        const released = await this.release(record.id, adapter, "proposed external action did not reach a durable owner", signal);
+        (released ? result.released : result.failed).push(record.id);
         continue;
       }
       if (record.generation !== currentGeneration) {
@@ -427,7 +451,7 @@ export class ExternalResourceRegistry {
     }
   }
 
-  private async transition(id: string, state: "STARTED" | "CONFIRMED", updates: { externalId?: string; summary?: string }): Promise<ExternalResourceRecord> {
+  private async transition(id: string, state: "STARTED" | "CONFIRMED", updates: { externalId?: string; externalRefs?: Record<string, string>; summary?: string }): Promise<ExternalResourceRecord> {
     return await this.serial(async () => await this.withLedgerLock(async () => {
       const current = this.recordsById.get(id);
       if (!current) throw new Error(`Unknown external resource: ${id}`);
@@ -436,6 +460,7 @@ export class ExternalResourceRegistry {
       if (state === "CONFIRMED" && !["STARTED", "CONFIRMED", "UNKNOWN"].includes(current.state)) throw new Error(`Cannot confirm external resource ${id} from ${current.state}`);
       current.state = state;
       if (updates.externalId !== undefined) current.externalId = boundedText(updates.externalId, "externalId");
+      if (updates.externalRefs !== undefined) current.externalRefs = mergeExternalRefs(current.externalRefs, updates.externalRefs);
       if (updates.summary !== undefined) current.lastSummary = boundedText(updates.summary, "summary");
       delete current.lastError;
       current.updatedAt = new Date(this.now()).toISOString();
@@ -499,6 +524,7 @@ function validateRegistration(input: ExternalResourceRegistration): void {
   if (input.recipeHash !== undefined && !HASH_PATTERN.test(input.recipeHash)) throw new Error("External resource recipeHash must be a sha256 hash");
   if (input.scopeHash !== undefined && !HASH_PATTERN.test(input.scopeHash)) throw new Error("External resource scopeHash must be a sha256 hash");
   if (input.bindingTxnId !== undefined && !HASH_PATTERN.test(input.bindingTxnId)) throw new Error("External resource bindingTxnId must be a sha256 hash");
+  validateExternalRefs(input.externalRefs);
 }
 
 function assertSameBinding(record: ExternalResourceRecord, input: ExternalResourceRegistration): void {
@@ -553,6 +579,7 @@ function isRecord(value: unknown): value is ExternalResourceRecord {
     && ["main", "planner", "executor", "verifier", "system"].includes(input.ownerLane as string)
     && ["PROPOSED", "STARTED", "CONFIRMED", "UNKNOWN", "RELEASED"].includes(input.state as string)
     && (input.externalId === undefined || boundedField(input.externalId))
+    && (input.externalRefs === undefined || isExternalRefs(input.externalRefs))
     && optionalBounded(input.effectId) && optionalBounded(input.requestKey)
     && optionalHash(input.policyHash) && optionalHash(input.recipeHash) && optionalHash(input.scopeHash)
     && optionalHash(input.bindingTxnId)
@@ -572,6 +599,34 @@ function boundedField(value: unknown): boolean {
 
 function optionalHash(value: unknown): boolean {
   return value === undefined || (typeof value === "string" && HASH_PATTERN.test(value));
+}
+
+function validateExternalRefs(value: Record<string, string> | undefined): void {
+  if (value === undefined) return;
+  if (!isExternalRefs(value)) throw new Error("External resource externalRefs are outside the bounded shape");
+}
+
+function isExternalRefs(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= 16 && entries.every(([key, item]) => /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(key) && boundedField(item));
+}
+
+function cloneExternalRefs(value: Record<string, string>): Record<string, string> {
+  validateExternalRefs(value);
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, boundedText(item, `externalRefs.${key}`)]));
+}
+
+function mergeExternalRefs(
+  current: Record<string, string> | undefined,
+  updates: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (current === undefined && updates === undefined) return undefined;
+  return cloneExternalRefs({ ...(current ?? {}), ...(updates ?? {}) });
+}
+
+function sameExternalRefs(left: Record<string, string> | undefined, right: Record<string, string> | undefined): boolean {
+  return canonicalJson(left ?? {}) === canonicalJson(right ?? {});
 }
 
 function clamp(value: number, min: number, max: number): number {

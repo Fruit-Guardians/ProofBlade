@@ -139,7 +139,7 @@
           "kind": "method",
           "signature": "(_record: ExternalResourceRecord, inspection: ExternalResourceInspection, _signal?: AbortSignal): Promise<{ state: \"CONFIRMED\" | \"UNKNOWN\"; summary?: string; }>",
           "module": "src/container/docker-resource-adapter.ts",
-          "line": 61,
+          "line": 66,
           "summary": "Adopt only a PRESENT/MATCH resource. UNKNOWN is a deliberate fail-closed result."
         }
       ],

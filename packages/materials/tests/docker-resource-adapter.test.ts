@@ -125,6 +125,52 @@ test("Docker adapter lets registry recovery adopt a matching container and relea
   }
 });
 
+test("Docker adapter releases a partially-created PROPOSED resource set after restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-docker-proposed-recovery-"));
+  try {
+    const calls: string[][] = [];
+    const bindingTxnId = externalResourceBindingTransactionId({ id: "container:RUN-PARTIAL:3:pwn", kind: "container", runId: "RUN-PARTIAL", generation: 3, ownerLane: "executor" });
+    const labels = {
+      "proofblade.managed": "true",
+      "proofblade.run_id": "RUN-PARTIAL",
+      "proofblade.generation": "3",
+      "proofblade.binding_txn": bindingTxnId,
+    };
+    const runner: DockerCommandRunner = {
+      async run(args) {
+        calls.push(args);
+        const target = args[args.length - 1];
+        if (args[0] === "inspect") {
+          const id = target === "solver-name" ? "solver-id" : target === "gateway-name" ? "gateway-id" : target;
+          return result(JSON.stringify({ Id: id, State: { Running: true }, Config: { Labels: labels } }));
+        }
+        if (args[0] === "network" && args[1] === "inspect") return result(JSON.stringify({ Id: "network-id", Labels: labels, Containers: {} }));
+        if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) return result("");
+        throw new Error(`unexpected Docker command: ${args.join(" ")}`);
+      },
+    };
+    const registry = new ExternalResourceRegistry(join(root, "resources.json"));
+    await registry.register({
+      id: "container:RUN-PARTIAL:3:pwn",
+      kind: "container",
+      runId: "RUN-PARTIAL",
+      generation: 3,
+      ownerLane: "executor",
+      bindingTxnId,
+      externalRefs: { solver: "solver-name", gateway: "gateway-name", network: "network-name" },
+    });
+    const adapter = new DockerContainerResourceAdapter(runner);
+    const recovered = await registry.reconcileRun("RUN-PARTIAL", 4, [adapter]);
+    assert.deepEqual(recovered, { examined: 1, adopted: [], released: ["container:RUN-PARTIAL:3:pwn"], unknown: [], failed: [] });
+    assert.equal((await registry.get("container:RUN-PARTIAL:3:pwn"))?.state, "RELEASED");
+    assert.ok(calls.some((args) => args[0] === "rm" && args[2] === "solver-id"));
+    assert.ok(calls.some((args) => args[0] === "rm" && args[2] === "gateway-id"));
+    assert.ok(calls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "network-id"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function record(): ExternalResourceRecord {
   return {
     schemaVersion: 1,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -102,6 +102,26 @@ test("file lock reports a live owner timeout instead of stealing it", async () =
   } finally {
     release();
     await held;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("file lock waits behind an active stale-reclaim claim", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-file-lock-reclaim-claim-"));
+  const lockPath = join(root, ".control.lock");
+  const claimPath = `${lockPath}.reclaim-test`;
+  try {
+    const old = Date.now() - 10_000;
+    await writeFile(lockPath, JSON.stringify({ token: "stale", pid: 999_999_999, acquiredAt: old }));
+    await utimes(lockPath, old / 1_000, old / 1_000);
+    await mkdir(claimPath);
+    await writeFile(`${claimPath}/owner`, JSON.stringify({ token: "reclaimer", targetToken: "stale", pid: process.pid, claimedAt: Date.now() }));
+    await assert.rejects(
+      withFileLock(lockPath, async () => "must-not-enter", { staleMs: 1, timeoutMs: 10, retryMs: 1 }),
+      (error: unknown) => error instanceof FileLockTimeoutError,
+    );
+    assert.match(await readFile(lockPath, "utf8"), /stale/);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

@@ -96,8 +96,13 @@ test("binding mismatches become manual recovery", () => {
   });
 });
 
-test("an OPEN owner backed by a proposal is inconsistent rather than releasable", () => {
-  assert.equal(classifyExternalBinding({ resource: resource({ state: "PROPOSED", externalId: undefined, controlSessionId: undefined }), controlSession: session() }).action, "MANUAL");
+test("an OPEN owner backed by a proposal requires backend reconciliation", () => {
+  assert.deepEqual(classifyExternalBinding({ resource: resource({ state: "PROPOSED", externalId: undefined, controlSessionId: undefined }), controlSession: session() }), {
+    phase: "PROPOSED",
+    action: "RECONCILE",
+    reason: "an OPEN Control Store session may have crossed the external side-effect boundary before STARTED was recorded",
+    bindingTxnId: sha256("binding-txn"),
+  });
 });
 
 const config = { schemaVersion: 1, runtime: { piVersion: "0.83.0" }, storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" }, modelProfiles: { executor: { thinkingLevel: "off" } } } as unknown as ProofBladeConfig;

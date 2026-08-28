@@ -280,15 +280,11 @@ async function releaseUnboundSessionResources(
       failed.push(record.id);
       continue;
     }
-    if (record.state === "PROPOSED") {
-      await registry.markReleased(record.id, "session start never committed to the Control Store");
-      await markBindingReleased(bindingCoordinator, record.bindingTxnId);
-      released.push(record.id);
-      continue;
-    }
     const adapter = adapterByKind.get(record.kind);
     if (!adapter) {
-      await registry.markUnknown(record.id, "session resource has no durable Control Store owner or recovery adapter");
+      await registry.markUnknown(record.id, record.state === "PROPOSED"
+        ? "session resource may have started before the Control Store owner; no recovery adapter is available for inspection"
+        : "session resource has no durable Control Store owner or recovery adapter");
       failed.push(record.id);
       continue;
     }

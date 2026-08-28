@@ -52,7 +52,7 @@ export function classifyExternalBinding(observation: ExternalBindingObservation)
   if (session) {
     if (session.status === "OPEN") {
       if (resource.state === "PROPOSED") {
-        return { phase: "AMBIGUOUS", action: "MANUAL", reason: "an OPEN Control Store session is backed by a resource that never recorded STARTED", bindingTxnId };
+        return { phase: "PROPOSED", action: "RECONCILE", reason: "an OPEN Control Store session may have crossed the external side-effect boundary before STARTED was recorded", bindingTxnId };
       }
       if (resource.controlSessionId === session.id) {
         return { phase: "CONTROL_BOUND", action: "ADOPT", reason: "the exact Control Store owner marker is durable", bindingTxnId };
@@ -85,7 +85,9 @@ function matchesSession(
     // those records recoverable using the immutable identity fields; whenever
     // both ledgers carry a marker it must match exactly.
     && (resource.bindingTxnId === undefined || session.bindingTxnId === undefined || resource.bindingTxnId === session.bindingTxnId)
-    && (resource.externalId === session.externalId || (session.externalId === undefined && resource.kind === "browser-context" && resource.externalId === session.id))
+    && (resource.externalId === session.externalId
+      || (resource.state === "PROPOSED" && resource.externalId === undefined)
+      || (session.externalId === undefined && resource.kind === "browser-context" && resource.externalId === session.id))
     && sessionKindMatches(resource.kind, session.kind);
 }
 
