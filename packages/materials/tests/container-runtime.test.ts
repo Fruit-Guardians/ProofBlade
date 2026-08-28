@@ -407,13 +407,13 @@ test("Docker destroy reports cleanup failures after attempting every resource", 
   const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
   const runtime = new DockerContainerRuntime(config, runner);
   await assert.rejects(
-    runtime.destroy({ runId: "cleanup-failure", generation: 1, containerId: "solver", gatewayContainerId: "gateway", networkName: "network", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only" }),
+    runtime.destroy({ runId: "cleanup-failure", generation: 1, containerId: "solver", gatewayContainerId: "gateway", networkName: "network", networkId: "network-id", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only" }),
     AggregateError,
   );
     assert.deepEqual(calls.filter((args) => args[0] === "rm" || args[0] === "network"), [
       ["rm", "-f", "solver"],
       ["rm", "-f", "gateway"],
-      ["network", "inspect", "--format", "{{json .}}", "network"],
+      ["network", "inspect", "--format", "{{json .}}", "network-id"],
       ["network", "rm", "network-id"],
     ]);
 });
@@ -435,6 +435,51 @@ test("Docker destroy refuses to remove a network that was replaced by another ow
     runtime.destroy({ runId: "original-run", generation: 1, containerId: "solver", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only", networkName: "shared-network", networkId: "old-network-id" }),
     AggregateError,
   );
+  assert.equal(networkRemovals, 0);
+});
+
+test("Docker destroy does not fall back to a same-label network after the persisted ID disappears", async () => {
+  const inspectedLocators: string[] = [];
+  let networkRemovals = 0;
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "network" && args[1] === "inspect") {
+        const locator = args.at(-1)!;
+        inspectedLocators.push(locator);
+        if (locator === "old-network-id") return processResult("No such network", 1);
+        return processResult(JSON.stringify({ Id: "replacement-network-id", Labels: dockerIdentityLabels("original-run", 1, "pwn") }));
+      }
+      if (args[0] === "network" && args[1] === "rm") networkRemovals += 1;
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  await assert.rejects(
+    runtime.destroy({ runId: "original-run", generation: 1, containerId: "solver", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only", networkName: "shared-network", networkId: "old-network-id" }),
+    AggregateError,
+  );
+  assert.deepEqual(inspectedLocators, ["old-network-id"]);
+  assert.equal(networkRemovals, 0);
+});
+
+test("Docker destroy refuses name-only network cleanup without a durable ID", async () => {
+  let networkInspections = 0;
+  let networkRemovals = 0;
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "network" && args[1] === "inspect") networkInspections += 1;
+      if (args[0] === "network" && args[1] === "rm") networkRemovals += 1;
+      return processResult(JSON.stringify({ Id: "replacement-network-id", Labels: dockerIdentityLabels("legacy-run", 1, "pwn") }));
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  await assert.rejects(
+    runtime.destroy({ runId: "legacy-run", generation: 1, containerId: "solver", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only", networkName: "legacy-network" }),
+    AggregateError,
+  );
+  assert.equal(networkInspections, 0);
   assert.equal(networkRemovals, 0);
 });
 

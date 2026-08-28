@@ -55,6 +55,8 @@ interface NetworkCleanupTarget {
   name?: string;
 }
 
+type NetworkCleanupMode = "create-rollback" | "destroy";
+
 type NetworkOwnership =
   | { status: "owned"; removeTarget: string }
   | { status: "absent" }
@@ -245,9 +247,10 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         networkName = networkNameForCreate;
         // Docker prints the immutable network ID on successful creation. Keep
         // the deterministic name only as a recovery fallback for a crash before
-        // this checkpoint is persisted.
-        networkId = network.stdout.trim() || networkNameForCreate;
-        await this.externalResources?.markStarted(resourceId, undefined, { network: networkId });
+        // this checkpoint is persisted; an absent stdout ID must not be treated
+        // as a durable ID because a later same-name network could be reused.
+        networkId = network.stdout.trim() || undefined;
+        await this.externalResources?.markStarted(resourceId, undefined, { network: networkId ?? networkNameForCreate });
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
         const gatewayName = gatewayHint ?? `${name}-gateway`;
@@ -332,6 +335,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // identityLabels alone would let a name-conflicting attempt delete a
         // gateway created by a different attempt.
         ownerLabels,
+        "create-rollback",
       );
       if (cleanupErrors.length > 0) {
         await this.externalResources?.markUnknown(resourceId, "Docker create cleanup was incomplete").catch(() => undefined);
@@ -531,6 +535,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         "proofblade.profile": ref.profile,
         "proofblade.binding_txn": externalResourceBindingTransactionId({ id: dockerContainerResourceId(ref.runId, ref.generation, ref.profile), kind: "container", runId: ref.runId, generation: ref.generation, ownerLane: "executor" }),
       },
+      "destroy",
     );
     const resourceId = dockerContainerResourceId(ref.runId, ref.generation, ref.profile);
     if (failures.length > 0) {
@@ -620,7 +625,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async cleanupResources(containerId?: string, gatewayContainerId?: string, network?: NetworkCleanupTarget, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>): Promise<Error[]> {
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, network?: NetworkCleanupTarget, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>, networkMode: NetworkCleanupMode = "destroy"): Promise<Error[]> {
     const failures: Error[] = [];
     const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
       try { await operation(); } catch (error) { failures.push(toError(error, label)); }
@@ -633,7 +638,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       const locator = network.id ?? network.name;
       if (!locator) return failures;
       await attempt(`network ${locator}`, async () => {
-        const ownership = await this.inspectOwnedNetwork(network, expectedLabels);
+        const ownership = await this.inspectOwnedNetwork(network, expectedLabels, networkMode);
         if (ownership.status === "absent") return;
         if (ownership.status !== "owned") throw new Error(ownership.reason);
         await this.removeNetwork(ownership.removeTarget);
@@ -658,43 +663,46 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
    * have been deleted and reused by another workflow while this process was
    * down; in that case cleanup must fail closed and leave the ledger UNKNOWN.
    */
-  private async inspectOwnedNetwork(target: NetworkCleanupTarget, expectedLabels: Record<string, string> | undefined): Promise<NetworkOwnership> {
+  private async inspectOwnedNetwork(target: NetworkCleanupTarget, expectedLabels: Record<string, string> | undefined, mode: NetworkCleanupMode): Promise<NetworkOwnership> {
     if (!expectedLabels) return { status: "unknown", reason: "network cleanup is missing expected ownership labels" };
-    const locators = [...new Set([target.id, target.name].filter((value): value is string => Boolean(value)))];
-    if (locators.length === 0) return { status: "unknown", reason: "network cleanup is missing a Docker locator" };
-    let sawAbsent = false;
-    for (const locator of locators) {
-      const result = await this.runner.run(["network", "inspect", "--format", "{{json .}}", locator], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
-      if (result.spawnError) return { status: "unknown", reason: `docker network inspect ${locator} failed: ${result.spawnError.message}` };
-      if (result.exitCode !== 0) {
-        const message = result.stderr || result.stdout;
-        if (/\b(no such|not found)\b/i.test(message)) {
-          sawAbsent = true;
-          continue;
-        }
-        return { status: "unknown", reason: `docker network inspect ${locator} failed: ${compactError(message, `exit ${String(result.exitCode)}`)}` };
+    const id = target.id?.trim() || undefined;
+    const name = target.name?.trim() || undefined;
+    const locator = id ?? name;
+    if (!locator) return { status: "unknown", reason: "network cleanup is missing a Docker locator" };
+    if (!id && mode !== "create-rollback") return { status: "unknown", reason: "network cleanup has no persisted ID; refusing name-only deletion" };
+    if (!id && expectedLabels["proofblade.owner_token"] === undefined) return { status: "unknown", reason: "name-only network rollback is missing its owner token" };
+    const result = await this.runner.run(["network", "inspect", "--format", "{{json .}}", locator], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+    if (result.spawnError) return { status: "unknown", reason: `docker network inspect ${locator} failed: ${result.spawnError.message}` };
+    if (result.exitCode !== 0) {
+      const message = result.stderr || result.stdout;
+      if (/\b(no such|not found)\b/i.test(message)) {
+        return id
+          ? { status: "mismatch", reason: `persisted network ID ${id} is absent; refusing name fallback` }
+          : { status: "absent" };
       }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.stdout.trim());
-      } catch (error) {
-        return { status: "unknown", reason: `docker network inspect ${locator} returned malformed JSON: ${error instanceof Error ? error.message : String(error)}` };
-      }
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return { status: "unknown", reason: `docker network inspect ${locator} returned a non-object` };
-      }
-      const details = parsed as { Id?: unknown; Labels?: unknown };
-      const labels = details.Labels;
-      if (labels === null || typeof labels !== "object" || Array.isArray(labels)) {
-        return { status: "mismatch", reason: `network ${locator} has no valid ownership labels` };
-      }
-      const actualLabels = labels as Record<string, unknown>;
-      const mismatch = Object.entries(expectedLabels).find(([key, value]) => actualLabels[key] !== value);
-      if (mismatch) return { status: "mismatch", reason: `network ${locator} ownership label ${mismatch[0]} does not match` };
-      const id = typeof details.Id === "string" && details.Id.trim() ? details.Id.trim() : locator;
-      return { status: "owned", removeTarget: id };
+      return { status: "unknown", reason: `docker network inspect ${locator} failed: ${compactError(message, `exit ${String(result.exitCode)}`)}` };
     }
-    return sawAbsent ? { status: "absent" } : { status: "unknown", reason: "network inspect returned no result" };
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(result.stdout.trim());
+    } catch (error) {
+      return { status: "unknown", reason: `docker network inspect ${locator} returned malformed JSON: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { status: "unknown", reason: `docker network inspect ${locator} returned a non-object` };
+    }
+    const details = parsed as { Id?: unknown; Labels?: unknown };
+    const actualId = typeof details.Id === "string" ? details.Id.trim() : "";
+    if (!actualId) return { status: "unknown", reason: `network ${locator} inspect did not return an immutable ID` };
+    if (id && actualId !== id) return { status: "mismatch", reason: `network inspect for ${locator} returned ID ${actualId}, not the persisted ID` };
+    const labels = details.Labels;
+    if (labels === null || typeof labels !== "object" || Array.isArray(labels)) {
+      return { status: "mismatch", reason: `network ${locator} has no valid ownership labels` };
+    }
+    const actualLabels = labels as Record<string, unknown>;
+    const mismatch = Object.entries(expectedLabels).find(([key, value]) => actualLabels[key] !== value);
+    if (mismatch) return { status: "mismatch", reason: `network ${locator} ownership label ${mismatch[0]} does not match` };
+    return { status: "owned", removeTarget: actualId };
   }
 
   /** Resolve a deterministic fallback name only after proving ownership. */

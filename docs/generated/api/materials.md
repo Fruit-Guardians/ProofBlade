@@ -214,7 +214,7 @@
 ### DockerContainerRuntime
 - Kind: `class`
 - Signature: `DockerContainerRuntime`
-- Source: [src/container/docker.ts:142](../../../packages/materials/src/container/docker.ts:142)
+- Source: [src/container/docker.ts:144](../../../packages/materials/src/container/docker.ts:144)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker container runtime class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -223,7 +223,7 @@
 ### SpawnDockerCommandRunner
 - Kind: `class`
 - Signature: `SpawnDockerCommandRunner`
-- Source: [src/container/docker.ts:87](../../../packages/materials/src/container/docker.ts:87)
+- Source: [src/container/docker.ts:89](../../../packages/materials/src/container/docker.ts:89)
 - Export: `@proofblade/materials`
 - Summary: Direct-spawn Docker CLI runner. It never invokes a host shell and never forwards process.env.
 - Summary source: `tsdoc`
@@ -933,7 +933,7 @@
 ### SUPPORTED_SIGNALS
 - Kind: `constant`
 - Signature: `NodeJS.Signals[]`
-- Source: [src/container/docker.ts:753](../../../packages/materials/src/container/docker.ts:753)
+- Source: [src/container/docker.ts:761](../../../packages/materials/src/container/docker.ts:761)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: supported signals constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1400,7 +1400,7 @@
 ### dockerContainerResourceId
 - Kind: `function`
 - Signature: `(runId: string, generation: number, profile: ContainerRef["profile"]): string`
-- Source: [src/container/docker.ts:732](../../../packages/materials/src/container/docker.ts:732)
+- Source: [src/container/docker.ts:740](../../../packages/materials/src/container/docker.ts:740)
 - Export: `@proofblade/materials`
 - Summary: Stable registry key for one per-run Docker container generation.
 - Summary source: `tsdoc`
@@ -3391,7 +3391,7 @@
 ### DockerCommandRunner
 - Kind: `interface`
 - Signature: `DockerCommandRunner`
-- Source: [src/container/docker.ts:73](../../../packages/materials/src/container/docker.ts:73)
+- Source: [src/container/docker.ts:75](../../../packages/materials/src/container/docker.ts:75)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker command runner type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3400,7 +3400,7 @@
 ### DockerProcessResult
 - Kind: `interface`
 - Signature: `DockerProcessResult`
-- Source: [src/container/docker.ts:64](../../../packages/materials/src/container/docker.ts:64)
+- Source: [src/container/docker.ts:66](../../../packages/materials/src/container/docker.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker process result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7290,7 +7290,7 @@
 ### DockerContainerRuntime.bindExternalResourceRegistry
 - Kind: `method`
 - Signature: `(registry: ExternalResourceRegistry): void`
-- Source: [src/container/docker.ts:155](../../../packages/materials/src/container/docker.ts:155)
+- Source: [src/container/docker.ts:157](../../../packages/materials/src/container/docker.ts:157)
 - Export: `@proofblade/materials`
 - Summary: Bind the shared recovery ledger when a runtime is supplied by an app shell.
 - Summary source: `tsdoc`
@@ -7298,7 +7298,7 @@
 ### DockerContainerRuntime.closeSession
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle): Promise<{ exitCode: number | null; }>`
-- Source: [src/container/docker.ts:454](../../../packages/materials/src/container/docker.ts:454)
+- Source: [src/container/docker.ts:458](../../../packages/materials/src/container/docker.ts:458)
 - Export: `@proofblade/materials`
 - Summary: Terminate the session process; idempotent.
 - Summary source: `tsdoc`
@@ -7307,7 +7307,7 @@
 ### DockerContainerRuntime.create
 - Kind: `method`
 - Signature: `(request: ContainerCreateRequest): Promise<ContainerRef>`
-- Source: [src/container/docker.ts:180](../../../packages/materials/src/container/docker.ts:180)
+- Source: [src/container/docker.ts:182](../../../packages/materials/src/container/docker.ts:182)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7316,7 +7316,7 @@
 ### DockerContainerRuntime.destroy
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<void>`
-- Source: [src/container/docker.ts:517](../../../packages/materials/src/container/docker.ts:517)
+- Source: [src/container/docker.ts:521](../../../packages/materials/src/container/docker.ts:521)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: destroy operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7325,7 +7325,7 @@
 ### DockerContainerRuntime.doctor
 - Kind: `method`
 - Signature: `(profile?: ContainerRef["profile"]): Promise<ContainerDoctorReport>`
-- Source: [src/container/docker.ts:164](../../../packages/materials/src/container/docker.ts:164)
+- Source: [src/container/docker.ts:166](../../../packages/materials/src/container/docker.ts:166)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: doctor operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -7334,7 +7334,7 @@
 ### DockerContainerRuntime.exec
 - Kind: `method`
 - Signature: `(ref: ContainerRef, command: string, options?: ContainerCommandOptions): Promise<ContainerCommandResult>`
-- Source: [src/container/docker.ts:352](../../../packages/materials/src/container/docker.ts:352)
+- Source: [src/container/docker.ts:356](../../../packages/materials/src/container/docker.ts:356)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: exec operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7343,7 +7343,7 @@
 ### DockerContainerRuntime.executionEnv
 - Kind: `method`
 - Signature: `(ref: ContainerRef): ContainerExecutionEnv`
-- Source: [src/container/docker.ts:348](../../../packages/materials/src/container/docker.ts:348)
+- Source: [src/container/docker.ts:352](../../../packages/materials/src/container/docker.ts:352)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: execution env operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7352,7 +7352,7 @@
 ### DockerContainerRuntime.externalResourceAdapter
 - Kind: `method`
 - Signature: `(): DockerContainerResourceAdapter`
-- Source: [src/container/docker.ts:160](../../../packages/materials/src/container/docker.ts:160)
+- Source: [src/container/docker.ts:162](../../../packages/materials/src/container/docker.ts:162)
 - Export: `@proofblade/materials`
 - Summary: Build the label-verifying adapter used by RunRecoveryService.
 - Summary source: `tsdoc`
@@ -7360,7 +7360,7 @@
 ### DockerContainerRuntime.health
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<boolean>`
-- Source: [src/container/docker.ts:512](../../../packages/materials/src/container/docker.ts:512)
+- Source: [src/container/docker.ts:516](../../../packages/materials/src/container/docker.ts:516)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: health operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7369,7 +7369,7 @@
 ### DockerContainerRuntime.openSession
 - Kind: `method`
 - Signature: `(ref: ContainerRef, options: ContainerSessionOpenOptions): Promise<ContainerSessionHandle>`
-- Source: [src/container/docker.ts:372](../../../packages/materials/src/container/docker.ts:372)
+- Source: [src/container/docker.ts:376](../../../packages/materials/src/container/docker.ts:376)
 - Export: `@proofblade/materials`
 - Summary: Start a long-lived process inside the container; the handle survives across tool calls.
 - Summary source: `tsdoc`
@@ -7378,7 +7378,7 @@
 ### DockerContainerRuntime.prewarm
 - Kind: `method`
 - Signature: `(profiles: ContainerRef["profile"][]): Promise<void>`
-- Source: [src/container/docker.ts:174](../../../packages/materials/src/container/docker.ts:174)
+- Source: [src/container/docker.ts:176](../../../packages/materials/src/container/docker.ts:176)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prewarm operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7387,7 +7387,7 @@
 ### DockerContainerRuntime.reapStale
 - Kind: `method`
 - Signature: `(options?: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean; }): Promise<number>`
-- Source: [src/container/docker.ts:543](../../../packages/materials/src/container/docker.ts:543)
+- Source: [src/container/docker.ts:548](../../../packages/materials/src/container/docker.ts:548)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reap stale operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7396,7 +7396,7 @@
 ### DockerContainerRuntime.sessionRead
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:432](../../../packages/materials/src/container/docker.ts:432)
+- Source: [src/container/docker.ts:436](../../../packages/materials/src/container/docker.ts:436)
 - Export: `@proofblade/materials`
 - Summary: Drain output without sending input.
 - Summary source: `tsdoc`
@@ -7405,7 +7405,7 @@
 ### DockerContainerRuntime.sessionSignal
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, signal: NodeJS.Signals): Promise<boolean>`
-- Source: [src/container/docker.ts:436](../../../packages/materials/src/container/docker.ts:436)
+- Source: [src/container/docker.ts:440](../../../packages/materials/src/container/docker.ts:440)
 - Export: `@proofblade/materials`
 - Summary: Signal the session's in-container foreground process group.
 - Summary source: `tsdoc`
@@ -7414,7 +7414,7 @@
 ### DockerContainerRuntime.sessionWrite
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, data: string | Uint8Array, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:426](../../../packages/materials/src/container/docker.ts:426)
+- Source: [src/container/docker.ts:430](../../../packages/materials/src/container/docker.ts:430)
 - Export: `@proofblade/materials`
 - Summary: Write to the session stdin, then wait for a readiness signal or timeout.
 - Summary source: `tsdoc`
@@ -7423,7 +7423,7 @@
 ### SpawnDockerCommandRunner.run
 - Kind: `method`
 - Signature: `(args: string[], options?: { timeoutMs?: number; signal?: AbortSignal; maxOutputBytes?: number; stdin?: string | Uint8Array; onStdout?: (chunk: string) => void; onStderr?: (chunk: string) => void; }): Promise<DockerProcessResult>`
-- Source: [src/container/docker.ts:90](../../../packages/materials/src/container/docker.ts:90)
+- Source: [src/container/docker.ts:92](../../../packages/materials/src/container/docker.ts:92)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -11182,7 +11182,7 @@
 ### SessionProcessSpawner
 - Kind: `type`
 - Signature: `SessionProcessSpawner`
-- Source: [src/container/docker.ts:82](../../../packages/materials/src/container/docker.ts:82)
+- Source: [src/container/docker.ts:84](../../../packages/materials/src/container/docker.ts:84)
 - Export: `@proofblade/materials`
 - Summary: Spawns the long-lived child for a persistent session. Injectable so tests can
 - Summary source: `tsdoc`
