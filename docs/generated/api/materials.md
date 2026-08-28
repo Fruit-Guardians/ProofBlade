@@ -214,7 +214,7 @@
 ### DockerContainerRuntime
 - Kind: `class`
 - Signature: `DockerContainerRuntime`
-- Source: [src/container/docker.ts:131](../../../packages/materials/src/container/docker.ts:131)
+- Source: [src/container/docker.ts:142](../../../packages/materials/src/container/docker.ts:142)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker container runtime class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -223,7 +223,7 @@
 ### SpawnDockerCommandRunner
 - Kind: `class`
 - Signature: `SpawnDockerCommandRunner`
-- Source: [src/container/docker.ts:76](../../../packages/materials/src/container/docker.ts:76)
+- Source: [src/container/docker.ts:87](../../../packages/materials/src/container/docker.ts:87)
 - Export: `@proofblade/materials`
 - Summary: Direct-spawn Docker CLI runner. It never invokes a host shell and never forwards process.env.
 - Summary source: `tsdoc`
@@ -933,7 +933,7 @@
 ### SUPPORTED_SIGNALS
 - Kind: `constant`
 - Signature: `NodeJS.Signals[]`
-- Source: [src/container/docker.ts:682](../../../packages/materials/src/container/docker.ts:682)
+- Source: [src/container/docker.ts:753](../../../packages/materials/src/container/docker.ts:753)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: supported signals constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1400,7 +1400,7 @@
 ### dockerContainerResourceId
 - Kind: `function`
 - Signature: `(runId: string, generation: number, profile: ContainerRef["profile"]): string`
-- Source: [src/container/docker.ts:661](../../../packages/materials/src/container/docker.ts:661)
+- Source: [src/container/docker.ts:732](../../../packages/materials/src/container/docker.ts:732)
 - Export: `@proofblade/materials`
 - Summary: Stable registry key for one per-run Docker container generation.
 - Summary source: `tsdoc`
@@ -1901,7 +1901,7 @@
 - Export: `@proofblade/materials`
 - Summary: Derive the stable identity of the external-start/control-owner handshake.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`
 
 ### resolveExternalResourceAdapters
 - Kind: `function`
@@ -3289,7 +3289,7 @@
 ### ContainerCommandOptions
 - Kind: `interface`
 - Signature: `ContainerCommandOptions`
-- Source: [src/container/contracts.ts:52](../../../packages/materials/src/container/contracts.ts:52)
+- Source: [src/container/contracts.ts:54](../../../packages/materials/src/container/contracts.ts:54)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container command options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3297,7 +3297,7 @@
 ### ContainerCommandResult
 - Kind: `interface`
 - Signature: `ContainerCommandResult`
-- Source: [src/container/contracts.ts:64](../../../packages/materials/src/container/contracts.ts:64)
+- Source: [src/container/contracts.ts:66](../../../packages/materials/src/container/contracts.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container command result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3305,7 +3305,7 @@
 ### ContainerCreateRequest
 - Kind: `interface`
 - Signature: `ContainerCreateRequest`
-- Source: [src/container/contracts.ts:38](../../../packages/materials/src/container/contracts.ts:38)
+- Source: [src/container/contracts.ts:40](../../../packages/materials/src/container/contracts.ts:40)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container create request type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3314,7 +3314,7 @@
 ### ContainerDoctorReport
 - Kind: `interface`
 - Signature: `ContainerDoctorReport`
-- Source: [src/container/contracts.ts:72](../../../packages/materials/src/container/contracts.ts:72)
+- Source: [src/container/contracts.ts:74](../../../packages/materials/src/container/contracts.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container doctor report type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3339,7 +3339,7 @@
 ### ContainerRuntimePort
 - Kind: `interface`
 - Signature: `ContainerRuntimePort`
-- Source: [src/container/contracts.ts:126](../../../packages/materials/src/container/contracts.ts:126)
+- Source: [src/container/contracts.ts:128](../../../packages/materials/src/container/contracts.ts:128)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container runtime port type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3348,7 +3348,7 @@
 ### ContainerSessionHandle
 - Kind: `interface`
 - Signature: `ContainerSessionHandle`
-- Source: [src/container/contracts.ts:90](../../../packages/materials/src/container/contracts.ts:90)
+- Source: [src/container/contracts.ts:92](../../../packages/materials/src/container/contracts.ts:92)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container session handle type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3357,7 +3357,7 @@
 ### ContainerSessionOpenOptions
 - Kind: `interface`
 - Signature: `ContainerSessionOpenOptions`
-- Source: [src/container/contracts.ts:98](../../../packages/materials/src/container/contracts.ts:98)
+- Source: [src/container/contracts.ts:100](../../../packages/materials/src/container/contracts.ts:100)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container session open options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3366,7 +3366,7 @@
 ### ContainerSessionReadOptions
 - Kind: `interface`
 - Signature: `ContainerSessionReadOptions`
-- Source: [src/container/contracts.ts:109](../../../packages/materials/src/container/contracts.ts:109)
+- Source: [src/container/contracts.ts:111](../../../packages/materials/src/container/contracts.ts:111)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container session read options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3374,7 +3374,7 @@
 ### ContainerSessionResult
 - Kind: `interface`
 - Signature: `ContainerSessionResult`
-- Source: [src/container/contracts.ts:115](../../../packages/materials/src/container/contracts.ts:115)
+- Source: [src/container/contracts.ts:117](../../../packages/materials/src/container/contracts.ts:117)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: container session result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3391,7 +3391,7 @@
 ### DockerCommandRunner
 - Kind: `interface`
 - Signature: `DockerCommandRunner`
-- Source: [src/container/docker.ts:62](../../../packages/materials/src/container/docker.ts:62)
+- Source: [src/container/docker.ts:73](../../../packages/materials/src/container/docker.ts:73)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker command runner type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3400,7 +3400,7 @@
 ### DockerProcessResult
 - Kind: `interface`
 - Signature: `DockerProcessResult`
-- Source: [src/container/docker.ts:53](../../../packages/materials/src/container/docker.ts:53)
+- Source: [src/container/docker.ts:64](../../../packages/materials/src/container/docker.ts:64)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: docker process result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7290,7 +7290,7 @@
 ### DockerContainerRuntime.bindExternalResourceRegistry
 - Kind: `method`
 - Signature: `(registry: ExternalResourceRegistry): void`
-- Source: [src/container/docker.ts:144](../../../packages/materials/src/container/docker.ts:144)
+- Source: [src/container/docker.ts:155](../../../packages/materials/src/container/docker.ts:155)
 - Export: `@proofblade/materials`
 - Summary: Bind the shared recovery ledger when a runtime is supplied by an app shell.
 - Summary source: `tsdoc`
@@ -7298,7 +7298,7 @@
 ### DockerContainerRuntime.closeSession
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle): Promise<{ exitCode: number | null; }>`
-- Source: [src/container/docker.ts:437](../../../packages/materials/src/container/docker.ts:437)
+- Source: [src/container/docker.ts:454](../../../packages/materials/src/container/docker.ts:454)
 - Export: `@proofblade/materials`
 - Summary: Terminate the session process; idempotent.
 - Summary source: `tsdoc`
@@ -7307,7 +7307,7 @@
 ### DockerContainerRuntime.create
 - Kind: `method`
 - Signature: `(request: ContainerCreateRequest): Promise<ContainerRef>`
-- Source: [src/container/docker.ts:169](../../../packages/materials/src/container/docker.ts:169)
+- Source: [src/container/docker.ts:180](../../../packages/materials/src/container/docker.ts:180)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7316,7 +7316,7 @@
 ### DockerContainerRuntime.destroy
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<void>`
-- Source: [src/container/docker.ts:500](../../../packages/materials/src/container/docker.ts:500)
+- Source: [src/container/docker.ts:517](../../../packages/materials/src/container/docker.ts:517)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: destroy operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7325,7 +7325,7 @@
 ### DockerContainerRuntime.doctor
 - Kind: `method`
 - Signature: `(profile?: ContainerRef["profile"]): Promise<ContainerDoctorReport>`
-- Source: [src/container/docker.ts:153](../../../packages/materials/src/container/docker.ts:153)
+- Source: [src/container/docker.ts:164](../../../packages/materials/src/container/docker.ts:164)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: doctor operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -7334,7 +7334,7 @@
 ### DockerContainerRuntime.exec
 - Kind: `method`
 - Signature: `(ref: ContainerRef, command: string, options?: ContainerCommandOptions): Promise<ContainerCommandResult>`
-- Source: [src/container/docker.ts:335](../../../packages/materials/src/container/docker.ts:335)
+- Source: [src/container/docker.ts:352](../../../packages/materials/src/container/docker.ts:352)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: exec operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7343,7 +7343,7 @@
 ### DockerContainerRuntime.executionEnv
 - Kind: `method`
 - Signature: `(ref: ContainerRef): ContainerExecutionEnv`
-- Source: [src/container/docker.ts:331](../../../packages/materials/src/container/docker.ts:331)
+- Source: [src/container/docker.ts:348](../../../packages/materials/src/container/docker.ts:348)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: execution env operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7352,7 +7352,7 @@
 ### DockerContainerRuntime.externalResourceAdapter
 - Kind: `method`
 - Signature: `(): DockerContainerResourceAdapter`
-- Source: [src/container/docker.ts:149](../../../packages/materials/src/container/docker.ts:149)
+- Source: [src/container/docker.ts:160](../../../packages/materials/src/container/docker.ts:160)
 - Export: `@proofblade/materials`
 - Summary: Build the label-verifying adapter used by RunRecoveryService.
 - Summary source: `tsdoc`
@@ -7360,7 +7360,7 @@
 ### DockerContainerRuntime.health
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<boolean>`
-- Source: [src/container/docker.ts:495](../../../packages/materials/src/container/docker.ts:495)
+- Source: [src/container/docker.ts:512](../../../packages/materials/src/container/docker.ts:512)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: health operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7369,7 +7369,7 @@
 ### DockerContainerRuntime.openSession
 - Kind: `method`
 - Signature: `(ref: ContainerRef, options: ContainerSessionOpenOptions): Promise<ContainerSessionHandle>`
-- Source: [src/container/docker.ts:355](../../../packages/materials/src/container/docker.ts:355)
+- Source: [src/container/docker.ts:372](../../../packages/materials/src/container/docker.ts:372)
 - Export: `@proofblade/materials`
 - Summary: Start a long-lived process inside the container; the handle survives across tool calls.
 - Summary source: `tsdoc`
@@ -7378,7 +7378,7 @@
 ### DockerContainerRuntime.prewarm
 - Kind: `method`
 - Signature: `(profiles: ContainerRef["profile"][]): Promise<void>`
-- Source: [src/container/docker.ts:163](../../../packages/materials/src/container/docker.ts:163)
+- Source: [src/container/docker.ts:174](../../../packages/materials/src/container/docker.ts:174)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prewarm operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7387,7 +7387,7 @@
 ### DockerContainerRuntime.reapStale
 - Kind: `method`
 - Signature: `(options?: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean; }): Promise<number>`
-- Source: [src/container/docker.ts:526](../../../packages/materials/src/container/docker.ts:526)
+- Source: [src/container/docker.ts:543](../../../packages/materials/src/container/docker.ts:543)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reap stale operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7396,7 +7396,7 @@
 ### DockerContainerRuntime.sessionRead
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:415](../../../packages/materials/src/container/docker.ts:415)
+- Source: [src/container/docker.ts:432](../../../packages/materials/src/container/docker.ts:432)
 - Export: `@proofblade/materials`
 - Summary: Drain output without sending input.
 - Summary source: `tsdoc`
@@ -7405,7 +7405,7 @@
 ### DockerContainerRuntime.sessionSignal
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, signal: NodeJS.Signals): Promise<boolean>`
-- Source: [src/container/docker.ts:419](../../../packages/materials/src/container/docker.ts:419)
+- Source: [src/container/docker.ts:436](../../../packages/materials/src/container/docker.ts:436)
 - Export: `@proofblade/materials`
 - Summary: Signal the session's in-container foreground process group.
 - Summary source: `tsdoc`
@@ -7414,7 +7414,7 @@
 ### DockerContainerRuntime.sessionWrite
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, data: string | Uint8Array, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:409](../../../packages/materials/src/container/docker.ts:409)
+- Source: [src/container/docker.ts:426](../../../packages/materials/src/container/docker.ts:426)
 - Export: `@proofblade/materials`
 - Summary: Write to the session stdin, then wait for a readiness signal or timeout.
 - Summary source: `tsdoc`
@@ -7423,7 +7423,7 @@
 ### SpawnDockerCommandRunner.run
 - Kind: `method`
 - Signature: `(args: string[], options?: { timeoutMs?: number; signal?: AbortSignal; maxOutputBytes?: number; stdin?: string | Uint8Array; onStdout?: (chunk: string) => void; onStderr?: (chunk: string) => void; }): Promise<DockerProcessResult>`
-- Source: [src/container/docker.ts:79](../../../packages/materials/src/container/docker.ts:79)
+- Source: [src/container/docker.ts:90](../../../packages/materials/src/container/docker.ts:90)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9348,7 +9348,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: action operation used to validate input or state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### HttpSessionRuntimeBroker.adopt
 - Kind: `method`
@@ -10579,7 +10579,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: action operation used to produce a deterministic value.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### HttpBrowserRuntimeContextPort.bind
 - Kind: `method`
@@ -10588,7 +10588,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in a remote runtime.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeContextPort.click
 - Kind: `method`
@@ -10687,7 +10687,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the remote broker.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeBroker.bindWireResource
 - Kind: `method`
@@ -10792,7 +10792,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the service ledger.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DurableBrowserRuntimeService.create
 - Kind: `method`
@@ -11182,7 +11182,7 @@
 ### SessionProcessSpawner
 - Kind: `type`
 - Signature: `SessionProcessSpawner`
-- Source: [src/container/docker.ts:71](../../../packages/materials/src/container/docker.ts:71)
+- Source: [src/container/docker.ts:82](../../../packages/materials/src/container/docker.ts:82)
 - Export: `@proofblade/materials`
 - Summary: Spawns the long-lived child for a persistent session. Injectable so tests can
 - Summary source: `tsdoc`
@@ -11374,7 +11374,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: lane type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### Phase
 - Kind: `type`

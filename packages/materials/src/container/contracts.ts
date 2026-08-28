@@ -33,6 +33,8 @@ export interface ContainerRef {
   networkPolicy: ContainerNetworkPolicy;
   gatewayContainerId?: string;
   networkName?: string;
+  /** Docker's immutable network handle, preferred over the mutable name during cleanup. */
+  networkId?: string;
 }
 
 export interface ContainerCreateRequest {

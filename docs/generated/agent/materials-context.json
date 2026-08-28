@@ -24,9 +24,9 @@
     "src/competition/solver.ts": "c34d45a0d33c7ca822999f419bec9ca3a0f17dda7432237807ef2579676b8736",
     "src/competition/task.ts": "0b802f81fb27a0276f1e85e30ce6da587d53faef60828ac9cb191d78964e6f25",
     "src/config.ts": "54f88ffdcc5b10390e1026a09ad32f65aa8321af5f92ea94dcc12410eecabc2f",
-    "src/container/contracts.ts": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+    "src/container/contracts.ts": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
     "src/container/docker-resource-adapter.ts": "c81ef7be99cae48d9e98393e10a600b3d882279c931d0c9a6e269a10945fc5e8",
-    "src/container/docker.ts": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+    "src/container/docker.ts": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
     "src/container/execution-env.ts": "578182c5ae5f0b4f6db939b91b582f90dfefe59534d37a2e133b2b5fbf4fb07a",
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
@@ -533,8 +533,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 131,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 142,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -549,8 +549,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 76,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 87,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -1925,8 +1925,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 682,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 753,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": []
     },
     {
@@ -2825,8 +2825,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 661,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 732,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": []
     },
     {
@@ -3732,6 +3732,7 @@
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts"
       ]
     },
@@ -6280,8 +6281,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 52,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 54,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6294,8 +6295,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 64,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 66,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6308,8 +6309,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 38,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 40,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts"
       ]
@@ -6324,8 +6325,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 72,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 74,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6339,7 +6340,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
       "line": 15,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6353,7 +6354,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
       "line": 23,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -6376,8 +6377,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 126,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 128,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -6398,8 +6399,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 90,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 92,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
@@ -6420,8 +6421,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 98,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 100,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/session-registry.test.ts"
       ]
@@ -6436,8 +6437,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 109,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 111,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6450,8 +6451,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
-      "line": 115,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "line": 117,
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
@@ -6473,7 +6474,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
       "line": 9,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -6486,8 +6487,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 62,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 73,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts"
@@ -6503,8 +6504,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 53,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 64,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts"
@@ -15087,8 +15088,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 144,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 155,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": []
     },
     {
@@ -15101,8 +15102,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 437,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 454,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15125,8 +15126,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 169,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 180,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15209,8 +15210,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 500,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 517,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15230,8 +15231,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 153,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 164,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -15247,8 +15248,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 335,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 352,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -15331,8 +15332,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 331,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 348,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -15349,8 +15350,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 149,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 160,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": []
     },
     {
@@ -15363,8 +15364,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 495,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 512,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -15396,8 +15397,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 355,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 372,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15418,8 +15419,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 163,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 174,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -15435,8 +15436,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 526,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 543,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -15451,8 +15452,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 415,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 432,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15475,8 +15476,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 419,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 436,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15499,8 +15500,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 409,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 426,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15523,8 +15524,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 79,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 90,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -22722,6 +22723,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
@@ -26818,6 +26820,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
@@ -26863,6 +26866,7 @@
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
@@ -27261,6 +27265,7 @@
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
@@ -27680,6 +27685,7 @@
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
@@ -29229,7 +29235,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/contracts.ts",
       "line": 7,
-      "moduleHash": "bb2b3189fa2b59b4f5424691af4a353edf53b728bd6b7fff8a6d4d68fb90eb53",
+      "moduleHash": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
       "testRefs": []
     },
     {
@@ -29242,8 +29248,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 71,
-      "moduleHash": "a2bdf8a351e33361668911b4f79c2896fff32dc680dc55caf8f91210ca766ef9",
+      "line": 82,
+      "moduleHash": "fbf3090f1a60f512769a984e359ab17191f915b28992ffd0971c1f14685b2595",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -29584,6 +29590,7 @@
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",

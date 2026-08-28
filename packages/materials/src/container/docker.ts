@@ -50,6 +50,17 @@ interface LiveSession {
   pidfile: string;
 }
 
+interface NetworkCleanupTarget {
+  id?: string;
+  name?: string;
+}
+
+type NetworkOwnership =
+  | { status: "owned"; removeTarget: string }
+  | { status: "absent" }
+  | { status: "mismatch"; reason: string }
+  | { status: "unknown"; reason: string };
+
 export interface DockerProcessResult {
   stdout: string;
   stderr: string;
@@ -212,6 +223,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
     let networkName: string | undefined;
+    let networkId: string | undefined;
     let networkCandidate: string | undefined;
     let networkPreexisted = false;
     let gatewayContainerId: string | undefined;
@@ -229,9 +241,13 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         // create; if create fails, only a newly observed, owned network may be
         // used as a partial-create fallback.
         networkPreexisted = (await this.ownedNetworkName(networkCandidate, ownerLabels)) !== undefined;
-        await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkNameForCreate]);
+        const network = await this.runChecked(["network", "create", ...labels, "--ipv6=false", networkNameForCreate]);
         networkName = networkNameForCreate;
-        await this.externalResources?.markStarted(resourceId, undefined, { network: networkName });
+        // Docker prints the immutable network ID on successful creation. Keep
+        // the deterministic name only as a recovery fallback for a crash before
+        // this checkpoint is persisted.
+        networkId = network.stdout.trim() || networkNameForCreate;
+        await this.externalResources?.markStarted(resourceId, undefined, { network: networkId });
         const gatewayImage = request.gatewayImage ?? this.config.images.gateway;
         await this.ensureImage(gatewayImage);
         const gatewayName = gatewayHint ?? `${name}-gateway`;
@@ -293,21 +309,22 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         externalRefs: {
           solver: name,
           ...(gatewayContainerId ? { gateway: gatewayContainerId } : {}),
-          ...(networkName ? { network: networkName } : {}),
+          ...(networkName ? { network: networkId ?? networkName } : {}),
         },
       });
       await this.runChecked(["exec", containerId, "/bin/sh", "-lc", "test -w /workspace && touch /workspace/.proofblade-write-test && rm -f /workspace/.proofblade-write-test"]);
       const inspected = await this.runChecked(["image", "inspect", "--format", "{{.Id}}", request.image]);
       await this.externalResources?.markConfirmed(resourceId, "Docker container created and workspace probe passed");
-      return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}) };
+      return { runId: request.runId, generation: request.generation, containerId, name, profile: request.profile, image: request.image, imageDigest: inspected.stdout.trim(), workspaceHostPath: request.workspaceHostPath, workspaceContainerPath: "/workspace", networkPolicy: request.networkPolicy, ...(gatewayContainerId ? { gatewayContainerId } : {}), ...(networkName ? { networkName } : {}), ...(networkId ? { networkId } : {}) };
     } catch (error) {
       const cleanupNetworkName = networkName ?? (!networkPreexisted && networkCandidate
         ? await this.ownedNetworkName(networkCandidate, ownerLabels)
         : undefined);
+      const cleanupNetwork = cleanupNetworkName || networkId ? { id: networkId, name: cleanupNetworkName } : undefined;
       const cleanupErrors = await this.cleanupResources(
         containerId,
         gatewayContainerId,
-        cleanupNetworkName,
+        cleanupNetwork,
         solverCreateAttempted ? name : undefined,
         gatewayCreateAttempted ? `${name}-gateway` : undefined,
         // The deterministic fallback names are shared by attempts with the
@@ -504,9 +521,9 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const failures = await this.cleanupResources(
       ref.containerId,
       ref.gatewayContainerId,
-      ref.networkName,
+      ref.networkId || ref.networkName ? { id: ref.networkId, name: ref.networkName } : undefined,
       ref.name,
-      ref.networkName ? `${ref.name}-gateway` : undefined,
+      ref.networkId || ref.networkName ? `${ref.name}-gateway` : undefined,
       {
         "proofblade.managed": "true",
         "proofblade.run_id": ref.runId,
@@ -603,7 +620,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     return result;
   }
 
-  private async cleanupResources(containerId?: string, gatewayContainerId?: string, networkName?: string, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>): Promise<Error[]> {
+  private async cleanupResources(containerId?: string, gatewayContainerId?: string, network?: NetworkCleanupTarget, solverName?: string, gatewayName?: string, expectedLabels?: Record<string, string>): Promise<Error[]> {
     const failures: Error[] = [];
     const attempt = async (label: string, operation: () => Promise<void>): Promise<void> => {
       try { await operation(); } catch (error) { failures.push(toError(error, label)); }
@@ -612,7 +629,16 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     const gatewayTarget = gatewayContainerId ?? await this.ownedContainerName(gatewayName, expectedLabels);
     if (solverTarget) await attempt(`solver container ${solverTarget}`, () => this.removeContainer(solverTarget));
     if (gatewayTarget) await attempt(`gateway container ${gatewayTarget}`, () => this.removeContainer(gatewayTarget));
-    if (networkName) await attempt(`network ${networkName}`, () => this.removeNetwork(networkName));
+    if (network?.id || network?.name) {
+      const locator = network.id ?? network.name;
+      if (!locator) return failures;
+      await attempt(`network ${locator}`, async () => {
+        const ownership = await this.inspectOwnedNetwork(network, expectedLabels);
+        if (ownership.status === "absent") return;
+        if (ownership.status !== "owned") throw new Error(ownership.reason);
+        await this.removeNetwork(ownership.removeTarget);
+      });
+    }
     return failures;
   }
 
@@ -624,6 +650,51 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
   private async removeNetwork(name: string): Promise<void> {
     const result = await this.runner.run(["network", "rm", name], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
     assertCleanupResult(result, `docker network rm ${name}`);
+  }
+
+  /**
+   * Re-inspect a network immediately before cleanup and return an immutable
+   * Docker ID only after all ownership labels still match. A mutable name may
+   * have been deleted and reused by another workflow while this process was
+   * down; in that case cleanup must fail closed and leave the ledger UNKNOWN.
+   */
+  private async inspectOwnedNetwork(target: NetworkCleanupTarget, expectedLabels: Record<string, string> | undefined): Promise<NetworkOwnership> {
+    if (!expectedLabels) return { status: "unknown", reason: "network cleanup is missing expected ownership labels" };
+    const locators = [...new Set([target.id, target.name].filter((value): value is string => Boolean(value)))];
+    if (locators.length === 0) return { status: "unknown", reason: "network cleanup is missing a Docker locator" };
+    let sawAbsent = false;
+    for (const locator of locators) {
+      const result = await this.runner.run(["network", "inspect", "--format", "{{json .}}", locator], { timeoutMs: configTimeout(this.config), maxOutputBytes: this.config.outputPreviewBytes });
+      if (result.spawnError) return { status: "unknown", reason: `docker network inspect ${locator} failed: ${result.spawnError.message}` };
+      if (result.exitCode !== 0) {
+        const message = result.stderr || result.stdout;
+        if (/\b(no such|not found)\b/i.test(message)) {
+          sawAbsent = true;
+          continue;
+        }
+        return { status: "unknown", reason: `docker network inspect ${locator} failed: ${compactError(message, `exit ${String(result.exitCode)}`)}` };
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.stdout.trim());
+      } catch (error) {
+        return { status: "unknown", reason: `docker network inspect ${locator} returned malformed JSON: ${error instanceof Error ? error.message : String(error)}` };
+      }
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return { status: "unknown", reason: `docker network inspect ${locator} returned a non-object` };
+      }
+      const details = parsed as { Id?: unknown; Labels?: unknown };
+      const labels = details.Labels;
+      if (labels === null || typeof labels !== "object" || Array.isArray(labels)) {
+        return { status: "mismatch", reason: `network ${locator} has no valid ownership labels` };
+      }
+      const actualLabels = labels as Record<string, unknown>;
+      const mismatch = Object.entries(expectedLabels).find(([key, value]) => actualLabels[key] !== value);
+      if (mismatch) return { status: "mismatch", reason: `network ${locator} ownership label ${mismatch[0]} does not match` };
+      const id = typeof details.Id === "string" && details.Id.trim() ? details.Id.trim() : locator;
+      return { status: "owned", removeTarget: id };
+    }
+    return sawAbsent ? { status: "absent" } : { status: "unknown", reason: "network inspect returned no result" };
   }
 
   /** Resolve a deterministic fallback name only after proving ownership. */

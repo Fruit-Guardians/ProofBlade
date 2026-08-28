@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { DockerContainerRuntime, SpawnDockerCommandRunner, type DockerCommandRunner, type DockerProcessResult, type SessionProcessSpawner } from "../src/container/docker.js";
 import type { ContainerRef } from "../src/container/contracts.js";
 import { parseCompetitionTargets } from "../src/competition/task.js";
-import { ExternalResourceRegistry } from "../src/recovery/external-resource-registry.js";
+import { ExternalResourceRegistry, externalResourceBindingTransactionId } from "../src/recovery/external-resource-registry.js";
 
 test("competition target parser extracts URL and nc endpoints without leaking connection text into scope", () => {
   const targets = parseCompetitionTargets("nc 1.14.76.59 20996; nc -v -u 1.14.76.60 5353; nc -w 3 -u 1.14.76.61 5354; web: http://example.test:8080/path");
@@ -49,6 +49,8 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
           const name = args[args.indexOf("--name") + 1];
           return processResult(name?.endsWith("-gateway") ? "gateway-id\n" : "solver-id\n");
         }
+        if (args[0] === "network" && args[1] === "create") return processResult("network-id\n");
+        if (args[0] === "network" && args[1] === "inspect") return processResult(JSON.stringify({ Id: "network-id", Labels: dockerIdentityLabels("RUN/42", 1, "pwn") }));
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
         if (args[0] === "exec") return processResult("");
         if (args[0] === "inspect") return processResult("true\n");
@@ -84,6 +86,7 @@ test("Docker runtime creates a target-only gateway namespace and destroys it ide
     await runtime.destroy(ref);
     assert.equal((await externalResources.get(resourceId))?.state, "RELEASED");
     assert.ok(calls.filter((args) => args[0] === "rm").length >= 2);
+    assert.ok(calls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "network-id"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -166,6 +169,7 @@ test("Docker create removes a gateway by deterministic name when docker run fail
           }
           return processResult("created-but-timeout", 1);
         }
+        if (args[0] === "network" && args[1] === "inspect") return processResult(JSON.stringify({ Id: "network-id", Labels: gatewayLabels }));
         if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify(gatewayLabels));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
         return processResult("");
@@ -175,7 +179,7 @@ test("Docker create removes a gateway by deterministic name when docker run fail
     const runtime = new DockerContainerRuntime(config, runner);
     await assert.rejects(runtime.create({ runId: "PARTIAL/1", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
     assert.ok(cleanupCalls.some((args) => args[0] === "rm" && args[2] === "proofblade-partial-1-g1-pwn-gateway"));
-    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "proofblade-partial-1-g1-net"));
+    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "network-id"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -185,14 +189,19 @@ test("Docker create keeps an incomplete resource unknown when partial cleanup fa
   const root = await mkdtemp(join(tmpdir(), "proofblade-partial-cleanup-failure-"));
   try {
     const cleanupCalls: string[][] = [];
+    let networkLabels: Record<string, string> = {};
     const runner: DockerCommandRunner = {
       async run(args): Promise<DockerProcessResult> {
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
-        if (args[0] === "network" && args[1] === "create") return processResult("network-id\n");
+        if (args[0] === "network" && args[1] === "create") {
+          networkLabels = labelsFromArgs(args);
+          return processResult("network-id\n");
+        }
         if (args[0] === "run" && args.includes("-d")) {
           const name = args[args.indexOf("--name") + 1] ?? "";
           return name.endsWith("-gateway") ? processResult("gateway-id\n") : processResult("solver failed", 1);
         }
+        if (args[0] === "network" && args[1] === "inspect") return processResult(JSON.stringify({ Id: "network-id", Labels: networkLabels }));
         if (args[0] === "inspect") return processResult(JSON.stringify({}));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) {
           cleanupCalls.push(args);
@@ -216,10 +225,16 @@ test("Docker create does not remove a pre-existing same-name gateway on conflict
   const root = await mkdtemp(join(tmpdir(), "proofblade-name-conflict-"));
   try {
     const cleanupCalls: string[][] = [];
+    let networkLabels: Record<string, string> = {};
     const runner: DockerCommandRunner = {
       async run(args): Promise<DockerProcessResult> {
         if (args[0] === "image" && args[1] === "inspect") return processResult("sha256:image\n");
+        if (args[0] === "network" && args[1] === "create") {
+          networkLabels = labelsFromArgs(args);
+          return processResult("network-id\n");
+        }
         if (args[0] === "run") return processResult("name conflict", 1);
+        if (args[0] === "network" && args[1] === "inspect") return processResult(JSON.stringify({ Id: "network-id", Labels: networkLabels }));
         if (args[0] === "inspect" && args.includes("--format")) return processResult(JSON.stringify({ "proofblade.managed": "true", "proofblade.run_id": "CONFLICT/1", "proofblade.generation": "1", "proofblade.profile": "pwn", "proofblade.owner_pid": String(process.pid), "proofblade.owner_started_at": "1", "proofblade.owner_token": "different-create-attempt" }));
         if (args[0] === "rm" || (args[0] === "network" && args[1] === "rm")) { cleanupCalls.push(args); return processResult(""); }
         return processResult("");
@@ -229,7 +244,7 @@ test("Docker create does not remove a pre-existing same-name gateway on conflict
     const runtime = new DockerContainerRuntime(config, runner);
     await assert.rejects(runtime.create({ runId: "CONFLICT/1", generation: 1, profile: "pwn", image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" }], networkPolicy: "target-only" }));
     assert.equal(cleanupCalls.some((args) => args[0] === "rm" && args[2] === "proofblade-conflict-1-g1-pwn-gateway"), false);
-    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "proofblade-conflict-1-g1-net"));
+    assert.ok(cleanupCalls.some((args) => args[0] === "network" && args[1] === "rm" && args[2] === "network-id"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -384,6 +399,7 @@ test("Docker destroy reports cleanup failures after attempting every resource", 
     async run(args): Promise<DockerProcessResult> {
       calls.push(args);
       if (args[0] === "rm") return processResult("daemon denied", 1);
+      if (args[0] === "network" && args[1] === "inspect") return processResult(JSON.stringify({ Id: "network-id", Labels: dockerIdentityLabels("cleanup-failure", 1, "pwn") }));
       if (args[0] === "network" && args[1] === "rm") return processResult("daemon denied", 1);
       return processResult("");
     },
@@ -394,11 +410,32 @@ test("Docker destroy reports cleanup failures after attempting every resource", 
     runtime.destroy({ runId: "cleanup-failure", generation: 1, containerId: "solver", gatewayContainerId: "gateway", networkName: "network", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only" }),
     AggregateError,
   );
-  assert.deepEqual(calls.filter((args) => args[0] === "rm" || args[0] === "network"), [
-    ["rm", "-f", "solver"],
-    ["rm", "-f", "gateway"],
-    ["network", "rm", "network"],
-  ]);
+    assert.deepEqual(calls.filter((args) => args[0] === "rm" || args[0] === "network"), [
+      ["rm", "-f", "solver"],
+      ["rm", "-f", "gateway"],
+      ["network", "inspect", "--format", "{{json .}}", "network"],
+      ["network", "rm", "network-id"],
+    ]);
+});
+
+test("Docker destroy refuses to remove a network that was replaced by another owner", async () => {
+  let networkRemovals = 0;
+  const runner: DockerCommandRunner = {
+    async run(args): Promise<DockerProcessResult> {
+      if (args[0] === "network" && args[1] === "inspect") {
+        return processResult(JSON.stringify({ Id: "replacement-network-id", Labels: dockerIdentityLabels("different-run", 1, "pwn") }));
+      }
+      if (args[0] === "network" && args[1] === "rm") networkRemovals += 1;
+      return processResult("");
+    },
+  };
+  const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never" };
+  const runtime = new DockerContainerRuntime(config, runner);
+  await assert.rejects(
+    runtime.destroy({ runId: "original-run", generation: 1, containerId: "solver", name: "solver", profile: "pwn", image: config.images.pwn, imageDigest: "sha256:test", workspaceHostPath: "C:\\tmp", workspaceContainerPath: "/workspace", networkPolicy: "target-only", networkName: "shared-network", networkId: "old-network-id" }),
+    AggregateError,
+  );
+  assert.equal(networkRemovals, 0);
 });
 
 test("Docker stale reaper does not count a resource when rm is rejected", async () => {
@@ -592,6 +629,28 @@ test("destroy closes live sessions for the container without orphaning children"
   // The session is gone: a subsequent read must reject as unknown.
   await assert.rejects(runtime.sessionRead(handle), /Unknown container session/);
 });
+
+function dockerIdentityLabels(runId: string, generation: number, profile: ContainerRef["profile"]): Record<string, string> {
+  const id = `container:${runId}:${generation}:${profile}`;
+  return {
+    "proofblade.managed": "true",
+    "proofblade.run_id": runId,
+    "proofblade.generation": String(generation),
+    "proofblade.profile": profile,
+    "proofblade.binding_txn": externalResourceBindingTransactionId({ id, kind: "container", runId, generation, ownerLane: "executor" }),
+  };
+}
+
+function labelsFromArgs(args: string[]): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] !== "--label") continue;
+    const value = args[index + 1];
+    const separator = value?.indexOf("=") ?? -1;
+    if (value && separator > 0) labels[value.slice(0, separator)] = value.slice(separator + 1);
+  }
+  return labels;
+}
 
 function processResult(stdout: string, exitCode = 0): DockerProcessResult {
   return { stdout, stderr: "", exitCode, truncated: false, durationMs: 1 };
