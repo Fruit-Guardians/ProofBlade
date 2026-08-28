@@ -268,6 +268,35 @@
       "status": "candidate",
       "symbols": [
         {
+          "id": "@proofblade/materials::method::ExternalResourceRegistry.markReleasedIfOwned",
+          "package": "@proofblade/materials",
+          "name": "ExternalResourceRegistry.markReleasedIfOwned",
+          "kind": "method",
+          "signature": "(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>",
+          "module": "src/recovery/external-resource-registry.ts",
+          "line": 348,
+          "summary": "Conditionally mark a resource released. This is intended for rollback of"
+        },
+        {
+          "id": "@proofblade/materials::method::ExternalResourceRegistry.markUnknownIfOwned",
+          "package": "@proofblade/materials",
+          "name": "ExternalResourceRegistry.markUnknownIfOwned",
+          "kind": "method",
+          "signature": "(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>",
+          "module": "src/recovery/external-resource-registry.ts",
+          "line": 327,
+          "summary": "Conditionally mark an in-flight resource unknown. The check and state"
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
           "id": "@proofblade/materials::method::SessionResourceAdapter.takeBinding",
           "package": "@proofblade/materials",
           "name": "SessionResourceAdapter.takeBinding",
@@ -509,6 +538,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 16
+    "candidates": 17
   }
 }

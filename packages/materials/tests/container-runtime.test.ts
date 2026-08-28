@@ -318,7 +318,8 @@ test("Docker create does not remove a concurrently-created same-name network", a
       },
     };
     const config: ResolvedExecutionConfig = { ...resolveExecutionConfig({} as never), backend: "docker", pullPolicy: "never", networkPolicy: "target-only" };
-    const runtime = new DockerContainerRuntime(config, runner);
+    const externalResources = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const runtime = new DockerContainerRuntime(config, runner, undefined, externalResources);
     const request = { runId: "SAME/RUN", generation: 1, profile: "pwn" as const, image: config.images.pwn, workspaceHostPath: root, targets: [{ host: "127.0.0.1", port: 31337, protocol: "tcp" as const }], networkPolicy: "target-only" as const };
     const first = runtime.create(request);
     const second = runtime.create(request);
@@ -331,6 +332,7 @@ test("Docker create does not remove a concurrently-created same-name network", a
     assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
     assert.equal(results.filter((result) => result.status === "rejected").length, 1);
     assert.equal(networkRemovals, 0);
+    assert.equal((await externalResources.get("container:SAME/RUN:1:pwn"))?.state, "CONFIRMED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

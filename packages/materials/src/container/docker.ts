@@ -189,6 +189,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
     }
     const resourceId = dockerContainerResourceId(request.runId, request.generation, request.profile);
     const bindingTxnId = externalResourceBindingTransactionId({ id: resourceId, kind: "container", runId: request.runId, generation: request.generation, ownerLane: "executor" });
+    const attemptToken = createOwnerToken();
     const slug = safeName(request.runId);
     const name = `proofblade-${slug}-g${request.generation}-${request.profile}`;
     const networkHint = request.networkPolicy === "target-only" ? `proofblade-${slug}-g${request.generation}-net` : undefined;
@@ -201,6 +202,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       ownerLane: "executor",
       bindingTxnId,
       externalRefs: {
+        attempt: attemptToken,
         solver: name,
         ...(networkHint ? { network: networkHint } : {}),
         ...(gatewayHint ? { gateway: gatewayHint } : {}),
@@ -218,9 +220,9 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
       "proofblade.owner_pid": String(process.pid),
       "proofblade.owner_started_at": String(PROCESS_STARTED_AT),
       // PID/start-time identify the process, not this individual create()
-      // attempt.  A unique token prevents a losing concurrent creator from
-      // claiming the winner's deterministically named network.
-      "proofblade.owner_token": createOwnerToken(),
+      // attempt. Keep the same unique token in the ledger and backend labels
+      // so rollback authority can be compared atomically after a race.
+      "proofblade.owner_token": attemptToken,
     };
     const labels = Object.entries(ownerLabels).flatMap(([key, value]) => ["--label", `${key}=${value}`]);
     const containerUser = await prepareWorkspace(request.workspaceHostPath);
@@ -310,6 +312,7 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         ownerLane: "executor",
         externalId: containerId,
         externalRefs: {
+          attempt: attemptToken,
           solver: name,
           ...(gatewayContainerId ? { gateway: gatewayContainerId } : {}),
           ...(networkName ? { network: networkId ?? networkName } : {}),
@@ -337,12 +340,14 @@ export class DockerContainerRuntime implements ContainerRuntimePort {
         ownerLabels,
         "create-rollback",
       );
+      const terminalGuard = {
+        attemptToken,
+        ...(containerId ? { externalId: containerId } : {}),
+      };
       if (cleanupErrors.length > 0) {
-        await this.externalResources?.markUnknown(resourceId, "Docker create cleanup was incomplete").catch(() => undefined);
+        await this.externalResources?.markUnknownIfOwned(resourceId, "Docker create cleanup was incomplete", terminalGuard).catch(() => undefined);
       } else if (containerId) {
-        await this.externalResources?.markReleased(resourceId, "Docker create rolled back").catch(() => undefined);
-      } else {
-        await this.externalResources?.markReleased(resourceId, "Docker create did not start a container").catch(() => undefined);
+        await this.externalResources?.markReleasedIfOwned(resourceId, "Docker create rolled back", terminalGuard).catch(() => undefined);
       }
       if (cleanupErrors.length > 0) throw new AggregateError([toError(error, "Docker create"), ...cleanupErrors], "Docker create failed and cleanup also failed");
       throw error;

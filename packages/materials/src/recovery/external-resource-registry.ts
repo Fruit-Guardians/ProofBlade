@@ -66,6 +66,17 @@ export interface ExternalResourceRegistration {
   bindingTxnId?: string;
 }
 
+/**
+ * Compare-and-set authority for a create attempt that may share a durable
+ * resource id with another in-flight attempt. The registry only performs a
+ * terminal transition when both the attempt token and, when supplied, the
+ * external handle still belong to the caller.
+ */
+export interface ExternalResourceTerminalGuard {
+  readonly attemptToken: string;
+  readonly externalId?: string;
+}
+
 export interface ExternalResourceInspection {
   status: ExternalResourceInspectionStatus;
   /** The backend must only return MATCH after validating the immutable binding. */
@@ -176,7 +187,9 @@ export class ExternalResourceRegistry {
       if (existing) {
         assertSameBinding(existing, input);
         const bindingTxnId = input.bindingTxnId ?? externalResourceBindingTransactionId(input);
-        const mergedExternalRefs = mergeExternalRefs(existing.externalRefs, input.externalRefs);
+        const mergedExternalRefs = existing.externalId === undefined
+          ? mergeExternalRefs(existing.externalRefs, input.externalRefs)
+          : mergeExternalRefsPreservingAttempt(existing.externalRefs, input.externalRefs);
         if (existing.bindingTxnId === undefined || !sameExternalRefs(existing.externalRefs, mergedExternalRefs)) {
           if (existing.bindingTxnId === undefined) existing.bindingTxnId = bindingTxnId;
           if (mergedExternalRefs) existing.externalRefs = mergedExternalRefs;
@@ -231,7 +244,7 @@ export class ExternalResourceRegistry {
           delete existing.lastError;
           changed = true;
         } else {
-          const mergedExternalRefs = mergeExternalRefs(existing.externalRefs, input.externalRefs);
+          const mergedExternalRefs = mergeExternalRefsPreservingAttempt(existing.externalRefs, input.externalRefs);
           if (!sameExternalRefs(existing.externalRefs, mergedExternalRefs)) {
             existing.externalRefs = mergedExternalRefs;
             changed = true;
@@ -306,6 +319,15 @@ export class ExternalResourceRegistry {
     }));
   }
 
+  /**
+   * Conditionally mark an in-flight resource unknown. The check and state
+   * transition share one ledger lock, so a concurrent creator cannot finalize
+   * a record after another attempt has claimed its external handle.
+   */
+  public async markUnknownIfOwned(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined> {
+    return await this.markTerminalIfOwned(id, "UNKNOWN", reason, guard);
+  }
+
   /** Mark a resource released when its owner has already closed it successfully. */
   public async markReleased(id: string, reason = "released"): Promise<ExternalResourceRecord | undefined> {
     return await this.serial(async () => await this.withLedgerLock(async () => {
@@ -316,6 +338,15 @@ export class ExternalResourceRegistry {
       await this.persist();
       return structuredClone(current);
     }));
+  }
+
+  /**
+   * Conditionally mark a resource released. This is intended for rollback of
+   * one create attempt; normal owner shutdown and recovery should continue to
+   * use the unconditional lifecycle methods above.
+   */
+  public async markReleasedIfOwned(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined> {
+    return await this.markTerminalIfOwned(id, "RELEASED", reason, guard);
   }
 
   /**
@@ -458,13 +489,44 @@ export class ExternalResourceRegistry {
       if (current.state === "RELEASED") throw new Error(`External resource ${id} is already released`);
       if (state === "STARTED" && current.state !== "PROPOSED" && current.state !== "UNKNOWN" && current.state !== "STARTED") throw new Error(`Cannot start external resource ${id} from ${current.state}`);
       if (state === "CONFIRMED" && !["STARTED", "CONFIRMED", "UNKNOWN"].includes(current.state)) throw new Error(`Cannot confirm external resource ${id} from ${current.state}`);
+      const hadExternalId = current.externalId !== undefined;
       current.state = state;
       if (updates.externalId !== undefined) current.externalId = boundedText(updates.externalId, "externalId");
-      if (updates.externalRefs !== undefined) current.externalRefs = mergeExternalRefs(current.externalRefs, updates.externalRefs);
+      if (updates.externalRefs !== undefined) {
+        current.externalRefs = hadExternalId
+          ? mergeExternalRefsPreservingAttempt(current.externalRefs, updates.externalRefs)
+          : mergeExternalRefs(current.externalRefs, updates.externalRefs);
+      }
       if (updates.summary !== undefined) current.lastSummary = boundedText(updates.summary, "summary");
       delete current.lastError;
       current.updatedAt = new Date(this.now()).toISOString();
       await this.persist();
+      return structuredClone(current);
+    }));
+  }
+
+  private async markTerminalIfOwned(
+    id: string,
+    state: "UNKNOWN" | "RELEASED",
+    reason: string,
+    guard: ExternalResourceTerminalGuard,
+  ): Promise<ExternalResourceRecord | undefined> {
+    const bounded = boundedText(reason, state === "UNKNOWN" ? "unknown resource" : "release reason");
+    validateTerminalGuard(guard);
+    return await this.serial(async () => await this.withLedgerLock(async () => {
+      const current = this.recordsById.get(id);
+      if (!current || current.state === "RELEASED") return clone(current);
+      if (!matchesTerminalGuard(current, guard)) return structuredClone(current);
+      if (state === "UNKNOWN") {
+        current.state = "UNKNOWN";
+        current.lastError = bounded;
+        current.lastSummary = bounded;
+        current.updatedAt = new Date(this.now()).toISOString();
+        await this.persist();
+      } else {
+        setReleased(current, bounded, this.now());
+        await this.persist();
+      }
       return structuredClone(current);
     }));
   }
@@ -525,6 +587,22 @@ function validateRegistration(input: ExternalResourceRegistration): void {
   if (input.scopeHash !== undefined && !HASH_PATTERN.test(input.scopeHash)) throw new Error("External resource scopeHash must be a sha256 hash");
   if (input.bindingTxnId !== undefined && !HASH_PATTERN.test(input.bindingTxnId)) throw new Error("External resource bindingTxnId must be a sha256 hash");
   validateExternalRefs(input.externalRefs);
+}
+
+function validateTerminalGuard(guard: ExternalResourceTerminalGuard): void {
+  if (!guard || typeof guard !== "object" || typeof guard.attemptToken !== "string" || !guard.attemptToken.trim()) {
+    throw new Error("External resource terminal guard requires an attempt token");
+  }
+  if (guard.attemptToken.length > 512) throw new Error("External resource terminal guard attempt token is outside the bounded length");
+  if (guard.externalId !== undefined && (typeof guard.externalId !== "string" || !guard.externalId.trim() || guard.externalId.length > 512)) {
+    throw new Error("External resource terminal guard externalId is outside the bounded length");
+  }
+}
+
+function matchesTerminalGuard(record: ExternalResourceRecord, guard: ExternalResourceTerminalGuard): boolean {
+  if (record.externalRefs?.attempt !== guard.attemptToken) return false;
+  if (guard.externalId === undefined) return record.externalId === undefined;
+  return record.externalId === guard.externalId;
 }
 
 function assertSameBinding(record: ExternalResourceRecord, input: ExternalResourceRegistration): void {
@@ -623,6 +701,15 @@ function mergeExternalRefs(
 ): Record<string, string> | undefined {
   if (current === undefined && updates === undefined) return undefined;
   return cloneExternalRefs({ ...(current ?? {}), ...(updates ?? {}) });
+}
+
+function mergeExternalRefsPreservingAttempt(
+  current: Record<string, string> | undefined,
+  updates: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  const merged = mergeExternalRefs(current, updates);
+  if (current?.attempt === undefined || merged === undefined) return merged;
+  return cloneExternalRefs({ ...merged, attempt: current.attempt });
 }
 
 function sameExternalRefs(left: Record<string, string> | undefined, right: Record<string, string> | undefined): boolean {

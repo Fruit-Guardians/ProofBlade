@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 140
-- Symbols: 1403
+- Symbols: 1406
 
 ## Public Symbols
 
@@ -525,7 +525,7 @@
 ### ExternalResourceRegistry
 - Kind: `class`
 - Signature: `ExternalResourceRegistry`
-- Source: [src/recovery/external-resource-registry.ts:133](../../../packages/materials/src/recovery/external-resource-registry.ts:133)
+- Source: [src/recovery/external-resource-registry.ts:144](../../../packages/materials/src/recovery/external-resource-registry.ts:144)
 - Export: `@proofblade/materials`
 - Summary: Cross-process ledger for resources whose lifetime is not represented by a
 - Summary source: `tsdoc`
@@ -933,7 +933,7 @@
 ### SUPPORTED_SIGNALS
 - Kind: `constant`
 - Signature: `NodeJS.Signals[]`
-- Source: [src/container/docker.ts:761](../../../packages/materials/src/container/docker.ts:761)
+- Source: [src/container/docker.ts:766](../../../packages/materials/src/container/docker.ts:766)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: supported signals constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1400,7 +1400,7 @@
 ### dockerContainerResourceId
 - Kind: `function`
 - Signature: `(runId: string, generation: number, profile: ContainerRef["profile"]): string`
-- Source: [src/container/docker.ts:740](../../../packages/materials/src/container/docker.ts:740)
+- Source: [src/container/docker.ts:745](../../../packages/materials/src/container/docker.ts:745)
 - Export: `@proofblade/materials`
 - Summary: Stable registry key for one per-run Docker container generation.
 - Summary source: `tsdoc`
@@ -1889,7 +1889,7 @@
 ### externalResourceBindingHash
 - Kind: `function`
 - Signature: `(record: Pick<ExternalResourceRecord, "runId" | "generation" | "kind" | "id" | "effectId" | "requestKey" | "policyHash" | "recipeHash" | "scopeHash">): string`
-- Source: [src/recovery/external-resource-registry.ts:642](../../../packages/materials/src/recovery/external-resource-registry.ts:642)
+- Source: [src/recovery/external-resource-registry.ts:729](../../../packages/materials/src/recovery/external-resource-registry.ts:729)
 - Export: `@proofblade/materials`
 - Summary: Stable binding hash useful for adapter labels and logs without raw values.
 - Summary source: `tsdoc`
@@ -1897,7 +1897,7 @@
 ### externalResourceBindingTransactionId
 - Kind: `function`
 - Signature: `(input: Pick<ExternalResourceRegistration, "id" | "kind" | "runId" | "generation" | "ownerLane" | "effectId" | "requestKey" | "policyHash" | "recipeHash" | "scopeHash">): string`
-- Source: [src/recovery/external-resource-registry.ts:652](../../../packages/materials/src/recovery/external-resource-registry.ts:652)
+- Source: [src/recovery/external-resource-registry.ts:739](../../../packages/materials/src/recovery/external-resource-registry.ts:739)
 - Export: `@proofblade/materials`
 - Summary: Derive the stable identity of the external-start/control-owner handshake.
 - Summary source: `tsdoc`
@@ -1906,7 +1906,7 @@
 ### resolveExternalResourceAdapters
 - Kind: `function`
 - Signature: `(source: ExternalResourceAdapterSource | undefined, context: ExternalResourceAdapterContext): Promise<readonly ExternalResourceAdapter[]>`
-- Source: [src/recovery/external-resource-registry.ts:95](../../../packages/materials/src/recovery/external-resource-registry.ts:95)
+- Source: [src/recovery/external-resource-registry.ts:106](../../../packages/materials/src/recovery/external-resource-registry.ts:106)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resolve external resource adapters operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4755,7 +4755,7 @@
 ### ExternalResourceAdapter
 - Kind: `interface`
 - Signature: `ExternalResourceAdapter`
-- Source: [src/recovery/external-resource-registry.ts:77](../../../packages/materials/src/recovery/external-resource-registry.ts:77)
+- Source: [src/recovery/external-resource-registry.ts:88](../../../packages/materials/src/recovery/external-resource-registry.ts:88)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource adapter type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4764,7 +4764,7 @@
 ### ExternalResourceAdapterContext
 - Kind: `interface`
 - Signature: `ExternalResourceAdapterContext`
-- Source: [src/recovery/external-resource-registry.ts:86](../../../packages/materials/src/recovery/external-resource-registry.ts:86)
+- Source: [src/recovery/external-resource-registry.ts:97](../../../packages/materials/src/recovery/external-resource-registry.ts:97)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource adapter context type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4772,7 +4772,7 @@
 ### ExternalResourceInspection
 - Kind: `interface`
 - Signature: `ExternalResourceInspection`
-- Source: [src/recovery/external-resource-registry.ts:69](../../../packages/materials/src/recovery/external-resource-registry.ts:69)
+- Source: [src/recovery/external-resource-registry.ts:80](../../../packages/materials/src/recovery/external-resource-registry.ts:80)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource inspection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4781,7 +4781,7 @@
 ### ExternalResourceReconcileOptions
 - Kind: `interface`
 - Signature: `ExternalResourceReconcileOptions`
-- Source: [src/recovery/external-resource-registry.ts:111](../../../packages/materials/src/recovery/external-resource-registry.ts:111)
+- Source: [src/recovery/external-resource-registry.ts:122](../../../packages/materials/src/recovery/external-resource-registry.ts:122)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource reconcile options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4789,7 +4789,7 @@
 ### ExternalResourceReconcileResult
 - Kind: `interface`
 - Signature: `ExternalResourceReconcileResult`
-- Source: [src/recovery/external-resource-registry.ts:103](../../../packages/materials/src/recovery/external-resource-registry.ts:103)
+- Source: [src/recovery/external-resource-registry.ts:114](../../../packages/materials/src/recovery/external-resource-registry.ts:114)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource reconcile result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4810,6 +4810,14 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource registration type contract used to provide a reusable operation.
 - Summary source: `inferred`
+
+### ExternalResourceTerminalGuard
+- Kind: `interface`
+- Signature: `ExternalResourceTerminalGuard`
+- Source: [src/recovery/external-resource-registry.ts:75](../../../packages/materials/src/recovery/external-resource-registry.ts:75)
+- Export: `@proofblade/materials`
+- Summary: Compare-and-set authority for a create attempt that may share a durable
+- Summary source: `tsdoc`
 
 ### PwnSessionSupervisor
 - Kind: `interface`
@@ -7298,7 +7306,7 @@
 ### DockerContainerRuntime.closeSession
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle): Promise<{ exitCode: number | null; }>`
-- Source: [src/container/docker.ts:458](../../../packages/materials/src/container/docker.ts:458)
+- Source: [src/container/docker.ts:463](../../../packages/materials/src/container/docker.ts:463)
 - Export: `@proofblade/materials`
 - Summary: Terminate the session process; idempotent.
 - Summary source: `tsdoc`
@@ -7316,7 +7324,7 @@
 ### DockerContainerRuntime.destroy
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<void>`
-- Source: [src/container/docker.ts:521](../../../packages/materials/src/container/docker.ts:521)
+- Source: [src/container/docker.ts:526](../../../packages/materials/src/container/docker.ts:526)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: destroy operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7334,7 +7342,7 @@
 ### DockerContainerRuntime.exec
 - Kind: `method`
 - Signature: `(ref: ContainerRef, command: string, options?: ContainerCommandOptions): Promise<ContainerCommandResult>`
-- Source: [src/container/docker.ts:356](../../../packages/materials/src/container/docker.ts:356)
+- Source: [src/container/docker.ts:361](../../../packages/materials/src/container/docker.ts:361)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: exec operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7343,7 +7351,7 @@
 ### DockerContainerRuntime.executionEnv
 - Kind: `method`
 - Signature: `(ref: ContainerRef): ContainerExecutionEnv`
-- Source: [src/container/docker.ts:352](../../../packages/materials/src/container/docker.ts:352)
+- Source: [src/container/docker.ts:357](../../../packages/materials/src/container/docker.ts:357)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: execution env operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7360,7 +7368,7 @@
 ### DockerContainerRuntime.health
 - Kind: `method`
 - Signature: `(ref: ContainerRef): Promise<boolean>`
-- Source: [src/container/docker.ts:516](../../../packages/materials/src/container/docker.ts:516)
+- Source: [src/container/docker.ts:521](../../../packages/materials/src/container/docker.ts:521)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: health operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7369,7 +7377,7 @@
 ### DockerContainerRuntime.openSession
 - Kind: `method`
 - Signature: `(ref: ContainerRef, options: ContainerSessionOpenOptions): Promise<ContainerSessionHandle>`
-- Source: [src/container/docker.ts:376](../../../packages/materials/src/container/docker.ts:376)
+- Source: [src/container/docker.ts:381](../../../packages/materials/src/container/docker.ts:381)
 - Export: `@proofblade/materials`
 - Summary: Start a long-lived process inside the container; the handle survives across tool calls.
 - Summary source: `tsdoc`
@@ -7387,7 +7395,7 @@
 ### DockerContainerRuntime.reapStale
 - Kind: `method`
 - Signature: `(options?: { olderThanMs?: number; runId?: string; protectedRunIds?: string[]; includeRunning?: boolean; }): Promise<number>`
-- Source: [src/container/docker.ts:548](../../../packages/materials/src/container/docker.ts:548)
+- Source: [src/container/docker.ts:553](../../../packages/materials/src/container/docker.ts:553)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reap stale operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7396,7 +7404,7 @@
 ### DockerContainerRuntime.sessionRead
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:436](../../../packages/materials/src/container/docker.ts:436)
+- Source: [src/container/docker.ts:441](../../../packages/materials/src/container/docker.ts:441)
 - Export: `@proofblade/materials`
 - Summary: Drain output without sending input.
 - Summary source: `tsdoc`
@@ -7405,7 +7413,7 @@
 ### DockerContainerRuntime.sessionSignal
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, signal: NodeJS.Signals): Promise<boolean>`
-- Source: [src/container/docker.ts:440](../../../packages/materials/src/container/docker.ts:440)
+- Source: [src/container/docker.ts:445](../../../packages/materials/src/container/docker.ts:445)
 - Export: `@proofblade/materials`
 - Summary: Signal the session's in-container foreground process group.
 - Summary source: `tsdoc`
@@ -7414,7 +7422,7 @@
 ### DockerContainerRuntime.sessionWrite
 - Kind: `method`
 - Signature: `(handle: ContainerSessionHandle, data: string | Uint8Array, options?: ContainerSessionReadOptions): Promise<ContainerSessionResult>`
-- Source: [src/container/docker.ts:430](../../../packages/materials/src/container/docker.ts:430)
+- Source: [src/container/docker.ts:435](../../../packages/materials/src/container/docker.ts:435)
 - Export: `@proofblade/materials`
 - Summary: Write to the session stdin, then wait for a readiness signal or timeout.
 - Summary source: `tsdoc`
@@ -8555,7 +8563,7 @@
 - Export: `@proofblade/materials`
 - Summary: Claim one durable executor WorkItem for a model turn.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/outcome-envelope.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/outcome-envelope.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RunCoordinator.domainPhaseForTurn
 - Kind: `method`
@@ -8650,7 +8658,7 @@
 - Export: `@proofblade/materials`
 - Summary: Selects or creates one executor item and acquires its durable lease.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/outcome-envelope.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/outcome-envelope.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RunWorkScheduler.complete
 - Kind: `method`
@@ -8659,7 +8667,7 @@
 - Export: `@proofblade/materials`
 - Summary: Marks a running item complete, attaching any accepted completion evidence.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`
 
 ### RunWorkScheduler.completeForSubmission
 - Kind: `method`
@@ -8890,7 +8898,7 @@
 - Export: `@proofblade/materials`
 - Summary: Finalize the registry marker after the Control Store owner is durable.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### BindingTransactionCoordinator.get
 - Kind: `method`
@@ -8926,7 +8934,7 @@
 - Export: `@proofblade/materials`
 - Summary: Mark a binding terminal after its exact external resource was released.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`
 
 ### BindingTransactionCoordinator.prepare
 - Kind: `method`
@@ -8949,7 +8957,7 @@
 ### ExternalResourceRegistry.get
 - Kind: `method`
 - Signature: `(id: string): Promise<ExternalResourceRecord | undefined>`
-- Source: [src/recovery/external-resource-registry.ts:156](../../../packages/materials/src/recovery/external-resource-registry.ts:156)
+- Source: [src/recovery/external-resource-registry.ts:167](../../../packages/materials/src/recovery/external-resource-registry.ts:167)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: get operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -8958,7 +8966,7 @@
 ### ExternalResourceRegistry.inspectAndAdopt
 - Kind: `method`
 - Signature: `(id: string, adapter: ExternalResourceAdapter, signal?: AbortSignal): Promise<ExternalResourceRecord | undefined>`
-- Source: [src/recovery/external-resource-registry.ts:385](../../../packages/materials/src/recovery/external-resource-registry.ts:385)
+- Source: [src/recovery/external-resource-registry.ts:416](../../../packages/materials/src/recovery/external-resource-registry.ts:416)
 - Export: `@proofblade/materials`
 - Summary: Inspect and adopt one resource without changing its immutable binding.
 - Summary source: `tsdoc`
@@ -8966,7 +8974,7 @@
 ### ExternalResourceRegistry.markConfirmed
 - Kind: `method`
 - Signature: `(id: string, summary?: string): Promise<ExternalResourceRecord>`
-- Source: [src/recovery/external-resource-registry.ts:291](../../../packages/materials/src/recovery/external-resource-registry.ts:291)
+- Source: [src/recovery/external-resource-registry.ts:304](../../../packages/materials/src/recovery/external-resource-registry.ts:304)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mark confirmed operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -8975,7 +8983,7 @@
 ### ExternalResourceRegistry.markControlBound
 - Kind: `method`
 - Signature: `(id: string, sessionId: string, bindingTxnId?: string): Promise<ExternalResourceRecord>`
-- Source: [src/recovery/external-resource-registry.ts:271](../../../packages/materials/src/recovery/external-resource-registry.ts:271)
+- Source: [src/recovery/external-resource-registry.ts:284](../../../packages/materials/src/recovery/external-resource-registry.ts:284)
 - Export: `@proofblade/materials`
 - Summary: Commit the second half of a cross-ledger session open. The Control Store
 - Summary source: `tsdoc`
@@ -8984,16 +8992,25 @@
 ### ExternalResourceRegistry.markReleased
 - Kind: `method`
 - Signature: `(id: string, reason?: string): Promise<ExternalResourceRecord | undefined>`
-- Source: [src/recovery/external-resource-registry.ts:310](../../../packages/materials/src/recovery/external-resource-registry.ts:310)
+- Source: [src/recovery/external-resource-registry.ts:332](../../../packages/materials/src/recovery/external-resource-registry.ts:332)
 - Export: `@proofblade/materials`
 - Summary: Mark a resource released when its owner has already closed it successfully.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`
+
+### ExternalResourceRegistry.markReleasedIfOwned
+- Kind: `method`
+- Signature: `(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>`
+- Source: [src/recovery/external-resource-registry.ts:348](../../../packages/materials/src/recovery/external-resource-registry.ts:348)
+- Export: `@proofblade/materials`
+- Summary: Conditionally mark a resource released. This is intended for rollback of
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/external-resource-registry.test.ts`
 
 ### ExternalResourceRegistry.markStarted
 - Kind: `method`
 - Signature: `(id: string, externalId?: string, externalRefs?: Record<string, string>): Promise<ExternalResourceRecord>`
-- Source: [src/recovery/external-resource-registry.ts:287](../../../packages/materials/src/recovery/external-resource-registry.ts:287)
+- Source: [src/recovery/external-resource-registry.ts:300](../../../packages/materials/src/recovery/external-resource-registry.ts:300)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mark started operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9002,16 +9019,25 @@
 ### ExternalResourceRegistry.markUnknown
 - Kind: `method`
 - Signature: `(id: string, reason: string): Promise<ExternalResourceRecord | undefined>`
-- Source: [src/recovery/external-resource-registry.ts:295](../../../packages/materials/src/recovery/external-resource-registry.ts:295)
+- Source: [src/recovery/external-resource-registry.ts:308](../../../packages/materials/src/recovery/external-resource-registry.ts:308)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mark unknown operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/web-session.test.ts`
+
+### ExternalResourceRegistry.markUnknownIfOwned
+- Kind: `method`
+- Signature: `(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>`
+- Source: [src/recovery/external-resource-registry.ts:327](../../../packages/materials/src/recovery/external-resource-registry.ts:327)
+- Export: `@proofblade/materials`
+- Summary: Conditionally mark an in-flight resource unknown. The check and state
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/external-resource-registry.test.ts`
 
 ### ExternalResourceRegistry.reconcileRun
 - Kind: `method`
 - Signature: `(runId: string, currentGeneration: number, adapters?: readonly ExternalResourceAdapter[], signal?: AbortSignal, options?: ExternalResourceReconcileOptions): Promise<ExternalResourceReconcileResult>`
-- Source: [src/recovery/external-resource-registry.ts:327](../../../packages/materials/src/recovery/external-resource-registry.ts:327)
+- Source: [src/recovery/external-resource-registry.ts:358](../../../packages/materials/src/recovery/external-resource-registry.ts:358)
 - Export: `@proofblade/materials`
 - Summary: Inspect every non-terminal resource for one Run. A stale generation is
 - Summary source: `tsdoc`
@@ -9020,7 +9046,7 @@
 ### ExternalResourceRegistry.records
 - Kind: `method`
 - Signature: `(runId?: string): Promise<ExternalResourceRecord[]>`
-- Source: [src/recovery/external-resource-registry.ts:162](../../../packages/materials/src/recovery/external-resource-registry.ts:162)
+- Source: [src/recovery/external-resource-registry.ts:173](../../../packages/materials/src/recovery/external-resource-registry.ts:173)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: records operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9029,7 +9055,7 @@
 ### ExternalResourceRegistry.register
 - Kind: `method`
 - Signature: `(input: ExternalResourceRegistration): Promise<ExternalResourceRecord>`
-- Source: [src/recovery/external-resource-registry.ts:172](../../../packages/materials/src/recovery/external-resource-registry.ts:172)
+- Source: [src/recovery/external-resource-registry.ts:183](../../../packages/materials/src/recovery/external-resource-registry.ts:183)
 - Export: `@proofblade/materials`
 - Summary: Register a resource before an external action starts. Repeating the exact binding is idempotent.
 - Summary source: `tsdoc`
@@ -9038,7 +9064,7 @@
 ### ExternalResourceRegistry.registerStarted
 - Kind: `method`
 - Signature: `(input: ExternalResourceRegistration & { readonly externalId: string; }): Promise<ExternalResourceRecord>`
-- Source: [src/recovery/external-resource-registry.ts:211](../../../packages/materials/src/recovery/external-resource-registry.ts:211)
+- Source: [src/recovery/external-resource-registry.ts:224](../../../packages/materials/src/recovery/external-resource-registry.ts:224)
 - Export: `@proofblade/materials`
 - Summary: Register a resource and record that its external action has started in
 - Summary source: `tsdoc`
@@ -9047,7 +9073,7 @@
 ### ExternalResourceRegistry.release
 - Kind: `method`
 - Signature: `(id: string, adapter: ExternalResourceAdapter, reason?: string, signal?: AbortSignal): Promise<boolean>`
-- Source: [src/recovery/external-resource-registry.ts:396](../../../packages/materials/src/recovery/external-resource-registry.ts:396)
+- Source: [src/recovery/external-resource-registry.ts:427](../../../packages/materials/src/recovery/external-resource-registry.ts:427)
 - Export: `@proofblade/materials`
 - Summary: Release one resource through its backend; failures remain retryable UNKNOWN.
 - Summary source: `tsdoc`
@@ -10099,7 +10125,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: finalize operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### BuiltinOutputRewriteAdapter.prepare
 - Kind: `method`
@@ -10117,7 +10143,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: finalize operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RtkOutputRewriteAdapter.prepare
 - Kind: `method`
@@ -11711,7 +11737,7 @@
 ### ExternalResourceAdapterSource
 - Kind: `type`
 - Signature: `ExternalResourceAdapterSource`
-- Source: [src/recovery/external-resource-registry.ts:91](../../../packages/materials/src/recovery/external-resource-registry.ts:91)
+- Source: [src/recovery/external-resource-registry.ts:102](../../../packages/materials/src/recovery/external-resource-registry.ts:102)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: external resource adapter source type contract used to provide a reusable operation.
 - Summary source: `inferred`

@@ -207,6 +207,31 @@ test("duplicate resource ids cannot change immutable bindings", async () => {
   }
 });
 
+test("conditional terminal transitions cannot finalize a resource claimed by another attempt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-resource-cas-"));
+  try {
+    const registry = new ExternalResourceRegistry(join(root, "external-resources.json"));
+    const id = "session:CAS";
+    await registry.register({ ...registration(id), externalRefs: { attempt: "attempt-a" } });
+    await registry.markUnknownIfOwned(id, "attempt-a cleanup was incomplete", { attemptToken: "attempt-a" });
+
+    await registry.registerStarted({
+      ...registration(id),
+      externalId: "winner-handle",
+      externalRefs: { attempt: "attempt-b" },
+    });
+    const stale = await registry.markReleasedIfOwned(id, "stale attempt rollback", { attemptToken: "attempt-a" });
+    assert.equal(stale?.state, "STARTED");
+    assert.equal(stale?.externalId, "winner-handle");
+
+    await registry.register({ ...registration(id), externalRefs: { attempt: "attempt-a" } });
+    assert.equal((await registry.get(id))?.externalRefs?.attempt, "attempt-b");
+    assert.equal((await registry.markReleasedIfOwned(id, "winner rollback", { attemptToken: "attempt-b", externalId: "winner-handle" }))?.state, "RELEASED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("control-session binding is durable and immutable", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-resource-control-binding-"));
   try {

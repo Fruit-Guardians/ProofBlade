@@ -26,7 +26,7 @@
     "src/config.ts": "54f88ffdcc5b10390e1026a09ad32f65aa8321af5f92ea94dcc12410eecabc2f",
     "src/container/contracts.ts": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
     "src/container/docker-resource-adapter.ts": "c81ef7be99cae48d9e98393e10a600b3d882279c931d0c9a6e269a10945fc5e8",
-    "src/container/docker.ts": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+    "src/container/docker.ts": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
     "src/container/execution-env.ts": "578182c5ae5f0b4f6db939b91b582f90dfefe59534d37a2e133b2b5fbf4fb07a",
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
@@ -84,7 +84,7 @@
     "src/pwn/pwn-tools.ts": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
     "src/recovery/binding-transaction-coordinator.ts": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
     "src/recovery/binding-transaction.ts": "95a0a2e4cdc5a5cd71ab265ef482f79ded99378a800f7b3f735396e3f481d4fd",
-    "src/recovery/external-resource-registry.ts": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+    "src/recovery/external-resource-registry.ts": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
     "src/recovery/pwn-session-runtime-host.ts": "44a4c3a7db82806c2ba9c9b33c43739ce44810eeee0e0768d6a64b08ce9e1b76",
     "src/recovery/pwn-session-supervisor.ts": "1b1970c2da493e3417c39b948c0de27dc385d9159d91a390a0ec071b647c1429",
     "src/recovery/run-recovery.ts": "c7500912ed8b226d0b4022924ba25a8157c5dddb4f29d334ede5acab81f86102",
@@ -534,7 +534,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 144,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -550,7 +550,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 89,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -1135,8 +1135,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 133,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 144,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -1925,8 +1925,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 761,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 766,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": []
     },
     {
@@ -2825,8 +2825,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 740,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 745,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": []
     },
     {
@@ -3713,8 +3713,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 642,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 729,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -3727,8 +3727,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 652,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 739,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -3746,8 +3746,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 95,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 106,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/session-resource-adapter.test.ts"
       ]
@@ -6488,7 +6488,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 75,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts"
@@ -6505,7 +6505,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 66,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts"
@@ -8974,8 +8974,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 77,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 88,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/session-resource-adapter.test.ts"
@@ -8991,8 +8991,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 86,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 97,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -9005,8 +9005,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 69,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 80,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
@@ -9024,8 +9024,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 111,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 122,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -9038,8 +9038,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 103,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 114,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -9053,7 +9053,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 18,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -9081,7 +9081,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 51,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ExternalResourceTerminalGuard",
+      "name": "ExternalResourceTerminalGuard",
+      "kind": "interface",
+      "signature": "ExternalResourceTerminalGuard",
+      "summary": "Compare-and-set authority for a create attempt that may share a durable",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/recovery/external-resource-registry.ts",
+      "line": 75,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -15089,7 +15103,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 157,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": []
     },
     {
@@ -15102,8 +15116,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 458,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 463,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15127,7 +15141,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 182,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15210,8 +15224,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 521,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 526,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15232,7 +15246,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 166,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -15248,8 +15262,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 356,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 361,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -15332,8 +15346,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 352,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 357,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -15351,7 +15365,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 162,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": []
     },
     {
@@ -15364,8 +15378,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 516,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 521,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -15397,8 +15411,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 376,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 381,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15420,7 +15434,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 176,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -15436,8 +15450,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 548,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 553,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -15452,8 +15466,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 436,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 441,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15476,8 +15490,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 440,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 445,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15500,8 +15514,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
-      "line": 430,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "line": 435,
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -15525,7 +15539,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 92,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -19557,6 +19571,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -19813,6 +19828,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -19849,6 +19865,7 @@
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/mcp.test.ts",
@@ -20714,6 +20731,7 @@
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -20854,7 +20872,8 @@
       "line": 226,
       "moduleHash": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
       "testRefs": [
-        "packages/materials/tests/binding-transaction.test.ts"
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts"
       ]
     },
     {
@@ -20959,8 +20978,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 156,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 167,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -21042,8 +21061,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 385,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 416,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -21056,8 +21075,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 291,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 304,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
@@ -21074,8 +21093,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 271,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 284,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21093,10 +21112,27 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 310,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 332,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
-        "packages/materials/tests/binding-transaction.test.ts"
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::ExternalResourceRegistry.markReleasedIfOwned",
+      "name": "ExternalResourceRegistry.markReleasedIfOwned",
+      "kind": "method",
+      "signature": "(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>",
+      "summary": "Conditionally mark a resource released. This is intended for rollback of",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/recovery/external-resource-registry.ts",
+      "line": 348,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
+      "testRefs": [
+        "packages/materials/tests/external-resource-registry.test.ts"
       ]
     },
     {
@@ -21109,8 +21145,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 287,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 300,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
@@ -21129,11 +21165,28 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 295,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 308,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/web-session.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::ExternalResourceRegistry.markUnknownIfOwned",
+      "name": "ExternalResourceRegistry.markUnknownIfOwned",
+      "kind": "method",
+      "signature": "(id: string, reason: string, guard: ExternalResourceTerminalGuard): Promise<ExternalResourceRecord | undefined>",
+      "summary": "Conditionally mark an in-flight resource unknown. The check and state",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/recovery/external-resource-registry.ts",
+      "line": 327,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
+      "testRefs": [
+        "packages/materials/tests/external-resource-registry.test.ts"
       ]
     },
     {
@@ -21146,8 +21199,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 327,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 358,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/docker-resource-adapter.test.ts",
@@ -21166,8 +21219,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 162,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 173,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21201,8 +21254,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 172,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 183,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21232,8 +21285,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 211,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 224,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
@@ -21250,8 +21303,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 396,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 427,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25537,6 +25590,7 @@
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -25592,6 +25646,7 @@
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
@@ -29249,7 +29304,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/container/docker.ts",
       "line": 84,
-      "moduleHash": "dd3ae7f154af94922fb7c87735d2aa6d4c74996c0ec598968bbd1f09396fa3a4",
+      "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
         "packages/materials/tests/container-runtime.test.ts"
       ]
@@ -30224,8 +30279,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
-      "line": 91,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "line": 102,
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -30239,7 +30294,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 15,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -30253,7 +30308,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 14,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -30267,7 +30322,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 12,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
@@ -30281,7 +30336,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/recovery/external-resource-registry.ts",
       "line": 13,
-      "moduleHash": "7eb5bb9689aeb1d53eaabab4987d74708afd21141a58cde16949bd1473ba4c95",
+      "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": []
     },
     {
