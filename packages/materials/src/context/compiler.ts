@@ -117,8 +117,10 @@ export class ContextCompiler {
     const activeLeases = Object.values(snapshot.leases).filter((lease) => lease.generation === snapshot.generation);
     const observationQueue = [...(input.observationQueue ?? [])];
     const ledgerBudget = Math.max(512, Math.floor(availableInput * 0.4));
-    const l3a = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, domainRecords, reasoningTrees, completions, jobs: [], handoffs, inFlightEffects: [], leases: [], tokenBudget: ledgerBudget });
-    const l3b = buildActiveControls({ jobs, handoffs, inFlightEffects, leases: activeLeases, observationQueue });
+    const l3aBudget = Math.max(128, Math.floor(ledgerBudget * 0.6));
+    const l3bBudget = Math.max(128, ledgerBudget - l3aBudget);
+    const l3a = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, domainRecords, reasoningTrees, completions, jobs: [], inFlightEffects: [], leases: [], tokenBudget: l3aBudget });
+    const l3b = buildActiveControls({ jobs, handoffs, inFlightEffects, leases: activeLeases, observationQueue, tokenBudget: l3bBudget });
     const l3 = `<durable-ledger>\n${l3a}\n</durable-ledger>\n<active-controls>\n${l3b}\n</active-controls>`;
     const requiredTokens = estimateTokens(`${l0}\n${l1}\n${l2}\n${l3}`);
     let remaining = Math.max(0, availableInput - requiredTokens);
@@ -310,7 +312,6 @@ interface LedgerBuildInput {
   reasoningTrees: RunSnapshot["reasoningTrees"][string][];
   completions: RunSnapshot["completions"][string][];
   jobs: RunSnapshot["jobs"][string][];
-  handoffs: RunSnapshot["handoffs"][string][];
   inFlightEffects: RunSnapshot["effects"][string][];
   leases: RunSnapshot["leases"][string][];
   tokenBudget: number;
@@ -351,14 +352,6 @@ function buildLedger(input: LedgerBuildInput): string {
     "</untrusted-observation-index>",
     "Completion proposals:",
     ...input.completions.map((item) => `- ${item.id}: sha256=${item.candidateHash} status=${item.status}`),
-    "Planner handoffs:",
-    ...input.handoffs.map((item) => [
-      `<planner-handoff id="${safeAttribute(item.id)}" status="${item.status}" hash="${safeAttribute(item.hash)}">`,
-      `- phase=${item.phase} domainPhase=${item.domainPhase} knowledge=${item.knowledgeVersion}`,
-      ...item.nextActions.map((action) => `- action ${action.id}: ${safeLedgerText(action.title)}; expected=${action.expectedEvidence.join(",")}`),
-      ...item.prohibitedRepeats.map((repeat) => `- prohibited_repeat: ${safeLedgerText(repeat)}`),
-      "</planner-handoff>",
-    ].join("\n")),
     "In-flight jobs:",
     ...input.jobs.map((item) => `- ${item.id}: ${item.capabilityId}.${item.operation} status=${item.status} replay=${item.replayPolicy} artifact=${item.artifactId ?? "none"}`),
     "In-flight effects:",
@@ -366,7 +359,7 @@ function buildLedger(input: LedgerBuildInput): string {
     "Leases:",
     ...input.leases.map((item) => `- ${item.resourceKey}: owner=${item.ownerLane} generation=${item.generation} expires=${item.expiresAt}`),
   ];
-  return lines.join("\n");
+  return boundLedger(lines.join("\n"), input.tokenBudget);
 }
 
 function ledgerDetails(items: Array<{ id: string; statement: string; evidenceIds: string[] }>, tokenBudget: number): string[] {
@@ -421,8 +414,15 @@ function selectRecentMessages(messages: ContextMessage[], tokenBudget: number, d
   return selected;
 }
 
-function buildActiveControls(input: Pick<LedgerBuildInput, "jobs" | "handoffs" | "inFlightEffects" | "leases"> & { observationQueue: ObservationQueueItem[] }): string {
-  return [
+function buildActiveControls(input: {
+  jobs: RunSnapshot["jobs"][string][];
+  handoffs: RunSnapshot["handoffs"][string][];
+  inFlightEffects: RunSnapshot["effects"][string][];
+  leases: RunSnapshot["leases"][string][];
+  observationQueue: ObservationQueueItem[];
+  tokenBudget: number;
+}): string {
+  return boundLedger([
     "Active controls change frequently and must not rewrite the durable ledger.",
     "Pending observations (read the corresponding Job, Artifact, or verifier state to acknowledge):",
     ...input.observationQueue.map((item) => `- ${item.id}: ${item.kind} priority=${item.priority} summary=${safeLedgerText(item.summary)} refs=${item.relatedIds.join(",") || "none"} artifacts=${item.artifactIds.join(",") || "none"}`),
@@ -439,7 +439,18 @@ function buildActiveControls(input: Pick<LedgerBuildInput, "jobs" | "handoffs" |
     "Leases:",
     ...input.leases.map((item) => `- ${item.resourceKey}: owner=${item.ownerLane} generation=${item.generation} expires=${item.expiresAt}`),
     ...(input.leases.length === 0 ? ["- none"] : []),
-  ].join("\n");
+  ].join("\n"), input.tokenBudget);
+}
+
+function boundLedger(value: string, tokenBudget: number): string {
+  if (estimateTokens(value) <= tokenBudget) return value;
+  let maxChars = Math.max(64, Math.floor(value.length * tokenBudget / Math.max(estimateTokens(value), 1) * 3));
+  let bounded = snipText(value, Math.max(64, Math.min(value.length, maxChars))).text;
+  while (estimateTokens(bounded) > tokenBudget && maxChars > 64) {
+    maxChars = Math.max(64, Math.floor(maxChars * 0.8));
+    bounded = snipText(value, Math.min(value.length, maxChars)).text;
+  }
+  return bounded;
 }
 
 function observationQueueSummary(items: ObservationQueueItem[]): NonNullable<ContextManifest["observationQueue"]> {
@@ -459,7 +470,7 @@ function observationQueueSummary(items: ObservationQueueItem[]): NonNullable<Con
 function normalizeMaintenancePolicy(input: ContextMaintenancePolicy | undefined): MoleculeContextMaintenancePolicy & ContextMaintenancePolicy {
   const targetRatio = input?.targetRatio ?? DEFAULT_CONTEXT_MAINTENANCE_POLICY.targetRatio;
   const hardRatio = input?.hardRatio ?? DEFAULT_CONTEXT_MAINTENANCE_POLICY.compactRatio;
-  if (!Number.isFinite(targetRatio) || !Number.isFinite(hardRatio) || targetRatio < 0 || hardRatio > 1 || targetRatio >= hardRatio) throw new Error("Context maintenance targetRatio must be below hardRatio between 0 and 1");
+  if (!Number.isFinite(targetRatio) || !Number.isFinite(hardRatio) || targetRatio < 0 || hardRatio <= 0 || hardRatio >= 1 || targetRatio >= hardRatio) throw new Error("Context maintenance targetRatio must be below hardRatio between 0 and 1");
   const span = hardRatio - targetRatio;
   const policy: MoleculeContextMaintenancePolicy & ContextMaintenancePolicy = {
     targetRatio,
@@ -471,7 +482,7 @@ function normalizeMaintenancePolicy(input: ContextMaintenancePolicy | undefined)
     snipRatio: targetRatio + span * 0.5,
     pruneRatio: targetRatio + span * 0.75,
     compactRatio: hardRatio,
-    forceRatio: Math.min(0.99, hardRatio + Math.max(0.01, (1 - hardRatio) * 0.5)),
+    forceRatio: Math.min(1, hardRatio + Math.max(0.001, (1 - hardRatio) * 0.5)),
   };
   if (!Number.isInteger(policy.keepRecentTurns) || policy.keepRecentTurns < 1 || policy.keepRecentTurns > 1_000) throw new Error("Context maintenance keepRecentTurns is invalid");
   return policy;

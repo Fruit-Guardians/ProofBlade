@@ -25,7 +25,7 @@ import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
-import { globWorkspace, grepWorkspace, workspaceSearchHash, workspaceSearchText } from "./workspace-search.js";
+import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSearchHash, workspaceSearchText, WORKSPACE_SEARCH_MODEL_MAX_CHARS } from "./workspace-search.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
@@ -359,7 +359,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   parameters: Type.Object({
     operation: Type.String({
       enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"],
-      description: "Evidence operation. curation_status takes no other arguments; inspect_uri reads a pb:// URI at L0/L1/L2; search_uri searches the current run projection; consolidate creates a resumable source-linked L0/L1 index without deleting raw Artifacts; inspect_tree requires treeId; read requires artifactId; annotate accepts artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
+      description: "Evidence operation. curation_status takes no other arguments; inspect_uri reads a pb:// URI at L0/L1/L2; search_uri searches current Run knowledge plus the read-only project Skill/Tool/MCP directory; consolidate creates a resumable source-linked L0/L1 index without deleting raw Artifacts; inspect_tree requires treeId; read requires artifactId; annotate accepts artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
     }),
     treeId: Type.Optional(Type.String({ minLength: 1 })),
     query: Type.Optional(Type.String({ maxLength: 200 })),
@@ -376,6 +376,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     uri: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
     level: Type.Optional(Type.String({ enum: ["L0", "L1", "L2"] })),
     maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 200 })),
+    includeStale: Type.Optional(Type.Boolean()),
     policy: Type.Optional(Type.String({ enum: ["deduplicate", "summarize", "all"] })),
     maxArtifacts: Type.Optional(Type.Number({ minimum: 1, maximum: 128 })),
     from: Type.Optional(Type.String({ minLength: 1, description: "Upstream premise/source node id; information flows from this node." })),
@@ -410,6 +411,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       uri?: string;
       level?: "L0" | "L1" | "L2";
       maxResults?: number;
+      includeStale?: boolean;
       policy?: "deduplicate" | "summarize" | "all";
       maxArtifacts?: number;
       treeId?: string;
@@ -453,8 +455,8 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", input.maxChars));
     }
     if (input.operation === "search_uri") {
-      assertOnly(input, ["operation", "query", "maxResults"], "evidence search_uri");
-      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50) });
+      assertOnly(input, ["operation", "query", "maxResults", "maxChars", "includeStale"], "evidence search_uri");
+      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50, input.maxChars ?? 12_000, input.includeStale ?? false) }, false, input.maxChars ?? 12_000);
     }
     if (input.operation === "consolidate") {
       assertOnly(input, ["operation", "artifactIds", "policy", "maxArtifacts"], "evidence consolidate");
@@ -935,10 +937,12 @@ function createGrepTool(): AgentHarnessTool<CodingResourceContext> {
 }
 
 async function searchToolResult(context: CodingResourceContext, result: Awaited<ReturnType<typeof globWorkspace>> | Awaited<ReturnType<typeof grepWorkspace>>): Promise<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never> {
-  const text = workspaceSearchText(result);
+  const modelResult = limitWorkspaceSearchResult(result);
   const hash = workspaceSearchHash(result);
   const artifact = await context.artifactStore.putText(context.runtime.runId, JSON.stringify(result), { filename: `${result.kind}-${hash.slice(0, 12)}.json`, mime: "application/json", sensitivity: "public" });
-  return toolResult({ ...result, artifactId: artifact.id, artifactHash: artifact.sha256, resultHash: hash, presentation: text });
+  const presentation = workspaceSearchText(result);
+  const details = { ...modelResult, artifactId: artifact.id, artifactHash: artifact.sha256, resultHash: hash, presentation };
+  return toolResult(details, false, WORKSPACE_SEARCH_MODEL_MAX_CHARS);
 }
 
 /**

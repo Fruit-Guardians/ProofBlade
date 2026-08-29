@@ -50,6 +50,51 @@ export interface ReplanRecord {
 export type UpdateProposalKind = "prompt" | "tool" | "skill" | "knowledge" | "program" | "model";
 export type UpdateProposalStatus = "PROPOSED" | "EVALUATED" | "APPROVED" | "ACTIVE" | "REJECTED" | "ROLLED_BACK";
 
+export interface UpdateEvaluationMeasurementSample {
+  datasetId: string;
+  total: number;
+  passed: number;
+  regressions: number;
+}
+
+export interface UpdateEvaluationGate {
+  schemaVersion: 1;
+  candidateHash: string;
+  evaluationSets: {
+    trigger: string[];
+    retention: string[];
+    migration: string[];
+    safety: string[];
+  };
+  canonical: {
+    protocolHash: string;
+    environmentHash: string;
+    toolCatalogHash: string;
+    corpusHash: string;
+    configHash: string;
+  };
+  measurement: {
+    trigger: { baseline: UpdateEvaluationMeasurementSample; candidate: UpdateEvaluationMeasurementSample };
+    retention: { baseline: UpdateEvaluationMeasurementSample; candidate: UpdateEvaluationMeasurementSample };
+    migration: UpdateEvaluationMeasurementSample;
+    safety: UpdateEvaluationMeasurementSample;
+    activation: { eligible: number; activated: number; followed: number };
+  };
+  passed: boolean;
+  checks: { trigger: boolean; retention: boolean; migration: boolean; safety: boolean };
+  reasons: string[];
+  scores: {
+    triggerPassRate: number;
+    retentionPassRate: number;
+    migrationPassRate: number;
+    safetyPassRate: number;
+    retentionRegressionRate: number;
+  };
+  activationRate: number;
+  followingRate: number;
+  hash: string;
+}
+
 /** Evaluation-backed change candidate. A proposal never becomes active by implication. */
 export interface UpdateProposal {
   id: string;
@@ -90,6 +135,7 @@ export interface UpdateProposal {
     followingRate?: number;
   };
   evaluationHash?: string;
+  evaluationGate?: UpdateEvaluationGate;
   activeVersion?: string;
   rollbackVersion?: string;
   reason?: string;
@@ -812,7 +858,7 @@ export interface HandoffRecord {
 
 export type ReplayPolicy = ReplayPolicyAtom;
 
-export type RunEventSource = "user" | "provider" | "tool" | "job" | "external" | "timer" | "maintenance" | "verifier";
+export type RunEventSource = "user" | "provider" | "tool" | "job" | "external" | "timer" | "maintenance" | "verifier" | "agent";
 export type RunEventPriority = "urgent" | "normal" | "background";
 export type RunEventStatus = "queued" | "admitted" | "deferred" | "applied" | "coalesced" | "failed";
 export type RunEventReplayPolicy = "pure" | "idempotent" | "unknown" | "never";
@@ -1121,7 +1167,7 @@ export interface ContextBlock {
 }
 
 export type KnowledgeLevel = "L0" | "L1" | "L2";
-export type KnowledgeKind = "task" | "forest" | "tree" | "evidence" | "fact" | "hypothesis" | "artifact" | "session" | "skill";
+export type KnowledgeKind = "task" | "forest" | "tree" | "evidence" | "fact" | "hypothesis" | "artifact" | "session" | "project" | "skill";
 
 export interface KnowledgeProjection {
   uri: string;
@@ -1135,6 +1181,8 @@ export interface KnowledgeProjection {
   links: { forward: string[]; backlinks: string[] };
   trust: "untrusted" | "observed" | "proposed" | "verified";
   stale: boolean;
+  /** Set only when a search response bounds the otherwise complete projection. */
+  truncated?: boolean;
 }
 
 export interface ContextManifest {

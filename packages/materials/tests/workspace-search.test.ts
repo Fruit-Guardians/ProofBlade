@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { globWorkspace, grepWorkspace } from "../src/runtime/workspace-search.js";
+import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSearchText } from "../src/runtime/workspace-search.js";
 
 test("workspace glob is deterministic, recursive, bounded, and scoped", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-search-"));
@@ -52,4 +52,23 @@ test("workspace grep returns line indexes and skips binary or oversized files", 
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("workspace search keeps complete artifacts separate from bounded model output", () => {
+  const result = {
+    kind: "grep" as const,
+    query: "needle",
+    matches: Array.from({ length: 200 }, (_, index) => ({ path: `file-${index}.txt`, line: index + 1, text: "needle " + "x".repeat(1_000) })),
+    filesScanned: 200,
+    filesSkipped: 0,
+    totalMatches: 200,
+    truncated: false,
+  };
+  const structured = limitWorkspaceSearchResult(result);
+  assert.ok(JSON.stringify(structured).length <= 12_000);
+  assert.equal(structured.matches.length < result.matches.length, true);
+  assert.equal(structured.totalMatches, result.totalMatches);
+  assert.equal(structured.truncated, true);
+  assert.ok(workspaceSearchText(result).length <= 12_000);
+  assert.match(workspaceSearchText(result), /archived in the result Artifact/);
 });

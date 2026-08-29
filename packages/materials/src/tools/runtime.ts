@@ -14,8 +14,9 @@ import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendRes
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobMonitorInput, type JobMonitorResult, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
-import { projectKnowledge, readKnowledge, searchKnowledge, type KnowledgeReadResult } from "../knowledge/projection.js";
+import { boundProjectionList, projectKnowledge, readKnowledge, readProjectKnowledge, searchKnowledge, searchProjectKnowledge, type KnowledgeReadResult, type ProjectKnowledgeSource } from "../knowledge/projection.js";
 import { EvidenceConsolidator, type ConsolidateInput, type ConsolidateResult } from "../knowledge/consolidation.js";
+import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 
 export interface InspectTargetResult {
   output: string;
@@ -30,6 +31,7 @@ export class ProofBladeToolRuntime {
   private readonly capabilityRouter: ProofBladeCapabilityRouter;
   private readonly jobs: BackgroundJobRunner;
   private readonly mcp: McpProjectRegistry;
+  private readonly skills?: ProofBladeSkillRegistry;
 
   public constructor(
     public readonly runId: string,
@@ -39,10 +41,11 @@ export class ProofBladeToolRuntime {
     private readonly artifactStore: ArtifactStore,
     private readonly journal: EffectJournal,
     projectRoot = dirname(runsRoot),
-    options: { includeMcp?: boolean } = {},
+    options: { includeMcp?: boolean; skills?: ProofBladeSkillRegistry } = {},
   ) {
     this.observer = new DeterministicObserver(controlStore);
     this.mcp = McpProjectRegistry.load(projectRoot);
+    this.skills = options.skills;
     const includeMcp = options.includeMcp !== false;
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...(includeMcp ? this.mcp.capabilityManifests() : [])]);
     const backends = new CapabilityBackendResolver([
@@ -392,13 +395,29 @@ export class ProofBladeToolRuntime {
   }
 
   public async inspectKnowledge(uri: string, level: KnowledgeLevel = "L0", maxChars = 6_000): Promise<KnowledgeReadResult> {
+    if (uri.trim().toLocaleLowerCase().startsWith("pb://project/")) return readProjectKnowledge(this.projectKnowledgeSource(), uri, level, maxChars);
     const snapshot = await this.controlStore.snapshot(this.runId);
     return await readKnowledge(snapshot, this.artifactStore, uri, level, maxChars);
   }
 
-  public async searchKnowledge(query = "", maxResults = 50): Promise<KnowledgeProjection[]> {
+  public async searchKnowledge(query = "", maxResults = 50, maxChars = 12_000, includeStale = false): Promise<KnowledgeProjection[]> {
     const snapshot = await this.controlStore.snapshot(this.runId);
-    return searchKnowledge(snapshot, query, maxResults);
+    const run = searchKnowledge(snapshot, query, 200, 64_000, includeStale);
+    const project = searchProjectKnowledge(this.projectKnowledgeSource(), query, 200, 64_000);
+    return boundProjectionList([...project, ...run].sort((left, right) => left.uri.localeCompare(right.uri)), maxResults, maxChars);
+  }
+
+  private projectKnowledgeSource(): ProjectKnowledgeSource {
+    const capabilities = this.capabilityRouter.listCapabilities();
+    const skillCatalogHash = this.skills?.catalogHash() ?? sha256(canonicalJson([]));
+    return {
+      skills: this.skills,
+      skillCatalogHash,
+      tools: capabilities.capabilities.map((capability) => ({ id: capability.id, description: capability.description, version: capability.version })),
+      toolCatalogHash: capabilities.catalogHash,
+      mcpServers: this.mcp.summaries().map(({ name, description, configHash, status }) => ({ name, description, configHash, status })),
+      mcpCatalogHash: this.mcp.catalogHash(),
+    };
   }
 
   public async consolidateKnowledge(input: ConsolidateInput = {}): Promise<ConsolidateResult> {

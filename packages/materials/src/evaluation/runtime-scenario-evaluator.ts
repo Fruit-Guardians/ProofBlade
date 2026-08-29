@@ -506,9 +506,9 @@ async function evaluateEventIngress(context: RuntimeScenarioContext): Promise<Re
   const replayed = await ingress.drain(runId, "job_safe_point", 8);
   requireCondition(duplicate.id === first.id, "duplicate ingress event was not idempotent");
   requireCondition(drained.admitted.map((item) => item.kind).join(",") === "user.cancel,job.output", "ingress priority or coalescing order changed");
-  requireCondition(drained.coalesced.length === 1 && drained.deferred.length === 1, "ingress did not record coalesced and stale events");
+  requireCondition(drained.coalesced.length === 1 && drained.failed.length === 1 && drained.deferred.length === 0, "ingress did not fence stale events and coalesce current events");
   requireCondition(replayed.admitted.length === 0, "processed ingress event was replayed twice");
-  return { admitted: drained.admitted.length, duplicateStable: true, coalesced: drained.coalesced.length, staleDeferred: drained.deferred.length };
+  return { admitted: drained.admitted.length, duplicateStable: true, coalesced: drained.coalesced.length, staleFailed: drained.failed.length, deferred: drained.deferred.length };
 }
 
 async function evaluateJobMonitorObservationQueue(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {

@@ -15,7 +15,7 @@ import { attributeFailure, createTrajectoryPrefix } from "../src/evaluation/fail
 import { CapabilityLifecycleRegistry, registrationIdentity } from "../src/capabilities/lifecycle.js";
 import { reconcileRuntimeConfig } from "../src/runtime/config-reconciliation.js";
 import { Scope } from "../src/runtime/scope.js";
-import { DEFAULT_AGENT_STRATEGY, selectAgentStrategy, validateAgentHandoff, winnerSettlementKey } from "../src/orchestration/multi-agent-contract.js";
+import { DEFAULT_AGENT_STRATEGY, DisabledMultiAgentControlPort, projectAgentControlOperation, selectAgentStrategy, validateAgentHandoff, winnerSettlementKey } from "../src/orchestration/multi-agent-contract.js";
 import { auditRunLifecycles, scanOrphanLifecycles, scanRecoveryRequiredLifecycles } from "../src/observability/lifecycle-audit.js";
 import type { HarnessEvent } from "../src/domain/types.js";
 
@@ -206,6 +206,66 @@ test("capability lifecycle fences new bindings during quiescing and releases chi
   assert.deepEqual(events.slice(0, 4), ["registered", "available", "bound", "quiescing"]);
 });
 
+test("capability teardown failure is observable, retryable, and does not block provider cleanup", async () => {
+  const registry = new CapabilityLifecycleRegistry();
+  const root = new Scope("run");
+  const providerScope = root.child("provider");
+  const consumerScope = root.child("consumer");
+  const events: string[] = [];
+  let attempts = 0;
+  registry.subscribe((event) => events.push(event.type));
+  const definition = { capabilityId: "proofblade.teardown", version: "1.0.0", description: "teardown test", contractHash: "f".repeat(64), capabilities: ["read"] };
+  registry.define(definition);
+  const registration = registry.register({ definition, providerId: "provider", providerVersion: "1.0.0", registrationId: "registration", scopeId: providerScope.id, priority: 1, capabilities: ["read"] }, { value: true }, providerScope);
+  const identity = registrationIdentity(registration);
+  registry.markAvailable(identity);
+  registry.registerConsumer({
+    consumerId: "consumer",
+    capabilityId: definition.capabilityId,
+    scopeId: consumerScope.id,
+    teardown: () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("teardown failed");
+    },
+  }, consumerScope);
+  const binding = registry.bind("consumer");
+
+  await assert.rejects(registry.releaseConsumer("consumer"), /teardown failed/);
+  assert.equal(registry.consumersSnapshot()[0]?.status, "ACTIVE");
+  assert.ok(events.includes("consumer_teardown_failed"));
+  assert.equal(registry.resolve<{ value: boolean }>(binding).value, true);
+  assert.equal(registry.bindingsSnapshot().length, 1);
+  assert.throws(() => registry.unregister(identity), /active consumers/);
+  await registry.releaseConsumer("consumer");
+  await registry.releaseConsumer("consumer");
+  assert.equal(registry.consumersSnapshot()[0]?.status, "RELEASED");
+  assert.equal(attempts, 2);
+
+  let stagedAttempts = 0;
+  registry.registerConsumer({
+    consumerId: "staged-consumer",
+    capabilityId: definition.capabilityId,
+    scopeId: consumerScope.id,
+    teardown: () => { stagedAttempts += 1; },
+  }, consumerScope);
+  registry.bind("staged-consumer");
+  assert.equal((await registry.beginConsumerTeardown("staged-consumer")).status, "TEARING_DOWN");
+  await registry.releaseConsumer("staged-consumer");
+  assert.equal(stagedAttempts, 1);
+  assert.equal(registry.consumersSnapshot().find((item) => item.consumerId === "staged-consumer")?.status, "RELEASED");
+
+  const cleanupLog: string[] = [];
+  const cleanupRoot = new Scope("cleanup");
+  cleanupRoot.add("first", () => { cleanupLog.push("first"); });
+  cleanupRoot.add("second", () => { cleanupLog.push("second"); throw new Error("second failed"); });
+  await assert.rejects(cleanupRoot.dispose(), /disposal had 1 failure/);
+  assert.deepEqual(cleanupLog, ["second", "first"]);
+  await assert.rejects(cleanupRoot.dispose(), /disposal had 1 failure/);
+
+  await root.dispose();
+  assert.equal(registry.registrationsSnapshot().length, 0);
+});
+
 test("runtime config reconciliation is field-level, hash-only, and marks catalog/cache refreshes", () => {
   const previous = { provider: { url: "a", apiKey: "secret-a" }, mcp: [], skills: ["base"], workspace: { root: "one" }, routingPolicy: { mode: "single-agent" }, toolContract: { version: 1 } };
   const desired = { ...previous, provider: { url: "b", apiKey: "secret-b" }, toolContract: { version: 2 } };
@@ -237,6 +297,30 @@ test("multi-agent contract remains disabled while single-agent is the only runna
   assert.equal(winnerSettlementKey(handoff.workItemId, "agent-1", handoff.evidenceRefs).length, 64);
   assert.throws(() => validateAgentHandoff({ ...handoff, visitedAgents: ["a", "a"] }, 2), /cycle/);
   assert.throws(() => validateAgentHandoff(handoff, 3), /generation/);
+});
+
+test("reserved agent controls map to one Run WorkItem but remain disabled", async () => {
+  const workItem = {
+    id: "work-1", runId: "RUN-1", title: "reserved child", objective: "future execution", role: "executor", status: "READY",
+    dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 1, createdSeq: 1, updatedSeq: 1,
+  } as const;
+  const base = { runId: "RUN-1", generation: 2, workItemId: workItem.id, correlationId: "agent-control", sequence: 3, createdAt: "2026-08-29T00:00:00.000Z", payloadHash: "a".repeat(64) };
+  for (const operation of ["spawn", "list", "send_message", "cancel", "wait"] as const) {
+    const request = { ...base, operation };
+    const projection = projectAgentControlOperation(request, workItem);
+    assert.equal(projection.workItemId, workItem.id);
+    assert.equal(projection.event.runId, workItem.runId);
+    assert.equal(projection.event.source, "agent");
+    assert.equal(projection.event.kind, `agent.${operation}`);
+    assert.equal(projection.event.generation, 2);
+    assert.equal(projection.event.payloadRef?.hash, base.payloadHash);
+  }
+  const port = new DisabledMultiAgentControlPort();
+  const result = await port.spawn({ ...base, operation: "spawn" }, workItem);
+  assert.equal(result.status, "unsupported");
+  assert.equal(result.enabled, false);
+  if (result.status === "unsupported") assert.equal(result.failure.code, "MULTI_AGENT_DISABLED");
+  assert.throws(() => projectAgentControlOperation({ ...base, runId: "OTHER", operation: "wait" }, workItem), /does not match/);
 });
 
 test("lifecycle audit exposes stalled, recovery-required, and orphan resources", () => {

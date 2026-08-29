@@ -1,4 +1,5 @@
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import type { RunEventEnvelope, WorkItem } from "../domain/types.js";
 
 export type AgentStrategy = "single-agent" | "planner-executor" | "parallel-race";
 
@@ -54,6 +55,72 @@ export type AgentStrategyDecision =
 
 export const DEFAULT_AGENT_STRATEGY = "single-agent" as const;
 
+export type AgentControlOperation = "spawn" | "list" | "send_message" | "cancel" | "wait";
+
+export interface AgentControlRequest {
+  operation: AgentControlOperation;
+  runId: string;
+  generation: number;
+  workItemId: string;
+  correlationId: string;
+  sequence: number;
+  createdAt: string;
+  idempotencyKey?: string;
+  payloadHash: string;
+}
+
+export interface AgentControlProjection {
+  workItemId: string;
+  event: RunEventEnvelope;
+}
+
+export type AgentControlResult =
+  | { status: "unsupported"; enabled: false; operation: AgentControlOperation; failure: AgentCapabilityFailure }
+  | { status: "projected"; enabled: true; projection: AgentControlProjection };
+
+/** Future implementations must use the caller's existing Run and WorkItem. */
+export interface MultiAgentControlPort {
+  spawn(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>;
+  list(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>;
+  sendMessage(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>;
+  cancel(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>;
+  wait(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>;
+}
+
+/** Default port reserves the API without owning a Loop, store, Scope, or agent list. */
+export class DisabledMultiAgentControlPort implements MultiAgentControlPort {
+  public async spawn(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult> { return disabledControl(request, workItem); }
+  public async list(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult> { return disabledControl(request, workItem); }
+  public async sendMessage(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult> { return disabledControl(request, workItem); }
+  public async cancel(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult> { return disabledControl(request, workItem); }
+  public async wait(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult> { return disabledControl(request, workItem); }
+}
+
+/** Deterministic mapping required of any later enabled implementation. */
+export function projectAgentControlOperation(request: AgentControlRequest, workItem: WorkItem): AgentControlProjection {
+  validateAgentControlRequest(request, workItem);
+  return {
+    workItemId: workItem.id,
+    event: {
+      id: `agent-event-${sha256(canonicalJson(request)).slice(0, 32)}`,
+      runId: request.runId,
+      generation: request.generation,
+      source: "agent",
+      kind: `agent.${request.operation}`,
+      priority: request.operation === "cancel" ? "urgent" : "normal",
+      status: "queued",
+      sequence: request.sequence,
+      correlationId: request.correlationId,
+      ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
+      coalescingKey: request.operation === "send_message" ? `agent-message:${workItem.id}` : `agent-control:${request.operation}:${workItem.id}`,
+      operationId: `agent:${request.operation}:${workItem.id}`,
+      replayPolicy: request.operation === "spawn" ? "unknown" : "idempotent",
+      payloadRef: { eventType: `agent.${request.operation}`, hash: request.payloadHash },
+      createdAt: request.createdAt,
+    },
+  };
+}
+
 /**
  * Capability gate for the future orchestration layer. No parallel executor is
  * hidden behind this API; unsupported requests remain explicit failures.
@@ -94,6 +161,33 @@ export function validateAgentHandoff(handoff: AgentHandoff, expectedGeneration?:
 /** Create the deterministic idempotency key expected by a future settlement writer. */
 export function winnerSettlementKey(workItemId: string, winnerId: string, evidenceRefs: readonly string[]): string {
   return sha256(canonicalJson({ workItemId, winnerId, evidenceRefs: [...evidenceRefs].sort() }));
+}
+
+function disabledControl(request: AgentControlRequest, workItem: WorkItem): AgentControlResult {
+  validateAgentControlRequest(request, workItem);
+  return {
+    status: "unsupported",
+    enabled: false,
+    operation: request.operation,
+    failure: {
+      code: "MULTI_AGENT_DISABLED",
+      strategy: "planner-executor",
+      message: `Agent control operation ${request.operation} is reserved but not enabled.`,
+      recoverability: "needs_human",
+    },
+  };
+}
+
+function validateAgentControlRequest(request: AgentControlRequest, workItem: WorkItem): void {
+  bounded(request.runId, "agent control runId");
+  bounded(request.workItemId, "agent control workItemId");
+  bounded(request.correlationId, "agent control correlationId");
+  if (!(["spawn", "list", "send_message", "cancel", "wait"] as string[]).includes(request.operation)) throw new Error("Agent control operation is invalid");
+  if (request.workItemId !== workItem.id || request.runId !== workItem.runId) throw new Error("Agent control request does not match its Run WorkItem");
+  if (!Number.isInteger(request.generation) || request.generation < 0 || !Number.isInteger(request.sequence) || request.sequence < 1) throw new Error("Agent control sequence or generation is invalid");
+  if (!Number.isFinite(Date.parse(request.createdAt))) throw new Error("Agent control createdAt is invalid");
+  if (!/^[a-f0-9]{64}$/i.test(request.payloadHash)) throw new Error("Agent control payloadHash must be sha256");
+  if (request.idempotencyKey !== undefined) bounded(request.idempotencyKey, "agent control idempotencyKey");
 }
 
 function bounded(value: string, label: string, max = 256): void {

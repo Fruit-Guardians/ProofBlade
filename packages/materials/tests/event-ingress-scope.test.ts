@@ -58,7 +58,8 @@ test("RunEventIngress deduplicates, prioritizes, coalesces, and fences stale gen
     const drained = await ingress.drain(runId, "job_safe_point", 8);
     assert.deepEqual(drained.admitted.map((item) => item.kind), ["user.cancel", "job.output"]);
     assert.equal(drained.coalesced.length, 1);
-    assert.equal(drained.deferred.length, 1);
+    assert.equal(drained.deferred.length, 0);
+    assert.equal(drained.failed.length, 1);
     const replayed = await ingress.drain(runId, "job_safe_point", 8);
     assert.deepEqual(replayed.admitted, []);
     assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_received").every((event) => event.envelope?.runId === runId), true);
@@ -78,6 +79,95 @@ test("RunCoordinator applies user control events through the normal command path
     const drained = await coordinator.drainEvents(runId, "user_cancel");
     assert.equal(drained.admitted.length, 1);
     assert.equal((await services.control.snapshot(runId)).status, "CANCELLED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("RunEventIngress leaves deferred events retryable and fences stale events as failed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-retry-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-RETRY-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const ingress = new RunEventIngress(services.control);
+    const deferred = await ingress.enqueue(runId, {
+      source: "provider",
+      kind: "provider.completed",
+      correlationId: "provider-1",
+      priority: "normal",
+      payload: { requestId: "req-1" },
+    });
+    const stale = await ingress.enqueue(runId, {
+      source: "job",
+      kind: "job.exit",
+      generation: 99,
+      correlationId: "job-stale",
+      payload: { jobId: "job-1" },
+    });
+
+    const first = await ingress.drain(runId, "provider_terminal", 8);
+    assert.deepEqual(first.admitted, []);
+    assert.deepEqual(first.failed, [stale.id]);
+    assert.deepEqual(first.deferred, [deferred.id]);
+
+    const second = await ingress.drain(runId, "idle", 8);
+    assert.deepEqual(second.admitted.map((item) => item.ingressId), [deferred.id]);
+    assert.deepEqual(second.failed, []);
+    assert.deepEqual(second.deferred, []);
+
+    const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed");
+    assert.deepEqual(processed.map((event) => [event.payload?.ingressId, event.payload?.status]), [
+      [stale.id, "failed"],
+      [deferred.id, "applied"],
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("concurrent ingress drains atomically claim each event once", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-concurrent-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-CONCURRENT-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const ingress = new RunEventIngress(services.control);
+    const envelope = await ingress.enqueue(runId, {
+      source: "job",
+      kind: "job.keyword",
+      correlationId: "job-keyword-1",
+      payload: { jobId: "job-1", keyword: "needle" },
+    });
+
+    const results = await Promise.all([
+      ingress.drain(runId, "job_safe_point", 8),
+      ingress.drain(runId, "job_safe_point", 8),
+    ]);
+    assert.equal(results.filter((result) => result.admitted.some((item) => item.ingressId === envelope.id)).length, 1);
+    assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id).length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("concurrent enqueue calls deduplicate received ingress inside the Run lock", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-enqueue-race-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-ENQUEUE-RACE-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const ingress = new RunEventIngress(services.control);
+    const input = {
+      source: "job" as const,
+      kind: "job.heartbeat",
+      correlationId: "job-heartbeat-1",
+      idempotencyKey: "job-heartbeat-idempotency",
+      payload: { jobId: "job-1", heartbeat: 1 },
+    };
+    const envelopes = await Promise.all([ingress.enqueue(runId, input), ingress.enqueue(runId, input)]);
+    assert.equal(envelopes[0]?.id, envelopes[1]?.id);
+    assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_received").length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

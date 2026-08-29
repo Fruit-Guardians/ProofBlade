@@ -32,6 +32,9 @@ import type {
   DomainRecordInput,
   VerificationRequest,
   UpdateProposal,
+  UpdateEvaluationGate,
+  RunEventEnvelope,
+  RunEventStatus,
 } from "../domain/types.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
@@ -48,13 +51,15 @@ import { completedWorkItemForCompletion } from "../domain/work-item.js";
 import { maxReplansFor, phaseBudget } from "../domain/phase-budget.js";
 import { evaluatePhaseGate } from "../domain/phase-gate.js";
 import { isPwnDomainRecord, isWebDomainRecord, validateDomainRecordShape } from "../domain/records.js";
+import { validateUpdateEvaluationGate } from "../evolution/evaluation-gates.js";
 
 type WithoutLane<T> = T extends unknown ? Omit<T, "lane"> : never;
-type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "verifier_input" | "fixture" | "recovery" | "binding";
+type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "verifier_input" | "fixture" | "recovery" | "binding" | "evaluation";
 type VerifierResultCommand = Extract<WithoutLane<DomainCommand>, { type: "evidence" | "completion_verified" | "fact" | "artifact_annotation" | "domain_record" }>;
 type VerifierEvidenceCommand = Extract<VerifierResultCommand, { type: "evidence" }>;
 type VerifierEffectCommand = Extract<WithoutLane<DomainCommand>, { type: "effect_proposed" | "effect_started" | "effect_finished" | "effect_reconciled" }>;
 type VerifierResultArtifactCommand = Extract<WithoutLane<DomainCommand>, { type: "artifact" }>;
+type UpdateEvaluationCommand = Extract<WithoutLane<DomainCommand>, { type: "update_proposal_evaluated" }>;
 
 export interface VerifierControlPort {
   /** Trusted harness-only channel. Never expose this port to a model lane. */
@@ -86,12 +91,18 @@ export interface VerificationRecoveryControlPort {
   markResolved(runId: string, input: { requestId: string; reason: string }): Promise<HarnessEvent[]>;
 }
 
+/** Evaluation-service-only capability for persisting canonical release gates. */
+export interface UpdateEvaluationControlPort {
+  dispatch(runId: string, command: UpdateEvaluationCommand): Promise<HarnessEvent[]>;
+}
+
 export interface ControlPlane {
   control: ControlStore;
   verifier: VerifierControlPort;
   verifierEffects: VerifierEffectControlPort;
   fixtureControl: FixtureControlPort;
   verificationRecovery: VerificationRecoveryControlPort;
+  updateEvaluation: UpdateEvaluationControlPort;
 }
 
 const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
@@ -148,7 +159,7 @@ export type DomainCommand =
   | { type: "experiment"; experiment: Omit<ExperimentRecord, "createdSeq">; lane?: Lane }
   | { type: "replan_requested"; replan: Omit<RunSnapshot["replans"][string], "createdSeq" | "runId" | "generation">; lane?: Lane }
   | { type: "update_proposal_created"; proposal: Omit<UpdateProposal, "createdSeq" | "updatedSeq" | "runId" | "status">; lane?: Lane }
-  | { type: "update_proposal_evaluated"; proposalId: string; evaluationHash: string; metrics?: UpdateProposal["metrics"]; lane?: Lane }
+  | { type: "update_proposal_evaluated"; proposalId: string; evaluationHash: string; metrics?: UpdateProposal["metrics"]; gate: UpdateEvaluationGate; lane?: Lane }
   | { type: "update_proposal_approved"; proposalId: string; reason?: string; lane?: Lane }
   | { type: "update_proposal_activated"; proposalId: string; lane?: Lane }
   | { type: "update_proposal_rejected"; proposalId: string; reason: string; lane?: Lane }
@@ -201,6 +212,13 @@ export type DomainCommand =
   | { type: "session_superseded"; sessionId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
+export interface IngressClaim {
+  ingressId: string;
+  envelope: RunEventEnvelope;
+  status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">;
+  safePoint: string;
+}
+
 type WorkItemCommand = Extract<DomainCommand, { type: `work_item_${string}` }>;
 
 export class ControlStore {
@@ -220,6 +238,7 @@ export class ControlStore {
       verifierEffects: control.#createVerifierEffectPort(),
       fixtureControl: control.#createFixtureControlPort(),
       verificationRecovery: control.#createVerificationRecoveryPort(),
+      updateEvaluation: control.#createUpdateEvaluationPort(),
     };
   }
 
@@ -264,6 +283,67 @@ export class ControlStore {
 
   public async events(runId: string): Promise<HarnessEvent[]> {
     return await this.eventStore.events(runId);
+  }
+
+  /** Atomically claim ingress events under the same Run lock used by writes. */
+  public async claimIngress(runId: string, claims: readonly IngressClaim[]): Promise<IngressClaim[]> {
+    if (claims.length === 0) return [];
+    if (claims.length > 256) throw new Error("At most 256 ingress events can be claimed in one batch");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const terminal = new Set(events
+        .filter((event) => event.type === "event_ingress_processed" && ["applied", "coalesced", "failed"].includes(String(event.payload?.status)))
+        .map((event) => String(event.payload?.ingressId ?? "")));
+      const received = new Map(events
+        .filter((event) => event.type === "event_ingress_received" && event.envelope)
+        .map((event) => [event.envelope!.id, event]));
+      const accepted = [...new Map(claims.map((claim) => [claim.ingressId, claim])).values()]
+        .filter((claim) => !terminal.has(claim.ingressId) && received.has(claim.ingressId));
+      if (accepted.length === 0) return [];
+      const materialized = accepted.map((claim, index) => {
+        const receivedEvent = received.get(claim.ingressId)!;
+        return makeEvent(runId, before.lastSeq + index + 1, "event_ingress_processed", "orchestrator", "main", {
+          ingressId: claim.ingressId,
+          status: claim.status,
+          safePoint: claim.safePoint,
+        }, receivedEvent.correlationId, { ...claim.envelope, status: claim.status });
+      });
+      await writer.append(materialized, this.#authoritySecret);
+      await writer.saveProjection(materialized.reduce(reduce, before), this.#authoritySecret);
+      return accepted;
+    }));
+  }
+
+  /**
+   * Append one received ingress event with idempotency checked inside the Run
+   * lock. The preflight read in the adapter is only an optimization; this
+   * method is the durable race boundary for two producers using the same key.
+   */
+  public async appendIngressReceived(
+    runId: string,
+    input: { envelope: RunEventEnvelope; payload?: Record<string, unknown> },
+  ): Promise<RunEventEnvelope> {
+    if (input.envelope.runId !== runId) throw new Error("Ingress envelope belongs to another Run");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const existing = events.find((event) => event.type === "event_ingress_received"
+        && event.envelope?.idempotencyKey === input.envelope.idempotencyKey);
+      if (existing?.envelope) return existing.envelope;
+      const materialized = makeEvent(
+        runId,
+        before.lastSeq + 1,
+        "event_ingress_received",
+        "orchestrator",
+        "main",
+        { envelope: input.envelope, ...(input.payload ? { payload: input.payload } : {}) },
+        input.envelope.correlationId,
+        input.envelope,
+      );
+      const after = reduce(before, materialized);
+      await writer.append([materialized], this.#authoritySecret);
+      await writer.saveProjection(after, this.#authoritySecret);
+      return materialized.envelope!;
+    }));
   }
 
   /** Wait for a durable event so long-running tools do not replay the full Run in a polling loop. */
@@ -544,6 +624,17 @@ export class ControlStore {
       markResolved: async (runId: string, input: { requestId: string; reason: string }) => await mark(runId, { type: "verification_recovery_resolved", ...input }),
     });
   }
+
+  #createUpdateEvaluationPort(): UpdateEvaluationControlPort {
+    return Object.freeze({
+      dispatch: async (runId: string, command: UpdateEvaluationCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
+        if (command.type !== "update_proposal_evaluated") throw new Error("Update evaluation capability only accepts evaluated proposal commands");
+        const trusted = { ...command, lane: "planner" } as DomainCommand;
+        const { events } = await this.#commitCommands(runId, snapshot, [trusted], "evaluation", writer);
+        return events;
+      })),
+    });
+  }
 }
 
 function eventType(command: DomainCommand): HarnessEvent["type"] {
@@ -722,7 +813,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
         updatedSeq: seq,
       },
     };
-    case "update_proposal_evaluated": return { proposalId: command.proposalId, evaluationHash: command.evaluationHash, metrics: command.metrics };
+    case "update_proposal_evaluated": return { proposalId: command.proposalId, evaluationHash: command.evaluationHash, metrics: command.metrics, gate: command.gate };
     case "update_proposal_approved": return { proposalId: command.proposalId, reason: command.reason };
     case "update_proposal_activated": return { proposalId: command.proposalId };
     case "update_proposal_rejected": return { proposalId: command.proposalId, reason: command.reason };
@@ -805,6 +896,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   const trustedVerifierInput = authority === "verifier_input";
   const trustedRecovery = authority === "recovery";
   const bindingAuthority = authority === "binding";
+  const trustedEvaluation = authority === "evaluation";
   if (bindingAuthority && command.type !== "session_opened" && command.type !== "session_binding_completed") {
     throw new Error("Binding authority is restricted to session binding commands");
   }
@@ -819,6 +911,9 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   if (trustedVerifierInput && command.type !== "artifact") throw new Error("Verifier input authority is restricted to Artifact registration");
   if (trustedRecovery && command.lane !== "verifier") throw new Error("Recovery commands must use the verifier lane");
   if (trustedRecovery && command.type !== "verification_recovery_required" && command.type !== "verification_recovery_resolved") throw new Error("Recovery authority is restricted to verifier request recovery markers");
+  if (command.type === "update_proposal_evaluated" && !trustedEvaluation) throw new Error("Update proposal evaluation is restricted to the trusted evaluation service");
+  if (trustedEvaluation && command.type !== "update_proposal_evaluated") throw new Error("Update evaluation authority is restricted to evaluated proposal commands");
+  if (trustedEvaluation && command.lane !== "planner") throw new Error("Update evaluation commands must use the planner lane");
   if (command.type === "fixture_reset") {
     if (authority !== "fixture") throw new Error("fixture_reset is restricted to the trusted fixture lifecycle service");
     validateFixtureResetState(snapshot);
@@ -1052,11 +1147,12 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!proposal) throw new Error(`Unknown update proposal: ${command.proposalId}`);
     if (proposal.status !== "PROPOSED") throw new Error(`Cannot evaluate update proposal in ${proposal.status}`);
     if (!/^[a-f0-9]{64}$/i.test(command.evaluationHash)) throw new Error("Update proposal evaluation hash must be sha256");
-    validateProposalMetrics(command.metrics);
+    validateProposalEvaluation(proposal, command);
   }
   if (command.type === "update_proposal_approved" || command.type === "update_proposal_activated" || command.type === "update_proposal_rejected") {
     const proposal = snapshot.updateProposals[command.proposalId];
     if (!proposal) throw new Error(`Unknown update proposal: ${command.proposalId}`);
+    if (command.type === "update_proposal_approved") validatePersistedProposalEvaluation(proposal, true);
   }
   if (command.type === "update_proposal_rolled_back") {
     const proposal = snapshot.updateProposals[command.proposalId];
@@ -1713,11 +1809,53 @@ function validateUpdateProposalCommand(snapshot: RunSnapshot, command: Extract<D
   if (!/^[a-f0-9]{64}$/i.test(proposal.candidateHash)) throw new Error("Update proposal candidate hash must be sha256");
   validateBoundedStringList(proposal.sourceArtifactIds, "update proposal source artifacts", 256, 128);
   validateBoundedStringList(proposal.triggerFailureIds, "update proposal trigger failures", 256, 128);
-  if (proposal.evaluationSets !== undefined) {
-    for (const [name, values] of Object.entries(proposal.evaluationSets)) {
-      if (!["trigger", "retention", "migration", "safety"].includes(name)) throw new Error(`Unknown update proposal evaluation set: ${name}`);
-      validateBoundedStringList(values, `update proposal ${name} evaluation set`, 16, 256);
-    }
+  if (!proposal.evaluationSets) throw new Error("Update proposal requires all evaluation sets");
+  if (Object.keys(proposal.evaluationSets).length !== 4) throw new Error("Update proposal requires exactly four evaluation sets");
+  for (const [name, values] of Object.entries(proposal.evaluationSets)) {
+    if (!["trigger", "retention", "migration", "safety"].includes(name)) throw new Error(`Unknown update proposal evaluation set: ${name}`);
+    validateBoundedStringList(values, `update proposal ${name} evaluation set`, 16, 256);
+  }
+}
+
+function validateProposalEvaluation(proposal: UpdateProposal, command: Extract<DomainCommand, { type: "update_proposal_evaluated" }>): void {
+  if (!command.gate) throw new Error("Update proposal evaluation requires a canonical gate report");
+  if (!proposal.evaluationSets) throw new Error("Update proposal evaluation sets are missing");
+  if (!command.metrics) throw new Error("Update proposal evaluation requires gate metrics");
+  validateUpdateEvaluationGate(command.gate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: command.evaluationHash,
+    gatePassed: command.metrics.gatePassed,
+  });
+  validateGateMetrics(command.gate, command.metrics);
+  validateProposalMetrics(command.metrics);
+}
+
+function validatePersistedProposalEvaluation(proposal: UpdateProposal, requirePassing: boolean): void {
+  if (!proposal.evaluationGate || !proposal.evaluationHash || !proposal.evaluationSets || !proposal.metrics) {
+    throw new Error("Update proposal approval requires a valid passing evaluation gate");
+  }
+  validateUpdateEvaluationGate(proposal.evaluationGate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: proposal.evaluationHash,
+    gatePassed: proposal.metrics.gatePassed,
+  });
+  validateGateMetrics(proposal.evaluationGate, proposal.metrics);
+  if (requirePassing && (!proposal.evaluationGate.passed || proposal.metrics.gatePassed !== 1)) {
+    throw new Error("Update proposal approval requires a valid passing evaluation gate");
+  }
+}
+
+function validateGateMetrics(gate: UpdateEvaluationGate, metrics: NonNullable<UpdateProposal["metrics"]>): void {
+  if (metrics.triggerPassRate !== gate.scores.triggerPassRate
+    || metrics.retentionPassRate !== gate.scores.retentionPassRate
+    || metrics.migrationPassRate !== gate.scores.migrationPassRate
+    || metrics.safetyPassRate !== gate.scores.safetyPassRate
+    || metrics.retentionRegressionRate !== gate.scores.retentionRegressionRate
+    || metrics.activationRate !== gate.activationRate
+    || metrics.followingRate !== gate.followingRate) {
+    throw new Error("Update proposal metrics do not match canonical gate report");
   }
 }
 

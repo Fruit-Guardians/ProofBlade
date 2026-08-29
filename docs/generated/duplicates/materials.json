@@ -129,7 +129,7 @@
           "kind": "method",
           "signature": "(identity: string): CapabilityProviderRegistration",
           "module": "src/capabilities/lifecycle.ts",
-          "line": 100,
+          "line": 102,
           "summary": "Inferred summary: mark available operation used to provide a reusable operation."
         },
         {
@@ -139,7 +139,7 @@
           "kind": "method",
           "signature": "(identity: string): CapabilityProviderRegistration",
           "module": "src/capabilities/lifecycle.ts",
-          "line": 108,
+          "line": 110,
           "summary": "Inferred summary: mark unavailable operation used to provide a reusable operation."
         }
       ],
@@ -216,7 +216,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 349,
+          "line": 429,
           "summary": "Commit the final Control Store fence for a broker-owned session binding."
         },
         {
@@ -226,7 +226,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 332,
+          "line": 412,
           "summary": "Inferred summary: dispatch transaction operation used to perform a durable write."
         }
       ],
@@ -245,7 +245,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 250,
+          "line": 269,
           "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
@@ -255,8 +255,67 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 245,
+          "line": 264,
           "summary": "Inferred summary: snapshot operation used to read or inspect state."
+        }
+      ],
+      "signals": [
+        "same-structure-hash"
+      ],
+      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
+    },
+    {
+      "status": "candidate",
+      "symbols": [
+        {
+          "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.cancel",
+          "package": "@proofblade/materials",
+          "name": "DisabledMultiAgentControlPort.cancel",
+          "kind": "method",
+          "signature": "(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>",
+          "module": "src/orchestration/multi-agent-contract.ts",
+          "line": 95,
+          "summary": "Inferred summary: cancel operation used to provide a reusable operation."
+        },
+        {
+          "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.list",
+          "package": "@proofblade/materials",
+          "name": "DisabledMultiAgentControlPort.list",
+          "kind": "method",
+          "signature": "(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>",
+          "module": "src/orchestration/multi-agent-contract.ts",
+          "line": 93,
+          "summary": "Inferred summary: list operation used to provide a reusable operation."
+        },
+        {
+          "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.sendMessage",
+          "package": "@proofblade/materials",
+          "name": "DisabledMultiAgentControlPort.sendMessage",
+          "kind": "method",
+          "signature": "(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>",
+          "module": "src/orchestration/multi-agent-contract.ts",
+          "line": 94,
+          "summary": "Inferred summary: send message operation used to provide a reusable operation."
+        },
+        {
+          "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.spawn",
+          "package": "@proofblade/materials",
+          "name": "DisabledMultiAgentControlPort.spawn",
+          "kind": "method",
+          "signature": "(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>",
+          "module": "src/orchestration/multi-agent-contract.ts",
+          "line": 92,
+          "summary": "Inferred summary: spawn operation used to provide a reusable operation."
+        },
+        {
+          "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.wait",
+          "package": "@proofblade/materials",
+          "name": "DisabledMultiAgentControlPort.wait",
+          "kind": "method",
+          "signature": "(request: AgentControlRequest, workItem: WorkItem): Promise<AgentControlResult>",
+          "module": "src/orchestration/multi-agent-contract.ts",
+          "line": 96,
+          "summary": "Inferred summary: wait operation used to provide a reusable operation."
         }
       ],
       "signals": [
@@ -390,7 +449,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 752,
+          "line": 765,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -419,7 +478,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 756,
+          "line": 769,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -567,6 +626,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 18
+    "candidates": 19
   }
 }

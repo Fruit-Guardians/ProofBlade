@@ -162,6 +162,34 @@ test("context blocks isolate durable ledger changes from active lease changes", 
   assert.equal(leaseView.manifest.firstChangedBlock, "context.l3b");
 });
 
+test("context compiler enforces aggregate L3 budgets and keeps handoffs in active controls", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  snapshot.status = "RUNNING";
+  snapshot.facts = Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`F-${index}`, {
+    id: `F-${index}`, runId: snapshot.runId, generation: snapshot.generation,
+    statement: `confirmed finding ${index} ${"x".repeat(300)}`, status: "CONFIRMED" as const, evidenceIds: [], createdSeq: index + 1,
+  }]));
+  snapshot.handoffs["HO-001"] = {
+    id: "HO-001", schemaVersion: 1, runId: snapshot.runId, taskId: task.task_id,
+    sourceLane: "planner", targetLane: "executor", knowledgeVersion: "v1", phase: snapshot.phase,
+    domainPhase: snapshot.domainPhase, objective: "continue", confirmedFacts: [], hypotheses: [], rejectedHypotheses: [],
+    exitCode: null, durationMs: 0, createdSeq: 100, status: "PROPOSED",
+  };
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, contextWindow: 4_000, outputBudget: 512, safetyMargin: 256 });
+  assert.ok(compiled.manifest.layerTokens.L3A + compiled.manifest.layerTokens.L3B <= Math.floor((4_000 - 512 - 256) * 0.4) + 8);
+  const l3a = compiled.manifest.blocks?.find((block) => block.id === "context.l3a")?.content ?? "";
+  const l3b = compiled.manifest.blocks?.find((block) => block.id === "context.l3b")?.content ?? "";
+  assert.doesNotMatch(l3a, /HO-001/);
+  assert.match(l3b, /HO-001/);
+});
+
+test("context maintenance rejects hardRatio 1 and derives a force ratio above hardRatio", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  assert.throws(() => new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, maintenancePolicy: { targetRatio: 0.8, hardRatio: 1, autoConsolidate: false, keepRecentTurns: 2 } }), /below hardRatio/);
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, maintenancePolicy: { targetRatio: 0.8, hardRatio: 0.995, autoConsolidate: false, keepRecentTurns: 2 } });
+  assert.ok((compiled.manifest.maintenance.hardRatio ?? 0) < 1);
+});
+
 test("context maintenance coordinator repairs every view and defers compaction", () => {
   const messages = [
     { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "inspect_target", arguments: {} }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 1 },

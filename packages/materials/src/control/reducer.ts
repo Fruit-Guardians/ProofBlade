@@ -1,8 +1,9 @@
-import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract, UpdateProposal } from "../domain/types.js";
+import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract, UpdateEvaluationGate, UpdateProposal } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { validateDomainRecordShape } from "../domain/records.js";
 import { completedWorkItemForCompletion } from "../domain/work-item.js";
+import { validateUpdateEvaluationGate } from "../evolution/evaluation-gates.js";
 
 export function createInitialSnapshot(runId: string, task: TaskContract): RunSnapshot {
   return {
@@ -295,15 +296,18 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "update_proposal_evaluated": {
       const proposal = getUpdateProposal(next, String(p.proposalId));
       if (proposal.status !== "PROPOSED") throw new Error(`Cannot evaluate update proposal in ${proposal.status}`);
+      const evaluated = validateEvaluatedProposalPayload(proposal, p);
       proposal.status = "EVALUATED";
-      proposal.evaluationHash = String(p.evaluationHash ?? "");
-      proposal.metrics = p.metrics as UpdateProposal["metrics"] | undefined;
+      proposal.evaluationHash = evaluated.evaluationHash;
+      proposal.metrics = structuredClone(evaluated.metrics);
+      proposal.evaluationGate = structuredClone(evaluated.gate);
       proposal.updatedSeq = event.seq;
       break;
     }
     case "update_proposal_approved": {
       const proposal = getUpdateProposal(next, String(p.proposalId));
       if (proposal.status !== "EVALUATED") throw new Error(`Cannot approve update proposal in ${proposal.status}`);
+      validatePersistedProposalGate(proposal, true);
       proposal.status = "APPROVED";
       proposal.reason = typeof p.reason === "string" ? p.reason : proposal.reason;
       proposal.updatedSeq = event.seq;
@@ -874,6 +878,57 @@ function getUpdateProposal(snapshot: RunSnapshot, proposalId: string): UpdatePro
   const proposal = snapshot.updateProposals[proposalId];
   if (!proposal) throw new Error(`Unknown update proposal: ${proposalId}`);
   return proposal;
+}
+
+function validateEvaluatedProposalPayload(proposal: UpdateProposal, payload: Record<string, unknown>): {
+  evaluationHash: string;
+  metrics: NonNullable<UpdateProposal["metrics"]>;
+  gate: UpdateEvaluationGate;
+} {
+  if (typeof payload.evaluationHash !== "string" || !/^[a-f0-9]{64}$/i.test(payload.evaluationHash)) throw new Error("update_proposal_evaluated requires a sha256 evaluationHash");
+  if (!proposal.evaluationSets) throw new Error("update_proposal_evaluated requires proposal evaluation sets");
+  const metrics = validateReplayGateMetrics(payload.metrics);
+  validateUpdateEvaluationGate(payload.gate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: payload.evaluationHash,
+    gatePassed: metrics.gatePassed,
+  });
+  validateGateMetricValues(payload.gate, metrics);
+  return { evaluationHash: payload.evaluationHash, metrics, gate: payload.gate };
+}
+
+function validatePersistedProposalGate(proposal: UpdateProposal, requirePassing: boolean): void {
+  if (!proposal.evaluationGate || !proposal.evaluationHash || !proposal.evaluationSets) throw new Error("Approved update proposal requires a persisted evaluation gate");
+  const metrics = validateReplayGateMetrics(proposal.metrics);
+  validateUpdateEvaluationGate(proposal.evaluationGate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: proposal.evaluationHash,
+    gatePassed: metrics.gatePassed,
+  });
+  validateGateMetricValues(proposal.evaluationGate, metrics);
+  if (requirePassing && (!proposal.evaluationGate.passed || metrics.gatePassed !== 1)) throw new Error("Approved update proposal requires a passing evaluation gate");
+}
+
+function validateReplayGateMetrics(value: unknown): NonNullable<UpdateProposal["metrics"]> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Update proposal replay requires gate metrics");
+  const metrics = value as NonNullable<UpdateProposal["metrics"]>;
+  if (metrics.gatePassed !== 0 && metrics.gatePassed !== 1) throw new Error("Update proposal replay gatePassed is invalid");
+  for (const [key, metric] of Object.entries(metrics)) {
+    if (typeof metric !== "number" || !Number.isFinite(metric) || metric < 0 || (key !== "p95LatencyMs" && key !== "costUsd" && metric > 1)) throw new Error(`Update proposal replay metric is invalid: ${key}`);
+  }
+  return metrics;
+}
+
+function validateGateMetricValues(gate: UpdateEvaluationGate, metrics: NonNullable<UpdateProposal["metrics"]>): void {
+  if (metrics.triggerPassRate !== gate.scores.triggerPassRate
+    || metrics.retentionPassRate !== gate.scores.retentionPassRate
+    || metrics.migrationPassRate !== gate.scores.migrationPassRate
+    || metrics.safetyPassRate !== gate.scores.safetyPassRate
+    || metrics.retentionRegressionRate !== gate.scores.retentionRegressionRate
+    || metrics.activationRate !== gate.activationRate
+    || metrics.followingRate !== gate.followingRate) throw new Error("Update proposal replay metrics do not match evaluation gate");
 }
 
 function updateEpochStatus(snapshot: RunSnapshot, payload: Record<string, unknown>, status: RunSnapshot["requestEpochs"][string]["status"], seq: number): void {

@@ -207,6 +207,12 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.equal(requests, 1);
     assert.match(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
     assert.match(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
+    assert.match(firstRequestBody, /proofblade-context/);
+    assert.match(firstRequestBody, /<task-contract>/);
+    assert.match(firstRequestBody, /<durable-ledger>/);
+    const firstRequest = JSON.parse(firstRequestBody) as { messages?: unknown };
+    const firstRequestMessages = JSON.stringify(firstRequest.messages ?? []);
+    assert.match(firstRequestMessages, /manifest-hash=\\"[a-f0-9]{64}\\"/);
     assert.doesNotMatch(firstRequestBody, /Categorize: pick the dominant category/);
     assert.doesNotMatch(firstRequestBody, /Load the playbook:/);
     assert.ok(firstRequestEventTypes?.includes("tool_preparation_recorded"));
@@ -215,6 +221,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.equal(typeof requestEpoch?.manifestSummary?.layerTokens?.L3A, "number");
     assert.equal(typeof requestEpoch?.manifestSummary?.layerTokens?.L3B, "number");
     assert.ok(requestEpoch?.manifestSummary?.maintenance);
+    const requestEpochContext = (await services.control.events(runId)).find((event) => event.type === "request_epoch_context")?.payload as { fields?: { dynamicSuffixHash?: unknown } } | undefined;
+    assert.equal(typeof requestEpochContext?.fields?.dynamicSuffixHash, "string");
 
     await lane.close();
     lane = undefined;

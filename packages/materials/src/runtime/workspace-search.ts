@@ -37,6 +37,7 @@ export interface WorkspaceGrepResult {
 
 const DEFAULT_MAX_RESULTS = 200;
 const DEFAULT_MAX_FILE_BYTES = 1_048_576;
+export const WORKSPACE_SEARCH_MODEL_MAX_CHARS = 12_000;
 const IGNORED_DIRECTORIES = new Set([".git", ".proofblade", "node_modules"]);
 
 export async function globWorkspace(options: WorkspaceSearchOptions): Promise<WorkspaceGlobResult> {
@@ -101,17 +102,34 @@ export async function grepWorkspace(options: WorkspaceSearchOptions): Promise<Wo
   return { kind: "grep", query, matches, filesScanned, filesSkipped, totalMatches, truncated };
 }
 
-export function workspaceSearchText(result: WorkspaceGlobResult | WorkspaceGrepResult): string {
+/** Render a bounded model-facing view; the complete result remains in its Artifact. */
+export function workspaceSearchText(result: WorkspaceGlobResult | WorkspaceGrepResult, maxChars = WORKSPACE_SEARCH_MODEL_MAX_CHARS): string {
+  if (!Number.isInteger(maxChars) || maxChars < 64 || maxChars > 64_000) throw new Error("Search presentation maxChars must be an integer from 64 to 64000");
   if (result.kind === "glob") {
-    return [
+    return boundPresentation([
       `glob pattern=${result.pattern} matches=${result.totalMatches}${result.truncated ? " truncated=true" : ""}`,
       ...result.matches,
-    ].join("\n");
+    ].join("\n"), maxChars);
   }
-  return [
+  return boundPresentation([
     `grep query=${JSON.stringify(result.query)} matches=${result.totalMatches}${result.truncated ? " truncated=true" : ""} filesScanned=${result.filesScanned} filesSkipped=${result.filesSkipped}`,
     ...result.matches.map((match) => `${match.path}:${match.line}:${match.text}`),
-  ].join("\n");
+  ].join("\n"), maxChars);
+}
+
+/** Bound the structured result independently from its text rendering. */
+export function limitWorkspaceSearchResult<T extends WorkspaceGlobResult | WorkspaceGrepResult>(result: T, maxChars = WORKSPACE_SEARCH_MODEL_MAX_CHARS): T {
+  if (!Number.isInteger(maxChars) || maxChars < 256 || maxChars > 64_000) throw new Error("Search result maxChars must be an integer from 256 to 64000");
+  if (JSON.stringify(result).length <= maxChars) return structuredClone(result);
+  let low = 0;
+  let high = result.matches.length;
+  while (low < high) {
+    const count = Math.ceil((low + high) / 2);
+    const candidate = { ...result, matches: result.matches.slice(0, count), truncated: true };
+    if (JSON.stringify(candidate).length <= maxChars) low = count;
+    else high = count - 1;
+  }
+  return { ...result, matches: result.matches.slice(0, low), truncated: true } as T;
 }
 
 export function workspaceSearchHash(result: WorkspaceGlobResult | WorkspaceGrepResult): string {
@@ -176,4 +194,12 @@ function boundedLimit(value: number | undefined): number {
   if (value === undefined) return DEFAULT_MAX_RESULTS;
   if (!Number.isInteger(value) || value < 1 || value > 2_000) throw new Error("maxResults must be an integer from 1 to 2000");
   return value;
+}
+
+function boundPresentation(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  const marker = `\n...[${value.length - Math.max(32, maxChars - 64)} chars archived in the result Artifact]...\n`;
+  const contentBudget = Math.max(32, maxChars - marker.length);
+  const head = Math.ceil(contentBudget * 0.65);
+  return `${value.slice(0, head)}${marker}${value.slice(-Math.max(0, contentBudget - head))}`.slice(0, maxChars);
 }

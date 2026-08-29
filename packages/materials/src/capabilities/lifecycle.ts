@@ -44,7 +44,8 @@ export type CapabilityLifecycleEvent =
   | { type: "registered"; registration: CapabilityProviderRegistration }
   | { type: "available" | "quiescing" | "unavailable" | "unregistered"; registrationIdentity: string }
   | { type: "bound"; binding: CapabilityBinding }
-  | { type: "consumer_teardown_started" | "consumer_released"; consumerId: string; bindingId?: string };
+  | { type: "consumer_teardown_started" | "consumer_released"; consumerId: string; bindingId?: string }
+  | { type: "consumer_teardown_failed"; consumerId: string; bindingId?: string; error: string };
 
 export type CapabilityLifecycleListener = (event: CapabilityLifecycleEvent) => void;
 
@@ -55,6 +56,7 @@ interface RegistrationEntry extends CapabilityProviderRegistration {
 
 interface ConsumerEntry extends CapabilityConsumer {
   teardown?: () => Promise<void> | void;
+  teardownPromise?: Promise<void>;
 }
 
 /**
@@ -171,26 +173,42 @@ export class CapabilityLifecycleRegistry {
     const consumer = this.consumers.get(consumerId);
     if (!consumer) throw new Error(`Unknown capability consumer: ${consumerId}`);
     if (consumer.status === "RELEASED") return publicConsumer(consumer);
+    if (consumer.teardownPromise) {
+      await consumer.teardownPromise;
+      return publicConsumer(consumer);
+    }
     consumer.status = "TEARING_DOWN";
     this.emit({ type: "consumer_teardown_started", consumerId, ...(consumer.bindingId ? { bindingId: consumer.bindingId } : {}) });
-    await consumer.teardown?.();
+    const teardownPromise = Promise.resolve().then(() => consumer.teardown?.()).then(() => undefined);
+    consumer.teardownPromise = teardownPromise;
+    try {
+      await teardownPromise;
+    } catch (error) {
+      consumer.status = "ACTIVE";
+      this.emit({ type: "consumer_teardown_failed", consumerId, ...(consumer.bindingId ? { bindingId: consumer.bindingId } : {}), error: String(error).slice(0, 1_000) });
+      throw error;
+    } finally {
+      consumer.teardownPromise = undefined;
+    }
     return publicConsumer(consumer);
   }
 
   public async releaseConsumer(consumerId: string): Promise<void> {
     const consumer = this.consumers.get(consumerId);
     if (!consumer || consumer.status === "RELEASED") return;
-    if (consumer.status === "ACTIVE") await this.beginConsumerTeardown(consumerId);
-    if (consumer.bindingId) {
-      const binding = this.bindings.get(consumer.bindingId);
+    if (consumer.status === "ACTIVE" || consumer.teardownPromise) await this.beginConsumerTeardown(consumerId);
+    const current = this.consumers.get(consumerId);
+    if (!current || current.status === "RELEASED") return;
+    if (current.bindingId) {
+      const binding = this.bindings.get(current.bindingId);
       if (binding) {
         const entry = this.registrations.get(registrationIdentity(binding));
         entry?.consumers.delete(consumerId);
         this.bindings.delete(binding.bindingId);
       }
-      consumer.bindingId = undefined;
+      current.bindingId = undefined;
     }
-    consumer.status = "RELEASED";
+    current.status = "RELEASED";
     this.emit({ type: "consumer_released", consumerId });
   }
 
@@ -245,7 +263,7 @@ function publicBinding(binding: CapabilityBinding): CapabilityBinding {
 }
 
 function publicConsumer(consumer: ConsumerEntry): CapabilityConsumer {
-  const { teardown: _teardown, ...publicValue } = consumer;
+  const { teardown: _teardown, teardownPromise: _teardownPromise, ...publicValue } = consumer;
   return structuredClone(publicValue);
 }
 

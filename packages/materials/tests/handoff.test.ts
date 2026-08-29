@@ -51,14 +51,17 @@ test("planner handoffs are lane-gated, versioned, and context-visible", async ()
     const plannedWorkItem = Object.values((await services.control.snapshot(runId)).workItems)[0];
     assert.equal(plannedWorkItem?.status, "READY");
     assert.ok(first.hash.length === 64);
-    assert.match(contextText(new ContextCompiler().build({
+    const compiledContext = contextText(new ContextCompiler().build({
       runId,
       lane: "executor",
       phase: "reconnaissance",
       task,
       snapshot: await services.control.snapshot(runId),
       contextWindow: 4096,
-    })), /<planner-handoff/);
+    }));
+    assert.match(compiledContext, /<active-controls>/);
+    assert.ok(compiledContext.includes(`- ${first.id}: phase=reconnaissance; status=ACCEPTED; knowledge=${first.knowledgeVersion}`));
+    assert.doesNotMatch(compiledContext, /<planner-handoff/);
 
     await assert.rejects(
       services.control.dispatch(runId, { type: "handoff_accepted", handoffId: first.id, lane: "planner" }),

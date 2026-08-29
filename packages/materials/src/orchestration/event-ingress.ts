@@ -1,4 +1,4 @@
-import type { ControlStore } from "../control/control-store.js";
+import type { ControlStore, IngressClaim } from "../control/control-store.js";
 import type { HarnessEvent, RunEventEnvelope, RunEventPriority, RunEventReplayPolicy, RunEventSource } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 
@@ -34,6 +34,7 @@ export interface RunEventDrainResult {
   admitted: RunEventAction[];
   deferred: string[];
   coalesced: string[];
+  failed: string[];
 }
 
 type IngressPayload = { envelope: RunEventEnvelope; payload?: Record<string, unknown> };
@@ -75,39 +76,33 @@ export class RunEventIngress {
       ...(input.payloadRef ? { payloadRef: input.payloadRef } : {}),
       createdAt: now,
     };
-    const appended = await this.controlStore.append(runId, [{
-      schemaVersion: 1,
-      type: "event_ingress_received",
-      actor: "orchestrator",
-      lane: "main",
-      correlationId: input.correlationId,
-      payload: { envelope, ...(payload ? { payload } : {}) },
-      envelope,
-    }]);
-    return appended.at(-1)!.envelope!;
+    return await this.controlStore.appendIngressReceived(runId, { envelope, ...(payload ? { payload } : {}) });
   }
 
   public async drain(runId: string, safePoint: SafePoint, maxEvents = 32): Promise<RunEventDrainResult> {
     if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 256) throw new Error("event ingress maxEvents must be an integer from 1 to 256");
     const events = await this.controlStore.events(runId);
     const currentGeneration = (await this.controlStore.snapshot(runId)).generation;
-    const processed = new Set(events.filter((event) => event.type === "event_ingress_processed").map((event) => String(event.payload?.ingressId ?? "")));
+    const processed = new Set(events
+      .filter((event) => event.type === "event_ingress_processed" && ["applied", "coalesced", "failed"].includes(String(event.payload?.status)))
+      .map((event) => String(event.payload?.ingressId ?? "")));
     const pending = events
       .filter((event): event is HarnessEvent & { payload: IngressPayload } => event.type === "event_ingress_received" && Boolean(event.envelope) && !processed.has(event.envelope!.id) && Boolean(event.payload?.envelope))
       .sort((a, b) => priorityRank(a.envelope!.priority) - priorityRank(b.envelope!.priority) || a.seq - b.seq);
-    const selected: Array<{ event: HarnessEvent & { payload: IngressPayload }; status: RunEventEnvelope["status"] }> = [];
+    const selected: Array<{ event: HarnessEvent & { payload: IngressPayload }; status: IngressClaim["status"] }> = [];
     const deferred: string[] = [];
     const coalesced: string[] = [];
+    const failed: string[] = [];
+    const stale: Array<{ event: HarnessEvent & { payload: IngressPayload }; status: "failed" }> = [];
+    const ready: Array<HarnessEvent & { payload: IngressPayload }> = [];
     const latestByKey = new Map<string, HarnessEvent & { payload: IngressPayload }>();
     for (const event of pending) {
       const envelope = event.envelope!;
       if (envelope.generation !== currentGeneration) {
-        selected.push({ event, status: "deferred" });
-        deferred.push(envelope.id);
+        stale.push({ event, status: "failed" });
         continue;
       }
       if (envelope.priority !== "urgent" && safePoint === "provider_terminal" && envelope.source === "provider") {
-        selected.push({ event, status: "deferred" });
         deferred.push(envelope.id);
         continue;
       }
@@ -119,30 +114,26 @@ export class RunEventIngress {
         }
         latestByKey.set(envelope.coalescingKey, event);
       } else {
-        selected.push({ event, status: "applied" });
+        ready.push(event);
       }
-      if (selected.length >= maxEvents) break;
     }
     for (const event of latestByKey.values()) {
-      if (!selected.some((item) => item.event.envelope!.id === event.envelope!.id)) selected.push({ event, status: "applied" });
+      ready.push(event);
     }
-    const bounded = selected.slice(0, maxEvents);
-    if (bounded.length > 0) {
-      await this.controlStore.append(runId, bounded.map(({ event, status }) => ({
-        schemaVersion: 1,
-        type: "event_ingress_processed" as const,
-        actor: "orchestrator" as const,
-        lane: "main" as const,
-        correlationId: event.envelope!.correlationId,
-        payload: { ingressId: event.envelope!.id, status, safePoint },
-        envelope: { ...event.envelope!, status },
-      })));
-    }
+    selected.push(...ready.map((event) => ({ event, status: "applied" as const })));
+    const bounded = [...stale, ...selected].slice(0, maxEvents);
+    const claims = await this.controlStore.claimIngress(runId, bounded.map(({ event, status }) => ({ ingressId: event.envelope!.id, envelope: event.envelope!, status, safePoint })));
+    const claimedIds = new Set(claims.map((claim) => claim.ingressId));
+    const claimed = bounded.filter((item) => claimedIds.has(item.event.envelope!.id));
+    failed.push(...claimed.filter((item) => item.status === "failed").map((item) => item.event.envelope!.id));
+    const admitted = claimed.filter((item) => item.status === "applied");
+    const claimedCoalesced = claimed.filter((item) => item.status === "coalesced");
     return {
       safePoint,
-      admitted: bounded.filter((item) => item.status === "applied").map(({ event }) => ({ ingressId: event.envelope!.id, kind: event.envelope!.kind, source: event.envelope!.source, generation: event.envelope!.generation, payload: event.payload.payload ?? {} })),
+      admitted: admitted.map(({ event }) => ({ ingressId: event.envelope!.id, kind: event.envelope!.kind, source: event.envelope!.source, generation: event.envelope!.generation, payload: event.payload.payload ?? {} })),
       deferred,
-      coalesced,
+      coalesced: claimedCoalesced.map((item) => item.event.envelope!.id),
+      failed,
     };
   }
 }

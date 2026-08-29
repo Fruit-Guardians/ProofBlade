@@ -79,17 +79,17 @@ export class BackgroundJobRunner {
     return created;
   }
 
-  public async poll(jobId: string): Promise<JobRecord> {
+  public async poll(jobId: string, now = Date.now()): Promise<JobRecord> {
     const job = (await this.controlStore.snapshot(this.runId)).jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
-    if (isExpired(job)) {
+    if (isExpired(job, now)) {
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
         jobId: job.id,
         status: "TIMED_OUT",
         outcome: "timeout",
         error: "Background job timeout exceeded.",
-        lane: "executor",
+        lane: job.lane,
       });
       return (await this.controlStore.snapshot(this.runId)).jobs[jobId]!;
     }
@@ -106,7 +106,7 @@ export class BackgroundJobRunner {
     return (await this.controlStore.snapshot(this.runId)).jobs[jobId]!;
   }
 
-  public async recover(): Promise<JobRecord[]> {
+  public async recover(now = Date.now()): Promise<JobRecord[]> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const recovered: JobRecord[] = [];
     for (const job of Object.values(snapshot.jobs)) {
@@ -116,8 +116,34 @@ export class BackgroundJobRunner {
         recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
         continue;
       }
+      if (job.status === "RUNNING" && job.timeoutMs !== undefined) {
+        const deadline = durableDeadline(job);
+        if (deadline === undefined) {
+          await this.controlStore.dispatch(this.runId, {
+            type: "job_reconciled",
+            jobId: job.id,
+            reason: "Process restarted while the running job had no valid durable deadline; execution was not resumed.",
+            lane: job.lane,
+          });
+          recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
+          continue;
+        }
+        if (now >= deadline) {
+          await this.controlStore.dispatch(this.runId, {
+            type: "job_finished",
+            jobId: job.id,
+            status: "TIMED_OUT",
+            outcome: "timeout",
+            error: "Background job deadline elapsed before recovery.",
+            finishedAt: new Date(now).toISOString(),
+            lane: job.lane,
+          });
+          recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
+          continue;
+        }
+      }
       if (job.argsRedacted) {
-        await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: "Process restarted after background arguments were redacted; original arguments are unavailable for replay.", lane: "executor" });
+        await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: "Process restarted after background arguments were redacted; original arguments are unavailable for replay.", lane: job.lane });
         recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
         continue;
       }
@@ -125,7 +151,7 @@ export class BackgroundJobRunner {
         this.schedule(job);
         recovered.push(job);
       } else {
-        await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: "Process restarted while an unsafe background job was active.", lane: "executor" });
+        await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: "Process restarted while an unsafe background job was active.", lane: job.lane });
         recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
       }
     }
@@ -222,8 +248,26 @@ export class BackgroundJobRunner {
     try {
       const current = await this.poll(job.id);
       if (current.status === "CANCELLED") return;
-      await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
-      if (job.timeoutMs) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, job.timeoutMs);
+      let running = current;
+      if (current.status === "QUEUED") {
+        await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
+        running = (await this.controlStore.snapshot(this.runId)).jobs[job.id]!;
+      }
+      const remainingTimeoutMs = running.timeoutMs === undefined ? undefined : durableDeadline(running) === undefined
+        ? undefined
+        : durableDeadline(running)! - Date.now();
+      if (running.timeoutMs !== undefined && remainingTimeoutMs !== undefined && remainingTimeoutMs <= 0) {
+        await this.controlStore.dispatch(this.runId, {
+          type: "job_finished",
+          jobId: job.id,
+          status: "TIMED_OUT",
+          outcome: "timeout",
+          error: "Background job deadline elapsed before execution resumed.",
+          lane: job.lane,
+        });
+        return;
+      }
+      if (remainingTimeoutMs !== undefined) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, remainingTimeoutMs);
       const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput, backendId: job.backendId, backendVersion: job.backendVersion }, entry.controller.signal);
       const after = await this.poll(job.id);
       if (["CANCELLED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(after.status)) return;
@@ -260,10 +304,16 @@ export class BackgroundJobRunner {
   }
 }
 
-function isExpired(job: JobRecord): boolean {
-  if (job.status !== "RUNNING" || !job.timeoutMs || !job.startedAt) return false;
+function isExpired(job: JobRecord, now = Date.now()): boolean {
+  if (job.status !== "RUNNING") return false;
+  const deadline = durableDeadline(job);
+  return deadline !== undefined && now >= deadline;
+}
+
+function durableDeadline(job: JobRecord): number | undefined {
+  if (!job.timeoutMs || !job.startedAt) return undefined;
   const startedAt = Date.parse(job.startedAt);
-  return Number.isFinite(startedAt) && Date.now() >= startedAt + job.timeoutMs;
+  return Number.isFinite(startedAt) ? startedAt + job.timeoutMs : undefined;
 }
 
 function isTerminalRun(status: string): boolean {

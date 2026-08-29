@@ -31,7 +31,7 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
+import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import { contextSnapshot, type AgentLanePort, type AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
@@ -55,7 +55,7 @@ import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
-import { acknowledgeObservationItems, formatObservationQueue, projectObservationQueue } from "../orchestration/observation-queue.js";
+import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
 import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
@@ -290,7 +290,7 @@ export class PiCodingLane implements AgentLanePort {
       // Enable MCP so the reverse capability backend can route disasm/decompile
       // to a configured decompiler MCP (idalib-mcp / jadx-mcp) instead of only
       // objdump-level static analysis. The mcp_call proxy is already enabled.
-      { includeMcp: true },
+      { includeMcp: true, skills },
     );
     // Wire persistent tube tools either over the per-run Docker runtime or over
     // a configured durable session broker. Without either backend (ordinary
@@ -572,22 +572,35 @@ export class PiCodingLane implements AgentLanePort {
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
       const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
-      const observationText = formatObservationQueue(queue);
-      if (observationText) {
+      if (queue.total > 0) {
         const injectedById = new Map(maintenance.injectedObservationItems.map((item) => [item.id, item]));
         for (const item of queue.items.slice(0, 8)) injectedById.set(item.id, item);
         maintenance.injectedObservationItems = [...injectedById.values()];
       }
-      const contextMessages = observationText
-        ? [...messages, { role: "user" as const, content: observationText, timestamp: Date.now() }]
-        : messages;
+      const compiled = contextCompiler.build({
+        runId: options.runId,
+        lane: "main",
+        phase: current.phase,
+        task: current.task,
+        snapshot: current,
+        contextWindow: profile.contextWindow,
+        outputBudget: profile.maxTokens,
+        safetyMargin: providerSafetyTokens,
+        resources: contextResources,
+        observationQueue: queue.items,
+        previousBlocks: previousContextBlocks,
+      });
+      previousContextBlocks = compiled.manifest.blocks;
+      const dynamicProjection = contextProjectionMessage(compiled);
+      const contextMessages = injectReasoningForestContext(messages, forestContext.value);
       const prepared = prepareContextMaintenance({
-        messages: injectReasoningForestContext(contextMessages, forestContext.value),
+        messages: contextMessages,
         availableTokens: contextBudget,
         maintenanceLimitTokens: proactiveMaintenanceLimit,
         messageBudget: targetMessageBudget,
+        baseTokens: estimateTokens(JSON.stringify(dynamicProjection)),
       });
-      currentContextTokens = prepared.estimatedTokens;
+      currentContextTokens = prepared.estimatedTokens + estimateTokens(JSON.stringify(dynamicProjection));
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
         // so persist the bounded ledger checkpoint directly before Pi compacts.
@@ -596,7 +609,7 @@ export class PiCodingLane implements AgentLanePort {
         await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
       }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
-      return { messages: prepared.messages };
+      return { messages: [...prepared.messages, dynamicProjection] };
     });
     harness.on("session_before_compact", async ({ preparation }) => ({
       compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, {
@@ -926,6 +939,30 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
     new Date(0).toISOString(),
   ));
   return output;
+}
+
+/**
+ * Attach the compiler's current dynamic projection to the provider view only.
+ * The message is hidden from the session UI and never persisted as a Pi entry;
+ * its hash/details make the exact provider suffix explainable from the same
+ * snapshot and ContextManifest used by observability.
+ */
+function contextProjectionMessage(compiled: ContextBuildOutput): AgentMessage {
+  const dynamicContent = compiled.messages.slice(1).map((message) => `[${message.role}]\n${message.content}`).join("\n\n");
+  const dynamicHash = sha256(dynamicContent);
+  const content = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n${dynamicContent}\n</proofblade-context>`;
+  return createCustomMessage(
+    "proofblade_context_projection",
+    content,
+    false,
+    {
+      manifestHash: compiled.manifest.hash,
+      dynamicSuffixHash: dynamicHash,
+      sourceIds: compiled.manifest.sourceIds ?? [],
+      blockIds: compiled.manifest.blocks?.map((block) => block.id) ?? [],
+    },
+    new Date(0).toISOString(),
+  );
 }
 
 function pwnReproductionPolicyFor(contract: PwnReproductionContract | undefined): PwnReproductionPolicy | undefined {

@@ -236,6 +236,29 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
 
     await services.control.dispatch(runId, {
       type: "job_queued",
+      job: { id: "J-RECOVER-EXPIRED", capabilityId: "proofblade.target", operation: "delay", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: { milliseconds: 500 }, replayPolicy: "idempotent", status: "QUEUED", lane: "executor", generation, timeoutMs: 50 },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-RECOVER-EXPIRED", startedAt: new Date(Date.now() - 1_000).toISOString(), lane: "executor" });
+    await runtime.recoverJobs();
+    const expired = await runtime.jobStatus("J-RECOVER-EXPIRED");
+    assert.equal(expired.status, "TIMED_OUT");
+    assert.match(expired.error ?? "", /deadline elapsed before recovery/);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-RECOVER-ACTIVE", capabilityId: "proofblade.target", operation: "delay", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: { milliseconds: 100 }, replayPolicy: "idempotent", status: "QUEUED", lane: "executor", generation, timeoutMs: 2_000 },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-RECOVER-ACTIVE", startedAt: new Date().toISOString(), lane: "executor" });
+    await runtime.recoverJobs();
+    await runtime.recoverJobs();
+    assert.equal((await runtime.waitJob("J-RECOVER-ACTIVE", 2_000)).status, "SUCCEEDED");
+    const activeStarts = (await services.control.events(runId)).filter((event) => event.type === "job_started" && event.payload.jobId === "J-RECOVER-ACTIVE");
+    assert.equal(activeStarts.length, 1);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
       job: { id: "J-BACKEND-DRIFT", capabilityId: "proofblade.target", operation: "list", backendId: "proofblade-bundled", backendVersion: "0.9.0", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation },
       lane: "executor",
     });
