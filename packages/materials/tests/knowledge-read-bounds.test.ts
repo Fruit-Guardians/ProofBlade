@@ -111,10 +111,15 @@ test("bounded projection metadata does not change artifact L2 content reads", as
   };
   snapshot.artifacts[artifact.id] = artifact;
   const artifactStore = {
-    readText: async (requestedRunId: string, requestedArtifact: ArtifactRef) => {
+    readText: async () => {
+      throw new Error("readKnowledge L2 must use readTextRange");
+    },
+    readTextRange: async (requestedRunId: string, requestedArtifact: ArtifactRef, maxBytes: number) => {
       assert.equal(requestedRunId, runId);
       assert.equal(requestedArtifact, artifact);
-      return content;
+      assert.ok(maxBytes < Buffer.byteLength(content));
+      const boundedContent = Buffer.from(content).subarray(0, maxBytes).toString("utf8");
+      return { content: boundedContent, offset: 0, bytesRead: Buffer.byteLength(boundedContent), totalBytes: Buffer.byteLength(content), truncated: true };
     },
   } as ArtifactStore;
 

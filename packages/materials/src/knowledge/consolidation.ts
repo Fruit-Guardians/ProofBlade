@@ -233,7 +233,9 @@ function closeIdSet(ids: string[], limit: number): { ids: string[]; closure: Con
 }
 
 function rejectedHypotheses(snapshot: RunSnapshot): string[] {
-  return Object.values(snapshot.hypotheses).filter((item) => item.status === "REJECTED").map((item) => item.id);
+  return Object.values(snapshot.hypotheses)
+    .filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && item.status === "REJECTED")
+    .map((item) => item.id);
 }
 
 function selectArtifacts(snapshot: RunSnapshot, input: ConsolidateInput): ArtifactRef[] {

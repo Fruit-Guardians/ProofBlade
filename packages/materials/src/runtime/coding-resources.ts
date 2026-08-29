@@ -9,11 +9,13 @@ import {
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
+import { boundedRequestedChars } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
+import { KNOWLEDGE_READ_MAX_TOKENS } from "../knowledge/projection.js";
 import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
@@ -447,16 +449,17 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
       if (!input.artifactId) throw new Error("evidence read requires artifactId");
-      return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, input.maxChars));
+      return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
     }
     if (input.operation === "inspect_uri") {
       assertOnly(input, ["operation", "uri", "level", "maxChars"], "evidence inspect_uri");
       if (!input.uri) throw new Error("evidence inspect_uri requires uri");
-      return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", input.maxChars));
+      return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
     }
     if (input.operation === "search_uri") {
       assertOnly(input, ["operation", "query", "maxResults", "maxChars", "includeStale"], "evidence search_uri");
-      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50, input.maxChars ?? 12_000, input.includeStale ?? false) }, false, input.maxChars ?? 12_000);
+      const maxChars = boundedRequestedChars(input.maxChars, 12_000, KNOWLEDGE_READ_MAX_TOKENS);
+      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50, maxChars, input.includeStale ?? false) }, false, maxChars);
     }
     if (input.operation === "consolidate") {
       assertOnly(input, ["operation", "artifactIds", "policy", "maxArtifacts"], "evidence consolidate");

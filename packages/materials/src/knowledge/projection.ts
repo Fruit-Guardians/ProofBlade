@@ -10,6 +10,7 @@ import type {
 import { buildReasoningForest } from "./evidence-graph.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { snipText } from "@proofblade/molecules";
+import { boundModelText, boundedRequestedChars } from "../domain/text-bounds.js";
 import type { ProofBladeSkillRegistry, SkillCatalogEntry } from "../skills/registry.js";
 
 export interface ProjectKnowledgeSource {
@@ -22,6 +23,8 @@ export interface ProjectKnowledgeSource {
 }
 
 export const KNOWLEDGE_VERSION = "proofblade-knowledge@1";
+/** Keep one knowledge response comfortably below the 10K-token ledger limit. */
+export const KNOWLEDGE_READ_MAX_TOKENS = 6_000;
 
 const READ_PROJECTION_SOURCE_IDS_LIMIT = 64;
 const READ_PROJECTION_LINKS_LIMIT = 64;
@@ -88,31 +91,33 @@ export async function readKnowledge(
   level: KnowledgeLevel = "L0",
   maxChars = 6_000,
 ): Promise<KnowledgeReadResult> {
-  if (!Number.isInteger(maxChars) || maxChars < 256 || maxChars > 64_000) throw new Error("Knowledge maxChars must be an integer from 256 to 64000");
+  const effectiveMaxChars = boundedRequestedChars(maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS);
   const projection = projectKnowledge(snapshot, uri);
   if (level !== "L2" || projection.kind !== "artifact" || !projection.levels.L2) {
     const raw = level === "L0" ? projection.levels.L0 : projection.levels.L1;
-    const bounded = snipText(raw, maxChars);
+    const bounded = boundModelText(raw, effectiveMaxChars, KNOWLEDGE_READ_MAX_TOKENS);
     return { projection: boundReadProjection(projection), level, content: bounded.text, truncated: bounded.truncated };
   }
   const artifactId = projection.sourceIds.find((id) => Boolean(snapshot.artifacts[id]));
   if (!artifactId) throw new Error(`Knowledge artifact source is missing: ${projection.uri}`);
   const artifact = snapshot.artifacts[artifactId]!;
-  const raw = await artifactStore.readText(snapshot.runId, artifact);
-  const content = raw.slice(0, maxChars);
+  const range = await artifactStore.readTextRange(snapshot.runId, artifact, effectiveMaxChars);
+  const bounded = boundModelText(range.content, effectiveMaxChars, KNOWLEDGE_READ_MAX_TOKENS);
+  const content = bounded.text;
+  const truncated = range.truncated || bounded.truncated;
   const boundedProjection = boundReadProjection(projection);
   return {
-    projection: { ...boundedProjection, levels: { ...boundedProjection.levels, L2: { ...projection.levels.L2, bytes: artifact.bytes, truncated: content.length < raw.length } } },
+    projection: { ...boundedProjection, levels: { ...boundedProjection.levels, L2: { ...projection.levels.L2, bytes: artifact.bytes, truncated } } },
     level,
     content,
     artifactId,
-    truncated: content.length < raw.length,
+    truncated,
   };
 }
 
 export function searchKnowledge(snapshot: RunSnapshot, query = "", maxResults = 50, maxChars = 12_000, includeStale = false): KnowledgeProjection[] {
   if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 200) throw new Error("Knowledge maxResults must be an integer from 1 to 200");
-  if (!Number.isInteger(maxChars) || maxChars < 256 || maxChars > 64_000) throw new Error("Knowledge search maxChars must be an integer from 256 to 64000");
+  const effectiveMaxChars = boundedRequestedChars(maxChars, 12_000, KNOWLEDGE_READ_MAX_TOKENS);
   const needle = query.trim().toLocaleLowerCase();
   const uris = [
     "task/current",
@@ -128,7 +133,7 @@ export function searchKnowledge(snapshot: RunSnapshot, query = "", maxResults = 
     .filter((projection) => includeStale || !projection.stale)
     .filter((projection) => !needle || `${projection.uri}\n${projection.levels.L0}\n${projection.levels.L1}`.toLocaleLowerCase().includes(needle))
     .sort((left, right) => left.uri.localeCompare(right.uri));
-  return boundProjectionList(candidates, maxResults, maxChars);
+  return boundProjectionList(candidates, maxResults, effectiveMaxChars);
 }
 
 export function projectProjectKnowledge(source: ProjectKnowledgeSource, uri: string): KnowledgeProjection {
@@ -151,27 +156,28 @@ export function projectProjectKnowledge(source: ProjectKnowledgeSource, uri: str
 }
 
 export function readProjectKnowledge(source: ProjectKnowledgeSource, uri: string, level: KnowledgeLevel = "L0", maxChars = 6_000): KnowledgeReadResult {
-  if (!Number.isInteger(maxChars) || maxChars < 256 || maxChars > 64_000) throw new Error("Knowledge maxChars must be an integer from 256 to 64000");
+  const effectiveMaxChars = boundedRequestedChars(maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS);
   const projection = projectProjectKnowledge(source, uri);
   if (level === "L2" && projection.kind === "skill") {
     const name = decodeSegment(projection.uri.slice("pb://project/skills/".length));
-    const loaded = source.skills?.loadForModel(name, Math.min(maxChars, 12_000));
+    const loaded = source.skills?.loadForModel(name, effectiveMaxChars);
     if (!loaded) throw new Error(`Unknown project skill: ${name}`);
-    return { projection: boundReadProjection(projection), level, content: loaded.content, truncated: loaded.truncated };
+    const bounded = boundModelText(loaded.content, effectiveMaxChars, KNOWLEDGE_READ_MAX_TOKENS);
+    return { projection: boundReadProjection(projection), level, content: bounded.text, truncated: loaded.truncated || bounded.truncated };
   }
   const raw = level === "L0" ? projection.levels.L0 : projection.levels.L1;
-  const bounded = snipText(raw, maxChars);
+  const bounded = boundModelText(raw, effectiveMaxChars, KNOWLEDGE_READ_MAX_TOKENS);
   return { projection: boundReadProjection(projection), level, content: bounded.text, truncated: bounded.truncated };
 }
 
 export function searchProjectKnowledge(source: ProjectKnowledgeSource, query = "", maxResults = 50, maxChars = 12_000): KnowledgeProjection[] {
   if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 200) throw new Error("Knowledge maxResults must be an integer from 1 to 200");
-  if (!Number.isInteger(maxChars) || maxChars < 256 || maxChars > 64_000) throw new Error("Knowledge search maxChars must be an integer from 256 to 64000");
+  const effectiveMaxChars = boundedRequestedChars(maxChars, 12_000, KNOWLEDGE_READ_MAX_TOKENS);
   const needle = query.trim().toLocaleLowerCase();
   const candidates = [projectProjectKnowledge(source, "pb://project/index"), ...(source.skills?.list().map((skill) => projectProjectKnowledge(source, skillUri(skill.name))) ?? [])]
     .filter((projection) => !needle || `${projection.uri}\n${projection.levels.L0}\n${projection.levels.L1}`.toLocaleLowerCase().includes(needle))
     .sort((left, right) => Number(left.kind === "project") - Number(right.kind === "project") || left.uri.localeCompare(right.uri));
-  return boundProjectionList(candidates, maxResults, maxChars);
+  return boundProjectionList(candidates, maxResults, effectiveMaxChars);
 }
 
 export function boundProjectionList(candidates: KnowledgeProjection[], maxResults: number, maxChars: number): KnowledgeProjection[] {

@@ -8,6 +8,12 @@
       "command": "node --import tsx --test packages/atoms/tests/atoms.test.ts"
     },
     {
+      "id": "molecules-artifact-storage",
+      "sourceGlobs": ["packages/molecules/src/file-artifact.ts"],
+      "testGlobs": ["packages/molecules/tests/molecules.test.ts"],
+      "command": "node --import tsx --test packages/molecules/tests/molecules.test.ts"
+    },
+    {
       "id": "mcp-registry",
       "sourceGlobs": ["packages/materials/src/mcp/**"],
       "testGlobs": ["packages/materials/tests/mcp.test.ts"],

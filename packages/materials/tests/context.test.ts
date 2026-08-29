@@ -4,6 +4,8 @@ import { ContextCompiler } from "../src/context/compiler.js";
 import { prepareContextMaintenance } from "../src/context/maintenance-coordinator.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
 import type { TaskContract } from "../src/domain/types.js";
+import { estimateTokens } from "../src/domain/utils.js";
+import { MAX_LEDGER_BLOCK_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
 
 const task: TaskContract = {
   schema_version: 1,
@@ -135,7 +137,78 @@ test("context control view exposes bounded recovery and work constraints", () =>
   assert.match(rendered, /external process outcome is unknown/);
   assert.match(rendered, /inspect the interrupted process/);
   assert.match(rendered, /same-payload/);
-  assert.equal(compiled.manifest.compilerVersion, "proofblade-context@7");
+  assert.equal(compiled.manifest.compilerVersion, "proofblade-context@8");
+});
+
+test("context task contract bounds oversized model-facing fields", () => {
+  const snapshot = createInitialSnapshot("CTX-BOUNDS", task);
+  const oversizedTask: TaskContract = {
+    ...task,
+    task_id: "CTX-BOUNDS",
+    objective: "objective-value ".repeat(12_000),
+    inputs: Array.from({ length: 80 }, (_, index) => ({ path: `input-${index}-${"x".repeat(300)}`, sha256: "a".repeat(64), read_only: true })),
+    success_criteria: Array.from({ length: 40 }, (_, index) => `criterion-${index}-${"x".repeat(300)}`),
+    scope: {
+      ...task.scope,
+      allowed_hosts: Array.from({ length: 80 }, (_, index) => `host-${index}-${"x".repeat(300)}`),
+      allowed_ports: Array.from({ length: 100 }, (_, index) => 1_000 + index),
+      allowed_endpoints: Array.from({ length: 80 }, (_, index) => ({ host: `endpoint-${index}-${"x".repeat(300)}`, port: 2_000 + index })),
+      allowed_workspace: "workspace/" + "x".repeat(2_000),
+    },
+    pause_policy: Array.from({ length: 40 }, (_, index) => `pause-${index}-${"x".repeat(300)}`),
+  };
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task: oversizedTask, snapshot, contextWindow: 100_000 });
+  const l1 = compiled.manifest.blocks?.find((block) => block.id === "context.l1")?.content ?? "";
+  const parsed = JSON.parse(l1) as { objective?: string; inputs?: unknown[]; input_refs?: { items?: unknown[] }; bounds?: { max_tokens: number; truncated_fields: string[] } };
+  assert.ok(estimateTokens(l1) <= MAX_TASK_LAYER_TOKENS);
+  assert.ok((parsed.objective?.length ?? 0) < oversizedTask.objective.length);
+  assert.ok((parsed.inputs?.length ?? parsed.input_refs?.items?.length ?? 0) <= 32);
+  assert.equal(parsed.bounds?.max_tokens, MAX_TASK_LAYER_TOKENS);
+  assert.ok((parsed.bounds?.truncated_fields.length ?? 0) > 0);
+  assert.equal(compiled.manifest.layerTokens.L1 <= MAX_TASK_LAYER_TOKENS, true);
+});
+
+test("context keeps each durable ledger block below the absolute token cap", () => {
+  const snapshot = createInitialSnapshot("CTX-L3-BOUNDS", task);
+  snapshot.facts = Object.fromEntries(Array.from({ length: 2_000 }, (_, index) => [`F-${index}`, {
+    id: `F-${index}`, runId: snapshot.runId, generation: snapshot.generation,
+    statement: `confirmed finding ${index} ${"x".repeat(300)}`, status: "CONFIRMED" as const, evidenceIds: [], createdSeq: index + 1,
+  }]));
+  snapshot.jobs = Object.fromEntries(Array.from({ length: 2_000 }, (_, index) => [`J-${index}`, {
+    id: `J-${index}`, capabilityId: "proofblade.test", operation: "run", backendId: "test", backendVersion: "1",
+    args: {}, replayPolicy: "idempotent" as const, status: "RUNNING" as const, lane: "executor" as const,
+    generation: snapshot.generation, createdSeq: index + 1,
+  }]));
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, contextWindow: 100_000 });
+  const l3a = compiled.manifest.blocks?.find((block) => block.id === "context.l3a")?.content ?? "";
+  const l3b = compiled.manifest.blocks?.find((block) => block.id === "context.l3b")?.content ?? "";
+  assert.ok(estimateTokens(l3a) <= MAX_LEDGER_BLOCK_TOKENS);
+  assert.ok(estimateTokens(l3b) <= MAX_LEDGER_BLOCK_TOKENS);
+  assert.ok(compiled.manifest.layerTokens.L3A <= MAX_LEDGER_BLOCK_TOKENS);
+  assert.ok(compiled.manifest.layerTokens.L3B <= MAX_LEDGER_BLOCK_TOKENS);
+});
+
+test("hidden observation queue changes do not change the visible dynamic projection hash", () => {
+  const snapshot = createInitialSnapshot("CTX-OBSERVATIONS", task);
+  const queue = Array.from({ length: 9 }, (_, index) => ({
+    id: `observation:${index}`,
+    sourceEventIds: [`event-${index}`],
+    source: "job" as const,
+    kind: "job.finished",
+    priority: "normal" as const,
+    generation: snapshot.generation,
+    sequence: index + 1,
+    summary: `job ${index}`,
+    relatedIds: [`J-${index}`],
+    artifactIds: [],
+    createdAt: new Date(0).toISOString(),
+  }));
+  const first = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, observationQueue: queue });
+  const second = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, observationQueue: [...queue, { ...queue[0]!, id: "observation:hidden", sourceEventIds: ["event-hidden"], sequence: 10, summary: "hidden job" }] });
+  assert.equal(first.manifest.observationQueue?.hash, second.manifest.observationQueue?.hash);
+  assert.equal(first.manifest.cache.dynamicHash, second.manifest.cache.dynamicHash);
+  assert.equal(second.manifest.observationQueue?.hidden, 2);
+  assert.doesNotMatch(second.manifest.blocks?.find((block) => block.id === "context.l3b")?.content ?? "", /hidden job/);
 });
 
 test("context blocks isolate durable ledger changes from active lease changes", () => {

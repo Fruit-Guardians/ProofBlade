@@ -6,6 +6,7 @@ const BEARER_VALUE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/=._-]+/gi;
 
 export interface RequestEpochInput {
   runId: string;
+  generation?: number;
   lane: Lane;
   provider: string;
   model: string;
@@ -60,6 +61,7 @@ export function createRequestEpoch(input: RequestEpochInput): Omit<RequestEpoch,
     id: input.requestId ? `RE-${sha256(`${input.runId}:${input.requestId}`).slice(0, 32)}` : `RE-${sha256(`${input.runId}:${Date.now()}:${Math.random()}`).slice(0, 32)}`,
     requestId: boundedIdentity(input.requestId ?? `request-${Date.now()}`, "request id"),
     runId: boundedIdentity(input.runId, "run id"),
+    ...(input.generation === undefined ? {} : { generation: boundedGeneration(input.generation) }),
     ...(input.turnId ? { turnId: boundedIdentity(input.turnId, "turn id") } : {}),
     ...(input.stepId ? { stepId: boundedIdentity(input.stepId, "step id") } : {}),
     lane: input.lane,
@@ -172,6 +174,11 @@ function boundedIdentity(value: string, label: string): string {
 
 function boundedPositiveInteger(value: number, label: string): number {
   if (!Number.isInteger(value) || value < 1 || value > 10_000_000) throw new Error(`${label} must be a positive bounded integer`);
+  return value;
+}
+
+function boundedGeneration(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 10_000_000) throw new Error("generation must be a bounded non-negative integer");
   return value;
 }
 

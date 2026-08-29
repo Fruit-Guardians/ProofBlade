@@ -53,6 +53,7 @@ export interface ContextManifestSummary {
 interface PendingProvider {
   requestId: string;
   epochId?: string;
+  generation?: number;
   startedAt: number;
   phase: string;
   provider: string;
@@ -269,6 +270,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     const pending: PendingProvider = {
       requestId: id("PR"),
       epochId: id("RE"),
+      generation: snapshot.generation,
       startedAt: Date.now(),
       phase: snapshot.phase,
       provider: event.model.provider,
@@ -290,6 +292,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         id: pending.epochId,
         requestId: pending.requestId,
         runId: options.runId,
+        ...(pending.generation === undefined ? {} : { generation: pending.generation }),
         lane: options.lane,
         provider: pending.provider,
         model: pending.model,

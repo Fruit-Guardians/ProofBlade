@@ -39,7 +39,7 @@ const DERIVED_EVENT_SOURCES: ReadonlyMap<HarnessEvent["type"], RunEventSource> =
  */
 export function projectObservationQueue(
   events: readonly HarnessEvent[],
-  snapshot: Pick<RunSnapshot, "runId" | "generation">,
+  snapshot: Pick<RunSnapshot, "runId" | "generation"> & Partial<Pick<RunSnapshot, "jobs" | "requestEpochs" | "verificationRequests" | "completions">>,
   options: ObservationQueueOptions = {},
 ): ObservationQueueProjection {
   const limit = normalizeLimit(options.limit);
@@ -50,7 +50,7 @@ export function projectObservationQueue(
       .filter(Boolean),
   );
   const candidates = events
-    .map((event) => observationCandidate(event, snapshot))
+    .map((event) => observationCandidate(event, events, snapshot))
     .filter((candidate): candidate is ObservationCandidate => candidate !== undefined)
     .filter((candidate) => candidate.generation === snapshot.generation)
     .filter((candidate) => !consumed.has(candidate.event.id));
@@ -110,7 +110,11 @@ interface ObservationCandidate {
   groupKey: string;
 }
 
-function observationCandidate(event: HarnessEvent, snapshot: Pick<RunSnapshot, "runId" | "generation">): ObservationCandidate | undefined {
+function observationCandidate(
+  event: HarnessEvent,
+  events: readonly HarnessEvent[],
+  snapshot: Pick<RunSnapshot, "runId" | "generation"> & Partial<Pick<RunSnapshot, "jobs" | "requestEpochs" | "verificationRequests" | "completions">>,
+): ObservationCandidate | undefined {
   if (event.type === "event_ingress_received") {
     const envelope = event.envelope;
     if (!envelope || envelope.runId !== snapshot.runId || envelope.source === "user") return undefined;
@@ -131,12 +135,14 @@ function observationCandidate(event: HarnessEvent, snapshot: Pick<RunSnapshot, "
   const source = DERIVED_EVENT_SOURCES.get(event.type);
   if (!source) return undefined;
   const payload = recordValue(event.payload);
+  const generation = generationForDerivedEvent(event, events, snapshot);
+  if (generation === undefined) return undefined;
   return {
     event,
     source,
     kind: derivedKind(event.type),
     priority: derivedPriority(event.type),
-    generation: payloadGeneration(event, snapshot.generation),
+    generation,
     summary: derivedSummary(event.type, payload),
     relatedIds: relatedIds(payload),
     artifactIds: artifactIds(payload),
@@ -193,8 +199,58 @@ function derivedSummary(type: HarnessEvent["type"], payload: Record<string, unkn
   return `${prefix}: maintenance state changed`;
 }
 
-function payloadGeneration(event: HarnessEvent, fallback: number): number {
-  return typeof event.envelope?.generation === "number" ? event.envelope.generation : typeof event.payload?.generation === "number" ? event.payload.generation : fallback;
+function generationForDerivedEvent(
+  event: HarnessEvent,
+  events: readonly HarnessEvent[],
+  snapshot: Pick<RunSnapshot, "runId" | "generation"> & Partial<Pick<RunSnapshot, "jobs" | "requestEpochs" | "verificationRequests" | "completions">>,
+): number | undefined {
+  if (Number.isSafeInteger(event.envelope?.generation)) return event.envelope!.generation;
+  if (Number.isSafeInteger(event.payload?.generation)) return event.payload!.generation as number;
+  const payload = recordValue(event.payload);
+  if (event.type === "job_finished" || event.type === "job_reconciled") {
+    const generation = typeof payload.jobId === "string"
+      ? snapshot.jobs?.[payload.jobId]?.generation ?? generationFromJobEvent(events, payload.jobId)
+      : undefined;
+    if (generation !== undefined) return generation;
+  }
+  if (event.type === "provider_request_stalled" || event.type === "provider_recovery_required") {
+    const epoch = Object.values(snapshot.requestEpochs ?? {}).find((candidate) => candidate.id === payload.epochId || candidate.requestId === payload.requestId);
+    const generation = epoch?.generation ?? generationFromEpochEvent(events, payload);
+    if (Number.isSafeInteger(generation)) return generation as number;
+  }
+  if (event.type === "verification_recovery_required" || event.type === "verification_recovery_resolved") {
+    const generation = typeof payload.requestId === "string" ? snapshot.verificationRequests?.[payload.requestId]?.generation : undefined;
+    if (generation !== undefined) return generation;
+  }
+  if (event.type === "completion_verified") {
+    const generation = typeof payload.completionId === "string" ? snapshot.completions?.[payload.completionId]?.generation : undefined;
+    if (generation !== undefined) return generation;
+  }
+  // An entity-free legacy event is ambiguous after a fixture reset. Failing
+  // closed prevents an old provider/job result from entering the current run.
+  return undefined;
+}
+
+function generationFromEpochEvent(events: readonly HarnessEvent[], payload: Record<string, unknown>): number | undefined {
+  const epochId = typeof payload.epochId === "string" ? payload.epochId : undefined;
+  const requestId = typeof payload.requestId === "string" ? payload.requestId : undefined;
+  const started = [...events].reverse().find((candidate) => {
+    if (candidate.type !== "request_epoch_started") return false;
+    const epoch = recordValue(candidate.payload?.epoch);
+    return (epochId !== undefined && epoch.id === epochId) || (requestId !== undefined && epoch.requestId === requestId);
+  });
+  const generation = started ? recordValue(started.payload?.epoch).generation : undefined;
+  return Number.isSafeInteger(generation) ? generation as number : undefined;
+}
+
+function generationFromJobEvent(events: readonly HarnessEvent[], jobId: string): number | undefined {
+  const queued = [...events].reverse().find((candidate) => {
+    if (candidate.type !== "job_queued") return false;
+    const job = recordValue(candidate.payload?.job);
+    return job.id === jobId;
+  });
+  const generation = queued ? recordValue(queued.payload?.job).generation : undefined;
+  return Number.isSafeInteger(generation) ? generation as number : undefined;
 }
 
 function relatedIds(payload: Record<string, unknown>): string[] {

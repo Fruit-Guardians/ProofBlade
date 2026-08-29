@@ -207,6 +207,30 @@ test("consolidation closes over complete bounded evidence and rejected-hypothesi
   }
 });
 
+test("consolidation excludes rejected hypotheses from a previous fixture generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-consolidation-generation-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "CONSOLIDATE-GENERATION";
+    const task = fixtureTask(runId, "reverse-strings-1", root, config);
+    await services.control.createRun(runId, task);
+    await services.control.dispatch(runId, {
+      type: "hypothesis",
+      hypothesis: { id: "H-OLD-GENERATION", statement: "old environment route", status: "REJECTED", evidenceIds: [] },
+    });
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    const source = await services.artifacts.putText(runId, "current generation source", { filename: "source.txt", sensitivity: "public" });
+    const result = await new EvidenceConsolidator(services.control, services.artifacts).consolidate(runId, { artifactIds: [source.id], policy: "all" });
+    assert.equal(result.closure.rejectedHypotheses.count, 0);
+    assert.deepEqual(result.closure.rejectedHypotheses.hash, sha256(canonicalJson([])));
+    assert.deepEqual(result.projection.levels.L1.includes("H-OLD-GENERATION"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("consolidation resumes start and artifact crash points without duplicate promotion", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-consolidation-recovery-"));
   try {

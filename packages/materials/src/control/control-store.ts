@@ -1948,6 +1948,11 @@ function validateRequestEpochCommand(snapshot: RunSnapshot, command: Extract<Dom
   const epoch = command.epoch;
   if (snapshot.requestEpochs[epoch.id]) throw new Error(`Request epoch already exists: ${epoch.id}`);
   if (epoch.runId !== snapshot.runId) throw new Error(`Request epoch run identity mismatch: ${epoch.id}`);
+  // Legacy epochs omitted generation. New epochs must bind to the snapshot
+  // that produced the actual Provider request.
+  if (epoch.generation !== undefined && epoch.generation !== snapshot.generation) {
+    throw new Error(`Request epoch generation mismatch: expected ${snapshot.generation}, got ${epoch.generation}`);
+  }
   if (!epoch.requestId.trim() || !epoch.provider.trim() || !epoch.model.trim() || !epoch.adapter.trim()) throw new Error("Request epoch identity fields are required");
   if (epoch.status !== "STARTED") throw new Error(`New request epoch must be STARTED, got ${epoch.status}`);
   if (!Number.isFinite(Date.parse(epoch.createdAt))) throw new Error("Request epoch createdAt must be an ISO timestamp");

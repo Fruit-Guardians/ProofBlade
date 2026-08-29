@@ -14,8 +14,9 @@ import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendRes
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobMonitorInput, type JobMonitorResult, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
-import { boundProjectionList, projectKnowledge, readKnowledge, readProjectKnowledge, searchKnowledge, searchProjectKnowledge, type KnowledgeReadResult, type ProjectKnowledgeSource } from "../knowledge/projection.js";
+import { boundProjectionList, KNOWLEDGE_READ_MAX_TOKENS, projectKnowledge, readKnowledge, readProjectKnowledge, searchKnowledge, searchProjectKnowledge, type KnowledgeReadResult, type ProjectKnowledgeSource } from "../knowledge/projection.js";
 import { EvidenceConsolidator, type ConsolidateInput, type ConsolidateResult } from "../knowledge/consolidation.js";
+import { boundedRequestedChars } from "../domain/text-bounds.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 
 export interface InspectTargetResult {
@@ -402,9 +403,10 @@ export class ProofBladeToolRuntime {
 
   public async searchKnowledge(query = "", maxResults = 50, maxChars = 12_000, includeStale = false): Promise<KnowledgeProjection[]> {
     const snapshot = await this.controlStore.snapshot(this.runId);
-    const run = searchKnowledge(snapshot, query, 200, 64_000, includeStale);
-    const project = searchProjectKnowledge(this.projectKnowledgeSource(), query, 200, 64_000);
-    return boundProjectionList([...project, ...run].sort((left, right) => left.uri.localeCompare(right.uri)), maxResults, maxChars);
+    const effectiveMaxChars = boundedRequestedChars(maxChars, 12_000, KNOWLEDGE_READ_MAX_TOKENS);
+    const run = searchKnowledge(snapshot, query, 200, effectiveMaxChars, includeStale);
+    const project = searchProjectKnowledge(this.projectKnowledgeSource(), query, 200, effectiveMaxChars);
+    return boundProjectionList([...project, ...run].sort((left, right) => left.uri.localeCompare(right.uri)), maxResults, effectiveMaxChars);
   }
 
   private projectKnowledgeSource(): ProjectKnowledgeSource {

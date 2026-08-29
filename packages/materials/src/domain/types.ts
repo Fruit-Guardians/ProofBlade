@@ -658,6 +658,8 @@ export interface RequestEpoch {
   id: string;
   requestId: string;
   runId: string;
+  /** Fixture/run generation that produced this request; omitted by legacy epochs. */
+  generation?: number;
   turnId?: string;
   stepId?: string;
   lane: Lane;
@@ -1186,7 +1188,7 @@ export interface KnowledgeProjection {
 }
 
 export interface ContextManifest {
-  version: 1;
+  version: 2;
   runId: string;
   lane: Lane;
   phase: Phase;

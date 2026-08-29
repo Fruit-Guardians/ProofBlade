@@ -39,12 +39,13 @@ test("RequestEpoch hashes request material without persisting secrets and replay
     const runId = "REQUEST-EPOCH-001";
     await services.control.createRun(runId, demoTask(runId, root, config));
     const epoch = createRequestEpoch({
-      runId, lane: "executor", provider: "test", model: "test-model", adapter: "openai-completions",
+      runId, generation: 0, lane: "executor", provider: "test", model: "test-model", adapter: "openai-completions",
       requestId: "request-1", contextWindow: 4096, toolNames: ["read", "read"],
       requestHeaders: { Authorization: "Bearer do-not-persist", "X-Trace": "opaque" },
       requestBody: { messages: [{ role: "user", content: "private" }], token: "do-not-persist" },
       scopePolicy: { allow: ["read"] },
     });
+    assert.equal(epoch.generation, 0);
     await services.control.dispatch(runId, { type: "request_epoch_started", epoch, lane: "executor" });
     await services.control.append(runId, [
       { schemaVersion: 1, lane: "executor", correlationId: "request-1", actor: "model", type: "request_epoch_context", payload: { requestEpochId: epoch.id, fields: { requestContextHash: hashRequestValue({ phase: "reconnaissance" }) } } },
@@ -60,6 +61,55 @@ test("RequestEpoch hashes request material without persisting secrets and replay
     assert.equal(JSON.stringify(replayed).includes("private"), false);
     assert.equal(replayed?.requestContextHash, hashRequestValue({ phase: "reconnaissance" }));
     assert.equal(hashRequestValue({ b: 2, a: 1 }), hashRequestValue({ a: 1, b: 2 }));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("RequestEpoch rejects stale generations while accepting legacy epochs without generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-request-epoch-generation-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "REQUEST-EPOCH-GENERATION-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const stale = createRequestEpoch({
+      runId, generation: 1, lane: "executor", provider: "test", model: "test-model", adapter: "openai-completions", requestId: "stale-request",
+    });
+    await assert.rejects(
+      services.control.dispatch(runId, { type: "request_epoch_started", epoch: stale, lane: "executor" }),
+      /generation mismatch/,
+    );
+
+    const legacy = createRequestEpoch({
+      runId, lane: "executor", provider: "test", model: "test-model", adapter: "openai-completions", requestId: "legacy-request",
+    });
+    await services.control.dispatch(runId, { type: "request_epoch_started", epoch: legacy, lane: "executor" });
+    assert.equal((await services.control.snapshot(runId)).requestEpochs[legacy.id]?.generation, undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ArtifactStore text ranges do not emit replacement characters at UTF-8 slice boundaries", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-artifact-range-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "ARTIFACT-RANGE-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const artifact = await services.artifacts.stageText(runId, "A\u4f60B\u597dC", { filename: "utf8.txt" });
+
+    const incompleteSuffix = await services.artifacts.readTextRange(runId, artifact, 2);
+    assert.equal(incompleteSuffix.content, "A");
+    assert.equal(incompleteSuffix.bytesRead, 2);
+    assert.equal(incompleteSuffix.truncated, true);
+
+    const splitBothEnds = await services.artifacts.readTextRange(runId, artifact, 4, 2);
+    assert.equal(splitBothEnds.content, "B");
+    assert.doesNotMatch(splitBothEnds.content, /\ufffd/);
+
+    const suffix = await services.artifacts.readTextRange(runId, artifact, 7, 2);
+    assert.equal(suffix.content, "B\u597dC");
+    assert.equal(suffix.truncated, false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

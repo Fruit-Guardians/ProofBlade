@@ -10,6 +10,7 @@ import { acknowledgeObservationItems, formatObservationQueue, projectObservation
 import { ContextCompiler } from "../src/context/compiler.js";
 import { Scope } from "../src/runtime/scope.js";
 import type { ProofBladeConfig } from "../src/config.js";
+import type { HarnessEvent, JobRecord, RequestEpoch } from "../src/domain/types.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -229,3 +230,81 @@ test("Observation queue is rebuilt from events, coalesces progress, redacts outp
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("Observation queue derives legacy Job and Provider generations without treating missing generation as current", () => {
+  const runId = "OBSERVATION-GENERATION-001";
+  const oldJob = jobRecord("J-OLD", 0);
+  const currentJob = jobRecord("J-CURRENT", 1);
+  const oldEpoch = requestEpoch("RE-OLD", "PR-OLD", 0);
+  const currentEpoch = requestEpoch("RE-CURRENT", "PR-CURRENT", 1);
+  const snapshot = {
+    runId,
+    generation: 1,
+    jobs: { [oldJob.id]: oldJob, [currentJob.id]: currentJob },
+    requestEpochs: { [oldEpoch.id]: oldEpoch, [currentEpoch.id]: currentEpoch },
+  };
+  const events = [
+    legacyEvent(runId, 1, "job_queued", { job: oldJob }),
+    legacyEvent(runId, 2, "job_queued", { job: currentJob }),
+    legacyEvent(runId, 3, "job_finished", { jobId: oldJob.id }),
+    legacyEvent(runId, 4, "job_finished", { jobId: currentJob.id }),
+    legacyEvent(runId, 5, "provider_request_stalled", { requestId: oldEpoch.requestId }),
+    legacyEvent(runId, 6, "provider_request_stalled", { requestId: currentEpoch.requestId }),
+    legacyEvent(runId, 7, "provider_request_stalled", { requestId: "PR-UNKNOWN" }),
+  ];
+  const projection = projectObservationQueue(events, snapshot);
+  assert.deepEqual(projection.items.map((item) => item.relatedIds[0]), [currentJob.id, currentEpoch.requestId]);
+  assert.equal(projection.items.some((item) => item.relatedIds.includes(oldJob.id)), false);
+  assert.equal(projection.items.some((item) => item.relatedIds.includes(oldEpoch.requestId)), false);
+  assert.equal(projection.items.some((item) => item.relatedIds.includes("PR-UNKNOWN")), false);
+});
+
+function jobRecord(id: string, generation: number): JobRecord {
+  return {
+    id,
+    capabilityId: "proofblade.test",
+    operation: "run",
+    backendId: "test",
+    backendVersion: "1",
+    args: {},
+    replayPolicy: "idempotent",
+    status: "SUCCEEDED",
+    lane: "executor",
+    generation,
+    createdSeq: generation + 1,
+  };
+}
+
+function requestEpoch(id: string, requestId: string, generation: number): RequestEpoch {
+  return {
+    id,
+    requestId,
+    runId: "OBSERVATION-GENERATION-001",
+    generation,
+    lane: "executor",
+    provider: "test",
+    model: "test",
+    adapter: "openai-completions",
+    toolNames: ["read"],
+    status: "STARTED",
+    createdAt: new Date(0).toISOString(),
+    createdSeq: 1,
+    updatedSeq: 1,
+  };
+}
+
+function legacyEvent(runId: string, seq: number, type: HarnessEvent["type"], payload: Record<string, unknown>): HarnessEvent {
+  return {
+    schemaVersion: 1,
+    id: `${runId}-E${seq}`,
+    streamId: runId,
+    runId,
+    lane: "main",
+    seq,
+    ts: new Date(seq * 1_000).toISOString(),
+    correlationId: `${runId}:legacy`,
+    actor: "orchestrator",
+    type,
+    payload,
+  } as HarnessEvent;
+}
