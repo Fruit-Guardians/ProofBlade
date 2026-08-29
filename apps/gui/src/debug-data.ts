@@ -1,4 +1,4 @@
-import { access, readdir, rm, stat } from "node:fs/promises";
+import { access, open, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
@@ -37,6 +37,8 @@ import {
   tryCreateConfiguredSessionRuntimeBrokers,
   withSessionResourceAdapters,
   projectObservationQueue,
+  JsonlControlStore,
+  projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
 import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
@@ -96,6 +98,7 @@ export class DebugDataService {
   private readonly services: AppServices;
   private readonly browserVerifierFactory?: BrowserVerifierFactory;
   private readonly createCodingLane: CodingLaneFactory;
+  private readonly materializedRuns: JsonlControlStore;
   public readonly appServer: ProofBladeAppServer;
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
@@ -132,6 +135,7 @@ export class DebugDataService {
       ...(sessionRuntime.configured ? { sessionRuntimeRequired: !sessionRuntime.tokenAvailable } : {}),
       ...(config.runtime.browserBroker ? { browserRuntimeRequired: true } : {}),
     });
+    this.materializedRuns = new JsonlControlStore(this.services.runsRoot);
     this.appServer = new ProofBladeAppServer({
       control: this.services.control,
       approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
@@ -203,10 +207,7 @@ export class DebugDataService {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
           const cached = this.runListCache.get(entry.name);
           if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
-          const [snapshot, events] = await Promise.all([
-            this.services.control.snapshot(entry.name),
-            this.services.control.events(entry.name),
-          ]);
+          const snapshot = await this.runListSnapshot(entry.name, eventsStat);
           const item: RunListItem = {
             runId: snapshot.runId,
             kind: runKind(snapshot.task),
@@ -218,7 +219,6 @@ export class DebugDataService {
             lastSeq: snapshot.lastSeq,
             updatedAt: eventsStat.mtime.toISOString(),
             counts: {
-              tools: events.filter((event) => event.type === "tool_call_recorded").length,
               evidence: Object.keys(snapshot.evidence).length,
               artifacts: Object.keys(snapshot.artifacts).length,
               effects: Object.keys(snapshot.effects).length,
@@ -232,6 +232,24 @@ export class DebugDataService {
         }
       }));
     return items.filter((item): item is RunListItem => Boolean(item)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
+    try {
+      const [snapshot, projectionStat] = await Promise.all([
+        this.materializedRuns.loadProjection(runId),
+        stat(join(this.services.runsRoot, runId, "projection.json")),
+      ]);
+      if (snapshot
+        && snapshot.runId === runId
+        && snapshot.projectionHash === projectionHash(snapshot)
+        && (projectionStat.mtimeMs >= eventsStat.mtimeMs
+          || await hasSingleTrailingAuthorityMigration(join(this.services.runsRoot, runId, "events.jsonl"), eventsStat, snapshot))) return snapshot;
+    } catch {
+      // Missing, malformed, or stale projections are disposable. The event
+      // stream remains authoritative and is replayed only for this Run.
+    }
+    return await this.services.control.snapshot(runId);
   }
 
   public async getRun(runId: string): Promise<RunDetail> {
@@ -649,6 +667,35 @@ export class DebugDataService {
       if (attempt === 1) return { sessions, version, stable: false };
     }
     throw new Error("Unreachable session load state");
+  }
+}
+
+async function hasSingleTrailingAuthorityMigration(eventsPath: string, eventsStat: Stats, snapshot: RunSnapshot): Promise<boolean> {
+  const tailBytes = Math.min(eventsStat.size, 64 * 1024);
+  if (tailBytes <= 0) return false;
+  const handle = await open(eventsPath, "r");
+  try {
+    const tail = Buffer.allocUnsafe(tailBytes);
+    await handle.read(tail, 0, tailBytes, eventsStat.size - tailBytes);
+    const line = tail.toString("utf8").trimEnd().split(/\r?\n/).at(-1);
+    if (!line) return false;
+    const event = JSON.parse(line) as { schemaVersion?: unknown; streamId?: unknown; runId?: unknown; seq?: unknown; type?: unknown; payload?: Record<string, unknown> };
+    const legacySnapshot = snapshot as RunSnapshot & { authorityHash?: string; taskHash?: string };
+    const migratedTaskHash = event.payload?.taskHash;
+    return (legacySnapshot.authorityHash === undefined || legacySnapshot.authorityHash === "LEGACY-UNTRUSTED")
+      && event.schemaVersion === 1
+      && event.streamId === snapshot.runId
+      && event.runId === snapshot.runId
+      && event.type === "run_authority_migrated"
+      && event.seq === snapshot.lastSeq + 1
+      && event.payload?.migratedFrom === "legacy-v1"
+      && typeof migratedTaskHash === "string"
+      && /^[a-f0-9]{64}$/i.test(migratedTaskHash)
+      && (legacySnapshot.taskHash === undefined || migratedTaskHash === legacySnapshot.taskHash)
+      && typeof event.payload.authorityHash === "string"
+      && /^[a-f0-9]{64}$/i.test(event.payload.authorityHash);
+  } finally {
+    await handle.close();
   }
 }
 

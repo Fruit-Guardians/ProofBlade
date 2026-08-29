@@ -193,7 +193,7 @@ export interface RunListItem {
   generation: number;
   lastSeq: number;
   updatedAt: string;
-  counts: { tools: number; evidence: number; artifacts: number; effects: number };
+  counts: { tools?: number; evidence: number; artifacts: number; effects: number };
   active?: ActiveRunInfo;
 }
 

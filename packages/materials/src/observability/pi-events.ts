@@ -65,6 +65,9 @@ interface PendingProvider {
   api: string;
   retryLimit: number;
   cacheRetention: string;
+  maxInterEventIdleMs?: number;
+  maxInterEventIdleAttempt?: number;
+  maxInterEventIdleEventType?: string;
 }
 
 /** Correlates Pi's pre-request hook with the scheduler's later slot grant. */
@@ -81,7 +84,7 @@ export class ProviderSchedulingTelemetry {
     cancelled: async (requestId, info) => await this.cancelledRequest(requestId, info),
     firstEvent: async (requestId, info) => await this.firstEvent(requestId, info),
     firstToken: async (requestId, info) => await this.firstToken(requestId, info),
-    interEventIdle: async (requestId, info) => await this.interEventIdle(requestId, info),
+    interEventIdle: (requestId, info) => this.interEventIdle(requestId, info),
     stalled: async (requestId, info) => await this.stalled(requestId, info),
     recoveryRequired: async (requestId, info) => await this.recoveryRequired(requestId, info),
     payload: async (requestId, payload) => await this.payload(requestId, payload),
@@ -169,13 +172,12 @@ export class ProviderSchedulingTelemetry {
     });
   }
 
-  private async interEventIdle(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; maxIdleMs: number; eventType: string }): Promise<void> {
-    if (info.idleMs < 100) return;
+  private interEventIdle(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; maxIdleMs: number; eventType: string }): void {
     const pending = requestId ? this.requests.get(requestId) : undefined;
-    await append(this.options, "provider_request_inter_event_idle", "model", {
-      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
-      attempt: info.attempt, idleMs: info.idleMs, maxIdleMs: info.maxIdleMs, eventType: info.eventType,
-    });
+    if (!pending || info.idleMs <= (pending.maxInterEventIdleMs ?? 0)) return;
+    pending.maxInterEventIdleMs = info.idleMs;
+    pending.maxInterEventIdleAttempt = info.attempt;
+    pending.maxInterEventIdleEventType = info.eventType;
   }
 
   private async stalled(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; reason: string }): Promise<void> {
@@ -233,6 +235,9 @@ export class ProviderSchedulingTelemetry {
       contextManifestHash: pending?.contextManifestHash,
       contextCache: pending?.contextCache,
       cachePrefix: pending?.cachePrefix,
+      maxInterEventIdleMs: pending?.maxInterEventIdleMs,
+      maxInterEventIdleAttempt: pending?.maxInterEventIdleAttempt,
+      maxInterEventIdleEventType: pending?.maxInterEventIdleEventType,
       queueCancelled: this.isCancelled(requestId),
       usage: message.usage,
     });

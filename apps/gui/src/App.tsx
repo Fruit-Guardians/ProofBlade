@@ -123,9 +123,11 @@ export function App() {
   const refreshPoller = refreshPollerRef.current;
 
   useEffect(() => {
-    void Promise.all([getBootstrap(), getProviderSettings(), getWorkspaceSettings(), refreshRuns(true)]).then(([data, provider, workspace]) => {
-      setBootstrap(data); setProviders(provider); setWorkspaceSettings(workspace);
+    void Promise.all([getBootstrap(), getProviderSettings()]).then(([data, provider]) => {
+      setBootstrap(data); setProviders(provider);
     }).catch((caught) => setError(message(caught))).finally(() => setLoading(false));
+    void getWorkspaceSettings().then(setWorkspaceSettings).catch((caught) => setError(message(caught)));
+    void refreshRuns(true).catch((caught) => setError(message(caught)));
   }, [refreshRuns]);
 
   useEffect(() => {
@@ -208,7 +210,7 @@ export function App() {
         {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
           <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
           <span className="run-item-body"><strong>{run.runId}</strong><small>{workspaceSettings?.conversations[run.runId]?.title ?? run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
-          <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>
+          {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
         </button>)}
         {!filteredRuns.length && !loading && <div className="empty-list">{runKindFilter === "chat" ? "还没有对话" : "没有匹配的 Fixture Run"}</div>}
       </div>

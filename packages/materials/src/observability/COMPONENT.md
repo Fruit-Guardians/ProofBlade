@@ -4,15 +4,15 @@
 {
   "id": "materials-observability",
   "name": "Runtime Observability",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-08-29T10:18:09.178Z",
   "qualityAudit": {
-    "bugAuditCount": 5,
-    "securityAuditCount": 5,
-    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
-    "sourceHash": "455ccc2e6ce02321b616b74a96db49e30119815f31dc74572fe933bfda4b3de4",
+    "bugAuditCount": 6,
+    "securityAuditCount": 6,
+    "lastBugAuditAt": "2026-08-29T10:18:09.178Z",
+    "lastSecurityAuditAt": "2026-08-29T10:18:09.178Z",
+    "sourceHash": "dc99000e770dcd8d69c9ddc900f61f818973adb4463f50314c2ffae37339d3ab",
     "result": "passed"
   }
 }
@@ -30,7 +30,7 @@
 
 ## 开发规则与验证
 
-每个指标必须说明数据来源，Provider 实报与本地估算不得混用。Provider 报表的 `scheduling` 显示排队请求、取消、最大队列深度和等待时长。新增字段要保持旧事件可读，并补充聚合和脱敏测试。
+每个指标必须说明数据来源，Provider 实报与本地估算不得混用。Provider 报表的 `scheduling` 显示排队请求、取消、最大队列深度和等待时长。流式响应的普通 event gap 不逐条落盘；每个请求只在 `model_usage` 保存最大 idle 及其 attempt/event type，报表仍兼容旧 Run 的 `provider_request_inter_event_idle` 并按 request 取最大值。新增字段要保持旧事件可读，并补充聚合和脱敏测试。
 
 ```powershell
 node --import tsx --test packages/materials/tests/observability.test.ts

@@ -83,7 +83,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly runId: string,
     private readonly controlStore: ControlStore,
     private readonly challengeMode: boolean,
-    private readonly preparedChallenge: boolean,
+    private readonly ctfTurnGuidance: string,
+    private readonly turnContext: { guidance: string },
     private readonly harness: AgentHarness<CodingResourceContext>,
     private readonly env: ExecutionEnv,
     private readonly sessionEnv: ExecutionEnv,
@@ -236,8 +237,8 @@ export class PiCodingLane implements AgentLanePort {
       assertToolPreparationPublished(await options.controlStore.snapshot(options.runId), preparation);
     }
     const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write", "glob", "grep"];
-    const enabledSkills = new Set(options.capabilities?.enabledSkills ?? challengeProfile?.skillNames ?? skills.list().map((skill) => skill.name));
-    const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? challengeProfile?.mcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
+    const enabledSkills = new Set(options.capabilities?.enabledSkills ?? skills.list().map((skill) => skill.name));
+    const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     const skillResourceSnapshot = skills.contextSnapshot();
     const activeSkillResources = skillResourceSnapshot.skills.filter((skill) => enabledSkills.has(skill.name));
@@ -253,9 +254,13 @@ export class PiCodingLane implements AgentLanePort {
     // Expose each enabled MCP server's tools as FIRST-CLASS provider tools
     // (mcp__<server>__<tool>) so the model uses them natively, like Claude Code —
     // instead of the mcp_call proxy it will not drive. mcp_call stays as a fallback.
-    const effectiveTargetKind = challengeProfile?.targetKind ?? snapshot.task.target_kind;
-    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers, challengeProfile?.id));
-    const activeMcpTools = selectFirstClassMcpTools(mcpFirstClassTools, effectiveTargetKind, snapshot.task.target, challengeProfile?.id);
+    const dynamicTargetKind = challengeProfile?.targetKind ?? snapshot.task.target_kind;
+    // Provider-native tool schemas belong to the stable prefix. A per-turn chat
+    // classification may steer the dynamic suffix, but only the immutable task
+    // contract may alter the top-level tool surface.
+    const effectiveTargetKind = snapshot.task.target_kind;
+    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers));
+    const activeMcpTools = selectFirstClassMcpTools(mcpFirstClassTools, effectiveTargetKind, snapshot.task.target);
     const artifactStore = options.artifactStore;
     const checkpointService = new CheckpointService(options.controlStore, artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
@@ -499,29 +504,37 @@ export class PiCodingLane implements AgentLanePort {
       imagesSeen: new Map<string, number>(),
     };
     const skillsLibraryPath = join(installRoot, "skills-library", "ctf-skills");
+    const skillsLibraryPathForPrompt = options.skillsLibraryPathForPrompt ?? skillsLibraryPath;
     const stableSystemPrompt = codingSystemPrompt(
       resources,
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
-      options.skillsLibraryPathForPrompt ?? skillsLibraryPath,
       options.workspaceRootForPrompt ?? options.projectRoot,
-      challengeProfile ? toolCatalog.promptBlock(challengeProfile.id, challengeProfile.hostToolIds) : toolCatalog.promptBlock(),
+      toolCatalog.promptBlock(),
       {
         platformJudged,
         maxSubmissions: snapshot.task.constraints.max_submissions,
         ...(snapshot.task.verification.kind === "reproduction" && snapshot.task.verification.command
           ? { verificationCommand: snapshot.task.verification.command }
           : {}),
-        targetKind: effectiveTargetKind,
-        target: snapshot.task.target,
-        challengeProfile,
-        preflight,
-        pwnToolsAvailable: Boolean(pwnTools),
-        pwnReproductionAvailable: Boolean(pwnTools && pwnReproductionPolicy),
-        webToolsAvailable: Boolean(webSession),
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
     );
+    const categoryGuidance = codingCtfCategoryGuidance(dynamicTargetKind, snapshot.task.target, Boolean(pwnTools), Boolean(pwnTools && pwnReproductionPolicy), Boolean(webSession));
+    const ctfTurnGuidance = challengeProfile
+      ? [
+          PREPARED_CTF_FAST_PATH_PROMPT,
+          PREPARED_CTF_WORKFLOW_PROMPT,
+          preparedChallengeProfileBlock(challengeProfile, preflight),
+          categoryGuidance,
+          toolCatalog.promptBlock(challengeProfile.id, challengeProfile.hostToolIds),
+        ].filter(Boolean).join("\n\n")
+      : [
+          CTF_FAST_PATH_PROMPT,
+          codingCtfWorkflowGuidance(skillsLibraryPathForPrompt),
+          categoryGuidance,
+        ].filter(Boolean).join("\n\n");
+    const turnContext = { guidance: "" };
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
     const failureStormBreaker = new ToolFailureStormBreaker();
@@ -591,7 +604,7 @@ export class PiCodingLane implements AgentLanePort {
         previousBlocks: previousContextBlocks,
       });
       previousContextBlocks = compiled.manifest.blocks;
-      const dynamicProjection = contextProjectionMessage(compiled);
+      const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
       const contextMessages = injectReasoningForestContext(messages, forestContext.value);
       const prepared = prepareContextMaintenance({
         messages: contextMessages,
@@ -655,7 +668,8 @@ export class PiCodingLane implements AgentLanePort {
       options.runId,
       options.controlStore,
       challengeMode,
-      challengeProfile !== undefined,
+      ctfTurnGuidance,
+      turnContext,
       harness,
       env,
       sessionEnv,
@@ -699,6 +713,7 @@ export class PiCodingLane implements AgentLanePort {
     this.termination.requested = false;
     this.termination.confirmed = false;
     this.termination.ctfMode = ctfMode;
+    this.turnContext.guidance = ctfMode ? this.ctfTurnGuidance : "";
     await this.refreshForestContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
@@ -728,15 +743,13 @@ export class PiCodingLane implements AgentLanePort {
       // where re-issuing sends the SAME request without restarting the turn — so
       // it never duplicates the user message or re-runs tools. Here we only
       // recover from context overflow, which legitimately changes the prompt.
-      const fastPathPrompt = this.preparedChallenge ? PREPARED_CTF_FAST_PATH_PROMPT : CTF_FAST_PATH_PROMPT;
-      const effectivePrompt = ctfMode && !text.includes("[ProofBlade CTF fast path]") && !text.includes("[ProofBlade prepared CTF path]") ? `${text}\n\n${fastPathPrompt}` : text;
       const recovered = await promptWithContextLengthRecovery({
         prompt: async (prompt) => await this.harness.prompt(prompt),
         compact: async (reason) => {
           await this.harness.compact(reason);
           this.maintenance.compactRequested = false;
         },
-      }, effectivePrompt);
+      }, text);
       const response = recovered.response;
       return await finalizeCodingTurn({
         runId: this.runId,
@@ -758,6 +771,7 @@ export class PiCodingLane implements AgentLanePort {
       const injected = this.maintenance.injectedObservationItems;
       this.maintenance.injectedObservationItems = [];
       if (injected.length > 0) await acknowledgeObservationItems(this.controlStore, this.runId, injected).catch(() => undefined);
+      this.turnContext.guidance = "";
       this.busy = false;
     }
   }
@@ -947,8 +961,11 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
  * its hash/details make the exact provider suffix explainable from the same
  * snapshot and ContextManifest used by observability.
  */
-function contextProjectionMessage(compiled: ContextBuildOutput): AgentMessage {
-  const dynamicContent = compiled.messages.slice(1).map((message) => `[${message.role}]\n${message.content}`).join("\n\n");
+function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = ""): AgentMessage {
+  const dynamicContent = [
+    compiled.messages.slice(1).map((message) => `[${message.role}]\n${message.content}`).join("\n\n"),
+    turnGuidance ? `<proofblade-turn-guidance>\n${turnGuidance}\n</proofblade-turn-guidance>` : "",
+  ].filter(Boolean).join("\n\n");
   const dynamicHash = sha256(dynamicContent);
   const content = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n${dynamicContent}\n</proofblade-context>`;
   return createCustomMessage(
@@ -1011,37 +1028,34 @@ const PREPARED_CTF_FAST_PATH_PROMPT = [
   "After the first useful structure or constraint is extracted, write a small solver or reproducer and validate a candidate through the verifier before reporting it.",
 ].join("\n");
 
+const PREPARED_CTF_WORKFLOW_PROMPT = [
+  "## CTF solving workflow (prepared direction)",
+  "When the task is to solve this prepared CTF challenge:",
+  "1. Use the durable profile and first-action contract below; do not reclassify the challenge, read unrelated playbooks, discover tools, install packages, or retry missing binaries.",
+  "2. The first assistant action MUST be one allowed tool call, not a prose plan or another classification. Persist its observation before choosing a second action.",
+  "3. Once the first useful structure or constraint is observed, write the smallest solver or reproducer that can test it. Change the hypothesis when a probe does not add a fact.",
+  "4. Validate the candidate through the verifier and only then report or submit it.",
+  "## Interactive native/Pwn protocol discipline",
+  "Use complete state-specific prompt anchors for interactive targets, log timeout and received bytes, and treat EOF or a timeout as protocol failure. Use a fresh connection for retries and confirm a shell with a unique PB_READY marker.",
+].join("\n");
+
+function codingCtfWorkflowGuidance(skillsLibraryPath: string): string {
+  const lib = skillsLibraryPath.replace(/\\/g, "/");
+  return `## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
+}
+
 function codingSystemPrompt(
   skills: Array<{ name: string; description: string; content: string }>,
   mcpServers: Array<{ name: string; description: string }>,
-  skillsLibraryPath: string,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; verificationCommand?: string; targetKind?: TaskContract["target_kind"]; target?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; pwnToolsAvailable?: boolean; pwnReproductionAvailable?: boolean; webToolsAvailable?: boolean; challengeProfile?: ChallengeToolProfile; preflight?: ChallengeToolPreflight } = {},
+  options: { platformJudged?: boolean; maxSubmissions?: number; verificationCommand?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
   // there (a very common trap: an unzipped folder with the SAME name as the file
   // inside it, where `sqlite3 x` opens the directory and fails).
   const workspaceBlock = `\n\nYour working directory is \`${workspaceRoot.replace(/\\/g, "/")}\` — every relative path resolves there, and the task's target files are in it. Stay in it: prefer relative paths over \`cd\`, and if you must \`cd\`, come back. Before treating a name as a file, confirm it with \`ls -la\` (a name can be a directory that contains a same-named file). If a tool says a path is a directory or cannot be opened, re-check the layout instead of retrying the same command.`;
-  // Resident CTF orchestrator. Category-AGNOSTIC on purpose: it only carries the
-  // general recon -> categorize -> read the matching on-disk playbook -> solve ->
-  // verify loop, so it never bloats or misdirects a non-matching challenge type.
-  // The deep per-category techniques live on disk and are read on demand, so
-  // switching challenge type just reads a different file — nothing here changes.
-  const lib = skillsLibraryPath.replace(/\\/g, "/");
-  const orchestrator = `\n\n## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
-  const preparedOrchestrator = [
-    "\n\n## CTF solving workflow (prepared direction)",
-    "When the task is to solve this prepared CTF challenge:",
-    "1. Use the durable profile and first-action contract below; do not reclassify the challenge, read unrelated playbooks, discover tools, install packages, or retry missing binaries.",
-    "2. The first assistant action MUST be one allowed tool call, not a prose plan or another classification. Persist its observation before choosing a second action.",
-    "3. Once the first useful structure or constraint is observed, write the smallest solver or reproducer that can test it. Change the hypothesis when a probe does not add a fact.",
-    "4. Validate the candidate through the verifier and only then report or submit it.",
-    "\n\n## Interactive native/Pwn protocol discipline",
-    "Use complete state-specific prompt anchors for interactive targets, log timeout and received bytes, and treat EOF or a timeout as protocol failure. Use a fresh connection for retries and confirm a shell with a unique PB_READY marker.",
-  ].join("\n");
-  const effectiveOrchestrator = options.challengeProfile ? preparedOrchestrator : orchestrator;
   const nativeSkills = skills.length > 0
     ? `\n\nAlso available via load_skill (optional): ${skills.map((s) => s.name).join(", ")}.`
     : "";
@@ -1060,10 +1074,7 @@ function codingSystemPrompt(
   const verificationBlock = options.verificationCommand
     ? `\n\n## Task-bound candidate verification\nThis run has one immutable verifier command. When reporting a deterministic candidate, call \`verify_claim\` with the exact command below; do not substitute a model-invented command:\n\n\`${options.verificationCommand}\``
     : "\n\n## Candidate verification\nThis run has no immutable verifier command. You may continue investigating and record observations, but any candidate conclusion remains unverified until the task is created with a verifier policy.";
-  const categoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable);
-  const profileBlock = options.challengeProfile ? preparedChallengeProfileBlock(options.challengeProfile, options.preflight) : "";
-  const webAwareCategoryBlock = codingCtfCategoryGuidance(options.targetKind, options.target, options.pwnToolsAvailable, options.pwnReproductionAvailable, options.webToolsAvailable);
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${effectiveOrchestrator}${profileBlock}${webAwareCategoryBlock}${toolCatalogBlock}${submissionBlock}${verificationBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${toolCatalogBlock}${submissionBlock}${verificationBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {

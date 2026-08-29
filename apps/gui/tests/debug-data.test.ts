@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import { JsonlControlStore, RunEventIngress, SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlControlStore, projectionHash, RunEventIngress, SingleAgentCtfLoop } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent, RunDetail } from "../src/shared.js";
@@ -208,6 +208,41 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
+});
+
+test("lists migration-tailed Runs from valid projections without replaying full event streams", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-run-list-projection-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-PROJECTION-LIST-001";
+    const projection = await data.createConversation({ runId, title: "projection list", workspacePath: root });
+    const legacyProjection = structuredClone(projection) as RunSnapshot & { authorityHash?: string; taskHash?: string };
+    delete legacyProjection.authorityHash;
+    delete legacyProjection.taskHash;
+    legacyProjection.projectionHash = projectionHash(legacyProjection);
+    await writeFile(join(root, "runs", runId, "projection.json"), `${JSON.stringify(legacyProjection)}\n`);
+    await appendFile(join(root, "runs", runId, "events.jsonl"), `${JSON.stringify({
+      schemaVersion: 1,
+      runId,
+      streamId: runId,
+      seq: legacyProjection.lastSeq + 1,
+      type: "run_authority_migrated",
+      payload: { taskHash: projection.taskHash, authorityHash: "a".repeat(64), migratedFrom: "legacy-v1" },
+    })}\n`);
+    const control = (data as unknown as {
+      services: { control: { snapshot: (requestedRunId: string) => Promise<RunSnapshot> } };
+    }).services.control;
+    control.snapshot = async () => { throw new Error("listRuns must not replay a current projection"); };
+
+    const runs = await data.listRuns();
+    const run = runs.find((item) => item.runId === runId);
+    assert.ok(run);
+    assert.equal(run.kind, "chat");
+    assert.equal(run.counts.tools, undefined);
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("RunDetail exposes the durable observation queue projection for the GUI", async () => {

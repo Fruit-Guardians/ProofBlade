@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { AgentHarness, JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
+import { captureProviderPrefixShape } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
@@ -99,6 +100,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
   let services: ReturnType<typeof createServices> | undefined;
   let firstRequestEventTypes: string[] | undefined;
   let firstRequestBody = "";
+  const requestBodies: string[] = [];
   let requests = 0;
   const server = createServer(async (request, response) => {
     requests += 1;
@@ -109,7 +111,9 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       request.on("end", resolve);
       request.on("error", reject);
     });
-    firstRequestBody = chunks.join("");
+    const requestBody = chunks.join("");
+    requestBodies.push(requestBody);
+    if (requests === 1) firstRequestBody = requestBody;
     if (services) firstRequestEventTypes = (await services.control.events("PI-HTTP-PREFLIGHT")).map((event) => event.type);
     response.writeHead(200, { "content-type": "text/event-stream" });
     response.write(`data: ${JSON.stringify({ id: "chatcmpl-preflight", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: { role: "assistant", content: "ready" }, finish_reason: null }] })}\n\n`);
@@ -202,7 +206,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.equal(pwnHealthCalls, 0, "a Web task must not probe the unrelated Pwn broker");
     assert.equal(httpHealthCalls, 1, "the Web task should probe its required HTTP broker once");
 
-    const outcome = await lane.prompt("Inspect the prepared challenge and report readiness.");
+    const firstPrompt = "Inspect the prepared challenge and report readiness.";
+    const outcome = await lane.prompt(firstPrompt);
     assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
     assert.equal(requests, 1);
     assert.match(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
@@ -210,9 +215,22 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.match(firstRequestBody, /proofblade-context/);
     assert.match(firstRequestBody, /<task-contract>/);
     assert.match(firstRequestBody, /<durable-ledger>/);
-    const firstRequest = JSON.parse(firstRequestBody) as { messages?: unknown };
+    const firstRequest = JSON.parse(firstRequestBody) as { messages?: Array<{ role?: string; content?: unknown }> };
     const firstRequestMessages = JSON.stringify(firstRequest.messages ?? []);
     assert.match(firstRequestMessages, /manifest-hash=\\"[a-f0-9]{64}\\"/);
+    const messageText = (message: { content?: unknown }): string => {
+      if (typeof message.content === "string") return message.content;
+      if (Array.isArray(message.content)) return message.content.map((item) => {
+        if (item && typeof item === "object" && "text" in item && typeof item.text === "string") return item.text;
+        return JSON.stringify(item);
+      }).join("");
+      return JSON.stringify(message.content ?? "");
+    };
+    const instructionText = (firstRequest.messages ?? []).filter((message) => message.role === "system" || message.role === "developer").map(messageText).join("\n");
+    assert.doesNotMatch(instructionText, /ProofBlade prepared CTF path|Prepared challenge tool profile|CTF solving workflow \(prepared direction\)/);
+    assert.ok((firstRequest.messages ?? []).some((message) => message.role === "user" && messageText(message) === firstPrompt));
+    assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
+    assert.match(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
     assert.doesNotMatch(firstRequestBody, /Categorize: pick the dominant category/);
     assert.doesNotMatch(firstRequestBody, /Load the playbook:/);
     assert.ok(firstRequestEventTypes?.includes("tool_preparation_recorded"));
@@ -233,6 +251,9 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.equal((await services.control.events(runId)).filter((event) => event.type === "tool_preparation_recorded").length, 1);
     assert.equal(pwnHealthCalls, 0, "session resume must still avoid the unrelated Pwn broker");
     assert.equal(httpHealthCalls, 1, "session resume must reuse the caller-owned preflight too");
+    await resumedLane.prompt("Continue from the durable prepared observation.");
+    assert.equal(requestBodies.length, 2);
+    assert.equal(captureProviderPrefixShape(JSON.parse(requestBodies[0]!)).prefixHash, captureProviderPrefixShape(JSON.parse(requestBodies[1]!)).prefixHash);
 
     const browserRunId = "PI-BROWSER-PREFLIGHT";
     const browserTask = fixtureTask(browserRunId, "web-source-1", root, config);

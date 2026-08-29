@@ -258,9 +258,24 @@ function metricForFirstAttemptEvent(events: HarnessEvent[], type: "provider_requ
 }
 
 function metricForIdle(events: HarnessEvent[]): { total: number; average: number; p95: number; max: number } {
-  const values = events.filter((event) => event.type === "provider_request_inter_event_idle")
-    .map((event) => number(event.payload?.idleMs, number(event.payload?.maxIdleMs)))
-    .sort((a, b) => a - b);
+  const byRequest = new Map<string, number>();
+  const aggregatedRequests = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "model_usage" || event.payload?.maxInterEventIdleMs === undefined) continue;
+    const key = String(event.payload?.requestId ?? event.payload?.epochId ?? event.id);
+    byRequest.set(key, number(event.payload.maxInterEventIdleMs));
+    aggregatedRequests.add(key);
+  }
+  // Legacy Runs recorded one event per stream gap. Collapse those events to the
+  // same per-request maximum used by current model_usage records.
+  for (const event of events) {
+    if (event.type !== "provider_request_inter_event_idle") continue;
+    const key = String(event.payload?.requestId ?? event.payload?.epochId ?? event.id);
+    if (aggregatedRequests.has(key)) continue;
+    const value = number(event.payload?.idleMs, number(event.payload?.maxIdleMs));
+    byRequest.set(key, Math.max(byRequest.get(key) ?? 0, value));
+  }
+  const values = [...byRequest.values()].sort((a, b) => a - b);
   return { total: sum(values), average: values.length ? round(sum(values) / values.length) : 0, p95: percentile(values, 0.95), max: Math.max(0, ...values) };
 }
 
