@@ -36,6 +36,7 @@ import {
   withBrowserResourceAdapter,
   tryCreateConfiguredSessionRuntimeBrokers,
   withSessionResourceAdapters,
+  projectObservationQueue,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
 import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
@@ -264,7 +265,7 @@ export class DebugDataService {
       this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events) } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
     if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {

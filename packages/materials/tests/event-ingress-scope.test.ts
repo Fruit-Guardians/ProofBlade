@@ -6,6 +6,8 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { RunEventIngress } from "../src/orchestration/event-ingress.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
+import { acknowledgeObservationItems, formatObservationQueue, projectObservationQueue } from "../src/orchestration/observation-queue.js";
+import { ContextCompiler } from "../src/context/compiler.js";
 import { Scope } from "../src/runtime/scope.js";
 import type { ProofBladeConfig } from "../src/config.js";
 
@@ -76,6 +78,63 @@ test("RunCoordinator applies user control events through the normal command path
     const drained = await coordinator.drainEvents(runId, "user_cancel");
     assert.equal(drained.admitted.length, 1);
     assert.equal((await services.control.snapshot(runId)).status, "CANCELLED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Observation queue is rebuilt from events, coalesces progress, redacts output, and acknowledges atomically", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-observation-queue-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "OBSERVATION-001";
+    const task = demoTask(runId, root, config);
+    await services.control.createRun(runId, task);
+    const ingress = new RunEventIngress(services.control);
+    await ingress.enqueue(runId, {
+      source: "job",
+      kind: "job.output",
+      correlationId: "job-output-1",
+      coalescingKey: "job:1",
+      payload: { jobId: "job-1", status: "running", cursor: 12, output: "secret target output" },
+    });
+    await ingress.enqueue(runId, {
+      source: "job",
+      kind: "job.output",
+      correlationId: "job-output-2",
+      coalescingKey: "job:1",
+      payload: { jobId: "job-1", status: "running", cursor: 24, output: "secret target output" },
+    });
+    const snapshot = await services.control.snapshot(runId);
+    const projection = projectObservationQueue(await services.control.events(runId), snapshot);
+    assert.equal(projection.total, 1);
+    assert.equal(projection.items[0]?.sourceEventIds.length, 2);
+    assert.match(projection.items[0]?.summary ?? "", /cursor/);
+    assert.doesNotMatch(formatObservationQueue(projection), /secret target output/);
+    assert.match(formatObservationQueue(projection), /未处理观察 1\/1/);
+
+    const compiled = new ContextCompiler().build({
+      runId,
+      lane: "main",
+      phase: snapshot.phase,
+      task,
+      snapshot,
+      observationQueue: projection.items,
+    });
+    assert.equal(compiled.manifest.observationQueue?.total, 1);
+    assert.equal(compiled.manifest.observationQueue?.ids[0], projection.items[0]?.id);
+    assert.match(compiled.messages[3]?.content ?? "", /Pending observations/);
+
+    await Promise.all([
+      acknowledgeObservationItems(services.control, runId, projection.items),
+      acknowledgeObservationItems(services.control, runId, projection.items),
+    ]);
+    const after = await services.control.snapshot(runId);
+    const persistedEvents = await services.control.events(runId);
+    const rebuilt = projectObservationQueue(await services.control.events(runId), after);
+    assert.equal(rebuilt.total, 0);
+    assert.equal(persistedEvents.filter((event) => event.type === "observation_consumed").length, 2);
+    assert.equal(after.lastSeq, persistedEvents.at(-1)?.seq, "the materialized projection must advance with acknowledgement telemetry");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

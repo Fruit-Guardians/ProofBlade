@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-29T10:24:52+08:00
+> 状态更新时间：2026-08-29T11:55:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-006 | 2026-08-29T08:44:14+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -54,6 +55,32 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260829-009
+
+时间：2026-08-29T11:55:00+08:00
+
+摘要：补齐单 Agent Job monitor 到观察队列的可重放链路，并修正非 ASCII Job 输出的 UTF-8 字节游标语义。
+
+### 变更
+
+- 新增 Job monitor 观察队列 provider-free 场景，覆盖关键词触发、job_finished、Artifact 关联、重启重建和幂等确认
+- BackgroundJobRunner 与 Coding shell_job 统一使用 UTF-8 字节 cursor，补充多字节输出回归测试
+- 同步中英文 README、GUI/Runtime/Orchestration/Jobs/Domain/Control/Evaluation 组件契约文档
+
+### 验证
+
+- [x] runtime-scenario-evaluator、evaluation 和 capability-jobs 定向测试通过
+- [x] npm run build passed
+- [x] npm run test:fast passed: 745 passed, 2 skipped, 0 failed
+- [x] npm run test:slow passed: 22 passed, 0 failed
+- [x] npm run test:integration passed: 87 passed, 0 failed
+- [x] npm run test:ci-gates passed: 40 passed, 0 failed
+- [x] npm run test:platform-fault-matrix passed: 6 passed, 0 failed
+- [x] npm run eval -- --enforce-gate passed: baseline-v4 37/37, evidence binding 18/18, replay parity 18/18, candidate leaks 0
+- [x] npm audit --omit=dev: 0 vulnerabilities
+- [x] api index/check/duplicates, component, change-contract, changed-test and project-report gates passed
+- [x] git diff --check passed
 
 ## UPDATE-20260829-008
 

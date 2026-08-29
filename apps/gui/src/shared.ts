@@ -1,4 +1,4 @@
-import type { ClaimVerificationProjection, HarnessEvent, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -288,6 +288,7 @@ export interface RunDetail {
   active?: ActiveRunInfo;
   updatedAt: string;
   context?: ContextRuntimeInfo;
+  observationQueue: ObservationQueueProjection;
 }
 
 export interface ContextRuntimeInfo {

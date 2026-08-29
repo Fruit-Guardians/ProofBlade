@@ -45,6 +45,8 @@
 - Coding `read` 与 `bash` 都为文本结果注册语义化中间 Artifact，并在模型可见结果中返回稳定 `A-*` 锚点；`evidence record` 使用该锚点一次完成命名、提升、Evidence 与可选 Fact。
 - Coding `read/bash` 接入 Evidence Curation Gate：4 个未审阅产物触发检查点，8 个触发硬门；Agent 必须 `record` 有价值发现或 `annotate` 已审阅的普通输出后才能继续侦察。
 - Coding 回合还对 `bash`/`shell_background` 的进程与网络实验做单回合预算（总调用、长任务、超时和归一化实验族）；触发后先持久化证据，再由 Competition Loop 发起一次替代假设重规划，最多恢复两次，不把题目级停滞误报为 Provider 故障。
+- `observation-queue.ts` 是事件流上的唯一观察投影：它从 ingress/Job/Provider/Verifier/Maintenance 事件生成有界脱敏摘要，按 urgent/normal/background 排序并支持 coalescing；`PiCodingLane` 在 context 安全点注入前 8 项，回合结束只确认实际展示项，避免把模型没有看到的观察误标记为已消费。
+- `monitor_job` 与 Coding `shell_job monitor` 都使用单调 UTF-8 字节 cursor，并支持 `new_output`、`keyword`、`exit`、`error`、`heartbeat` 和有界 `timeout`；后台 Job 的 `job_finished` 保留原始 Artifact 引用，GUI/重启通过 ControlStore 重建待处理观察，不需要第二套内存状态。
 
 ## 开发规则与验证
 

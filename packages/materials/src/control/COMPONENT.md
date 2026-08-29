@@ -47,6 +47,7 @@
 - 多命令领域批次写入使用同步临时文件加原子替换，而不是直接追加半个 JSONL 批次；常见单事件写入保持同步追加吞吐。进程在提交后、Projection 写入前退出时，事件流仍可完整重放。`ControlStore.reconcileProjection()` 以事件流为事实来源修复过期或损坏的 Projection，且对 `LEGACY-UNTRUSTED` Run 保持只读。
 - Control Store 的完整读-校验-事件-Projection 事务还必须持有 Run 目录下的跨进程文件锁；锁使用 create-exclusive token、owner PID 和 stale reclaim，活跃 owner 不得被抢占。单个进程内的 `KeyedOperationQueue` 只负责降噪，不能替代跨进程协调。所有基于最新快照构造序号的写入必须在锁内重新读取事件流，避免两个进程生成相同 `seq` 或用旧 Projection 覆盖新状态。
 - Web/Pwn 领域记录通过 `domain_record_added` 进入同一 Control Store；记录只保存有界结构化元数据和 Artifact/Evidence/Effect 引用，必须匹配当前 generation 与任务方向，不能用模型权限写入 Web `reproduced` 结论。
+- 观察队列不写入第二个状态文件：`acknowledgeObservations()` 在同一 Run 写锁内把实际消费的源事件转换为 `observation_consumed`，先 reduce 再保存 Projection，使 `lastSeq` 与事件流保持一致；重复确认只产生一次标记。
 - Broker-owned session 的 Control Store owner 使用可选 `bindingState` fence：`session_opened` 只能由 binding authority 写入 `FINALIZING`，external ledger marker 成功后再由同一 Run 锁内的 `session_binding_completed` 转为 `BOUND`；旧记录默认无 fence。关闭或恢复不能跳过该事件，也不能凭 marker 单独伪造 BOUND。
 - Run 目录采用 create-exclusive 锚点；重复 `runId` 不得重写 `task.json` 或截断 `events.jsonl`。Reducer 只允许 seq=1 的唯一 `run_started`，authority hash 一经锚定不可替换；公开 JSONL reader 的 append/projection write 原语还必须提交创建者 secret。`fixture_reset` 只能由 Fixture capability 单独提交，Sandbox 在实际 reset 前必须调用 `assertResetAllowed` preflight；终态、错误 authority 及 verification/report 阶段不得先改变外部 fixture 再被 ControlStore 拒绝。submission 配额按整个 Run 计数，不能用 generation bump 清零。
 

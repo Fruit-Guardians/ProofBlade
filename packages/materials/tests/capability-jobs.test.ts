@@ -267,3 +267,45 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("monitor_job resumes at UTF-8 byte cursors without splitting multibyte output", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-job-utf8-"));
+  let runtime: ProofBladeToolRuntime | undefined;
+  try {
+    const services = createServices(root, config);
+    const runId = "JOBS-UTF8-001";
+    const task = fixtureTask(runId, "reverse-strings-1", root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+    const artifact = await services.artifacts.putText(runId, "前缀\n命中结果", { filename: "job-output.txt", sensitivity: "public" });
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: {
+        id: "J-UTF8",
+        capabilityId: "proofblade.target",
+        operation: "list",
+        backendId: "proofblade-bundled",
+        backendVersion: "1.0.0",
+        args: {},
+        replayPolicy: "pure",
+        status: "QUEUED",
+        lane: "executor",
+        generation,
+      },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-UTF8", lane: "executor" });
+    await services.control.dispatch(runId, { type: "job_finished", jobId: "J-UTF8", status: "SUCCEEDED", outcome: "success", artifactId: artifact.id, lane: "executor" });
+
+    const prefixBytes = Buffer.byteLength("前缀\n", "utf8");
+    const monitored = await runtime.monitorJob("J-UTF8", { sinceCursor: String(prefixBytes), triggers: ["new_output"], waitMs: 100 });
+    assert.equal(monitored.cursor, String(Buffer.byteLength("前缀\n命中结果", "utf8")));
+    assert.equal(monitored.output, "命中结果");
+  } finally {
+    await runtime?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});

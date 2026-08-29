@@ -47,6 +47,7 @@ export interface ContextManifestSummary {
   droppedCount: number;
   maintenance: Pick<ContextManifest["maintenance"], "stage" | "targetRatio" | "hardRatio" | "shouldCompact" | "forceCompact" | "target" | "nextAction">;
   budget: Pick<ContextManifest["budget"], "contextWindow" | "availableInput" | "estimatedInput" | "ratio" | "overBudget">;
+  observationQueue?: ContextManifest["observationQueue"];
 }
 
 interface PendingProvider {

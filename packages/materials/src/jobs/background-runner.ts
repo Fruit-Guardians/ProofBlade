@@ -167,8 +167,12 @@ export class BackgroundJobRunner {
     while (true) {
       const job = await this.poll(jobId);
       const content = await this.jobContent(job);
-      const cursor = content.length;
-      const delta = content.slice(Math.min(sinceCursor, content.length));
+      // The cursor is a wire/storage position, so count UTF-8 bytes rather
+      // than JavaScript code units. This keeps monitor_job resumable when a
+      // capability emits non-ASCII output and matches shell_job semantics.
+      const contentBytes = Buffer.from(content, "utf8");
+      const cursor = contentBytes.length;
+      const delta = decodeUtf8FromByteCursor(contentBytes, sinceCursor);
       if (triggers.has("new_output") && cursor > sinceCursor) return monitorResult(job, "new_output", cursor, delta);
       if (triggers.has("keyword")) {
         const matchedKeyword = keywords.find((keyword) => delta.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
@@ -296,4 +300,10 @@ function isTerminal(status: JobRecord["status"]): boolean {
 
 function monitorResult(job: JobRecord, trigger: JobMonitorResult["trigger"], cursor: number, output: string): JobMonitorResult {
   return { jobId: job.id, status: job.status, trigger, cursor: String(cursor), ...(output ? { output: output.slice(0, 12_000) } : {}), ...(job.artifactId ? { artifactId: job.artifactId } : {}) };
+}
+
+function decodeUtf8FromByteCursor(bytes: Buffer, cursor: number): string {
+  let offset = Math.max(0, Math.min(bytes.length, Math.floor(cursor)));
+  while (offset < bytes.length && (bytes[offset]! & 0xc0) === 0x80) offset += 1;
+  return bytes.subarray(offset).toString("utf8");
 }

@@ -41,11 +41,11 @@ test("[contract:fixture-runtime-gate] fixture evaluator reports evidence, runtim
     assert.deepEqual(summary.budget, { maxTurns: 1 });
     assert.equal(summary.attempts, 3);
     assert.equal(summary.fixtureTotal, 3);
-    assert.equal(summary.scenarioTotal, 18);
-    assert.equal(summary.total, 21);
+    assert.equal(summary.scenarioTotal, 19);
+    assert.equal(summary.total, 22);
     assert.equal(summary.fixtureSuccessCount, 3);
-    assert.equal(summary.scenarioSuccessCount, 18);
-    assert.equal(summary.successCount, 21);
+    assert.equal(summary.scenarioSuccessCount, 19);
+    assert.equal(summary.successCount, 22);
     assert.equal(summary.successRate, 1);
     assert.equal(summary.evidenceBackedRate, 1);
     assert.equal(summary.replayParityRate, 1);

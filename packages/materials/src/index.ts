@@ -70,6 +70,7 @@ export * from "./pwn/pwn-tools.js";
 export * from "./orchestration/single-agent-loop.js";
 export * from "./orchestration/run-coordinator.js";
 export * from "./orchestration/event-ingress.js";
+export * from "./orchestration/observation-queue.js";
 export * from "./orchestration/multi-agent-contract.js";
 export * from "./orchestration/planner.js";
 export * from "./orchestration/intent-scheduler.js";

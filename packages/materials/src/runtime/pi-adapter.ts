@@ -167,6 +167,7 @@ export function contextSnapshot(manifest: import("../domain/types.js").ContextMa
       hash: manifest.hash,
       layerTokens: { ...manifest.layerTokens },
       blockHashes: Object.fromEntries((manifest.blocks ?? []).map((block) => [block.id, block.contentHash])),
+      ...(manifest.observationQueue ? { observationQueue: manifest.observationQueue } : {}),
       ...(manifest.firstChangedBlock ? { firstChangedBlock: manifest.firstChangedBlock } : {}),
       ...(manifest.compressionTarget ? { compressionTarget: manifest.compressionTarget } : {}),
       droppedCount: manifest.dropped.length,

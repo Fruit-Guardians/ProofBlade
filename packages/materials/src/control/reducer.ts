@@ -815,6 +815,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "compaction_recorded":
     case "event_ingress_received":
     case "event_ingress_processed":
+    case "observation_consumed":
       break;
     case "provider_request_queue_cancelled":
       updateEpochStatus(next, p, "CANCELLED", event.seq);

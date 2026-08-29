@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-29T10:24:52+08:00",
+  "updatedAt": "2026-08-29T11:55:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -209,7 +209,7 @@
       "milestone": "Milestone 6",
       "owner": "unassigned",
       "progress": 35,
-      "updatedAt": "2026-08-29T08:44:14+08:00",
+      "updatedAt": "2026-08-29T11:55:00+08:00",
       "objective": "基于第 6、7、9、10 章，把普通 Chat、CTF、Fixture 和 Competition 的长运行事件、工具监控、上下文压缩、证据整理、评估、多 Agent 协作和持续演化收敛到同一个可恢复系统。",
       "deliverables": [
         "统一 RunEventEnvelope、事件优先级、安全点消费和 generation fencing",
@@ -274,6 +274,34 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260829-009",
+      "occurredAt": "2026-08-29T11:55:00+08:00",
+      "summary": "补齐单 Agent Job monitor 到观察队列的可重放链路，并修正非 ASCII Job 输出的 UTF-8 字节游标语义。",
+      "branch": "codex/unified-agent-development",
+      "commit": "self",
+      "planIds": [
+        "PLAN-230"
+      ],
+      "changes": [
+        "新增 Job monitor 观察队列 provider-free 场景，覆盖关键词触发、job_finished、Artifact 关联、重启重建和幂等确认",
+        "BackgroundJobRunner 与 Coding shell_job 统一使用 UTF-8 字节 cursor，补充多字节输出回归测试",
+        "同步中英文 README、GUI/Runtime/Orchestration/Jobs/Domain/Control/Evaluation 组件契约文档"
+      ],
+      "validation": [
+        "runtime-scenario-evaluator、evaluation 和 capability-jobs 定向测试通过",
+        "npm run build passed",
+        "npm run test:fast passed: 745 passed, 2 skipped, 0 failed",
+        "npm run test:slow passed: 22 passed, 0 failed",
+        "npm run test:integration passed: 87 passed, 0 failed",
+        "npm run test:ci-gates passed: 40 passed, 0 failed",
+        "npm run test:platform-fault-matrix passed: 6 passed, 0 failed",
+        "npm run eval -- --enforce-gate passed: baseline-v4 37/37, evidence binding 18/18, replay parity 18/18, candidate leaks 0",
+        "npm audit --omit=dev: 0 vulnerabilities",
+        "api index/check/duplicates, component, change-contract, changed-test and project-report gates passed",
+        "git diff --check passed"
+      ]
+    },
     {
       "id": "UPDATE-20260829-008",
       "occurredAt": "2026-08-29T10:24:52+08:00",

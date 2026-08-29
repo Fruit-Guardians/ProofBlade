@@ -39,6 +39,7 @@ plan-only、等待确认和验证边界 fail-closed。引入新模型角色前�
 - Provider 的 `length` stop reason 与显式 maximum-context 错误进入同一单次恢复状态机：先持久化检查点并压缩，再继续下一 Executor turn；重复溢出必须明确失败。
 - Task-owned reproduction 已由 Loop 统一收口：`CodingClaimVerifier` 已接受的 Completion 直接经过 `REPORT → SUBMIT`，不再错误地重复走 hidden scorer；崩溃恢复不得从 `SUBMIT` 回退到 `REPORT`。
 - `RunWorkScheduler.blockAndQueue` 将失败 WorkItem、下一项 READY WorkItem 和 `replan_requested` 放进同一 ControlStore 事务；`phaseBudget` 从 durable Experiment/Effect/Replan 投影推导阶段、工具、提交和恢复余量，重启后不依赖进程内计数。
+- `observation-queue.ts` 将事件 ingress 和派生的 Job/Provider/Verifier/Maintenance terminal 事件投影为模型可见的有界队列；队列不单独持久化，`observation_consumed` 是唯一确认标记，重启通过 ControlStore 事件流重建。单 Agent 在 Provider terminal、Tool end、Job safe point 或 idle 边界消费，未来多 Agent 只预留同一接口，不启用并行策略。
 
 ```powershell
 npm run test:materials

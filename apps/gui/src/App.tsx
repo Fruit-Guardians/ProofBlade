@@ -416,6 +416,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
       </div>
+      {detail.observationQueue.total > 0 && <ObservationQueuePanel detail={detail} />}
       <div className="message-thread" ref={thread}>
         {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
         {session?.messages.map((chat) => {
@@ -456,6 +457,21 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
     {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
   </div>;
+}
+
+function ObservationQueuePanel({ detail }: { detail: RunDetail }) {
+  const queue = detail.observationQueue;
+  return <section className="observation-queue-panel" aria-label="待处理观察">
+    <header><div><ListChecks size={14} /><strong>待处理观察</strong><span>{queue.total} 项 · urgent {queue.urgent}</span></div>{queue.hidden > 0 && <em>还有 {queue.hidden} 项</em>}</header>
+    <div className="observation-queue-list">{queue.items.map((item) => <article className={`observation-queue-item priority-${item.priority}`} key={item.id}>
+      <div className="observation-queue-item-head"><StatusMini status="待消费" /><strong>{item.kind}</strong><code>{item.source}</code><span>seq {item.sequence}</span></div>
+      <p>{item.summary}</p>
+      {(item.relatedIds.length > 0 || item.artifactIds.length > 0) && <div className="observation-queue-links">
+        {item.relatedIds.map((id) => <code key={`ref:${id}`} title={id}>ref {shortId(id)}</code>)}
+        {item.artifactIds.map((id) => { const artifact = detail.snapshot.artifacts[id]; return <code key={`artifact:${id}`} title={id}><Archive size={10} />{artifact?.semantic?.name ?? shortId(id)}</code>; })}
+      </div>}
+    </article>)}</div>
+  </section>;
 }
 
 type ToolCardValue = ToolCallDebug | LiveToolCall;
@@ -850,6 +866,7 @@ function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail
     <section><div className="metrics-title"><Gauge size={14} />Provider 调度</div><MetricLine label="排队请求" value={String(telemetry.provider.scheduling.queued)} /><MetricLine label="排队取消" value={String(telemetry.provider.scheduling.cancelled)} /><MetricLine label="平均等待" value={`${Math.round(telemetry.provider.scheduling.averageWaitMs)} ms`} /><MetricLine label="最大队列" value={String(telemetry.provider.scheduling.maxQueueDepth)} /></section>
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={hasBoundFinalResult} label="最终结果已绑定验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
+    <section><div className="metrics-title"><ListChecks size={14} />观察队列</div><MetricLine label="待处理" value={String(detail.observationQueue.total)} /><MetricLine label="Urgent" value={String(detail.observationQueue.urgent)} /><MetricLine label="已展示" value={String(detail.observationQueue.visible)} /><MetricLine label="已隐藏" value={String(detail.observationQueue.hidden)} /><MetricLine label="状态" value={detail.observationQueue.total > 0 ? "待消费" : "已清空"} /></section>
     <section><div className="metrics-title"><FlaskConical size={14} />当前对话配置</div><MetricLine label="Provider" value={provider} /><MetricLine label="Model" value={model} /><MetricLine label="Thinking" value={thinkingLevel} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
   </div>;
 }

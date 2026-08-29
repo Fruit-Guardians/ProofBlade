@@ -55,6 +55,7 @@ import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
+import { acknowledgeObservationItems, formatObservationQueue, projectObservationQueue } from "../orchestration/observation-queue.js";
 import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
@@ -90,7 +91,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly mcp: McpProjectRegistry,
     private readonly runtime: ProofBladeToolRuntime,
     private readonly claimVerifier: CodingClaimVerifier,
-    private readonly maintenance: { compactRequested: boolean },
+    private readonly maintenance: { compactRequested: boolean; injectedObservationItems: import("../domain/types.js").ObservationQueueItem[] },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
     private readonly progressBreaker: NoProgressToolBreaker,
     private readonly failureStormBreaker: ToolFailureStormBreaker,
@@ -554,7 +555,7 @@ export class PiCodingLane implements AgentLanePort {
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
     attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget);
-    const maintenance = { compactRequested: false };
+    const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
     const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
@@ -569,8 +570,19 @@ export class PiCodingLane implements AgentLanePort {
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
     harness.on("context", async ({ messages }) => {
+      const current = await options.controlStore.snapshot(options.runId);
+      const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
+      const observationText = formatObservationQueue(queue);
+      if (observationText) {
+        const injectedById = new Map(maintenance.injectedObservationItems.map((item) => [item.id, item]));
+        for (const item of queue.items.slice(0, 8)) injectedById.set(item.id, item);
+        maintenance.injectedObservationItems = [...injectedById.values()];
+      }
+      const contextMessages = observationText
+        ? [...messages, { role: "user" as const, content: observationText, timestamp: Date.now() }]
+        : messages;
       const prepared = prepareContextMaintenance({
-        messages: injectReasoningForestContext(messages, forestContext.value),
+        messages: injectReasoningForestContext(contextMessages, forestContext.value),
         availableTokens: contextBudget,
         maintenanceLimitTokens: proactiveMaintenanceLimit,
         messageBudget: targetMessageBudget,
@@ -605,6 +617,7 @@ export class PiCodingLane implements AgentLanePort {
       estimateContextTokens: async () => currentContextTokens,
       getContextSnapshot: async () => {
         const current = await options.controlStore.snapshot(options.runId);
+        const observationQueue = projectObservationQueue(await options.controlStore.events(options.runId), current);
         const compiled = contextCompiler.build({
           runId: options.runId,
           lane: "main",
@@ -615,6 +628,7 @@ export class PiCodingLane implements AgentLanePort {
           outputBudget: profile.maxTokens,
           safetyMargin: providerSafetyTokens,
           resources: contextResources,
+          observationQueue: observationQueue.items,
           previousBlocks: previousContextBlocks,
         });
         previousContextBlocks = compiled.manifest.blocks;
@@ -675,6 +689,10 @@ export class PiCodingLane implements AgentLanePort {
     await this.refreshForestContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
+    const coordinator = new RunCoordinator(this.controlStore);
+    // Admit durable user/control signals at the idle safe point before the
+    // next Provider request. The queue itself remains projected from events.
+    await coordinator.drainEvents(this.runId, "idle");
     await this.eventIngress.enqueue(this.runId, {
       source: "user",
       kind: "user.message",
@@ -721,6 +739,12 @@ export class PiCodingLane implements AgentLanePort {
         maintainAfterTurn: async () => await this.maintainAfterTurn(response),
       });
     } finally {
+      // Apply urgent control signals only after the Provider/tool pair has
+      // reached a terminal boundary; never rewrite a half-finished turn.
+      await coordinator.drainEvents(this.runId, "provider_terminal").catch(() => undefined);
+      const injected = this.maintenance.injectedObservationItems;
+      this.maintenance.injectedObservationItems = [];
+      if (injected.length > 0) await acknowledgeObservationItems(this.controlStore, this.runId, injected).catch(() => undefined);
       this.busy = false;
     }
   }

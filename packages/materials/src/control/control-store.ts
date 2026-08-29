@@ -120,6 +120,7 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "model_usage",
   "event_ingress_received",
   "event_ingress_processed",
+  "observation_consumed",
 ]);
 const VERIFIER_RESULT_COMMAND_TYPES = new Set(["evidence", "completion_verified", "fact", "artifact_annotation", "domain_record"]);
 const VERIFIER_EFFECT_COMMAND_TYPES = new Set(["effect_proposed", "effect_started", "effect_finished", "effect_reconciled"]);
@@ -268,6 +269,47 @@ export class ControlStore {
   /** Wait for a durable event so long-running tools do not replay the full Run in a polling loop. */
   public async waitForEvents(runId: string, afterSeq: number, timeoutMs = 30_000): Promise<HarnessEvent[]> {
     return await this.eventStore.waitForEvents(runId, afterSeq, timeoutMs);
+  }
+
+  /**
+   * Atomically acknowledge model-visible observations. Queue state is derived
+   * from the event stream; these markers are the only durable cursor and keep
+   * restart/replay independent from process memory.
+   */
+  public async acknowledgeObservations(runId: string, observationIds: readonly string[], lane: Lane = "main"): Promise<string[]> {
+    const ids = [...new Set(observationIds.map((value) => String(value).trim()).filter(Boolean))];
+    if (ids.length === 0) return [];
+    if (ids.length > 128) throw new Error("At most 128 observations can be acknowledged in one batch");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const observationEventIds = new Map<string, string>();
+      for (const event of events) {
+        if (event.type !== "observation_consumed") {
+          observationEventIds.set(event.id, event.id);
+          if (event.envelope?.id) observationEventIds.set(event.envelope.id, event.id);
+        }
+      }
+      const normalizedIds = [...new Set(ids.map((observationId) => observationEventIds.get(observationId) ?? observationId))];
+      const consumed = new Set(events.filter((event) => event.type === "observation_consumed").map((event) => String(event.payload?.observationId ?? "")));
+      const pending = normalizedIds.filter((observationId) => !consumed.has(observationId));
+      if (pending.length === 0) return [];
+      const materialized = pending.map((observationId, index) => makeEvent(
+        runId,
+        before.lastSeq + index + 1,
+        "observation_consumed",
+        "orchestrator",
+        lane,
+        { observationId },
+        `${runId}:${lane}:observation-consumed`,
+      ));
+      await writer.append(materialized, this.#authoritySecret);
+      // Telemetry does not change domain fields, but it still advances the
+      // replay cursor. Persist the reduced projection so the materialized
+      // snapshot cannot lag the durable event stream after acknowledgement.
+      const after = materialized.reduce(reduce, before);
+      await writer.saveProjection(after, this.#authoritySecret);
+      return pending;
+    }));
   }
 
   /** Serialize slow, replay-safe maintenance operations for one Run. */

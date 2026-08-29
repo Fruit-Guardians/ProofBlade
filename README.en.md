@@ -28,7 +28,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
-- Machine-readable `baseline-v4` evaluator that runs all six fixtures three times by default and adds 18 provider-free runtime scenarios covering cache, context, convergence, evidence, durability, event ingress and recovery contracts. It aggregates latency, tokens, cost, effective actions, first-evidence time, Fact evidence coverage and replay parity, and binds the stable report hash to canonical Fixture/Scenario Catalog snapshots and the execution budget.
+- Machine-readable `baseline-v4` evaluator that runs all six fixtures three times by default and adds 19 provider-free runtime scenarios (37 cases total), covering cache, context, convergence, evidence, durability, event ingress, Job-monitor observation queues, and recovery contracts. It aggregates latency, tokens, cost, effective actions, first-evidence time, Fact evidence coverage and replay parity, and binds the stable report hash to canonical Fixture/Scenario Catalog snapshots and the execution budget.
 
 Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI manages multiple relay or local-model profiles and lets each conversation select its provider, model, and thinking level. Profiles and keys stay in the user's `.proofblade/gui-provider.json`; folders and conversation preferences stay in `.proofblade/gui-workspace.json`. Neither file enters the repository, and API responses never expose key values. Pi 0.83.0 declares Node.js 22.19 or newer.
 
@@ -114,6 +114,7 @@ RTK wraps only ordinary Coding-Agent `bash`; `read/edit/write` and Solver Effect
 - real-model multi-turn conversation, streaming output, and Tool calls inside assistant messages;
 - readable Tool cards with the actual instruction/arguments, returned result, duration, and Artifact/Evidence/Effect references, with complete JSON one action away;
 - a merged user/AI/Tool/Control execution trace plus dedicated Tool-result, structured-evidence, and artifact views for ordinary conversations;
+- a durable observation queue for Job completion, keyword, exit, error, and heartbeat signals; bounded redacted summaries enter the same event stream and GUI projection at safe points;
 - `Run -> Pi Session -> assistant turn -> Tool call` drill-down;
 - tree and raw views for Arguments, Result, Pi Entry, Telemetry, and the complete correlated object;
 - correlation of Pi and Control Store records by `toolCallId`, including Artifact, Evidence, and Effect references;
@@ -123,6 +124,8 @@ RTK wraps only ordinary Coding-Agent `bash`; `read/edit/write` and Solver Effect
 - separate provider-token, visible-context, and cache-field accounting.
 
 Script Lab receives the selected complete Tool debug object as `input`. Scripts return a value with normal JavaScript `return`, run for at most 1500 ms, and remain inside a temporary browser Worker. See `docs/gui.md` for the object shape and local API.
+
+Long-running work uses `shell_background` or `run_background` and returns a Job id immediately. `shell_job monitor` and `monitor_job` wait on a monotonic UTF-8 byte cursor for new output, keywords, exit/error, heartbeat, or a bounded timeout, so the model does not need a tight `read` polling loop. Completion remains durable in the Control Store; the next safe point injects a bounded redacted summary into the same single-agent lane, while raw output remains available through its Artifact or Session. The GUI rebuilds the pending observation view from durable events and records acknowledgements as replayable events.
 
 ## CLI
 

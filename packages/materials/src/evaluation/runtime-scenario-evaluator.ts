@@ -11,11 +11,13 @@ import { AUTOMATIC_CONTEXT_RECOVERY_PROMPT, latestExternalUserMessage, userMessa
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { auditRunLifecycles } from "../observability/lifecycle-audit.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
+import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
 import { DEFAULT_AGENT_STRATEGY, selectAgentStrategy } from "../orchestration/multi-agent-contract.js";
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { createRequestEpoch, reconstructRequestEpoch } from "../runtime/request-epoch.js";
 import { Scope } from "../runtime/scope.js";
 import {
@@ -142,6 +144,12 @@ export const DEFAULT_RUNTIME_SCENARIOS: readonly RuntimeScenarioDefinition[] = [
     category: "events",
     description: "Ingress must deduplicate, prioritize, coalesce and defer stale-generation events at a safe point.",
     evaluate: evaluateEventIngress,
+  },
+  {
+    id: "events.job-monitor-observation-queue",
+    category: "events",
+    description: "A completed monitored Job must leave a visible, replayable observation that is acknowledged exactly once.",
+    evaluate: evaluateJobMonitorObservationQueue,
   },
   {
     id: "recovery.request-epoch-reconstruction",
@@ -501,6 +509,53 @@ async function evaluateEventIngress(context: RuntimeScenarioContext): Promise<Re
   requireCondition(drained.coalesced.length === 1 && drained.deferred.length === 1, "ingress did not record coalesced and stale events");
   requireCondition(replayed.admitted.length === 0, "processed ingress event was replayed twice");
   return { admitted: drained.admitted.length, duplicateStable: true, coalesced: drained.coalesced.length, staleDeferred: drained.deferred.length };
+}
+
+async function evaluateJobMonitorObservationQueue(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {
+  const services = createServices(context.root, context.config);
+  const runId = `${context.runPrefix}-scenario-job-observations`;
+  const task = demoTask(runId, context.root, context.config);
+  await services.control.createRun(runId, task);
+  const fixture = await services.sandbox.build(task);
+  const generation = await services.sandbox.reset(fixture);
+  await services.fixtureControl.reset(runId, generation);
+  const runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+  try {
+    const started = await runtime.runBackground({
+      capabilityId: "proofblade.target",
+      operation: "delay",
+      input: { milliseconds: 50 },
+      timeoutMs: 2_000,
+    });
+    const monitored = await runtime.monitorJob(String(started.jobId), {
+      triggers: ["keyword", "exit"],
+      keywords: ["milliseconds"],
+      waitMs: 2_000,
+    });
+    requireCondition(monitored.trigger === "keyword", "completed Job keyword trigger was not observed");
+    requireCondition(monitored.status === "SUCCEEDED", "monitored Job did not complete successfully");
+
+    const events = await services.control.events(runId);
+    const snapshot = await services.control.snapshot(runId);
+    const queue = projectObservationQueue(events, snapshot);
+    const item = queue.items.find((candidate) => candidate.relatedIds.includes(String(started.jobId)));
+    requireCondition(Boolean(item), "completed Job did not produce a visible observation");
+    requireCondition(item!.artifactIds.length === 1, "Job observation lost its output Artifact reference");
+
+    // Reopen the durable store before acknowledgement to prove the queue is
+    // reconstructed from JSONL events rather than the original runtime object.
+    const replayed = await services.control.replay(runId);
+    const rebuilt = projectObservationQueue(await services.control.events(runId), replayed);
+    requireCondition(rebuilt.ids.includes(item!.id), "restarted queue did not retain the pending Job observation");
+    await acknowledgeObservationItems(services.control, runId, [item!]);
+    const acknowledged = projectObservationQueue(await services.control.events(runId), await services.control.snapshot(runId));
+    requireCondition(!acknowledged.ids.includes(item!.id), "acknowledged Job observation remained pending");
+    await acknowledgeObservationItems(services.control, runId, [item!]);
+    requireCondition((await services.control.events(runId)).filter((event) => event.type === "observation_consumed").length === 1, "observation acknowledgement was not idempotent");
+    return { trigger: monitored.trigger, jobFinished: true, replayRebuilt: true, acknowledgedOnce: true, artifactLinked: true };
+  } finally {
+    await runtime.close();
+  }
 }
 
 async function evaluateRequestEpochRecovery(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {

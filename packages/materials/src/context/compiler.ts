@@ -1,5 +1,5 @@
 import { buildPromptCacheMetadata, compileContextLayers, DEFAULT_CONTEXT_MAINTENANCE_POLICY, planContextMaintenance, snipText, type ContextMaintenancePolicy as MoleculeContextMaintenancePolicy } from "@proofblade/molecules";
-import type { ContextBlock, ContextBuildInput, ContextBuildOutput, ContextManifest, ContextMessage, ContextMaintenancePolicy, RunSnapshot } from "../domain/types.js";
+import type { ContextBlock, ContextBuildInput, ContextBuildOutput, ContextManifest, ContextMessage, ContextMaintenancePolicy, ObservationQueueItem, RunSnapshot } from "../domain/types.js";
 import { evaluatePhaseGate } from "../domain/phase-gate.js";
 import { phaseBudget } from "../domain/phase-budget.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
@@ -115,9 +115,10 @@ export class ContextCompiler {
       },
     });
     const activeLeases = Object.values(snapshot.leases).filter((lease) => lease.generation === snapshot.generation);
+    const observationQueue = [...(input.observationQueue ?? [])];
     const ledgerBudget = Math.max(512, Math.floor(availableInput * 0.4));
     const l3a = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, domainRecords, reasoningTrees, completions, jobs: [], handoffs, inFlightEffects: [], leases: [], tokenBudget: ledgerBudget });
-    const l3b = buildActiveControls({ jobs, handoffs, inFlightEffects, leases: activeLeases });
+    const l3b = buildActiveControls({ jobs, handoffs, inFlightEffects, leases: activeLeases, observationQueue });
     const l3 = `<durable-ledger>\n${l3a}\n</durable-ledger>\n<active-controls>\n${l3b}\n</active-controls>`;
     const requiredTokens = estimateTokens(`${l0}\n${l1}\n${l2}\n${l3}`);
     let remaining = Math.max(0, availableInput - requiredTokens);
@@ -154,7 +155,7 @@ export class ContextCompiler {
         L1: [task.task_id],
         L2: [snapshot.runId, `generation:${snapshot.generation}`],
         L3A: [...facts, ...proposedFacts, ...rejectedHypotheses, ...observations, ...evidence, ...domainRecords, ...reasoningTrees, ...completions].map((item) => item.id),
-        L3B: [...jobs, ...handoffs, ...inFlightEffects].map((item) => item.id).concat(activeLeases.map((lease) => lease.resourceKey)),
+        L3B: [...jobs, ...handoffs, ...inFlightEffects].map((item) => item.id).concat(activeLeases.map((lease) => lease.resourceKey), observationQueue.map((item) => item.id)),
         L4: recent.map((message, index) => `message:${index}:${sha256(message.content).slice(0, 12)}`),
         L5: selectedArtifacts.map((artifact) => artifact.id),
       },
@@ -209,6 +210,7 @@ export class ContextCompiler {
         return { stage: plan.stage, ratio: plan.ratio, targetRatio: maintenancePolicy.targetRatio, hardRatio: maintenancePolicy.hardRatio, shouldCompact: plan.shouldCompact, forceCompact: plan.forceCompact, target: maintenancePolicy.selectedTarget ?? (plan.shouldCompact ? "all" as const : plan.shouldSnip ? "tool-results" as const : undefined), nextAction };
       })(),
       blocks,
+      observationQueue: observationQueueSummary(observationQueue),
       firstChangedBlock: firstChangedBlock(blocks, input.previousBlocks),
       compressionTarget: compressionTarget(blocks, estimatedTokens / Math.max(1, availableInput)),
       sourceIds: [...new Set(blocks.flatMap((block) => block.sourceIds))].sort(),
@@ -419,9 +421,12 @@ function selectRecentMessages(messages: ContextMessage[], tokenBudget: number, d
   return selected;
 }
 
-function buildActiveControls(input: Pick<LedgerBuildInput, "jobs" | "handoffs" | "inFlightEffects" | "leases">): string {
+function buildActiveControls(input: Pick<LedgerBuildInput, "jobs" | "handoffs" | "inFlightEffects" | "leases"> & { observationQueue: ObservationQueueItem[] }): string {
   return [
     "Active controls change frequently and must not rewrite the durable ledger.",
+    "Pending observations (read the corresponding Job, Artifact, or verifier state to acknowledge):",
+    ...input.observationQueue.map((item) => `- ${item.id}: ${item.kind} priority=${item.priority} summary=${safeLedgerText(item.summary)} refs=${item.relatedIds.join(",") || "none"} artifacts=${item.artifactIds.join(",") || "none"}`),
+    ...(input.observationQueue.length === 0 ? ["- none"] : []),
     "Handoffs:",
     ...input.handoffs.map((item) => `- ${item.id}: phase=${item.phase}; status=${item.status}; knowledge=${item.knowledgeVersion}`),
     ...(input.handoffs.length === 0 ? ["- none"] : []),
@@ -435,6 +440,20 @@ function buildActiveControls(input: Pick<LedgerBuildInput, "jobs" | "handoffs" |
     ...input.leases.map((item) => `- ${item.resourceKey}: owner=${item.ownerLane} generation=${item.generation} expires=${item.expiresAt}`),
     ...(input.leases.length === 0 ? ["- none"] : []),
   ].join("\n");
+}
+
+function observationQueueSummary(items: ObservationQueueItem[]): NonNullable<ContextManifest["observationQueue"]> {
+  const ordered = items.map(({ id, sourceEventIds, source, kind, priority, generation, sequence, summary, relatedIds, artifactIds, createdAt }) => ({ id, sourceEventIds, source, kind, priority, generation, sequence, summary, relatedIds, artifactIds, createdAt }));
+  const visible = items.slice(0, 8);
+  return {
+    schemaVersion: 1,
+    total: items.length,
+    visible: visible.length,
+    hidden: Math.max(0, items.length - visible.length),
+    urgent: items.filter((item) => item.priority === "urgent").length,
+    ids: visible.map((item) => item.id),
+    hash: sha256(canonicalJson(ordered)),
+  };
 }
 
 function normalizeMaintenancePolicy(input: ContextMaintenancePolicy | undefined): MoleculeContextMaintenancePolicy & ContextMaintenancePolicy {

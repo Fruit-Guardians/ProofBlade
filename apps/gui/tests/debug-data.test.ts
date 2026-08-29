@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import { JsonlControlStore, SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlControlStore, RunEventIngress, SingleAgentCtfLoop } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent, RunDetail } from "../src/shared.js";
@@ -208,6 +208,32 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
+});
+
+test("RunDetail exposes the durable observation queue projection for the GUI", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-observation-queue-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-OBSERVATION-QUEUE-001";
+    await data.createConversation({ runId, title: "observation queue", workspacePath: root });
+    const control = (data as unknown as { services: { control: import("@proofblade/materials").ControlStore } }).services.control;
+    await new RunEventIngress(control).enqueue(runId, {
+      source: "job",
+      kind: "job.output",
+      priority: "urgent",
+      correlationId: "gui-observation-1",
+      payload: { jobId: "sh-1", cursor: 12, output: "secret output must stay out of the projection" },
+    });
+
+    const detail = await data.getRun(runId);
+    assert.equal(detail.observationQueue.total, 1);
+    assert.equal(detail.observationQueue.urgent, 1);
+    assert.equal(detail.observationQueue.items[0]?.relatedIds[0], "sh-1");
+    assert.doesNotMatch(JSON.stringify(detail.observationQueue), /secret output/);
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("deletes an idle coding conversation and rejects active deletion", async () => {

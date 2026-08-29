@@ -29,8 +29,9 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 统一 RunEvent envelope 与有界 ingress：用户、Provider、Tool、Job、维护和外部信号可按 priority、generation、幂等键和 coalescing key 重放；单 Agent 默认在安全点消费，多 Agent 并行暂不启用。
+- Durable 观察队列：后台 Job 的完成、关键词、退出、错误和心跳事件以脱敏摘要进入同一事件流，在 Provider/Tool 安全点注入 Coding Lane；GUI 可直接查看待消费数量、优先级、来源、序号和 Artifact/ref，确认结果可幂等重放。
 - Run/Lane/Job Scope 的 child-first、LIFO、幂等释放，以及评测驱动的 UpdateProposal 创建、评估、批准、激活和 hash 绑定回滚。
-- 机器可读的 `baseline-v4` 评测器，默认执行六个靶场各三次并追加 18 个 provider-free 运行时场景，覆盖缓存、上下文、收敛、证据、持久化、事件 ingress 和恢复契约；同时汇总耗时、Token、成本、有效动作、首个证据时间、事实证据覆盖率和 Replay parity，并用规范化 Fixture/Scenario Catalog 哈希绑定题目内容、预算和稳定报告哈希。
+- 机器可读的 `baseline-v4` 评测器，默认执行六个靶场各三次并追加 19 个 provider-free 运行时场景（合计 37 项），覆盖缓存、上下文、收敛、证据、持久化、事件 ingress、Job monitor 观察队列和恢复契约；同时汇总耗时、Token、成本、有效动作、首个证据时间、事实证据覆盖率和 Replay parity，并用规范化 Fixture/Scenario Catalog 哈希绑定题目内容、预算和稳定报告哈希。
 
 Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
@@ -123,6 +124,8 @@ npm run gui -- --config proofblade.config.json --port 4173
 右上角齿轮打开“中转站与模型”，可创建多个 OpenAI-compatible Profile。每个 Profile 分别保存名称、Base URL、API Key、可选代理 URL、模型列表、默认思考等级和并发请求上限（1-32，默认 1）；模型发现和真实对话共用该代理。相同 Provider/模型的对话共用 FIFO 并发槽，排队请求可暂停取消且不会先占用成本预算。Windows 本地配置默认位于 `%USERPROFILE%\.proofblade\gui-provider.json`；服务端响应只返回 `hasApiKey`，不会返回 Key 内容。保存后可在输入框下方按对话切换中转站、模型与思考等级，无需改动仓库文件。
 
 对话可以放入自定义文件夹并在侧栏筛选，也可从输入框下方随时切换工作目录。能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。工作目录、文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
+
+长任务通过 `shell_background` 或 `run_background` 立即返回 Job ID；`shell_job monitor` / `monitor_job` 使用单调 UTF-8 字节游标等待新增输出、关键词、退出、错误、心跳或有界超时，不需要模型紧密重复 `read`。Job 完成事件仍保存在 Control Store，下一次安全点会把有界脱敏摘要注入同一个单 Agent 上下文；原始输出只通过已有 Artifact/Session 读取。GUI 的“待处理观察”面板直接从事件流重建，显示待消费与 urgent 数量及每条观察的来源、序号和关联对象；消费标记也写入事件流，重启后不会丢失或重复确认。
 
 上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入显示为“未报告”，不会用估算值伪装成缓存命中。
 

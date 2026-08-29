@@ -2,7 +2,7 @@
 
 The baseline is deterministic and offline. A fixture is reset before each run, the event stream is replayed from zero, and the projection hash must match. Add live provider evaluations only after the adapter contract tests pass.
 
-The current release baseline is `baseline-v4`: six fixtures run three times (18 cases) plus 18 provider-free runtime scenarios (36 cases total). The runtime catalog covers the original cache, context, convergence, evidence and durability scenarios, and adds event-ingress fencing plus recovery of RequestEpoch identity, lifecycle audits, Scope disposal, Spill fallback and the single-agent capability gate. The catalog is versioned and its IDs, categories and descriptions are included in the stable report hash.
+The current release baseline is `baseline-v4`: six fixtures run three times (18 cases) plus 19 provider-free runtime scenarios (37 cases total). The runtime catalog covers cache, context, convergence, evidence, durability, event ingress, Job monitor observation projection, and recovery of RequestEpoch identity, lifecycle audits, Scope disposal, Spill fallback and the single-agent capability gate. The catalog is versioned and its IDs, categories and descriptions are included in the stable report hash.
 
 The durability suite injects failure immediately after effect proposal, start, execution and artifact persistence. Every replayable case must converge to one finished effect with one registered result artifact. It also checks concurrent event sequence allocation, lease ownership and fixture generation persistence.
 
@@ -12,7 +12,7 @@ The workflow suite runs all six local profiles through the same Tool Runtime, Ob
 
 The context suite forces a 20%-of-normal window and checks that confirmed facts and rejected hypotheses remain in the manifest, old tool exchanges are pruned as pairs, and artifact retrieval is bounded. It also reopens a mechanical checkpoint, verifies prompt-injection text stays inside an untrusted observation tag, and injects two context overflows to assert one recovery followed by explicit `context_overflow` failure.
 
-The capability/job suite checks that manifest and core solver-tool hashes are stable, unknown operations and escaping paths fail closed, target capability results produce artifact/evidence anchors, and output tiers are bounded. It runs background list/delay jobs through success, timeout, cancellation and durable recovery, then compares the replayed job projection with the persisted snapshot.
+The capability/job suite checks that manifest and core solver-tool hashes are stable, unknown operations and escaping paths fail closed, target capability results produce artifact/evidence anchors, and output tiers are bounded. It runs background list/delay jobs through success, timeout, cancellation and durable recovery, then checks UTF-8 byte cursors and the Job-completion observation queue before comparing the replayed job projection with the persisted snapshot.
 
 The handoff suite checks planner/executor lane gates, knowledge-version invalidation, deterministic supersession, context handoff indexing and replay parity. The workflow suite also prepares an accepted handoff before each executor turn without adding a second model request.
 

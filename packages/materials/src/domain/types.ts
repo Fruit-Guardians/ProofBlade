@@ -1067,6 +1067,7 @@ export type EventType =
   | "model_usage"
   | "event_ingress_received"
   | "event_ingress_processed"
+  | "observation_consumed"
   | "run_paused"
   | "run_resumed"
   | "run_finished"
@@ -1182,6 +1183,8 @@ export interface ContextManifest {
   };
   /** Optional in schema v1 so old manifests remain readable. */
   blocks?: ContextBlock[];
+  /** A bounded projection of world-side events awaiting model acknowledgement. */
+  observationQueue?: ObservationQueueSummary;
   firstChangedBlock?: string;
   compressionTarget?: ContextBand;
   sourceIds?: string[];
@@ -1195,6 +1198,30 @@ export interface ContextManifest {
     ratio: number;
     overBudget: boolean;
   };
+  hash: string;
+}
+
+export interface ObservationQueueItem {
+  id: string;
+  sourceEventIds: string[];
+  source: RunEventSource;
+  kind: string;
+  priority: RunEventPriority;
+  generation: number;
+  sequence: number;
+  summary: string;
+  relatedIds: string[];
+  artifactIds: string[];
+  createdAt: string;
+}
+
+export interface ObservationQueueSummary {
+  schemaVersion: 1;
+  total: number;
+  visible: number;
+  hidden: number;
+  urgent: number;
+  ids: string[];
   hash: string;
 }
 
@@ -1221,6 +1248,7 @@ export interface ContextBuildInput {
   resources?: RuntimeResourceSnapshot;
   previousBlocks?: ContextBlock[];
   maintenancePolicy?: ContextMaintenancePolicy;
+  observationQueue?: readonly ObservationQueueItem[];
 }
 
 export interface ContextMaintenancePolicy {

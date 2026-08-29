@@ -28,6 +28,7 @@
 - Job 生命周期通过 Control Store 事件投影；执行结果通过 Artifact 引用。
 - Job 入队时固定逻辑 Capability 对应的 Backend ID 和版本；恢复时必须复用绑定并拒绝环境漂移。
 - Run teardown 必须停止仍在进程内活动的任务。
+- `monitor_job` 使用单调 UTF-8 字节 cursor 等待新增输出、关键词、退出/错误、心跳或有界超时；Job 完成事件携带 Artifact 引用，可由观察队列和重启后的 ControlStore 投影继续消费，不要求模型重复快速轮询。
 
 ## 开发规则与验证
 

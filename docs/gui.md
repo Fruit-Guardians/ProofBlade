@@ -90,7 +90,7 @@ Browser -> POST /api/runs/:id/chat
 | `done` | 最终文本、stop reason 和 usage |
 | `error` | Provider、Harness 或 Tool 错误 |
 
-浏览器只把这些事件作为当前 turn 的临时画面。请求完成后重新读取 Pi Session，以 durable entries 替换临时消息。每个 assistant message 下方的 Tool 卡片直接显示实际指令/参数、Tool Result 文本、状态、耗时和关联引用；“完整数据”再打开原始调试侧栏。普通会话可持续多轮；Fixture 终态 Run 保持只读。
+浏览器只把这些事件作为当前 turn 的临时画面。请求完成后重新读取 Pi Session，以 durable entries 替换临时消息。每个 assistant message 下方的 Tool 卡片直接显示实际指令/参数、Tool Result 文本、状态、耗时和关联引用；“完整数据”再打开原始调试侧栏。Run 详情还从 ControlStore 事件重建“待处理观察”投影，显示待消费/urgent 数量、脱敏摘要、source、sequence 以及关联 Job、Request、Artifact/ref；Coding lane 在安全点注入前 8 项并把确认写为 `observation_consumed`，因此刷新或重启不会依赖 GUI 内存状态。普通会话可持续多轮；Fixture 终态 Run 保持只读。
 
 普通对话还提供三种 durable 投影：
 

@@ -37,6 +37,8 @@ Reasoning Tree 是共享 DAG 的可读投影，不是独立复制的数据结构
 
 Reasoning Forest 的 orphan 投影必须同时保留总数和有界的近期语义摘要，避免把无界 ID 列表注入模型上下文。
 
+`ObservationQueueItem`/`ObservationQueueSummary` 只保存事件 ID、来源、优先级、序号、脱敏摘要和有限的关联 ID；它们是从 `event_ingress_received`、Job/Provider/Verifier/Maintenance terminal 事件重建的模型/GUI 投影，`observation_consumed` 负责 durable acknowledgement。
+
 ```powershell
 npm run typecheck --workspace=@proofblade/materials
 npm run test:materials

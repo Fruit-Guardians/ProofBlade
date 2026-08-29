@@ -34,7 +34,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "3bf31958d857e83d20aaaab578bba5cb06b20af6d9b37770381f485d328774fc";
+const CODING_TOOL_CONTRACT_HASH = "190b7d5cc50ce8767f90a6c196acbb214e1b15bbccf22523e38ee181f48d172b";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -639,7 +639,10 @@ test("shell_background returns immediately and shell_job polls then stops the re
       t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
       return;
     }
-    const context = { env, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
 
     // A command that runs far longer than the tool call may block for.
     const started = Date.now();
@@ -658,6 +661,19 @@ test("shell_background returns immediately and shell_job polls then stops the re
     assert.equal(polled.status, "running", "the job must still be running while it ticks");
     assert.match(polled.output, /tick-1/);
 
+    const monitored = await executeTool("shell_job", {
+      operation: "monitor",
+      jobId: job.jobId,
+      sinceCursor: String(polled.totalBytes ?? 0),
+      triggers: ["keyword"],
+      keywords: ["tick-4"],
+      waitMs: 5_000,
+    }, context);
+    const monitorDetails = monitored.details as { trigger: string; output: string; cursor: string };
+    assert.equal(monitorDetails.trigger, "keyword");
+    assert.match(monitorDetails.output, /tick-4/);
+    assert.ok(Number(monitorDetails.cursor) > Number(polled.totalBytes ?? 0));
+
     // Stopping must actually kill it: the log stops growing.
     const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
     assert.equal((stop.details as { stopped: boolean }).stopped, true, "stop must report a killed process");
@@ -666,6 +682,10 @@ test("shell_background returns immediately and shell_job polls then stops the re
     const later = (await executeTool("shell_job", { operation: "read", jobId: job.jobId }, context)).details as { status: string; totalBytes?: number };
     assert.equal(later.totalBytes, afterStop.totalBytes, "a stopped job must not keep writing output");
     assert.equal(later.status, "finished");
+
+    const queueEvents = await services.control.events(runId);
+    assert.ok(queueEvents.filter((event) => event.type === "observation_consumed").length >= 3, "read, monitor, and stop should acknowledge their returned observations");
+    assert.equal((await services.control.snapshot(runId)).lastSeq, queueEvents.at(-1)?.seq);
 
     const listed = (await executeTool("shell_job", { operation: "list" }, context)).details as { jobs: string[] };
     assert.ok(listed.jobs.some((entry) => entry.includes(job.jobId)), "the job log must be listable");

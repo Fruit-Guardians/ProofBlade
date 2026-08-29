@@ -26,6 +26,7 @@ import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
 import { globWorkspace, grepWorkspace, workspaceSearchHash, workspaceSearchText } from "./workspace-search.js";
+import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
@@ -567,15 +568,20 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
   label: "shell_job",
   description: "Read the output of, or stop, a background job started by shell_background.",
   parameters: Type.Object({
-    operation: Type.String({ enum: ["read", "stop", "list"], description: "read tails the job log, stop kills it, list shows known jobs." }),
+    operation: Type.String({ enum: ["read", "monitor", "stop", "list"], description: "read returns bounded output, monitor waits for a trigger, stop kills it, list shows known jobs." }),
     jobId: Type.Optional(Type.String({ minLength: 1, description: "Job id from shell_background. Required for read and stop." })),
     maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 20_000, description: "Bound on returned log text (default 4000)." })),
+    sinceCursor: Type.Optional(Type.String({ pattern: "^[0-9]+$", description: "Byte cursor returned by an earlier read or monitor call." })),
+    triggers: Type.Optional(Type.Array(Type.String({ enum: ["new_output", "keyword", "exit", "error", "heartbeat", "timeout"] }), { minItems: 1, maxItems: 6 })),
+    keywords: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 16, description: "Case-insensitive sentinel strings for the keyword trigger." })),
+    waitMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000, description: "Maximum time to wait in monitor mode." })),
+    heartbeatMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000, description: "Optional heartbeat interval while the job remains active." })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, onUpdate, context) {
-    const input = params as { operation: "read" | "stop" | "list"; jobId?: string; maxChars?: number };
+    const input = params as { operation: "read" | "monitor" | "stop" | "list"; jobId?: string; maxChars?: number; sinceCursor?: string; triggers?: Array<"new_output" | "keyword" | "exit" | "error" | "heartbeat" | "timeout">; keywords?: string[]; waitMs?: number; heartbeatMs?: number };
     if (input.operation === "list") {
-      assertAbsent(input as unknown as Record<string, unknown>, ["jobId"], "shell_job list");
+      assertAbsent(input as unknown as Record<string, unknown>, ["jobId", "maxChars", "sinceCursor", "triggers", "keywords", "waitMs", "heartbeatMs"], "shell_job list");
       const listed = await runShell(`ls -1 .proofblade/jobs/*.log 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
       return toolResult({ jobs: listed.trim().split(/\r?\n/).filter(Boolean) });
     }
@@ -598,35 +604,203 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
         context,
       );
       if (stopped.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${input.jobId}`);
+      const observationId = await recordShellJobObservation(context, input.jobId, { status: "finished", cursor: 0, trigger: "exit" });
+      if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
       return toolResult({ jobId: input.jobId, stopped: stopped.includes("stopped"), detail: stopped.trim() });
     }
     const maxChars = input.maxChars ?? 4_000;
-    const output = await runShell(
-      `f=$(ls -1 .proofblade/jobs/${input.jobId}-*.log 2>/dev/null | head -1); ` +
-      `if [ -z "$f" ]; then echo "__NO_JOB__"; else ` +
-      `p=$(cat ${pidPath(input.jobId)} 2>/dev/null); ` +
-      `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else echo "__FINISHED__"; fi; ` +
-      `wc -c < "$f"; tail -c ${Math.max(256, maxChars)} "$f"; fi`,
-      signal,
-      onUpdate,
-      context,
-    );
-    if (output.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${input.jobId}`);
-    const running = output.includes("__RUNNING__");
-    const body = output.replace(/__(RUNNING|FINISHED)__\r?\n/, "");
-    const [sizeLine, ...rest] = body.split(/\r?\n/);
-    const totalBytes = Number.parseInt((sizeLine ?? "").trim(), 10);
-    const text = rest.join("\n");
+    if (input.operation === "read") {
+      const inspection = await inspectShellJob(input.jobId, maxChars, signal, onUpdate, context);
+      const sinceCursor = parseShellCursor(input.sinceCursor);
+      const projection = shellOutputProjection(inspection, sinceCursor);
+      const trigger = inspection.status === "finished" ? "exit" : projection.newOutput ? "new_output" : undefined;
+      if (trigger) {
+        const observationId = await recordShellJobObservation(context, input.jobId, { ...inspection, trigger });
+        if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
+      }
+      return toolResult({
+        jobId: input.jobId,
+        status: inspection.status,
+        cursor: String(inspection.cursor),
+        sinceCursor: String(sinceCursor),
+        totalBytes: inspection.totalBytes,
+        truncated: projection.truncated,
+        output: snipText(projection.output, maxChars).text,
+        ...(inspection.status === "running" ? { note: "Still running. Use shell_job monitor with a trigger instead of repeated empty reads." } : {}),
+      });
+    }
+    const monitored = await monitorShellJob(input.jobId, input, signal, onUpdate, context);
+    const observationId = await recordShellJobObservation(context, input.jobId, monitored);
+    if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
     return toolResult({
       jobId: input.jobId,
-      status: running ? "running" : "finished",
-      totalBytes: Number.isFinite(totalBytes) ? totalBytes : undefined,
-      truncated: Number.isFinite(totalBytes) && totalBytes > text.length,
-      output: text,
-      ...(running ? { note: "Still running — do not wait in a loop; go do other analysis and poll again later." } : {}),
+      status: monitored.status,
+      trigger: monitored.trigger,
+      cursor: String(monitored.cursor),
+      sinceCursor: String(monitored.sinceCursor),
+      truncated: monitored.truncated,
+      output: snipText(monitored.output, maxChars).text,
+      ...(monitored.matchedKeyword ? { matchedKeyword: monitored.matchedKeyword } : {}),
     });
   },
 };
+
+interface ShellJobInspection {
+  status: "running" | "finished";
+  totalBytes: number;
+  cursor: number;
+  tail: Buffer;
+}
+
+interface ShellOutputProjection {
+  output: string;
+  newOutput: boolean;
+  truncated: boolean;
+}
+
+interface ShellMonitorResult {
+  status: "running" | "finished";
+  trigger: "new_output" | "keyword" | "exit" | "error" | "heartbeat" | "timeout";
+  cursor: number;
+  sinceCursor: number;
+  output: string;
+  truncated: boolean;
+  matchedKeyword?: string;
+}
+
+async function inspectShellJob(
+  jobId: string,
+  maxChars: number,
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<ShellJobInspection> {
+  const output = await runShell(
+    `f=$(ls -1 .proofblade/jobs/${jobId}-*.log 2>/dev/null | head -1); ` +
+    `if [ -z "$f" ]; then echo "__NO_JOB__"; else ` +
+    `p=$(cat ${pidPath(jobId)} 2>/dev/null); ` +
+    `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else echo "__FINISHED__"; fi; ` +
+    `wc -c < "$f"; tail -c ${Math.max(256, Math.min(20_000, Math.floor(maxChars)))} "$f" | base64 | tr -d '\\r\\n'; fi`,
+    signal,
+    onUpdate,
+    context,
+  );
+  if (output.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${jobId}`);
+  const running = output.startsWith("__RUNNING__");
+  const body = output.replace(/^__(RUNNING|FINISHED)__\r?\n/, "");
+  const [sizeLine, ...rest] = body.split(/\r?\n/);
+  const totalBytes = Number.parseInt((sizeLine ?? "").trim(), 10);
+  if (!Number.isSafeInteger(totalBytes) || totalBytes < 0) throw new Error(`Background job ${jobId} returned an invalid byte cursor`);
+  const encodedTail = rest.join("").trim();
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encodedTail)) {
+    throw new Error(`Background job ${jobId} returned an invalid base64 log tail`);
+  }
+  let tail: Buffer;
+  try {
+    tail = Buffer.from(encodedTail, "base64");
+  } catch {
+    throw new Error(`Background job ${jobId} returned an invalid base64 log tail`);
+  }
+  if (tail.length > totalBytes) throw new Error(`Background job ${jobId} returned an oversized log tail`);
+  return { status: running ? "running" : "finished", totalBytes, cursor: totalBytes, tail };
+}
+
+function shellOutputProjection(inspection: ShellJobInspection, sinceCursor: number): ShellOutputProjection {
+  const tailBytes = inspection.tail.length;
+  const tailStart = Math.max(0, inspection.totalBytes - tailBytes);
+  if (sinceCursor < tailStart) return { output: decodeUtf8Tail(inspection.tail, 0), newOutput: inspection.totalBytes > sinceCursor, truncated: true };
+  const offset = Math.max(0, sinceCursor - tailStart);
+  const output = decodeUtf8Tail(inspection.tail, offset);
+  return { output, newOutput: inspection.totalBytes > sinceCursor, truncated: false };
+}
+
+function decodeUtf8Tail(bytes: Buffer, offset: number): string {
+  let safeOffset = Math.max(0, Math.min(bytes.length, Math.floor(offset)));
+  // A byte cursor is allowed to point at the beginning of a retained tail,
+  // which may itself start in the middle of a UTF-8 sequence after truncation.
+  // Skip continuation bytes so the model never receives a replacement glyph.
+  while (safeOffset < bytes.length && (bytes[safeOffset]! & 0xc0) === 0x80) safeOffset += 1;
+  return bytes.subarray(safeOffset).toString("utf8");
+}
+
+async function monitorShellJob(
+  jobId: string,
+  input: { sinceCursor?: string; triggers?: ShellMonitorResult["trigger"][]; keywords?: string[]; waitMs?: number; heartbeatMs?: number },
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<ShellMonitorResult> {
+  const sinceCursor = parseShellCursor(input.sinceCursor);
+  const triggers = new Set(input.triggers ?? ["new_output", "keyword", "exit", "error", "heartbeat"]);
+  if (triggers.has("keyword") && (!input.keywords || input.keywords.length === 0)) throw new Error("shell_job monitor keyword trigger requires keywords");
+  const keywords = (input.keywords ?? []).map((keyword) => keyword.trim()).filter(Boolean);
+  const waitMs = normalizeShellMonitorWait(input.waitMs ?? 30_000);
+  const heartbeatMs = normalizeShellMonitorWait(input.heartbeatMs ?? 5_000);
+  const deadline = Date.now() + waitMs;
+  let lastHeartbeat = Date.now();
+  while (true) {
+    throwIfShellAborted(signal);
+    const inspection = await inspectShellJob(jobId, 12_000, signal, onUpdate, context);
+    const projection = shellOutputProjection(inspection, sinceCursor);
+    const matchedKeyword = keywords.find((keyword) => projection.output.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
+    if (triggers.has("keyword") && matchedKeyword) return { status: inspection.status, trigger: "keyword", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated, matchedKeyword };
+    if (triggers.has("new_output") && projection.newOutput) return { status: inspection.status, trigger: "new_output", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    if (inspection.status === "finished") {
+      if (triggers.has("error")) return { status: inspection.status, trigger: "error", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+      if (triggers.has("exit")) return { status: inspection.status, trigger: "exit", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    }
+    if (triggers.has("heartbeat") && Date.now() - lastHeartbeat >= heartbeatMs) {
+      lastHeartbeat = Date.now();
+      return { status: inspection.status, trigger: "heartbeat", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    }
+    if (Date.now() >= deadline) return { status: inspection.status, trigger: "timeout", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    // A single bounded wait lives inside the tool call; it does not create
+    // extra Provider turns or consume model tokens for empty reads.
+    await delayShellMonitor(Math.min(250, Math.max(1, deadline - Date.now())), signal);
+  }
+}
+
+async function recordShellJobObservation(context: CodingResourceContext, jobId: string, result: { status: string; cursor: number; trigger: string }): Promise<string | undefined> {
+  const ingress = new RunEventIngress(context.controlStore);
+  const envelope = await ingress.enqueue(context.runtime.runId, {
+    source: "job",
+    kind: result.trigger === "timeout" ? "job.wait_timeout" : result.status === "finished" ? "job.exit" : "job.output",
+    priority: result.trigger === "error" || result.trigger === "exit" ? "normal" : "background",
+    correlationId: `${context.runtime.runId}:${jobId}:shell-job`,
+    idempotencyKey: `${context.runtime.runId}:${jobId}:${result.trigger}:${result.cursor}`,
+    coalescingKey: `shell-job:${jobId}`,
+    replayPolicy: "unknown",
+    payload: { jobId, status: result.status, cursor: result.cursor, trigger: result.trigger },
+  });
+  const event = (await context.controlStore.events(context.runtime.runId)).find((candidate) => candidate.type === "event_ingress_received" && candidate.envelope?.id === envelope.id);
+  return event?.id;
+}
+
+function parseShellCursor(value: string | undefined): number {
+  if (value === undefined) return 0;
+  if (!/^\d+$/.test(value)) throw new Error("shell_job sinceCursor must be a non-negative byte cursor");
+  const cursor = Number(value);
+  if (!Number.isSafeInteger(cursor)) throw new Error("shell_job sinceCursor is too large");
+  return cursor;
+}
+
+function normalizeShellMonitorWait(value: number): number {
+  if (!Number.isInteger(value) || value < 50 || value > 120_000) throw new Error("shell_job monitor wait must be an integer from 50 to 120000");
+  return value;
+}
+
+function throwIfShellAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "shell_job monitor aborted"));
+}
+
+function delayShellMonitor(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    const onAbort = () => { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); reject(signal?.reason); };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /** Run one shell command through the lane's execution env and return its text. */
 async function runShell(
