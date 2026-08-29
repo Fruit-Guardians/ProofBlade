@@ -67,6 +67,7 @@
 - 新增 Job monitor 观察队列 provider-free 场景，覆盖关键词触发、job_finished、Artifact 关联、重启重建和幂等确认
 - BackgroundJobRunner 与 Coding shell_job 统一使用 UTF-8 字节 cursor，补充多字节输出回归测试
 - 同步中英文 README、GUI/Runtime/Orchestration/Jobs/Domain/Control/Evaluation 组件契约文档
+- 修复 shell_background 测试在 Linux Bash 分支引用未定义局部配置的问题
 
 ### 验证
 
@@ -81,6 +82,7 @@
 - [x] npm audit --omit=dev: 0 vulnerabilities
 - [x] api index/check/duplicates, component, change-contract, changed-test and project-report gates passed
 - [x] git diff --check passed
+- [x] coding-resources.test.ts passed: 21 passed, 2 skipped, 0 failed after the cross-platform test fix
 
 ## UPDATE-20260829-008
 

@@ -286,7 +286,8 @@
       "changes": [
         "新增 Job monitor 观察队列 provider-free 场景，覆盖关键词触发、job_finished、Artifact 关联、重启重建和幂等确认",
         "BackgroundJobRunner 与 Coding shell_job 统一使用 UTF-8 字节 cursor，补充多字节输出回归测试",
-        "同步中英文 README、GUI/Runtime/Orchestration/Jobs/Domain/Control/Evaluation 组件契约文档"
+        "同步中英文 README、GUI/Runtime/Orchestration/Jobs/Domain/Control/Evaluation 组件契约文档",
+        "修复 shell_background 测试在 Linux Bash 分支引用未定义局部配置的问题"
       ],
       "validation": [
         "runtime-scenario-evaluator、evaluation 和 capability-jobs 定向测试通过",
@@ -299,7 +300,8 @@
         "npm run eval -- --enforce-gate passed: baseline-v4 37/37, evidence binding 18/18, replay parity 18/18, candidate leaks 0",
         "npm audit --omit=dev: 0 vulnerabilities",
         "api index/check/duplicates, component, change-contract, changed-test and project-report gates passed",
-        "git diff --check passed"
+        "git diff --check passed",
+        "coding-resources.test.ts passed: 21 passed, 2 skipped, 0 failed after the cross-platform test fix"
       ]
     },
     {

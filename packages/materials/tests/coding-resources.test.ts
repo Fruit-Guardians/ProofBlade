@@ -634,6 +634,12 @@ test("durable CTF task classification enables challenge guards without prompt ke
 test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
   const dir = await mkdtemp(join(process.cwd(), "shell-bg-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
   try {
     if (!(await hasWorkingBash(env))) {
       t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
