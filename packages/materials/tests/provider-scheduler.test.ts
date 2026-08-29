@@ -282,14 +282,41 @@ test("a source that throws synchronously after the permit is acquired yields a t
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-throw")?.active ?? 0, 0);
 });
 
-test("an observer.started that throws still yields a terminal error and frees the slot", async () => {
+test("an observer.started that throws does not block the provider terminal event", async () => {
   const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 0 });
   const observer = { queued: () => "R1", started: () => { throw new Error("started hook failed"); }, cancelled: () => {} };
   const source: ProviderStreams = { stream: () => delayedStream(2), streamSimple: () => delayedStream(2) };
   const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-started-throw", maxConcurrentRequests: 1 }, observer);
   const result = await collect(wrapped.stream(model, { messages: [{ role: "user", content: "x", timestamp: 1 }] }));
-  assert.equal(result.stopReason, "error");
+  assert.equal(result.stopReason, "stop");
   assert.equal(scheduler.statuses().find((s) => s.endpoint === "endpoint-started-throw")?.active ?? 0, 0);
+});
+
+test("provider stream telemetry records first event/token and cannot block stall recovery", async () => {
+  const scheduler = new ProviderRequestScheduler({ idleTimeoutMs: 20, maxRetries: 0 });
+  const observed: string[] = [];
+  const source: ProviderStreams = {
+    stream: () => {
+      const output = createAssistantMessageEventStream();
+      setTimeout(() => output.push({ type: "start", partial: message() }), 1);
+      setTimeout(() => output.push({ type: "text_delta", contentIndex: 0, delta: "x", partial: message() }), 2);
+      return output;
+    },
+    streamSimple: () => createAssistantMessageEventStream(),
+  };
+  const wrapped = scheduler.wrap(source, { provider: model.provider, model: model.id, endpoint: "endpoint-metrics", maxConcurrentRequests: 1 }, {
+    queued: () => "PR-metrics",
+    started: () => {},
+    cancelled: () => {},
+    firstEvent: () => { observed.push("first-event"); throw new Error("telemetry offline"); },
+    firstToken: () => { observed.push("first-token"); },
+    stalled: () => { observed.push("stalled"); throw new Error("telemetry offline"); },
+    recoveryRequired: () => { observed.push("recovery"); throw new Error("telemetry offline"); },
+  });
+  const result = await collect(wrapped.stream(model, { messages: [] }));
+  assert.equal(result.stopReason, "error");
+  assert.deepEqual(observed, ["first-event", "first-token", "stalled", "recovery"]);
+  assert.equal(scheduler.statuses().find((status) => status.endpoint === "endpoint-metrics")?.active, 0);
 });
 
 function heartbeatStream(beats: number, gapMs: number): AssistantMessageEventStream {

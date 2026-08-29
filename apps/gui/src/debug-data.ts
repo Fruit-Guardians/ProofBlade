@@ -982,21 +982,69 @@ function contextRuntimeInfo(events: readonly HarnessEvent[]): ContextRuntimeInfo
   if (!usageEvent) return undefined;
   const usage = usageEvent.payload?.usage as { input?: unknown; cacheRead?: unknown } | undefined;
   const usageInput = Number(usage?.input ?? 0);
-  const cacheRead = Number(usage?.cacheRead ?? 0);
+  const cacheReported = typeof usage?.cacheRead === "number";
+  const cacheRead = cacheReported ? Number(usage?.cacheRead) : 0;
   const epochEvent = [...events].reverse().find((event) => event.type === "request_epoch_started");
   const contextWindow = Number((epochEvent?.payload?.epoch as { contextWindow?: unknown } | undefined)?.contextWindow ?? 0);
   if (!Number.isFinite(contextWindow) || contextWindow <= 0) return undefined;
   const usedTokens = Math.max(0, usageInput) + Math.max(0, cacheRead);
   const estimatedTokens = Number(usageEvent.payload?.contextEstimatedTokens);
+  const epochId = typeof epochEvent?.payload?.epochId === "string"
+    ? epochEvent?.payload?.epochId
+    : typeof (epochEvent?.payload?.epoch as { id?: unknown } | undefined)?.id === "string"
+      ? (epochEvent?.payload?.epoch as { id: string }).id
+      : undefined;
+  const epoch = epochEvent?.payload?.epoch as { requestContextHash?: unknown; contextManifestHash?: unknown; manifestSummary?: unknown } | undefined;
+  const manifestSummary = isRecord(epoch?.manifestSummary) ? epoch.manifestSummary : undefined;
+  const layerTokens = numericRecord(manifestSummary?.layerTokens);
+  const blockHashes = stringRecord(manifestSummary?.blockHashes);
+  const manifestBudget = isRecord(manifestSummary?.budget) ? manifestSummary.budget : undefined;
+  const manifestMaintenance = isRecord(manifestSummary?.maintenance) ? manifestSummary.maintenance : undefined;
+  const contextEvent = [...events].reverse().find((event) => event.type === "request_epoch_context" && (!epochId || event.payload?.requestEpochId === epochId || event.payload?.requestEpochId === undefined));
+  const fields = contextEvent?.payload?.fields as { requestBodyHash?: unknown; stablePrefixHash?: unknown; dynamicSuffixHash?: unknown } | undefined;
+  const lastCompaction = [...events].reverse().find((event) => event.type === "compaction_recorded");
+  const lastConsolidation = [...events].reverse().find((event) => event.type === "consolidate_finished" || event.type === "consolidate_failed");
   return {
     contextWindow,
     usedTokens,
     remainingTokens: Math.max(0, contextWindow - usedTokens),
     utilization: usedTokens / contextWindow,
     ...(Number.isFinite(estimatedTokens) && estimatedTokens > 0 ? { estimatedTokens } : {}),
-    lastCacheRead: Math.max(0, cacheRead),
+    cacheReported,
+    ...(cacheReported ? { lastCacheRead: Math.max(0, cacheRead) } : {}),
+    ...(typeof fields?.requestBodyHash === "string" ? { requestBodyHash: fields.requestBodyHash } : {}),
+    ...(typeof fields?.stablePrefixHash === "string" ? { stablePrefixHash: fields.stablePrefixHash } : {}),
+    ...(typeof fields?.dynamicSuffixHash === "string" ? { dynamicSuffixHash: fields.dynamicSuffixHash } : {}),
+    ...(epochId ? { requestEpochId: epochId } : {}),
+    ...(typeof epoch?.requestContextHash === "string" ? { requestContextHash: epoch.requestContextHash } : {}),
+    ...(typeof epoch?.contextManifestHash === "string" ? { contextManifestHash: epoch.contextManifestHash } : {}),
+    ...(typeof manifestSummary?.hash === "string" ? { contextManifestHash: manifestSummary.hash } : {}),
+    ...(typeof manifestSummary?.firstChangedBlock === "string" ? { firstChangedBlock: manifestSummary.firstChangedBlock } : {}),
+    ...(typeof manifestSummary?.compressionTarget === "string" ? { compressionTarget: manifestSummary.compressionTarget } : {}),
+    ...(typeof manifestSummary?.droppedCount === "number" ? { droppedCount: manifestSummary.droppedCount } : {}),
+    ...(layerTokens ? { layerTokens } : {}),
+    ...(blockHashes ? { blockHashes } : {}),
+    ...(typeof manifestBudget?.availableInput === "number" ? { availableInput: manifestBudget.availableInput } : {}),
+    ...(typeof manifestBudget?.estimatedInput === "number" ? { estimatedInput: manifestBudget.estimatedInput } : {}),
+    ...(typeof manifestBudget?.overBudget === "boolean" ? { overBudget: manifestBudget.overBudget } : {}),
+    ...(typeof manifestMaintenance?.stage === "string" ? { maintenanceStage: manifestMaintenance.stage } : {}),
+    ...(typeof manifestMaintenance?.targetRatio === "number" ? { targetRatio: manifestMaintenance.targetRatio } : {}),
+    ...(typeof manifestMaintenance?.hardRatio === "number" ? { hardRatio: manifestMaintenance.hardRatio } : {}),
+    ...(typeof manifestMaintenance?.nextAction === "string" ? { nextMaintenanceAction: manifestMaintenance.nextAction } : {}),
+    ...(lastCompaction ? { maintenanceStage: "compact", nextMaintenanceAction: "none" } : lastConsolidation?.type === "consolidate_failed" ? { maintenanceStage: "notice", nextMaintenanceAction: "consolidate" } : {}),
+    ...(lastConsolidation ? { lastConsolidationAt: lastConsolidation.ts } : {}),
     lastUpdatedAt: usageEvent.ts,
   };
+}
+
+function numericRecord(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === "number" && Number.isFinite(item))) as Record<string, number>;
+}
+
+function stringRecord(value: unknown): Record<string, string> | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === "string")) as Record<string, string>;
 }
 
 function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {

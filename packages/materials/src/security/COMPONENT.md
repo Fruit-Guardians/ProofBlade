@@ -4,15 +4,15 @@
 {
   "id": "materials-security",
   "name": "Runtime Approval Security",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "createdAt": "2026-08-22T00:00:00+08:00",
-  "updatedAt": "2026-08-22T00:00:00+08:00",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-22T00:00:00+08:00",
-    "lastSecurityAuditAt": "2026-08-22T00:00:00+08:00",
-    "sourceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "ac60c98b87223528846ac7f91888cd6053b1edc2339c635e0d96baaedf840d79",
     "result": "passed"
   }
 }

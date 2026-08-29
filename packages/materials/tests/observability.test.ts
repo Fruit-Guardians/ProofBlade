@@ -49,6 +49,10 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_started", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", contextEstimatedTokens: 800, retryLimit: 0 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_queued", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_slot_acquired", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2, waitMs: 40 } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_first_event", payload: { requestId: "PR-1", elapsedMs: 15, attempt: 0, eventType: "start" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_first_token", payload: { requestId: "PR-1", elapsedMs: 20, attempt: 0, eventType: "text_delta" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_inter_event_idle", payload: { requestId: "PR-1", idleMs: 120, maxIdleMs: 120, eventType: "text_delta" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "orchestrator", type: "provider_request_retried", payload: { requestId: "PR-1", attempt: 1, delayMs: 5, reason: "transient" } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_response_received", payload: { requestId: "PR-1", status: 200, headerNames: ["content-type"], responseHeaderCount: 1 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "model_usage", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", durationMs: 120, finishReason: "toolUse", toolCallCount: 1, usage: { input: 100, output: 20, reasoning: 5, cacheRead: 25, cacheWrite: 10, totalTokens: 120, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } },
       { schemaVersion: 1, lane: "executor", correlationId: "tool-1", actor: "model", type: "tool_call_recorded", payload: { toolCallId: "TC-1", toolName: "inspect_target", argsHash: sha256("{}"), waitMs: 4, executionMode: "sequential", sensitivity: "target", timeoutMs: 30_000 } },
@@ -91,6 +95,11 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     assert.equal(report.provider.tokens.cacheRead, 25);
     assert.equal(report.provider.cacheHitRate, 0.2);
     assert.equal(report.provider.latencyMs.p95, 120);
+    assert.deepEqual(report.provider.stream.timeToFirstEventMs, { total: 15, average: 15, p95: 15 });
+    assert.deepEqual(report.provider.stream.timeToFirstTokenMs, { total: 20, average: 20, p95: 20 });
+    assert.deepEqual(report.provider.stream.interEventIdleMs, { total: 120, average: 120, p95: 120, max: 120 });
+    assert.equal(report.provider.stream.retryCount, 1);
+    assert.equal(report.provider.stream.retryDelayMs, 5);
     assert.equal(report.provider.cost.totalUsd, 0);
     assert.deepEqual(report.provider.scheduling, { queued: 1, cancelled: 0, maxQueueDepth: 2, waitMs: 40, averageWaitMs: 40 });
     assert.equal(report.tools.agentCalls, 1);

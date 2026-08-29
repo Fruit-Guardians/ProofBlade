@@ -3,7 +3,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { CompletionProposal, DomainRecordInput, JobRecord, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
+import type { CompletionProposal, DomainRecordInput, JobRecord, KnowledgeLevel, KnowledgeProjection, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver, type ObservationOutcome } from "../knowledge/observer.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
@@ -11,9 +11,11 @@ import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityDiscoveryInput, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
 import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, FirmwareCapabilityBackend, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
-import { BackgroundJobRunner, type BackgroundJobStartInput, type JobOutput } from "../jobs/background-runner.js";
+import { BackgroundJobRunner, type BackgroundJobStartInput, type JobMonitorInput, type JobMonitorResult, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
+import { projectKnowledge, readKnowledge, searchKnowledge, type KnowledgeReadResult } from "../knowledge/projection.js";
+import { EvidenceConsolidator, type ConsolidateInput, type ConsolidateResult } from "../knowledge/consolidation.js";
 
 export interface InspectTargetResult {
   output: string;
@@ -187,6 +189,10 @@ export class ProofBladeToolRuntime {
 
   public async waitJob(jobId: string, timeoutMs?: number): Promise<JobRecord> {
     return await this.jobs.wait(jobId, timeoutMs);
+  }
+
+  public async monitorJob(jobId: string, input: JobMonitorInput = {}): Promise<JobMonitorResult> {
+    return await this.jobs.monitor(jobId, input);
   }
 
   public async listJobs(): Promise<JobRecord[]> {
@@ -383,6 +389,20 @@ export class ProofBladeToolRuntime {
       originalChars: snipped.originalChars,
       resultArtifactId: executed.artifactId,
     };
+  }
+
+  public async inspectKnowledge(uri: string, level: KnowledgeLevel = "L0", maxChars = 6_000): Promise<KnowledgeReadResult> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return await readKnowledge(snapshot, this.artifactStore, uri, level, maxChars);
+  }
+
+  public async searchKnowledge(query = "", maxResults = 50): Promise<KnowledgeProjection[]> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return searchKnowledge(snapshot, query, maxResults);
+  }
+
+  public async consolidateKnowledge(input: ConsolidateInput = {}): Promise<ConsolidateResult> {
+    return await new EvidenceConsolidator(this.controlStore, this.artifactStore).consolidate(this.runId, input);
   }
 
   public async searchHistory(query: string): Promise<Array<Record<string, unknown>>> {

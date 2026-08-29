@@ -1,12 +1,19 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T22:48:00+08:00
+> 状态更新时间：2026-08-29T09:36:31+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
+| UPDATE-20260829-006 | 2026-08-29T08:44:14+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
+| UPDATE-20260829-005 | 2026-08-29T02:58:32+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220, PLAN-230 | main | 本条记录所在提交 |
+| UPDATE-20260829-004 | 2026-08-29T02:12:12+08:00 | PLAN-200, PLAN-210, PLAN-220, PLAN-230 | main | 本条记录所在提交 |
+| UPDATE-20260829-003 | 2026-08-29T01:03:42+08:00 | PLAN-100, PLAN-110, PLAN-120, PLAN-130, PLAN-200, PLAN-210, PLAN-220, PLAN-230 | main | 本条记录所在提交 |
+| UPDATE-20260829-002 | 2026-08-29T00:35:00+08:00 | PLAN-100, PLAN-110, PLAN-120, PLAN-200, PLAN-220, PLAN-230 | codex/stable-dynamic-context-tail | 本条记录所在提交 |
+| UPDATE-20260829-001 | 2026-08-29T00:12:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220, PLAN-230 | codex/stable-dynamic-context-tail | 本条记录所在提交 |
 | UPDATE-20260825-006 | 2026-08-25T22:48:00+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220 | codex/stable-dynamic-context-tail | 90fc7a3 |
 | UPDATE-20260825-005 | 2026-08-25T13:20:00+08:00 | PLAN-200 | codex/proofblade-agent-foundation | 本条记录所在提交 |
 | UPDATE-20260825-004 | 2026-08-25T13:05:00+08:00 | PLAN-200, PLAN-210 | codex/proofblade-agent-foundation | 本条记录所在提交 |
@@ -46,6 +53,145 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260829-007
+
+时间：2026-08-29T09:36:31+08:00
+
+摘要：完成统一 Agent 单 Agent 基础设施的文档和回放校验收尾。
+
+### 变更
+
+- 修复 replay stats 将 candidateArtifactId、candidatePath 等 hash-bound 安全引用误判为候选泄漏的问题，仅检测候选明文泄漏
+- 为 Tool Replay 增加 tape 内容哈希校验，篡改录制结果时拒绝重放
+- 同步中英文 README 的 baseline-v3 描述和 doctor、Replay、Knowledge、consolidate、Job monitor CLI 入口
+- 明确多 Agent 仍只保留结构接口，默认 selectAgentStrategy() 继续使用 single-agent
+
+### 验证
+
+- [x] 定向 Replay、Knowledge、Scope、Event ingress、UpdateProposal 和运行时契约测试通过
+- [x] npm run eval -- --enforce-gate passed: 30/30 provider-free cases, evidence binding 18/18, replay parity 18/18, candidate leaks 0
+- [x] npm run test:fast passed: 735 passed, 2 skipped, 0 failed; test:slow 22 passed; test:integration 87 passed
+- [x] CLI demo、Protocol Replay、Knowledge search、Evidence consolidate 和 Job monitor smoke passed
+- [x] api index、component、changed-tests、change-contract、project-report、CI gate、platform fault matrix 和 git diff --check passed
+
+## UPDATE-20260829-006
+
+时间：2026-08-29T08:44:14+08:00
+
+摘要：修复统一 Agent 基础能力收尾问题：知识链接目标校验、grep 精确截断判断、图片源码 NUL 字节和 Evidence consolidate 并发幂等。
+
+### 变更
+
+- 知识投影只为已知 Knowledge 目标生成 URI，task 的 forest 链接和 Artifact 的 Effect 引用不再产生伪 URI
+- grep 只有发现第 maxResults + 1 个命中时才标记 truncated，并保留 exact-limit 的正确状态
+- 将图片去重分隔符从源码实际 NUL 修复为可移植的 \u0000 转义
+- 为同一 Run 的 Evidence consolidate 增加跨进程维护锁，避免并发重复注册整理 Artifact
+- 补充知识投影、搜索边界和并发整理回归测试
+
+### 验证
+
+- [x] knowledge-projection 与 workspace-search 定向测试通过
+- [x] npm run typecheck passed
+- [x] npm run test:fast passed: 735 passed, 2 skipped, 0 failed
+- [x] npm run test:slow passed: 22 passed, 0 failed
+- [x] npm run test:integration passed: 87 passed, 0 failed
+- [x] npm run test:ci-gates passed: 40 passed, 0 failed
+- [x] npm run api:index:check:all、api:duplicates:all、check:components、check:change-contracts、check:project-reports、check:changed-tests 和 git diff --check passed
+
+## UPDATE-20260829-005
+
+时间：2026-08-29T02:58:32+08:00
+
+摘要：实现统一计划的第一批单 Agent 运行时基础能力，并保留多 Agent 的结构接口而不启用并行策略。
+
+### 变更
+
+- 增加有界 glob/grep、doctor、knowledge URI 检索和 Evidence consolidate CLI 能力
+- 增加 RunEventEnvelope、幂等/优先级/generation fencing/coalescing ingress，并在安全点由 RunCoordinator 消费用户控制事件
+- 增加 ContextBlock、P0-P10 元数据、RequestEpoch/GUI hash 诊断和 Knowledge L0/L1/L2 投影
+- 增加后台 Job monitor、Scope child-first/LIFO 释放和 UpdateProposal 评估/激活/hash 绑定回滚生命周期
+- 补充对应的 provider-free 回归测试、README、架构文档、API 索引和项目报告
+- 多 Agent winner、ACK、级联回收和并行调度仅保留后续接口，不改变默认单 Agent 路径
+
+### 验证
+
+- [x] npm run typecheck passed
+- [x] materials typecheck and build passed
+- [x] 9 targeted materials tests passed
+- [x] npm run api:index、api:index:check:all、api:duplicates:all passed; 0 exact duplicates and 18 candidates
+- [x] npm run reports:project、check:project-reports and git diff --check passed
+- [x] full materials suite: 738 passed, 12 environment/legacy failures documented; new feature tests passed
+
+## UPDATE-20260829-004
+
+时间：2026-08-29T02:12:12+08:00
+
+摘要：阅读 AI Agent 第 7 章和第 10 章，将评估基础设施与多 Agent 协作边界补充到统一开发安排。
+
+### 变更
+
+- 加入 Dataset、Environment State、Tools、Rubric、Interaction Protocol 五元组，以及 Pass@k、Pass^k、FAIL_TO_PASS、PASS_TO_PASS 和 flaky 检查
+- 加入 Trace/Span、生产轨迹脱敏回流、FailureAttribution 首错归因、端到端回归和 trajectory-prefix 回归
+- 加入 Manager/Planner/Executor、结构化 handoff、verified winner settle_once、优雅取消 ACK、父子 Scope 级联、预算和 cycle detection
+- 明确多 Agent、评估、Telemetry 和协作文件空间都复用同一 ControlStore、RunEvent、Work Graph、Artifact、Evidence 和 Verifier，不建立第二套系统
+
+### 验证
+
+- [x] 待本轮文档和项目报告门禁执行
+
+## UPDATE-20260829-003
+
+时间：2026-08-29T01:03:42+08:00
+
+摘要：将 Cordis 论文和 DeepSeek Harness 参考中的可逆 Effect、依赖反应、RequestEpoch、Scope、Tool 三态输出、Spill 和孤儿恢复补充到统一开发安排。
+
+### 变更
+
+- 新增七份参考文档的共同运行时不变量：请求可重建、注册可逆、Provider binding 不漂移、Tool 三态输出、操作括号和遥测旁路
+- 在 S0-S8 中补充 RequestEpoch、Definition/Provider/Consumer、Disposable Scope、CapabilityRouter broker、字段级 reconciliation、Spill 和双模型边界
+- 增加 Provider/Consumer 生命周期、孤儿 compaction/curation、依赖变化、请求重建、Spill 失败和 Subagent 能力失败测试安排
+- 明确不整体引入 Cordis、不合并 Pi Session 与 CTF ControlStore、不创建巨型 Registry 或第二套 Agent loop
+
+### 验证
+
+- [x] reports:project、check:project-reports、typecheck、API index check、CI gates 和 diff check 已执行并通过；首次 CI gates 受陈旧 dist 导出影响，强制重建后 40/40 通过
+
+## UPDATE-20260829-002
+
+时间：2026-08-29T00:35:00+08:00
+
+摘要：将知识投影、上下文变更频率、Coding Agent 工具、异步交互和持续演化五份建议合并为一份统一开发安排。
+
+### 变更
+
+- 新增 docs/UNIFIED_AGENT_DEVELOPMENT_PLAN_ZH.md，按契约观测、Tool 基础能力、运行恢复、事件循环、知识投影、ContextBlock、Evidence 整理和持续演化安排实施顺序
+- 将五份文档的建议映射到统一 RunEvent、ControlStore、Work Graph、ContextCompiler、Knowledge Projection、Artifact、Evidence 和 Verifier 边界
+- 补充阶段依赖、文件级落点、失败恢复矩阵、上下文缓存事实、测试矩阵、发布流程和 Definition of Done
+
+### 验证
+
+- [x] reports:project、check:project-reports、typecheck、API index check、CI gates 和 diff check 已执行并通过
+
+## UPDATE-20260829-001
+
+时间：2026-08-29T00:12:00+08:00
+
+摘要：阅读 AI Agent 第 6 章和第 9 章，形成统一事件驱动、上下文维护、工具恢复、证据整理和持续演化的开发建议。
+
+### 变更
+
+- 确认当前动态 ProofBlade 内容追加在 transcript 尾部，尾部内部排序不直接增加 Provider KV Cache 命中，只服务本地投影、裁剪和压缩优先级
+- 基于 chapter6 增加统一事件 envelope、安全点消费、后台 Job monitor、Provider/Tool 延迟和可恢复卡住状态建议
+- 基于 chapter9 增加评价先于总结、在线记录与空闲整理分离、最小 diff、独立验证、保留集回归和更新受益能力指标建议
+- 明确普通 Chat、CTF、Fixture 和 Competition 共享一套 ControlStore、Coding Lane、Evidence、Completion、压缩和恢复契约
+- 新增 docs/AGENT_EVOLUTION_CHAPTER6_9_DEV_SUGGESTIONS_ZH.md，包含文件改动地图、五阶段路线和故障测试矩阵
+
+### 验证
+
+- [x] 已只读核对 chapter6 与 chapter9 正文标题和关键段落
+- [x] 已核对 ContextCompiler、动态 suffix、maintenance coordinator、Provider scheduler、Job runtime 和 telemetry 当前实现
+- [x] 文档与 project-status.json 已同步，reports:project 和 check:project-reports 均已通过
 
 ## UPDATE-20260825-006
 

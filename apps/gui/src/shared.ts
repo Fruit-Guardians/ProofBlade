@@ -297,6 +297,26 @@ export interface ContextRuntimeInfo {
   utilization: number;
   estimatedTokens?: number;
   lastCacheRead?: number;
+  cacheReported?: boolean;
+  requestBodyHash?: string;
+  stablePrefixHash?: string;
+  dynamicSuffixHash?: string;
+  requestEpochId?: string;
+  requestContextHash?: string;
+  contextManifestHash?: string;
+  firstChangedBlock?: string;
+  compressionTarget?: string;
+  droppedCount?: number;
+  layerTokens?: Record<string, number>;
+  blockHashes?: Record<string, string>;
+  availableInput?: number;
+  estimatedInput?: number;
+  overBudget?: boolean;
+  targetRatio?: number;
+  hardRatio?: number;
+  maintenanceStage?: string;
+  nextMaintenanceAction?: string;
+  lastConsolidationAt?: string;
   lastUpdatedAt?: string;
 }
 

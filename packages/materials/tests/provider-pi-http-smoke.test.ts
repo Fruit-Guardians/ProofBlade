@@ -210,6 +210,11 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.doesNotMatch(firstRequestBody, /Categorize: pick the dominant category/);
     assert.doesNotMatch(firstRequestBody, /Load the playbook:/);
     assert.ok(firstRequestEventTypes?.includes("tool_preparation_recorded"));
+    const requestEpoch = (await services.control.events(runId)).find((event) => event.type === "request_epoch_started")?.payload?.epoch as { contextManifestHash?: unknown; manifestSummary?: { layerTokens?: Record<string, unknown>; maintenance?: unknown } } | undefined;
+    assert.equal(typeof requestEpoch?.contextManifestHash, "string");
+    assert.equal(typeof requestEpoch?.manifestSummary?.layerTokens?.L3A, "number");
+    assert.equal(typeof requestEpoch?.manifestSummary?.layerTokens?.L3B, "number");
+    assert.ok(requestEpoch?.manifestSummary?.maintenance);
 
     await lane.close();
     lane = undefined;

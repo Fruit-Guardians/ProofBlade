@@ -5,6 +5,7 @@ import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { toToolFailure } from "../tools/errors.js";
+import type { JobMonitorTrigger } from "../jobs/background-runner.js";
 
 export interface SolverToolContext {
   runtime: ProofBladeToolRuntime;
@@ -180,6 +181,39 @@ const readJobOutputContract: ProofBladeToolContract<typeof readJobOutputSchema, 
   executionMode: "sequential",
   async execute(input, context) {
     return await context.runtime.readJobOutput(input.jobId, input.maxChars);
+  },
+};
+
+const monitorJobSchema = Type.Object({
+  jobId: Type.String({ minLength: 1 }),
+  sinceCursor: Type.Optional(Type.String({ pattern: "^[0-9]+$" })),
+  triggers: Type.Optional(Type.Array(Type.String({ enum: ["new_output", "keyword", "exit", "error", "heartbeat"] }))),
+  keywords: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 16 })),
+  waitMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000 })),
+  heartbeatMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000 })),
+}, { additionalProperties: false });
+
+const monitorJobContract: ProofBladeToolContract<typeof monitorJobSchema, Static<typeof monitorJobSchema>, unknown, SolverToolContext> = {
+  name: "monitor_job",
+  version: "1.0.0",
+  description: "Wait for new job output, a keyword, exit/error, or heartbeat using a monotonic cursor. Returns once or at a bounded timeout instead of requiring a polling loop.",
+  parameters: monitorJobSchema,
+  readOnly: true,
+  sideEffect: "none",
+  timeoutMs: 120_000,
+  replay: "pure",
+  outputPolicy: "summary",
+  resourceKeys: ["job:{jobId}"],
+  sensitivity: "target",
+  evidenceKinds: [],
+  executionMode: "sequential",
+  async execute(input, context) {
+    const { triggers, ...rest } = input;
+    const monitorInput = {
+      ...rest,
+      ...(triggers ? { triggers: triggers as JobMonitorTrigger[] } : {}),
+    };
+    return await context.runtime.monitorJob(input.jobId, monitorInput);
   },
 };
 
@@ -402,6 +436,7 @@ const solverToolContracts: ReadonlyArray<ProofBladeToolContract<any, any, any, S
   invokeCapabilityContract,
   runBackgroundContract,
   readJobOutputContract,
+  monitorJobContract,
   stopJobContract,
   loadSkillContract,
   proposeIntentContract,

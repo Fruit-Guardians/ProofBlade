@@ -135,7 +135,31 @@ test("context control view exposes bounded recovery and work constraints", () =>
   assert.match(rendered, /external process outcome is unknown/);
   assert.match(rendered, /inspect the interrupted process/);
   assert.match(rendered, /same-payload/);
-  assert.equal(compiled.manifest.compilerVersion, "proofblade-context@6");
+  assert.equal(compiled.manifest.compilerVersion, "proofblade-context@7");
+});
+
+test("context blocks isolate durable ledger changes from active lease changes", () => {
+  const snapshot = createInitialSnapshot("CTX-001", task);
+  snapshot.status = "RUNNING";
+  const compiler = new ContextCompiler();
+  const first = compiler.build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot });
+  const withEvidence = structuredClone(snapshot);
+  withEvidence.evidence["EV-NEW"] = {
+    id: "EV-NEW", kind: "observation", summary: "new durable finding", source: { tool: "evidence", generation: 0 },
+    provenance: { schemaVersion: 1, runId: snapshot.runId, generation: 0, recordedBy: "agent", artifactIds: [] }, confidence: 0.8, supports: [], refutes: [], createdSeq: 2,
+  };
+  const evidenceView = compiler.build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot: withEvidence });
+  const block = (view: typeof first, id: string) => view.manifest.blocks?.find((item) => item.id === id)?.contentHash;
+  assert.equal(block(first, "context.l0"), block(evidenceView, "context.l0"));
+  assert.equal(block(first, "context.l1"), block(evidenceView, "context.l1"));
+  assert.notEqual(block(first, "context.l3a"), block(evidenceView, "context.l3a"));
+
+  const withLease = structuredClone(snapshot);
+  withLease.leases["target:CTX-001"] = { resourceKey: "target:CTX-001", ownerLane: "executor", generation: 0, acquiredAt: "2026-08-29T00:00:00.000Z", expiresAt: "2026-08-29T00:01:00.000Z", heartbeatAt: "2026-08-29T00:00:30.000Z" };
+  const leaseView = compiler.build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot: withLease, previousBlocks: first.manifest.blocks });
+  assert.equal(block(first, "context.l3a"), block(leaseView, "context.l3a"));
+  assert.notEqual(block(first, "context.l3b"), block(leaseView, "context.l3b"));
+  assert.equal(leaseView.manifest.firstChangedBlock, "context.l3b");
 });
 
 test("context maintenance coordinator repairs every view and defers compaction", () => {

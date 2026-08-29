@@ -41,6 +41,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     "invoke_capability",
     "run_background",
     "read_job_output",
+    "monitor_job",
     "stop_job",
     "load_skill",
     "propose_intent",
@@ -59,7 +60,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.sensitivity), /^(public|target|secret)$/);
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
-  assert.equal(solverToolContractHash(), "de45f9ec53c2f8f4b5d946cfe7e7283e76486cedd1ca005b5d160fad8c25a3ac");
+  assert.equal(solverToolContractHash(), "5e7564286643f24dec5ff30af45bb90878cf58bf5177d1cb3315f541a8e302c4");
   assert.equal(bundledCapabilityCatalogHash(), "a8f993b8344a62572a7a3e643e0506edc301f8750f69609353d081eaeb2f3e9e");
 });
 
@@ -201,6 +202,15 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.equal(completed.backendId, "proofblade-bundled");
     assert.equal(completed.backendVersion, "1.0.0");
     assert.match((await runtime.readJobOutput(completed.id)).output, /binary-info|strings/);
+    const completedOutput = await runtime.readJobOutput(completed.id);
+    const exitSignal = await runtime.monitorJob(completed.id, { sinceCursor: String(completedOutput.originalChars), triggers: ["exit"], waitMs: 100 });
+    assert.equal(exitSignal.trigger, "exit");
+    assert.equal(exitSignal.status, "SUCCEEDED");
+
+    const heartbeatJob = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 500 }, timeoutMs: 5_000 });
+    const heartbeat = await runtime.monitorJob(String(heartbeatJob.jobId), { triggers: ["heartbeat"], heartbeatMs: 50, waitMs: 500 });
+    assert.equal(heartbeat.trigger, "heartbeat");
+    await runtime.stopJob(String(heartbeatJob.jobId), "heartbeat test cleanup");
 
     const timeout = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 250 }, timeoutMs: 50 });
     const blockedUntil = Date.now() + 100;

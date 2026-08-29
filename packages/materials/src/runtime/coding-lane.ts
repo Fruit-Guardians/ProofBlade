@@ -12,6 +12,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
+import { ContextCompiler } from "../context/compiler.js";
 import { latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
@@ -30,9 +31,9 @@ import { CodingClaimVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { PwnReproductionContract, RunSnapshot, RunToolPreparation, TaskContract } from "../domain/types.js";
+import type { PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
-import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
+import { contextSnapshot, type AgentLanePort, type AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
@@ -53,6 +54,7 @@ import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import { RunEventIngress } from "../orchestration/event-ingress.js";
 import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
@@ -74,6 +76,7 @@ Use the capability proxy as an optional analysis instrument, not a mandatory wor
 
 export class PiCodingLane implements AgentLanePort {
   private busy = false;
+  private readonly eventIngress: RunEventIngress;
 
   private constructor(
     private readonly runId: string,
@@ -101,7 +104,9 @@ export class PiCodingLane implements AgentLanePort {
     private readonly pwnVerifierRegistry?: SessionRegistry,
     /** Exploratory HTTP sessions are lane-owned and must be closed with the lane. */
     private readonly webSession?: WebToolHandler,
-  ) {}
+  ) {
+    this.eventIngress = new RunEventIngress(controlStore);
+  }
 
   public static async create(options: {
     runId: string;
@@ -229,10 +234,21 @@ export class PiCodingLane implements AgentLanePort {
       }
       assertToolPreparationPublished(await options.controlStore.snapshot(options.runId), preparation);
     }
-    const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write"];
+    const enabledTools = options.capabilities?.enabledTools ?? ["read", "bash", "edit", "write", "glob", "grep"];
     const enabledSkills = new Set(options.capabilities?.enabledSkills ?? challengeProfile?.skillNames ?? skills.list().map((skill) => skill.name));
     const enabledMcpServers = new Set(options.capabilities?.enabledMcpServers ?? challengeProfile?.mcpServers ?? mcp.summaries().filter((server) => !server.disabled).map((server) => server.name));
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
+    const skillResourceSnapshot = skills.contextSnapshot();
+    const activeSkillResources = skillResourceSnapshot.skills.filter((skill) => enabledSkills.has(skill.name));
+    const toolResourceSnapshot = toolCatalog.contextSnapshot();
+    const contextResources: RuntimeResourceSnapshot = {
+      ...skillResourceSnapshot,
+      skillCatalogHash: sha256(canonicalJson(activeSkillResources)),
+      skills: activeSkillResources,
+      ...toolResourceSnapshot,
+      mcpCatalogHash: mcp.catalogHash(),
+      mcpServers: mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled).map(({ name, description, configHash }) => ({ name, description, configHash })),
+    };
     // Expose each enabled MCP server's tools as FIRST-CLASS provider tools
     // (mcp__<server>__<tool>) so the model uses them natively, like Claude Code —
     // instead of the mcp_call proxy it will not drive. mcp_call stays as a fallback.
@@ -550,6 +566,8 @@ export class PiCodingLane implements AgentLanePort {
     // actual compact trigger relative to the provider input budget.
     const proactiveMaintenanceLimit = Math.min(contextBudget, Math.max(8_192, Math.floor(contextBudget * threshold / 0.8)));
     let currentContextTokens = 0;
+    const contextCompiler = new ContextCompiler();
+    let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
     harness.on("context", async ({ messages }) => {
       const prepared = prepareContextMaintenance({
         messages: injectReasoningForestContext(messages, forestContext.value),
@@ -585,6 +603,24 @@ export class PiCodingLane implements AgentLanePort {
         toolNames: activeToolNames,
       },
       estimateContextTokens: async () => currentContextTokens,
+      getContextSnapshot: async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        const compiled = contextCompiler.build({
+          runId: options.runId,
+          lane: "main",
+          phase: current.phase,
+          task: current.task,
+          snapshot: current,
+          contextWindow: profile.contextWindow,
+          outputBudget: profile.maxTokens,
+          safetyMargin: providerSafetyTokens,
+          resources: contextResources,
+          previousBlocks: previousContextBlocks,
+        });
+        previousContextBlocks = compiled.manifest.blocks;
+        const summary = contextSnapshot(compiled.manifest);
+        return { ...summary, estimatedTokens: currentContextTokens > 0 ? currentContextTokens : summary.estimatedTokens };
+      },
       scheduling,
     });
     if (options.onEvent) harness.subscribe(options.onEvent);
@@ -639,6 +675,14 @@ export class PiCodingLane implements AgentLanePort {
     await this.refreshForestContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
+    await this.eventIngress.enqueue(this.runId, {
+      source: "user",
+      kind: "user.message",
+      correlationId,
+      idempotencyKey: `${correlationId}:${sha256(text)}`,
+      replayPolicy: "pure",
+      payload: { text },
+    });
     await this.controlStore.append(this.runId, [{
       schemaVersion: 1,
       lane: "main",

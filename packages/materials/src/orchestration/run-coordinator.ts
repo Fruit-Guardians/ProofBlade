@@ -7,6 +7,7 @@ import type { IndependentVerifier, VerificationOutcome } from "../verification/v
 import { RunWorkScheduler } from "./run-work-scheduler.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { completedWorkItemForCompletion } from "../domain/work-item.js";
+import { RunEventIngress, type RunEventDrainResult, type RunEventInput, type SafePoint } from "./event-ingress.js";
 
 /**
  * The verifier capability needed by the shared run state machine.
@@ -32,6 +33,7 @@ export interface RunCoordinatorOptions {
  */
 export class RunCoordinator {
   private readonly scheduler: RunWorkScheduler;
+  private readonly ingress: RunEventIngress;
 
   public constructor(
     private readonly control: ControlStore,
@@ -40,9 +42,31 @@ export class RunCoordinator {
   ) {
     this.scheduler = options.scheduler ?? new RunWorkScheduler(control);
     this.verifier = options.verifier;
+    this.ingress = new RunEventIngress(control);
   }
 
   private readonly verifier?: RunVerifier;
+
+  /** Append an external signal without mutating the in-memory lane. */
+  public async enqueueEvent(runId: string, input: RunEventInput): Promise<void> {
+    await this.ingress.enqueue(runId, input);
+  }
+
+  /**
+   * Consume a bounded batch at a safe point. User control events are applied
+   * through the normal ControlStore command path; other signals are returned
+   * as structured actions for the lane that owns their policy.
+   */
+  public async drainEvents(runId: string, safePoint: SafePoint, maxEvents = 32): Promise<RunEventDrainResult> {
+    const drained = await this.ingress.drain(runId, safePoint, maxEvents);
+    for (const action of drained.admitted) {
+      if (action.source !== "user") continue;
+      if (action.kind === "user.pause") await this.control.dispatch(runId, { type: "pause", reason: String(action.payload.reason ?? "Paused by user."), lane: "main" });
+      else if (action.kind === "user.resume") await this.control.dispatch(runId, { type: "resume", lane: "main" });
+      else if (action.kind === "user.cancel") await this.control.dispatch(runId, { type: "cancel", reason: String(action.payload.reason ?? "Cancelled by user."), lane: "main" });
+    }
+    return drained;
+  }
 
   /** Move the durable competition projection, tolerating an idempotent race. */
   public async setDomainPhase(runId: string, domainPhase: DomainPhase): Promise<void> {

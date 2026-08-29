@@ -7,6 +7,7 @@ import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
 import type { ProviderRequestCancelInfo, ProviderRequestQueueInfo, ProviderRequestScope, ProviderRequestSchedulingObserver, ProviderRequestStartInfo } from "../runtime/provider-scheduler.js";
+import { hashRequestValue } from "../runtime/request-epoch.js";
 
 export interface PiObservabilityOptions {
   runId: string;
@@ -23,6 +24,7 @@ export interface PiObservabilityOptions {
     toolNames?: string[];
     capabilityCatalogHash?: string;
     parentEpochId?: string;
+    manifestSummary?: ContextManifestSummary;
   } | undefined>;
   requestContext?: {
     contextWindow?: number;
@@ -33,6 +35,18 @@ export interface PiObservabilityOptions {
     parentEpochId?: string;
   };
   scheduling?: ProviderSchedulingTelemetry;
+}
+
+/** Safe ContextManifest projection persisted beside the RequestEpoch. */
+export interface ContextManifestSummary {
+  hash: string;
+  layerTokens: Record<string, number>;
+  blockHashes: Record<string, string>;
+  firstChangedBlock?: string;
+  compressionTarget?: string;
+  droppedCount: number;
+  maintenance: Pick<ContextManifest["maintenance"], "stage" | "targetRatio" | "hardRatio" | "shouldCompact" | "forceCompact" | "target" | "nextAction">;
+  budget: Pick<ContextManifest["budget"], "contextWindow" | "availableInput" | "estimatedInput" | "ratio" | "overBudget">;
 }
 
 interface PendingProvider {
@@ -64,6 +78,11 @@ export class ProviderSchedulingTelemetry {
     queued: async (info) => await this.queued(info),
     started: async (requestId, info) => await this.started(requestId, info),
     cancelled: async (requestId, info) => await this.cancelledRequest(requestId, info),
+    firstEvent: async (requestId, info) => await this.firstEvent(requestId, info),
+    firstToken: async (requestId, info) => await this.firstToken(requestId, info),
+    interEventIdle: async (requestId, info) => await this.interEventIdle(requestId, info),
+    stalled: async (requestId, info) => await this.stalled(requestId, info),
+    recoveryRequired: async (requestId, info) => await this.recoveryRequired(requestId, info),
     payload: async (requestId, payload) => await this.payload(requestId, payload),
     response: async (requestId, response) => await this.response(requestId, response),
     completed: async (requestId, message) => await this.completed(requestId, message),
@@ -133,13 +152,54 @@ export class ProviderSchedulingTelemetry {
     });
   }
 
+  private async firstEvent(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; elapsedMs: number; eventType: string }): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "provider_request_first_event", "model", {
+      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
+      attempt: info.attempt, elapsedMs: info.elapsedMs, eventType: info.eventType,
+    });
+  }
+
+  private async firstToken(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; elapsedMs: number; eventType: string }): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "provider_request_first_token", "model", {
+      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
+      attempt: info.attempt, elapsedMs: info.elapsedMs, eventType: info.eventType,
+    });
+  }
+
+  private async interEventIdle(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; maxIdleMs: number; eventType: string }): Promise<void> {
+    if (info.idleMs < 100) return;
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "provider_request_inter_event_idle", "model", {
+      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
+      attempt: info.attempt, idleMs: info.idleMs, maxIdleMs: info.maxIdleMs, eventType: info.eventType,
+    });
+  }
+
+  private async stalled(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; reason: string }): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "provider_request_stalled", "model", {
+      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
+      attempt: info.attempt, idleMs: info.idleMs, reason: info.reason,
+    });
+  }
+
+  private async recoveryRequired(requestId: string | undefined, info: ProviderRequestScope & { attempts: number; maxRetries: number; reason: string }): Promise<void> {
+    const pending = requestId ? this.requests.get(requestId) : undefined;
+    await append(this.options, "provider_recovery_required", "orchestrator", {
+      requestId, epochId: pending?.epochId, provider: info.provider, model: info.model,
+      attempts: info.attempts, maxRetries: info.maxRetries, reason: info.reason,
+    });
+  }
+
   private async payload(requestId: string | undefined, payload: unknown): Promise<void> {
     const pending = requestId ? this.requests.get(requestId) : undefined;
     if (pending) {
       pending.cachePrefix = captureProviderPrefixShape(payload);
       if (pending.epochId) await append(this.options, "request_epoch_context", "model", {
         requestEpochId: pending.epochId,
-        fields: { requestBodyHash: sha256(canonicalJson(payload)), stablePrefixHash: pending.cachePrefix.prefixHash },
+        fields: { requestBodyHash: hashRequestValue(payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash },
       });
     }
   }
@@ -234,8 +294,10 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         toolNames: [...new Set(epochContext.toolNames ?? solverToolContractSnapshot().map((tool) => String(tool.name)))].sort(),
         ...(epochContext.capabilityCatalogHash ? { capabilityCatalogHash: epochContext.capabilityCatalogHash } : {}),
         ...(pending.contextManifestHash ? { contextManifestHash: pending.contextManifestHash } : {}),
+        requestContextHash: hashRequestValue(epochContext),
         ...(pending.contextCache?.prefixHash ? { stablePrefixHash: pending.contextCache.prefixHash } : {}),
         ...(epochContext.parentEpochId ? { parentEpochId: epochContext.parentEpochId } : {}),
+        ...(context?.manifestSummary ? { manifestSummary: context.manifestSummary } : {}),
         status: "STARTED",
         createdAt: new Date().toISOString(),
       },
@@ -278,7 +340,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
       pending.cachePrefix = captureProviderPrefixShape(event.payload);
       await append(options, "request_epoch_context", "model", {
         requestEpochId: pending.epochId,
-        fields: { requestBodyHash: sha256(canonicalJson(event.payload)), stablePrefixHash: pending.cachePrefix.prefixHash },
+        fields: { requestBodyHash: hashRequestValue(event.payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash },
       });
     }
     return undefined;
@@ -362,8 +424,8 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   };
 }
 
-function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
-  return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]);
+function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
+  return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]).then(() => undefined);
 }
 
 function providerKey(provider: string, model: string): string {

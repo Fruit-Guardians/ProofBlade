@@ -40,6 +40,8 @@ CLI / GUI -> Control Store -> Reducer -> Run Snapshot
 
 The first implementation uses one JSONL file per run. A keyed operation queue gives each run a single writer. Each event is reduced before append, the append is flushed to stable storage, and the derived projection is replaced atomically. `replay` rebuilds the snapshot from events and compares its canonical hash with the persisted projection hash. This gives a storage-independent contract before a SQLite adapter is introduced.
 
+Every newly created event also carries an optional `RunEventEnvelope`. The envelope records source, kind, priority, status, generation, correlation/causation, idempotency and coalescing keys, operation/request references and replay policy. `RunEventIngress` appends immutable `event_ingress_received` facts and later appends `event_ingress_processed` facts at a bounded safe point; it never mutates an earlier event or maintains a GUI-only queue. The default application path is still one Coding lane. Multi-agent WorkItems and handoffs remain structural interfaces, but no parallel strategy is enabled by default.
+
 Effects are recorded as `PROPOSED`, `STARTED` and `FINISHED`. Recovery reruns pure or idempotent work under the original effect id, adopts a result artifact that was already persisted, and marks work with an unsafe replay policy as `UNKNOWN`. Fixture generations and leases are durable control-store facts, so stale work can be rejected after reset or ownership change.
 
 ## Single-agent loop
@@ -84,6 +86,10 @@ If a session host has no dedicated heartbeat endpoint, the durable service uses 
 Session handoff across the Control Store and external-resource ledger is coordinated by a durable `BindingTransactionCoordinator`. `prepare` records an immutable identity and `STARTED` external handle in a companion intent journal, `commitControl` writes one `session_opened` event carrying `bindingTxnId` and `bindingIdentityHash`, and `finalize` records the owner marker before moving the intent to `BOUND`. Recovery replays the intent first: an exact open owner can repair a missing marker and then go through the broker's `inspect/adopt`; missing, stale, or mismatched identities never create a replacement session. The coordinator owns metadata only and never carries sockets, cookies, tokens, command lines, or response bodies.
 
 `run_background` creates a durable `JobRecord` before starting work. Job lifecycle events (`job_queued`, `job_started`, `job_finished`, `job_cancelled`, `job_reconciled`) are reduced beside effects and artifacts. Pure/idempotent/resumable jobs can be restarted after a process boundary under the same deterministic effect key; forbidden replay becomes `UNKNOWN`. Timeouts and cancellation abort the controller, while the effect journal remains the source of truth. Run teardown stops active jobs so in-process or child execution does not outlive the run unexpectedly.
+
+Runtime resources use `Scope`: child scopes dispose before parents, resources dispose in reverse registration order, disposal is idempotent, and one cleanup failure is aggregated after the remaining resources have had a chance to release. `RunCoordinator` exposes the same ingress for user control signals and maps pause/resume/cancel through normal ControlStore commands.
+
+Experience changes are represented by `UpdateProposal` records in the same ControlStore. A proposal must be evaluated before approval or activation; rollback is explicit and checks the candidate hash before restoring the base version pointer. This is a release boundary, not a second knowledge store or an automatic self-modification path.
 
 ## Planner and executor handoff
 

@@ -1,12 +1,12 @@
 # 项目计划
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-25T22:48:00+08:00
+> 状态更新时间：2026-08-29T09:36:31+08:00
 
 ## 概览
 
-- 计划总数：9
-- 进行中：5
+- 计划总数：10
+- 进行中：6
 - 待开始：1
 - 受阻：1
 - 已完成：2
@@ -21,6 +21,7 @@
 | PLAN-220 | P0 | Milestone 2 / 5 | 进行中 | 45% | unassigned | 2026-08-20T12:15:00+08:00 |
 | PLAN-130 | P0 | Milestone 1 debt | 待开始 | 0% | unassigned | 2026-08-07T18:37:33+08:00 |
 | PLAN-200 | P1 | Milestone 6 | 进行中 | 45% | unassigned | 2026-08-25T13:05:00+08:00 |
+| PLAN-230 | P1 | Milestone 6 | 进行中 | 35% | unassigned | 2026-08-29T08:44:14+08:00 |
 | PLAN-210 | P3 | Milestone 5 | 受阻 | 15% | unassigned | 2026-08-24T22:00:00+08:00 |
 
 ## PLAN-100 二进制 Artifact 与 Reverse 能力包
@@ -138,6 +139,39 @@
 - [ ] 同一录制轨迹重放产生相同 projection hash
 - [ ] Shadow 计算不影响主 Run
 - [ ] 策略比较报告包含成功率、成本、缓存和错误提交率
+
+## PLAN-230 统一事件驱动、上下文维护与 Agent 持续演化建议
+
+目标：基于第 6、7、9、10 章，把普通 Chat、CTF、Fixture 和 Competition 的长运行事件、工具监控、上下文压缩、证据整理、评估、多 Agent 协作和持续演化收敛到同一个可恢复系统。
+
+依赖：PLAN-110, PLAN-120, PLAN-200, PLAN-220
+
+### 交付物
+
+- 统一 RunEventEnvelope、事件优先级、安全点消费和 generation fencing
+- Provider/Tool/Job 的进度、卡住、重试、unknown 和 reconcile 可见事件
+- 可重建 RequestEpoch、实际请求 hash、模型视图来源和敏感字段脱敏
+- 统一 Definition/Provider/Consumer、Disposable Scope、Provider binding identity 和依赖变化生命周期
+- canonical Tool value、model presentation、Artifact/Spill 三态输出和孤儿操作恢复
+- ContextBlock、L3A/L3B、K0-K2、动态尾部和用户可控的单一压缩策略
+- Evidence consolidate 的幂等 WorkItem、L0/L1/L2 投影和原始 Artifact 保留
+- 带触发集、保留集、迁移集、激活率、遵循率和回滚的持续更新评测
+
+### 验收条件
+
+- [ ] 可恢复的上下文压力、Provider/Tool 暂停、重复失败和证据缺口不会静默强停 Run
+- [ ] 所有事件从 ControlStore 重放后产生稳定 projection hash，内存队列不成为第二份状态真相
+- [ ] 每个实际 Provider 请求都有可重建 RequestEpoch，恢复请求与原请求规范 JSON 一致且不包含密钥
+- [ ] 动态注册具有幂等 dispose，Consumer teardown 完成前旧 Provider binding 保持可读，依赖变化产生可重放生命周期事件
+- [ ] 动态尾部内部排序只影响本地投影和压缩优先级，不被报告为 Provider KV Cache 命中提升
+- [ ] 普通 Chat、CTF、Fixture 和 Competition 共享同一事件、Tool、Evidence、Completion 和恢复契约
+- [ ] Tool 的 canonical/presentation/durable 三态可追溯，Spill 或维护失败不伪造完整结果和可信 Evidence
+- [ ] 原始 Tool/Provider 输出始终可通过 Artifact 或 Session 有界读取，整理失败不会产生半提交
+- [ ] Compaction、Curation、Effect、Sandbox、MCP reconnect 和 Subagent 孤儿操作可被扫描并进入恢复路径
+- [ ] 更新提案改善触发失败集且保留集不退化，发布失败可以按版本 hash 回滚
+- [ ] 评估任务具备 Dataset、Environment State、Tools、Rubric 和 Interaction Protocol 五元组，并同时报告 Pass@k、Pass^k、FAIL_TO_PASS、PASS_TO_PASS 和 flaky 检查
+- [ ] 生产失败可以定位首错并生成端到端与 trajectory-prefix 回归，Trace/Span、Artifact 和 Evidence 引用可重建归因
+- [ ] 多 Agent 只作为同一 Work Graph 的策略层，winner 结算、优雅取消 ACK、级联回收、预算和 handoff cycle detection 不产生第二套状态真相
 
 ## PLAN-210 单 coding lane 上的 Planner/Refiner 策略层
 

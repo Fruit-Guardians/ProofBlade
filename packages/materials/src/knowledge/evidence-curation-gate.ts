@@ -35,8 +35,9 @@ export class EvidenceCurationGate {
     }
   }
 
-  public async inspect(): Promise<EvidenceCurationStatus> {
-    const [snapshot, events] = await Promise.all([this.controlStore.snapshot(this.runId), this.controlStore.events(this.runId)]);
+  public async inspect(options: { includeReviewEvents?: boolean } = {}): Promise<EvidenceCurationStatus> {
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const events = options.includeReviewEvents !== false ? await this.controlStore.events(this.runId) : [];
     const currentEvidence = Object.values(snapshot.evidence).filter((evidence) => evidence.provenance?.runId === snapshot.runId && evidence.provenance.generation === snapshot.generation);
     const currentArtifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.runId === snapshot.runId && artifact.generation === snapshot.generation);
     // Automatic bash/read observations are retrieval indexes, not curation.
@@ -100,13 +101,16 @@ export class EvidenceCurationGate {
    * undefined below the "required" threshold.
    */
   public async assertInvestigationAllowed(): Promise<string | undefined> {
-    const status = await this.inspect();
+    const status = await this.inspect({ includeReviewEvents: false });
     if (status.stage !== "required") return undefined;
     return this.format(status, true);
   }
 
   public async checkpointNotice(): Promise<string | undefined> {
-    const status = await this.inspect();
+    // The hot path only needs a bounded backlog hint. Full event replay is
+    // reserved for the explicit curation_status view, where reviewed state is
+    // important and the caller expects the extra work.
+    const status = await this.inspect({ includeReviewEvents: false });
     return status.stage === "clear" ? undefined : this.format(status, status.stage === "required");
   }
 

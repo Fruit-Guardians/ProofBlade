@@ -22,6 +22,26 @@ export interface JobOutput {
   originalChars: number;
 }
 
+export type JobMonitorTrigger = "new_output" | "keyword" | "exit" | "error" | "heartbeat";
+
+export interface JobMonitorInput {
+  sinceCursor?: string;
+  triggers?: JobMonitorTrigger[];
+  keywords?: string[];
+  waitMs?: number;
+  heartbeatMs?: number;
+}
+
+export interface JobMonitorResult {
+  jobId: string;
+  status: JobRecord["status"];
+  trigger: JobMonitorTrigger | "timeout";
+  cursor: string;
+  output?: string;
+  matchedKeyword?: string;
+  artifactId?: string;
+}
+
 export class BackgroundJobRunner {
   private readonly active = new Map<string, { controller: AbortController; timeout?: ReturnType<typeof setTimeout>; timedOut: boolean; promise: Promise<void> }>();
 
@@ -133,6 +153,46 @@ export class BackgroundJobRunner {
     return await this.poll(jobId);
   }
 
+  /** Wait for a durable job signal instead of making the model poll in a loop. */
+  public async monitor(jobId: string, input: JobMonitorInput = {}): Promise<JobMonitorResult> {
+    const triggers = new Set<JobMonitorTrigger>(input.triggers ?? ["new_output", "keyword", "exit", "error", "heartbeat"]);
+    const keywords = (input.keywords ?? []).map((value) => value.trim()).filter(Boolean);
+    if (triggers.has("keyword") && keywords.length === 0) throw new Error("monitor_job keyword trigger requires keywords");
+    const sinceCursor = parseCursor(input.sinceCursor);
+    const waitMs = normalizeMonitorWait(input.waitMs);
+    const heartbeatMs = normalizeMonitorHeartbeat(input.heartbeatMs);
+    const deadline = Date.now() + waitMs;
+    let lastHeartbeat = Date.now();
+    let eventCursor = (await this.controlStore.events(this.runId)).at(-1)?.seq ?? 0;
+    while (true) {
+      const job = await this.poll(jobId);
+      const content = await this.jobContent(job);
+      const cursor = content.length;
+      const delta = content.slice(Math.min(sinceCursor, content.length));
+      if (triggers.has("new_output") && cursor > sinceCursor) return monitorResult(job, "new_output", cursor, delta);
+      if (triggers.has("keyword")) {
+        const matchedKeyword = keywords.find((keyword) => delta.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
+        if (matchedKeyword) return { ...monitorResult(job, "keyword", cursor, delta), matchedKeyword };
+      }
+      if (isTerminal(job.status)) {
+        if (triggers.has("error") && ["FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) return monitorResult(job, "error", cursor, delta);
+        if (triggers.has("exit")) return monitorResult(job, "exit", cursor, delta);
+        return monitorResult(job, "timeout", cursor, delta);
+      }
+      if (triggers.has("heartbeat") && Date.now() - lastHeartbeat >= heartbeatMs) {
+        lastHeartbeat = Date.now();
+        return monitorResult(job, "heartbeat", cursor, delta);
+      }
+      if (Date.now() >= deadline) return monitorResult(job, "timeout", cursor, delta);
+      const untilDeadline = Math.max(0, deadline - Date.now());
+      const untilHeartbeat = triggers.has("heartbeat") ? Math.max(1, heartbeatMs - (Date.now() - lastHeartbeat)) : untilDeadline;
+      const waitFor = Math.min(untilDeadline, untilHeartbeat);
+      if (waitFor <= 0) continue;
+      const events = await this.controlStore.waitForEvents(this.runId, eventCursor, waitFor);
+      if (events.length > 0) eventCursor = Math.max(eventCursor, events.at(-1)!.seq);
+    }
+  }
+
   public async stopAll(reason = "Run ended; stopping background jobs."): Promise<void> {
     for (const jobId of this.active.keys()) await this.cancel(jobId, reason).catch(() => undefined);
   }
@@ -187,6 +247,13 @@ export class BackgroundJobRunner {
       });
     }
   }
+
+  private async jobContent(job: JobRecord): Promise<string> {
+    if (!job.artifactId) return job.error ?? "";
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const artifact = snapshot.artifacts[job.artifactId];
+    return artifact ? await this.artifactStore.readText(this.runId, artifact) : job.error ?? "";
+  }
 }
 
 function isExpired(job: JobRecord): boolean {
@@ -203,4 +270,30 @@ function normalizeTimeout(value: number | undefined): number {
   if (value === undefined) return 30_000;
   if (!Number.isFinite(value) || value < 50) throw new Error("Background timeout must be at least 50ms");
   return Math.min(120_000, Math.floor(value));
+}
+
+function parseCursor(value: string | undefined): number {
+  if (value === undefined) return 0;
+  if (!/^\d+$/.test(value)) throw new Error("monitor_job sinceCursor must be a non-negative byte cursor");
+  return Number(value);
+}
+
+function normalizeMonitorWait(value: number | undefined): number {
+  if (value === undefined) return 30_000;
+  if (!Number.isInteger(value) || value < 50 || value > 120_000) throw new Error("monitor_job waitMs must be an integer from 50 to 120000");
+  return value;
+}
+
+function normalizeMonitorHeartbeat(value: number | undefined): number {
+  if (value === undefined) return 5_000;
+  if (!Number.isInteger(value) || value < 50 || value > 120_000) throw new Error("monitor_job heartbeatMs must be an integer from 50 to 120000");
+  return value;
+}
+
+function isTerminal(status: JobRecord["status"]): boolean {
+  return ["SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELLED", "UNKNOWN"].includes(status);
+}
+
+function monitorResult(job: JobRecord, trigger: JobMonitorResult["trigger"], cursor: number, output: string): JobMonitorResult {
+  return { jobId: job.id, status: job.status, trigger, cursor: String(cursor), ...(output ? { output: output.slice(0, 12_000) } : {}), ...(job.artifactId ? { artifactId: job.artifactId } : {}) };
 }

@@ -34,11 +34,11 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "3096bff39cf42133b8b36ed0562b2aef251a4d81c1978e2ca07e560baf1cc533";
+const CODING_TOOL_CONTRACT_HASH = "3bf31958d857e83d20aaaab578bba5cb06b20af6d9b37770381f485d328774fc";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
@@ -150,7 +150,7 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
 
   const evidence = snapshot.find((tool) => tool.name === "evidence")?.parameters as { properties?: Record<string, { type?: unknown; enum?: unknown }> };
   assert.equal(evidence.properties?.operation?.type, "string");
-  assert.deepEqual(evidence.properties?.operation?.enum, ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
+  assert.deepEqual(evidence.properties?.operation?.enum, ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"]);
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
@@ -289,7 +289,17 @@ test("coding bash is blocked after the durable evidence curation threshold", asy
       },
     });
   }
-  const env = new NodeExecutionEnv({ cwd: dir });
+  // This contract test only exercises the curation advisory. Use a tiny
+  // deterministic execution double so the test does not depend on Windows
+  // shell-service permissions in the host running the suite.
+  const env = {
+    cwd: dir,
+    exec: async (_command: string, options: { onStdout?: (value: string) => void }) => {
+      options.onStdout?.("ran-anyway\n");
+      return { ok: true, value: { stdout: "", stderr: "", exitCode: 0 } };
+    },
+    cleanup: async () => undefined,
+  } as unknown as NodeExecutionEnv;
   const context = {
     env,
     skills: {},
@@ -621,10 +631,14 @@ test("durable CTF task classification enables challenge guards without prompt ke
   assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
-test("shell_background returns immediately and shell_job polls then stops the real process", async () => {
+test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
   const dir = await mkdtemp(join(process.cwd(), "shell-bg-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
   try {
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
+      return;
+    }
     const context = { env, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
 
     // A command that runs far longer than the tool call may block for.
@@ -783,10 +797,14 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
   assert.equal((result.details as { artifactId: string }).artifactId, "A-1");
 });
 
-test("bash anchors an artifact only when output was actually withheld", async () => {
+test("bash anchors an artifact only when output was actually withheld", async (t) => {
   const dir = await mkdtemp(join(process.cwd(), "anchor-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
   try {
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
+      return;
+    }
     const archived: string[] = [];
     let savedBytes = 0;
     const pipeline = {
@@ -830,4 +848,9 @@ async function executeTool(name: string, params: Record<string, unknown>, contex
   assert.ok(tool, `Missing coding tool: ${name}`);
   const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("test-call", params, new AbortController().signal, () => undefined, context);
   return result as { content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean };
+}
+
+async function hasWorkingBash(env: NodeExecutionEnv): Promise<boolean> {
+  const result = await env.exec("printf proofblade-shell-ready");
+  return result.ok && result.value.stdout.includes("proofblade-shell-ready");
 }

@@ -1,6 +1,7 @@
+import { watch } from "node:fs";
 import { mkdir, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { HarnessEvent, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
+import type { HarnessEvent, RunEventEnvelope, RunSnapshot, RunVersionSnapshot } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createInitialSnapshot, projectionHash, reduce } from "../control/reducer.js";
 import { atomicWriteFile, durableAppendFile, KeyedOperationQueue, withFileLock } from "@proofblade/atoms";
@@ -66,6 +67,12 @@ export class JsonlControlStore {
     }, this.lockOptions));
   }
 
+  /** Serialize slow, durable Run maintenance without holding the Control lock. */
+  public async withRunMaintenanceLock<T>(runId: string, operation: () => Promise<T>): Promise<T> {
+    const lockPath = join(this.runsRoot, runId, ".maintenance.lock");
+    return await this.writes.run(`maintenance:${runId}`, async () => await withFileLock(lockPath, operation, this.lockOptions));
+  }
+
   public async events(runId: string): Promise<HarnessEvent[]> {
     try {
       const content = await readFile(this.runPath(runId), "utf8");
@@ -83,6 +90,44 @@ export class JsonlControlStore {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`Run not found: ${runId}`);
       throw error;
     }
+  }
+
+  /** Wait for a newer durable event without repeatedly replaying a large Run. */
+  public async waitForEvents(runId: string, afterSeq: number, timeoutMs = 30_000): Promise<HarnessEvent[]> {
+    if (!Number.isInteger(afterSeq) || afterSeq < 0) throw new Error("afterSeq must be a non-negative integer");
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 120_000) throw new Error("timeoutMs must be an integer from 0 to 120000");
+    const path = this.runPath(runId);
+    const readNew = async (): Promise<HarnessEvent[]> => (await this.events(runId)).filter((event) => event.seq > afterSeq);
+    const current = await readNew();
+    if (current.length > 0 || timeoutMs === 0) return current;
+    return await new Promise<HarnessEvent[]>((resolve, reject) => {
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let watcher: ReturnType<typeof watch> | undefined;
+      const finish = (result: HarnessEvent[] | Error): void => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        watcher?.close();
+        if (result instanceof Error) reject(result);
+        else resolve(result);
+      };
+      const check = (): void => {
+        void readNew().then((events) => {
+          if (events.length > 0) finish(events);
+        }).catch((error: unknown) => finish(error instanceof Error ? error : new Error(String(error))));
+      };
+      try {
+        watcher = watch(path, { persistent: false }, check);
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      timer = setTimeout(() => finish([]), timeoutMs);
+      // Close the read/watch race: an append may happen between the initial
+      // read and watcher registration.
+      check();
+    });
   }
 
   /**
@@ -298,7 +343,32 @@ export function makeEvent(
   lane: HarnessEvent["lane"],
   payload: Record<string, unknown> = {},
   correlationId = `${runId}:system`,
+  envelopeInput?: Partial<RunEventEnvelope>,
 ): HarnessEvent {
+  const ts = new Date().toISOString();
+  const envelope: RunEventEnvelope = {
+    id: envelopeInput?.id ?? `${runId}:EV-${String(seq).padStart(6, "0")}`,
+    runId,
+    generation: typeof envelopeInput?.generation === "number" ? envelopeInput.generation : Number(payload.generation ?? 0),
+    source: envelopeInput?.source ?? sourceForEvent(type, actor),
+    kind: envelopeInput?.kind ?? type,
+    priority: envelopeInput?.priority ?? priorityForEvent(type),
+    status: envelopeInput?.status ?? "applied",
+    sequence: seq,
+    correlationId: envelopeInput?.correlationId ?? correlationId,
+    ...(envelopeInput?.causationId ? { causationId: envelopeInput.causationId } : {}),
+    ...(envelopeInput?.idempotencyKey ? { idempotencyKey: envelopeInput.idempotencyKey } : {}),
+    ...(envelopeInput?.coalescingKey ? { coalescingKey: envelopeInput.coalescingKey } : {}),
+    ...(envelopeInput?.operationId ? { operationId: envelopeInput.operationId } : {}),
+    ...(envelopeInput?.requestEpochId ? { requestEpochId: envelopeInput.requestEpochId } : {}),
+    ...(envelopeInput?.deadlineAt ? { deadlineAt: envelopeInput.deadlineAt } : {}),
+    replayPolicy: envelopeInput?.replayPolicy ?? replayPolicyForEvent(type),
+    ...(envelopeInput?.payloadRef ? { payloadRef: envelopeInput.payloadRef } : {}),
+    createdAt: envelopeInput?.createdAt ?? ts,
+  };
+  const eventPayload = type.startsWith("event_ingress_") && payload.envelope && typeof payload.envelope === "object"
+    ? { ...payload, envelope: { ...(payload.envelope as Record<string, unknown>), sequence: seq, status: envelope.status } }
+    : payload;
   return {
     schemaVersion: 1,
     id: `${runId}-E${String(seq).padStart(6, "0")}`,
@@ -306,10 +376,32 @@ export function makeEvent(
     runId,
     lane,
     seq,
-    ts: new Date().toISOString(),
+    ts,
     correlationId,
     actor,
     type,
-    payload,
+    payload: eventPayload,
+    envelope,
   };
+}
+
+function sourceForEvent(type: HarnessEvent["type"], actor: HarnessEvent["actor"]): RunEventEnvelope["source"] {
+  if (type.startsWith("provider_") || type === "model_usage" || type === "request_epoch_started" || type === "request_epoch_context") return "provider";
+  if (type.startsWith("job_")) return "job";
+  if (type.startsWith("tool_") || type.startsWith("effect_") || actor === "tool") return "tool";
+  if (type.startsWith("consolidate") || type === "compaction_recorded") return "maintenance";
+  if (type.startsWith("event_ingress_")) return "external";
+  return "maintenance";
+}
+
+function priorityForEvent(type: HarnessEvent["type"]): RunEventEnvelope["priority"] {
+  if (type === "run_paused" || type === "run_resumed" || type === "run_finished" || type === "run_failed") return "urgent";
+  if (type.startsWith("event_ingress_")) return "normal";
+  return "background";
+}
+
+function replayPolicyForEvent(type: HarnessEvent["type"]): RunEventEnvelope["replayPolicy"] {
+  if (type.startsWith("event_ingress_")) return "idempotent";
+  if (type.startsWith("provider_") || type === "model_usage" || type.startsWith("tool_") || type.startsWith("consolidate")) return "pure";
+  return "unknown";
 }

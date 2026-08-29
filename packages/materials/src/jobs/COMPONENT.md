@@ -4,15 +4,15 @@
 {
   "id": "materials-jobs",
   "name": "Durable Background Jobs",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T15:32:20.000Z",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-09T15:32:20.000Z",
-    "lastSecurityAuditAt": "2026-08-09T15:32:20.000Z",
-    "sourceHash": "47b16225d5c8d60ec06d37fd4fb3121a33fa0a090548c5163e6f6e2ac04cbce3",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "6fab4963b5e2c090b73ef46078ebe44da322263aeae0a8f7549e214503f09ddb",
     "result": "passed"
   }
 }

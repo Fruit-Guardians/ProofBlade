@@ -28,7 +28,9 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 对话式 Coding Agent GUI：通过 SSE 与真实配置模型持续对话，实时显示文本、思考和 Tool 生命周期；每次调用可展开 Arguments、Result、Pi Entry、Control telemetry、完整关联 JSON 和浏览器 Worker 脚本处理。
 - 六类中断恢复：过期租约回收、Fixture 生命周期核对、旧代次 Effect 隔离、Tool 批次配对修复和两阶段 Pi compaction。
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
-- 机器可读的 `baseline-v2` 六靶场评测器，默认每题重复三次，汇总耗时、Token、成本、有效动作、首个证据时间和事实证据覆盖率，并用规范化 Fixture Catalog 哈希绑定题目内容、预算和稳定报告哈希。
+- 统一 RunEvent envelope 与有界 ingress：用户、Provider、Tool、Job、维护和外部信号可按 priority、generation、幂等键和 coalescing key 重放；单 Agent 默认在安全点消费，多 Agent 并行暂不启用。
+- Run/Lane/Job Scope 的 child-first、LIFO、幂等释放，以及评测驱动的 UpdateProposal 创建、评估、批准、激活和 hash 绑定回滚。
+- 机器可读的 `baseline-v3` 评测器，默认执行六个靶场各三次并追加 12 个 provider-free 运行时场景，汇总耗时、Token、成本、有效动作、首个证据时间、事实证据覆盖率和 Replay parity，并用规范化 Fixture/Scenario Catalog 哈希绑定题目内容、预算和稳定报告哈希。
 
 Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 
@@ -122,7 +124,7 @@ npm run gui -- --config proofblade.config.json --port 4173
 
 对话可以放入自定义文件夹并在侧栏筛选，也可从输入框下方随时切换工作目录。能力按钮会列出当前项目的内建 Tool、Skill 和 MCP Server，可为每个对话分别启停。Coding Agent 的 `load_skill` 与 `mcp_call` Schema 始终固定，启用集合只控制运行时可加载或调用的资源；MCP Server 数量变化不会扩展 Provider 顶层 Tool 列表。工作目录、文件夹和会话偏好保存在 `%USERPROFILE%\.proofblade\gui-workspace.json`。
 
-上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入会明确显示为 `0`，不会用估算值伪装成缓存命中。
+上下文面板把 Provider 实际上报的输入、输出、推理、缓存读取和缓存写入 Token 分开显示，同时给出发往 Provider 的可见消息、Tool Schema 和字符数估算。部分中转站会在极短提示上仍报告数千输入 Token，这是网关或模型模板的固定开销；若上游响应没有缓存字段，缓存读取与写入显示为“未报告”，不会用估算值伪装成缓存命中。
 
 右侧“缓存前缀”诊断直接从最终 Provider payload 计算 System/Developer 指令和 Tool Schema 的规范哈希，不保存提示正文。稳定率用于发现系统提示、工具名称、顺序或 Schema 在相邻请求间漂移；它只说明客户端前缀是否稳定。真实缓存命中仍以模型响应中的 `cacheRead / (input + cacheRead + cacheWrite)` 为准，两项指标应一起判断：前缀稳定但 `cacheRead` 不增长通常表示中转站或模型没有复用缓存，而前缀变化会直接指出 `system`、`tools` 或 `rewrite` 原因。
 
@@ -173,6 +175,7 @@ proofblade eval-real <corpus.json> --allow-live --variant ID=config.json --varia
 proofblade tools [list|probe|init|preflight|show] [profile|tool-id]
 proofblade competition-api inspect <journal.jsonl>
 proofblade competition-api replay <journal.jsonl> --script <requests.json>
+proofblade doctor
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
@@ -182,14 +185,17 @@ proofblade show <run-id>
 proofblade timeline <run-id>
 proofblade ledger <run-id>
 proofblade context <run-id>
-proofblade replay <run-id>
+proofblade replay <run-id> [projection|protocol|tools|stats|shadow]
+proofblade replay compare <baseline-run-id> <candidate-run-id>
 proofblade reconcile <run-id>
 proofblade cost <run-id>
 proofblade checkpoint <run-id> [reason]
 proofblade compact <run-id> [reason]
 proofblade history <run-id> <query>
+proofblade knowledge <run-id> [search|inspect] [query|pb://uri] [L0|L1|L2]
+proofblade consolidate <run-id> [deduplicate|summarize|all]
 proofblade handoff <run-id> [show|prepare]
-proofblade jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]
+proofblade jobs <run-id> [list|recover|monitor|read|stop] [job-id] [max-chars]
 proofblade artifact <run-id> <artifact-id> [max-chars]
 proofblade fixture-build <run-id>
 proofblade fixture-reset <run-id>

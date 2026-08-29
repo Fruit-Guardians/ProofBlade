@@ -47,6 +47,56 @@ export interface ReplanRecord {
   createdSeq: number;
 }
 
+export type UpdateProposalKind = "prompt" | "tool" | "skill" | "knowledge" | "program" | "model";
+export type UpdateProposalStatus = "PROPOSED" | "EVALUATED" | "APPROVED" | "ACTIVE" | "REJECTED" | "ROLLED_BACK";
+
+/** Evaluation-backed change candidate. A proposal never becomes active by implication. */
+export interface UpdateProposal {
+  id: string;
+  schemaVersion: 1;
+  runId: string;
+  kind: UpdateProposalKind;
+  status: UpdateProposalStatus;
+  baseVersion: string;
+  candidateVersion: string;
+  candidateHash: string;
+  sourceArtifactIds: string[];
+  triggerFailureIds: string[];
+  retentionDataset: string;
+  migrationDataset: string;
+  safetyDataset: string;
+  /** Explicit evaluation partitions. Older proposals may omit this field. */
+  evaluationSets?: {
+    trigger: string[];
+    retention: string[];
+    migration: string[];
+    safety: string[];
+  };
+  metrics?: {
+    passAtK?: number;
+    passAll?: number;
+    failToPass?: number;
+    passToPass?: number;
+    flakyRate?: number;
+    p95LatencyMs?: number;
+    costUsd?: number;
+    triggerPassRate?: number;
+    retentionPassRate?: number;
+    migrationPassRate?: number;
+    safetyPassRate?: number;
+    retentionRegressionRate?: number;
+    gatePassed?: number;
+    activationRate?: number;
+    followingRate?: number;
+  };
+  evaluationHash?: string;
+  activeVersion?: string;
+  rollbackVersion?: string;
+  reason?: string;
+  createdSeq: number;
+  updatedSeq: number;
+}
+
 export type RunStatus =
   | "CREATED"
   | "READY"
@@ -574,7 +624,16 @@ export interface RequestEpoch {
   toolNames: string[];
   capabilityCatalogHash?: string;
   contextManifestHash?: string;
+  /** Hash of the request headers after sensitive values are removed. */
+  requestHeadersHash?: string;
+  /** Hash of the bounded context metadata used to construct the request. */
+  requestContextHash?: string;
+  /** Stable Provider registration identity fixed for this request. */
+  providerBindingId?: string;
+  /** Hash of the scope policy applied to this request. */
+  scopePolicyHash?: string;
   stablePrefixHash?: string;
+  dynamicSuffixHash?: string;
   requestBodyHash?: string;
   parentEpochId?: string;
   status: RequestEpochStatus;
@@ -652,6 +711,9 @@ export interface JobRecord {
   outcome?: "success" | "error" | "timeout" | "unknown";
   error?: string;
   outputTier?: "small" | "medium" | "large";
+  /** Monotonic byte cursor for monitor_job; old jobs begin at zero. */
+  progressCursor?: number;
+  heartbeatAt?: string;
 }
 
 /**
@@ -749,6 +811,33 @@ export interface HandoffRecord {
 }
 
 export type ReplayPolicy = ReplayPolicyAtom;
+
+export type RunEventSource = "user" | "provider" | "tool" | "job" | "external" | "timer" | "maintenance" | "verifier";
+export type RunEventPriority = "urgent" | "normal" | "background";
+export type RunEventStatus = "queued" | "admitted" | "deferred" | "applied" | "coalesced" | "failed";
+export type RunEventReplayPolicy = "pure" | "idempotent" | "unknown" | "never";
+
+/** Stable metadata shared by all external and internal Run event sources. */
+export interface RunEventEnvelope {
+  id: string;
+  runId: string;
+  generation: number;
+  source: RunEventSource;
+  kind: string;
+  priority: RunEventPriority;
+  status: RunEventStatus;
+  sequence: number;
+  correlationId: string;
+  causationId?: string;
+  idempotencyKey?: string;
+  coalescingKey?: string;
+  operationId?: string;
+  requestEpochId?: string;
+  deadlineAt?: string;
+  replayPolicy: RunEventReplayPolicy;
+  payloadRef?: { artifactId?: string; eventType: string; hash: string };
+  createdAt: string;
+}
 
 export type ArtifactRole = "supporting" | "intermediate" | "debug" | "result";
 
@@ -864,6 +953,7 @@ export interface RunSnapshot {
   experiments: Record<string, ExperimentRecord>;
   /** Replans are durable control decisions, not an in-memory turn counter. */
   replans: Record<string, ReplanRecord>;
+  updateProposals: Record<string, UpdateProposal>;
   replanCount: number;
   contextOverflowRecoveries: number;
   artifacts: Record<string, ArtifactRef>;
@@ -953,13 +1043,30 @@ export type EventType =
   | "provider_request_slot_acquired"
   | "provider_request_queue_cancelled"
   | "provider_request_retried"
+  | "provider_request_first_event"
+  | "provider_request_first_token"
+  | "provider_request_inter_event_idle"
+  | "provider_request_stalled"
+  | "provider_recovery_required"
   | "provider_response_received"
   | "tool_call_recorded"
   | "tool_result_recorded"
   | "experiment_recorded"
   | "replan_requested"
+  | "update_proposal_created"
+  | "update_proposal_evaluated"
+  | "update_proposal_approved"
+  | "update_proposal_activated"
+  | "update_proposal_rejected"
+  | "update_proposal_rolled_back"
+  | "consolidate_started"
+  | "consolidate_summary"
+  | "consolidate_finished"
+  | "consolidate_failed"
   | "compaction_recorded"
   | "model_usage"
+  | "event_ingress_received"
+  | "event_ingress_processed"
   | "run_paused"
   | "run_resumed"
   | "run_finished"
@@ -973,6 +1080,8 @@ export interface HarnessEvent extends SequencedEventAtom<
 > {
   schemaVersion: 1;
   runId: string;
+  /** Optional for legacy events; present on events created by the unified ingress. */
+  envelope?: RunEventEnvelope;
 }
 
 export interface RawEffectResult {
@@ -993,13 +1102,47 @@ export interface EffectRequest extends EffectAtom<ReplayPolicy> {
 
 export interface ContextMessage extends MessageAtom<"system" | "user" | "assistant" | "tool", string> {}
 
+export type ContextBand = "P0" | "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9" | "P10";
+export type ContextLayer = "L0" | "L1" | "L2" | "L3A" | "L3B" | "L4" | "L5" | "K0" | "K1" | "K2";
+
+/** Deterministic unit used for local context budgeting and replay diagnostics. */
+export interface ContextBlock {
+  id: string;
+  band: ContextBand;
+  layer: ContextLayer;
+  content: string;
+  required: boolean;
+  volatility: "immutable" | "run_stable" | "low" | "medium" | "high" | "very_high";
+  sourceIds: string[];
+  contentHash: string;
+  estimatedTokens: number;
+  compressible: boolean;
+}
+
+export type KnowledgeLevel = "L0" | "L1" | "L2";
+export type KnowledgeKind = "task" | "forest" | "tree" | "evidence" | "fact" | "hypothesis" | "artifact" | "session" | "skill";
+
+export interface KnowledgeProjection {
+  uri: string;
+  kind: KnowledgeKind;
+  runId?: string;
+  generation?: number;
+  sourceIds: string[];
+  contentHash: string;
+  knowledgeVersion: string;
+  levels: { L0: string; L1: string; L2?: { uri: string; bytes?: number; truncated?: boolean } };
+  links: { forward: string[]; backlinks: string[] };
+  trust: "untrusted" | "observed" | "proposed" | "verified";
+  stale: boolean;
+}
+
 export interface ContextManifest {
   version: 1;
   runId: string;
   lane: Lane;
   phase: Phase;
   compilerVersion: string;
-  layerTokens: Record<"L0" | "L1" | "L2" | "L3" | "L4" | "L5", number>;
+  layerTokens: Record<"L0" | "L1" | "L2" | "L3A" | "L3B" | "L4" | "L5", number>;
   factIds: string[];
   hypothesisIds: string[];
   observationIds: string[];
@@ -1030,9 +1173,18 @@ export interface ContextManifest {
   maintenance: {
     stage: "stable" | "notice" | "snip" | "prune" | "compact";
     ratio: number;
+    targetRatio?: number;
+    hardRatio?: number;
     shouldCompact: boolean;
     forceCompact: boolean;
+    target?: "tool-results" | "recent-transcript" | "ledger" | "all";
+    nextAction?: "none" | "compact" | "consolidate";
   };
+  /** Optional in schema v1 so old manifests remain readable. */
+  blocks?: ContextBlock[];
+  firstChangedBlock?: string;
+  compressionTarget?: ContextBand;
+  sourceIds?: string[];
   dropped: Array<{ kind: string; id?: string; reason: string }>;
   budget: {
     contextWindow: number;
@@ -1067,6 +1219,16 @@ export interface ContextBuildInput {
   outputBudget?: number;
   safetyMargin?: number;
   resources?: RuntimeResourceSnapshot;
+  previousBlocks?: ContextBlock[];
+  maintenancePolicy?: ContextMaintenancePolicy;
+}
+
+export interface ContextMaintenancePolicy {
+  targetRatio: number;
+  hardRatio: number;
+  autoConsolidate: boolean;
+  keepRecentTurns: number;
+  selectedTarget?: "tool-results" | "recent-transcript" | "ledger" | "all";
 }
 
 export interface ContextBuildOutput {

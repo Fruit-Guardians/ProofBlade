@@ -48,32 +48,40 @@ export class DeterministicObserver {
     const observationId = id("O");
     const evidenceId = id("EV");
     const outcome = effect.result.exitCode === 0 ? "completed" : effect.result.exitCode === null ? "timed out" : "failed";
-    await this.controlStore.dispatch(runId, {
-      type: "observation",
-      observation: {
-        id: observationId,
-        summary: `${effect.operation} ${outcome}; ${Buffer.byteLength(combined, "utf8")} bytes; candidates=${candidateKinds.join(",") || "none"}`,
-        source: { operation: effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
-        candidateKinds,
-      },
-      lane: "executor",
-    });
-    await this.controlStore.dispatch(runId, {
-      type: "evidence",
-      evidence: {
-        id: evidenceId,
-        // A failed tool call is an observed failure signature, not verifier-grade
-        // negative Evidence. Only the trusted verifier may promote a failed
-        // reproduction into terminal negative Evidence.
-        kind: "observation",
-        summary: `Deterministic observation ${observationId} from ${effect.operation}.`,
-        source: { tool: journalEffect?.operation ?? effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
-        confidence: 0.9,
-        supports: [observationId],
-        refutes: [],
-      },
-      lane: "executor",
-    });
+    // Observation and its derived Evidence are one logical write. Keeping them
+    // in one ControlStore transaction halves snapshot/replay work on every
+    // read/bash result while preserving the same append-only facts.
+    await this.controlStore.dispatchTransaction(runId, () => ({
+      commands: [
+        {
+          type: "observation" as const,
+          observation: {
+            id: observationId,
+            summary: `${effect.operation} ${outcome}; ${Buffer.byteLength(combined, "utf8")} bytes; candidates=${candidateKinds.join(",") || "none"}`,
+            source: { operation: effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
+            candidateKinds,
+          },
+          lane: "executor" as const,
+        },
+        {
+          type: "evidence" as const,
+          evidence: {
+            id: evidenceId,
+            // A failed tool call is an observed failure signature, not verifier-grade
+            // negative Evidence. Only the trusted verifier may promote a failed
+            // reproduction into terminal negative Evidence.
+            kind: "observation" as const,
+            summary: `Deterministic observation ${observationId} from ${effect.operation}.`,
+            source: { tool: journalEffect?.operation ?? effect.operation, ...(effect.effectId ? { effectId: effect.effectId } : {}), artifactId: effect.artifactId, generation: effect.generation },
+            confidence: 0.9,
+            supports: [observationId],
+            refutes: [],
+          },
+          lane: "executor" as const,
+        },
+      ],
+      project: () => undefined,
+    }));
     return { observationId, evidenceId, candidateKinds };
   }
 }

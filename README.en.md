@@ -28,7 +28,7 @@ ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness 
 - A conversational coding-agent GUI that streams the configured real model over SSE, renders text, thinking and Tool lifecycle events live, and opens each call into correlated Pi/Control JSON and browser-Worker processing.
 - Recovery for all six fault windows, including expired-lease reaping, Fixture lifecycle reconciliation, old-generation Effect isolation, Tool-batch repair, and two-phase Pi compaction.
 - Deterministic planner lane with versioned planner-to-executor handoffs; stale plans are superseded before execution and the active handoff is indexed in context.
-- Machine-readable `baseline-v2` runner that repeats all six fixtures three times by default, aggregates latency, tokens, cost, effective actions, first-evidence time and Fact evidence coverage, and binds the stable report hash to a canonical Fixture Catalog snapshot and execution budget.
+- Machine-readable `baseline-v3` evaluator that runs all six fixtures three times by default and adds 12 provider-free runtime scenarios, aggregates latency, tokens, cost, effective actions, first-evidence time, Fact evidence coverage and replay parity, and binds the stable report hash to canonical Fixture/Scenario Catalog snapshots and the execution budget.
 
 Base Provider, model, thinking-level, and OpenAI compatibility settings live in `proofblade.config.json`. The checked-in profile uses `model: "auto"` to discover the active LM Studio chat model; other Providers may configure `thinkingLevel`, `reasoning`, `supportsReasoningEffort`, and `maxTokensField`. The CLI reads the environment variable named by `apiKeyEnv`. The GUI manages multiple relay or local-model profiles and lets each conversation select its provider, model, and thinking level. Profiles and keys stay in the user's `.proofblade/gui-provider.json`; folders and conversation preferences stay in `.proofblade/gui-workspace.json`. Neither file enters the repository, and API responses never expose key values. Pi 0.83.0 declares Node.js 22.19 or newer.
 
@@ -131,6 +131,7 @@ proofblade init <task-id>
 proofblade run demo
 proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]
+proofblade doctor
 proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
@@ -140,14 +141,17 @@ proofblade show <run-id>
 proofblade timeline <run-id>
 proofblade ledger <run-id>
 proofblade context <run-id>
-proofblade replay <run-id>
+proofblade replay <run-id> [projection|protocol|tools|stats|shadow]
+proofblade replay compare <baseline-run-id> <candidate-run-id>
 proofblade reconcile <run-id>
 proofblade cost <run-id>
 proofblade checkpoint <run-id> [reason]
 proofblade compact <run-id> [reason]
 proofblade history <run-id> <query>
+proofblade knowledge <run-id> [search|inspect] [query|pb://uri] [L0|L1|L2]
+proofblade consolidate <run-id> [deduplicate|summarize|all]
 proofblade handoff <run-id> [show|prepare]
-proofblade jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]
+proofblade jobs <run-id> [list|recover|monitor|read|stop] [job-id] [max-chars]
 proofblade artifact <run-id> <artifact-id> [max-chars]
 proofblade fixture-build <run-id>
 proofblade fixture-reset <run-id>

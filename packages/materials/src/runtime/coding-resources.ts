@@ -25,8 +25,9 @@ import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
+import { globWorkspace, grepWorkspace, workspaceSearchHash, workspaceSearchText } from "./workspace-search.js";
 
-export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
+export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
@@ -353,11 +354,11 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Evidence and knowledge proxy for durable observations, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
-      enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"],
-      description: "Evidence operation. curation_status takes no other arguments; inspect_tree requires treeId; read requires artifactId; annotate requires artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
+      enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"],
+      description: "Evidence operation. curation_status takes no other arguments; inspect_uri reads a pb:// URI at L0/L1/L2; search_uri searches the current run projection; consolidate creates a resumable source-linked L0/L1 index without deleting raw Artifacts; inspect_tree requires treeId; read requires artifactId; annotate accepts artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
     }),
     treeId: Type.Optional(Type.String({ minLength: 1 })),
     query: Type.Optional(Type.String({ maxLength: 200 })),
@@ -371,6 +372,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     dependsOn: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16 })),
     claim: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
     maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+    uri: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
+    level: Type.Optional(Type.String({ enum: ["L0", "L1", "L2"] })),
+    maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 200 })),
+    policy: Type.Optional(Type.String({ enum: ["deduplicate", "summarize", "all"] })),
+    maxArtifacts: Type.Optional(Type.Number({ minimum: 1, maximum: 128 })),
     from: Type.Optional(Type.String({ minLength: 1, description: "Upstream premise/source node id; information flows from this node." })),
     to: Type.Optional(Type.String({ minLength: 1, description: "Downstream derived, supported, refuted, or reproduced node id." })),
     relation: Type.Optional(Type.String({
@@ -388,7 +394,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as {
-      operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
+      operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "inspect_uri" | "search_uri" | "consolidate" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
       query?: string;
       artifactId?: string;
       artifactIds?: string[];
@@ -400,6 +406,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       dependsOn?: string[];
       claim?: string;
       maxChars?: number;
+      uri?: string;
+      level?: "L0" | "L1" | "L2";
+      maxResults?: number;
+      policy?: "deduplicate" | "summarize" | "all";
+      maxArtifacts?: number;
       treeId?: string;
       from?: string;
       to?: string;
@@ -412,10 +423,10 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
     if (input.operation === "curation_status") {
       assertOnly(input, ["operation"], "evidence curation_status");
-      return toolResult({ curation: await context.evidenceCurationGate?.inspect() ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
+      return toolResult({ curation: await context.evidenceCurationGate?.inspect({ includeReviewEvents: true }) ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
     }
     if (input.operation === "inspect_forest") {
       assertOnly(input, ["operation", "maxChars"], "evidence inspect_forest");
@@ -434,6 +445,19 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
       if (!input.artifactId) throw new Error("evidence read requires artifactId");
       return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, input.maxChars));
+    }
+    if (input.operation === "inspect_uri") {
+      assertOnly(input, ["operation", "uri", "level", "maxChars"], "evidence inspect_uri");
+      if (!input.uri) throw new Error("evidence inspect_uri requires uri");
+      return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", input.maxChars));
+    }
+    if (input.operation === "search_uri") {
+      assertOnly(input, ["operation", "query", "maxResults"], "evidence search_uri");
+      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50) });
+    }
+    if (input.operation === "consolidate") {
+      assertOnly(input, ["operation", "artifactIds", "policy", "maxArtifacts"], "evidence consolidate");
+      return toolResult(await context.runtime.consolidateKnowledge({ artifactIds: input.artifactIds, policy: input.policy, maxArtifacts: input.maxArtifacts }));
     }
     if (input.operation === "annotate") {
       assertOnly(input, ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"], "evidence annotate");
@@ -703,7 +727,44 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
     createCodingBashTool(),
     createEditTool<CodingResourceContext>(),
     createWriteTool<CodingResourceContext>(),
+    createGlobTool(),
+    createGrepTool(),
   ];
+}
+
+function createGlobTool(): AgentHarnessTool<CodingResourceContext> {
+  return {
+    name: "glob",
+    label: "glob",
+    description: "Find workspace files with a deterministic glob pattern. Results are sorted, bounded, and exclude control/runtime directories.",
+    parameters: Type.Object({ pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })) }, { additionalProperties: false }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, context) {
+      const result = await globWorkspace({ cwd: context.env.cwd, ...(params as { pattern?: string; maxResults?: number }) });
+      return searchToolResult(context, result);
+    },
+  };
+}
+
+function createGrepTool(): AgentHarnessTool<CodingResourceContext> {
+  return {
+    name: "grep",
+    label: "grep",
+    description: "Search text in workspace files with deterministic path/line matches, bounded file reads, binary skipping, and a result Artifact.",
+    parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 1_000 }), pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), caseSensitive: Type.Optional(Type.Boolean()), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })), maxFileBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: 16 * 1024 * 1024 })) }, { additionalProperties: false }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, context) {
+      const result = await grepWorkspace({ cwd: context.env.cwd, ...(params as { query: string; pattern?: string; caseSensitive?: boolean; maxResults?: number; maxFileBytes?: number }) });
+      return searchToolResult(context, result);
+    },
+  };
+}
+
+async function searchToolResult(context: CodingResourceContext, result: Awaited<ReturnType<typeof globWorkspace>> | Awaited<ReturnType<typeof grepWorkspace>>): Promise<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never> {
+  const text = workspaceSearchText(result);
+  const hash = workspaceSearchHash(result);
+  const artifact = await context.artifactStore.putText(context.runtime.runId, JSON.stringify(result), { filename: `${result.kind}-${hash.slice(0, 12)}.json`, mime: "application/json", sensitivity: "public" });
+  return toolResult({ ...result, artifactId: artifact.id, artifactHash: artifact.sha256, resultHash: hash, presentation: text });
 }
 
 /**
@@ -736,7 +797,7 @@ export function dedupeImageRead(
   if (!imagesSeen) return result;
   // Hash the concatenated image-block payloads: this is the identity that matters
   // (same pixels = nothing new to see), independent of how the path was written.
-  const imageData = result.content.filter((item) => item.type === "image").map((item) => (item as { data?: string }).data ?? "").join(" ");
+  const imageData = result.content.filter((item) => item.type === "image").map((item) => (item as { data?: string }).data ?? "").join("\u0000");
   const key = sha256(imageData);
   const seen = imagesSeen.get(key) ?? 0;
   imagesSeen.set(key, seen + 1);
@@ -751,7 +812,6 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
     ...contract,
     async execute(toolCallId, params, signal, onUpdate, context) {
       const input = params as { path: string; offset?: number; limit?: number };
-      await context.evidenceCurationGate?.assertInvestigationAllowed();
       const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
       if (result.content.some((item) => item.type === "image")) {
         return dedupeImageRead(input.path, result, context.imagesSeen);
@@ -773,12 +833,11 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         },
       });
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
-      const notice = await context.evidenceCurationGate?.checkpointNotice();
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content)],
         details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
       };
     },
@@ -868,22 +927,20 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const visible = error instanceof Error ? error.message : String(error);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
-        const notice = await context.evidenceCurationGate?.checkpointNotice();
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation), ...(notice ? [notice] : [])].filter(Boolean).join("\n\n"), { cause: error });
+        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
-      const notice = await context.evidenceCurationGate?.checkpointNotice();
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0))],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
