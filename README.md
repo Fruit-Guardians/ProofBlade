@@ -30,7 +30,7 @@ ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Age
 - 确定性规划通道和带知识版本的 Planner-to-Executor handoff；执行前会淘汰过期计划，并把当前 handoff 编入上下文索引。
 - 统一 RunEvent envelope 与有界 ingress：用户、Provider、Tool、Job、维护和外部信号可按 priority、generation、幂等键和 coalescing key 重放；单 Agent 默认在安全点消费，多 Agent 并行暂不启用。
 - Run/Lane/Job Scope 的 child-first、LIFO、幂等释放，以及评测驱动的 UpdateProposal 创建、评估、批准、激活和 hash 绑定回滚。
-- 机器可读的 `baseline-v3` 评测器，默认执行六个靶场各三次并追加 12 个 provider-free 运行时场景，汇总耗时、Token、成本、有效动作、首个证据时间、事实证据覆盖率和 Replay parity，并用规范化 Fixture/Scenario Catalog 哈希绑定题目内容、预算和稳定报告哈希。
+- 机器可读的 `baseline-v4` 评测器，默认执行六个靶场各三次并追加 18 个 provider-free 运行时场景，覆盖缓存、上下文、收敛、证据、持久化、事件 ingress 和恢复契约；同时汇总耗时、Token、成本、有效动作、首个证据时间、事实证据覆盖率和 Replay parity，并用规范化 Fixture/Scenario Catalog 哈希绑定题目内容、预算和稳定报告哈希。
 
 Provider、模型、思考级别和 OpenAI 兼容参数的基础值由 `proofblade.config.json` 管理。仓库内配置使用 `model: "auto"` 发现 LM Studio 当前已加载的聊天模型；其他 Provider 可配置 `thinkingLevel`、`reasoning`、`supportsReasoningEffort` 和 `maxTokensField`。CLI 通过 `apiKeyEnv` 指向的环境变量读取 Key；GUI 可管理多个中转站或本地模型 Profile，并为每个对话独立选择 Provider、模型和思考等级。Profile 和 Key 只写入用户目录 `.proofblade/gui-provider.json`，文件夹与对话偏好写入 `.proofblade/gui-workspace.json`，两者都不会进入仓库，Key 也不会进入 API 响应。Pi 0.83.0 要求 Node.js 22.19 或更高版本。
 

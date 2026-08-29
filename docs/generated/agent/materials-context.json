@@ -57,13 +57,13 @@
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
-    "src/evaluation/fixture-evaluator.ts": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+    "src/evaluation/fixture-evaluator.ts": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
     "src/evaluation/real-model-evaluator.ts": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
-    "src/evaluation/runtime-scenario-evaluator.ts": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+    "src/evaluation/runtime-scenario-evaluator.ts": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
     "src/evolution/evaluation-gates.ts": "a4fff69232964f6d507d23db5fff45a0b9d6e6e23d16a3c011d68923da6f7c61",
     "src/evolution/update-proposals.ts": "67ada80dd9aec0b9f18c99f6b115b2968ac350df7bfa5921892c6d158d417374",
     "src/index.ts": "0c36b3126d494ef6f3ef49f38f0af3ae7a53f240460a91e8f3bceb9d92421d31",
@@ -121,7 +121,7 @@
     "src/runtime/provider-scheduler.ts": "e4f36a666b297dd0dccf81f1fccaae7bf06f65cb4176ec24a8f592402b5dfaa5",
     "src/runtime/provider-transport.ts": "0c1652999beba307d5a760f294935fd85bee8c402f8cff3dfc0f61c477d891b3",
     "src/runtime/pwn-coding-tools.ts": "79fcdab70723d3c2a01d6aae6c231bf375e7e9c993a028538c1eed99c617abe9",
-    "src/runtime/request-epoch.ts": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+    "src/runtime/request-epoch.ts": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
     "src/runtime/scope.ts": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
     "src/runtime/solver-tools.ts": "d0c024edb46d433479553a7ba949277b7d8587addcda257d8526f65c6bad03b4",
     "src/runtime/tool-repeat-breaker.ts": "f998cc13dd983858b65fa3ab43a2caaa2c4bdd53fb4ab3e30c15013e0788256e",
@@ -802,7 +802,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 115,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -849,8 +849,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 135,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 178,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": [
         "packages/materials/tests/runtime-scenario-evaluator.test.ts"
       ]
@@ -2159,14 +2159,14 @@
       "id": "@proofblade/materials::constant::BASELINE_PROTOCOL_VERSION",
       "name": "BASELINE_PROTOCOL_VERSION",
       "kind": "constant",
-      "signature": "\"baseline-v3\"",
+      "signature": "\"baseline-v4\"",
       "summary": "Inferred summary: baseline protocol version constant used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 19,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -2182,7 +2182,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 20,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -2196,21 +2196,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 21,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
       "id": "@proofblade/materials::constant::BASELINE_REQUIRED_TOTAL_CASES",
       "name": "BASELINE_REQUIRED_TOTAL_CASES",
       "kind": "constant",
-      "signature": "30",
+      "signature": "36",
       "summary": "Inferred summary: baseline required total cases constant used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 22,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -2251,8 +2251,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 60,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 67,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": [
         "packages/materials/tests/runtime-scenario-evaluator.test.ts"
       ]
@@ -2267,8 +2267,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 23,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 30,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": [
         "packages/materials/tests/runtime-scenario-evaluator.test.ts"
       ]
@@ -5264,7 +5264,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
       "line": 41,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": [
         "packages/materials/tests/runtime-contracts.test.ts"
       ]
@@ -5279,8 +5279,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
-      "line": 109,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "line": 110,
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": [
         "packages/materials/tests/runtime-contracts.test.ts"
       ]
@@ -5295,8 +5295,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
-      "line": 89,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "line": 90,
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": [
         "packages/materials/tests/runtime-contracts.test.ts"
       ]
@@ -5311,8 +5311,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
-      "line": 115,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "line": 116,
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": [
         "packages/materials/tests/runtime-contracts.test.ts"
       ]
@@ -5327,8 +5327,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
-      "line": 139,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "line": 140,
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": []
     },
     {
@@ -5341,8 +5341,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
-      "line": 95,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "line": 96,
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": []
     },
     {
@@ -9023,7 +9023,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 26,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -9037,7 +9037,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 44,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -9051,7 +9051,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 37,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -9065,7 +9065,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 71,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -9518,8 +9518,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 40,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 47,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": []
     },
     {
@@ -9532,8 +9532,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 27,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 34,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": []
     },
     {
@@ -9546,8 +9546,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 33,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 40,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": [
         "packages/materials/tests/runtime-scenario-evaluator.test.ts"
       ]
@@ -9562,8 +9562,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 49,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 56,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": []
     },
     {
@@ -11747,7 +11747,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/request-epoch.ts",
       "line": 7,
-      "moduleHash": "3a7660099115066f6efffa5f047bb532799e6acce4c2923adae0cdb8ef5535bf",
+      "moduleHash": "99849b728b1c541fded6609f091a5e39c516ea175a735162532a5427eaaab9e4",
       "testRefs": []
     },
     {
@@ -19192,6 +19192,7 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -19933,7 +19934,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 122,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -20253,8 +20254,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 142,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 185,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -20933,6 +20934,7 @@
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/session-runtime-combined-host.test.ts",
@@ -24079,6 +24081,7 @@
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/session-runtime-combined-host.test.ts",
@@ -25137,6 +25140,7 @@
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/session-runtime-combined-host.test.ts",
@@ -28427,6 +28431,7 @@
         "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -33874,7 +33879,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 24,
-      "moduleHash": "956061153a622d522f5a69507d84f6fd8c2a514c5f707666643ed646898ba7e5",
+      "moduleHash": "78579f76635fef916a081b8cd5d9da8a5114d53fd236950e48aa2cc8235f2f6f",
       "testRefs": []
     },
     {
@@ -33929,8 +33934,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/runtime-scenario-evaluator.ts",
-      "line": 25,
-      "moduleHash": "36be648b7d4281bd85551b7f27e716d5d9e22ebbc2a3c077db8c4b2622122e96",
+      "line": 32,
+      "moduleHash": "f28b3ac0837cfca1d5720d39985dc24845d55511543983ae4429dff1f63a8eff",
       "testRefs": []
     },
     {

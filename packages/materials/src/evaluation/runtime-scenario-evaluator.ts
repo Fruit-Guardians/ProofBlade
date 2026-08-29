@@ -3,26 +3,33 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ProofBladeConfig } from "../config.js";
 import { createServices, demoTask } from "../app/demo.js";
 import { createInitialSnapshot, projectionHash } from "../control/reducer.js";
+import type { HarnessEvent } from "../domain/types.js";
 import { LeaseManager } from "../control/lease-manager.js";
 import { ContextCompiler } from "../context/compiler.js";
 import { prepareContextMaintenance } from "../context/maintenance-coordinator.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_PROMPT, latestExternalUserMessage, userMessageText } from "../context/user-task-anchor.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import { auditRunLifecycles } from "../observability/lifecycle-audit.js";
+import { RunEventIngress } from "../orchestration/event-ingress.js";
+import { DEFAULT_AGENT_STRATEGY, selectAgentStrategy } from "../orchestration/multi-agent-contract.js";
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
+import { createRequestEpoch, reconstructRequestEpoch } from "../runtime/request-epoch.js";
+import { Scope } from "../runtime/scope.js";
 import {
   NoProgressToolBreaker,
   RepeatedToolFailureBreaker,
   ToolFailureStormBreaker,
   type ToolFailureObservation,
 } from "../runtime/tool-repeat-breaker.js";
+import { SpillStore, type SpillArtifactWriter } from "../storage/spill-store.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 
 export const RUNTIME_SCENARIO_PROTOCOL_VERSION = "runtime-scenarios-v1";
 
-export type RuntimeScenarioCategory = "cache" | "context" | "convergence" | "evidence" | "durability";
+export type RuntimeScenarioCategory = "cache" | "context" | "convergence" | "evidence" | "durability" | "events" | "recovery";
 
 export interface RuntimeScenarioContext {
   root: string;
@@ -129,6 +136,42 @@ export const DEFAULT_RUNTIME_SCENARIOS: readonly RuntimeScenarioDefinition[] = [
     category: "durability",
     description: "A live resource lease must fence a competing lane and release cleanly.",
     evaluate: evaluateLeaseOwnerFencing,
+  },
+  {
+    id: "events.ingress-ordering-and-fencing",
+    category: "events",
+    description: "Ingress must deduplicate, prioritize, coalesce and defer stale-generation events at a safe point.",
+    evaluate: evaluateEventIngress,
+  },
+  {
+    id: "recovery.request-epoch-reconstruction",
+    category: "recovery",
+    description: "A Provider request must be reconstructable from durable events without exposing secrets.",
+    evaluate: evaluateRequestEpochRecovery,
+  },
+  {
+    id: "recovery.lifecycle-audit",
+    category: "recovery",
+    description: "Lifecycle auditing must identify stalled, orphaned and recovery-required work after restart.",
+    evaluate: evaluateLifecycleRecovery,
+  },
+  {
+    id: "recovery.scope-disposal",
+    category: "recovery",
+    description: "Scope recovery must dispose children first, use LIFO order and remain idempotent.",
+    evaluate: evaluateScopeRecovery,
+  },
+  {
+    id: "recovery.spill-fallback",
+    category: "recovery",
+    description: "Spill failure must retain the canonical Tool result and expose a controlled durable failure state.",
+    evaluate: evaluateSpillFallback,
+  },
+  {
+    id: "recovery.single-agent-capability-gate",
+    category: "recovery",
+    description: "Unsupported multi-agent strategies must fail explicitly while single-agent execution remains enabled.",
+    evaluate: evaluateSingleAgentCapabilityGate,
   },
 ] as const;
 
@@ -411,6 +454,147 @@ async function evaluateLeaseOwnerFencing(context: RuntimeScenarioContext): Promi
   return { competingOwnerRejected: true, released: true };
 }
 
+async function evaluateEventIngress(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {
+  const services = createServices(context.root, context.config);
+  const runId = `${context.runPrefix}-scenario-event-ingress`;
+  await services.control.createRun(runId, demoTask(runId, context.root, context.config));
+  const ingress = new RunEventIngress(services.control);
+  const first = await ingress.enqueue(runId, {
+    source: "job",
+    kind: "job.output",
+    correlationId: "job-1",
+    coalescingKey: "job:output",
+    payload: { cursor: 1 },
+  });
+  const duplicate = await ingress.enqueue(runId, {
+    source: "job",
+    kind: "job.output",
+    correlationId: "job-1",
+    coalescingKey: "job:output",
+    payload: { cursor: 1 },
+  });
+  await ingress.enqueue(runId, {
+    source: "user",
+    kind: "user.cancel",
+    priority: "urgent",
+    correlationId: "user-1",
+    payload: { reason: "scenario" },
+  });
+  await ingress.enqueue(runId, {
+    source: "job",
+    kind: "job.output",
+    correlationId: "job-2",
+    coalescingKey: "job:output",
+    payload: { cursor: 2 },
+  });
+  await ingress.enqueue(runId, {
+    source: "job",
+    kind: "job.output",
+    generation: 99,
+    correlationId: "stale-job",
+    payload: { cursor: 3 },
+  });
+  const drained = await ingress.drain(runId, "job_safe_point", 8);
+  const replayed = await ingress.drain(runId, "job_safe_point", 8);
+  requireCondition(duplicate.id === first.id, "duplicate ingress event was not idempotent");
+  requireCondition(drained.admitted.map((item) => item.kind).join(",") === "user.cancel,job.output", "ingress priority or coalescing order changed");
+  requireCondition(drained.coalesced.length === 1 && drained.deferred.length === 1, "ingress did not record coalesced and stale events");
+  requireCondition(replayed.admitted.length === 0, "processed ingress event was replayed twice");
+  return { admitted: drained.admitted.length, duplicateStable: true, coalesced: drained.coalesced.length, staleDeferred: drained.deferred.length };
+}
+
+async function evaluateRequestEpochRecovery(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {
+  const services = createServices(context.root, context.config);
+  const runId = `${context.runPrefix}-scenario-request-epoch`;
+  await services.control.createRun(runId, demoTask(runId, context.root, context.config));
+  const epoch = createRequestEpoch({
+    runId,
+    lane: "executor",
+    provider: "scenario-provider",
+    model: "deterministic",
+    adapter: "openai-completions",
+    requestId: "scenario-request-1",
+    contextWindow: 4_096,
+    systemPrompt: "stable system prompt",
+    toolNames: ["read", "read"],
+    toolCatalog: { tools: ["read"] },
+    contextManifest: { phase: "reconnaissance" },
+    requestHeaders: { Authorization: "Bearer scenario-secret", "X-Trace": "opaque" },
+    requestBody: { messages: [{ role: "user", content: "private request" }], token: "scenario-secret" },
+    stablePrefixHash: sha256("stable-prefix"),
+    dynamicSuffixHash: sha256("dynamic-suffix"),
+  });
+  await services.control.dispatch(runId, { type: "request_epoch_started", epoch, lane: "executor" });
+  const contextHash = sha256("reconstructed-context");
+  await services.control.append(runId, [
+    { schemaVersion: 1, lane: "executor", correlationId: epoch.requestId, actor: "model", type: "request_epoch_context", payload: { requestEpochId: epoch.id, fields: { requestContextHash: contextHash } } },
+    { schemaVersion: 1, lane: "executor", correlationId: epoch.requestId, actor: "model", type: "provider_response_received", payload: { epochId: epoch.id, status: 200 } },
+    { schemaVersion: 1, lane: "executor", correlationId: epoch.requestId, actor: "model", type: "model_usage", payload: { epochId: epoch.id, usage: { input: 1, output: 1 } } },
+  ]);
+  const events = await services.control.events(runId);
+  const reconstructed = reconstructRequestEpoch(events, epoch.id);
+  requireCondition(reconstructed?.status === "COMPLETED", "request epoch did not reach a reconstructable terminal status");
+  requireCondition(reconstructed.requestContextHash === contextHash, "request context hash was not rebuilt from durable events");
+  requireCondition(reconstructed.toolNames.join(",") === "read", "request Tool catalog was not normalized");
+  requireCondition(!JSON.stringify(events).includes("scenario-secret") && !JSON.stringify(events).includes("private request"), "request secrets leaked into durable events");
+  return { status: reconstructed.status, contextRebuilt: true, secretsRedacted: true, toolNames: reconstructed.toolNames };
+}
+
+function evaluateLifecycleRecovery(): Record<string, unknown> {
+  const events: HarnessEvent[] = [
+    scenarioEvent(1, "provider_request_started", { requestId: "provider-stalled", epochId: "RE-stalled" }),
+    scenarioEvent(2, "provider_recovery_required", { requestId: "provider-recovery", reason: "scenario retry budget" }),
+    scenarioEvent(3, "provider_request_first_event", { requestId: "provider-orphan" }),
+    scenarioEvent(4, "tool_call_recorded", { toolCallId: "tool-stalled" }),
+    scenarioEvent(5, "job_started", { jobId: "job-orphan" }),
+  ];
+  const report = auditRunLifecycles(events, { jobs: {} }, { now: "2026-08-29T00:10:00.000Z", providerStallAfterMs: 100, toolStallAfterMs: 100, jobStallAfterMs: 100 });
+  requireCondition(report.providers.find((item) => item.key === "provider-stalled")?.stalled === true, "stalled Provider was not detected");
+  requireCondition(report.providers.find((item) => item.key === "provider-recovery")?.recoveryRequired === true, "Provider recovery requirement was not detected");
+  requireCondition(report.providers.find((item) => item.key === "provider-orphan")?.orphan === true, "orphan Provider lifecycle was not detected");
+  requireCondition(report.jobs.find((item) => item.key === "job-orphan")?.orphan === true, "orphan Job lifecycle was not detected");
+  return { stalled: report.counts.stalled, recoveryRequired: report.counts.recoveryRequired, orphan: report.counts.orphan };
+}
+
+async function evaluateScopeRecovery(): Promise<Record<string, unknown>> {
+  const order: string[] = [];
+  const root = new Scope("scenario-run");
+  const child = root.child("scenario-lane");
+  root.add("parent-resource", () => { order.push("parent"); });
+  child.add("child-first", () => { order.push("child-1"); });
+  child.add("child-last", () => { order.push("child-2"); });
+  await Promise.all([root.dispose(), root.dispose()]);
+  requireCondition(order.join(",") === "child-2,child-1,parent", "Scope disposal order changed");
+  await root.dispose();
+  requireCondition(order.length === 3, "Scope disposal was not idempotent");
+  return { order, idempotent: true };
+}
+
+async function evaluateSpillFallback(context: RuntimeScenarioContext): Promise<Record<string, unknown>> {
+  const writer: SpillArtifactWriter = {
+    async putText() { throw new Error("scenario spill backend unavailable"); },
+    async readText() { return ""; },
+  };
+  const result = await new SpillStore(writer).persist(`${context.runPrefix}-spill`, {
+    operation: "read",
+    value: { output: "x".repeat(512) },
+    spillThresholdChars: 64,
+    presentationMaxChars: 80,
+  });
+  requireCondition(result.canonical.state === "success", "spill fallback changed the canonical Tool result state");
+  requireCondition(result.durable.state === "spill_failed", "spill backend failure was hidden as success");
+  requireCondition(result.durable.resultHash === result.canonical.resultHash && result.presentation.resultHash === result.canonical.resultHash, "Tool result triple lost its canonical hash binding");
+  return { canonicalRetained: true, durableState: result.durable.state, presentationTruncated: result.presentation.truncated };
+}
+
+function evaluateSingleAgentCapabilityGate(): Record<string, unknown> {
+  const single = selectAgentStrategy();
+  const unsupported = selectAgentStrategy("parallel-race");
+  requireCondition(single.status === "ready" && single.strategy === DEFAULT_AGENT_STRATEGY && single.enabled, "single-agent strategy is not enabled");
+  requireCondition(unsupported.status === "unsupported" && !unsupported.enabled && unsupported.failure.code === "MULTI_AGENT_DISABLED", "unsupported multi-agent strategy was not explicit");
+  return { singleAgent: single.strategy, multiAgentEnabled: unsupported.enabled, failureCode: unsupported.failure.code };
+}
+
 function toolHistory(turns: number): AgentMessage[] {
   return Array.from({ length: turns }, (_, index) => [
     {
@@ -452,6 +636,22 @@ function scenarioTask(runId: string, context: RuntimeScenarioContext) {
   };
 }
 
+function scenarioEvent(seq: number, type: HarnessEvent["type"], payload: Record<string, unknown>): HarnessEvent {
+  return {
+    schemaVersion: 1,
+    id: `SCENARIO-E-${seq}`,
+    streamId: "SCENARIO-RUN",
+    runId: "SCENARIO-RUN",
+    seq,
+    ts: "2026-08-29T00:00:00.000Z",
+    lane: "executor",
+    correlationId: "scenario-correlation",
+    actor: "orchestrator",
+    type,
+    payload,
+  };
+}
+
 async function rejects(operation: () => Promise<unknown>, expected: RegExp): Promise<boolean> {
   try {
     await operation();
@@ -479,7 +679,7 @@ function scenarioCatalogHash(definitions: readonly RuntimeScenarioDefinition[]):
 }
 
 function categoryCounts(cases: RuntimeScenarioCase[]): RuntimeScenarioSummary["categoryCounts"] {
-  const categories: RuntimeScenarioCategory[] = ["cache", "context", "convergence", "evidence", "durability"];
+  const categories: RuntimeScenarioCategory[] = ["cache", "context", "convergence", "evidence", "durability", "events", "recovery"];
   return Object.fromEntries(categories.map((category) => {
     const selected = cases.filter((item) => item.category === category);
     return [category, { total: selected.length, passed: selected.filter((item) => item.success).length }];

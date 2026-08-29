@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-29T09:36:31+08:00
+> 状态更新时间：2026-08-29T10:24:52+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-006 | 2026-08-29T08:44:14+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-005 | 2026-08-29T02:58:32+08:00 | PLAN-110, PLAN-120, PLAN-200, PLAN-220, PLAN-230 | main | 本条记录所在提交 |
@@ -53,6 +54,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260829-008
+
+时间：2026-08-29T10:24:52+08:00
+
+摘要：将统一 Agent 的 provider-free 评测基线升级为 baseline-v4，并把事件与恢复契约纳入固定场景目录。
+
+### 变更
+
+- 新增事件 ingress 优先级、幂等、coalescing 和 stale-generation fencing 运行时场景
+- 新增 RequestEpoch 重建脱敏、生命周期孤儿审计、Scope 释放、Spill 失败回退和单 Agent 能力门禁场景
+- 修复 createRequestEpoch 已计算但未写入返回对象的 requestContextHash
+- 将 Fixture 评测协议和中英文文档从 baseline-v3/30 项更新为 baseline-v4/36 项
+
+### 验证
+
+- [x] Materials build passed
+- [x] 18/18 runtime scenario cases passed
+- [x] 13/13 runtime contract and event ingress tests passed
+- [x] 4/4 evaluation tests passed
+- [x] npm test passed: 851 passed, 2 skipped, 0 failed
+- [x] npm run eval -- --enforce-gate passed: 36/36 provider-free cases, evidence binding 18/18, replay parity 18/18, candidate leaks 0
 
 ## UPDATE-20260829-007
 
