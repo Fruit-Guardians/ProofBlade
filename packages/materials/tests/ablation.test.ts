@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAblationPairings, DEFAULT_HARNESS_POLICY, validateAblationExperiment } from "../src/index.js";
+import { buildAblationPairings, DEFAULT_HARNESS_POLICY, preflightAblationExperiment, AblationExperimentStore, validateAblationExperiment } from "../src/index.js";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const profile = {
   provider: "relay",
@@ -14,6 +17,7 @@ const profile = {
   requestTimeoutMs: 120000,
   maxRetries: 2,
   input: ["text"] as Array<"text">,
+  pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2, cacheReadUsdPerMillion: 0, cacheWriteUsdPerMillion: 0 },
 };
 
 function input(overrides: Record<string, unknown> = {}) {
@@ -68,4 +72,36 @@ test("builds deterministic interleaved and seeded stratified pairings", () => {
   const stratified = buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases);
   assert.deepEqual(stratified, buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases));
   assert.deepEqual(stratified.map((item) => item.ordinal), stratified.map((_, index) => index));
+});
+
+test("preflight exposes credential presence without exposing its value and probes only model metadata", async () => {
+  process.env.TEST_KEY = "secret-value-that-must-not-be-returned";
+  const experiment = validateAblationExperiment(input(), profile);
+  const result = await preflightAblationExperiment(experiment, profile, {
+    probe: true,
+    fetch: async (url, init) => {
+      assert.match(String(url), /models$/);
+      assert.match(String((init?.headers as Record<string, string>).authorization), /^Bearer secret-value/);
+      return new Response(JSON.stringify({ data: [{ id: "luna-1" }] }), { status: 200 });
+    },
+  });
+  assert.equal(result.ready, true);
+  assert.equal(result.provider.credentialPresent, true);
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
+  delete process.env.TEST_KEY;
+});
+
+test("experiment store persists immutable snapshots and rejects tampering", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-store-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const experiment = validateAblationExperiment(input(), profile);
+    const path = await store.save(experiment);
+    assert.match(path, /AB-20260831-001\.json$/);
+    assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
+    assert.equal((await store.load(experiment.experimentId)).experimentFingerprint, experiment.experimentFingerprint);
+    const original = await readFile(path, "utf8");
+    await (await import("node:fs/promises")).writeFile(path, original.replace("Receipt comparison", "tampered"));
+    await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
