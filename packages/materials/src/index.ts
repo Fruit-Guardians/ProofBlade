@@ -28,6 +28,7 @@ export * from "./context/agent-pruner.js";
 export * from "./context/maintenance-coordinator.js";
 export * from "./context/checkpoint.js";
 export * from "./context/durable-compaction.js";
+export * from "./context/model-receipt.js";
 export * from "./effects/artifact-store.js";
 export * from "./effects/effect-journal.js";
 export * from "./knowledge/observer.js";
