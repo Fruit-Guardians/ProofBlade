@@ -175,6 +175,13 @@ proofblade fixtures
 proofblade eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]
 proofblade eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--enforce-gate]
 proofblade eval-real <corpus.json> --allow-live --variant ID=config.json --variant ID=config.json
+proofblade ablation list
+proofblade ablation create <experiment.json>
+proofblade ablation preflight <experiment-id> [--probe]
+proofblade ablation init <experiment-id>
+proofblade ablation status <experiment-id>
+proofblade ablation resume <experiment-id>
+proofblade ablation report <experiment-id> [--results results.json] [--markdown]
 proofblade tools [list|probe|init|preflight|show] [profile|tool-id]
 proofblade competition-api inspect <journal.jsonl>
 proofblade competition-api replay <journal.jsonl> --script <requests.json>
@@ -205,6 +212,20 @@ proofblade fixture-reset <run-id>
 proofblade fixture-score <run-id> <candidate>  # verifier-backed diagnostic
 proofblade agent <run-id> [prompt]
 ```
+
+### 消融实验
+
+消融实验配置使用 `profileId`、具体模型名和策略 Variant；正式实验不能使用 `model: "auto"`。先创建并预检，再初始化配对账本：
+
+```powershell
+proofblade ablation create docs/experiments/receipt-vs-direct.json
+proofblade ablation preflight AB-20260831-001 --probe
+proofblade ablation init AB-20260831-001
+proofblade ablation status AB-20260831-001
+proofblade ablation report AB-20260831-001 --results runs/ablation-results.json --markdown
+```
+
+`--probe` 只访问 Provider 的模型元数据接口，不发送题目内容。API Key 只能通过 Provider Profile 或环境变量提供；实验快照、事件、Artifact、账本和报告只保存环境变量名及 `credentialPresent`，不会保存 Key 明文、Authorization Header 或候选答案。
 
 ## 分层结构
 
