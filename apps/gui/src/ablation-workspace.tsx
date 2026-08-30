@@ -42,7 +42,9 @@ export function AblationWorkspace({ providers, onError, onNotice }: { providers?
       const created = await createAblationExperiment(input);
       setCreating(false);
       setSelectedId(created.experimentId);
-      await refresh();
+      const next = await getAblationExperiments();
+      setItems(next);
+      setDetail(await getAblationExperiment(created.experimentId));
       onNotice("消融实验配置已保存");
     } catch (caught) { onError(caught instanceof Error ? caught.message : String(caught)); }
     finally { setBusy(false); }
