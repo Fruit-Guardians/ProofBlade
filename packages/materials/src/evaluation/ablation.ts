@@ -1,3 +1,5 @@
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { ModelProfileConfig, ProofBladeConfig } from "../config.js";
 import type { TargetKind } from "../domain/types.js";
@@ -129,6 +131,7 @@ export interface AblationModelSnapshot {
   provider: string;
   api: ModelProfileConfig["api"];
   baseUrl: string;
+  apiKeyEnv: string;
   endpointMode?: "exact";
   model: string;
   thinkingLevel?: ThinkingLevel;
@@ -217,14 +220,97 @@ export function validateAblationExperiment(value: unknown, profile?: ModelProfil
 export function snapshotModel(input: AblationModelInput, profile?: ModelProfileConfig): AblationModelSnapshot {
   const resolved = profile ?? ({ provider: input.profileId, api: "openai-completions", baseUrl: "", model: input.model, modelDiscoveryPath: "/models", apiKeyEnv: "", contextWindow: input.contextWindow ?? 0, maxTokens: input.maxTokens ?? 0, requestTimeoutMs: 1, maxRetries: 0, input: ["text"] } satisfies ModelProfileConfig);
   const model = input.model.trim();
-  if (profile && model !== profile.model && model !== "auto") throw new Error(`Experiment model ${model} does not match Provider profile model ${profile.model}`);
+  if (profile && profile.model !== "auto" && model !== profile.model && model !== "auto") throw new Error(`Experiment model ${model} does not match Provider profile model ${profile.model}`);
   const snapshot = {
     profileId: input.profileId.trim(), provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl,
-    ...(resolved.endpointMode === undefined ? {} : { endpointMode: resolved.endpointMode }), model,
+    apiKeyEnv: resolved.apiKeyEnv, ...(resolved.endpointMode === undefined ? {} : { endpointMode: resolved.endpointMode }), model,
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
     ...(input.sampling === undefined ? {} : { sampling: input.sampling }), contextWindow: input.contextWindow ?? resolved.contextWindow, maxTokens: input.maxTokens ?? resolved.maxTokens,
   } as Omit<AblationModelSnapshot, "profileFingerprint">;
-  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+}
+
+export interface AblationPreflightCheck { id: string; passed: boolean; actual: string | number; expected: string | number; }
+export interface AblationPreflightSummary {
+  schemaVersion: 1;
+  experimentId: string;
+  provider: { id: string; api: string; baseUrl: string; model: string; apiKeyEnv: string; credentialPresent: boolean; pricingPresent: boolean };
+  estimatedMaxRequests: number;
+  checks: AblationPreflightCheck[];
+  ready: boolean;
+}
+
+/** Validate an immutable snapshot against the selected local Provider profile. */
+export function preflightAblationExperiment(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, options: { probe?: boolean; fetch?: typeof globalThis.fetch } = {}): Promise<AblationPreflightSummary> {
+  return (async () => {
+    const envName = profile.apiKeyEnv.trim();
+    const credentialPresent = envName.length > 0 && Boolean(process.env[envName]?.trim());
+    const pricingPresent = profile.pricing !== undefined && profile.pricing.inputUsdPerMillion > 0 && profile.pricing.outputUsdPerMillion > 0;
+    const checks: AblationPreflightCheck[] = [
+      { id: "concrete_model", passed: experiment.model.model !== "auto", actual: experiment.model.model, expected: "concrete model" },
+      { id: "provider_match", passed: experiment.model.provider === profile.provider && experiment.model.api === profile.api && experiment.model.baseUrl === profile.baseUrl.replace(/\/+$/, ""), actual: `${experiment.model.provider}/${experiment.model.api}/${experiment.model.baseUrl}`, expected: `${profile.provider}/${profile.api}/${profile.baseUrl.replace(/\/+$/, "")}` },
+      { id: "credential", passed: credentialPresent, actual: credentialPresent ? "present" : "missing", expected: "present" },
+      { id: "pricing", passed: pricingPresent, actual: pricingPresent ? "valid" : "missing_or_invalid", expected: "valid" },
+    ];
+    if (options.probe) {
+      const probe = await probeAblationProvider(experiment, profile, options.fetch);
+      checks.push({ id: "provider_probe", passed: probe.ok, actual: probe.status, expected: "2xx" });
+    }
+    return { schemaVersion: 1, experimentId: experiment.experimentId, provider: { id: profile.provider, api: profile.api, baseUrl: profile.baseUrl, model: experiment.model.model, apiKeyEnv: envName, credentialPresent, pricingPresent }, estimatedMaxRequests: experiment.budget.attempts * experiment.budget.maxTurns * experiment.variants.length, checks, ready: checks.every((item) => item.passed) };
+  })();
+}
+
+export interface AblationProviderProbe { ok: boolean; status: number | string; modelId?: string; modelsHash?: string; }
+
+/** Probe only the model-discovery endpoint; task content is never sent. */
+export async function probeAblationProvider(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch: typeof globalThis.fetch = fetch): Promise<AblationProviderProbe> {
+  const path = profile.modelDiscoveryPath.startsWith("/") ? profile.modelDiscoveryPath : `/${profile.modelDiscoveryPath}`;
+  const endpoint = `${profile.baseUrl.replace(/\/+$/, "")}${path}`;
+  const headers: Record<string, string> = profile.api === "anthropic-messages" ? { "x-api-key": process.env[profile.apiKeyEnv] ?? "", "anthropic-version": "2023-06-01" } : { authorization: `Bearer ${process.env[profile.apiKeyEnv] ?? ""}` };
+  try {
+    const response = await providerFetch(endpoint, { headers, signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) return { ok: false, status: response.status };
+    const body = await response.json() as { data?: Array<{ id?: string }> };
+    const ids = (body.data ?? []).map((item) => item.id).filter((item): item is string => Boolean(item)).sort();
+    const modelId = ids.find((id) => id === experiment.model.model) ?? ids.find((id) => !id.toLowerCase().includes("embed"));
+    return { ok: Boolean(modelId), status: response.status, ...(modelId ? { modelId } : {}), modelsHash: sha256(canonicalJson(ids)) };
+  } catch (error) { return { ok: false, status: error instanceof Error ? error.name : "error" }; }
+}
+
+export class AblationExperimentStore {
+  public constructor(private readonly directory: string) {}
+  public async save(experiment: AblationExperimentSnapshot): Promise<string> {
+    const root = resolve(this.directory);
+    await mkdir(root, { recursive: true });
+    const path = join(root, `${experiment.experimentId}.json`);
+    const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
+    await writeFile(temporary, `${JSON.stringify(experiment, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    await rename(temporary, path);
+    return path;
+  }
+  public async load(experimentId: string): Promise<AblationExperimentSnapshot> {
+    const id = requiredId(experimentId, "experimentId");
+    const parsed = JSON.parse(await readFile(join(resolve(this.directory), `${id}.json`), "utf8")) as AblationExperimentSnapshot;
+    assertSnapshotIntegrity(parsed);
+    return parsed;
+  }
+  public async list(): Promise<Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">>> {
+    let names: string[];
+    try { names = await readdir(resolve(this.directory)); } catch (error) { if ((error as { code?: string }).code === "ENOENT") return []; throw error; }
+    const results: Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">> = [];
+    for (const name of names.filter((item) => item.endsWith(".json")).sort()) {
+      const parsed = JSON.parse(await readFile(join(resolve(this.directory), name), "utf8")) as AblationExperimentSnapshot;
+      assertSnapshotIntegrity(parsed);
+      results.push({ experimentId: parsed.experimentId, name: parsed.name, experimentFingerprint: parsed.experimentFingerprint });
+    }
+    return results;
+  }
+}
+
+function assertSnapshotIntegrity(snapshot: AblationExperimentSnapshot): void {
+  if (!snapshot || snapshot.schemaVersion !== 1 || snapshot.protocolVersion !== ABLATION_PROTOCOL_VERSION) throw new Error("Invalid ablation experiment snapshot");
+  const { experimentFingerprint: _fingerprint, ...content } = snapshot;
+  if (_fingerprint !== sha256(canonicalJson(content))) throw new Error("Ablation experiment snapshot fingerprint mismatch");
 }
 
 export function buildAblationPairings(experiment: Pick<AblationExperimentSnapshot, "experimentId" | "variants" | "runOrder" | "budget">, cases: readonly AblationCaseRef[]): AblationPairing[] {
