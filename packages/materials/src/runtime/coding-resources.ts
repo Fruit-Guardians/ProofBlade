@@ -843,7 +843,7 @@ function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths
     `stop_supervisor() { terminate_child_tree; exit 143; }; trap terminate_child_tree EXIT; trap stop_supervisor HUP INT TERM`,
     `"$bash_bin" -c ${shellQuote(userCommand)} > ${logPath} 2>&1 & child_pid=$!;`,
     `snapshot_pids || { terminate_child_tree; exit 70; };`,
-    `for warmup in 1 2 3 4 5 6 7 8 9 10; do if ! kill -0 "$child_pid" 2>/dev/null; then break; fi; snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.01; done;`,
+    `warmup=0; while [ "$warmup" -lt 100 ]; do if ! kill -0 "$child_pid" 2>/dev/null; then break; fi; snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.01; warmup=$(( warmup + 1 )); done;`,
     `while kill -0 "$child_pid" 2>/dev/null; do snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.1; done;`,
     `snapshot_pids || { terminate_child_tree; exit 70; };`,
     `wait "$child_pid"; exit $?`,
