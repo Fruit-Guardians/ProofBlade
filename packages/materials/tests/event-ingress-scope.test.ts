@@ -61,6 +61,7 @@ test("RunEventIngress deduplicates, prioritizes, coalesces, and fences stale gen
     assert.equal(drained.coalesced.length, 1);
     assert.equal(drained.deferred.length, 0);
     assert.equal(drained.failed.length, 1);
+    for (const action of drained.admitted) await ingress.complete(runId, action, "applied");
     const replayed = await ingress.drain(runId, "job_safe_point", 8);
     assert.deepEqual(replayed.admitted, []);
     assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_received").every((event) => event.envelope?.runId === runId), true);
@@ -116,10 +117,12 @@ test("RunEventIngress leaves deferred events retryable and fences stale events a
     assert.deepEqual(second.admitted.map((item) => item.ingressId), [deferred.id]);
     assert.deepEqual(second.failed, []);
     assert.deepEqual(second.deferred, []);
+    await ingress.complete(runId, second.admitted[0]!, "applied");
 
     const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed");
     assert.deepEqual(processed.map((event) => [event.payload?.ingressId, event.payload?.status]), [
       [stale.id, "failed"],
+      [deferred.id, "claimed"],
       [deferred.id, "applied"],
     ]);
   } finally {
@@ -146,7 +149,33 @@ test("concurrent ingress drains atomically claim each event once", async () => {
       ingress.drain(runId, "job_safe_point", 8),
     ]);
     assert.equal(results.filter((result) => result.admitted.some((item) => item.ingressId === envelope.id)).length, 1);
-    assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id).length, 1);
+    const admitted = results.flatMap((result) => result.admitted);
+    for (const action of admitted) await ingress.complete(runId, action, "applied");
+    assert.equal((await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id).length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ingress claims are durable leases and only become applied after completion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-lease-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-LEASE-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const ingress = new RunEventIngress(services.control, { leaseMs: 50 });
+    const envelope = await ingress.enqueue(runId, { source: "user", kind: "user.pause", correlationId: "pause-lease" });
+    const first = await ingress.drain(runId, "user_cancel", 8);
+    assert.equal(first.admitted[0]?.ingressId, envelope.id);
+    assert.equal((await services.control.events(runId)).at(-1)?.payload?.status, "claimed");
+    assert.deepEqual((await ingress.drain(runId, "user_cancel", 8)).admitted, []);
+    await new Promise((resolve) => setTimeout(resolve, 70));
+    const second = await ingress.drain(runId, "user_cancel", 8);
+    assert.equal(second.admitted[0]?.ingressId, envelope.id);
+    await assert.rejects(() => ingress.complete(runId, first.admitted[0]!, "applied"), /lease expired|owned by another worker/);
+    await ingress.complete(runId, second.admitted[0]!, "applied");
+    const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id);
+    assert.deepEqual(processed.map((event) => event.payload?.status), ["claimed", "claimed", "applied"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

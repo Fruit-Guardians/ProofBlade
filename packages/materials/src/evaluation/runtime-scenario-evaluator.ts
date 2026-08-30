@@ -503,6 +503,7 @@ async function evaluateEventIngress(context: RuntimeScenarioContext): Promise<Re
     payload: { cursor: 3 },
   });
   const drained = await ingress.drain(runId, "job_safe_point", 8);
+  for (const action of drained.admitted) await ingress.complete(runId, action, "applied");
   const replayed = await ingress.drain(runId, "job_safe_point", 8);
   requireCondition(duplicate.id === first.id, "duplicate ingress event was not idempotent");
   requireCondition(drained.admitted.map((item) => item.kind).join(",") === "user.cancel,job.output", "ingress priority or coalescing order changed");

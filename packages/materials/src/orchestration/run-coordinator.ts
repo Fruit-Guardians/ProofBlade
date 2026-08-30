@@ -61,11 +61,22 @@ export class RunCoordinator {
     const drained = await this.ingress.drain(runId, safePoint, maxEvents);
     for (const action of drained.admitted) {
       if (action.source !== "user") continue;
-      if (action.kind === "user.pause") await this.control.dispatch(runId, { type: "pause", reason: String(action.payload.reason ?? "Paused by user."), lane: "main" });
-      else if (action.kind === "user.resume") await this.control.dispatch(runId, { type: "resume", lane: "main" });
-      else if (action.kind === "user.cancel") await this.control.dispatch(runId, { type: "cancel", reason: String(action.payload.reason ?? "Cancelled by user."), lane: "main" });
+      try {
+        if (action.kind === "user.pause") await this.control.dispatch(runId, { type: "pause", reason: String(action.payload.reason ?? "Paused by user."), lane: "main" });
+        else if (action.kind === "user.resume") await this.control.dispatch(runId, { type: "resume", lane: "main" });
+        else if (action.kind === "user.cancel") await this.control.dispatch(runId, { type: "cancel", reason: String(action.payload.reason ?? "Cancelled by user."), lane: "main" });
+        await this.ingress.complete(runId, action, "applied");
+      } catch (error) {
+        await this.ingress.complete(runId, action, "failed", String(error)).catch(() => undefined);
+        throw error;
+      }
     }
     return drained;
+  }
+
+  /** Complete a non-user ingress action after the owning lane applies it. */
+  public async completeEvent(runId: string, action: RunEventDrainResult["admitted"][number], status: "applied" | "failed" | "coalesced" = "applied", reason?: string): Promise<void> {
+    await this.ingress.complete(runId, action, status, reason);
   }
 
   /** Move the durable competition projection, tolerating an idempotent race. */

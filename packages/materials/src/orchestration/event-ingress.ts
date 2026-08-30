@@ -27,6 +27,8 @@ export interface RunEventAction {
   source: RunEventSource;
   generation: number;
   payload: Record<string, unknown>;
+  claimToken: string;
+  leaseExpiresAt: string;
 }
 
 export interface RunEventDrainResult {
@@ -39,13 +41,21 @@ export interface RunEventDrainResult {
 
 type IngressPayload = { envelope: RunEventEnvelope; payload?: Record<string, unknown> };
 
+export interface RunEventIngressOptions {
+  leaseMs?: number;
+}
+
 /**
  * Durable ingress adapter for user, provider, Job and maintenance signals.
  * Received events are immutable; processing appends a second fact instead of
  * mutating the first event, so a restart can rebuild the pending queue.
  */
 export class RunEventIngress {
-  public constructor(private readonly controlStore: ControlStore) {}
+  private readonly leaseMs: number;
+
+  public constructor(private readonly controlStore: ControlStore, options: RunEventIngressOptions = {}) {
+    this.leaseMs = normalizeLease(options.leaseMs ?? 30_000);
+  }
 
   public async enqueue(runId: string, input: RunEventInput): Promise<RunEventEnvelope> {
     const snapshot = await this.controlStore.snapshot(runId);
@@ -120,21 +130,30 @@ export class RunEventIngress {
     for (const event of latestByKey.values()) {
       ready.push(event);
     }
-    selected.push(...ready.map((event) => ({ event, status: "applied" as const })));
+    selected.push(...ready.map((event) => ({ event, status: "claimed" as const })));
     const bounded = [...stale, ...selected].slice(0, maxEvents);
-    const claims = await this.controlStore.claimIngress(runId, bounded.map(({ event, status }) => ({ ingressId: event.envelope!.id, envelope: event.envelope!, status, safePoint })));
+    const claims = await this.controlStore.claimIngress(runId, bounded.map(({ event, status }) => ({ ingressId: event.envelope!.id, envelope: event.envelope!, status, safePoint, leaseMs: this.leaseMs })));
     const claimedIds = new Set(claims.map((claim) => claim.ingressId));
     const claimed = bounded.filter((item) => claimedIds.has(item.event.envelope!.id));
     failed.push(...claimed.filter((item) => item.status === "failed").map((item) => item.event.envelope!.id));
-    const admitted = claimed.filter((item) => item.status === "applied");
+    const admitted = claimed.filter((item) => item.status === "claimed");
     const claimedCoalesced = claimed.filter((item) => item.status === "coalesced");
+    const claimsById = new Map(claims.map((claim) => [claim.ingressId, claim]));
     return {
       safePoint,
-      admitted: admitted.map(({ event }) => ({ ingressId: event.envelope!.id, kind: event.envelope!.kind, source: event.envelope!.source, generation: event.envelope!.generation, payload: event.payload.payload ?? {} })),
+      admitted: admitted.map(({ event }) => {
+        const claim = claimsById.get(event.envelope!.id)!;
+        return { ingressId: event.envelope!.id, kind: event.envelope!.kind, source: event.envelope!.source, generation: event.envelope!.generation, payload: event.payload.payload ?? {}, claimToken: claim.claimToken!, leaseExpiresAt: claim.leaseExpiresAt! };
+      }),
       deferred,
       coalesced: claimedCoalesced.map((item) => item.event.envelope!.id),
       failed,
     };
+  }
+
+  public async complete(runId: string, action: Pick<RunEventAction, "ingressId" | "claimToken" | "leaseExpiresAt">, status: "applied" | "failed" | "coalesced", reason?: string): Promise<void> {
+    if (Date.parse(action.leaseExpiresAt) <= Date.now()) throw new Error(`Ingress ${action.ingressId} claim lease expired`);
+    await this.controlStore.completeIngress(runId, { ingressId: action.ingressId, claimToken: action.claimToken, status, reason });
   }
 }
 
@@ -158,4 +177,9 @@ function defaultPriority(source: RunEventSource, kind: string): RunEventPriority
 
 function priorityRank(priority: RunEventPriority): number {
   return priority === "urgent" ? 0 : priority === "normal" ? 1 : 2;
+}
+
+function normalizeLease(value: number): number {
+  if (!Number.isInteger(value) || value < 50 || value > 300_000) throw new Error("event ingress lease must be an integer from 50 to 300000ms");
+  return value;
 }

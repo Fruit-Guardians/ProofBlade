@@ -28,7 +28,7 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
@@ -100,6 +100,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
+    /** Teardown hook for durable shell jobs owned by this lane. */
+    private readonly closeShellJobs: () => Promise<void>,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
     /** Separate owner-scoped registry for trusted clean-process Pwn reproduction. */
@@ -468,6 +470,7 @@ export class PiCodingLane implements AgentLanePort {
       : undefined;
     const toolContext: CodingResourceContext = {
       env,
+      ownerLane: "main",
       controlStore: options.controlStore,
       artifactStore,
       skills,
@@ -692,6 +695,7 @@ export class PiCodingLane implements AgentLanePort {
         }
         return undefined;
       },
+      async () => await stopAllShellJobs(toolContext),
       pwnRegistry,
       pwnVerifierRegistry,
       webSession,
@@ -793,6 +797,7 @@ export class PiCodingLane implements AgentLanePort {
       await this.harness.waitForIdle();
     } finally {
       try {
+        await this.closeShellJobs().catch(() => undefined);
         // Tear down live pwn tube sessions first: their docker-exec children are
         // host processes that would otherwise outlive the lane, and the durable
         // sessions would stay OPEN until the container is destroyed. Best-effort

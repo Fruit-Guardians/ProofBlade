@@ -215,8 +215,11 @@ export type DomainCommand =
 export interface IngressClaim {
   ingressId: string;
   envelope: RunEventEnvelope;
-  status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">;
+  status: Extract<RunEventStatus, "claimed" | "coalesced" | "failed">;
   safePoint: string;
+  leaseMs?: number;
+  claimToken?: string;
+  leaseExpiresAt?: string;
 }
 
 type WorkItemCommand = Extract<DomainCommand, { type: `work_item_${string}` }>;
@@ -294,23 +297,70 @@ export class ControlStore {
       const terminal = new Set(events
         .filter((event) => event.type === "event_ingress_processed" && ["applied", "coalesced", "failed"].includes(String(event.payload?.status)))
         .map((event) => String(event.payload?.ingressId ?? "")));
+      const activeClaims = new Map<string, { claimToken: string; leaseExpiresAt: string }>();
+      for (const event of events.filter((candidate) => candidate.type === "event_ingress_processed" && candidate.payload?.status === "claimed")) {
+        const ingressId = String(event.payload?.ingressId ?? "");
+        const claimToken = String(event.payload?.claimToken ?? "");
+        const leaseExpiresAt = String(event.payload?.leaseExpiresAt ?? "");
+        if (ingressId && claimToken && Number.isFinite(Date.parse(leaseExpiresAt)) && Date.parse(leaseExpiresAt) > Date.now()) {
+          activeClaims.set(ingressId, { claimToken, leaseExpiresAt });
+        }
+      }
       const received = new Map(events
         .filter((event) => event.type === "event_ingress_received" && event.envelope)
         .map((event) => [event.envelope!.id, event]));
       const accepted = [...new Map(claims.map((claim) => [claim.ingressId, claim])).values()]
-        .filter((claim) => !terminal.has(claim.ingressId) && received.has(claim.ingressId));
+        .filter((claim) => !terminal.has(claim.ingressId) && !activeClaims.has(claim.ingressId) && received.has(claim.ingressId));
       if (accepted.length === 0) return [];
-      const materialized = accepted.map((claim, index) => {
+      const admitted = accepted.map((claim) => claim.status === "claimed"
+        ? { ...claim, claimToken: id("IC"), leaseExpiresAt: new Date(Date.now() + normalizeIngressLease(claim.leaseMs)).toISOString() }
+        : claim);
+      const materialized = admitted.map((claim, index) => {
         const receivedEvent = received.get(claim.ingressId)!;
         return makeEvent(runId, before.lastSeq + index + 1, "event_ingress_processed", "orchestrator", "main", {
           ingressId: claim.ingressId,
           status: claim.status,
           safePoint: claim.safePoint,
+          ...(claim.claimToken ? { claimToken: claim.claimToken } : {}),
+          ...(claim.leaseExpiresAt ? { leaseExpiresAt: claim.leaseExpiresAt } : {}),
         }, receivedEvent.correlationId, { ...claim.envelope, status: claim.status });
       });
       await writer.append(materialized, this.#authoritySecret);
       await writer.saveProjection(materialized.reduce(reduce, before), this.#authoritySecret);
-      return accepted;
+      return admitted;
+    }));
+  }
+
+  /** Complete a previously claimed ingress action after its side effect ran. */
+  public async completeIngress(
+    runId: string,
+    input: { ingressId: string; claimToken: string; status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">; safePoint?: string; reason?: string },
+  ): Promise<void> {
+    if (!input.ingressId || !input.claimToken) throw new Error("Ingress completion requires ingressId and claimToken");
+    await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const received = events.find((event) => event.type === "event_ingress_received" && event.envelope?.id === input.ingressId);
+      if (!received?.envelope) throw new Error(`Unknown ingress event ${input.ingressId}`);
+      const processed = events.filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === input.ingressId).at(-1);
+      const currentStatus = String(processed?.payload?.status ?? "");
+      if (["applied", "coalesced", "failed"].includes(currentStatus)) {
+        if (currentStatus !== input.status) throw new Error(`Ingress ${input.ingressId} is already ${currentStatus}`);
+        return;
+      }
+      if (currentStatus !== "claimed" || String(processed?.payload?.claimToken ?? "") !== input.claimToken) {
+        throw new Error(`Ingress ${input.ingressId} claim is missing or owned by another worker`);
+      }
+      const leaseExpiresAt = String(processed?.payload?.leaseExpiresAt ?? "");
+      if (!Number.isFinite(Date.parse(leaseExpiresAt)) || Date.parse(leaseExpiresAt) <= Date.now()) throw new Error(`Ingress ${input.ingressId} claim lease expired`);
+      const materialized = makeEvent(runId, before.lastSeq + 1, "event_ingress_processed", "orchestrator", "main", {
+        ingressId: input.ingressId,
+        status: input.status,
+        safePoint: input.safePoint ?? String(processed?.payload?.safePoint ?? "unknown"),
+        ...(input.reason ? { reason: input.reason } : {}),
+      }, received.correlationId, { ...received.envelope, status: input.status });
+      const after = reduce(before, materialized);
+      await writer.append([materialized], this.#authoritySecret);
+      await writer.saveProjection(after, this.#authoritySecret);
     }));
   }
 
@@ -1115,8 +1165,14 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     const job = snapshot.jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
     if (command.type === "job_started" && job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
+    if (command.type === "job_started" && job.generation !== snapshot.generation) throw new Error(`Cannot start job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
+    if (command.type === "job_finished" && job.generation !== snapshot.generation) throw new Error(`Cannot finish job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
+    if (command.type === "job_cancelled" && job.generation !== snapshot.generation) throw new Error(`Cannot cancel job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
     if (command.type === "job_finished" && job.status === "CANCELLED") return;
     if (command.type === "job_cancelled" && ["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) throw new Error(`Cannot cancel job in ${job.status}`);
+  }
+  if ((command.type === "job_queued" || command.type === "job_queued_legacy") && command.job.generation !== snapshot.generation) {
+    throw new Error(`Cannot queue job ${command.job.id} for generation ${command.job.generation}; current generation is ${snapshot.generation}`);
   }
   if (command.type === "handoff_proposed") {
     if (isTerminal(snapshot.status)) throw new Error(`Cannot propose a handoff for terminal run ${snapshot.status}`);
@@ -2023,4 +2079,10 @@ function sameStringArray(left: readonly string[], right: readonly string[]): boo
 export function createEffectInput(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string } {
   const normalizedArgs = canonicalJson(args);
   return { effectId: id("EF"), idempotencyKey: sha256(`${runId}:${operation}:${normalizedArgs}:${generation}:${replayPolicy}`) };
+}
+
+function normalizeIngressLease(value: number | undefined): number {
+  if (value === undefined) return 30_000;
+  if (!Number.isInteger(value) || value < 50 || value > 300_000) throw new Error("event ingress lease must be an integer from 50 to 300000ms");
+  return value;
 }

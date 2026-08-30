@@ -567,11 +567,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "job_queued": {
       const job = p.job as RunSnapshot["jobs"][string];
       if (!job?.id) throw new Error("job_queued requires job");
+      if (job.generation !== next.generation) throw new Error(`job_queued generation mismatch: expected ${next.generation}, got ${String(job.generation)}`);
       next.jobs[job.id] = job;
       break;
     }
     case "job_started": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_started generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
       job.status = "RUNNING";
       job.startedAt = typeof p.startedAt === "string" ? p.startedAt : job.startedAt;
@@ -579,6 +581,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     }
     case "job_finished": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_finished generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (["CANCELLED", "SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) break;
       const status = p.status as typeof job.status;
       if (!["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(status)) throw new Error(`Invalid job terminal status: ${String(status)}`);
@@ -594,6 +597,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     }
     case "job_cancelled": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_cancelled generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (job.status === "SUCCEEDED" || job.status === "FAILED" || job.status === "TIMED_OUT") break;
       job.status = "CANCELLED";
       job.finishedAt = typeof p.finishedAt === "string" ? p.finishedAt : job.finishedAt;

@@ -25,7 +25,7 @@ import { CodingClaimVerifier, requiresClaimVerification } from "../src/verificat
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
@@ -659,6 +659,11 @@ test("shell_background returns immediately and shell_job polls then stops the re
     assert.match(job.jobId, /^sh-/);
     assert.ok(job.pid > 0, "a real pid must be returned");
     assert.equal(job.status, "running");
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { schemaVersion: number; runId: string; generation: number; ownerLane: string; pid: number; processGroupId: number; processStartTime: string; commandHash: string; status: string };
+    assert.deepEqual({ schemaVersion: record.schemaVersion, runId: record.runId, generation: record.generation, ownerLane: record.ownerLane }, { schemaVersion: 1, runId, generation: 0, ownerLane: "main" });
+    assert.ok(record.pid > 0 && record.processGroupId > 0);
+    assert.ok(record.processStartTime.length > 0 && record.commandHash.length === 64 && record.status === "RUNNING");
     assert.ok(startElapsed < 10_000, `starting must not block for the command's duration, took ${startElapsed}ms`);
 
     // Give it a moment to write some output, then poll.

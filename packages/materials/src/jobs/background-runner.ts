@@ -80,8 +80,13 @@ export class BackgroundJobRunner {
   }
 
   public async poll(jobId: string, now = Date.now()): Promise<JobRecord> {
-    const job = (await this.controlStore.snapshot(this.runId)).jobs[jobId];
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    const job = snapshot.jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
+    if (job.generation !== snapshot.generation && job.status !== "UNKNOWN") {
+      await this.reconcileStale(job, snapshot.generation);
+      return (await this.controlStore.snapshot(this.runId)).jobs[jobId]!;
+    }
     if (isExpired(job, now)) {
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
@@ -100,6 +105,10 @@ export class BackgroundJobRunner {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const job = snapshot.jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
+    if (job.generation !== snapshot.generation) {
+      await this.reconcileStale(job, snapshot.generation);
+      return (await this.controlStore.snapshot(this.runId)).jobs[jobId]!;
+    }
     if (["SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELLED", "UNKNOWN"].includes(job.status)) return job;
     this.active.get(jobId)?.controller.abort(reason);
     await this.controlStore.dispatch(this.runId, { type: "job_cancelled", jobId, reason, lane: "executor" });
@@ -111,6 +120,11 @@ export class BackgroundJobRunner {
     const recovered: JobRecord[] = [];
     for (const job of Object.values(snapshot.jobs)) {
       if (job.status !== "QUEUED" && job.status !== "RUNNING") continue;
+      if (job.generation !== snapshot.generation) {
+        await this.reconcileStale(job, snapshot.generation);
+        recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
+        continue;
+      }
       if (isTerminalRun(snapshot.status)) {
         await this.controlStore.dispatch(this.runId, { type: "job_reconciled", jobId: job.id, reason: `Run is already terminal (${snapshot.status}); background work was not resumed.`, lane: "executor" });
         recovered.push((await this.controlStore.snapshot(this.runId)).jobs[job.id]!);
@@ -247,11 +261,21 @@ export class BackgroundJobRunner {
   private async run(job: JobRecord, executionInput: Record<string, unknown>, entry: { controller: AbortController; timeout?: ReturnType<typeof setTimeout>; timedOut: boolean }): Promise<void> {
     try {
       const current = await this.poll(job.id);
-      if (current.status === "CANCELLED") return;
+      if (["SUCCEEDED", "FAILED", "TIMED_OUT", "CANCELLED", "UNKNOWN"].includes(current.status)) return;
+      const currentGeneration = (await this.controlStore.snapshot(this.runId)).generation;
+      if (current.generation !== currentGeneration) {
+        await this.reconcileStale(current, currentGeneration);
+        return;
+      }
       let running = current;
       if (current.status === "QUEUED") {
         await this.controlStore.dispatch(this.runId, { type: "job_started", jobId: job.id, lane: job.lane, startedAt: new Date().toISOString() });
         running = (await this.controlStore.snapshot(this.runId)).jobs[job.id]!;
+        const startedGeneration = (await this.controlStore.snapshot(this.runId)).generation;
+        if (running.generation !== startedGeneration) {
+          await this.reconcileStale(running, startedGeneration);
+          return;
+        }
       }
       const remainingTimeoutMs = running.timeoutMs === undefined ? undefined : durableDeadline(running) === undefined
         ? undefined
@@ -268,9 +292,14 @@ export class BackgroundJobRunner {
         return;
       }
       if (remainingTimeoutMs !== undefined) entry.timeout = setTimeout(() => { entry.timedOut = true; entry.controller.abort("background job timeout"); }, remainingTimeoutMs);
-      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput, backendId: job.backendId, backendVersion: job.backendVersion }, entry.controller.signal);
+      const result = await this.router.invoke({ capabilityId: job.capabilityId, operation: job.operation, input: executionInput, backendId: job.backendId, backendVersion: job.backendVersion, expectedGeneration: running.generation }, entry.controller.signal);
       const after = await this.poll(job.id);
       if (["CANCELLED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(after.status)) return;
+      const afterGeneration = (await this.controlStore.snapshot(this.runId)).generation;
+      if (after.generation !== afterGeneration) {
+        await this.reconcileStale(after, afterGeneration);
+        return;
+      }
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
         jobId: job.id,
@@ -284,6 +313,11 @@ export class BackgroundJobRunner {
     } catch (error) {
       const after = await this.poll(job.id).catch(() => undefined);
       if (!after || ["CANCELLED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(after.status)) return;
+      const currentGeneration = (await this.controlStore.snapshot(this.runId)).generation;
+      if (after.generation !== currentGeneration) {
+        await this.reconcileStale(after, currentGeneration);
+        return;
+      }
       const timedOut = entry.timedOut;
       await this.controlStore.dispatch(this.runId, {
         type: "job_finished",
@@ -294,6 +328,16 @@ export class BackgroundJobRunner {
         lane: job.lane,
       });
     }
+  }
+
+  private async reconcileStale(job: JobRecord, currentGeneration: number): Promise<void> {
+    if (job.status === "UNKNOWN") return;
+    await this.controlStore.dispatch(this.runId, {
+      type: "job_reconciled",
+      jobId: job.id,
+      reason: `Background job belongs to generation ${job.generation}; current Run generation is ${currentGeneration}. Execution was not resumed.`,
+      lane: job.lane,
+    });
   }
 
   private async jobContent(job: JobRecord): Promise<string> {

@@ -862,7 +862,7 @@ export type ReplayPolicy = ReplayPolicyAtom;
 
 export type RunEventSource = "user" | "provider" | "tool" | "job" | "external" | "timer" | "maintenance" | "verifier" | "agent";
 export type RunEventPriority = "urgent" | "normal" | "background";
-export type RunEventStatus = "queued" | "admitted" | "deferred" | "applied" | "coalesced" | "failed";
+export type RunEventStatus = "queued" | "admitted" | "deferred" | "claimed" | "applied" | "coalesced" | "failed";
 export type RunEventReplayPolicy = "pure" | "idempotent" | "unknown" | "never";
 
 /** Stable metadata shared by all external and internal Run event sources. */

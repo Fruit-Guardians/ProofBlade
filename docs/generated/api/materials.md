@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 159
-- Symbols: 1650
+- Symbols: 1655
 
 ## Public Symbols
 
@@ -82,7 +82,7 @@
 ### CapabilityRegistry
 - Kind: `class`
 - Signature: `CapabilityRegistry`
-- Source: [src/capabilities/router.ts:82](../../../packages/materials/src/capabilities/router.ts:82)
+- Source: [src/capabilities/router.ts:85](../../../packages/materials/src/capabilities/router.ts:85)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: capability registry class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -90,7 +90,7 @@
 ### ProofBladeCapabilityRouter
 - Kind: `class`
 - Signature: `ProofBladeCapabilityRouter`
-- Source: [src/capabilities/router.ts:106](../../../packages/materials/src/capabilities/router.ts:106)
+- Source: [src/capabilities/router.ts:109](../../../packages/materials/src/capabilities/router.ts:109)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: proof blade capability router class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -303,7 +303,7 @@
 ### ControlStore
 - Kind: `class`
 - Signature: `ControlStore`
-- Source: [src/control/control-store.ts:224](../../../packages/materials/src/control/control-store.ts:224)
+- Source: [src/control/control-store.ts:227](../../../packages/materials/src/control/control-store.ts:227)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: control store class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -489,7 +489,7 @@
 ### RunEventIngress
 - Kind: `class`
 - Signature: `RunEventIngress`
-- Source: [src/orchestration/event-ingress.ts:47](../../../packages/materials/src/orchestration/event-ingress.ts:47)
+- Source: [src/orchestration/event-ingress.ts:53](../../../packages/materials/src/orchestration/event-ingress.ts:53)
 - Export: `@proofblade/materials`
 - Summary: Durable ingress adapter for user, provider, Job and maintenance signals.
 - Summary source: `tsdoc`
@@ -1285,7 +1285,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:959](../../../packages/materials/src/runtime/coding-resources.ts:959)
+- Source: [src/runtime/coding-resources.ts:1038](../../../packages/materials/src/runtime/coding-resources.ts:1038)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -1670,7 +1670,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2023](../../../packages/materials/src/control/control-store.ts:2023)
+- Source: [src/control/control-store.ts:2079](../../../packages/materials/src/control/control-store.ts:2079)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1704,7 +1704,7 @@
 ### projectionHash
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot): string`
-- Source: [src/control/reducer.ts:953](../../../packages/materials/src/control/reducer.ts:953)
+- Source: [src/control/reducer.ts:957](../../../packages/materials/src/control/reducer.ts:957)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: projection hash operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2578,7 +2578,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1119](../../../packages/materials/src/runtime/coding-lane.ts:1119)
+- Source: [src/runtime/coding-lane.ts:1124](../../../packages/materials/src/runtime/coding-lane.ts:1124)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -2587,7 +2587,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1186](../../../packages/materials/src/runtime/coding-lane.ts:1186)
+- Source: [src/runtime/coding-lane.ts:1191](../../../packages/materials/src/runtime/coding-lane.ts:1191)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2596,7 +2596,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:851](../../../packages/materials/src/runtime/coding-lane.ts:851)
+- Source: [src/runtime/coding-lane.ts:856](../../../packages/materials/src/runtime/coding-lane.ts:856)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -2605,7 +2605,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:941](../../../packages/materials/src/runtime/coding-lane.ts:941)
+- Source: [src/runtime/coding-lane.ts:946](../../../packages/materials/src/runtime/coding-lane.ts:946)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2614,7 +2614,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:1011](../../../packages/materials/src/runtime/coding-lane.ts:1011)
+- Source: [src/runtime/coding-lane.ts:1016](../../../packages/materials/src/runtime/coding-lane.ts:1016)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -2623,7 +2623,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1006](../../../packages/materials/src/runtime/coding-lane.ts:1006)
+- Source: [src/runtime/coding-lane.ts:1011](../../../packages/materials/src/runtime/coding-lane.ts:1011)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -2632,7 +2632,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1061](../../../packages/materials/src/runtime/coding-resources.ts:1061)
+- Source: [src/runtime/coding-resources.ts:1140](../../../packages/materials/src/runtime/coding-resources.ts:1140)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2641,7 +2641,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:878](../../../packages/materials/src/runtime/coding-resources.ts:878)
+- Source: [src/runtime/coding-resources.ts:957](../../../packages/materials/src/runtime/coding-resources.ts:957)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2650,7 +2650,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:895](../../../packages/materials/src/runtime/coding-resources.ts:895)
+- Source: [src/runtime/coding-resources.ts:974](../../../packages/materials/src/runtime/coding-resources.ts:974)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2659,7 +2659,7 @@
 ### codingToolCatalog
 - Kind: `function`
 - Signature: `(): CodingToolCatalogEntry[]`
-- Source: [src/runtime/coding-resources.ts:134](../../../packages/materials/src/runtime/coding-resources.ts:134)
+- Source: [src/runtime/coding-resources.ts:136](../../../packages/materials/src/runtime/coding-resources.ts:136)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2667,7 +2667,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:259](../../../packages/materials/src/runtime/coding-resources.ts:259)
+- Source: [src/runtime/coding-resources.ts:261](../../../packages/materials/src/runtime/coding-resources.ts:261)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2676,7 +2676,7 @@
 ### createCodingTools
 - Kind: `function`
 - Signature: `(options?: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): AgentHarnessTool<CodingResourceContext>[]`
-- Source: [src/runtime/coding-resources.ts:142](../../../packages/materials/src/runtime/coding-resources.ts:142)
+- Source: [src/runtime/coding-resources.ts:144](../../../packages/materials/src/runtime/coding-resources.ts:144)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create coding tools operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2685,7 +2685,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:175](../../../packages/materials/src/runtime/coding-resources.ts:175)
+- Source: [src/runtime/coding-resources.ts:177](../../../packages/materials/src/runtime/coding-resources.ts:177)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2694,7 +2694,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:973](../../../packages/materials/src/runtime/coding-resources.ts:973)
+- Source: [src/runtime/coding-resources.ts:1052](../../../packages/materials/src/runtime/coding-resources.ts:1052)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2703,7 +2703,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1045](../../../packages/materials/src/runtime/coding-resources.ts:1045)
+- Source: [src/runtime/coding-resources.ts:1124](../../../packages/materials/src/runtime/coding-resources.ts:1124)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -2712,7 +2712,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1035](../../../packages/materials/src/runtime/coding-resources.ts:1035)
+- Source: [src/runtime/coding-resources.ts:1114](../../../packages/materials/src/runtime/coding-resources.ts:1114)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -2721,7 +2721,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:162](../../../packages/materials/src/runtime/coding-resources.ts:162)
+- Source: [src/runtime/coding-resources.ts:164](../../../packages/materials/src/runtime/coding-resources.ts:164)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -2729,11 +2729,19 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:233](../../../packages/materials/src/runtime/coding-resources.ts:233)
+- Source: [src/runtime/coding-resources.ts:235](../../../packages/materials/src/runtime/coding-resources.ts:235)
 - Export: `@proofblade/materials`
 - Summary: Keep decompiler schemas out of unrelated challenge contexts. The generic
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/coding-resources.test.ts`
+
+### stopAllShellJobs
+- Kind: `function`
+- Signature: `(context: CodingResourceContext): Promise<void>`
+- Source: [src/runtime/coding-resources.ts:840](../../../packages/materials/src/runtime/coding-resources.ts:840)
+- Export: `@proofblade/materials`
+- Summary: Stop every current-generation shell job owned by this lane during teardown.
+- Summary source: `tsdoc`
 
 ### reconcileRuntimeConfig
 - Kind: `function`
@@ -3548,7 +3556,7 @@
 ### CapabilityDiscoveryInput
 - Kind: `interface`
 - Signature: `CapabilityDiscoveryInput`
-- Source: [src/capabilities/router.ts:47](../../../packages/materials/src/capabilities/router.ts:47)
+- Source: [src/capabilities/router.ts:50](../../../packages/materials/src/capabilities/router.ts:50)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: capability discovery input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3556,7 +3564,7 @@
 ### CapabilityDiscoveryResult
 - Kind: `interface`
 - Signature: `CapabilityDiscoveryResult`
-- Source: [src/capabilities/router.ts:74](../../../packages/materials/src/capabilities/router.ts:74)
+- Source: [src/capabilities/router.ts:77](../../../packages/materials/src/capabilities/router.ts:77)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: capability discovery result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3572,7 +3580,7 @@
 ### CapabilityInvocationResult
 - Kind: `interface`
 - Signature: `CapabilityInvocationResult`
-- Source: [src/capabilities/router.ts:17](../../../packages/materials/src/capabilities/router.ts:17)
+- Source: [src/capabilities/router.ts:20](../../../packages/materials/src/capabilities/router.ts:20)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: capability invocation result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3580,7 +3588,7 @@
 ### CapabilityOperationDiscovery
 - Kind: `interface`
 - Signature: `CapabilityOperationDiscovery`
-- Source: [src/capabilities/router.ts:55](../../../packages/materials/src/capabilities/router.ts:55)
+- Source: [src/capabilities/router.ts:58](../../../packages/materials/src/capabilities/router.ts:58)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: capability operation discovery type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3588,7 +3596,7 @@
 ### PersistedCapabilityInvocation
 - Kind: `interface`
 - Signature: `PersistedCapabilityInvocation`
-- Source: [src/capabilities/router.ts:39](../../../packages/materials/src/capabilities/router.ts:39)
+- Source: [src/capabilities/router.ts:42](../../../packages/materials/src/capabilities/router.ts:42)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: persisted capability invocation type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5689,9 +5697,17 @@
 ### RunEventDrainResult
 - Kind: `interface`
 - Signature: `RunEventDrainResult`
-- Source: [src/orchestration/event-ingress.ts:32](../../../packages/materials/src/orchestration/event-ingress.ts:32)
+- Source: [src/orchestration/event-ingress.ts:34](../../../packages/materials/src/orchestration/event-ingress.ts:34)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run event drain result type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### RunEventIngressOptions
+- Kind: `interface`
+- Signature: `RunEventIngressOptions`
+- Source: [src/orchestration/event-ingress.ts:44](../../../packages/materials/src/orchestration/event-ingress.ts:44)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: run event ingress options type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### RunEventInput
@@ -6428,7 +6444,7 @@
 ### CodingToolCatalogEntry
 - Kind: `interface`
 - Signature: `CodingToolCatalogEntry`
-- Source: [src/runtime/coding-resources.ts:128](../../../packages/materials/src/runtime/coding-resources.ts:128)
+- Source: [src/runtime/coding-resources.ts:130](../../../packages/materials/src/runtime/coding-resources.ts:130)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog entry type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7698,7 +7714,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resolve operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityBackendResolver.statuses
 - Kind: `method`
@@ -8039,7 +8055,7 @@
 - Export: `@proofblade/materials`
 - Summary: Existing bindings remain readable while their provider is quiescing.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityLifecycleRegistry.snapshotHash
 - Kind: `method`
@@ -8070,7 +8086,7 @@
 ### CapabilityRegistry.catalogHash
 - Kind: `method`
 - Signature: `(): string`
-- Source: [src/capabilities/router.ts:93](../../../packages/materials/src/capabilities/router.ts:93)
+- Source: [src/capabilities/router.ts:96](../../../packages/materials/src/capabilities/router.ts:96)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: catalog hash operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -8079,7 +8095,7 @@
 ### CapabilityRegistry.find
 - Kind: `method`
 - Signature: `(capabilityId: string, operationName: string): { manifest: CapabilityManifest; operation: CapabilityOperationAtom; }`
-- Source: [src/capabilities/router.ts:97](../../../packages/materials/src/capabilities/router.ts:97)
+- Source: [src/capabilities/router.ts:100](../../../packages/materials/src/capabilities/router.ts:100)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: find operation used to read or inspect state.
 - Summary source: `inferred`
@@ -8088,7 +8104,7 @@
 ### CapabilityRegistry.list
 - Kind: `method`
 - Signature: `(): CapabilityManifest[]`
-- Source: [src/capabilities/router.ts:89](../../../packages/materials/src/capabilities/router.ts:89)
+- Source: [src/capabilities/router.ts:92](../../../packages/materials/src/capabilities/router.ts:92)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -8097,7 +8113,7 @@
 ### ProofBladeCapabilityRouter.describe
 - Kind: `method`
 - Signature: `(capabilityId: string, operationName: string): CapabilityOperationAtom`
-- Source: [src/capabilities/router.ts:122](../../../packages/materials/src/capabilities/router.ts:122)
+- Source: [src/capabilities/router.ts:125](../../../packages/materials/src/capabilities/router.ts:125)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: describe operation used to read or inspect state.
 - Summary source: `inferred`
@@ -8106,7 +8122,7 @@
 ### ProofBladeCapabilityRouter.discover
 - Kind: `method`
 - Signature: `(input?: CapabilityDiscoveryInput): CapabilityDiscoveryResult`
-- Source: [src/capabilities/router.ts:126](../../../packages/materials/src/capabilities/router.ts:126)
+- Source: [src/capabilities/router.ts:129](../../../packages/materials/src/capabilities/router.ts:129)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: discover operation used to read or inspect state.
 - Summary source: `inferred`
@@ -8115,7 +8131,7 @@
 ### ProofBladeCapabilityRouter.invoke
 - Kind: `method`
 - Signature: `(request: CapabilityInvocation, signal?: AbortSignal): Promise<CapabilityInvocationResult>`
-- Source: [src/capabilities/router.ts:187](../../../packages/materials/src/capabilities/router.ts:187)
+- Source: [src/capabilities/router.ts:190](../../../packages/materials/src/capabilities/router.ts:190)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: invoke operation used to perform a durable write.
 - Summary source: `inferred`
@@ -8124,7 +8140,7 @@
 ### ProofBladeCapabilityRouter.listCapabilities
 - Kind: `method`
 - Signature: `(): { catalogHash: string; capabilities: CapabilityManifest[]; backends: CapabilityBackendStatus[]; }`
-- Source: [src/capabilities/router.ts:118](../../../packages/materials/src/capabilities/router.ts:118)
+- Source: [src/capabilities/router.ts:121](../../../packages/materials/src/capabilities/router.ts:121)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list capabilities operation used to read or inspect state.
 - Summary source: `inferred`
@@ -8133,7 +8149,7 @@
 ### ProofBladeCapabilityRouter.preparePersistence
 - Kind: `method`
 - Signature: `(request: CapabilityInvocation): PersistedCapabilityInvocation`
-- Source: [src/capabilities/router.ts:175](../../../packages/materials/src/capabilities/router.ts:175)
+- Source: [src/capabilities/router.ts:178](../../../packages/materials/src/capabilities/router.ts:178)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prepare persistence operation used to perform a durable write.
 - Summary source: `inferred`
@@ -8142,7 +8158,7 @@
 ### ProofBladeCapabilityRouter.resolveInvocationPolicy
 - Kind: `method`
 - Signature: `(request: CapabilityInvocation): CapabilityOperationAtom`
-- Source: [src/capabilities/router.ts:171](../../../packages/materials/src/capabilities/router.ts:171)
+- Source: [src/capabilities/router.ts:174](../../../packages/materials/src/capabilities/router.ts:174)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resolve invocation policy operation used to perform a durable write.
 - Summary source: `inferred`
@@ -8698,7 +8714,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: solve operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/dependency-funnel.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-transport.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DockerContainerResourceAdapter.adopt
 - Kind: `method`
@@ -9043,7 +9059,7 @@
 ### ControlStore.#commitCommands
 - Kind: `method`
 - Signature: `(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>`
-- Source: [src/control/control-store.ts:502](../../../packages/materials/src/control/control-store.ts:502)
+- Source: [src/control/control-store.ts:552](../../../packages/materials/src/control/control-store.ts:552)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #commit commands operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9051,7 +9067,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:594](../../../packages/materials/src/control/control-store.ts:594)
+- Source: [src/control/control-store.ts:644](../../../packages/materials/src/control/control-store.ts:644)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9059,7 +9075,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:628](../../../packages/materials/src/control/control-store.ts:628)
+- Source: [src/control/control-store.ts:678](../../../packages/materials/src/control/control-store.ts:678)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9067,7 +9083,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:609](../../../packages/materials/src/control/control-store.ts:609)
+- Source: [src/control/control-store.ts:659](../../../packages/materials/src/control/control-store.ts:659)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9075,7 +9091,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:571](../../../packages/materials/src/control/control-store.ts:571)
+- Source: [src/control/control-store.ts:621](../../../packages/materials/src/control/control-store.ts:621)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9083,7 +9099,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:539](../../../packages/materials/src/control/control-store.ts:539)
+- Source: [src/control/control-store.ts:589](../../../packages/materials/src/control/control-store.ts:589)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9091,7 +9107,7 @@
 ### ControlStore.#migrateLegacyRunBestEffort
 - Kind: `method`
 - Signature: `(runId: string): Promise<void>`
-- Source: [src/control/control-store.ts:274](../../../packages/materials/src/control/control-store.ts:274)
+- Source: [src/control/control-store.ts:277](../../../packages/materials/src/control/control-store.ts:277)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #migrate legacy run best effort operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9099,7 +9115,7 @@
 ### ControlStore.#withWrite
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:497](../../../packages/materials/src/control/control-store.ts:497)
+- Source: [src/control/control-store.ts:547](../../../packages/materials/src/control/control-store.ts:547)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #with write operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9107,7 +9123,7 @@
 ### ControlStore.acknowledgeObservations
 - Kind: `method`
 - Signature: `(runId: string, observationIds: readonly string[], lane?: Lane): Promise<string[]>`
-- Source: [src/control/control-store.ts:359](../../../packages/materials/src/control/control-store.ts:359)
+- Source: [src/control/control-store.ts:409](../../../packages/materials/src/control/control-store.ts:409)
 - Export: `@proofblade/materials`
 - Summary: Atomically acknowledge model-visible observations. Queue state is derived
 - Summary source: `tsdoc`
@@ -9115,7 +9131,7 @@
 ### ControlStore.append
 - Kind: `method`
 - Signature: `(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:441](../../../packages/materials/src/control/control-store.ts:441)
+- Source: [src/control/control-store.ts:491](../../../packages/materials/src/control/control-store.ts:491)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: append operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9124,7 +9140,7 @@
 ### ControlStore.appendIngressReceived
 - Kind: `method`
 - Signature: `(runId: string, input: { envelope: RunEventEnvelope; payload?: Record<string, unknown>; }): Promise<RunEventEnvelope>`
-- Source: [src/control/control-store.ts:322](../../../packages/materials/src/control/control-store.ts:322)
+- Source: [src/control/control-store.ts:372](../../../packages/materials/src/control/control-store.ts:372)
 - Export: `@proofblade/materials`
 - Summary: Append one received ingress event with idempotency checked inside the Run
 - Summary source: `tsdoc`
@@ -9132,15 +9148,23 @@
 ### ControlStore.claimIngress
 - Kind: `method`
 - Signature: `(runId: string, claims: readonly IngressClaim[]): Promise<IngressClaim[]>`
-- Source: [src/control/control-store.ts:289](../../../packages/materials/src/control/control-store.ts:289)
+- Source: [src/control/control-store.ts:292](../../../packages/materials/src/control/control-store.ts:292)
 - Export: `@proofblade/materials`
 - Summary: Atomically claim ingress events under the same Run lock used by writes.
+- Summary source: `tsdoc`
+
+### ControlStore.completeIngress
+- Kind: `method`
+- Signature: `(runId: string, input: { ingressId: string; claimToken: string; status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">; safePoint?: string; reason?: string; }): Promise<void>`
+- Source: [src/control/control-store.ts:335](../../../packages/materials/src/control/control-store.ts:335)
+- Export: `@proofblade/materials`
+- Summary: Complete a previously claimed ingress action after its side effect ran.
 - Summary source: `tsdoc`
 
 ### ControlStore.create
 - Kind: `method`
 - Signature: `(eventStore: JsonlControlStore, versionProvider?: () => Promise<RunVersionSnapshot>, authoritySecret?: string): ControlPlane`
-- Source: [src/control/control-store.ts:229](../../../packages/materials/src/control/control-store.ts:229)
+- Source: [src/control/control-store.ts:232](../../../packages/materials/src/control/control-store.ts:232)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9149,7 +9173,7 @@
 ### ControlStore.createRun
 - Kind: `method`
 - Signature: `(runId: string, task: TaskContract): Promise<RunSnapshot>`
-- Source: [src/control/control-store.ts:257](../../../packages/materials/src/control/control-store.ts:257)
+- Source: [src/control/control-store.ts:260](../../../packages/materials/src/control/control-store.ts:260)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9158,7 +9182,7 @@
 ### ControlStore.dispatch
 - Kind: `method`
 - Signature: `(runId: string, command: DomainCommand): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:400](../../../packages/materials/src/control/control-store.ts:400)
+- Source: [src/control/control-store.ts:450](../../../packages/materials/src/control/control-store.ts:450)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9167,7 +9191,7 @@
 ### ControlStore.dispatchBatch
 - Kind: `method`
 - Signature: `(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:404](../../../packages/materials/src/control/control-store.ts:404)
+- Source: [src/control/control-store.ts:454](../../../packages/materials/src/control/control-store.ts:454)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch batch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9176,7 +9200,7 @@
 ### ControlStore.dispatchBindingTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>`
-- Source: [src/control/control-store.ts:429](../../../packages/materials/src/control/control-store.ts:429)
+- Source: [src/control/control-store.ts:479](../../../packages/materials/src/control/control-store.ts:479)
 - Export: `@proofblade/materials`
 - Summary: Commit the final Control Store fence for a broker-owned session binding.
 - Summary source: `tsdoc`
@@ -9185,7 +9209,7 @@
 ### ControlStore.dispatchTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>`
-- Source: [src/control/control-store.ts:412](../../../packages/materials/src/control/control-store.ts:412)
+- Source: [src/control/control-store.ts:462](../../../packages/materials/src/control/control-store.ts:462)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch transaction operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9194,7 +9218,7 @@
 ### ControlStore.events
 - Kind: `method`
 - Signature: `(runId: string): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:284](../../../packages/materials/src/control/control-store.ts:284)
+- Source: [src/control/control-store.ts:287](../../../packages/materials/src/control/control-store.ts:287)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: events operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9203,7 +9227,7 @@
 ### ControlStore.reconcileProjection
 - Kind: `method`
 - Signature: `(runId: string): Promise<{ repaired: boolean; replayHash: string; }>`
-- Source: [src/control/control-store.ts:476](../../../packages/materials/src/control/control-store.ts:476)
+- Source: [src/control/control-store.ts:526](../../../packages/materials/src/control/control-store.ts:526)
 - Export: `@proofblade/materials`
 - Summary: Rebuild the materialized projection after a process interruption. The
 - Summary source: `tsdoc`
@@ -9212,7 +9236,7 @@
 ### ControlStore.replay
 - Kind: `method`
 - Signature: `(runId: string): Promise<RunSnapshot>`
-- Source: [src/control/control-store.ts:269](../../../packages/materials/src/control/control-store.ts:269)
+- Source: [src/control/control-store.ts:272](../../../packages/materials/src/control/control-store.ts:272)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: replay operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9221,7 +9245,7 @@
 ### ControlStore.runHash
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/control/control-store.ts:465](../../../packages/materials/src/control/control-store.ts:465)
+- Source: [src/control/control-store.ts:515](../../../packages/materials/src/control/control-store.ts:515)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run hash operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9230,7 +9254,7 @@
 ### ControlStore.snapshot
 - Kind: `method`
 - Signature: `(runId: string): Promise<RunSnapshot>`
-- Source: [src/control/control-store.ts:264](../../../packages/materials/src/control/control-store.ts:264)
+- Source: [src/control/control-store.ts:267](../../../packages/materials/src/control/control-store.ts:267)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9239,7 +9263,7 @@
 ### ControlStore.waitForEvents
 - Kind: `method`
 - Signature: `(runId: string, afterSeq: number, timeoutMs?: number): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:350](../../../packages/materials/src/control/control-store.ts:350)
+- Source: [src/control/control-store.ts:400](../../../packages/materials/src/control/control-store.ts:400)
 - Export: `@proofblade/materials`
 - Summary: Wait for a durable event so long-running tools do not replay the full Run in a polling loop.
 - Summary source: `tsdoc`
@@ -9247,7 +9271,7 @@
 ### ControlStore.withConsolidationLock
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: () => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:396](../../../packages/materials/src/control/control-store.ts:396)
+- Source: [src/control/control-store.ts:446](../../../packages/materials/src/control/control-store.ts:446)
 - Export: `@proofblade/materials`
 - Summary: Serialize slow, replay-safe maintenance operations for one Run.
 - Summary source: `tsdoc`
@@ -9580,7 +9604,7 @@
 ### BackgroundJobRunner.cancel
 - Kind: `method`
 - Signature: `(jobId: string, reason?: string): Promise<JobRecord>`
-- Source: [src/jobs/background-runner.ts:99](../../../packages/materials/src/jobs/background-runner.ts:99)
+- Source: [src/jobs/background-runner.ts:104](../../../packages/materials/src/jobs/background-runner.ts:104)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: cancel operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9589,7 +9613,7 @@
 ### BackgroundJobRunner.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/jobs/background-runner.ts:230](../../../packages/materials/src/jobs/background-runner.ts:230)
+- Source: [src/jobs/background-runner.ts:244](../../../packages/materials/src/jobs/background-runner.ts:244)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9598,7 +9622,7 @@
 ### BackgroundJobRunner.monitor
 - Kind: `method`
 - Signature: `(jobId: string, input?: JobMonitorInput): Promise<JobMonitorResult>`
-- Source: [src/jobs/background-runner.ts:183](../../../packages/materials/src/jobs/background-runner.ts:183)
+- Source: [src/jobs/background-runner.ts:197](../../../packages/materials/src/jobs/background-runner.ts:197)
 - Export: `@proofblade/materials`
 - Summary: Wait for a durable job signal instead of making the model poll in a loop.
 - Summary source: `tsdoc`
@@ -9616,7 +9640,7 @@
 ### BackgroundJobRunner.readOutput
 - Kind: `method`
 - Signature: `(jobId: string, maxChars?: number): Promise<JobOutput>`
-- Source: [src/jobs/background-runner.ts:161](../../../packages/materials/src/jobs/background-runner.ts:161)
+- Source: [src/jobs/background-runner.ts:175](../../../packages/materials/src/jobs/background-runner.ts:175)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read output operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9624,7 +9648,7 @@
 ### BackgroundJobRunner.recover
 - Kind: `method`
 - Signature: `(now?: number): Promise<JobRecord[]>`
-- Source: [src/jobs/background-runner.ts:109](../../../packages/materials/src/jobs/background-runner.ts:109)
+- Source: [src/jobs/background-runner.ts:118](../../../packages/materials/src/jobs/background-runner.ts:118)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: recover operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9642,7 +9666,7 @@
 ### BackgroundJobRunner.stopAll
 - Kind: `method`
 - Signature: `(reason?: string): Promise<void>`
-- Source: [src/jobs/background-runner.ts:226](../../../packages/materials/src/jobs/background-runner.ts:226)
+- Source: [src/jobs/background-runner.ts:240](../../../packages/materials/src/jobs/background-runner.ts:240)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: stop all operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9650,7 +9674,7 @@
 ### BackgroundJobRunner.wait
 - Kind: `method`
 - Signature: `(jobId: string, timeoutMs?: number): Promise<JobRecord>`
-- Source: [src/jobs/background-runner.ts:172](../../../packages/materials/src/jobs/background-runner.ts:172)
+- Source: [src/jobs/background-runner.ts:186](../../../packages/materials/src/jobs/background-runner.ts:186)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: wait operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10010,10 +10034,19 @@
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/workspace-search.test.ts`
 
+### RunEventIngress.complete
+- Kind: `method`
+- Signature: `(runId: string, action: Pick<RunEventAction, "ingressId" | "claimToken" | "leaseExpiresAt">, status: "applied" | "failed" | "coalesced", reason?: string): Promise<void>`
+- Source: [src/orchestration/event-ingress.ts:154](../../../packages/materials/src/orchestration/event-ingress.ts:154)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: complete operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-retry-harness.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-evaluation-gates.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/workspace-search.test.ts`
+
 ### RunEventIngress.drain
 - Kind: `method`
 - Signature: `(runId: string, safePoint: SafePoint, maxEvents?: number): Promise<RunEventDrainResult>`
-- Source: [src/orchestration/event-ingress.ts:82](../../../packages/materials/src/orchestration/event-ingress.ts:82)
+- Source: [src/orchestration/event-ingress.ts:92](../../../packages/materials/src/orchestration/event-ingress.ts:92)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: drain operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10022,7 +10055,7 @@
 ### RunEventIngress.enqueue
 - Kind: `method`
 - Signature: `(runId: string, input: RunEventInput): Promise<RunEventEnvelope>`
-- Source: [src/orchestration/event-ingress.ts:50](../../../packages/materials/src/orchestration/event-ingress.ts:50)
+- Source: [src/orchestration/event-ingress.ts:60](../../../packages/materials/src/orchestration/event-ingress.ts:60)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: enqueue operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10236,7 +10269,7 @@
 ### RunCoordinator.block
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:124](../../../packages/materials/src/orchestration/run-coordinator.ts:124)
+- Source: [src/orchestration/run-coordinator.ts:135](../../../packages/materials/src/orchestration/run-coordinator.ts:135)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: block operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10245,7 +10278,7 @@
 ### RunCoordinator.blockAndQueue
 - Kind: `method`
 - Signature: `(runId: string, task: TaskContract, workItemId: string | undefined, reason: string, category?: PrimaryFailureCategory): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:128](../../../packages/materials/src/orchestration/run-coordinator.ts:128)
+- Source: [src/orchestration/run-coordinator.ts:139](../../../packages/materials/src/orchestration/run-coordinator.ts:139)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: block and queue operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10254,16 +10287,24 @@
 ### RunCoordinator.claim
 - Kind: `method`
 - Signature: `(runId: string, task: TaskContract, turn: number, intent?: SchedulerIntent): Promise<WorkItem>`
-- Source: [src/orchestration/run-coordinator.ts:112](../../../packages/materials/src/orchestration/run-coordinator.ts:112)
+- Source: [src/orchestration/run-coordinator.ts:123](../../../packages/materials/src/orchestration/run-coordinator.ts:123)
 - Export: `@proofblade/materials`
 - Summary: Claim one durable executor WorkItem for a model turn.
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/outcome-envelope.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
+### RunCoordinator.completeEvent
+- Kind: `method`
+- Signature: `(runId: string, action: RunEventDrainResult["admitted"][number], status?: "applied" | "failed" | "coalesced", reason?: string): Promise<void>`
+- Source: [src/orchestration/run-coordinator.ts:78](../../../packages/materials/src/orchestration/run-coordinator.ts:78)
+- Export: `@proofblade/materials`
+- Summary: Complete a non-user ingress action after the owning lane applies it.
+- Summary source: `tsdoc`
+
 ### RunCoordinator.domainPhaseForTurn
 - Kind: `method`
 - Signature: `(turn: number): DomainPhase`
-- Source: [src/orchestration/run-coordinator.ts:97](../../../packages/materials/src/orchestration/run-coordinator.ts:97)
+- Source: [src/orchestration/run-coordinator.ts:108](../../../packages/materials/src/orchestration/run-coordinator.ts:108)
 - Export: `@proofblade/materials`
 - Summary: Select the durable investigation phase for a bounded model turn.
 - Summary source: `tsdoc`
@@ -10289,7 +10330,7 @@
 ### RunCoordinator.fail
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:120](../../../packages/materials/src/orchestration/run-coordinator.ts:120)
+- Source: [src/orchestration/run-coordinator.ts:131](../../../packages/materials/src/orchestration/run-coordinator.ts:131)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fail operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10298,7 +10339,7 @@
 ### RunCoordinator.finishAccepted
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, completionId: string, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:153](../../../packages/materials/src/orchestration/run-coordinator.ts:153)
+- Source: [src/orchestration/run-coordinator.ts:164](../../../packages/materials/src/orchestration/run-coordinator.ts:164)
 - Export: `@proofblade/materials`
 - Summary: Commit an already verifier-accepted completion.  The WorkItem and domain
 - Summary source: `tsdoc`
@@ -10307,7 +10348,7 @@
 ### RunCoordinator.moveToPhase
 - Kind: `method`
 - Signature: `(runId: string, phase: Phase): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:89](../../../packages/materials/src/orchestration/run-coordinator.ts:89)
+- Source: [src/orchestration/run-coordinator.ts:100](../../../packages/materials/src/orchestration/run-coordinator.ts:100)
 - Export: `@proofblade/materials`
 - Summary: Advance the generic Run phase through the legal transition path.
 - Summary source: `tsdoc`
@@ -10315,7 +10356,7 @@
 ### RunCoordinator.recordToolPreparation
 - Kind: `method`
 - Signature: `(runId: string, preparation: RunToolPreparation): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:105](../../../packages/materials/src/orchestration/run-coordinator.ts:105)
+- Source: [src/orchestration/run-coordinator.ts:116](../../../packages/materials/src/orchestration/run-coordinator.ts:116)
 - Export: `@proofblade/materials`
 - Summary: Persist the bounded tool readiness snapshot before a model turn.
 - Summary source: `tsdoc`
@@ -10323,7 +10364,7 @@
 ### RunCoordinator.setDomainPhase
 - Kind: `method`
 - Signature: `(runId: string, domainPhase: DomainPhase): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:72](../../../packages/materials/src/orchestration/run-coordinator.ts:72)
+- Source: [src/orchestration/run-coordinator.ts:83](../../../packages/materials/src/orchestration/run-coordinator.ts:83)
 - Export: `@proofblade/materials`
 - Summary: Move the durable competition projection, tolerating an idempotent race.
 - Summary source: `tsdoc`
@@ -10332,7 +10373,7 @@
 ### RunCoordinator.settle
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, progressed: boolean, evidenceIds?: string[], artifactIds?: string[]): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:116](../../../packages/materials/src/orchestration/run-coordinator.ts:116)
+- Source: [src/orchestration/run-coordinator.ts:127](../../../packages/materials/src/orchestration/run-coordinator.ts:127)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: settle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10341,7 +10382,7 @@
 ### RunCoordinator.verifyCompletion
 - Kind: `method`
 - Signature: `(runId: string, fixture: FixtureRef, completionId: string, signal?: AbortSignal): Promise<VerificationOutcome>`
-- Source: [src/orchestration/run-coordinator.ts:136](../../../packages/materials/src/orchestration/run-coordinator.ts:136)
+- Source: [src/orchestration/run-coordinator.ts:147](../../../packages/materials/src/orchestration/run-coordinator.ts:147)
 - Export: `@proofblade/materials`
 - Summary: Start the reproduction phase and run the independent verifier.  A model
 - Summary source: `tsdoc`
@@ -11087,7 +11128,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: action operation used to validate input or state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### HttpSessionRuntimeBroker.adopt
 - Kind: `method`
@@ -11280,7 +11321,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:779](../../../packages/materials/src/runtime/coding-lane.ts:779)
+- Source: [src/runtime/coding-lane.ts:783](../../../packages/materials/src/runtime/coding-lane.ts:783)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11289,7 +11330,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:791](../../../packages/materials/src/runtime/coding-lane.ts:791)
+- Source: [src/runtime/coding-lane.ts:795](../../../packages/materials/src/runtime/coding-lane.ts:795)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11298,7 +11339,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:783](../../../packages/materials/src/runtime/coding-lane.ts:783)
+- Source: [src/runtime/coding-lane.ts:787](../../../packages/materials/src/runtime/coding-lane.ts:787)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11307,7 +11348,7 @@
 ### PiCodingLane.create
 - Kind: `method`
 - Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
-- Source: [src/runtime/coding-lane.ts:113](../../../packages/materials/src/runtime/coding-lane.ts:113)
+- Source: [src/runtime/coding-lane.ts:115](../../../packages/materials/src/runtime/coding-lane.ts:115)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -11316,7 +11357,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:787](../../../packages/materials/src/runtime/coding-lane.ts:787)
+- Source: [src/runtime/coding-lane.ts:791](../../../packages/materials/src/runtime/coding-lane.ts:791)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11325,7 +11366,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:701](../../../packages/materials/src/runtime/coding-lane.ts:701)
+- Source: [src/runtime/coding-lane.ts:705](../../../packages/materials/src/runtime/coding-lane.ts:705)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12422,7 +12463,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: action operation used to produce a deterministic value.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/runtime-preflight.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### HttpBrowserRuntimeContextPort.bind
 - Kind: `method`
@@ -13273,7 +13314,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: lane type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### Phase
 - Kind: `type`

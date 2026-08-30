@@ -186,7 +186,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const task = fixtureTask(runId, "reverse-strings-1", root, config);
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
-    const generation = await services.sandbox.reset(fixture);
+    let generation = await services.sandbox.reset(fixture);
     await services.fixtureControl.reset(runId, generation);
     runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
@@ -233,6 +233,20 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const snapshot = await services.control.snapshot(runId);
     assert.equal(snapshot.jobs["J-RECOVER"]?.status, "SUCCEEDED");
     assert.equal((await services.control.replay(runId)).jobs["J-RECOVER"]?.status, "SUCCEEDED");
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-STALE-RECOVER", capabilityId: "proofblade.target", operation: "list", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation: snapshot.generation },
+      lane: "executor",
+    });
+    const nextGeneration = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, nextGeneration);
+    generation = nextGeneration;
+    await runtime.recoverJobs();
+    const staleRecovered = await runtime.jobStatus("J-STALE-RECOVER");
+    assert.equal(staleRecovered.status, "UNKNOWN");
+    assert.match(staleRecovered.error ?? "", /belongs to generation/);
+    assert.equal((await services.control.events(runId)).filter((event) => event.type === "job_started" && event.payload.jobId === "J-STALE-RECOVER").length, 0);
 
     await services.control.dispatch(runId, {
       type: "job_queued",

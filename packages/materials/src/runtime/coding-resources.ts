@@ -20,7 +20,7 @@ import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.j
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
-import type { RawEffectResult, TargetKind } from "../domain/types.js";
+import type { Lane, RawEffectResult, TargetKind } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
@@ -62,6 +62,8 @@ export interface CodingFlagSubmission {
 }
 
 export interface CodingResourceContext extends ExecutionToolContext {
+  /** Durable owner identity for lane-scoped shell process records. */
+  ownerLane?: Lane;
   controlStore: ControlStore;
   artifactStore: ArtifactStore;
   skills: ProofBladeSkillRegistry;
@@ -533,19 +535,35 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     // existing job remains available, but new background work must stop when
     // the durable evidence backlog reaches the hard curation threshold.
     const curationNotice = await context.evidenceCurationGate?.assertInvestigationAllowed();
+    const snapshot = await context.controlStore.snapshot(context.runtime.runId);
     const jobId = `sh-${toolCallId.slice(-8)}`;
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
-    const logPath = `.proofblade/jobs/${jobId}-${slug}.log`;
-    // setsid/nohup keeps the child alive past this tool call; $! is captured
-    // before any other command can overwrite it.
-    // The pid goes to a file rather than being matched later with `pgrep -f`:
-    // the log path is a redirection performed by THIS shell, so it never appears
-    // in the child's argv and pattern-matching for it always misses.
+    const paths = shellJobPaths(context.runtime.runId, snapshot.generation, jobId);
+    const processStartTime = new Date().toISOString();
+    const reservation: ShellJobRecord = {
+      schemaVersion: 1,
+      jobId,
+      runId: context.runtime.runId,
+      generation: snapshot.generation,
+      ownerLane: context.ownerLane ?? "main",
+      pid: 0,
+      processGroupId: 0,
+      processStartTime,
+      processStartEpochMs: Date.now(),
+      logPath: paths.logPath,
+      status: "STARTING",
+      commandHash: sha256(input.command),
+      label: slug,
+      createdAt: processStartTime,
+    };
+    // Write a reservation before spawning. A crash between spawn and the final
+    // metadata write is recovered as UNKNOWN instead of guessed from a PID.
     const launcher = [
-      `mkdir -p .proofblade/jobs`,
-      `nohup bash -c ${shellQuote(input.command)} > ${logPath} 2>&1 &`,
-      `echo $! > ${pidPath(jobId)}`,
-      `echo "pid=$!"`,
+      `mkdir -p ${paths.rootPath}`,
+      `printf %s ${shellQuote(JSON.stringify(reservation))} > ${paths.recordPath}`,
+      `if command -v setsid >/dev/null 2>&1; then setsid nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & else nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & fi`,
+      `p=$!`,
+      `echo "pid=$p"`,
     ].join("\n");
     let started: string;
     try {
@@ -556,11 +574,15 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     }
     const pid = /pid=(\d+)/.exec(started)?.[1];
     if (!pid) throw new Error(`Could not start background job: ${started.slice(0, 400)}`);
+    const record: ShellJobRecord = { ...reservation, pid: Number(pid), processGroupId: Number(pid), status: "RUNNING" };
+    await runShell(`printf %s ${shellQuote(JSON.stringify(record))} > ${paths.recordPath}`, signal, onUpdate, context);
     await context.experimentGate?.record({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label }, outcome: "success", summary: "Background shell process started." });
     return toolResult({
       jobId,
       pid: Number(pid),
-      logPath,
+      logPath: paths.logPath,
+      generation: snapshot.generation,
+      ownerLane: reservation.ownerLane,
       status: "running",
       note: [`Started in the background. Poll with shell_job {"operation":"read","jobId":"${jobId}"} and stop it with {"operation":"stop","jobId":"${jobId}"}. Keep working while it runs.`, ...(curationNotice ? [curationNotice] : [])].join("\n\n"),
     });
@@ -587,35 +609,24 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
     const input = params as { operation: "read" | "monitor" | "stop" | "list"; jobId?: string; maxChars?: number; sinceCursor?: string; triggers?: Array<"new_output" | "keyword" | "exit" | "error" | "heartbeat" | "timeout">; keywords?: string[]; waitMs?: number; heartbeatMs?: number };
     if (input.operation === "list") {
       assertAbsent(input as unknown as Record<string, unknown>, ["jobId", "maxChars", "sinceCursor", "triggers", "keywords", "waitMs", "heartbeatMs"], "shell_job list");
-      const listed = await runShell(`ls -1 .proofblade/jobs/*.log 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
+      const generation = (await context.controlStore.snapshot(context.runtime.runId)).generation;
+      const paths = shellJobPaths(context.runtime.runId, generation);
+      const listed = await runShell(`ls -1 ${paths.rootPath}/*.json 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
       return toolResult({ jobs: listed.trim().split(/\r?\n/).filter(Boolean) });
     }
     if (!input.jobId) throw new Error(`shell_job ${input.operation} requires jobId`);
     if (!/^[A-Za-z0-9._-]+$/.test(input.jobId)) throw new Error("shell_job jobId contains unsupported characters");
+    const generation = (await context.controlStore.snapshot(context.runtime.runId)).generation;
     if (input.operation === "stop") {
-      // Kill the recorded pid AND its children: the pid is a `bash -c` wrapper, and
-      // the work (a sweep, a fuzzer) usually lives in a child of it.
-      const stopped = await runShell(
-        [
-          `p=$(cat ${pidPath(input.jobId)} 2>/dev/null)`,
-          `if [ -z "$p" ]; then echo "__NO_JOB__"; else`,
-          `pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null`,
-          `sleep 0.3`,
-          `if kill -0 "$p" 2>/dev/null; then pkill -9 -P "$p" 2>/dev/null; kill -9 "$p" 2>/dev/null; sleep 0.2; fi`,
-          `if kill -0 "$p" 2>/dev/null; then echo "still-alive"; else echo stopped; fi; fi`,
-        ].join("\n"),
-        signal,
-        onUpdate,
-        context,
-      );
-      if (stopped.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${input.jobId}`);
+      const stopped = await stopShellJob(shellJobPaths(context.runtime.runId, generation, input.jobId), context.runtime.runId, generation, context.ownerLane ?? "main", signal, onUpdate, context);
+      if (stopped.includes("__NO_JOB__") || stopped.includes("__UNKNOWN_JOB__")) throw new Error(`Background job ${input.jobId} is unknown or belongs to another Run/lane`);
       const observationId = await recordShellJobObservation(context, input.jobId, { status: "finished", cursor: 0, trigger: "exit" });
       if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
       return toolResult({ jobId: input.jobId, stopped: stopped.includes("stopped"), detail: stopped.trim() });
     }
     const maxChars = input.maxChars ?? 4_000;
     if (input.operation === "read") {
-      const inspection = await inspectShellJob(input.jobId, maxChars, signal, onUpdate, context);
+      const inspection = await inspectShellJob(input.jobId, generation, maxChars, signal, onUpdate, context);
       const sinceCursor = parseShellCursor(input.sinceCursor);
       const projection = shellOutputProjection(inspection, sinceCursor);
       const trigger = inspection.status === "finished" ? "exit" : projection.newOutput ? "new_output" : undefined;
@@ -634,7 +645,7 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
         ...(inspection.status === "running" ? { note: "Still running. Use shell_job monitor with a trigger instead of repeated empty reads." } : {}),
       });
     }
-    const monitored = await monitorShellJob(input.jobId, input, signal, onUpdate, context);
+    const monitored = await monitorShellJob(input.jobId, generation, input, signal, onUpdate, context);
     const observationId = await recordShellJobObservation(context, input.jobId, monitored);
     if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
     return toolResult({
@@ -657,6 +668,23 @@ interface ShellJobInspection {
   tail: Buffer;
 }
 
+interface ShellJobRecord {
+  schemaVersion: 1;
+  jobId: string;
+  runId: string;
+  generation: number;
+  ownerLane: Lane;
+  pid: number;
+  processGroupId: number;
+  processStartTime: string;
+  processStartEpochMs: number;
+  logPath: string;
+  status: "STARTING" | "RUNNING" | "FINISHED" | "STOPPED" | "UNKNOWN";
+  commandHash: string;
+  label: string;
+  createdAt: string;
+}
+
 interface ShellOutputProjection {
   output: string;
   newOutput: boolean;
@@ -675,16 +703,19 @@ interface ShellMonitorResult {
 
 async function inspectShellJob(
   jobId: string,
+  generation: number,
   maxChars: number,
   signal: AbortSignal | undefined,
   onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
   context: CodingResourceContext,
 ): Promise<ShellJobInspection> {
+  const paths = shellJobPaths(context.runtime.runId, generation, jobId);
+  const identity = shellRecordIdentity(context.runtime.runId, generation, context.ownerLane ?? "main");
   const output = await runShell(
-    `f=$(ls -1 .proofblade/jobs/${jobId}-*.log 2>/dev/null | head -1); ` +
-    `if [ -z "$f" ]; then echo "__NO_JOB__"; else ` +
-    `p=$(cat ${pidPath(jobId)} 2>/dev/null); ` +
-    `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else echo "__FINISHED__"; fi; ` +
+    `f=${paths.logPath}; r=${paths.recordPath}; ` +
+    `if [ ! -f "$r" ] || ! grep -Fq ${shellQuote(identity)} "$r" || [ ! -f "$f" ]; then echo "__NO_JOB__"; else ` +
+    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); ` +
+    `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else sed -E -i 's/"status":"[^\"]+"/"status":"FINISHED"/' "$r" 2>/dev/null; echo "__FINISHED__"; fi; ` +
     `wc -c < "$f"; tail -c ${Math.max(256, Math.min(20_000, Math.floor(maxChars)))} "$f" | base64 | tr -d '\\r\\n'; fi`,
     signal,
     onUpdate,
@@ -730,6 +761,7 @@ function decodeUtf8Tail(bytes: Buffer, offset: number): string {
 
 async function monitorShellJob(
   jobId: string,
+  generation: number,
   input: { sinceCursor?: string; triggers?: ShellMonitorResult["trigger"][]; keywords?: string[]; waitMs?: number; heartbeatMs?: number },
   signal: AbortSignal | undefined,
   onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
@@ -745,7 +777,7 @@ async function monitorShellJob(
   let lastHeartbeat = Date.now();
   while (true) {
     throwIfShellAborted(signal);
-    const inspection = await inspectShellJob(jobId, 12_000, signal, onUpdate, context);
+    const inspection = await inspectShellJob(jobId, generation, 12_000, signal, onUpdate, context);
     const projection = shellOutputProjection(inspection, sinceCursor);
     const matchedKeyword = keywords.find((keyword) => projection.output.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
     if (triggers.has("keyword") && matchedKeyword) return { status: inspection.status, trigger: "keyword", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated, matchedKeyword };
@@ -762,6 +794,58 @@ async function monitorShellJob(
     // A single bounded wait lives inside the tool call; it does not create
     // extra Provider turns or consume model tokens for empty reads.
     await delayShellMonitor(Math.min(250, Math.max(1, deadline - Date.now())), signal);
+  }
+}
+
+interface ShellJobPaths {
+  rootPath: string;
+  recordPath: string;
+  logPath: string;
+}
+
+function shellJobPaths(runId: string, generation: number, jobId?: string): ShellJobPaths {
+  const rootPath = `${shellJobRunRoot(runId)}/${generation}`;
+  const suffix = jobId ? `/${jobId}` : "";
+  return { rootPath, recordPath: `${rootPath}${suffix}.json`, logPath: `${rootPath}${suffix}.log` };
+}
+
+function shellJobRunRoot(runId: string): string {
+  return `.proofblade/jobs/${sha256(runId).slice(0, 24)}`;
+}
+
+function shellRecordIdentity(runId: string, generation: number, ownerLane: Lane): string {
+  return `"runId":${JSON.stringify(runId)},"generation":${generation},"ownerLane":${JSON.stringify(ownerLane)}`;
+}
+
+async function stopShellJob(
+  paths: ShellJobPaths,
+  runId: string,
+  generation: number,
+  ownerLane: Lane,
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<string> {
+  const identity = shellRecordIdentity(runId, generation, ownerLane);
+  return await runShell([
+    `r=${paths.recordPath}; if [ ! -f "$r" ] || ! grep -Fq ${shellQuote(identity)} "$r"; then echo "__NO_JOB__"; else`,
+    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); g=$(sed -n 's/.*"processGroupId":\\([0-9][0-9]*\\).*/\\1/p' "$r");`,
+    `started=$(sed -n 's/.*"processStartEpochMs":\\([0-9][0-9]*\\).*/\\1/p' "$r"); now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ');`,
+    `if ! kill -0 "$p" 2>/dev/null; then sed -E -i 's/"status":"[^\"]+"/"status":"FINISHED"/' "$r" 2>/dev/null; echo finished; elif [ -z "$p" ] || [ -z "$g" ] || [ "$p" = 0 ] || [ "$g" = 0 ] || [ -z "$etimes" ] || [ -z "$started" ] || [ -z "$now" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; then sed -E -i 's/"status":"[^\"]+"/"status":"UNKNOWN"/' "$r" 2>/dev/null; echo "__UNKNOWN_JOB__"; else`,
+    `kill -- -"$g" 2>/dev/null || kill "$p" 2>/dev/null; sleep 0.3; kill -0 -- -"$g" 2>/dev/null && kill -9 -- -"$g" 2>/dev/null; sed -E -i 's/"status":"[^\"]+"/"status":"STOPPED"/' "$r" 2>/dev/null; if kill -0 -- -"$g" 2>/dev/null || kill -0 "$p" 2>/dev/null; then echo "still-alive"; else echo stopped; fi; fi; fi`,
+  ].join("\n"), signal, onUpdate, context);
+}
+
+/** Stop every current-generation shell job owned by this lane during teardown. */
+export async function stopAllShellJobs(context: CodingResourceContext): Promise<void> {
+  const listed = await runShell(`ls -1 ${shellJobRunRoot(context.runtime.runId)}/*/*.json 2>/dev/null || true`, undefined, undefined, context);
+  for (const entry of listed.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
+    const match = /\/([^/]+)\/([^/]+)\.json$/.exec(entry);
+    const generation = Number(match?.[1]);
+    const jobId = match?.[2];
+    if (!Number.isInteger(generation) || generation < 0) continue;
+    if (!jobId) continue;
+    await stopShellJob(shellJobPaths(context.runtime.runId, generation, jobId), context.runtime.runId, generation, context.ownerLane ?? "main", undefined, undefined, context).catch(() => undefined);
   }
 }
 
@@ -817,11 +901,6 @@ async function runShell(
   const bash = createBashTool<CodingResourceContext>();
   const result = await bash.execute("shell-helper", { command }, signal ?? new AbortController().signal, onUpdate, context);
   return result.content.map((part) => (part.type === "text" ? part.text : "")).join("\n");
-}
-
-/** Where a background job records its pid, used for liveness and for stopping. */
-function pidPath(jobId: string): string {
-  return `.proofblade/jobs/${jobId}.pid`;
 }
 
 /** Single-quote a string for bash. */
