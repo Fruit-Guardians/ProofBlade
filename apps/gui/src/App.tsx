@@ -13,6 +13,7 @@ import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
+import { AblationWorkspace } from "./ablation-workspace.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -64,6 +65,7 @@ export function App() {
   const [detail, setDetail] = useState<RunDetail>();
   const [tab, setTab] = useState<MainTab>("chat");
   const [fleetView, setFleetView] = useState(false);
+  const [ablationView, setAblationView] = useState(false);
   const [search, setSearch] = useState("");
   const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -134,6 +136,7 @@ export function App() {
     if (!runId) return;
     localStorage.setItem("proofblade.runId", runId);
     setFleetView(false);
+    setAblationView(false);
     setTab("chat");
     setDetail(undefined);
     setRefreshing(true);
@@ -194,7 +197,8 @@ export function App() {
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
       <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button><button className="fixture-test-button" onClick={() => setCtfOpen(true)}><Zap size={15} />CTF 解题</button></div>
-      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
+      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setAblationView(false); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
+      <button className={`fleet-entry ${ablationView ? "active" : ""}`} onClick={() => { setAblationView(true); setFleetView(false); setDetail(undefined); setLeftOpen(false); }}><FlaskConical size={15} />消融实验</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
       <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
       {runKindFilter === "fixture" && <div className="filter-row">
@@ -222,7 +226,7 @@ export function App() {
         <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
           <div><h1>{fleetView ? "并行解题 (Fleet)" : (detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run"))}</h1>{!fleetView && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
-          <p>{fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
+          <p>{ablationView ? "Provider、策略 Variant、预检与结果比较" : fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
         </div>
         <div className="header-actions">
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
@@ -236,14 +240,15 @@ export function App() {
         </div>
       </header>
 
-      {!fleetView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
-      {!fleetView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
+      {!fleetView && !ablationView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
+      {!fleetView && !ablationView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
+        {ablationView && <AblationWorkspace providers={providers} onError={setError} onNotice={setNotice} />}
         {fleetView && <FleetView onError={setError} />}
-        {!fleetView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {!fleetView && !ablationView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
         {!fleetView && detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
         {!fleetView && detail && tab === "overview" && <Overview detail={detail} />}
         {!fleetView && detail && tab === "debugger" && <ToolDebugger detail={detail} />}

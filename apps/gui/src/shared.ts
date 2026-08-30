@@ -1,4 +1,4 @@
-import type { ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { AblationPreflightSummary, AblationReport, AblationExperimentSnapshot, ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -324,4 +324,24 @@ export interface ContextRuntimeInfo {
 export interface ArtifactContent {
   artifact: RunSnapshot["artifacts"][string];
   content: string;
+}
+
+export type AblationStatus = "draft" | "ready" | "running" | "paused" | "completed" | "failed";
+
+export interface AblationListItem {
+  experimentId: string;
+  name: string;
+  experimentFingerprint: string;
+  status: AblationStatus;
+  updatedAt?: string;
+}
+
+export interface AblationDetail {
+  experiment: AblationExperimentSnapshot;
+  status: AblationStatus;
+  preflight?: AblationPreflightSummary;
+  ledger?: { total: number; ready: number; running: number; unknown: number; succeeded: number; failed: number; cancelled: number };
+  report?: AblationReport;
+  reportMarkdown?: string;
+  run?: { startedAt: string; finishedAt?: string; error?: string };
 }
