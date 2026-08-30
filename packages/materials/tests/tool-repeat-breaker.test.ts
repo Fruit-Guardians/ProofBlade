@@ -10,6 +10,8 @@ import { ControlStore } from "../src/control/control-store.js";
 import { sha256 } from "../src/domain/utils.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
+import { AblationPolicyController } from "../src/evaluation/ablation-policy.js";
+import { DEFAULT_HARNESS_POLICY } from "../src/evaluation/ablation.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
 import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 
@@ -1024,6 +1026,42 @@ test("[contract:first-action-budget] blocks broad tools until the prepared probe
     assert.equal(bashExecutions, 1);
     assert.equal(firstActionBudget.completed, true);
     assert.equal(response.stopReason, "stop");
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:ablation-policy-binding] soft first-action advice records a decision and leaves the tool available", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-policy-binding-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-ablation-policy" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("evidence", { operation: "search", query: "anything" }, { id: "advised-action" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("advice was recorded", { stopReason: "stop" }),
+    ]);
+    let executions = 0;
+    const evidence: AgentHarnessTool<undefined> = {
+      name: "evidence", label: "evidence", description: "evidence search", parameters: Type.Object({ operation: Type.String(), query: Type.String() }),
+      async execute() { executions += 1; return { content: [{ type: "text" as const, text: "observation" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "ablation-policy", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence], activeToolNames: ["evidence"], systemPrompt: "test" });
+    const events: string[] = [];
+    const firstActionBudget = { allowedToolNames: ["bash"], maxCalls: 1, count: 0, completed: false };
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, {}, undefined, undefined, undefined, undefined, firstActionBudget, {
+      controller: new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "soft_advice" }),
+      experimentId: "AB-TEST", variantId: "candidate", caseId: "case-1", attempt: 1, runId: "run-1",
+      onDecision: (event) => { events.push(`${event.decision}:${event.reasonCode}`); },
+    });
+    const response = await harness.prompt("inspect");
+    assert.equal(executions, 1);
+    assert.equal(response.stopReason, "stop");
+    assert.deepEqual(events, ["advise:first_action_advice"]);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });

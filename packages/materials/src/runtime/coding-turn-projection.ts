@@ -5,6 +5,7 @@ import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verific
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import type { AblationDecisionEvent, AblationPolicyController } from "../evaluation/ablation-policy.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
 
@@ -23,6 +24,17 @@ export interface FirstActionBudget {
   maxCalls: number;
   count: number;
   completed: boolean;
+}
+
+export interface AblationPolicyBinding {
+  controller: AblationPolicyController;
+  experimentId: string;
+  variantId: string;
+  caseId: string;
+  runId: string;
+  attempt: number;
+  turn?: () => number;
+  onDecision?: (event: AblationDecisionEvent) => void | Promise<void>;
 }
 
 export interface CodingTurnTermination {
@@ -61,6 +73,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   experimentBudgetBreaker?: ExperimentBudgetBreaker,
   toolBudget?: ToolCallBudget,
   firstActionBudget?: FirstActionBudget,
+  ablationPolicy?: AblationPolicyBinding,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -205,6 +218,37 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
     const storm = failureStormBreaker?.observe(observation);
     const decision = repeatBreaker.observe(observation);
+    const policyEvent = ablationPolicy && ablationPolicy.controller.decide({
+      experimentId: ablationPolicy.experimentId,
+      variantId: ablationPolicy.variantId,
+      caseId: ablationPolicy.caseId,
+      attempt: ablationPolicy.attempt,
+      runId: ablationPolicy.runId,
+      turn: ablationPolicy.turn?.() ?? 1,
+      requestedAction: "tool_result",
+      requestedTool: event.toolName,
+      ...(decision.terminate ? { duplicateFailure: true } : {}),
+      ...(storm?.terminate ? { circuitBreakerTriggered: true } : {}),
+      reasonInputs: { toolName: event.toolName, duplicateFailure: decision.terminate, circuitBreakerTriggered: Boolean(storm?.terminate) },
+    });
+    if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
+    const ablationRelaxesFailureGuard = policyEvent?.decision === "allow" || policyEvent?.decision === "advise";
+    if (ablationRelaxesFailureGuard && storm?.terminate) {
+      failureStormBreaker?.reset();
+      return {
+        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: toolFailureStormMessage(storm.count) }],
+        details: { failureStorm: true, advisory: true, count: storm.count, key: storm.key },
+        isError: true,
+      };
+    }
+    if (ablationRelaxesFailureGuard && decision.terminate) {
+      repeatBreaker.reset();
+      return {
+        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: repeatedToolFailureMessage(event.toolName, decision.count) }],
+        details: { repeatedFailure: true, advisory: true, toolName: event.toolName, count: decision.count, key: decision.key },
+        isError: true,
+      };
+    }
     if (storm?.terminate && !decision.terminate) {
       if (termination.continuousRecovery) {
         failureStormBreaker?.reset();
@@ -244,7 +288,26 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
   });
   const unsubscribeToolCall = harness.on("tool_call", (event) => {
-    if (firstActionBudget && !firstActionBudget.completed) {
+    const firstActionViolation = firstActionBudget && !firstActionBudget.completed
+      && !isFirstActionCompletionTool(event.toolName)
+      && !matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames);
+    const policyEvent = ablationPolicy && ablationPolicy.controller.decide({
+      experimentId: ablationPolicy.experimentId,
+      variantId: ablationPolicy.variantId,
+      caseId: ablationPolicy.caseId,
+      attempt: ablationPolicy.attempt,
+      runId: ablationPolicy.runId,
+      turn: ablationPolicy.turn?.() ?? 1,
+      requestedAction: "tool_call",
+      requestedTool: event.toolName,
+      ...(firstActionViolation ? { firstActionViolation: true } : {}),
+      reasonInputs: { toolName: event.toolName, firstActionViolation: Boolean(firstActionViolation) },
+    });
+    if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
+    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") return { block: true, reason: `[ProofBlade ablation] ${policyEvent.reasonCode}` };
+    const ablationRelaxesFirstAction = policyEvent?.policyName === "first_action"
+      && (policyEvent.decision === "allow" || policyEvent.decision === "advise");
+    if (firstActionBudget && !firstActionBudget.completed && !ablationRelaxesFirstAction) {
       if (isFirstActionCompletionTool(event.toolName)) {
         firstActionBudget.completed = true;
       } else if (!matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {

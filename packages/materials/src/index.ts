@@ -94,6 +94,7 @@ export * from "./runtime/provider-budget.js";
 export * from "./runtime/provider-scheduler.js";
 export * from "./runtime/coding-resources.js";
 export * from "./runtime/coding-lane.js";
+export * from "./runtime/coding-turn-projection.js";
 export * from "./runtime/challenge-tool-profile.js";
 export * from "./runtime/context-length-recovery.js";
 export * from "./runtime/solver-tools.js";
