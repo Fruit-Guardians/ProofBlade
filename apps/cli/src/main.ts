@@ -36,6 +36,8 @@ import {
   validateAblationExperiment,
   AblationRunLedger,
   loadRealEvaluationCorpus,
+  buildAblationReport,
+  renderAblationReportZh,
   LocalHoldoutEvaluationRunner,
   anonymizeRunReplay,
   anonymizeEvaluationSummary,
@@ -237,6 +239,15 @@ async function main(): Promise<void> {
         const ledger = await AblationRunLedger.load(ledgerPath, experiment);
         if (action === "resume") await ledger.markInterrupted();
         print({ experimentId: experiment.experimentId, ...(action === "resume" ? { recovered: true } : {}), next: ledger.next(), summary: ledger.summary() });
+        break;
+      }
+      if (action === "report") {
+        const resultsPath = option(rest, "--results");
+        const parsed = resultsPath ? JSON.parse(await readFile(resolve(root, resultsPath), "utf8")) as unknown : [];
+        const records = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" && Array.isArray((parsed as { records?: unknown }).records) ? (parsed as { records: unknown[] }).records : []);
+        const report = buildAblationReport(experiment, records as Parameters<typeof buildAblationReport>[1]);
+        if (rest.includes("--markdown")) console.log(renderAblationReportZh(report));
+        else print(report);
         break;
       }
       throw new Error("ablation action must be list, create, or preflight");
@@ -739,7 +750,7 @@ function helpText(): string {
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--run-prefix ID] [--min-success-rate 0..1] [--enforce-gate]",
-    "  ablation list|create <experiment.json>|preflight|init|status|resume <experiment-id> [--probe]",
+    "  ablation list|create <experiment.json>|preflight|init|status|resume|report <experiment-id> [--results file] [--markdown]",
     "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
     "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
