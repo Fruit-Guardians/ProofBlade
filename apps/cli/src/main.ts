@@ -237,6 +237,8 @@ async function main(): Promise<void> {
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
+          ablationPolicy: variant.policySnapshot.policy,
+          ablationExperimentId: experiment.experimentId,
           config: {
             ...config,
             modelProfiles: {

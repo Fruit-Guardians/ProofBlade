@@ -11,6 +11,8 @@ import { projectionHash } from "../control/reducer.js";
 import { SingleAgentCtfLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { loadRealEvaluationCorpus, stageRealEvaluationCase, type LoadedRealEvaluationCase, type RealEvaluationCorpusSnapshot } from "./real-corpus.js";
+import { AblationPolicyController, type AblationDecisionEvent } from "./ablation-policy.js";
+import type { HarnessPolicy } from "./ablation.js";
 
 export const REAL_MODEL_EVALUATION_PROTOCOL_VERSION = "real-model-eval-v2";
 
@@ -21,6 +23,9 @@ export interface RealEvaluationVariant {
   config: ProofBladeConfig;
   /** Optional strategy identity used by strict same-model ablation runs. */
   strategyFingerprint?: string;
+  /** Optional same-model cognitive policy used by an ablation variant. */
+  ablationPolicy?: HarnessPolicy;
+  ablationExperimentId?: string;
 }
 
 export interface RealModelEvaluationOptions {
@@ -186,6 +191,7 @@ export interface RealModelEvaluationCase {
   providerDiagnostics: RealModelProviderDiagnostics;
   failureCategory?: RealEvaluationFailureCategory;
   error?: string;
+  ablationDecisions?: AblationDecisionEvent[];
 }
 
 export interface RealModelTurnDiagnostics {
@@ -304,7 +310,7 @@ export class RealModelEvaluationRunner {
             assertRunId(runId);
             await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, corpusCase);
             const task = realEvaluationTask(runId, corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
-            cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs));
+            cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
           }
         }
       } finally {
@@ -365,6 +371,8 @@ export class RealModelEvaluationRunner {
     services: AppServices,
     maxTurns: number,
     deadlineMs: number,
+    ablationPolicy?: HarnessPolicy,
+    ablationExperimentId?: string,
   ): Promise<RealModelEvaluationCase> {
     const started = Date.now();
     let status = "FAILED";
@@ -373,6 +381,8 @@ export class RealModelEvaluationRunner {
     let error: string | undefined;
     let deadlineExceeded = false;
     const deadline = new AbortController();
+    const ablationDecisions: AblationDecisionEvent[] = [];
+    const ablationController = ablationPolicy ? new AblationPolicyController(ablationPolicy) : undefined;
     const deadlineTimer = setTimeout(() => deadline.abort(new Error("Real evaluation case deadline exhausted")), deadlineMs);
     try {
       const loop = this.createLane
@@ -385,6 +395,15 @@ export class RealModelEvaluationRunner {
         maxTurns,
         signal: deadline.signal,
         terminalizeAbort: { reason: "Real evaluation case deadline exhausted.", category: "budget_exhausted" },
+        ...(ablationController ? { ablationPolicy: {
+          controller: ablationController,
+          experimentId: ablationExperimentId ?? "REAL-EVAL",
+          variantId,
+          caseId: corpusCase.id,
+          attempt,
+          runId,
+          onDecision: (event: AblationDecisionEvent) => { ablationDecisions.push(event); },
+        } } : {}),
       });
       status = outcome.status;
       phase = outcome.phase;
@@ -511,6 +530,7 @@ export class RealModelEvaluationRunner {
       providerDiagnostics,
       ...(failureCategory ? { failureCategory } : {}),
       ...(error ? { error } : {}),
+      ...(ablationDecisions.length > 0 ? { ablationDecisions } : {}),
     };
   }
 }

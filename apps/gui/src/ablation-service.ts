@@ -123,7 +123,7 @@ export class AblationService {
           executor: { ...profile, input: [...profile.input], model: variant.modelSnapshot.model },
         },
       };
-      return { id: variant.id, strategyFingerprint: variant.policySnapshot.policyFingerprint, config: variantConfig };
+      return { id: variant.id, strategyFingerprint: variant.policySnapshot.policyFingerprint, ablationPolicy: variant.policySnapshot.policy, ablationExperimentId: experiment.experimentId, config: variantConfig };
     });
     const summary = await new RealModelEvaluationRunner(this.root).run({
       corpusPath: resolve(this.root, experiment.corpus.path),
