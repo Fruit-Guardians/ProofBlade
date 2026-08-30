@@ -104,6 +104,7 @@ export * from "./mcp/registry.js";
 export * from "./evaluation/fixture-evaluator.js";
 export * from "./evaluation/real-corpus.js";
 export * from "./evaluation/real-model-evaluator.js";
+export * from "./evaluation/ablation.js";
 export * from "./evaluation/anonymous-replay.js";
 export * from "./evaluation/local-holdout.js";
 export * from "./evaluation/runtime-scenario-evaluator.js";
