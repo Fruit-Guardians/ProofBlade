@@ -786,7 +786,7 @@ test("shell_job stop reaps a descendant after the fallback parent exits", async 
   try {
     await mkdir(commandPath, { recursive: true });
     const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
-    const requiredCommands = ["awk", "bash", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tr"];
+    const requiredCommands = ["awk", "bash", "cat", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tr"];
     for (const command of requiredCommands) {
       const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
         try { return readFileSync(candidate).length >= 0; } catch { return false; }
@@ -849,7 +849,7 @@ test("fallback supervisor survives user trap, PATH changes, and exec", async (t)
   try {
     await mkdir(commandPath, { recursive: true });
     const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
-    const requiredCommands = ["awk", "bash", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sh", "sleep", "tr"];
+    const requiredCommands = ["awk", "bash", "cat", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sh", "sleep", "tr"];
     const commandSources = new Map<string, string>();
     for (const command of requiredCommands) {
       const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {

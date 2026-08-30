@@ -849,20 +849,20 @@ function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths
   ].join("\n");
   return [
     `root=${rootPath}; record=${recordPath}; log=${logPath};`,
-    `mkdir -p "$root" || { echo startup-failed:mkdir; exit 70; };`,
-    `bash_bin=$(command -v bash 2>/dev/null) || { echo startup-failed:bash; exit 70; }; nohup_bin=$(command -v nohup 2>/dev/null) || { echo startup-failed:nohup; exit 70; }; sed_bin=$(command -v sed 2>/dev/null) || { echo startup-failed:sed; exit 70; }; grep_bin=$(command -v grep 2>/dev/null) || { echo startup-failed:grep; exit 70; }; sleep_bin=$(command -v sleep 2>/dev/null) || { echo startup-failed:sleep; exit 70; }; ps_bin=$(command -v ps 2>/dev/null) || true; awk_bin=$(command -v awk 2>/dev/null) || true; date_bin=$(command -v date 2>/dev/null) || true; tr_bin=$(command -v tr 2>/dev/null) || { echo startup-failed:tr; exit 70; }; mv_bin=$(command -v mv 2>/dev/null) || { echo startup-failed:mv; exit 70; }; rm_bin=$(command -v rm 2>/dev/null) || { echo startup-failed:rm; exit 70; }; setsid_bin=$(command -v setsid 2>/dev/null) || true; export bash_bin sed_bin grep_bin sleep_bin ps_bin awk_bin date_bin tr_bin mv_bin rm_bin;`,
+    `mkdir -p "$root" || { echo startup-failed; exit 70; };`,
+    `bash_bin=$(command -v bash 2>/dev/null) || { echo startup-failed; exit 70; }; nohup_bin=$(command -v nohup 2>/dev/null) || { echo startup-failed; exit 70; }; sed_bin=$(command -v sed 2>/dev/null) || { echo startup-failed; exit 70; }; grep_bin=$(command -v grep 2>/dev/null) || { echo startup-failed; exit 70; }; sleep_bin=$(command -v sleep 2>/dev/null) || { echo startup-failed; exit 70; }; ps_bin=$(command -v ps 2>/dev/null) || true; awk_bin=$(command -v awk 2>/dev/null) || true; date_bin=$(command -v date 2>/dev/null) || true; tr_bin=$(command -v tr 2>/dev/null) || { echo startup-failed; exit 70; }; mv_bin=$(command -v mv 2>/dev/null) || { echo startup-failed; exit 70; }; rm_bin=$(command -v rm 2>/dev/null) || { echo startup-failed; exit 70; }; setsid_bin=$(command -v setsid 2>/dev/null) || true; export bash_bin sed_bin grep_bin sleep_bin ps_bin awk_bin date_bin tr_bin mv_bin rm_bin;`,
     `temporary="$record.tmp.$$"; printf %s ${shellQuote(reservationJson)} > "$temporary" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; }; "$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; };`,
     `if [ -n "$setsid_bin" ]; then`,
     `  "$setsid_bin" "$nohup_bin" "$bash_bin" -c ${shellQuote(groupWrapper)} > "$log" 2>&1 &`,
     `  mode=true`,
     `else`,
-    `  if [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo "startup-failed missing-tools ps=$ps_bin awk=$awk_bin date=$date_bin"; exit 70; fi`,
+    `  if [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo startup-failed; exit 70; fi`,
     `  "$nohup_bin" "$bash_bin" -c ${shellQuote(fallbackSupervisor)} > "$log" 2>&1 &`,
     `  mode=false`,
     `fi`,
     `launcher_pid=$!;`,
     `cleanup_startup() { if kill -0 "$launcher_pid" 2>/dev/null; then if [ "$mode" = true ]; then kill -- -"$launcher_pid" 2>/dev/null || kill "$launcher_pid" 2>/dev/null || true; else kill "$launcher_pid" 2>/dev/null || true; fi; fi; };`,
-    `i=0; while [ "$i" -lt 100 ]; do if [ -f "$record" ] && "$grep_bin" -Fq '"status":"RUNNING"' "$record"; then committed_pid=$("$sed_bin" -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$record"); if [ -n "$committed_pid" ] && [ "$committed_pid" != 0 ]; then echo "pid=$committed_pid"; if [ "$mode" = true ]; then echo process-group-created=true; else echo process-group-created=false; fi; exit 0; fi; fi; if ! kill -0 "$launcher_pid" 2>/dev/null; then "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-failed; "$sed_bin" -n '1,80p' "$log" 2>/dev/null || true; exit 70; fi; "$sleep_bin" 0.05; i=$((i + 1)); done; cleanup_startup; "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-timeout; "$sed_bin" -n '1,80p' "$log" 2>/dev/null || true; exit 70;`,
+    `i=0; while [ "$i" -lt 100 ]; do if [ -f "$record" ] && "$grep_bin" -Fq '"status":"RUNNING"' "$record"; then committed_pid=$("$sed_bin" -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$record"); if [ -n "$committed_pid" ] && [ "$committed_pid" != 0 ]; then echo "pid=$committed_pid"; if [ "$mode" = true ]; then echo process-group-created=true; else echo process-group-created=false; fi; exit 0; fi; fi; if ! kill -0 "$launcher_pid" 2>/dev/null; then "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-failed; exit 70; fi; "$sleep_bin" 0.05; i=$((i + 1)); done; cleanup_startup; "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-timeout; exit 70;`,
   ].join("\n");
 }
 
