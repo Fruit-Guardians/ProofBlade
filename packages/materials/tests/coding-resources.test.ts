@@ -728,7 +728,7 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
   try {
     await mkdir(commandPath, { recursive: true });
     const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
-    const requiredCommands = ["awk", "bash", "base64", "cat", "date", "grep", "kill", "ls", "mkdir", "nohup", "ps", "sed", "sleep", "tail", "tr", "wc"];
+    const requiredCommands = ["awk", "bash", "base64", "cat", "date", "grep", "kill", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tail", "tr", "wc"];
     for (const command of requiredCommands) {
       const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
         try { return readFileSync(candidate).length >= 0; } catch { return false; }
