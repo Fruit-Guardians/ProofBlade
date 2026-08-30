@@ -20,7 +20,7 @@
 
 ## 职责
 
-提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测和 Tool 调试界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果。
+提供真实模型对话、工作目录选择、Provider 配置、会话文件夹、对话重命名/删除、能力开关、上下文用量/剩余窗口/主动压缩阈值、Run 观测、Tool 调试和消融实验界面。Node server 是 Materials 的应用适配器，浏览器只保存展示状态和临时脚本结果；消融实验状态从 Materials 快照、账本和报告文件投影，不创建 GUI 私有事实库。
 
 ## 入口与依赖
 
@@ -31,6 +31,7 @@
 ## 开发规则
 
 - API 响应只暴露 `hasApiKey`，不回传 Key。
+- “消融实验”工作区的创建、预检、运行和报告只通过服务端 `/api/ablation` 路由访问；真实运行必须显式确认 `allowLive`，预检失败不得发送题目内容或 Provider 请求。
 - SSE 临时消息在 turn 完成后由 Pi Session 持久数据替换；用户暂停或 Provider idle/error 造成的空 Assistant entry 必须由持久化 assistant_message 的可见恢复文本补回，不能留下无提示的空气泡。
 - Runtime 的 `repeated_tool_failure`、`no_progress` 与 `tool_failure_storm` 都属于可恢复的正常终止；SSE 必须发送可见 `done`，历史投影只能用持久化 Pi entry ID 覆盖对应的空 Assistant ToolUse/Error 消息。
 - Coding Lane 为上下文恢复生成的内部续跑提示只出现在原始调试轨迹，不投影成用户对话气泡。
