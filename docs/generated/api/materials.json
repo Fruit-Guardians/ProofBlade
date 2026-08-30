@@ -36,6 +36,7 @@
     "src/context/compiler.ts": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+    "src/context/model-receipt.ts": "6f657d88a00b22a1ecf95ace95307f9e7399cdd41b0b039e9f590f06a0b2ff67",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
     "src/control/control-store.ts": "c400082af8f0b6ed00ed84502c6eb06724aaefa7a8406154c0e3c638eea17645",
@@ -57,18 +58,23 @@
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
+    "src/evaluation/ablation-ledger.ts": "b1a75ede36002034ffdf0e0997384470825e3302f9ca19120541ae377a7dae3a",
+    "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
+    "src/evaluation/ablation-report.ts": "f9277062459ba6f5d27730dc6109b050cee874ae501ef5e352a5d2810d028a79",
+    "src/evaluation/ablation.ts": "277b5cbfc1f025868a86c1adc76a914900682d8599bad26ae9f1374a0d9836f0",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+    "src/evaluation/information-value.ts": "e4a934481431f78a6f5fd0ab8e34c2024ffc99a4bdfee747025ab64f64a37b04",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+    "src/evaluation/real-model-evaluator.ts": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "43af361f3e67a0e5f522fedcc483c55d25d446b40355aec18f90dd75b9a99263",
+    "src/index.ts": "f6f91f0958a305d32efd5c8208579d212ba7d895f7282f681948458cccda7c76",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
@@ -113,7 +119,7 @@
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
     "src/runtime/coding-lane.ts": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
-    "src/runtime/coding-resources.ts": "c835b70c5e54ce6575a6aca0daa3a2154fd3cbf337d324326af25d518d93c9df",
+    "src/runtime/coding-resources.ts": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
     "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -1083,6 +1089,72 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::class::AblationRunLedger",
+      "name": "AblationRunLedger",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 17,
+      "signature": "AblationRunLedger",
+      "summary": "Inferred summary: ablation run ledger class used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::class::AblationPolicyController",
+      "name": "AblationPolicyController",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 45,
+      "signature": "AblationPolicyController",
+      "summary": "Applies only experiment-controlled cognitive policies. Resource, scope,",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::class::AblationExperimentStore",
+      "name": "AblationExperimentStore",
+      "kind": "class",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 280,
+      "signature": "AblationExperimentStore",
+      "summary": "Inferred summary: ablation experiment store class used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::class::FixtureEvaluationRunner",
       "name": "FixtureEvaluationRunner",
       "kind": "class",
@@ -1143,7 +1215,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 270,
+      "line": 275,
       "signature": "RealModelEvaluationRunner",
       "summary": "Runs real provider-backed Coding lanes only after an explicit caller opt-in.",
       "summarySource": "tsdoc",
@@ -3287,6 +3359,97 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::constant::ABLATION_PROTOCOL_VERSION",
+      "name": "ABLATION_PROTOCOL_VERSION",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 9,
+      "signature": "\"ablation-v1\"",
+      "summary": "Inferred summary: ablation protocol version constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::constant::ABLATION_SCHEMA_VERSION",
+      "name": "ABLATION_SCHEMA_VERSION",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 8,
+      "signature": "1",
+      "summary": "Inferred summary: ablation schema version constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::constant::DEFAULT_HARNESS_POLICY",
+      "name": "DEFAULT_HARNESS_POLICY",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 53,
+      "signature": "HarnessPolicy",
+      "summary": "Inferred summary: default harness policy constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::constant::FIXED_SAFETY_BOUNDARY",
+      "name": "FIXED_SAFETY_BOUNDARY",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 78,
+      "signature": "FixedSafetyBoundary",
+      "summary": "Inferred summary: fixed safety boundary constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::constant::BASELINE_PROTOCOL_VERSION",
       "name": "BASELINE_PROTOCOL_VERSION",
       "kind": "constant",
@@ -3957,7 +4120,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1079,
+      "line": 1092,
       "signature": "2",
       "summary": "How many times identical image CONTENT is re-injected into context before the",
       "summarySource": "tsdoc",
@@ -5089,6 +5252,91 @@
       "structureHash": "c72870a7dbe37670b649ef027802aead09eca8eb898dd4da821fa14f0554d4f0"
     },
     {
+      "id": "@proofblade/materials::function::artifactUri",
+      "name": "artifactUri",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 61,
+      "signature": "(runId: string, artifactId: string, content?: boolean): string",
+      "summary": "Inferred summary: artifact uri operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::function::createModelReceipt",
+      "name": "createModelReceipt",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 63,
+      "signature": "(options: ModelReceiptOptions): ModelReceipt",
+      "summary": "Inferred summary: create model receipt operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ],
+      "structureHash": "6345f5e8ae33f101ad7d460c7016acef8dd1c0f995bc8321711f582d89de9047"
+    },
+    {
+      "id": "@proofblade/materials::function::recallArtifact",
+      "name": "recallArtifact",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 103,
+      "signature": "(options: { artifactStore: ArtifactStore; artifact: ArtifactRef; runId: string; generation: number; requester: RecallRecord[\"requester\"]; operationId?: string; level?: ContextLevel; offset?: number; limit?: number; allowSensitive?: boolean; recordId?: string; }): Promise<RecallResult>",
+      "summary": "Inferred summary: recall artifact operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ],
+      "structureHash": "22657a5d884c856817997242c6fac6cc525a86cc20fe4f6b58d48dfba7ed9922"
+    },
+    {
+      "id": "@proofblade/materials::function::selectContextCandidates",
+      "name": "selectContextCandidates",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 140,
+      "signature": "(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection",
+      "summary": "Deterministic, provenance-aware selection; scores are ranking signals, not trust.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ],
+      "structureHash": "8d0af6a9a06297d281b4c015f8e23a6a73a9cacf4b4f2245573e832574d82e35"
+    },
+    {
       "id": "@proofblade/materials::function::appServerApproval",
       "name": "appServerApproval",
       "kind": "function",
@@ -5632,6 +5880,171 @@
       "structureHash": "7b4133bf36e9aec7c0f47f4cec88282216caffbe10bbbd44b532d87b724c076e"
     },
     {
+      "id": "@proofblade/materials::function::buildAblationReport",
+      "name": "buildAblationReport",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 52,
+      "signature": "(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport",
+      "summary": "Inferred summary: build ablation report operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ],
+      "structureHash": "f474e496c4a717b10cf6f3619271f1ca3a98ad7d9c6f64fdd2cfc3c287b55939"
+    },
+    {
+      "id": "@proofblade/materials::function::renderAblationReportZh",
+      "name": "renderAblationReportZh",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 66,
+      "signature": "(report: AblationReport): string",
+      "summary": "Inferred summary: render ablation report zh operation used to produce a deterministic value.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ],
+      "structureHash": "355ca4f93a3470814a66547d3512a2850419924fcb177c9ef855a26069aff7fa"
+    },
+    {
+      "id": "@proofblade/materials::function::buildAblationPairings",
+      "name": "buildAblationPairings",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 322,
+      "signature": "(experiment: Pick<AblationExperimentSnapshot, \"experimentId\" | \"variants\" | \"runOrder\" | \"budget\">, cases: readonly AblationCaseRef[]): AblationPairing[]",
+      "summary": "Inferred summary: build ablation pairings operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ],
+      "structureHash": "19b5577cfee469c30f288dc8846d56748d41a8d95ddcae9929ab4aabb9e15df2"
+    },
+    {
+      "id": "@proofblade/materials::function::preflightAblationExperiment",
+      "name": "preflightAblationExperiment",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 244,
+      "signature": "(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, options?: { probe?: boolean; fetch?: typeof globalThis.fetch; }): Promise<AblationPreflightSummary>",
+      "summary": "Validate an immutable snapshot against the selected local Provider profile.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ],
+      "structureHash": "654dc0f59d896776753293c7508e4a4383b6bb575df54277c05cf816665d4445"
+    },
+    {
+      "id": "@proofblade/materials::function::probeAblationProvider",
+      "name": "probeAblationProvider",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 266,
+      "signature": "(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch?: typeof globalThis.fetch): Promise<AblationProviderProbe>",
+      "summary": "Probe only the model-discovery endpoint; task content is never sent.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [],
+      "structureHash": "daf1bccc973abd0028772851bac45acec182d7c38e96e5438a42198f4f665f74"
+    },
+    {
+      "id": "@proofblade/materials::function::snapshotModel",
+      "name": "snapshotModel",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 220,
+      "signature": "(input: AblationModelInput, profile?: ModelProfileConfig): AblationModelSnapshot",
+      "summary": "Inferred summary: snapshot model operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [],
+      "structureHash": "edecf51ffa0e88a1fc9f2498d4f0bf23b7c3efffd5322d6c582d36fa6ea24cd3"
+    },
+    {
+      "id": "@proofblade/materials::function::validateAblationExperiment",
+      "name": "validateAblationExperiment",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 197,
+      "signature": "(value: unknown, profile?: ModelProfileConfig): AblationExperimentSnapshot",
+      "summary": "Inferred summary: validate ablation experiment operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts"
+      ],
+      "structureHash": "c39d2a6d95ef885ef6afa6e03f30fc15e1807632d43ed92bf3673fcd5685cc88"
+    },
+    {
       "id": "@proofblade/materials::function::anonymizeEvaluationSummary",
       "name": "anonymizeEvaluationSummary",
       "kind": "function",
@@ -5716,6 +6129,106 @@
         "packages/materials/tests/runtime-contracts.test.ts"
       ],
       "structureHash": "9e365909cf1f0961c4813b2c4ce5895f5c52ae06d08171dd4ccd09cc857fd3cb"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateDecisionVoi",
+      "name": "estimateDecisionVoi",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 58,
+      "signature": "(input: DecisionVoiInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate decision voi operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "36d0f08d17312ec33f6fa334b3466114a300f9262e60e8082875865697f1bfc8"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateHeuristicInformation",
+      "name": "estimateHeuristicInformation",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 18,
+      "signature": "(input: HeuristicInformationInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate heuristic information operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "310f17d01d63af1c34a411f5533dfaa9153764194ad39a077983b3a03c27d0e4"
+    },
+    {
+      "id": "@proofblade/materials::function::estimatePmi",
+      "name": "estimatePmi",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 25,
+      "signature": "(input: PmiInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate pmi operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "94525d50f67c9983672004b33dd38b68991bfdce90c450d7569e9664b5676194"
+    },
+    {
+      "id": "@proofblade/materials::function::estimatePosteriorEIG",
+      "name": "estimatePosteriorEIG",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 33,
+      "signature": "(hypotheses: readonly PosteriorHypothesis[]): InformationValueEstimate",
+      "summary": "Inferred summary: estimate posterior eig operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "ab79b178224017418a780129efe8a9c489090d23416917438871a6805be7cae1"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateVerifiedUplift",
+      "name": "estimateVerifiedUplift",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 69,
+      "signature": "(input: VerifiedUpliftInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate verified uplift operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "115680f4e978f9b0626a181a5f7b35706cb947f66342d08b2b06b86fb42ec09b"
     },
     {
       "id": "@proofblade/materials::function::compareEvaluationAttempts",
@@ -5856,7 +6369,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 705,
+      "line": 712,
       "signature": "(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics",
       "summary": "Projects provider traffic onto durable executor turns without relying on",
       "summarySource": "tsdoc",
@@ -5888,7 +6401,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 100,
+      "line": 104,
       "signature": "(options: RealModelEvaluationPreflightOptions): Promise<RealModelEvaluationPreflightSummary>",
       "summary": "Validate a live evaluation setup without creating a Run or contacting a",
       "summarySource": "tsdoc",
@@ -7915,7 +8428,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1181,
+      "line": 1194,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -7958,7 +8471,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 998,
+      "line": 1011,
       "signature": "(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]",
       "summary": "Inferred summary: coding active tool names operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -8003,7 +8516,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1015,
+      "line": 1028,
       "signature": "(): Array<{ name: string; description: string; parameters: unknown; }>",
       "summary": "Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -8216,7 +8729,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1093,
+      "line": 1106,
       "signature": "(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>[\"execute\"]>>, imagesSeen: Map<string, number> | undefined): typeof result",
       "summary": "Deduplicate repeated image reads within one run, keyed by the image's CONTENT",
       "summarySource": "tsdoc",
@@ -8259,7 +8772,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1165,
+      "line": 1178,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -8302,7 +8815,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1155,
+      "line": 1168,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -8428,7 +8941,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 881,
+      "line": 894,
       "signature": "(context: CodingResourceContext): Promise<void>",
       "summary": "Stop every current-generation shell job owned by this lane during teardown.",
       "summarySource": "tsdoc",
@@ -12252,6 +12765,143 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::interface::BrokerSelection",
+      "name": "BrokerSelection",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 137,
+      "signature": "BrokerSelection",
+      "summary": "Inferred summary: broker selection type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ContextCandidate",
+      "name": "ContextCandidate",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 122,
+      "signature": "ContextCandidate",
+      "summary": "Inferred summary: context candidate type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::ContextRef",
+      "name": "ContextRef",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 9,
+      "signature": "ContextRef",
+      "summary": "Inferred summary: context ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ModelReceipt",
+      "name": "ModelReceipt",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 27,
+      "signature": "ModelReceipt",
+      "summary": "Inferred summary: model receipt type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::ModelReceiptOptions",
+      "name": "ModelReceiptOptions",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 42,
+      "signature": "ModelReceiptOptions",
+      "summary": "Inferred summary: model receipt options type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::RecallRecord",
+      "name": "RecallRecord",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 81,
+      "signature": "RecallRecord",
+      "summary": "Inferred summary: recall record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::RecallResult",
+      "name": "RecallResult",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 101,
+      "signature": "RecallResult",
+      "summary": "Inferred summary: recall result type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::interface::AppServerRequest",
       "name": "AppServerRequest",
       "kind": "interface",
@@ -13079,6 +13729,7 @@
         "@proofblade/atoms"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -13091,6 +13742,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/information-value.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -13141,6 +13793,9 @@
         "@proofblade/atoms"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -14185,6 +14840,492 @@
       ]
     },
     {
+      "id": "@proofblade/materials::interface::AblationLedgerDocument",
+      "name": "AblationLedgerDocument",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 6,
+      "signature": "AblationLedgerDocument",
+      "summary": "Inferred summary: ablation ledger document type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationLedgerSummary",
+      "name": "AblationLedgerSummary",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 15,
+      "signature": "AblationLedgerSummary",
+      "summary": "Inferred summary: ablation ledger summary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationDecisionEvent",
+      "name": "AblationDecisionEvent",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 29,
+      "signature": "AblationDecisionEvent",
+      "summary": "Inferred summary: ablation decision event type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPolicyDecisionInput",
+      "name": "AblationPolicyDecisionInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 6,
+      "signature": "AblationPolicyDecisionInput",
+      "summary": "Inferred summary: ablation policy decision input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationReport",
+      "name": "AblationReport",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 41,
+      "signature": "AblationReport",
+      "summary": "Inferred summary: ablation report type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationResultRecord",
+      "name": "AblationResultRecord",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 4,
+      "signature": "AblationResultRecord",
+      "summary": "Inferred summary: ablation result record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantReport",
+      "name": "AblationVariantReport",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 20,
+      "signature": "AblationVariantReport",
+      "summary": "Inferred summary: ablation variant report type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationAttemptRecord",
+      "name": "AblationAttemptRecord",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 184,
+      "signature": "AblationAttemptRecord",
+      "summary": "Inferred summary: ablation attempt record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationCaseRef",
+      "name": "AblationCaseRef",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 192,
+      "signature": "AblationCaseRef",
+      "summary": "Inferred summary: ablation case ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationCorpusRef",
+      "name": "AblationCorpusRef",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 89,
+      "signature": "AblationCorpusRef",
+      "summary": "Inferred summary: ablation corpus ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationExperimentInput",
+      "name": "AblationExperimentInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 115,
+      "signature": "AblationExperimentInput",
+      "summary": "Inferred summary: ablation experiment input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationExperimentSnapshot",
+      "name": "AblationExperimentSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 157,
+      "signature": "AblationExperimentSnapshot",
+      "summary": "Inferred summary: ablation experiment snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationModelInput",
+      "name": "AblationModelInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 94,
+      "signature": "AblationModelInput",
+      "summary": "Inferred summary: ablation model input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationModelSnapshot",
+      "name": "AblationModelSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 129,
+      "signature": "AblationModelSnapshot",
+      "summary": "Inferred summary: ablation model snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPairing",
+      "name": "AblationPairing",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 176,
+      "signature": "AblationPairing",
+      "summary": "Inferred summary: ablation pairing type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPolicySnapshot",
+      "name": "AblationPolicySnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 144,
+      "signature": "AblationPolicySnapshot",
+      "summary": "Inferred summary: ablation policy snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPreflightCheck",
+      "name": "AblationPreflightCheck",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 233,
+      "signature": "AblationPreflightCheck",
+      "summary": "Inferred summary: ablation preflight check type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPreflightSummary",
+      "name": "AblationPreflightSummary",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 234,
+      "signature": "AblationPreflightSummary",
+      "summary": "Inferred summary: ablation preflight summary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationProviderProbe",
+      "name": "AblationProviderProbe",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 263,
+      "signature": "AblationProviderProbe",
+      "summary": "Inferred summary: ablation provider probe type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantInput",
+      "name": "AblationVariantInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 103,
+      "signature": "AblationVariantInput",
+      "summary": "Inferred summary: ablation variant input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantSnapshot",
+      "name": "AblationVariantSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 151,
+      "signature": "AblationVariantSnapshot",
+      "summary": "Inferred summary: ablation variant snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::FixedSafetyBoundary",
+      "name": "FixedSafetyBoundary",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 67,
+      "signature": "FixedSafetyBoundary",
+      "summary": "Inferred summary: fixed safety boundary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::HarnessPolicy",
+      "name": "HarnessPolicy",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 39,
+      "signature": "HarnessPolicy",
+      "summary": "Inferred summary: harness policy type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::interface::AnonymousEvaluationReplay",
       "name": "AnonymousEvaluationReplay",
       "kind": "interface",
@@ -14391,6 +15532,108 @@
         "./runtime-scenario-evaluator.js",
         "node:fs/promises",
         "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::DecisionVoiInput",
+      "name": "DecisionVoiInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 57,
+      "signature": "DecisionVoiInput",
+      "summary": "Inferred summary: decision voi input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::HeuristicInformationInput",
+      "name": "HeuristicInformationInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 17,
+      "signature": "HeuristicInformationInput",
+      "summary": "Inferred summary: heuristic information input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::InformationValueEstimate",
+      "name": "InformationValueEstimate",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 5,
+      "signature": "InformationValueEstimate",
+      "summary": "Inferred summary: information value estimate type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PmiInput",
+      "name": "PmiInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 24,
+      "signature": "PmiInput",
+      "summary": "Inferred summary: pmi input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PosteriorHypothesis",
+      "name": "PosteriorHypothesis",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "PosteriorHypothesis",
+      "summary": "Inferred summary: posterior hypothesis type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::VerifiedUpliftInput",
+      "name": "VerifiedUpliftInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 68,
+      "signature": "VerifiedUpliftInput",
+      "summary": "Inferred summary: verified uplift input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
       ],
       "testRefs": []
     },
@@ -14732,7 +15975,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 204,
+      "line": 208,
       "signature": "RealModelCategorySummary",
       "summary": "Inferred summary: real model category summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14761,7 +16004,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 150,
+      "line": 154,
       "signature": "RealModelEvaluationCase",
       "summary": "Inferred summary: real model evaluation case type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14790,7 +16033,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 49,
+      "line": 53,
       "signature": "RealModelEvaluationGatePolicy",
       "summary": "Inferred summary: real model evaluation gate policy type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14819,7 +16062,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 24,
+      "line": 26,
       "signature": "RealModelEvaluationOptions",
       "summary": "Inferred summary: real model evaluation options type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14848,7 +16091,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 58,
+      "line": 62,
       "signature": "RealModelEvaluationPreflightOptions",
       "summary": "Inferred summary: real model evaluation preflight options type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14877,7 +16120,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 72,
+      "line": 76,
       "signature": "RealModelEvaluationPreflightSummary",
       "summary": "Inferred summary: real model evaluation preflight summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14906,7 +16149,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 250,
+      "line": 255,
       "signature": "RealModelEvaluationSummary",
       "summary": "Inferred summary: real model evaluation summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14935,7 +16178,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 196,
+      "line": 200,
       "signature": "RealModelProviderDiagnostics",
       "summary": "Inferred summary: real model provider diagnostics type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14964,7 +16207,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 187,
+      "line": 191,
       "signature": "RealModelTurnDiagnostics",
       "summary": "Inferred summary: real model turn diagnostics type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -14993,7 +16236,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 218,
+      "line": 222,
       "signature": "RealModelVariantSummary",
       "summary": "Inferred summary: real model variant summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -21593,6 +22836,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21639,6 +22883,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21845,6 +23090,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21891,6 +23137,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21978,6 +23225,7 @@
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ],
@@ -22223,6 +23471,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -22269,6 +23518,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -22475,6 +23725,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -22521,6 +23772,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -22727,6 +23979,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -22773,6 +24026,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -22979,6 +24233,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -23025,6 +24280,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -23224,6 +24480,7 @@
         "../runtime/scope.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -23254,6 +24511,7 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -23374,6 +24632,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -23695,6 +24954,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -24095,6 +25355,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -24117,6 +25379,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -25018,6 +26281,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -25076,6 +26341,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -25407,6 +26673,8 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -25429,6 +26697,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -25517,6 +26786,8 @@
         "./api.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -25605,6 +26876,9 @@
         "./api.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -25657,6 +26931,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -25764,6 +27039,7 @@
         "./api.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -25838,6 +27114,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -26617,6 +27895,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -26658,6 +27937,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -27209,6 +28489,9 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -27261,6 +28544,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -27646,6 +28930,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -27755,6 +29040,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -27801,6 +29087,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -27958,6 +29245,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28034,6 +29322,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28075,6 +29364,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -28134,6 +29424,8 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -28181,6 +29473,8 @@
         "@earendil-works/pi-agent-core"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28274,6 +29568,8 @@
         "./control-store.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28317,6 +29613,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -28882,6 +30179,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28923,6 +30221,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -29257,6 +30556,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -29483,6 +30783,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -29802,6 +31103,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -29830,6 +31132,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts"
       ],
       "structureHash": "73118058909c5f2f13f959c842736e8a0ff8838673d2138b957a9241c2a6394f",
@@ -29992,6 +31295,7 @@
         "./artifact-store.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30033,6 +31337,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -30407,6 +31712,722 @@
       "parentId": "@proofblade/materials::class::EffectJournal"
     },
     {
+      "id": "@proofblade/materials::method::AblationRunLedger.claim",
+      "name": "AblationRunLedger.claim",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 42,
+      "signature": "(pairingId: string, runId: string, clock?: () => string): Promise<AblationAttemptRecord>",
+      "summary": "Inferred summary: claim operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ],
+      "structureHash": "b9199e6befb372269d194df2546462744cd5887c47e5fa2e89d10e298d709c6c",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.complete",
+      "name": "AblationRunLedger.complete",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 51,
+      "signature": "(pairingId: string, status: Extract<AblationAttemptRecord[\"status\"], \"succeeded\" | \"failed\" | \"cancelled\">, error?: string, clock?: () => string): Promise<AblationAttemptRecord>",
+      "summary": "Inferred summary: complete operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/intent-filter.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/provider-retry-harness.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-evaluation-gates.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/workspace-search.test.ts"
+      ],
+      "structureHash": "da3a044361964742709f5a330cd05396715e033c903905d7ce8356ec9ca73c81",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.create",
+      "name": "AblationRunLedger.create",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 20,
+      "signature": "(path: string, experiment: AblationExperimentSnapshot, cases: readonly AblationCaseRef[], clock?: () => string): Promise<AblationRunLedger>",
+      "summary": "Inferred summary: create operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/challenge-tool-profile.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-remote-query-matrix.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-authority-migration.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/demo.test.ts",
+        "packages/materials/tests/docker-resource-adapter.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/durability.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-filter.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/provider-api.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/provider-retry-harness.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/session-runtime-composition.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ],
+      "structureHash": "ecc139d33329022a231af327462b80064ae405854c3caf850eb818706f7c9aa4",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.load",
+      "name": "AblationRunLedger.load",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 30,
+      "signature": "(path: string): Promise<AblationRunLedger>",
+      "summary": "Inferred summary: load operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/challenge-tool-profile.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/intent-scheduler-config.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ],
+      "structureHash": "ceab2c4efd1333fe29a03cc564847e6abcb268f3bea367814fd85266c987c667",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.markInterrupted",
+      "name": "AblationRunLedger.markInterrupted",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 60,
+      "signature": "(clock?: () => string): Promise<number>",
+      "summary": "Inferred summary: mark interrupted operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts"
+      ],
+      "structureHash": "809173f7f962e506266d3c2bbca23efff411bef57b032f8ae2e658104779a69b",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.next",
+      "name": "AblationRunLedger.next",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 37,
+      "signature": "(): AblationAttemptRecord | undefined",
+      "summary": "Inferred summary: next operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ],
+      "structureHash": "731f193732a924eb422db18b3aeaaa7b76381804eed32832b2d9dcbd2361b178",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.snapshot",
+      "name": "AblationRunLedger.snapshot",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 73,
+      "signature": "(): AblationLedgerDocument",
+      "summary": "Inferred summary: snapshot operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-authority-migration.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/demo.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/durability.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ],
+      "structureHash": "031e5a20faf09607801091eb6f171a80d2e1ef65c68c68486e879175d81b2a43",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.summary",
+      "name": "AblationRunLedger.summary",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 67,
+      "signature": "(): AblationLedgerSummary",
+      "summary": "Inferred summary: summary operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/binary-core.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-remote-query-matrix.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evaluation.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/local-holdout.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
+        "packages/materials/tests/session-resource-adapter.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ],
+      "structureHash": "aeddad1e2580548e1bb40438e490eed5e0e29bfafbea44917882bffdc931b724",
+      "parentId": "@proofblade/materials::class::AblationRunLedger"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationPolicyController.decide",
+      "name": "AblationPolicyController.decide",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 50,
+      "signature": "(input: AblationPolicyDecisionInput): AblationDecisionEvent",
+      "summary": "Inferred summary: decide operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts"
+      ],
+      "structureHash": "1e8f5d8b338fe1128a45071bfe57f7efad9a60403efb0146c7ba37771692ea80",
+      "parentId": "@proofblade/materials::class::AblationPolicyController"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationPolicyController.eventsSnapshot",
+      "name": "AblationPolicyController.eventsSnapshot",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 74,
+      "signature": "(): AblationDecisionEvent[]",
+      "summary": "Inferred summary: events snapshot operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts"
+      ],
+      "structureHash": "e7fd53f82c8aa6cfc5f974696adf95b59c900e453e9c40d9c34464250a413e6c",
+      "parentId": "@proofblade/materials::class::AblationPolicyController"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationPolicyController.recordOutcome",
+      "name": "AblationPolicyController.recordOutcome",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 67,
+      "signature": "(event: AblationDecisionEvent, accepted: boolean, evidenceIds?: string[], outcome?: string): AblationDecisionEvent",
+      "summary": "Inferred summary: record outcome operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts"
+      ],
+      "structureHash": "b3bcd4ab4b6ed81a02986164380c1284dd6d9befdd2de17f3992f7e7fa6388e3",
+      "parentId": "@proofblade/materials::class::AblationPolicyController"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationExperimentStore.list",
+      "name": "AblationExperimentStore.list",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 303,
+      "signature": "(): Promise<Array<Pick<AblationExperimentSnapshot, \"experimentId\" | \"name\" | \"experimentFingerprint\">>>",
+      "summary": "Inferred summary: list operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/firmware-core.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ],
+      "structureHash": "bce0e9d957e723cf9efa924aed58cc42f342582d540eb9440cf66d0f16acf90e",
+      "parentId": "@proofblade/materials::class::AblationExperimentStore"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationExperimentStore.load",
+      "name": "AblationExperimentStore.load",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 297,
+      "signature": "(experimentId: string): Promise<AblationExperimentSnapshot>",
+      "summary": "Inferred summary: load operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/challenge-tool-profile.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/intent-scheduler-config.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ],
+      "structureHash": "5cbfa6deebf4fdc7a0bbb09f465e9ec9d5130305a8a3a6a0e51b0851005ef2ee",
+      "parentId": "@proofblade/materials::class::AblationExperimentStore"
+    },
+    {
+      "id": "@proofblade/materials::method::AblationExperimentStore.save",
+      "name": "AblationExperimentStore.save",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 282,
+      "signature": "(experiment: AblationExperimentSnapshot): Promise<string>",
+      "summary": "Inferred summary: save operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts"
+      ],
+      "structureHash": "fd515b528c869a17560f33f73bc2cb0d6a7b199360a607783360e497c0d29743",
+      "parentId": "@proofblade/materials::class::AblationExperimentStore"
+    },
+    {
       "id": "@proofblade/materials::method::FixtureEvaluationRunner.run",
       "name": "FixtureEvaluationRunner.run",
       "kind": "method",
@@ -30434,6 +32455,9 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30486,6 +32510,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -30551,6 +32576,9 @@
         "./real-model-evaluator.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30603,6 +32631,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -30655,7 +32684,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 273,
+      "line": 278,
       "signature": "(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary>",
       "summary": "Inferred summary: run operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -30676,6 +32705,9 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30728,6 +32760,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -30770,7 +32803,7 @@
         "packages/materials/tests/web-tools.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ],
-      "structureHash": "c3488c03ebe60ad4241651a97115cc6b07af2a8bafb06efaa54bdf82151be97c",
+      "structureHash": "38826bf8d7ad26aec83f936309e651e522f94063c1a6f2e548a45fbad5b04075",
       "parentId": "@proofblade/materials::class::RealModelEvaluationRunner"
     },
     {
@@ -30813,6 +32846,9 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30865,6 +32901,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -30979,6 +33016,7 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31020,6 +33058,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -31129,6 +33168,7 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -31187,6 +33227,7 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -31233,6 +33274,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -31281,6 +33323,9 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31783,6 +33828,8 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -31834,6 +33881,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -32368,6 +34416,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -32762,6 +34811,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -33050,6 +35101,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -33081,6 +35133,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -33135,6 +35188,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -33212,6 +35266,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33259,6 +35315,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -33362,6 +35419,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -33819,6 +35877,7 @@
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
+        "packages/materials/tests/information-value.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -33917,6 +35976,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -34021,6 +36081,8 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -34072,6 +36134,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -34275,6 +36338,7 @@
         "./run-work-scheduler.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34352,6 +36416,7 @@
         "./run-work-scheduler.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -34552,6 +36617,7 @@
         "./run-work-scheduler.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -34805,6 +36871,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34872,6 +36939,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -34921,6 +36989,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -34999,6 +37068,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -35123,6 +37193,9 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -35175,6 +37248,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -35732,6 +37806,7 @@
         "./pwn-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -35801,6 +37876,7 @@
         "./pwn-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -36209,6 +38285,9 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36252,6 +38331,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -36503,6 +38583,9 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36546,6 +38629,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -36838,6 +38922,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36895,6 +38981,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -37049,6 +39136,7 @@
         "./session-runtime-wire.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37090,6 +39178,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -37425,6 +39514,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37466,6 +39556,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -38109,6 +40200,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38150,6 +40242,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -38459,6 +40552,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38500,6 +40594,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -38798,6 +40893,7 @@
         "node:http"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -38903,6 +40999,7 @@
         "node:http"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -38944,6 +41041,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -39377,6 +41475,9 @@
         "../sandbox/fixture.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -39420,6 +41521,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -39471,6 +41573,7 @@
         "../sandbox/fixture.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -40106,6 +42209,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -40147,6 +42251,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -40543,6 +42648,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -40584,6 +42690,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -41052,6 +43159,8 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -41605,6 +43714,8 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -41648,6 +43759,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -41765,6 +43877,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -41825,6 +43938,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -42123,6 +44238,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42164,6 +44280,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -42225,6 +44342,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -42520,6 +44638,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42672,6 +44791,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -42722,6 +44842,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -42768,6 +44889,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -42879,6 +45001,9 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -42922,6 +45047,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -42975,6 +45101,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -43035,6 +45162,8 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
@@ -43105,6 +45234,8 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -44362,6 +46493,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -44408,6 +46540,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -44957,6 +47090,8 @@
         "./verification-key.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -44979,6 +47114,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -45585,6 +47721,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -45978,6 +48115,8 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -46029,6 +48168,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -46209,6 +48349,7 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -46250,6 +48391,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -46561,6 +48703,8 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -46716,6 +48860,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -46757,6 +48902,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -47297,6 +49443,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47430,6 +49577,8 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -47481,6 +49630,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -47704,6 +49854,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47789,6 +49940,8 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47832,6 +49985,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -48045,6 +50199,7 @@
         "./http-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -48109,6 +50264,7 @@
         "./http-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -48272,6 +50428,8 @@
         "./http-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -48315,6 +50473,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -48870,6 +51029,101 @@
         "./checkpoint.js",
         "./user-task-anchor.js",
         "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextLevel",
+      "name": "ContextLevel",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 5,
+      "signature": "ContextLevel",
+      "summary": "Inferred summary: context level type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextSensitivity",
+      "name": "ContextSensitivity",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 7,
+      "signature": "ContextSensitivity",
+      "summary": "Inferred summary: context sensitivity type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextTrust",
+      "name": "ContextTrust",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 6,
+      "signature": "ContextTrust",
+      "summary": "Inferred summary: context trust type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ReceiptNextAction",
+      "name": "ReceiptNextAction",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 25,
+      "signature": "ReceiptNextAction",
+      "summary": "Inferred summary: receipt next action type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ReceiptState",
+      "name": "ReceiptState",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/context/model-receipt.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 24,
+      "signature": "ReceiptState",
+      "summary": "Inferred summary: receipt state type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/types.js",
+        "../domain/utils.js",
+        "../effects/artifact-store.js"
       ],
       "testRefs": []
     },
@@ -49854,6 +52108,354 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::type::AblationDecision",
+      "name": "AblationDecision",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-policy.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 4,
+      "signature": "AblationDecision",
+      "summary": "Inferred summary: ablation decision type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationAttemptStatus",
+      "name": "AblationAttemptStatus",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 174,
+      "signature": "AblationAttemptStatus",
+      "summary": "Inferred summary: ablation attempt status type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationChangedFactor",
+      "name": "AblationChangedFactor",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 12,
+      "signature": "AblationChangedFactor",
+      "summary": "Inferred summary: ablation changed factor type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationExperimentStatus",
+      "name": "AblationExperimentStatus",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 173,
+      "signature": "AblationExperimentStatus",
+      "summary": "Inferred summary: ablation experiment status type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationRunOrder",
+      "name": "AblationRunOrder",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 11,
+      "signature": "AblationRunOrder",
+      "summary": "Inferred summary: ablation run order type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ActionBundleMode",
+      "name": "ActionBundleMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 29,
+      "signature": "ActionBundleMode",
+      "summary": "Inferred summary: action bundle mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CircuitBreakerMode",
+      "name": "CircuitBreakerMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 31,
+      "signature": "CircuitBreakerMode",
+      "summary": "Inferred summary: circuit breaker mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CompressionMode",
+      "name": "CompressionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 36,
+      "signature": "CompressionMode",
+      "summary": "Inferred summary: compression mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextSelectionMode",
+      "name": "ContextSelectionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "ContextSelectionMode",
+      "summary": "Inferred summary: context selection mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::DuplicateFailureMode",
+      "name": "DuplicateFailureMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 30,
+      "signature": "DuplicateFailureMode",
+      "summary": "Inferred summary: duplicate failure mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::EvidenceCurationMode",
+      "name": "EvidenceCurationMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 34,
+      "signature": "EvidenceCurationMode",
+      "summary": "Inferred summary: evidence curation mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::FirstActionMode",
+      "name": "FirstActionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 27,
+      "signature": "FirstActionMode",
+      "summary": "Inferred summary: first action mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::InformationValueEstimator",
+      "name": "InformationValueEstimator",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 35,
+      "signature": "InformationValueEstimator",
+      "summary": "Inferred summary: information value estimator type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::PhaseRouteMode",
+      "name": "PhaseRouteMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 28,
+      "signature": "PhaseRouteMode",
+      "summary": "Inferred summary: phase route mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::RecallMode",
+      "name": "RecallMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 33,
+      "signature": "RecallMode",
+      "summary": "Inferred summary: recall mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::StopSuggestionMode",
+      "name": "StopSuggestionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 37,
+      "signature": "StopSuggestionMode",
+      "summary": "Inferred summary: stop suggestion mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::type::EvaluationFailureCategory",
       "name": "EvaluationFailureCategory",
       "kind": "type",
@@ -49879,6 +52481,23 @@
         "./runtime-scenario-evaluator.js",
         "node:fs/promises",
         "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::InformationEstimatorKind",
+      "name": "InformationEstimatorKind",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 3,
+      "signature": "InformationEstimatorKind",
+      "summary": "Inferred summary: information estimator kind type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
       ],
       "testRefs": []
     },
