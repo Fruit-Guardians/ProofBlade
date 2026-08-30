@@ -215,6 +215,33 @@ test("real evaluation preflight reports missing credentials and direction covera
   }
 });
 
+test("strict ablation mode allows shared Provider profiles when strategy fingerprints differ", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-shared-profile-"));
+  try {
+    const source = "shared profile marker";
+    const expected = "flag{shared_profile}";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({ schemaVersion: 1, id: "shared-profile", cases: [corpusCase("sample", "target.bin", expected, source)] }), "utf8");
+    const shared = config("alpha");
+    const summary = await new RealModelEvaluationRunner(root, solver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [
+        { id: "baseline", config: shared, strategyFingerprint: "policy-base" },
+        { id: "candidate", config: shared, strategyFingerprint: "policy-recall" },
+      ],
+      allowLive: true,
+      allowSharedProviderProfile: true,
+      requireProviderTraffic: false,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-SHARED-PROFILE",
+    });
+    assert.equal(summary.gate.checks.find((item) => item.id === "distinct_profile_variants")?.passed, true);
+    assert.deepEqual(summary.variants.map((item) => item.strategyFingerprint), ["policy-base", "policy-recall"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("real evaluation rejects two ids that point to the same provider profile", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-duplicate-profile-"));
   try {

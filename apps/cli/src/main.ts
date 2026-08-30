@@ -227,6 +227,46 @@ async function main(): Promise<void> {
         if (!result.ready) process.exitCode = 1;
         break;
       }
+      if (action === "run") {
+        if (!rest.includes("--allow-live")) throw new Error("ablation run requires --allow-live because it sends real Provider requests");
+        const preflight = await preflightAblationExperiment(experiment, config.modelProfiles.executor, { probe: rest.includes("--probe") });
+        if (!preflight.ready) {
+          const failed = preflight.checks.filter((item) => !item.passed).map((item) => `${item.id} (actual=${item.actual}, expected=${item.expected})`).join("; ");
+          throw new Error(`ablation preflight failed before any Provider request: ${failed}`);
+        }
+        const variants = experiment.variants.map((variant) => ({
+          id: variant.id,
+          strategyFingerprint: variant.policySnapshot.policyFingerprint,
+          config: {
+            ...config,
+            modelProfiles: {
+              ...config.modelProfiles,
+              executor: {
+                ...config.modelProfiles.executor,
+                model: experiment.model.model,
+                ...(variant.modelSnapshot.thinkingLevel === undefined ? {} : { thinkingLevel: variant.modelSnapshot.thinkingLevel }),
+              },
+            },
+          },
+        }));
+        const summary = await new RealModelEvaluationRunner(root).run({
+          corpusPath: resolve(root, experiment.corpus.path),
+          variants,
+          allowLive: true,
+          allowSharedProviderProfile: true,
+          requireProviderTraffic: true,
+          attempts: experiment.budget.attempts,
+          maxTurns: experiment.budget.maxTurns,
+          maxCostUsd: experiment.budget.maxCostUsd,
+          deadlineMs: experiment.budget.deadlineMs,
+          runPrefix: option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`,
+          requireAnswerLiteralsAbsent: true,
+          baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
+        });
+        print(summary);
+        if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
+        break;
+      }
       if (action === "init") {
         const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
         const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
@@ -250,7 +290,7 @@ async function main(): Promise<void> {
         else print(report);
         break;
       }
-      throw new Error("ablation action must be list, create, or preflight");
+      throw new Error("ablation action must be list, create, preflight, run, init, status, resume, or report");
     }
     case "eval-anonymize": {
       const summaryPath = required(arg, "evaluation summary path");
@@ -750,7 +790,7 @@ function helpText(): string {
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--run-prefix ID] [--min-success-rate 0..1] [--enforce-gate]",
-    "  ablation list|create <experiment.json>|preflight|init|status|resume|report <experiment-id> [--results file] [--markdown]",
+    "  ablation list|create <experiment.json>|preflight|run|init|status|resume|report <experiment-id> [--allow-live] [--results file] [--markdown]",
     "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
     "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
