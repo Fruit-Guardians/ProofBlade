@@ -12,7 +12,10 @@ import {
   type CapabilityBackendStatus,
 } from "./backend.js";
 
-export interface CapabilityInvocation extends CapabilityBackendRequest {}
+export interface CapabilityInvocation extends CapabilityBackendRequest {
+  /** Internal fence used by durable jobs; ordinary callers leave it unset. */
+  expectedGeneration?: number;
+}
 
 export interface CapabilityInvocationResult {
   capabilityId: string;
@@ -191,6 +194,7 @@ export class ProofBladeCapabilityRouter {
     const persistence = resolved.backend.preparePersistence(request, manifestOperation);
     const operation = persistence.operation;
     const snapshot = await this.controlStore.snapshot(this.runId);
+    assertExpectedGeneration(request, snapshot.generation);
     const plan = resolved.backend.prepareExecution(request, operation, {
       runId: this.runId,
       fixture: this.fixture,
@@ -212,6 +216,9 @@ export class ProofBladeCapabilityRouter {
       artifactSensitivity: plan.artifactSensitivity,
       cwd: plan.cwd,
     };
+    // Re-read immediately before entering the effect journal. This closes the
+    // normal reset-to-invoke window for durable background jobs.
+    assertExpectedGeneration(request, (await this.controlStore.snapshot(this.runId)).generation);
     const executed = plan.execute
       ? await this.journal.executeWith(this.runId, journalInput, async (_effect, innerSignal) => await plan.execute!(innerSignal), signal)
       : await this.journal.execute(this.runId, journalInput, signal);
@@ -227,6 +234,12 @@ export class ProofBladeCapabilityRouter {
       truncated: output.truncated,
       originalChars: output.originalChars,
     };
+  }
+}
+
+function assertExpectedGeneration(request: CapabilityInvocation, currentGeneration: number): void {
+  if (request.expectedGeneration !== undefined && request.expectedGeneration !== currentGeneration) {
+    throw new Error(`Capability invocation generation is stale: expected ${request.expectedGeneration}, current ${currentGeneration}`);
   }
 }
 

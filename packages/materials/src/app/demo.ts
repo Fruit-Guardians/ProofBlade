@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { TaskContract } from "../domain/types.js";
 import { id, sha256 } from "../domain/utils.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
-import { ControlStore, type FixtureControlPort, type VerificationRecoveryControlPort, type VerifierControlPort } from "../control/control-store.js";
+import { ControlStore, type FixtureControlPort, type UpdateEvaluationControlPort, type VerificationRecoveryControlPort, type VerifierControlPort } from "../control/control-store.js";
 import { ArtifactStore } from "../effects/artifact-store.js";
 import { EffectJournal, type VerifierEffectJournal, type VerifierEffectTestHarness } from "../effects/effect-journal.js";
 import { LocalFixtureSandbox, type SandboxPort } from "../sandbox/fixture.js";
@@ -20,6 +20,7 @@ export interface AppServices {
   control: ControlStore;
   verifier: VerifierControlPort;
   fixtureControl: FixtureControlPort;
+  updateEvaluation: UpdateEvaluationControlPort;
   artifacts: ArtifactStore;
   journal: EffectJournal;
   verifierJournal: VerifierEffectJournal;
@@ -81,7 +82,7 @@ function createServicePlane(root: string, config: ProofBladeConfig, options: Cre
   const resolved: CreateServicesOptions = typeof options === "function" ? { effectFault: options } : options;
   const runsRoot = join(root, config.storage.runsDir);
   const authoritySecret = resolveControlAuthority(resolved.authoritySecret, resolved.authorityStateDirectory);
-  const { control, verifier, verifierEffects, fixtureControl, verificationRecovery } = ControlStore.create(
+  const { control, verifier, verifierEffects, fixtureControl, verificationRecovery, updateEvaluation } = ControlStore.create(
     new JsonlControlStore(runsRoot),
     async () => await createRunVersionSnapshot(root, config),
     authoritySecret,
@@ -95,6 +96,7 @@ function createServicePlane(root: string, config: ProofBladeConfig, options: Cre
     control,
     verifier,
     fixtureControl,
+    updateEvaluation,
     verificationRecovery,
     ...(resolved.verificationRecoveryAdapters ? { verificationRecoveryAdapters: resolved.verificationRecoveryAdapters } : {}),
     externalResources,

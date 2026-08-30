@@ -12,7 +12,7 @@ import type { Lane } from "../domain/types.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
-import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import { attachPiObservability, createProviderSchedulingTelemetry, type ContextManifestSummary } from "../observability/pi-events.js";
 import type { ClaimVerificationProjection } from "../verification/claim-verification.js";
 import { persistedAssistantText } from "./assistant-message.js";
 
@@ -91,6 +91,11 @@ export class PiAgentLane implements AgentLanePort {
         const current = await options.controlStore.snapshot(options.runId);
         return new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow }).estimatedTokens;
       },
+      getContextSnapshot: async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        const currentContext = new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow });
+        return contextSnapshot(currentContext.manifest);
+      },
       scheduling,
     });
     return new PiAgentLane(options.runId, lane, options.controlStore, harness);
@@ -144,4 +149,30 @@ export class PiAgentLane implements AgentLanePort {
   public async close(): Promise<void> {
     await this.harness.waitForIdle();
   }
+}
+
+export function contextSnapshot(manifest: import("../domain/types.js").ContextManifest): {
+  estimatedTokens: number;
+  manifestHash: string;
+  cache: import("../domain/types.js").ContextManifest["cache"];
+  contextWindow: number;
+  manifestSummary: ContextManifestSummary;
+} {
+  return {
+    estimatedTokens: manifest.budget.estimatedInput,
+    manifestHash: manifest.hash,
+    cache: manifest.cache,
+    contextWindow: manifest.budget.contextWindow,
+    manifestSummary: {
+      hash: manifest.hash,
+      layerTokens: { ...manifest.layerTokens },
+      blockHashes: Object.fromEntries((manifest.blocks ?? []).map((block) => [block.id, block.contentHash])),
+      ...(manifest.observationQueue ? { observationQueue: manifest.observationQueue } : {}),
+      ...(manifest.firstChangedBlock ? { firstChangedBlock: manifest.firstChangedBlock } : {}),
+      ...(manifest.compressionTarget ? { compressionTarget: manifest.compressionTarget } : {}),
+      droppedCount: manifest.dropped.length,
+      maintenance: { stage: manifest.maintenance.stage, ...(manifest.maintenance.targetRatio === undefined ? {} : { targetRatio: manifest.maintenance.targetRatio }), ...(manifest.maintenance.hardRatio === undefined ? {} : { hardRatio: manifest.maintenance.hardRatio }), shouldCompact: manifest.maintenance.shouldCompact, forceCompact: manifest.maintenance.forceCompact, ...(manifest.maintenance.target ? { target: manifest.maintenance.target } : {}), ...(manifest.maintenance.nextAction ? { nextAction: manifest.maintenance.nextAction } : {}) },
+      budget: { contextWindow: manifest.budget.contextWindow, availableInput: manifest.budget.availableInput, estimatedInput: manifest.budget.estimatedInput, ratio: manifest.budget.ratio, overBudget: manifest.budget.overBudget },
+    },
+  };
 }

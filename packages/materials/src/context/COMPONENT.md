@@ -4,15 +4,15 @@
 {
   "id": "materials-context",
   "name": "Context and Compaction",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T04:00:00.000Z",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 3,
-    "securityAuditCount": 3,
-    "lastBugAuditAt": "2026-08-09T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-09T04:00:00.000Z",
-    "sourceHash": "169c106d39463e9e372720dc31fad16c149721ca292b70c0eced29a2706b61bf",
+    "bugAuditCount": 4,
+    "securityAuditCount": 4,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "e3f04e7afe3a580387bedaa9db84043a047a237eed15e70215e6e56ce490f66d",
     "result": "passed"
   }
 }

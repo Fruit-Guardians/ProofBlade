@@ -4,15 +4,15 @@
 {
   "id": "materials-sandbox",
   "name": "Fixture Sandbox",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T20:17:19.5056968+08:00",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-07T20:17:19.5056968+08:00",
-    "lastSecurityAuditAt": "2026-08-07T20:17:19.5056968+08:00",
-    "sourceHash": "115ef660ac0923ffbfe4046449d59bcc7f619494524c9e385027525c68c7573e",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "c19de21abe1ed7b16717b2cc8b486d2e948da1d819f2c5547130e551f47f928d",
     "result": "passed"
   }
 }

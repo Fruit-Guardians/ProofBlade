@@ -1,2 +1,4 @@
 # Hash-bound local evaluation fixtures must have identical bytes on every host.
 fixtures/holdout/** text eol=lf
+docs/generated/** text eol=lf
+plugins/proofblade-api-index/** text eol=lf

@@ -9,24 +9,28 @@ import {
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
+import { boundedRequestedChars } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
 import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
+import { KNOWLEDGE_READ_MAX_TOKENS } from "../knowledge/projection.js";
 import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
-import type { RawEffectResult, TargetKind } from "../domain/types.js";
+import type { Lane, RawEffectResult, TargetKind } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { WebExploitRecipe } from "../verification/web-reproducer.js";
 import type { WebToolHandler } from "../web/web-tools.js";
 import { createWebSessionTools } from "./web-coding-tools.js";
+import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSearchHash, workspaceSearchText, WORKSPACE_SEARCH_MODEL_MAX_CHARS } from "./workspace-search.js";
+import { RunEventIngress } from "../orchestration/event-ingress.js";
 
-export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
+export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
 export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
@@ -58,6 +62,8 @@ export interface CodingFlagSubmission {
 }
 
 export interface CodingResourceContext extends ExecutionToolContext {
+  /** Durable owner identity for lane-scoped shell process records. */
+  ownerLane?: Lane;
   controlStore: ControlStore;
   artifactStore: ArtifactStore;
   skills: ProofBladeSkillRegistry;
@@ -353,11 +359,11 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence Curator proxy for durable observations, typed graph edges, reasoning trees, and the compact forest index. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Evidence and knowledge proxy for durable observations, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
-      enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"],
-      description: "Evidence operation. curation_status takes no other arguments; inspect_tree requires treeId; read requires artifactId; annotate requires artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
+      enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"],
+      description: "Evidence operation. curation_status takes no other arguments; inspect_uri reads a pb:// URI at L0/L1/L2; search_uri searches current Run knowledge plus the read-only project Skill/Tool/MCP directory; consolidate creates a resumable source-linked L0/L1 index without deleting raw Artifacts; inspect_tree requires treeId; read requires artifactId; annotate accepts artifactId, name, and summary; record requires artifactIds (plural), name, and summary and never accepts artifactId or role; link requires from, to, and relation; create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds; update_tree requires treeId.",
     }),
     treeId: Type.Optional(Type.String({ minLength: 1 })),
     query: Type.Optional(Type.String({ maxLength: 200 })),
@@ -371,6 +377,12 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     dependsOn: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16 })),
     claim: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000 })),
     maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
+    uri: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
+    level: Type.Optional(Type.String({ enum: ["L0", "L1", "L2"] })),
+    maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 200 })),
+    includeStale: Type.Optional(Type.Boolean()),
+    policy: Type.Optional(Type.String({ enum: ["deduplicate", "summarize", "all"] })),
+    maxArtifacts: Type.Optional(Type.Number({ minimum: 1, maximum: 128 })),
     from: Type.Optional(Type.String({ minLength: 1, description: "Upstream premise/source node id; information flows from this node." })),
     to: Type.Optional(Type.String({ minLength: 1, description: "Downstream derived, supported, refuted, or reproduced node id." })),
     relation: Type.Optional(Type.String({
@@ -388,7 +400,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as {
-      operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
+      operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "inspect_uri" | "search_uri" | "consolidate" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
       query?: string;
       artifactId?: string;
       artifactIds?: string[];
@@ -400,6 +412,12 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       dependsOn?: string[];
       claim?: string;
       maxChars?: number;
+      uri?: string;
+      level?: "L0" | "L1" | "L2";
+      maxResults?: number;
+      includeStale?: boolean;
+      policy?: "deduplicate" | "summarize" | "all";
+      maxArtifacts?: number;
       treeId?: string;
       from?: string;
       to?: string;
@@ -412,10 +430,10 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
     if (input.operation === "curation_status") {
       assertOnly(input, ["operation"], "evidence curation_status");
-      return toolResult({ curation: await context.evidenceCurationGate?.inspect() ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
+      return toolResult({ curation: await context.evidenceCurationGate?.inspect({ includeReviewEvents: true }) ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
     }
     if (input.operation === "inspect_forest") {
       assertOnly(input, ["operation", "maxChars"], "evidence inspect_forest");
@@ -433,7 +451,21 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
       if (!input.artifactId) throw new Error("evidence read requires artifactId");
-      return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, input.maxChars));
+      return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
+    }
+    if (input.operation === "inspect_uri") {
+      assertOnly(input, ["operation", "uri", "level", "maxChars"], "evidence inspect_uri");
+      if (!input.uri) throw new Error("evidence inspect_uri requires uri");
+      return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
+    }
+    if (input.operation === "search_uri") {
+      assertOnly(input, ["operation", "query", "maxResults", "maxChars", "includeStale"], "evidence search_uri");
+      const maxChars = boundedRequestedChars(input.maxChars, 12_000, KNOWLEDGE_READ_MAX_TOKENS);
+      return toolResult({ results: await context.runtime.searchKnowledge(input.query ?? "", input.maxResults ?? 50, maxChars, input.includeStale ?? false) }, false, maxChars);
+    }
+    if (input.operation === "consolidate") {
+      assertOnly(input, ["operation", "artifactIds", "policy", "maxArtifacts"], "evidence consolidate");
+      return toolResult(await context.runtime.consolidateKnowledge({ artifactIds: input.artifactIds, policy: input.policy, maxArtifacts: input.maxArtifacts }));
     }
     if (input.operation === "annotate") {
       assertOnly(input, ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"], "evidence annotate");
@@ -503,20 +535,31 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     // existing job remains available, but new background work must stop when
     // the durable evidence backlog reaches the hard curation threshold.
     const curationNotice = await context.evidenceCurationGate?.assertInvestigationAllowed();
+    const snapshot = await context.controlStore.snapshot(context.runtime.runId);
     const jobId = `sh-${toolCallId.slice(-8)}`;
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
-    const logPath = `.proofblade/jobs/${jobId}-${slug}.log`;
-    // setsid/nohup keeps the child alive past this tool call; $! is captured
-    // before any other command can overwrite it.
-    // The pid goes to a file rather than being matched later with `pgrep -f`:
-    // the log path is a redirection performed by THIS shell, so it never appears
-    // in the child's argv and pattern-matching for it always misses.
-    const launcher = [
-      `mkdir -p .proofblade/jobs`,
-      `nohup bash -c ${shellQuote(input.command)} > ${logPath} 2>&1 &`,
-      `echo $! > ${pidPath(jobId)}`,
-      `echo "pid=$!"`,
-    ].join("\n");
+    const paths = shellJobPaths(context.runtime.runId, snapshot.generation, jobId);
+    const processStartTime = new Date().toISOString();
+    const reservation: ShellJobRecord = {
+      schemaVersion: 2,
+      jobId,
+      runId: context.runtime.runId,
+      generation: snapshot.generation,
+      ownerLane: context.ownerLane ?? "main",
+      pid: 0,
+      processGroupCreated: false,
+      processTreePath: paths.pidPath,
+      processStartTime,
+      processStartEpochMs: Date.now(),
+      logPath: paths.logPath,
+      status: "STARTING",
+      commandHash: sha256(input.command),
+      label: slug,
+      createdAt: processStartTime,
+    };
+    // The wrapper commits its real PID metadata before it starts user code.
+    // This removes the old spawn -> second host write failure window.
+    const launcher = buildShellJobLauncher(reservation, paths, input.command);
     let started: string;
     try {
       started = await runShell(launcher, signal, onUpdate, context);
@@ -526,11 +569,19 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     }
     const pid = /pid=(\d+)/.exec(started)?.[1];
     if (!pid) throw new Error(`Could not start background job: ${started.slice(0, 400)}`);
+    const processGroupCreated = /process-group-created=true/.test(started);
+    if (!processGroupCreated && !/process-group-created=false/.test(started)) {
+      throw new Error(`Could not determine process isolation mode: ${started.slice(0, 400)}`);
+    }
     await context.experimentGate?.record({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label }, outcome: "success", summary: "Background shell process started." });
     return toolResult({
       jobId,
       pid: Number(pid),
-      logPath,
+      processGroupCreated,
+      ...(processGroupCreated ? { processGroupId: Number(pid) } : {}),
+      logPath: paths.logPath,
+      generation: snapshot.generation,
+      ownerLane: reservation.ownerLane,
       status: "running",
       note: [`Started in the background. Poll with shell_job {"operation":"read","jobId":"${jobId}"} and stop it with {"operation":"stop","jobId":"${jobId}"}. Keep working while it runs.`, ...(curationNotice ? [curationNotice] : [])].join("\n\n"),
     });
@@ -543,66 +594,356 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
   label: "shell_job",
   description: "Read the output of, or stop, a background job started by shell_background.",
   parameters: Type.Object({
-    operation: Type.String({ enum: ["read", "stop", "list"], description: "read tails the job log, stop kills it, list shows known jobs." }),
+    operation: Type.String({ enum: ["read", "monitor", "stop", "list"], description: "read returns bounded output, monitor waits for a trigger, stop kills it, list shows known jobs." }),
     jobId: Type.Optional(Type.String({ minLength: 1, description: "Job id from shell_background. Required for read and stop." })),
     maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 20_000, description: "Bound on returned log text (default 4000)." })),
+    sinceCursor: Type.Optional(Type.String({ pattern: "^[0-9]+$", description: "Byte cursor returned by an earlier read or monitor call." })),
+    triggers: Type.Optional(Type.Array(Type.String({ enum: ["new_output", "keyword", "exit", "error", "heartbeat", "timeout"] }), { minItems: 1, maxItems: 6 })),
+    keywords: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { maxItems: 16, description: "Case-insensitive sentinel strings for the keyword trigger." })),
+    waitMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000, description: "Maximum time to wait in monitor mode." })),
+    heartbeatMs: Type.Optional(Type.Number({ minimum: 50, maximum: 120_000, description: "Optional heartbeat interval while the job remains active." })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, onUpdate, context) {
-    const input = params as { operation: "read" | "stop" | "list"; jobId?: string; maxChars?: number };
+    const input = params as { operation: "read" | "monitor" | "stop" | "list"; jobId?: string; maxChars?: number; sinceCursor?: string; triggers?: Array<"new_output" | "keyword" | "exit" | "error" | "heartbeat" | "timeout">; keywords?: string[]; waitMs?: number; heartbeatMs?: number };
     if (input.operation === "list") {
-      assertAbsent(input as unknown as Record<string, unknown>, ["jobId"], "shell_job list");
-      const listed = await runShell(`ls -1 .proofblade/jobs/*.log 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
+      assertAbsent(input as unknown as Record<string, unknown>, ["jobId", "maxChars", "sinceCursor", "triggers", "keywords", "waitMs", "heartbeatMs"], "shell_job list");
+      const generation = (await context.controlStore.snapshot(context.runtime.runId)).generation;
+      const paths = shellJobPaths(context.runtime.runId, generation);
+      const listed = await runShell(`ls -1 ${paths.rootPath}/*.json 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
       return toolResult({ jobs: listed.trim().split(/\r?\n/).filter(Boolean) });
     }
     if (!input.jobId) throw new Error(`shell_job ${input.operation} requires jobId`);
     if (!/^[A-Za-z0-9._-]+$/.test(input.jobId)) throw new Error("shell_job jobId contains unsupported characters");
+    const generation = (await context.controlStore.snapshot(context.runtime.runId)).generation;
     if (input.operation === "stop") {
-      // Kill the recorded pid AND its children: the pid is a `bash -c` wrapper, and
-      // the work (a sweep, a fuzzer) usually lives in a child of it.
-      const stopped = await runShell(
-        [
-          `p=$(cat ${pidPath(input.jobId)} 2>/dev/null)`,
-          `if [ -z "$p" ]; then echo "__NO_JOB__"; else`,
-          `pkill -P "$p" 2>/dev/null; kill "$p" 2>/dev/null`,
-          `sleep 0.3`,
-          `if kill -0 "$p" 2>/dev/null; then pkill -9 -P "$p" 2>/dev/null; kill -9 "$p" 2>/dev/null; sleep 0.2; fi`,
-          `if kill -0 "$p" 2>/dev/null; then echo "still-alive"; else echo stopped; fi; fi`,
-        ].join("\n"),
-        signal,
-        onUpdate,
-        context,
-      );
-      if (stopped.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${input.jobId}`);
+      const stopped = await stopShellJob(shellJobPaths(context.runtime.runId, generation, input.jobId), context.runtime.runId, generation, context.ownerLane ?? "main", signal, onUpdate, context);
+      if (stopped.includes("__NO_JOB__") || stopped.includes("__UNKNOWN_JOB__")) throw new Error(`Background job ${input.jobId} is unknown or belongs to another Run/lane`);
+      const observationId = await recordShellJobObservation(context, input.jobId, { status: "finished", cursor: 0, trigger: "exit" });
+      if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
       return toolResult({ jobId: input.jobId, stopped: stopped.includes("stopped"), detail: stopped.trim() });
     }
     const maxChars = input.maxChars ?? 4_000;
-    const output = await runShell(
-      `f=$(ls -1 .proofblade/jobs/${input.jobId}-*.log 2>/dev/null | head -1); ` +
-      `if [ -z "$f" ]; then echo "__NO_JOB__"; else ` +
-      `p=$(cat ${pidPath(input.jobId)} 2>/dev/null); ` +
-      `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else echo "__FINISHED__"; fi; ` +
-      `wc -c < "$f"; tail -c ${Math.max(256, maxChars)} "$f"; fi`,
-      signal,
-      onUpdate,
-      context,
-    );
-    if (output.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${input.jobId}`);
-    const running = output.includes("__RUNNING__");
-    const body = output.replace(/__(RUNNING|FINISHED)__\r?\n/, "");
-    const [sizeLine, ...rest] = body.split(/\r?\n/);
-    const totalBytes = Number.parseInt((sizeLine ?? "").trim(), 10);
-    const text = rest.join("\n");
+    if (input.operation === "read") {
+      const inspection = await inspectShellJob(input.jobId, generation, maxChars, signal, onUpdate, context);
+      const sinceCursor = parseShellCursor(input.sinceCursor);
+      const projection = shellOutputProjection(inspection, sinceCursor);
+      const trigger = inspection.status === "finished" ? "exit" : projection.newOutput ? "new_output" : undefined;
+      if (trigger) {
+        const observationId = await recordShellJobObservation(context, input.jobId, { ...inspection, trigger });
+        if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
+      }
+      return toolResult({
+        jobId: input.jobId,
+        status: inspection.status,
+        cursor: String(inspection.cursor),
+        sinceCursor: String(sinceCursor),
+        totalBytes: inspection.totalBytes,
+        truncated: projection.truncated,
+        output: snipText(projection.output, maxChars).text,
+        ...(inspection.status === "running" ? { note: "Still running. Use shell_job monitor with a trigger instead of repeated empty reads." } : {}),
+      });
+    }
+    const monitored = await monitorShellJob(input.jobId, generation, input, signal, onUpdate, context);
+    const observationId = await recordShellJobObservation(context, input.jobId, monitored);
+    if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
     return toolResult({
       jobId: input.jobId,
-      status: running ? "running" : "finished",
-      totalBytes: Number.isFinite(totalBytes) ? totalBytes : undefined,
-      truncated: Number.isFinite(totalBytes) && totalBytes > text.length,
-      output: text,
-      ...(running ? { note: "Still running — do not wait in a loop; go do other analysis and poll again later." } : {}),
+      status: monitored.status,
+      trigger: monitored.trigger,
+      cursor: String(monitored.cursor),
+      sinceCursor: String(monitored.sinceCursor),
+      truncated: monitored.truncated,
+      output: snipText(monitored.output, maxChars).text,
+      ...(monitored.matchedKeyword ? { matchedKeyword: monitored.matchedKeyword } : {}),
     });
   },
 };
+
+interface ShellJobInspection {
+  status: "running" | "finished";
+  totalBytes: number;
+  cursor: number;
+  tail: Buffer;
+}
+
+interface ShellJobRecord {
+  schemaVersion: 1 | 2;
+  jobId: string;
+  runId: string;
+  generation: number;
+  ownerLane: Lane;
+  pid: number;
+  processGroupCreated?: boolean;
+  processGroupId?: number;
+  processTreePath?: string;
+  processStartTime: string;
+  processStartEpochMs: number;
+  logPath: string;
+  status: "STARTING" | "RUNNING" | "FINISHED" | "STOPPED" | "UNKNOWN";
+  commandHash: string;
+  label: string;
+  createdAt: string;
+}
+
+interface ShellOutputProjection {
+  output: string;
+  newOutput: boolean;
+  truncated: boolean;
+}
+
+interface ShellMonitorResult {
+  status: "running" | "finished";
+  trigger: "new_output" | "keyword" | "exit" | "error" | "heartbeat" | "timeout";
+  cursor: number;
+  sinceCursor: number;
+  output: string;
+  truncated: boolean;
+  matchedKeyword?: string;
+}
+
+async function inspectShellJob(
+  jobId: string,
+  generation: number,
+  maxChars: number,
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<ShellJobInspection> {
+  const paths = shellJobPaths(context.runtime.runId, generation, jobId);
+  const identity = shellRecordIdentity(context.runtime.runId, generation, context.ownerLane ?? "main");
+  const output = await runShell(
+    `f=${paths.logPath}; r=${paths.recordPath}; ` +
+    `if [ ! -f "$r" ] || ! grep -Fq ${shellQuote(identity)} "$r" || [ ! -f "$f" ]; then echo "__NO_JOB__"; else ` +
+    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); ` +
+    `if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "__RUNNING__"; else sed -E -i 's/"status":"[^\"]+"/"status":"FINISHED"/' "$r" 2>/dev/null; echo "__FINISHED__"; fi; ` +
+    `wc -c < "$f"; tail -c ${Math.max(256, Math.min(20_000, Math.floor(maxChars)))} "$f" | base64 | tr -d '\\r\\n'; fi`,
+    signal,
+    onUpdate,
+    context,
+  );
+  if (output.includes("__NO_JOB__")) throw new Error(`Unknown background job: ${jobId}`);
+  const running = output.startsWith("__RUNNING__");
+  const body = output.replace(/^__(RUNNING|FINISHED)__\r?\n/, "");
+  const [sizeLine, ...rest] = body.split(/\r?\n/);
+  const totalBytes = Number.parseInt((sizeLine ?? "").trim(), 10);
+  if (!Number.isSafeInteger(totalBytes) || totalBytes < 0) throw new Error(`Background job ${jobId} returned an invalid byte cursor`);
+  const encodedTail = rest.join("").trim();
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encodedTail)) {
+    throw new Error(`Background job ${jobId} returned an invalid base64 log tail`);
+  }
+  let tail: Buffer;
+  try {
+    tail = Buffer.from(encodedTail, "base64");
+  } catch {
+    throw new Error(`Background job ${jobId} returned an invalid base64 log tail`);
+  }
+  if (tail.length > totalBytes) throw new Error(`Background job ${jobId} returned an oversized log tail`);
+  return { status: running ? "running" : "finished", totalBytes, cursor: totalBytes, tail };
+}
+
+function shellOutputProjection(inspection: ShellJobInspection, sinceCursor: number): ShellOutputProjection {
+  const tailBytes = inspection.tail.length;
+  const tailStart = Math.max(0, inspection.totalBytes - tailBytes);
+  if (sinceCursor < tailStart) return { output: decodeUtf8Tail(inspection.tail, 0), newOutput: inspection.totalBytes > sinceCursor, truncated: true };
+  const offset = Math.max(0, sinceCursor - tailStart);
+  const output = decodeUtf8Tail(inspection.tail, offset);
+  return { output, newOutput: inspection.totalBytes > sinceCursor, truncated: false };
+}
+
+function decodeUtf8Tail(bytes: Buffer, offset: number): string {
+  let safeOffset = Math.max(0, Math.min(bytes.length, Math.floor(offset)));
+  // A byte cursor is allowed to point at the beginning of a retained tail,
+  // which may itself start in the middle of a UTF-8 sequence after truncation.
+  // Skip continuation bytes so the model never receives a replacement glyph.
+  while (safeOffset < bytes.length && (bytes[safeOffset]! & 0xc0) === 0x80) safeOffset += 1;
+  return bytes.subarray(safeOffset).toString("utf8");
+}
+
+async function monitorShellJob(
+  jobId: string,
+  generation: number,
+  input: { sinceCursor?: string; triggers?: ShellMonitorResult["trigger"][]; keywords?: string[]; waitMs?: number; heartbeatMs?: number },
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<ShellMonitorResult> {
+  const sinceCursor = parseShellCursor(input.sinceCursor);
+  const triggers = new Set(input.triggers ?? ["new_output", "keyword", "exit", "error", "heartbeat"]);
+  if (triggers.has("keyword") && (!input.keywords || input.keywords.length === 0)) throw new Error("shell_job monitor keyword trigger requires keywords");
+  const keywords = (input.keywords ?? []).map((keyword) => keyword.trim()).filter(Boolean);
+  const waitMs = normalizeShellMonitorWait(input.waitMs ?? 30_000);
+  const heartbeatMs = normalizeShellMonitorWait(input.heartbeatMs ?? 5_000);
+  const deadline = Date.now() + waitMs;
+  let lastHeartbeat = Date.now();
+  while (true) {
+    throwIfShellAborted(signal);
+    const inspection = await inspectShellJob(jobId, generation, 12_000, signal, onUpdate, context);
+    const projection = shellOutputProjection(inspection, sinceCursor);
+    const matchedKeyword = keywords.find((keyword) => projection.output.toLocaleLowerCase().includes(keyword.toLocaleLowerCase()));
+    if (triggers.has("keyword") && matchedKeyword) return { status: inspection.status, trigger: "keyword", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated, matchedKeyword };
+    if (triggers.has("new_output") && projection.newOutput) return { status: inspection.status, trigger: "new_output", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    if (inspection.status === "finished") {
+      if (triggers.has("error")) return { status: inspection.status, trigger: "error", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+      if (triggers.has("exit")) return { status: inspection.status, trigger: "exit", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    }
+    if (triggers.has("heartbeat") && Date.now() - lastHeartbeat >= heartbeatMs) {
+      lastHeartbeat = Date.now();
+      return { status: inspection.status, trigger: "heartbeat", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    }
+    if (Date.now() >= deadline) return { status: inspection.status, trigger: "timeout", cursor: inspection.cursor, sinceCursor, output: projection.output, truncated: projection.truncated };
+    // A single bounded wait lives inside the tool call; it does not create
+    // extra Provider turns or consume model tokens for empty reads.
+    await delayShellMonitor(Math.min(250, Math.max(1, deadline - Date.now())), signal);
+  }
+}
+
+interface ShellJobPaths {
+  rootPath: string;
+  recordPath: string;
+  logPath: string;
+  pidPath: string;
+}
+
+function shellJobPaths(runId: string, generation: number, jobId?: string): ShellJobPaths {
+  const rootPath = `${shellJobRunRoot(runId)}/${generation}`;
+  const suffix = jobId ? `/${jobId}` : "";
+  return { rootPath, recordPath: `${rootPath}${suffix}.json`, logPath: `${rootPath}${suffix}.log`, pidPath: `${rootPath}${suffix}.pids` };
+}
+
+function shellJobRunRoot(runId: string): string {
+  return `.proofblade/jobs/${sha256(runId).slice(0, 24)}`;
+}
+
+function shellRecordIdentity(runId: string, generation: number, ownerLane: Lane): string {
+  return `"runId":${JSON.stringify(runId)},"generation":${generation},"ownerLane":${JSON.stringify(ownerLane)}`;
+}
+
+function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths, userCommand: string): string {
+  const reservationJson = JSON.stringify(reservation);
+  const recordPath = shellQuote(paths.recordPath);
+  const logPath = shellQuote(paths.logPath);
+  const rootPath = shellQuote(paths.rootPath);
+  const pidPath = shellQuote(paths.pidPath);
+  const groupWrapper = [
+    `record=${recordPath}; temporary="$record.tmp.$$";`,
+    `printf %s ${shellQuote(reservationJson)} > "$temporary" || exit 70;`,
+    `"$sed_bin" -E -i 's/"pid":0/"pid":'$$'/; s/"processGroupCreated":false/"processGroupCreated":true,"processGroupId":'$$'/; s/"status":"STARTING"/"status":"RUNNING"/' "$temporary" || exit 70;`,
+    `"$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; exit 70; }`,
+    `exec "$bash_bin" -c ${shellQuote(userCommand)}`,
+  ].join("\n");
+  const fallbackSupervisor = [
+    `record=${recordPath}; pid_file=${pidPath}; temporary="$record.tmp.$BASHPID";`,
+    `printf %s ${shellQuote(reservationJson)} > "$temporary" || exit 70;`,
+    `"$sed_bin" -E -i 's/"pid":0/"pid":'$$'/' "$temporary" || exit 70;`,
+    `"$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; exit 70; }`,
+    `set -m 2>/dev/null || exit 70;`,
+    `"$bash_bin" -c ${shellQuote(userCommand)} > ${logPath} 2>&1 & child_pid=$!; group_id=$child_pid;`,
+    `if ! kill -0 -- -"$group_id" 2>/dev/null; then kill "$child_pid" 2>/dev/null || true; exit 70; fi;`,
+    `temporary="$record.tmp.$BASHPID"; "$cat_bin" "$record" > "$temporary" || exit 70; "$sed_bin" -E -i 's/"processGroupCreated":false/"processGroupCreated":true,"processGroupId":'"$group_id"'/; s/"status":"STARTING"/"status":"RUNNING"/' "$temporary" || exit 70; "$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; exit 70; }`,
+    `collect_descendants() { parent="$1"; for child in $("$ps_bin" -eo pid=,ppid= 2>/dev/null | "$awk_bin" -v parent="$parent" '$2 == parent { print $1 }'); do collect_descendants "$child"; printf '%s\\n' "$child"; done; }`,
+    `snapshot_pids() { now=$("$date_bin" +%s 2>/dev/null) || return 1; temporary="$pid_file.tmp.$BASHPID"; if [ -f "$pid_file" ]; then "$cat_bin" "$pid_file" > "$temporary" || return 1; else : > "$temporary" || return 1; fi; if ! "$grep_bin" -Fq "$$:" "$temporary"; then printf '%s:%s\\n' "$$" "$(( now * 1000 ))" >> "$temporary" || return 1; fi; targets=$(collect_descendants "$$"); if [ -n "$child_pid" ]; then targets="$targets $child_pid $(collect_descendants "$child_pid")"; fi; for target in $targets; do etimes=$("$ps_bin" -o etimes= -p "$target" 2>/dev/null | "$tr_bin" -d ' '); if [ -n "$etimes" ] && ! "$grep_bin" -Fq "$target:" "$temporary"; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$temporary" || return 1; fi; done; "$mv_bin" "$temporary" "$pid_file" || { "$rm_bin" -f "$temporary"; return 1; }; }`,
+    `terminate_child_tree() { if [ -n "$child_pid" ]; then for target in $(collect_descendants "$child_pid"); do kill "$target" 2>/dev/null || true; done; kill "$child_pid" 2>/dev/null || true; fi; }`,
+    `stop_supervisor() { terminate_child_tree; exit 143; }; trap terminate_child_tree EXIT; trap stop_supervisor HUP INT TERM`,
+    `supervisor_pid=$$; snapshot_loop() { while kill -0 "$supervisor_pid" 2>/dev/null; do snapshot_pids || exit 70; "$sleep_bin" 0.01; done; }; snapshot_loop & snapshot_pid=$!;`,
+    `snapshot_pids || { terminate_child_tree; exit 70; };`,
+    `warmup=0; while [ "$warmup" -lt 100 ]; do if ! kill -0 "$child_pid" 2>/dev/null; then break; fi; snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.01; warmup=$(( warmup + 1 )); done;`,
+    `while kill -0 "$child_pid" 2>/dev/null; do snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.1; done;`,
+    `snapshot_pids || { terminate_child_tree; exit 70; };`,
+    `kill "$snapshot_pid" 2>/dev/null || true; wait "$snapshot_pid" 2>/dev/null || true; wait "$child_pid"; exit $?`,
+  ].join("\n");
+  return [
+    `root=${rootPath}; record=${recordPath}; log=${logPath};`,
+    `mkdir -p "$root" || { echo startup-failed; exit 70; };`,
+    `bash_bin=$(command -v bash 2>/dev/null) || { echo startup-failed; exit 70; }; nohup_bin=$(command -v nohup 2>/dev/null) || { echo startup-failed; exit 70; }; sed_bin=$(command -v sed 2>/dev/null) || { echo startup-failed; exit 70; }; grep_bin=$(command -v grep 2>/dev/null) || { echo startup-failed; exit 70; }; sleep_bin=$(command -v sleep 2>/dev/null) || { echo startup-failed; exit 70; }; cat_bin=$(command -v cat 2>/dev/null) || true; ps_bin=$(command -v ps 2>/dev/null) || true; awk_bin=$(command -v awk 2>/dev/null) || true; date_bin=$(command -v date 2>/dev/null) || true; tr_bin=$(command -v tr 2>/dev/null) || { echo startup-failed; exit 70; }; mv_bin=$(command -v mv 2>/dev/null) || { echo startup-failed; exit 70; }; rm_bin=$(command -v rm 2>/dev/null) || { echo startup-failed; exit 70; }; setsid_bin=$(command -v setsid 2>/dev/null) || true; export bash_bin sed_bin grep_bin sleep_bin cat_bin ps_bin awk_bin date_bin tr_bin mv_bin rm_bin;`,
+    `temporary="$record.tmp.$$"; printf %s ${shellQuote(reservationJson)} > "$temporary" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; }; "$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; };`,
+    `if [ -n "$setsid_bin" ]; then`,
+    `  "$setsid_bin" "$nohup_bin" "$bash_bin" -c ${shellQuote(groupWrapper)} > "$log" 2>&1 &`,
+    `  mode=true`,
+    `else`,
+    `  if [ -z "$cat_bin" ] || [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo startup-failed; exit 70; fi`,
+    `  "$nohup_bin" "$bash_bin" -c ${shellQuote(fallbackSupervisor)} > "$log" 2>&1 &`,
+    `  mode=false`,
+    `fi`,
+    `launcher_pid=$!;`,
+    `cleanup_startup() { if kill -0 "$launcher_pid" 2>/dev/null; then group=$("$sed_bin" -n 's/.*"processGroupId":\\([0-9][0-9]*\\).*/\\1/p' "$record" 2>/dev/null); if [ -n "$group" ] && kill -0 -- -"$group" 2>/dev/null; then kill -- -"$group" 2>/dev/null || true; else kill "$launcher_pid" 2>/dev/null || true; fi; fi; };`,
+    `i=0; while [ "$i" -lt 100 ]; do if [ -f "$record" ] && "$grep_bin" -Fq '"status":"RUNNING"' "$record"; then committed_pid=$("$sed_bin" -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$record"); if [ -n "$committed_pid" ] && [ "$committed_pid" != 0 ]; then echo "pid=$committed_pid"; if "$grep_bin" -Fq '"processGroupCreated":true' "$record"; then echo process-group-created=true; else echo process-group-created=false; fi; exit 0; fi; fi; if ! kill -0 "$launcher_pid" 2>/dev/null; then "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-failed; exit 70; fi; "$sleep_bin" 0.05; i=$((i + 1)); done; cleanup_startup; "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-timeout; exit 70;`,
+  ].join("\n");
+}
+
+async function stopShellJob(
+  paths: ShellJobPaths,
+  runId: string,
+  generation: number,
+  ownerLane: Lane,
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<NonNullable<AgentHarnessTool<CodingResourceContext>["execute"]>>[3],
+  context: CodingResourceContext,
+): Promise<string> {
+  const identity = shellRecordIdentity(runId, generation, ownerLane);
+  return await runShell([
+    `r=${paths.recordPath}; if [ ! -f "$r" ] || ! grep -Fq ${shellQuote(identity)} "$r"; then echo "__NO_JOB__"; else`,
+    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); g=$(sed -n 's/.*"processGroupId":\\([0-9][0-9]*\\).*/\\1/p' "$r"); schema=$(sed -n 's/.*"schemaVersion":\\([0-9][0-9]*\\).*/\\1/p' "$r"); group_created=$(sed -n 's/.*"processGroupCreated":\\(true\\|false\\).*/\\1/p' "$r"); if [ -z "$group_created" ] && [ "$schema" = 1 ] && [ -n "$g" ] && [ "$g" != 0 ]; then group_created=true; fi;`,
+    `started=$(sed -n 's/.*"processStartEpochMs":\\([0-9][0-9]*\\).*/\\1/p' "$r"); mark_status() { status="$1"; sed -E -i 's/"status":"[^\"]+"/"status":"'"$status"'"/' "$r" 2>/dev/null; };`,
+    `if [ -z "$p" ] || [ "$p" = 0 ] || [ -z "$group_created" ] || [ -z "$started" ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif [ "$group_created" = true ]; then if [ -z "$g" ] || [ "$g" = 0 ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif kill -0 -- -"$g" 2>/dev/null; then now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' '); if kill -0 "$p" 2>/dev/null && { [ -z "$now" ] || [ -z "$etimes" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; }; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else kill -- -"$g" 2>/dev/null || true; sleep 0.3; kill -0 -- -"$g" 2>/dev/null && kill -9 -- -"$g" 2>/dev/null || true; if kill -0 -- -"$g" 2>/dev/null; then mark_status RUNNING; echo "still-alive"; else mark_status STOPPED; echo stopped; fi; fi; elif kill -0 "$p" 2>/dev/null; then now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' '); if [ -z "$now" ] || [ -z "$etimes" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else kill "$p" 2>/dev/null || true; sleep 0.3; kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null || true; if kill -0 "$p" 2>/dev/null; then mark_status RUNNING; echo "still-alive"; else mark_status STOPPED; echo stopped; fi; fi; else mark_status FINISHED; echo finished; fi; elif [ "$group_created" != false ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif ! command -v ps >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else`,
+    `pid_file=${shellQuote(paths.pidPath)}; descendants() { parent="$1"; for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v parent="$parent" '$2 == parent { print $1 }'); do descendants "$child"; printf '%s\\n' "$child"; done; }; matching_process() { target="$1"; expected="$2"; current=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); current_now=$(date +%s 2>/dev/null); if [ -z "$target" ] || [ -z "$expected" ] || [ -z "$current" ] || [ -z "$current_now" ] || ! kill -0 "$target" 2>/dev/null; then return 1; fi; actual=$(( (current_now - current) * 1000 )); delta=$(( actual - expected )); [ "$delta" -le 3000 ] && [ "$delta" -ge -3000 ]; }; targets_file="$pid_file.stop.$BASHPID"; : > "$targets_file"; root_running=false; if kill -0 "$p" 2>/dev/null; then root_running=true; kill "$p" 2>/dev/null || true; sleep 0.1; fi; if [ -f "$pid_file" ]; then while IFS=: read -r target expected; do [ -n "$target" ] && printf '%s:%s\\n' "$target" "$expected" >> "$targets_file"; done < "$pid_file"; fi; if kill -0 "$p" 2>/dev/null; then now=$(date +%s 2>/dev/null); for target in $(descendants "$p"); do etimes=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); if [ -n "$etimes" ] && [ -n "$now" ]; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$targets_file"; fi; done; fi; printf '%s:%s\\n' "$p" "$started" >> "$targets_file"; was_running=false; unverified=false; while IFS=: read -r target expected; do if kill -0 "$target" 2>/dev/null; then was_running=true; if ! matching_process "$target" "$expected"; then unverified=true; fi; fi; done < "$targets_file"; signal_targets() { signal="$1"; while IFS=: read -r target expected; do if [ "$target" != "$p" ] && matching_process "$target" "$expected"; then kill -s "$signal" "$target" 2>/dev/null || true; fi; done < "$targets_file"; if matching_process "$p" "$started"; then kill -s "$signal" "$p" 2>/dev/null || true; fi; }; if [ "$unverified" = true ]; then rm -f "$targets_file"; mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else signal_targets TERM; sleep 0.3; signal_targets KILL; alive=false; while IFS=: read -r target expected; do if matching_process "$target" "$expected"; then alive=true; fi; done < "$targets_file"; rm -f "$targets_file"; if [ "$alive" = true ]; then mark_status RUNNING; echo "still-alive"; elif [ "$was_running" = true ] || [ "$root_running" = true ]; then mark_status STOPPED; echo stopped; else mark_status FINISHED; echo finished; fi; fi; fi; fi`,
+  ].join("\n"), signal, onUpdate, context);
+}
+
+/** Stop every current-generation shell job owned by this lane during teardown. */
+export async function stopAllShellJobs(context: CodingResourceContext): Promise<void> {
+  const listed = await runShell(`ls -1 ${shellJobRunRoot(context.runtime.runId)}/*/*.json 2>/dev/null || true`, undefined, undefined, context);
+  for (const entry of listed.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
+    const match = /\/([^/]+)\/([^/]+)\.json$/.exec(entry);
+    const generation = Number(match?.[1]);
+    const jobId = match?.[2];
+    if (!Number.isInteger(generation) || generation < 0) continue;
+    if (!jobId) continue;
+    await stopShellJob(shellJobPaths(context.runtime.runId, generation, jobId), context.runtime.runId, generation, context.ownerLane ?? "main", undefined, undefined, context).catch(() => undefined);
+  }
+}
+
+async function recordShellJobObservation(context: CodingResourceContext, jobId: string, result: { status: string; cursor: number; trigger: string }): Promise<string | undefined> {
+  const ingress = new RunEventIngress(context.controlStore);
+  const envelope = await ingress.enqueue(context.runtime.runId, {
+    source: "job",
+    kind: result.trigger === "timeout" ? "job.wait_timeout" : result.status === "finished" ? "job.exit" : "job.output",
+    priority: result.trigger === "error" || result.trigger === "exit" ? "normal" : "background",
+    correlationId: `${context.runtime.runId}:${jobId}:shell-job`,
+    idempotencyKey: `${context.runtime.runId}:${jobId}:${result.trigger}:${result.cursor}`,
+    coalescingKey: `shell-job:${jobId}`,
+    replayPolicy: "unknown",
+    payload: { jobId, status: result.status, cursor: result.cursor, trigger: result.trigger },
+  });
+  const event = (await context.controlStore.events(context.runtime.runId)).find((candidate) => candidate.type === "event_ingress_received" && candidate.envelope?.id === envelope.id);
+  return event?.id;
+}
+
+function parseShellCursor(value: string | undefined): number {
+  if (value === undefined) return 0;
+  if (!/^\d+$/.test(value)) throw new Error("shell_job sinceCursor must be a non-negative byte cursor");
+  const cursor = Number(value);
+  if (!Number.isSafeInteger(cursor)) throw new Error("shell_job sinceCursor is too large");
+  return cursor;
+}
+
+function normalizeShellMonitorWait(value: number): number {
+  if (!Number.isInteger(value) || value < 50 || value > 120_000) throw new Error("shell_job monitor wait must be an integer from 50 to 120000");
+  return value;
+}
+
+function throwIfShellAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "shell_job monitor aborted"));
+}
+
+function delayShellMonitor(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    const onAbort = () => { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); reject(signal?.reason); };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /** Run one shell command through the lane's execution env and return its text. */
 async function runShell(
@@ -614,11 +955,6 @@ async function runShell(
   const bash = createBashTool<CodingResourceContext>();
   const result = await bash.execute("shell-helper", { command }, signal ?? new AbortController().signal, onUpdate, context);
   return result.content.map((part) => (part.type === "text" ? part.text : "")).join("\n");
-}
-
-/** Where a background job records its pid, used for liveness and for stopping. */
-function pidPath(jobId: string): string {
-  return `.proofblade/jobs/${jobId}.pid`;
 }
 
 /** Single-quote a string for bash. */
@@ -703,7 +1039,46 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
     createCodingBashTool(),
     createEditTool<CodingResourceContext>(),
     createWriteTool<CodingResourceContext>(),
+    createGlobTool(),
+    createGrepTool(),
   ];
+}
+
+function createGlobTool(): AgentHarnessTool<CodingResourceContext> {
+  return {
+    name: "glob",
+    label: "glob",
+    description: "Find workspace files with a deterministic glob pattern. Results are sorted, bounded, and exclude control/runtime directories.",
+    parameters: Type.Object({ pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })) }, { additionalProperties: false }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, context) {
+      const result = await globWorkspace({ cwd: context.env.cwd, ...(params as { pattern?: string; maxResults?: number }) });
+      return searchToolResult(context, result);
+    },
+  };
+}
+
+function createGrepTool(): AgentHarnessTool<CodingResourceContext> {
+  return {
+    name: "grep",
+    label: "grep",
+    description: "Search text in workspace files with deterministic path/line matches, bounded file reads, binary skipping, and a result Artifact.",
+    parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 1_000 }), pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), caseSensitive: Type.Optional(Type.Boolean()), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })), maxFileBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: 16 * 1024 * 1024 })) }, { additionalProperties: false }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, context) {
+      const result = await grepWorkspace({ cwd: context.env.cwd, ...(params as { query: string; pattern?: string; caseSensitive?: boolean; maxResults?: number; maxFileBytes?: number }) });
+      return searchToolResult(context, result);
+    },
+  };
+}
+
+async function searchToolResult(context: CodingResourceContext, result: Awaited<ReturnType<typeof globWorkspace>> | Awaited<ReturnType<typeof grepWorkspace>>): Promise<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never> {
+  const modelResult = limitWorkspaceSearchResult(result);
+  const hash = workspaceSearchHash(result);
+  const artifact = await context.artifactStore.putText(context.runtime.runId, JSON.stringify(result), { filename: `${result.kind}-${hash.slice(0, 12)}.json`, mime: "application/json", sensitivity: "public" });
+  const presentation = workspaceSearchText(result);
+  const details = { ...modelResult, artifactId: artifact.id, artifactHash: artifact.sha256, resultHash: hash, presentation };
+  return toolResult(details, false, WORKSPACE_SEARCH_MODEL_MAX_CHARS);
 }
 
 /**
@@ -736,7 +1111,7 @@ export function dedupeImageRead(
   if (!imagesSeen) return result;
   // Hash the concatenated image-block payloads: this is the identity that matters
   // (same pixels = nothing new to see), independent of how the path was written.
-  const imageData = result.content.filter((item) => item.type === "image").map((item) => (item as { data?: string }).data ?? "").join(" ");
+  const imageData = result.content.filter((item) => item.type === "image").map((item) => (item as { data?: string }).data ?? "").join("\u0000");
   const key = sha256(imageData);
   const seen = imagesSeen.get(key) ?? 0;
   imagesSeen.set(key, seen + 1);
@@ -751,7 +1126,6 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
     ...contract,
     async execute(toolCallId, params, signal, onUpdate, context) {
       const input = params as { path: string; offset?: number; limit?: number };
-      await context.evidenceCurationGate?.assertInvestigationAllowed();
       const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
       if (result.content.some((item) => item.type === "image")) {
         return dedupeImageRead(input.path, result, context.imagesSeen);
@@ -773,12 +1147,11 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
         },
       });
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
-      const notice = await context.evidenceCurationGate?.checkpointNotice();
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content)],
         details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
       };
     },
@@ -868,22 +1241,20 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const visible = error instanceof Error ? error.message : String(error);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
-        const notice = await context.evidenceCurationGate?.checkpointNotice();
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation), ...(notice ? [notice] : [])].filter(Boolean).join("\n\n"), { cause: error });
+        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
-      const notice = await context.evidenceCurationGate?.checkpointNotice();
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(notice ? [{ type: "text" as const, text: notice }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0))],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,

@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/molecules`
 - Module hashes: 12
-- Symbols: 42
+- Symbols: 43
 
 ## Public Symbols
 
@@ -24,6 +24,7 @@
 - Export: `@proofblade/molecules`
 - Summary: Inferred summary: file artifact repository class used to provide a reusable operation.
 - Summary source: `inferred`
+- Tests: `packages/molecules/tests/molecules.test.ts`
 
 ### DEFAULT_CONTEXT_MAINTENANCE_POLICY
 - Kind: `constant`
@@ -328,6 +329,15 @@
 - Summary: Inferred summary: read operation used to read or inspect state.
 - Summary source: `inferred`
 - Tests: `packages/molecules/tests/molecules.test.ts`, `packages/molecules/tests/provider-prefix.test.ts`
+
+### FileArtifactRepository.readRange
+- Kind: `method`
+- Signature: `(artifact: ArtifactAtom, offset?: number, maxBytes?: number): Promise<{ content: Uint8Array; totalBytes: number; truncated: boolean; }>`
+- Source: [src/file-artifact.ts:30](../../../packages/molecules/src/file-artifact.ts:30)
+- Export: `@proofblade/molecules`
+- Summary: Read only a bounded byte range. This intentionally does not verify the
+- Summary source: `tsdoc`
+- Tests: `packages/molecules/tests/molecules.test.ts`
 
 ### CapabilityOutputPolicy
 - Kind: `type`

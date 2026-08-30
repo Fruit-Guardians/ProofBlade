@@ -123,9 +123,11 @@ export function App() {
   const refreshPoller = refreshPollerRef.current;
 
   useEffect(() => {
-    void Promise.all([getBootstrap(), getProviderSettings(), getWorkspaceSettings(), refreshRuns(true)]).then(([data, provider, workspace]) => {
-      setBootstrap(data); setProviders(provider); setWorkspaceSettings(workspace);
+    void Promise.all([getBootstrap(), getProviderSettings()]).then(([data, provider]) => {
+      setBootstrap(data); setProviders(provider);
     }).catch((caught) => setError(message(caught))).finally(() => setLoading(false));
+    void getWorkspaceSettings().then(setWorkspaceSettings).catch((caught) => setError(message(caught)));
+    void refreshRuns(true).catch((caught) => setError(message(caught)));
   }, [refreshRuns]);
 
   useEffect(() => {
@@ -208,7 +210,7 @@ export function App() {
         {filteredRuns.map((run) => <button className={`run-item ${run.runId === runId ? "selected" : ""}`} key={run.runId} onClick={() => setRunId(run.runId)}>
           <span className={`status-dot ${run.kind === "chat" ? "status-chat" : `status-${run.status.toLowerCase()}`}`} />
           <span className="run-item-body"><strong>{run.runId}</strong><small>{workspaceSettings?.conversations[run.runId]?.title ?? run.objective}</small><em>{run.kind === "chat" ? "普通对话" : phaseLabels[run.phase]} · {relativeTime(run.updatedAt)}</em></span>
-          <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>
+          {run.counts.tools !== undefined && <span className="run-tool-count"><TerminalSquare size={12} />{run.counts.tools}</span>}
         </button>)}
         {!filteredRuns.length && !loading && <div className="empty-list">{runKindFilter === "chat" ? "还没有对话" : "没有匹配的 Fixture Run"}</div>}
       </div>
@@ -416,6 +418,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
       </div>
+      {detail.observationQueue.total > 0 && <ObservationQueuePanel detail={detail} />}
       <div className="message-thread" ref={thread}>
         {!session?.messages.length && !pendingUser && <div className="chat-empty"><MessageSquare size={23} /><strong>{detail.snapshot.task.objective}</strong>{detail.kind === "fixture" && <span>{detail.snapshot.task.target}</span>}</div>}
         {session?.messages.map((chat) => {
@@ -456,6 +459,21 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
     {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
   </div>;
+}
+
+function ObservationQueuePanel({ detail }: { detail: RunDetail }) {
+  const queue = detail.observationQueue;
+  return <section className="observation-queue-panel" aria-label="待处理观察">
+    <header><div><ListChecks size={14} /><strong>待处理观察</strong><span>{queue.total} 项 · urgent {queue.urgent}</span></div>{queue.hidden > 0 && <em>还有 {queue.hidden} 项</em>}</header>
+    <div className="observation-queue-list">{queue.items.map((item) => <article className={`observation-queue-item priority-${item.priority}`} key={item.id}>
+      <div className="observation-queue-item-head"><StatusMini status="待消费" /><strong>{item.kind}</strong><code>{item.source}</code><span>seq {item.sequence}</span></div>
+      <p>{item.summary}</p>
+      {(item.relatedIds.length > 0 || item.artifactIds.length > 0) && <div className="observation-queue-links">
+        {item.relatedIds.map((id) => <code key={`ref:${id}`} title={id}>ref {shortId(id)}</code>)}
+        {item.artifactIds.map((id) => { const artifact = detail.snapshot.artifacts[id]; return <code key={`artifact:${id}`} title={id}><Archive size={10} />{artifact?.semantic?.name ?? shortId(id)}</code>; })}
+      </div>}
+    </article>)}</div>
+  </section>;
 }
 
 type ToolCardValue = ToolCallDebug | LiveToolCall;
@@ -501,7 +519,7 @@ function ContextBreakdown({ session, snapshot, context, threshold, onThreshold }
       <MetricLine label="输入侧总量" value={`${formatNumber(cache.inputBasis)} tokens`} />
       <MetricLine label="累计未命中" value={`${formatNumber(cache.uncachedInput)} tokens`} />
       <MetricLine label="输出" value={`${formatNumber(usage?.output ?? 0)} tokens`} />
-      <MetricLine label="累计缓存读取" value={`${formatNumber(cache.cacheRead)} tokens`} />
+      <MetricLine label="累计缓存读取" value={context?.cacheReported === false ? "未报告" : `${formatNumber(cache.cacheRead)} tokens`} />
       <MetricLine label="累计缓存写入" value={`${formatNumber(cache.cacheWrite)} tokens`} />
       <MetricLine label="累计缓存命中率" value={formatPercent(cache.hitRate)} />
       <MetricLine label="推理" value={`${formatNumber(usage?.reasoning ?? 0)} tokens`} />
@@ -509,7 +527,10 @@ function ContextBreakdown({ session, snapshot, context, threshold, onThreshold }
     </div>
     <label className="context-threshold"><span>主动压缩阈值</span><select aria-label="主动压缩阈值" value={threshold} onChange={(event) => onThreshold(Number(event.target.value))}>{[20, 30, 40, 50, 60, 70, 80].map((value) => <option value={value} key={value}>{value}% · 达到后压缩</option>)}</select></label>
     {snapshot && <div className="context-visible-detail"><span>当前请求可见消息 {snapshot.messages} 条</span><span>启用 Tool {snapshot.tools} 个</span><span>系统提示 {formatNumber(snapshot.systemPromptChars)} chars</span><span>消息 {formatNumber(snapshot.messageChars)} chars</span><span>Tool schema {formatNumber(snapshot.toolSchemaChars)} chars</span><span>可见估算 {formatNumber(snapshot.estimatedVisibleTokens)} tokens</span></div>}
-    <div className="context-note">缓存由中转站返回的 usage 字段决定。缓存前缀通常按离散 token 块计量，相邻请求可能返回相同的“本次缓存读取”；累计读取、累计未命中、请求次数和命中率仍会随真实请求变化。Provider 不返回缓存字段时显示为 0。</div>
+    {context && <div className="context-visible-detail"><span title={context.stablePrefixHash}>稳定前缀 {context.stablePrefixHash ? shortId(context.stablePrefixHash) : "未记录"}</span><span title={context.dynamicSuffixHash}>动态尾部 {context.dynamicSuffixHash ? shortId(context.dynamicSuffixHash) : "未记录"}</span><span title={context.requestBodyHash}>请求 hash {context.requestBodyHash ? shortId(context.requestBodyHash) : "未记录"}</span></div>}
+    {context && <div className="context-visible-detail"><span>维护阶段 {context.maintenanceStage ?? "未记录"}</span><span>下一动作 {context.nextMaintenanceAction ?? "未记录"}</span><span>最近整理 {context.lastConsolidationAt ? new Date(context.lastConsolidationAt).toLocaleTimeString() : "未记录"}</span></div>}
+    {context && <div className="context-visible-detail"><span>目标点 {context.targetRatio === undefined ? "未记录" : formatPercent(context.targetRatio)}</span><span>硬边界 {context.hardRatio === undefined ? "未记录" : formatPercent(context.hardRatio)}</span><span>估算占用 {context.estimatedInput === undefined ? "未记录" : `${formatNumber(context.estimatedInput)} tokens`}</span><span>最大可压缩块 {context.compressionTarget ?? "未记录"}</span><span>丢弃项 {context.droppedCount === undefined ? "未记录" : context.droppedCount}</span></div>}
+    <div className="context-note">缓存由中转站返回的 usage 字段决定。缓存前缀通常按离散 token 块计量，相邻请求可能返回相同的“本次缓存读取”；累计读取、累计未命中、请求次数和命中率仍会随真实请求变化。Provider 不返回缓存字段时显示为“未报告”。</div>
   </div>;
 }
 
@@ -631,11 +652,14 @@ function Overview({ detail }: { detail: RunDetail }) {
   const recent = detail.events.slice(-10).reverse();
   const preparation = snapshot.toolPreparation;
   const readyTools = preparation?.tools.filter((tool) => tool.status === "ready") ?? [];
+  const lifecycleIssues = detail.telemetry.lifecycle.issues;
+  const proposals = Object.values(snapshot.updateProposals).sort((a, b) => b.updatedSeq - a.updatedSeq);
   return <div className="overview-page">
     <div className="stat-strip"><Stat label="Control Events" value={snapshot.lastSeq} icon={<Activity size={15} />} /><Stat label="Evidence" value={Object.keys(snapshot.evidence).length} icon={<ShieldCheck size={15} />} /><Stat label="Domain Records" value={Object.keys(snapshot.domainRecords).length} icon={<Database size={15} />} /><Stat label="Effects" value={Object.keys(snapshot.effects).length} icon={<Zap size={15} />} /><Stat label="Artifacts" value={Object.keys(snapshot.artifacts).length} icon={<Archive size={15} />} /></div>
     <section><div className="section-head"><div><strong>控制面</strong><span>{control.domainPhase}</span></div><StatusMini status={control.gate.status} /></div><dl className="key-values"><dt>门禁缺口</dt><dd>{control.gate.missing.join(", ") || "无"}{control.gate.stale.length > 0 ? ` · stale: ${control.gate.stale.join(", ")}` : ""}</dd><dt>阶段动作预算</dt><dd>{control.budget.phaseActionsUsed} / {control.budget.phaseActionsRemaining === undefined ? "--" : control.budget.phaseActionsUsed + control.budget.phaseActionsRemaining}</dd><dt>Run Tool 预算</dt><dd>{control.budget.runToolCallsUsed} used · {control.budget.runToolCallsRemaining} remaining</dd><dt>提交预算</dt><dd>{control.budget.submissionsUsed} used · {control.budget.submissionsRemaining} remaining</dd><dt>恢复预算</dt><dd>{control.budget.replansUsed} / {control.budget.replanLimit} · 剩余 {control.budget.replansRemaining}</dd><dt>Verifier 恢复</dt><dd>{control.recovery.required > 0 ? `${control.recovery.required} 个请求等待受控恢复` : "无待恢复请求"}</dd><dt>下一动作</dt><dd>{control.nextAction ? `${control.nextAction.objective} · ${control.nextAction.toolNames.join(", ") || "无预备工具"} · ${control.nextAction.maxCalls} 次` : "当前阶段没有预备动作"}</dd></dl>{control.recovery.items.length > 0 && <div className="ledger-lines">{control.recovery.items.map((item) => <div key={item.requestId}><StatusMini status={item.state} /><code>{item.kind}</code><span>{item.reason ?? item.requestId}</span></div>)}</div>}</section>
     <div className="overview-grid"><section><div className="section-head"><strong>任务契约</strong><code>{snapshot.task.task_id}</code></div><dl className="key-values"><dt>目标类型</dt><dd>{snapshot.task.target_kind}</dd><dt>目标</dt><dd>{snapshot.task.target}</dd><dt>模式</dt><dd>{snapshot.task.mode}</dd><dt>验证</dt><dd>{snapshot.task.verification.kind}</dd><dt>Tool 上限</dt><dd>{snapshot.task.constraints.max_tool_calls}</dd><dt>截止时间</dt><dd>{formatDuration(snapshot.task.constraints.deadline_ms)}</dd></dl></section>
       <section><div className="section-head"><strong>最近事件</strong><span>{recent.length}</span></div><div className="compact-timeline">{recent.map((event) => <div key={event.id}><span className={`event-mark actor-${event.actor}`} /><time>{clock(event.ts)}</time><strong>{event.type}</strong><em>{event.lane}</em></div>)}</div></section></div>
+    <div className="overview-grid"><section><div className="section-head"><div><strong>运行健康</strong><span>{detail.telemetry.lifecycle.asOf}</span></div><StatusMini status={lifecycleIssues.length === 0 ? "ready" : "attention"} /></div><dl className="key-values"><dt>卡住</dt><dd>{detail.telemetry.lifecycle.counts.stalled}</dd><dt>需要恢复</dt><dd>{detail.telemetry.lifecycle.counts.recoveryRequired}</dd><dt>孤儿操作</dt><dd>{detail.telemetry.lifecycle.counts.orphan}</dd><dt>维护阶段</dt><dd>{detail.context?.maintenanceStage ?? "未记录"}</dd><dt>下一维护动作</dt><dd>{detail.context?.nextMaintenanceAction ?? "无"}</dd></dl>{lifecycleIssues.slice(0, 4).map((issue) => <div className="ledger-lines" key={`${issue.owner}:${issue.key}:${issue.code}`}><div><StatusMini status={issue.code} /><code>{issue.owner}:{issue.key}</code><span>{issue.reason}</span></div></div>)}</section><section><div className="section-head"><strong>更新提案</strong><span>{proposals.length}</span></div>{proposals.length === 0 ? <div className="empty-list">尚无评估提案</div> : <div className="ledger-lines">{proposals.slice(0, 6).map((proposal) => <div key={proposal.id}><StatusMini status={proposal.status} /><code>{proposal.id}</code><span>{proposal.kind} · {proposal.candidateVersion}</span><em>{proposal.metrics?.gatePassed === undefined ? "未执行四集门控" : proposal.metrics.gatePassed === 1 ? "门控通过" : "门控失败"}</em></div>)}</div>}</section></div>
     <section><div className="section-head"><div><strong>工具准备</strong><span>{preparation ? `${preparation.profileId} · ${preparation.runtime}` : "首轮预检"}</span></div><StatusMini status={preparation?.health ?? "pending"} /></div>{preparation ? <><dl className="key-values"><dt>执行环境</dt><dd>{preparation.runtimeKey}</dd><dt>已准备</dt><dd>{readyTools.map((tool) => tool.name).join(", ") || "无"}</dd><dt>缺失必需</dt><dd>{preparation.missingRequiredTools.join(", ") || "无"}</dd><dt>缺失可选</dt><dd>{preparation.missingOptionalTools.join(", ") || "无"}</dd><dt>首探测预算</dt><dd>{preparation.firstActionPlan ? `${preparation.firstActionPlan.maxCalls} 次 · ${preparation.firstActionPlan.allowedToolNames.join(", ")}` : "旧版本 Run 无首探测计划"}</dd><dt>目录 Hash</dt><dd><code>{preparation.toolCatalogHash.slice(0, 12)}…</code> / <code>{preparation.mcpCatalogHash.slice(0, 12)}…</code></dd></dl><div className="ledger-lines">{preparation.fallbackStrategies.map((strategy) => <div key={strategy}><StatusMini status="fallback" /><span>{strategy}</span></div>)}{preparation.fallbackStrategies.length === 0 && <div><StatusMini status="ready" /><span>没有 fallback，工具链完整</span></div>}</div></> : <div className="empty-list">尚未执行工具预检；创建首轮 Agent 会话后这里会记录 profile、环境和缺失项。</div>}</section>
     <section><div className="section-head"><strong>事实与假设</strong><span>{Object.keys(snapshot.facts).length + Object.keys(snapshot.hypotheses).length}</span></div><div className="ledger-lines">{[...Object.values(snapshot.facts), ...Object.values(snapshot.hypotheses)].sort((a, b) => a.createdSeq - b.createdSeq).map((item) => <div key={item.id}><StatusMini status={item.status} /><code>{item.id}</code><span>{"statement" in item ? item.statement : ""}</span><em>seq {item.createdSeq}</em></div>)}</div></section>
   </div>;
@@ -809,7 +833,7 @@ function Artifacts({ detail }: { detail: RunDetail }) {
 
 function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail; provider: string; model: string; thinkingLevel: string }) {
   const { telemetry, snapshot } = detail;
-  const contextWindow = snapshot.versionSnapshot ? 1 : 1;
+  const contextWindow = detail.context?.contextWindow ?? 0;
   const sessionUsage = detail.sessions.reduce((total, session) => ({
     input: total.input + session.usage.input,
     output: total.output + session.usage.output,
@@ -837,13 +861,14 @@ function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail
     && finalCompletion.evidenceIds.length === finalResult.evidenceIds.length
     && finalCompletion.evidenceIds.every((evidenceId) => finalResult.evidenceIds.includes(evidenceId));
   return <div className="metrics-content">
-    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${Math.min(100, (tokenTotal / Math.max(tokenTotal, contextWindow)) * 100)}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>累计 tokens</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
+    <section className="metric-hero"><div className="token-ring" style={{ "--ratio": `${contextWindow > 0 ? Math.min(100, (tokenTotal / contextWindow) * 100) : 0}%` } as React.CSSProperties}><strong>{formatNumber(tokenTotal)}</strong><span>{contextWindow > 0 ? `/${formatNumber(contextWindow)} context` : "累计 tokens"}</span></div><div><span>模型用量</span><strong>{hasSessionUsage ? sessionUsage.requests : telemetry.provider.requestCount} requests</strong><em>{telemetry.provider.toolCallCount} tool calls</em></div></section>
     <section><div className="metrics-title"><Gauge size={14} />Token</div><MetricLine label="输入侧总量" value={formatNumber(cache.inputBasis)} /><MetricLine label="累计未命中" value={formatNumber(cache.uncachedInput)} /><MetricLine label="输出" value={formatNumber(tokenOutput)} /><MetricLine label="推理" value={formatNumber(tokenReasoning)} /><MetricLine label="累计缓存读取" value={formatNumber(cache.cacheRead)} /><MetricLine label="累计缓存写入" value={formatNumber(cache.cacheWrite)} /><MetricLine label="累计缓存命中率" value={formatPercent(cache.hitRate)} /></section>
     <section><div className="metrics-title"><Database size={14} />缓存前缀</div><MetricLine label="稳定率" value={prefix.comparableRequests > 0 ? formatPercent(prefix.stabilityRate) : "等待下一轮"} /><MetricLine label="变化" value={`${prefix.changedRequests} / ${prefix.comparableRequests}`} /><MetricLine label="System" value={`${formatNumber(prefix.last?.systemTokens ?? 0)} tokens`} /><MetricLine label="Tool schema" value={`${formatNumber(prefix.last?.toolSchemaTokens ?? 0)} tokens`} /><MetricLine label="Tool 数量" value={String(prefix.last?.toolCount ?? 0)} /><MetricLine label="Prefix hash" value={prefix.last ? shortId(prefix.last.prefixHash) : "--"} /></section>
     <section><div className="metrics-title"><Clock3 size={14} />延迟与成本</div><MetricLine label="平均延迟" value={`${Math.round(telemetry.provider.latencyMs.average)} ms`} /><MetricLine label="P95" value={`${Math.round(telemetry.provider.latencyMs.p95)} ms`} /><MetricLine label="执行时长" value={formatDuration(telemetry.durationMs)} /><MetricLine label="成本" value={`$${telemetry.provider.cost.totalUsd.toFixed(4)}`} /></section>
     <section><div className="metrics-title"><Gauge size={14} />Provider 调度</div><MetricLine label="排队请求" value={String(telemetry.provider.scheduling.queued)} /><MetricLine label="排队取消" value={String(telemetry.provider.scheduling.cancelled)} /><MetricLine label="平均等待" value={`${Math.round(telemetry.provider.scheduling.averageWaitMs)} ms`} /><MetricLine label="最大队列" value={String(telemetry.provider.scheduling.maxQueueDepth)} /></section>
     {detail.kind === "fixture" && <section><div className="metrics-title"><ShieldCheck size={14} />验证门</div><HealthLine ok={Object.keys(snapshot.evidence).length > 0} label="证据已绑定" /><HealthLine ok={hasBoundFinalResult} label="最终结果已绑定验证" /><HealthLine ok={telemetry.tools.effectUnknown === 0} label="Effect 结果确定" /><HealthLine ok={!snapshot.failureCategory} label="无主失败分类" /></section>}
     {detail.kind === "fixture" && <section><div className="metrics-title"><ServerCog size={14} />运行资源</div><MetricLine label="Effects" value={`${effects.filter((item) => item.status === "STARTED").length} active / ${effects.length}`} /><MetricLine label="Leases" value={String(Object.keys(snapshot.leases).length)} /><MetricLine label="Jobs" value={String(Object.keys(snapshot.jobs).length)} /><MetricLine label="Checkpoints" value={String(Object.keys(snapshot.checkpoints).length)} /></section>}
+    <section><div className="metrics-title"><ListChecks size={14} />观察队列</div><MetricLine label="待处理" value={String(detail.observationQueue.total)} /><MetricLine label="Urgent" value={String(detail.observationQueue.urgent)} /><MetricLine label="已展示" value={String(detail.observationQueue.visible)} /><MetricLine label="已隐藏" value={String(detail.observationQueue.hidden)} /><MetricLine label="状态" value={detail.observationQueue.total > 0 ? "待消费" : "已清空"} /></section>
     <section><div className="metrics-title"><FlaskConical size={14} />当前对话配置</div><MetricLine label="Provider" value={provider} /><MetricLine label="Model" value={model} /><MetricLine label="Thinking" value={thinkingLevel} /><MetricLine label="Pi" value={snapshot.versionSnapshot?.piVersion ?? "0.83.0"} /></section>
   </div>;
 }

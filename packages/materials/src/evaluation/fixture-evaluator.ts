@@ -16,10 +16,10 @@ import {
   type RuntimeScenarioSummary,
 } from "./runtime-scenario-evaluator.js";
 
-export const BASELINE_PROTOCOL_VERSION = "baseline-v3";
+export const BASELINE_PROTOCOL_VERSION = "baseline-v4";
 export const BASELINE_REQUIRED_ATTEMPTS = 3;
 export const BASELINE_REQUIRED_SCENARIOS = DEFAULT_RUNTIME_SCENARIOS.length;
-export const BASELINE_REQUIRED_TOTAL_CASES = 30;
+export const BASELINE_REQUIRED_TOTAL_CASES = 37;
 
 export type EvaluationFailureCategory = PrimaryFailureCategory | "unclassified";
 

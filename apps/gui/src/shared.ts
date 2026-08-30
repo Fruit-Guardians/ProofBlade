@@ -1,4 +1,4 @@
-import type { ClaimVerificationProjection, HarnessEvent, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -193,7 +193,7 @@ export interface RunListItem {
   generation: number;
   lastSeq: number;
   updatedAt: string;
-  counts: { tools: number; evidence: number; artifacts: number; effects: number };
+  counts: { tools?: number; evidence: number; artifacts: number; effects: number };
   active?: ActiveRunInfo;
 }
 
@@ -288,6 +288,7 @@ export interface RunDetail {
   active?: ActiveRunInfo;
   updatedAt: string;
   context?: ContextRuntimeInfo;
+  observationQueue: ObservationQueueProjection;
 }
 
 export interface ContextRuntimeInfo {
@@ -297,6 +298,26 @@ export interface ContextRuntimeInfo {
   utilization: number;
   estimatedTokens?: number;
   lastCacheRead?: number;
+  cacheReported?: boolean;
+  requestBodyHash?: string;
+  stablePrefixHash?: string;
+  dynamicSuffixHash?: string;
+  requestEpochId?: string;
+  requestContextHash?: string;
+  contextManifestHash?: string;
+  firstChangedBlock?: string;
+  compressionTarget?: string;
+  droppedCount?: number;
+  layerTokens?: Record<string, number>;
+  blockHashes?: Record<string, string>;
+  availableInput?: number;
+  estimatedInput?: number;
+  overBudget?: boolean;
+  targetRatio?: number;
+  hardRatio?: number;
+  maintenanceStage?: string;
+  nextMaintenanceAction?: string;
+  lastConsolidationAt?: string;
   lastUpdatedAt?: string;
 }
 

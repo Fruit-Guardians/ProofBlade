@@ -32,13 +32,13 @@ const config: ProofBladeConfig = {
   },
 };
 
-test("[contract:runtime-scenario-baseline] runtime scenario evaluator covers cache, context, convergence, evidence, and durability", async () => {
+test("[contract:runtime-scenario-baseline] runtime scenario evaluator covers cache, context, convergence, evidence, durability, events, and recovery", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-runtime-eval-"));
   try {
     const summary = await new RuntimeScenarioEvaluator(root, config).run("RUNTIME-EVAL");
     assert.equal(summary.protocolVersion, RUNTIME_SCENARIO_PROTOCOL_VERSION);
-    assert.equal(summary.total, 12);
-    assert.equal(summary.successCount, 12);
+    assert.equal(summary.total, 19);
+    assert.equal(summary.successCount, 19);
     assert.equal(summary.successRate, 1);
     assert.equal(summary.catalogHash.length, 64);
     assert.deepEqual(summary.requiredIds, [...DEFAULT_RUNTIME_SCENARIOS].map((item) => item.id).sort());
@@ -48,6 +48,8 @@ test("[contract:runtime-scenario-baseline] runtime scenario evaluator covers cac
       convergence: { total: 3, passed: 3 },
       evidence: { total: 2, passed: 2 },
       durability: { total: 3, passed: 3 },
+      events: { total: 2, passed: 2 },
+      recovery: { total: 5, passed: 5 },
     });
     assert.ok(summary.cases.every((item) => item.success && item.detailsHash?.length === 64 && !item.error));
   } finally {

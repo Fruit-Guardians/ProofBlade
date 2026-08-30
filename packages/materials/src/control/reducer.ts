@@ -1,8 +1,9 @@
-import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract } from "../domain/types.js";
+import type { HarnessEvent, RunSnapshot, RunStatus, TaskContract, UpdateEvaluationGate, UpdateProposal } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
 import { validateDomainRecordShape } from "../domain/records.js";
 import { completedWorkItemForCompletion } from "../domain/work-item.js";
+import { validateUpdateEvaluationGate } from "../evolution/evaluation-gates.js";
 
 export function createInitialSnapshot(runId: string, task: TaskContract): RunSnapshot {
   return {
@@ -35,6 +36,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     requestEpochs: {},
     experiments: {},
     replans: {},
+    updateProposals: {},
     replanCount: 0,
     contextOverflowRecoveries: 0,
     artifacts: {},
@@ -58,6 +60,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
   next.schedulerIntents ??= {};
   next.leaseEpochs ??= {};
   next.replans ??= {};
+  next.updateProposals ??= {};
   next.domainRecords ??= {};
   next.replanCount ??= Object.keys(next.replans).length;
   next.lastSeq = event.seq;
@@ -280,6 +283,60 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       if (!Array.isArray(replan.prohibitedRepeatKeys)) throw new Error(`Replan ${replan.id} requires prohibited repeat keys`);
       next.replans[replan.id] = { ...replan, createdSeq: event.seq };
       next.replanCount += 1;
+      break;
+    }
+    case "update_proposal_created": {
+      const proposal = p.proposal as RunSnapshot["updateProposals"][string];
+      if (!proposal?.id || proposal.runId !== next.runId) throw new Error("update_proposal_created requires a Run-bound proposal");
+      if (proposal.status !== "PROPOSED") throw new Error("Update proposal must start in PROPOSED state");
+      if (next.updateProposals[proposal.id]) throw new Error(`Update proposal already exists: ${proposal.id}`);
+      next.updateProposals[proposal.id] = proposal;
+      break;
+    }
+    case "update_proposal_evaluated": {
+      const proposal = getUpdateProposal(next, String(p.proposalId));
+      if (proposal.status !== "PROPOSED") throw new Error(`Cannot evaluate update proposal in ${proposal.status}`);
+      const evaluated = validateEvaluatedProposalPayload(proposal, p);
+      proposal.status = "EVALUATED";
+      proposal.evaluationHash = evaluated.evaluationHash;
+      proposal.metrics = structuredClone(evaluated.metrics);
+      proposal.evaluationGate = structuredClone(evaluated.gate);
+      proposal.updatedSeq = event.seq;
+      break;
+    }
+    case "update_proposal_approved": {
+      const proposal = getUpdateProposal(next, String(p.proposalId));
+      if (proposal.status !== "EVALUATED") throw new Error(`Cannot approve update proposal in ${proposal.status}`);
+      validatePersistedProposalGate(proposal, true);
+      proposal.status = "APPROVED";
+      proposal.reason = typeof p.reason === "string" ? p.reason : proposal.reason;
+      proposal.updatedSeq = event.seq;
+      break;
+    }
+    case "update_proposal_activated": {
+      const proposal = getUpdateProposal(next, String(p.proposalId));
+      if (proposal.status !== "APPROVED") throw new Error(`Cannot activate update proposal in ${proposal.status}`);
+      proposal.status = "ACTIVE";
+      proposal.activeVersion = proposal.candidateVersion;
+      proposal.updatedSeq = event.seq;
+      break;
+    }
+    case "update_proposal_rejected": {
+      const proposal = getUpdateProposal(next, String(p.proposalId));
+      if (["ACTIVE", "ROLLED_BACK"].includes(proposal.status)) throw new Error(`Cannot reject update proposal in ${proposal.status}`);
+      proposal.status = "REJECTED";
+      proposal.reason = String(p.reason ?? "rejected");
+      proposal.updatedSeq = event.seq;
+      break;
+    }
+    case "update_proposal_rolled_back": {
+      const proposal = getUpdateProposal(next, String(p.proposalId));
+      if (proposal.status !== "ACTIVE") throw new Error(`Cannot roll back update proposal in ${proposal.status}`);
+      if (p.candidateHash !== proposal.candidateHash) throw new Error("Rollback candidate hash does not match proposal");
+      proposal.status = "ROLLED_BACK";
+      proposal.rollbackVersion = proposal.baseVersion;
+      proposal.reason = String(p.reason ?? "rolled back");
+      proposal.updatedSeq = event.seq;
       break;
     }
     case "reasoning_node_upserted": {
@@ -510,11 +567,13 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "job_queued": {
       const job = p.job as RunSnapshot["jobs"][string];
       if (!job?.id) throw new Error("job_queued requires job");
+      if (job.generation !== next.generation) throw new Error(`job_queued generation mismatch: expected ${next.generation}, got ${String(job.generation)}`);
       next.jobs[job.id] = job;
       break;
     }
     case "job_started": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_started generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
       job.status = "RUNNING";
       job.startedAt = typeof p.startedAt === "string" ? p.startedAt : job.startedAt;
@@ -522,6 +581,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     }
     case "job_finished": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_finished generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (["CANCELLED", "SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) break;
       const status = p.status as typeof job.status;
       if (!["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(status)) throw new Error(`Invalid job terminal status: ${String(status)}`);
@@ -537,6 +597,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     }
     case "job_cancelled": {
       const job = getJob(next, String(p.jobId));
+      if (job.generation !== next.generation) throw new Error(`job_cancelled generation mismatch: expected ${next.generation}, got ${job.generation}`);
       if (job.status === "SUCCEEDED" || job.status === "FAILED" || job.status === "TIMED_OUT") break;
       job.status = "CANCELLED";
       job.finishedAt = typeof p.finishedAt === "string" ? p.finishedAt : job.finishedAt;
@@ -732,7 +793,7 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const epoch = next.requestEpochs[String(p.requestEpochId)];
       if (!epoch) break;
       const fields = p.fields && typeof p.fields === "object" ? p.fields as Record<string, unknown> : {};
-      for (const key of ["requestBodyHash", "stablePrefixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash"] as const) {
+      for (const key of ["requestBodyHash", "requestHeadersHash", "requestContextHash", "providerBindingId", "scopePolicyHash", "stablePrefixHash", "dynamicSuffixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash"] as const) {
         if (typeof fields[key] === "string") epoch[key] = fields[key];
       }
       epoch.updatedSeq = event.seq;
@@ -749,12 +810,26 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "provider_request_queued":
     case "provider_request_slot_acquired":
     case "provider_request_retried":
+    case "provider_request_first_event":
+    case "provider_request_first_token":
+    case "provider_request_inter_event_idle":
+    case "provider_request_stalled":
     case "tool_call_recorded":
     case "tool_result_recorded":
+    case "consolidate_started":
+    case "consolidate_summary":
+    case "consolidate_finished":
+    case "consolidate_failed":
     case "compaction_recorded":
+    case "event_ingress_received":
+    case "event_ingress_processed":
+    case "observation_consumed":
       break;
     case "provider_request_queue_cancelled":
       updateEpochStatus(next, p, "CANCELLED", event.seq);
+      break;
+    case "provider_recovery_required":
+      updateEpochStatus(next, p, "FAILED", event.seq);
       break;
     case "provider_response_received":
       updateEpochStatus(next, p, Number(p.status) >= 400 ? "FAILED" : "RESPONSE_RECEIVED", event.seq);
@@ -801,6 +876,63 @@ function getSession(snapshot: RunSnapshot, sessionId: string) {
   const session = snapshot.sessions[sessionId];
   if (!session) throw new Error(`Unknown session ${sessionId}`);
   return session;
+}
+
+function getUpdateProposal(snapshot: RunSnapshot, proposalId: string): UpdateProposal {
+  const proposal = snapshot.updateProposals[proposalId];
+  if (!proposal) throw new Error(`Unknown update proposal: ${proposalId}`);
+  return proposal;
+}
+
+function validateEvaluatedProposalPayload(proposal: UpdateProposal, payload: Record<string, unknown>): {
+  evaluationHash: string;
+  metrics: NonNullable<UpdateProposal["metrics"]>;
+  gate: UpdateEvaluationGate;
+} {
+  if (typeof payload.evaluationHash !== "string" || !/^[a-f0-9]{64}$/i.test(payload.evaluationHash)) throw new Error("update_proposal_evaluated requires a sha256 evaluationHash");
+  if (!proposal.evaluationSets) throw new Error("update_proposal_evaluated requires proposal evaluation sets");
+  const metrics = validateReplayGateMetrics(payload.metrics);
+  validateUpdateEvaluationGate(payload.gate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: payload.evaluationHash,
+    gatePassed: metrics.gatePassed,
+  });
+  validateGateMetricValues(payload.gate, metrics);
+  return { evaluationHash: payload.evaluationHash, metrics, gate: payload.gate };
+}
+
+function validatePersistedProposalGate(proposal: UpdateProposal, requirePassing: boolean): void {
+  if (!proposal.evaluationGate || !proposal.evaluationHash || !proposal.evaluationSets) throw new Error("Approved update proposal requires a persisted evaluation gate");
+  const metrics = validateReplayGateMetrics(proposal.metrics);
+  validateUpdateEvaluationGate(proposal.evaluationGate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: proposal.evaluationHash,
+    gatePassed: metrics.gatePassed,
+  });
+  validateGateMetricValues(proposal.evaluationGate, metrics);
+  if (requirePassing && (!proposal.evaluationGate.passed || metrics.gatePassed !== 1)) throw new Error("Approved update proposal requires a passing evaluation gate");
+}
+
+function validateReplayGateMetrics(value: unknown): NonNullable<UpdateProposal["metrics"]> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Update proposal replay requires gate metrics");
+  const metrics = value as NonNullable<UpdateProposal["metrics"]>;
+  if (metrics.gatePassed !== 0 && metrics.gatePassed !== 1) throw new Error("Update proposal replay gatePassed is invalid");
+  for (const [key, metric] of Object.entries(metrics)) {
+    if (typeof metric !== "number" || !Number.isFinite(metric) || metric < 0 || (key !== "p95LatencyMs" && key !== "costUsd" && metric > 1)) throw new Error(`Update proposal replay metric is invalid: ${key}`);
+  }
+  return metrics;
+}
+
+function validateGateMetricValues(gate: UpdateEvaluationGate, metrics: NonNullable<UpdateProposal["metrics"]>): void {
+  if (metrics.triggerPassRate !== gate.scores.triggerPassRate
+    || metrics.retentionPassRate !== gate.scores.retentionPassRate
+    || metrics.migrationPassRate !== gate.scores.migrationPassRate
+    || metrics.safetyPassRate !== gate.scores.safetyPassRate
+    || metrics.retentionRegressionRate !== gate.scores.retentionRegressionRate
+    || metrics.activationRate !== gate.activationRate
+    || metrics.followingRate !== gate.followingRate) throw new Error("Update proposal replay metrics do not match evaluation gate");
 }
 
 function updateEpochStatus(snapshot: RunSnapshot, payload: Record<string, unknown>, status: RunSnapshot["requestEpochs"][string]["status"], seq: number): void {

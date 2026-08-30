@@ -4,15 +4,15 @@
 {
   "id": "materials-jobs",
   "name": "Durable Background Jobs",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T15:32:20.000Z",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 2,
-    "securityAuditCount": 2,
-    "lastBugAuditAt": "2026-08-09T15:32:20.000Z",
-    "lastSecurityAuditAt": "2026-08-09T15:32:20.000Z",
-    "sourceHash": "47b16225d5c8d60ec06d37fd4fb3121a33fa0a090548c5163e6f6e2ac04cbce3",
+    "bugAuditCount": 3,
+    "securityAuditCount": 3,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "6fab4963b5e2c090b73ef46078ebe44da322263aeae0a8f7549e214503f09ddb",
     "result": "passed"
   }
 }
@@ -28,6 +28,7 @@
 - Job 生命周期通过 Control Store 事件投影；执行结果通过 Artifact 引用。
 - Job 入队时固定逻辑 Capability 对应的 Backend ID 和版本；恢复时必须复用绑定并拒绝环境漂移。
 - Run teardown 必须停止仍在进程内活动的任务。
+- `monitor_job` 使用单调 UTF-8 字节 cursor 等待新增输出、关键词、退出/错误、心跳或有界超时；Job 完成事件携带 Artifact 引用，可由观察队列和重启后的 ControlStore 投影继续消费，不要求模型重复快速轮询。
 
 ## 开发规则与验证
 

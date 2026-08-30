@@ -25,7 +25,8 @@ import { CodingClaimVerifier, requiresClaimVerification } from "../src/verificat
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
@@ -34,11 +35,11 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "3096bff39cf42133b8b36ed0562b2aef251a4d81c1978e2ca07e560baf1cc533";
+const CODING_TOOL_CONTRACT_HASH = "a2995bca1a1a56aaf44126e4ee5b95c994053d1e32689762b19d7497c0dc7f43";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
@@ -92,10 +93,11 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /PB_READY/);
   assert.match(source, /PYTHONIOENCODING=utf-8/);
   assert.match(source, /First action contract/);
-  assert.match(source, /preparedOrchestrator/);
+  assert.match(source, /PREPARED_CTF_WORKFLOW_PROMPT/);
   assert.match(source, /first assistant action MUST be one allowed tool call/);
   assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
-  assert.match(source, /this\.preparedChallenge \? PREPARED_CTF_FAST_PATH_PROMPT/);
+  assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
+  assert.match(source, /<proofblade-turn-guidance>/);
 });
 
 test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
@@ -150,7 +152,7 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
 
   const evidence = snapshot.find((tool) => tool.name === "evidence")?.parameters as { properties?: Record<string, { type?: unknown; enum?: unknown }> };
   assert.equal(evidence.properties?.operation?.type, "string");
-  assert.deepEqual(evidence.properties?.operation?.enum, ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "annotate", "record", "link", "create_tree", "update_tree"]);
+  assert.deepEqual(evidence.properties?.operation?.enum, ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"]);
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
@@ -289,7 +291,17 @@ test("coding bash is blocked after the durable evidence curation threshold", asy
       },
     });
   }
-  const env = new NodeExecutionEnv({ cwd: dir });
+  // This contract test only exercises the curation advisory. Use a tiny
+  // deterministic execution double so the test does not depend on Windows
+  // shell-service permissions in the host running the suite.
+  const env = {
+    cwd: dir,
+    exec: async (_command: string, options: { onStdout?: (value: string) => void }) => {
+      options.onStdout?.("ran-anyway\n");
+      return { ok: true, value: { stdout: "", stderr: "", exitCode: 0 } };
+    },
+    cleanup: async () => undefined,
+  } as unknown as NodeExecutionEnv;
   const context = {
     env,
     skills: {},
@@ -621,11 +633,24 @@ test("durable CTF task classification enables challenge guards without prompt ke
   assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
-test("shell_background returns immediately and shell_job polls then stops the real process", async () => {
-  const dir = await mkdtemp(join(process.cwd(), "shell-bg-test-"));
+test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-bg-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
   try {
-    const context = { env, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
+      return;
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
 
     // A command that runs far longer than the tool call may block for.
     const started = Date.now();
@@ -635,6 +660,11 @@ test("shell_background returns immediately and shell_job polls then stops the re
     assert.match(job.jobId, /^sh-/);
     assert.ok(job.pid > 0, "a real pid must be returned");
     assert.equal(job.status, "running");
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { schemaVersion: number; runId: string; generation: number; ownerLane: string; pid: number; processGroupCreated: boolean; processGroupId?: number; processStartTime: string; commandHash: string; status: string };
+    assert.deepEqual({ schemaVersion: record.schemaVersion, runId: record.runId, generation: record.generation, ownerLane: record.ownerLane }, { schemaVersion: 2, runId, generation: 0, ownerLane: "main" });
+    assert.ok(record.pid > 0 && record.processGroupCreated && record.processGroupId && record.processGroupId > 0);
+    assert.ok(record.processStartTime.length > 0 && record.commandHash.length === 64 && record.status === "RUNNING");
     assert.ok(startElapsed < 10_000, `starting must not block for the command's duration, took ${startElapsed}ms`);
 
     // Give it a moment to write some output, then poll.
@@ -643,6 +673,19 @@ test("shell_background returns immediately and shell_job polls then stops the re
     const polled = read.details as { status: string; output: string; totalBytes?: number };
     assert.equal(polled.status, "running", "the job must still be running while it ticks");
     assert.match(polled.output, /tick-1/);
+
+    const monitored = await executeTool("shell_job", {
+      operation: "monitor",
+      jobId: job.jobId,
+      sinceCursor: String(polled.totalBytes ?? 0),
+      triggers: ["keyword"],
+      keywords: ["tick-4"],
+      waitMs: 5_000,
+    }, context);
+    const monitorDetails = monitored.details as { trigger: string; output: string; cursor: string };
+    assert.equal(monitorDetails.trigger, "keyword");
+    assert.match(monitorDetails.output, /tick-4/);
+    assert.ok(Number(monitorDetails.cursor) > Number(polled.totalBytes ?? 0));
 
     // Stopping must actually kill it: the log stops growing.
     const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
@@ -653,11 +696,255 @@ test("shell_background returns immediately and shell_job polls then stops the re
     assert.equal(later.totalBytes, afterStop.totalBytes, "a stopped job must not keep writing output");
     assert.equal(later.status, "finished");
 
+    const queueEvents = await services.control.events(runId);
+    assert.ok(queueEvents.filter((event) => event.type === "observation_consumed").length >= 3, "read, monitor, and stop should acknowledge their returned observations");
+    assert.equal((await services.control.snapshot(runId)).lastSeq, queueEvents.at(-1)?.seq);
+
     const listed = (await executeTool("shell_job", { operation: "list" }, context)).details as { jobs: string[] };
     assert.ok(listed.jobs.some((entry) => entry.includes(job.jobId)), "the job log must be listable");
   } finally {
-    await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("shell_job stop reaps descendants when setsid is unavailable", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-tree-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "base64", "cat", "date", "grep", "kill", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tail", "tr", "wc"];
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-TREE-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300 & child=$!; printf '%s' \"$child\" > child.pid; wait", label: "tree" }, context);
+    const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+    assert.equal(job.processGroupCreated, true);
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { processGroupCreated: boolean; processGroupId?: number };
+    assert.equal(record.processGroupCreated, true);
+    assert.ok(Number.isInteger(record.processGroupId) && record.processGroupId! > 0);
+    const childPidResult = await env.exec("cat child.pid");
+    assert.ok(childPidResult.ok);
+    const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+    assert.match(childPid, /^\d+$/);
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(alive.ok);
+    assert.equal(alive.ok ? alive.value.stdout : "", "dead", "stop must terminate the descendant process");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("shell_job stop reaps a descendant after the fallback user command exits", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-orphan-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "cat", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tr"];
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-ORPHAN-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300 & child=$!; printf '%s' \"$child\" > child.pid; exit 0", label: "orphan" }, context);
+    const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+    assert.equal(job.processGroupCreated, true);
+    const pidPath = `.proofblade/jobs/${sha256(runId).slice(0, 24)}/0/${job.jobId}.pids`;
+    const childPidResult = await env.exec(`while [ ! -s child.pid ] || [ ! -s ${pidPath} ]; do sleep 0.05; done; cat child.pid`);
+    assert.ok(childPidResult.ok);
+    const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+    assert.match(childPid, /^\d+$/);
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const recordBeforeStop = JSON.parse(await readFile(recordPath, "utf8")) as { processGroupCreated: boolean; processGroupId?: number };
+    assert.equal(recordBeforeStop.processGroupCreated, true);
+    assert.ok(Number.isInteger(recordBeforeStop.processGroupId) && recordBeforeStop.processGroupId! > 0);
+    const supervisorAlive = await env.exec(`if kill -0 ${job.pid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(supervisorAlive.ok);
+    assert.equal(supervisorAlive.ok ? supervisorAlive.value.stdout : "", "alive", "the fallback supervisor must remain to manage the user command's process group");
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { status: string };
+    assert.equal(record.status, "STOPPED");
+    const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(alive.ok);
+    assert.equal(alive.ok ? alive.value.stdout : "", "dead", "stop must terminate a descendant after its parent exits");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("fallback supervisor survives user trap, PATH changes, and exec", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-supervisor-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "cat", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sh", "sleep", "tr"];
+    const commandSources = new Map<string, string>();
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      commandSources.set(command, source);
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-SUPERVISOR-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+    const sleepPath = quote(commandSources.get("sleep")!);
+    const shPath = quote(commandSources.get("sh")!);
+    const cases = [
+      { id: "trap", command: `trap - EXIT; ${sleepPath} 300 & child=$!; printf '%s' "$child" > child-trap.pid; exit 0` },
+      { id: "path", command: `export PATH=/nonexistent; ${sleepPath} 300 & child=$!; printf '%s' "$child" > child-path.pid; exit 0` },
+      { id: "exec", command: `exec ${shPath} -c ${quote(`${sleepPath} 300 & child=$!; printf '%s' "$child" > child-exec.pid; exit 0`)}` },
+    ];
+    for (const item of cases) {
+      const tool = createCodingTools().find((candidate) => candidate.name === "shell_background");
+      assert.ok(tool);
+      const startResult = await (tool as AgentHarnessTool<CodingResourceContext>).execute(`test-${item.id}`, { command: item.command, label: item.id }, new AbortController().signal, () => undefined, context);
+      const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+      assert.equal(job.processGroupCreated, true);
+      const pidPath = `.proofblade/jobs/${sha256(runId).slice(0, 24)}/0/${job.jobId}.pids`;
+      const childPidResult = await env.exec(`while [ ! -s child-${item.id}.pid ] || [ ! -s ${pidPath} ]; do ${sleepPath} 0.05; done; cat child-${item.id}.pid`);
+      assert.ok(childPidResult.ok);
+      const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+      assert.match(childPid, /^\d+$/);
+      const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+      assert.equal((stop.details as { stopped: boolean }).stopped, true, `${item.id} descendant should be stopped`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+      const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+      assert.ok(alive.ok);
+      assert.equal(alive.ok ? alive.value.stdout : "", "dead", `${item.id} descendant must not survive stop`);
+    }
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("shell_job stop accepts a schema 1 process-group record during upgrade", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process groups");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-legacy-test-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell");
+      return;
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-LEGACY-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300", label: "legacy" }, context);
+    const job = startResult.details as { jobId: string; pid: number };
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const current = JSON.parse(await readFile(recordPath, "utf8")) as Record<string, unknown>;
+    if (current.processGroupId === undefined) {
+      await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+      t.skip("requires setsid to exercise the legacy process-group record");
+      return;
+    }
+    delete current.processGroupCreated;
+    delete current.processTreePath;
+    current.schemaVersion = 1;
+    await writeFile(recordPath, JSON.stringify(current), "utf8");
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    assert.equal(JSON.parse(await readFile(recordPath, "utf8")).status, "STOPPED");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 });
 
@@ -783,10 +1070,14 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
   assert.equal((result.details as { artifactId: string }).artifactId, "A-1");
 });
 
-test("bash anchors an artifact only when output was actually withheld", async () => {
-  const dir = await mkdtemp(join(process.cwd(), "anchor-test-"));
+test("bash anchors an artifact only when output was actually withheld", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-anchor-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
   try {
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell; the Windows WSL shim may be installed without a runnable distribution");
+      return;
+    }
     const archived: string[] = [];
     let savedBytes = 0;
     const pipeline = {
@@ -820,8 +1111,11 @@ test("bash anchors an artifact only when output was actually withheld", async ()
     assert.match(withheldText, /do not re-run the command/);
     assert.equal(archived.length, 2);
   } finally {
-    await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 });
 
@@ -830,4 +1124,9 @@ async function executeTool(name: string, params: Record<string, unknown>, contex
   assert.ok(tool, `Missing coding tool: ${name}`);
   const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("test-call", params, new AbortController().signal, () => undefined, context);
   return result as { content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean };
+}
+
+async function hasWorkingBash(env: NodeExecutionEnv): Promise<boolean> {
+  const result = await env.exec("printf proofblade-shell-ready");
+  return result.ok && result.value.stdout.includes("proofblade-shell-ready");
 }

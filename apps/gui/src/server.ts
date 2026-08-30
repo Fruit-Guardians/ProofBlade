@@ -431,7 +431,25 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
   };
 }
 
+type ProjectCapabilities = Pick<WorkspaceSettings["capabilities"], "tools" | "skills" | "mcpServers">;
+let projectCapabilitiesPromise: Promise<ProjectCapabilities> | undefined;
+
 async function capabilityCatalog(): Promise<WorkspaceSettings["capabilities"]> {
+  projectCapabilitiesPromise ??= loadProjectCapabilities().catch((error: unknown) => {
+    projectCapabilitiesPromise = undefined;
+    throw error;
+  });
+  const projectCapabilities = await projectCapabilitiesPromise;
+  return {
+    ...projectCapabilities,
+    providerNative: Object.fromEntries(providerSettings.publicSettings().profiles.map((profile) => [
+      profile.id,
+      providerNativeCapabilities(profile),
+    ])),
+  };
+}
+
+async function loadProjectCapabilities(): Promise<ProjectCapabilities> {
   const [skills, mcp] = await Promise.all([
     ProofBladeSkillRegistry.load(projectRoot),
     Promise.resolve(McpProjectRegistry.load(projectRoot)),
@@ -447,10 +465,6 @@ async function capabilityCatalog(): Promise<WorkspaceSettings["capabilities"]> {
         disabled: server.disabled,
         ...(server.toolchain ? { toolchain: server.toolchain } : {}),
       })),
-      providerNative: Object.fromEntries(providerSettings.publicSettings().profiles.map((profile) => [
-        profile.id,
-        providerNativeCapabilities(profile),
-      ])),
     };
   } finally {
     await mcp.close();

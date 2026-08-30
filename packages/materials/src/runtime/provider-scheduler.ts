@@ -40,6 +40,11 @@ export interface ProviderRequestSchedulingObserver {
   queued(info: ProviderRequestQueueInfo): Promise<string | undefined> | string | undefined;
   started(requestId: string | undefined, info: ProviderRequestStartInfo): Promise<void> | void;
   cancelled(requestId: string | undefined, info: ProviderRequestCancelInfo): Promise<void> | void;
+  firstEvent?(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; elapsedMs: number; eventType: string }): Promise<void> | void;
+  firstToken?(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; elapsedMs: number; eventType: string }): Promise<void> | void;
+  interEventIdle?(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; maxIdleMs: number; eventType: string }): Promise<void> | void;
+  stalled?(requestId: string | undefined, info: ProviderRequestScope & { attempt: number; idleMs: number; reason: string }): Promise<void> | void;
+  recoveryRequired?(requestId: string | undefined, info: ProviderRequestScope & { attempts: number; maxRetries: number; reason: string }): Promise<void> | void;
   payload?(requestId: string | undefined, payload: unknown): Promise<void> | void;
   response?(requestId: string | undefined, response: { status: number; headers: Record<string, string> }): Promise<void> | void;
   completed?(requestId: string | undefined, message: AssistantMessage): Promise<void> | void;
@@ -162,26 +167,26 @@ export class ProviderRequestScheduler {
     try {
       const pool = this.pool(scope);
       queueDepth = pool.queue.length;
-      requestId = await observer?.queued({ ...scope, queueDepth });
+      try {
+        requestId = await observer?.queued({ ...scope, queueDepth });
+      } catch {
+        // Observability is a side channel. A failed queue recorder must not
+        // turn a runnable provider request into a fake queue failure.
+        requestId = undefined;
+      }
       permit = await this.acquire(pool, options?.signal);
     } catch (error) {
       // Failed BEFORE the provider stream started (queue abort / acquire error).
       // This is a cancellation, never retried; tell the observer, then emit.
       const waitMs = Math.max(0, Date.now() - requestedAt);
       const reason = error instanceof Error ? error.message : String(error);
-      try {
-        await observer?.cancelled(requestId, { ...scope, queueDepth, waitMs, reason });
-      } catch (observerError) {
-        output.push(errorEvent(model, observerError));
-        permit?.release();
-        return;
-      }
+      await notifyObserver(() => observer?.cancelled(requestId, { ...scope, queueDepth, waitMs, reason }));
       output.push(errorEvent(model, error));
       permit?.release();
       return;
     }
     try {
-      await observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs });
+      await notifyObserver(() => observer?.started(requestId, { ...scope, queueDepth: permit.queueDepth, waitMs: permit.waitMs }));
       // Bounded retry at the STREAM boundary. Each attempt buffers its events and
       // is committed to `output` only once it terminates (success or a final,
       // non-retryable/ budget-exhausted error). A retryable error mid-stream
@@ -197,7 +202,7 @@ export class ProviderRequestScheduler {
         const idle = new AbortController();
         const signal = options?.signal ? AbortSignal.any([options.signal, idle.signal]) : idle.signal;
         const source = start(model, context, observedOptions({ ...options, signal }, requestId, observer));
-        const outcome = await this.drainAttempt(source, idle);
+        const outcome = await this.drainAttempt(source, idle, observer, requestId, attempt, Date.now(), scope);
         // A terminal error this attempt produced (either a real error event or a
         // synthetic one from an idle stall / iterator throw).
         const errorMessage = outcome.kind === "error" ? outcome.event.error : outcome.kind === "threw" ? errorEvent(model, outcome.error).error : undefined;
@@ -206,7 +211,7 @@ export class ProviderRequestScheduler {
         if (retryable) {
           attempt += 1;
           const delayMs = this.retryBaseDelayMs * 2 ** (attempt - 1);
-          await observer?.retried?.(requestId, { ...scope, attempt, maxRetries: this.maxRetries, delayMs, reason: errorMessage!.errorMessage ?? "transient provider error" });
+          await notifyObserver(() => observer?.retried?.(requestId, { ...scope, attempt, maxRetries: this.maxRetries, delayMs, reason: errorMessage!.errorMessage ?? "transient provider error" }));
           const aborted = await backoff(delayMs, options?.signal);
           if (aborted) {
             // Cancelled during backoff: emit an aborted terminal so the consumer
@@ -217,6 +222,14 @@ export class ProviderRequestScheduler {
             return;
           }
           continue; // discard this attempt's buffer, re-issue
+        }
+        if (errorMessage && (outcome.kind === "threw" || isRetryableAssistantError(errorMessage) || isIdleProviderError(errorMessage))) {
+          await notifyObserver(() => observer?.recoveryRequired?.(requestId, {
+            ...scope,
+            attempts: attempt + 1,
+            maxRetries: this.maxRetries,
+            reason: errorMessage.errorMessage ?? "provider request recovery required",
+          }));
         }
         // Commit this attempt: flush its buffered events in order, then fire the
         // single terminal completion for telemetry.
@@ -267,29 +280,46 @@ export class ProviderRequestScheduler {
    * Buffering costs live token streaming during a call, which the fleet does not
    * rely on, in exchange for a retry that never leaks a partial stream.
    */
-  private async drainAttempt(source: AssistantMessageEventStream, idle: AbortController): Promise<AttemptOutcome> {
+  private async drainAttempt(
+    source: AssistantMessageEventStream,
+    idle: AbortController,
+    observer: ProviderRequestSchedulingObserver | undefined,
+    requestId: string | undefined,
+    attempt: number,
+    attemptStartedAt: number,
+    scope: ProviderRequestScope,
+  ): Promise<AttemptOutcome> {
     const events: AssistantMessageEvent[] = [];
+    const stats: AttemptStats = { maxInterEventIdleMs: 0 };
     if (this.idleTimeoutMs <= 0) {
       for await (const event of source) {
+        const now = Date.now();
+        const idleMs = Math.max(0, now - (stats.lastEventAt ?? attemptStartedAt));
+        stats.maxInterEventIdleMs = Math.max(stats.maxInterEventIdleMs, idleMs);
+        stats.lastEventAt = now;
+        observeProviderEvent(observer, requestId, attempt, attemptStartedAt, stats, event, idleMs, scope);
         events.push(event);
-        if (event.type === "done") return { kind: "success", events, message: event.message };
-        if (event.type === "error") return { kind: "error", events, event };
+        if (event.type === "done") return { kind: "success", events, message: event.message, stats };
+        if (event.type === "error") return { kind: "error", events, event, stats };
       }
-      return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event") };
+      return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
     }
     const iterator = source[Symbol.asyncIterator]();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastEventAt = attemptStartedAt;
     // Local, not an instance field: concurrent streams each run their own attempt
     // and must not share one timer handle.
     let rearm: () => void = () => {};
     const stall = new Promise<never>((_, reject) => {
-      rearm = (): void => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
-          idle.abort(reason);
-          reject(reason);
-        }, this.idleTimeoutMs);
+        rearm = (): void => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            const idleMs = Math.max(0, Date.now() - lastEventAt);
+            const reason = new Error(`Provider stream idle for more than ${this.idleTimeoutMs}ms`);
+            void notifyObserver(() => observer?.stalled?.(requestId, { ...scope, attempt, idleMs, reason: reason.message }));
+            idle.abort(reason);
+            reject(reason);
+          }, this.idleTimeoutMs);
       };
       rearm();
     });
@@ -301,15 +331,20 @@ export class ProviderRequestScheduler {
         // never surfaces as an unhandled rejection.
         pending.catch(() => {});
         const next = await Promise.race([pending, stall]);
-        if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event") };
-        rearm();
+        if (next.done) return { kind: "threw", events, error: new Error("Provider stream ended without a terminal event"), stats };
         const event = next.value;
+        const now = Date.now();
+        const idleMs = Math.max(0, now - lastEventAt);
+        stats.maxInterEventIdleMs = Math.max(stats.maxInterEventIdleMs, idleMs);
+        lastEventAt = now;
+        observeProviderEvent(observer, requestId, attempt, attemptStartedAt, stats, event, idleMs, scope);
+        rearm();
         events.push(event);
-        if (event.type === "done") return { kind: "success", events, message: event.message };
-        if (event.type === "error") return { kind: "error", events, event };
+        if (event.type === "done") return { kind: "success", events, message: event.message, stats };
+        if (event.type === "error") return { kind: "error", events, event, stats };
       }
     } catch (error) {
-      return { kind: "threw", events, error };
+      return { kind: "threw", events, error, stats };
     } finally {
       clearTimeout(timer);
       // Best-effort close so the abandoned generator can run its own cleanup.
@@ -379,10 +414,55 @@ function isIdleProviderError(message: { errorMessage?: string }): boolean {
 }
 
 /** Outcome of one buffered provider-stream attempt (see drainAttempt). */
+interface AttemptStats {
+  firstEventMs?: number;
+  firstTokenMs?: number;
+  maxInterEventIdleMs: number;
+  lastEventAt?: number;
+  lastEventType?: string;
+}
+
 type AttemptOutcome =
-  | { kind: "success"; events: AssistantMessageEvent[]; message: AssistantMessage }
-  | { kind: "error"; events: AssistantMessageEvent[]; event: Extract<AssistantMessageEvent, { type: "error" }> }
-  | { kind: "threw"; events: AssistantMessageEvent[]; error: unknown };
+  | { kind: "success"; events: AssistantMessageEvent[]; message: AssistantMessage; stats: AttemptStats }
+  | { kind: "error"; events: AssistantMessageEvent[]; event: Extract<AssistantMessageEvent, { type: "error" }>; stats: AttemptStats }
+  | { kind: "threw"; events: AssistantMessageEvent[]; error: unknown; stats: AttemptStats };
+
+function observeProviderEvent(
+  observer: ProviderRequestSchedulingObserver | undefined,
+  requestId: string | undefined,
+  attempt: number,
+  attemptStartedAt: number,
+  stats: AttemptStats,
+  event: AssistantMessageEvent,
+  idleMs: number | undefined,
+  scope: ProviderRequestScope,
+): void {
+  const eventType = event.type;
+  stats.lastEventType = eventType;
+  const elapsedMs = Math.max(0, Date.now() - attemptStartedAt);
+  if (stats.firstEventMs === undefined) {
+    stats.firstEventMs = elapsedMs;
+    void notifyObserver(() => observer?.firstEvent?.(requestId, { ...scope, attempt, elapsedMs, eventType }));
+  }
+  if (stats.firstTokenMs === undefined && isProviderTokenEvent(event)) {
+    stats.firstTokenMs = elapsedMs;
+    void notifyObserver(() => observer?.firstToken?.(requestId, { ...scope, attempt, elapsedMs, eventType }));
+  }
+  // Persist only meaningful gaps. A callback for every token would recreate
+  // the slow telemetry path this metric is meant to diagnose.
+  if (idleMs !== undefined && idleMs >= 100) {
+    void notifyObserver(() => observer?.interEventIdle?.(requestId, { ...scope, attempt, idleMs, maxIdleMs: stats.maxInterEventIdleMs, eventType }));
+  }
+}
+
+function isProviderTokenEvent(event: AssistantMessageEvent): boolean {
+  return event.type === "text_delta" || event.type === "thinking_delta" || event.type === "toolcall_delta";
+}
+
+async function notifyObserver(action: (() => Promise<void> | void) | undefined): Promise<void> {
+  if (!action) return;
+  try { await action(); } catch { /* telemetry cannot change provider terminal behavior */ }
+}
 
 /** Abortable backoff sleep. Resolves true if the signal aborted during the wait. */
 function backoff(delayMs: number, signal: AbortSignal | undefined): Promise<boolean> {
@@ -432,12 +512,12 @@ function observedOptions(options: StreamOptions | undefined, requestId: string |
     ...options,
     onPayload: async (payload, model) => {
       const next = await options?.onPayload?.(payload, model);
-      await observer.payload?.(requestId, next ?? payload);
+      await notifyObserver(() => observer.payload?.(requestId, next ?? payload));
       return next;
     },
     onResponse: async (response, model) => {
       await options?.onResponse?.(response, model);
-      await observer.response?.(requestId, response);
+      await notifyObserver(() => observer.response?.(requestId, response));
     },
   };
 }

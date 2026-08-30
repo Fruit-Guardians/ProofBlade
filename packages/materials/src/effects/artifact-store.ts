@@ -13,6 +13,14 @@ export interface ArtifactMeta {
   semantic?: Omit<ArtifactSemanticMetadata, "updatedSeq">;
 }
 
+export interface ArtifactTextRange {
+  content: string;
+  offset: number;
+  bytesRead: number;
+  totalBytes: number;
+  truncated: boolean;
+}
+
 export class ArtifactStore {
   public constructor(private readonly runsRoot: string, private readonly controlStore: ControlStore) {}
 
@@ -59,6 +67,19 @@ export class ArtifactStore {
     return Buffer.from(await repository.read(artifact)).toString("utf8");
   }
 
+  /** Read a bounded UTF-8 prefix without allocating the complete Artifact. */
+  public async readTextRange(runId: string, artifact: ArtifactRef, maxBytes: number, offset = 0): Promise<ArtifactTextRange> {
+    const repository = new FileArtifactRepository(join(this.runsRoot, runId));
+    const range = await repository.readRange(artifact, offset, maxBytes);
+    return {
+      content: decodeUtf8Range(range.content, offset, range.truncated),
+      offset,
+      bytesRead: range.content.byteLength,
+      totalBytes: range.totalBytes,
+      truncated: range.truncated,
+    };
+  }
+
   public async verify(runId: string, artifact: ArtifactRef): Promise<boolean> {
     try {
       await this.readText(runId, artifact);
@@ -67,6 +88,38 @@ export class ArtifactStore {
       return false;
     }
   }
+}
+
+function decodeUtf8Range(content: Uint8Array, offset: number, truncated: boolean): string {
+  const buffer = Buffer.from(content);
+  let start = 0;
+  if (offset > 0) {
+    while (start < buffer.length && isUtf8ContinuationByte(buffer[start]!)) start += 1;
+  }
+  if (!truncated) return buffer.subarray(start).toString("utf8");
+
+  let end = buffer.length;
+  while (end > start && isIncompleteUtf8Suffix(buffer.subarray(start, end))) end -= 1;
+  return buffer.subarray(start, end).toString("utf8");
+}
+
+function isUtf8ContinuationByte(byte: number): boolean {
+  return (byte & 0xc0) === 0x80;
+}
+
+function isIncompleteUtf8Suffix(buffer: Buffer): boolean {
+  if (buffer.length === 0) return false;
+  let lead = buffer.length - 1;
+  while (lead > 0 && isUtf8ContinuationByte(buffer[lead]!)) lead -= 1;
+  const expected = utf8SequenceLength(buffer[lead]!);
+  return buffer.length - lead < expected;
+}
+
+function utf8SequenceLength(byte: number): number {
+  if (byte >= 0xc2 && byte <= 0xdf) return 2;
+  if (byte >= 0xe0 && byte <= 0xef) return 3;
+  if (byte >= 0xf0 && byte <= 0xf4) return 4;
+  return 1;
 }
 
 function sanitizeFilename(filename: string): string {

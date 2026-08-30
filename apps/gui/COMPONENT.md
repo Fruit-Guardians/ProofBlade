@@ -4,15 +4,15 @@
 {
   "id": "gui",
   "name": "ProofBlade GUI",
-  "version": "0.7.16",
+  "version": "0.7.19",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-25T06:00:00.000Z",
+  "updatedAt": "2026-08-29T10:29:31.463Z",
   "qualityAudit": {
-    "bugAuditCount": 16,
-    "securityAuditCount": 16,
-    "lastBugAuditAt": "2026-08-25T06:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-25T06:00:00.000Z",
-    "sourceHash": "bc13738e181e889582c5dbe2655f382098e9aa2e3df53d7891057a021dbe2d2e",
+    "bugAuditCount": 19,
+    "securityAuditCount": 19,
+    "lastBugAuditAt": "2026-08-29T10:29:31.463Z",
+    "lastSecurityAuditAt": "2026-08-29T10:29:31.463Z",
+    "sourceHash": "9dee480e6ffc8660ad9ab60160a9d4f9c281e3c61f74357bc9291c4e38411dc9",
     "result": "passed"
   }
 }
@@ -43,6 +43,7 @@
 - Provider Profile 可设置 `maxConcurrentRequests`（1-32，默认 1）；普通对话与 Fixture Solver 共用按 Provider/model 的 FIFO 槽位，排队取消不会发送请求。运行指标展示排队数、取消数、最大队列深度和平均等待。
 - 缓存展示同时给出本次离散缓存块和会话累计读取、未命中、请求数、输入侧命中率；`cacheWrite` 不进入缓存命中率分母。
 - 上下文面板显示最近一次真实 Provider 请求的已用 tokens、窗口上限、剩余 tokens 和利用率；对话可选择 20%-80% 的主动压缩阈值，该偏好由服务端传入现有 Coding Lane 维护链，不能在 GUI 另建压缩流程。
+- “待处理观察”面板直接由 `ControlStore` 事件重建，不维护 GUI 私有队列；显示 Job/Provider/Verifier/Maintenance 的有界脱敏摘要、待消费和 urgent 数量、来源、事件序号、关联 Job/Request/Artifact/ref。Coding Lane 在安全点只注入本次确实展示的前 8 项，消费标记以 `observation_consumed` 事件持久化，重启后可重建且幂等。
 - 会话工作目录必须经过服务端绝对路径、存在性和目录类型校验，再传给 `PiCodingLane`。
 - 普通 Coding 对话的名称保存在用户本地 workspace metadata；删除必须由服务端校验 Run 类型和活动状态后删除完整持久目录，并同步移除本地对话偏好。Fixture Run 不提供删除入口，避免破坏复盘材料。
 - GUI 创建 Coding Lane 时必须传入共享 Artifact Store 与 Effect Journal，让 `capability` 代理复用现有持久化和安全边界；不得在 GUI 层创建旁路执行器或第二套 Capability 状态。
@@ -54,6 +55,8 @@
 - GUI Shutdown 先拒绝新 Chat/Solve/Conversation，并中止、等待全部活动任务；服务、HTTP Server 和 Vite 的清理必须全部执行，最后统一报告失败。
 - Run 切换、定时器、手动操作和对话完成后的列表/详情刷新必须共用组件生命周期内唯一的单飞协调器；后台 tick 忙时立即返回且不得积压等待 Promise，交互刷新忙时只合并一次最新请求，旧 Run 的迟到响应不得覆盖当前详情。后台刷新不得清除可见错误；Run 切换、手动刷新和对话完成等交互刷新成功后必须清除已恢复的请求错误。
 - Run 详情缓存必须同时观察 durable `events.jsonl` 的 `mtimeMs`/文件大小和递归排序后的 Pi Session 文件状态；Session 加载期间发生变化时重读一次，仍不稳定则不得缓存。完整详情采用容量 32、单项 8 MiB、总量 64 MiB 的加权 LRU，超限详情只返回不缓存；同一 Run 的并发 miss 必须 single-flight，命中缓存时仍要刷新进程内 `active` 状态，服务关闭时必须与列表缓存一并清空。
+- 首屏只等待轻量 bootstrap 与 Provider 设置即可解除全局 loading；Workspace Skill/MCP 能力扫描和 Run 列表必须后台加载，不能阻止用户打开“新建对话”。静态 Skill/MCP 目录在进程内 single-flight 缓存，Provider Native 状态继续按当前配置动态生成。
+- Run 列表优先读取并校验 `projection.json`，不为侧栏统计 Tool 次数而回放完整事件流；projection 缺失、损坏或真正落后时才回放。历史 authority migration 允许作为唯一相邻尾事件，不得让大批旧 Run 退回冷启动全量回放。列表 Tool 数是可选投影，缺失时不显示。
 
 ## 验证
 

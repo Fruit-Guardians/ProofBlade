@@ -1,4 +1,4 @@
-import { access, readdir, rm, stat } from "node:fs/promises";
+import { access, open, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
@@ -36,6 +36,9 @@ import {
   withBrowserResourceAdapter,
   tryCreateConfiguredSessionRuntimeBrokers,
   withSessionResourceAdapters,
+  projectObservationQueue,
+  JsonlControlStore,
+  projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
 import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
@@ -95,6 +98,7 @@ export class DebugDataService {
   private readonly services: AppServices;
   private readonly browserVerifierFactory?: BrowserVerifierFactory;
   private readonly createCodingLane: CodingLaneFactory;
+  private readonly materializedRuns: JsonlControlStore;
   public readonly appServer: ProofBladeAppServer;
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
@@ -131,6 +135,7 @@ export class DebugDataService {
       ...(sessionRuntime.configured ? { sessionRuntimeRequired: !sessionRuntime.tokenAvailable } : {}),
       ...(config.runtime.browserBroker ? { browserRuntimeRequired: true } : {}),
     });
+    this.materializedRuns = new JsonlControlStore(this.services.runsRoot);
     this.appServer = new ProofBladeAppServer({
       control: this.services.control,
       approvals: new ApprovalPolicy({ ledgerPath: join(this.services.runsRoot, "approvals.json") }),
@@ -202,10 +207,7 @@ export class DebugDataService {
           const eventsStat = await stat(join(this.services.runsRoot, entry.name, "events.jsonl"));
           const cached = this.runListCache.get(entry.name);
           if (cached?.mtimeMs === eventsStat.mtimeMs) return { ...cached.item, active: this.active.get(entry.name) };
-          const [snapshot, events] = await Promise.all([
-            this.services.control.snapshot(entry.name),
-            this.services.control.events(entry.name),
-          ]);
+          const snapshot = await this.runListSnapshot(entry.name, eventsStat);
           const item: RunListItem = {
             runId: snapshot.runId,
             kind: runKind(snapshot.task),
@@ -217,7 +219,6 @@ export class DebugDataService {
             lastSeq: snapshot.lastSeq,
             updatedAt: eventsStat.mtime.toISOString(),
             counts: {
-              tools: events.filter((event) => event.type === "tool_call_recorded").length,
               evidence: Object.keys(snapshot.evidence).length,
               artifacts: Object.keys(snapshot.artifacts).length,
               effects: Object.keys(snapshot.effects).length,
@@ -231,6 +232,24 @@ export class DebugDataService {
         }
       }));
     return items.filter((item): item is RunListItem => Boolean(item)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
+    try {
+      const [snapshot, projectionStat] = await Promise.all([
+        this.materializedRuns.loadProjection(runId),
+        stat(join(this.services.runsRoot, runId, "projection.json")),
+      ]);
+      if (snapshot
+        && snapshot.runId === runId
+        && snapshot.projectionHash === projectionHash(snapshot)
+        && (projectionStat.mtimeMs >= eventsStat.mtimeMs
+          || await hasSingleTrailingAuthorityMigration(join(this.services.runsRoot, runId, "events.jsonl"), eventsStat, snapshot))) return snapshot;
+    } catch {
+      // Missing, malformed, or stale projections are disposable. The event
+      // stream remains authoritative and is replayed only for this Run.
+    }
+    return await this.services.control.snapshot(runId);
   }
 
   public async getRun(runId: string): Promise<RunDetail> {
@@ -264,7 +283,7 @@ export class DebugDataService {
       this.loadStableSessions(runId, sessionsRoot, sessionsVersion),
     ]);
     const { sessions, version: loadedSessionsVersion, stable: sessionsStable } = sessionRead;
-    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events) } satisfies RunDetail;
+    const detail = { kind: runKind(snapshot.task), snapshot, events, telemetry, sessions, controlView: buildRunControlView(snapshot), active: this.active.get(runId), updatedAt: eventsStat.mtime.toISOString(), context: contextRuntimeInfo(events), observationQueue: projectObservationQueue(events, snapshot) } satisfies RunDetail;
     const currentVersion = sessionsStable && await this.isCurrentRunVersion(runId, eventsStat, sessionsRoot, loadedSessionsVersion);
     const bytes = currentVersion ? boundedJsonByteSize(detail, runDetailCacheMaxEntryBytes) : runDetailCacheMaxEntryBytes + 1;
     if (!this.closing && currentVersion && bytes <= runDetailCacheMaxEntryBytes) {
@@ -651,6 +670,35 @@ export class DebugDataService {
   }
 }
 
+async function hasSingleTrailingAuthorityMigration(eventsPath: string, eventsStat: Stats, snapshot: RunSnapshot): Promise<boolean> {
+  const tailBytes = Math.min(eventsStat.size, 64 * 1024);
+  if (tailBytes <= 0) return false;
+  const handle = await open(eventsPath, "r");
+  try {
+    const tail = Buffer.allocUnsafe(tailBytes);
+    await handle.read(tail, 0, tailBytes, eventsStat.size - tailBytes);
+    const line = tail.toString("utf8").trimEnd().split(/\r?\n/).at(-1);
+    if (!line) return false;
+    const event = JSON.parse(line) as { schemaVersion?: unknown; streamId?: unknown; runId?: unknown; seq?: unknown; type?: unknown; payload?: Record<string, unknown> };
+    const legacySnapshot = snapshot as RunSnapshot & { authorityHash?: string; taskHash?: string };
+    const migratedTaskHash = event.payload?.taskHash;
+    return (legacySnapshot.authorityHash === undefined || legacySnapshot.authorityHash === "LEGACY-UNTRUSTED")
+      && event.schemaVersion === 1
+      && event.streamId === snapshot.runId
+      && event.runId === snapshot.runId
+      && event.type === "run_authority_migrated"
+      && event.seq === snapshot.lastSeq + 1
+      && event.payload?.migratedFrom === "legacy-v1"
+      && typeof migratedTaskHash === "string"
+      && /^[a-f0-9]{64}$/i.test(migratedTaskHash)
+      && (legacySnapshot.taskHash === undefined || migratedTaskHash === legacySnapshot.taskHash)
+      && typeof event.payload.authorityHash === "string"
+      && /^[a-f0-9]{64}$/i.test(event.payload.authorityHash);
+  } finally {
+    await handle.close();
+  }
+}
+
 async function filesystemVersion(root: string): Promise<string> {
   const entries: string[] = [];
   async function visit(directory: string): Promise<void> {
@@ -982,21 +1030,69 @@ function contextRuntimeInfo(events: readonly HarnessEvent[]): ContextRuntimeInfo
   if (!usageEvent) return undefined;
   const usage = usageEvent.payload?.usage as { input?: unknown; cacheRead?: unknown } | undefined;
   const usageInput = Number(usage?.input ?? 0);
-  const cacheRead = Number(usage?.cacheRead ?? 0);
+  const cacheReported = typeof usage?.cacheRead === "number";
+  const cacheRead = cacheReported ? Number(usage?.cacheRead) : 0;
   const epochEvent = [...events].reverse().find((event) => event.type === "request_epoch_started");
   const contextWindow = Number((epochEvent?.payload?.epoch as { contextWindow?: unknown } | undefined)?.contextWindow ?? 0);
   if (!Number.isFinite(contextWindow) || contextWindow <= 0) return undefined;
   const usedTokens = Math.max(0, usageInput) + Math.max(0, cacheRead);
   const estimatedTokens = Number(usageEvent.payload?.contextEstimatedTokens);
+  const epochId = typeof epochEvent?.payload?.epochId === "string"
+    ? epochEvent?.payload?.epochId
+    : typeof (epochEvent?.payload?.epoch as { id?: unknown } | undefined)?.id === "string"
+      ? (epochEvent?.payload?.epoch as { id: string }).id
+      : undefined;
+  const epoch = epochEvent?.payload?.epoch as { requestContextHash?: unknown; contextManifestHash?: unknown; manifestSummary?: unknown } | undefined;
+  const manifestSummary = isRecord(epoch?.manifestSummary) ? epoch.manifestSummary : undefined;
+  const layerTokens = numericRecord(manifestSummary?.layerTokens);
+  const blockHashes = stringRecord(manifestSummary?.blockHashes);
+  const manifestBudget = isRecord(manifestSummary?.budget) ? manifestSummary.budget : undefined;
+  const manifestMaintenance = isRecord(manifestSummary?.maintenance) ? manifestSummary.maintenance : undefined;
+  const contextEvent = [...events].reverse().find((event) => event.type === "request_epoch_context" && (!epochId || event.payload?.requestEpochId === epochId || event.payload?.requestEpochId === undefined));
+  const fields = contextEvent?.payload?.fields as { requestBodyHash?: unknown; stablePrefixHash?: unknown; dynamicSuffixHash?: unknown } | undefined;
+  const lastCompaction = [...events].reverse().find((event) => event.type === "compaction_recorded");
+  const lastConsolidation = [...events].reverse().find((event) => event.type === "consolidate_finished" || event.type === "consolidate_failed");
   return {
     contextWindow,
     usedTokens,
     remainingTokens: Math.max(0, contextWindow - usedTokens),
     utilization: usedTokens / contextWindow,
     ...(Number.isFinite(estimatedTokens) && estimatedTokens > 0 ? { estimatedTokens } : {}),
-    lastCacheRead: Math.max(0, cacheRead),
+    cacheReported,
+    ...(cacheReported ? { lastCacheRead: Math.max(0, cacheRead) } : {}),
+    ...(typeof fields?.requestBodyHash === "string" ? { requestBodyHash: fields.requestBodyHash } : {}),
+    ...(typeof fields?.stablePrefixHash === "string" ? { stablePrefixHash: fields.stablePrefixHash } : {}),
+    ...(typeof fields?.dynamicSuffixHash === "string" ? { dynamicSuffixHash: fields.dynamicSuffixHash } : {}),
+    ...(epochId ? { requestEpochId: epochId } : {}),
+    ...(typeof epoch?.requestContextHash === "string" ? { requestContextHash: epoch.requestContextHash } : {}),
+    ...(typeof epoch?.contextManifestHash === "string" ? { contextManifestHash: epoch.contextManifestHash } : {}),
+    ...(typeof manifestSummary?.hash === "string" ? { contextManifestHash: manifestSummary.hash } : {}),
+    ...(typeof manifestSummary?.firstChangedBlock === "string" ? { firstChangedBlock: manifestSummary.firstChangedBlock } : {}),
+    ...(typeof manifestSummary?.compressionTarget === "string" ? { compressionTarget: manifestSummary.compressionTarget } : {}),
+    ...(typeof manifestSummary?.droppedCount === "number" ? { droppedCount: manifestSummary.droppedCount } : {}),
+    ...(layerTokens ? { layerTokens } : {}),
+    ...(blockHashes ? { blockHashes } : {}),
+    ...(typeof manifestBudget?.availableInput === "number" ? { availableInput: manifestBudget.availableInput } : {}),
+    ...(typeof manifestBudget?.estimatedInput === "number" ? { estimatedInput: manifestBudget.estimatedInput } : {}),
+    ...(typeof manifestBudget?.overBudget === "boolean" ? { overBudget: manifestBudget.overBudget } : {}),
+    ...(typeof manifestMaintenance?.stage === "string" ? { maintenanceStage: manifestMaintenance.stage } : {}),
+    ...(typeof manifestMaintenance?.targetRatio === "number" ? { targetRatio: manifestMaintenance.targetRatio } : {}),
+    ...(typeof manifestMaintenance?.hardRatio === "number" ? { hardRatio: manifestMaintenance.hardRatio } : {}),
+    ...(typeof manifestMaintenance?.nextAction === "string" ? { nextMaintenanceAction: manifestMaintenance.nextAction } : {}),
+    ...(lastCompaction ? { maintenanceStage: "compact", nextMaintenanceAction: "none" } : lastConsolidation?.type === "consolidate_failed" ? { maintenanceStage: "notice", nextMaintenanceAction: "consolidate" } : {}),
+    ...(lastConsolidation ? { lastConsolidationAt: lastConsolidation.ts } : {}),
     lastUpdatedAt: usageEvent.ts,
   };
+}
+
+function numericRecord(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === "number" && Number.isFinite(item))) as Record<string, number>;
+}
+
+function stringRecord(value: unknown): Record<string, string> | undefined {
+  if (!isRecord(value)) return undefined;
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === "string")) as Record<string, string>;
 }
 
 function emitAgentEvent(event: AgentHarnessEvent, emit: (event: ChatStreamEvent) => void): void {

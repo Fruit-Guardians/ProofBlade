@@ -1,7 +1,8 @@
 import { cacheHitRate as calculateCacheHitRate, compareProviderPrefixShapes, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { HarnessEvent, PrimaryFailureCategory, RunSnapshot } from "../domain/types.js";
-import { canonicalJson, sha256 } from "../domain/utils.js";
+import { canonicalJson, isTerminal, sha256 } from "../domain/utils.js";
+import { auditRunLifecycles, type LifecycleAuditReport } from "./lifecycle-audit.js";
 
 interface TokenTotals {
   input: number;
@@ -33,6 +34,15 @@ export interface RunTelemetryReport {
     responseCount: number;
     httpErrorCount: number;
     latencyMs: { total: number; average: number; p95: number };
+    stream: {
+      timeToFirstEventMs: { total: number; average: number; p95: number };
+      timeToFirstTokenMs: { total: number; average: number; p95: number };
+      interEventIdleMs: { total: number; average: number; p95: number; max: number };
+      retryCount: number;
+      retryDelayMs: number;
+      stalledCount: number;
+      recoveryRequiredCount: number;
+    };
     tokens: TokenTotals;
     cost: CostTotals;
     contextEfficiency: number;
@@ -86,6 +96,7 @@ export interface RunTelemetryReport {
     foregroundBashTimeouts: number;
     firstCandidateMs?: number;
   };
+  lifecycle: LifecycleAuditReport;
   failure?: { primary: PrimaryFailureCategory; reason?: string };
   reportHash: string;
 }
@@ -123,6 +134,7 @@ export class RunTelemetry {
         ...(firstEvidence ? { firstEvidenceMs: Math.max(0, Date.parse(firstEvidence.ts) - startedMs) } : {}),
       },
       convergence: convergenceReport(snapshot, events, startedMs, firstCandidate),
+      lifecycle: auditRunLifecycles(events, snapshot, { now: snapshot.finishedAt ?? (isTerminal(snapshot.status) ? (events.at(-1)?.ts ?? startedMs) : Date.now()) }),
       ...(failureCategory ? { failure: { primary: failureCategory, reason: snapshot.terminalReason } } : {}),
     };
     return { ...base, reportHash: sha256(canonicalJson(base)) };
@@ -221,7 +233,50 @@ function providerReport(events: HarnessEvent[]): RunTelemetryReport["provider"] 
       waitMs: sum(acquired.map((event) => number(event.payload?.waitMs))),
       averageWaitMs: acquired.length ? round(sum(acquired.map((event) => number(event.payload?.waitMs))) / acquired.length) : 0,
     },
+    stream: {
+      timeToFirstEventMs: metricForFirstAttemptEvent(events, "provider_request_first_event"),
+      timeToFirstTokenMs: metricForFirstAttemptEvent(events, "provider_request_first_token"),
+      interEventIdleMs: metricForIdle(events),
+      retryCount: events.filter((event) => event.type === "provider_request_retried").length,
+      retryDelayMs: sum(events.filter((event) => event.type === "provider_request_retried").map((event) => number(event.payload?.delayMs))),
+      stalledCount: events.filter((event) => event.type === "provider_request_stalled").length,
+      recoveryRequiredCount: events.filter((event) => event.type === "provider_recovery_required").length,
+    },
   };
+}
+
+function metricForFirstAttemptEvent(events: HarnessEvent[], type: "provider_request_first_event" | "provider_request_first_token"): { total: number; average: number; p95: number } {
+  const firstByRequest = new Map<string, number>();
+  for (const event of events) {
+    if (event.type !== type) continue;
+    const value = number(event.payload?.elapsedMs);
+    const key = String(event.payload?.requestId ?? event.payload?.epochId ?? event.id);
+    if (!firstByRequest.has(key)) firstByRequest.set(key, value);
+  }
+  const values = [...firstByRequest.values()].sort((a, b) => a - b);
+  return { total: sum(values), average: values.length ? round(sum(values) / values.length) : 0, p95: percentile(values, 0.95) };
+}
+
+function metricForIdle(events: HarnessEvent[]): { total: number; average: number; p95: number; max: number } {
+  const byRequest = new Map<string, number>();
+  const aggregatedRequests = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "model_usage" || event.payload?.maxInterEventIdleMs === undefined) continue;
+    const key = String(event.payload?.requestId ?? event.payload?.epochId ?? event.id);
+    byRequest.set(key, number(event.payload.maxInterEventIdleMs));
+    aggregatedRequests.add(key);
+  }
+  // Legacy Runs recorded one event per stream gap. Collapse those events to the
+  // same per-request maximum used by current model_usage records.
+  for (const event of events) {
+    if (event.type !== "provider_request_inter_event_idle") continue;
+    const key = String(event.payload?.requestId ?? event.payload?.epochId ?? event.id);
+    if (aggregatedRequests.has(key)) continue;
+    const value = number(event.payload?.idleMs, number(event.payload?.maxIdleMs));
+    byRequest.set(key, Math.max(byRequest.get(key) ?? 0, value));
+  }
+  const values = [...byRequest.values()].sort((a, b) => a - b);
+  return { total: sum(values), average: values.length ? round(sum(values) / values.length) : 0, p95: percentile(values, 0.95), max: Math.max(0, ...values) };
 }
 
 function providerPrefixReport(usages: HarnessEvent[]): RunTelemetryReport["provider"]["cachePrefix"] {

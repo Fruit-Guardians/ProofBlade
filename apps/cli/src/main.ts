@@ -34,6 +34,13 @@ import {
   LocalHoldoutEvaluationRunner,
   anonymizeRunReplay,
   anonymizeEvaluationSummary,
+  createProtocolReplay,
+  replayProtocol,
+  createToolReplay,
+  replayTool,
+  replayStats,
+  compareReplayStats,
+  shadowReplay,
   CompetitionApiJournal,
   replayCompetitionApiScript,
   RunTelemetry,
@@ -75,6 +82,26 @@ async function main(): Promise<void> {
     services.sessionRuntimeBrokers ?? [],
   );
   switch (command) {
+    case "doctor": {
+      const tools = await ProofBladeToolCatalogRegistry.load(root);
+      const mcp = McpProjectRegistry.load(root);
+      const profile = config.modelProfiles.executor;
+      const toolProbe = await tools.probe();
+      const runtime = await preflightConfiguredRuntimes(config);
+      const providerReady = Boolean(profile.provider && profile.baseUrl && profile.model && process.env[profile.apiKeyEnv]);
+      print({
+        node: process.version,
+        projectRoot: root,
+        configPath,
+        provider: { provider: profile.provider, api: profile.api, model: profile.model, contextWindow: profile.contextWindow, apiKeyEnv: profile.apiKeyEnv },
+        tools: { catalogHash: tools.catalogHash(), count: tools.list().length, diagnostics: [...tools.diagnostics, ...toolProbe] },
+        mcp: { catalogHash: mcp.catalogHash(), servers: mcp.summaries().map((server) => ({ name: server.name, status: server.status, disabled: server.disabled, toolchain: server.toolchain?.state })) },
+        runtime,
+        ready: tools.diagnostics.length === 0 && toolProbe.length === 0 && providerReady && runtime.ready && mcp.summaries().every((server) => !["failed", "unavailable"].includes(server.status)),
+      });
+      await mcp.close();
+      break;
+    }
     case "init": {
       const runId = required(arg, "task id");
       const snapshot = await services.control.createRun(runId, demoTask(runId, root, config));
@@ -321,7 +348,37 @@ async function main(): Promise<void> {
       break;
     }
     case "replay": {
+      const action = arg === "compare" ? "compare" : (rest[0] ?? "projection");
+      if (action === "compare") {
+        const baselineRunId = required(rest[0], "baseline run id");
+        const candidateRunId = required(rest[1], "candidate run id");
+        const [baselineEvents, candidateEvents] = await Promise.all([services.control.events(baselineRunId), services.control.events(candidateRunId)]);
+        print(compareReplayStats(replayStats(baselineEvents), replayStats(candidateEvents), "ab"));
+        break;
+      }
       const runId = required(arg, "run id");
+      const events = await services.control.events(runId);
+      if (action === "tools") {
+        print({ runId, tape: createToolReplay(events), replay: replayTool(createToolReplay(events)) });
+        break;
+      }
+      if (action === "stats") {
+        print(replayStats(events));
+        break;
+      }
+      if (action === "shadow") {
+        const ignored = optionValues(rest.slice(1), "--ignore") as Array<import("@proofblade/materials").HarnessEvent["type"]>;
+        print(compareReplayStats(replayStats(events), shadowReplay(events, ignored), "shadow"));
+        break;
+      }
+      if (action === "protocol") {
+        const snapshot = await services.control.snapshot(runId);
+        const tape = createProtocolReplay(events, snapshot);
+        const replayed = replayProtocol(tape, snapshot.task);
+        print({ runId, eventCount: replayed.lastSeq, tapeHash: tape.hash, replayHash: projectionHash(replayed), recordedHash: tape.projectionHash, match: projectionHash(replayed) === tape.projectionHash });
+        break;
+      }
+      if (action !== "projection") throw new Error("replay action must be projection, protocol, tools, stats, shadow, or compare");
       const replayed = await services.control.replay(runId);
       const persisted = await new JsonlControlStore(services.runsRoot).loadProjection(runId);
       const replayHash = projectionHash(replayed);
@@ -389,6 +446,29 @@ async function main(): Promise<void> {
       print(await runtime.searchHistory(query));
       break;
     }
+    case "knowledge": {
+      const runId = required(arg, "run id");
+      const runtime = await toolRuntime(runId, services);
+      try {
+        const action = rest[0] ?? "search";
+        if (action === "inspect") print(await runtime.inspectKnowledge(required(rest[1], "knowledge URI"), (rest[2] as "L0" | "L1" | "L2" | undefined) ?? "L0"));
+        else if (action === "search") print(await runtime.searchKnowledge(rest.slice(1).join(" "), 50));
+        else throw new Error("knowledge action must be inspect or search");
+      } finally {
+        await runtime.close();
+      }
+      break;
+    }
+    case "consolidate": {
+      const runId = required(arg, "run id");
+      const runtime = await toolRuntime(runId, services);
+      try {
+        print(await runtime.consolidateKnowledge({ policy: (rest[0] as "deduplicate" | "summarize" | "all" | undefined) ?? "all" }));
+      } finally {
+        await runtime.close();
+      }
+      break;
+    }
     case "jobs": {
       const runId = required(arg, "run id");
       const runtime = await toolRuntime(runId, services);
@@ -396,9 +476,19 @@ async function main(): Promise<void> {
         const action = rest[0] ?? "list";
         if (action === "list") print(await runtime.listJobs());
         else if (action === "recover") print(await runtime.recoverJobs());
+        else if (action === "monitor") {
+          const triggers = optionValues(rest, "--trigger") as Array<"new_output" | "keyword" | "exit" | "error" | "heartbeat">;
+          print(await runtime.monitorJob(required(rest[1], "job id"), {
+            ...(option(rest, "--since") === undefined ? {} : { sinceCursor: option(rest, "--since") }),
+            ...(triggers.length === 0 ? {} : { triggers }),
+            ...(optionValues(rest, "--keyword").length === 0 ? {} : { keywords: optionValues(rest, "--keyword") }),
+            ...(option(rest, "--wait-ms") === undefined ? {} : { waitMs: parsePositiveOption(rest, "--wait-ms") }),
+            ...(option(rest, "--heartbeat-ms") === undefined ? {} : { heartbeatMs: parsePositiveOption(rest, "--heartbeat-ms") }),
+          }));
+        }
         else if (action === "read") print(await runtime.readJobOutput(required(rest[1], "job id"), rest[2] === undefined ? undefined : Number(rest[2])));
         else if (action === "stop") print(await runtime.stopJob(required(rest[1], "job id"), rest.slice(2).join(" ") || undefined));
-        else throw new Error("jobs action must be list, recover, read, or stop");
+        else throw new Error("jobs action must be list, recover, monitor, read, or stop");
       } finally {
         await runtime.close();
       }
@@ -610,6 +700,7 @@ function helpText(): string {
     "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
     "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
+    "  doctor  Read-only environment, Tool catalog, MCP, and Provider diagnostics",
     "  mcp [list|doctor|describe|call] [run-id] [server] [tool] [json-arguments]",
     "  skills [list|show] [skill-name] [max-chars]",
     "  tools [list|probe|init|preflight|show] [profile|tool-id]  Host catalog/readiness",
@@ -622,14 +713,18 @@ function helpText(): string {
     "  timeline <run-id>",
     "  ledger <run-id>",
     "  context <run-id>",
-    "  replay <run-id>",
+    "  replay <run-id> [projection|protocol|tools|stats|shadow]",
+    "  replay compare <baseline-run-id> <candidate-run-id>",
     "  reconcile <run-id>",
     "  cost <run-id>",
     "  checkpoint <run-id> [reason]",
     "  compact <run-id> [reason]",
     "  history <run-id> <query>",
+    "  knowledge <run-id> [inspect <pb://...> [L0|L1|L2]|search <query>]",
+    "  consolidate <run-id> [deduplicate|summarize|all]",
     "  handoff <run-id> [show|prepare]",
-    "  jobs <run-id> [list|recover|read|stop] [job-id] [max-chars]",
+    "  jobs <run-id> [list|recover|monitor|read|stop] [job-id] [max-chars]",
+    "    monitor options: --since N --trigger NAME --keyword TEXT --wait-ms N --heartbeat-ms N",
     "  artifact <run-id> <artifact-id> [max-chars]",
     "  fixture-build <run-id>",
     "  fixture-reset <run-id>",

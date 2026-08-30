@@ -9,7 +9,7 @@
     "src/capability.ts": "48fcfe343437540f14f3748cdca10a1f4a1114f7f1d17095a58dc5d65149cecc",
     "src/context-maintenance.ts": "dcbe802524125a104cb01af6471012b5c660f79d9c10e34f9e29755cf053e56a",
     "src/event-projector.ts": "47257d67085114905203f7acf8151fbcb9bb77c64265d89c2840bc6692c04842",
-    "src/file-artifact.ts": "4ccf418dce850f90db499c0d941128a94ec457458eae14afd57db5ceaa1db6e9",
+    "src/file-artifact.ts": "1aa9daa3c3e588fc61aebfb052781d6e41533b02fc2f7df7d7532fb6091db0f2",
     "src/index.ts": "a1c1275a8d02fdc5aabba23932965611654930917a3e1b8f5c75e88f7a3141ee",
     "src/layered-context.ts": "2c53870b27b56c275f6ecd743cd37095ccb19aaa480b403eb295b844f2bfe4cc",
     "src/output-rewrite.ts": "41ad548a6df035ad589a9b23a712d38469fbacd875ba22b8a750d15b9ac2b5be",
@@ -54,7 +54,9 @@
         "node:fs/promises",
         "node:path"
       ],
-      "testRefs": []
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ]
     },
     {
       "id": "@proofblade/molecules::constant::DEFAULT_CONTEXT_MAINTENANCE_POLICY",
@@ -693,6 +695,29 @@
         "packages/molecules/tests/provider-prefix.test.ts"
       ],
       "structureHash": "ef6d5d98eaeaaa5b6d0ed080844139c49145c6700f9a8994834a1337a821022c",
+      "parentId": "@proofblade/molecules::class::FileArtifactRepository"
+    },
+    {
+      "id": "@proofblade/molecules::method::FileArtifactRepository.readRange",
+      "name": "FileArtifactRepository.readRange",
+      "kind": "method",
+      "visibility": "public",
+      "module": "src/file-artifact.ts",
+      "exportPath": "@proofblade/molecules",
+      "line": 30,
+      "signature": "(artifact: ArtifactAtom, offset?: number, maxBytes?: number): Promise<{ content: Uint8Array; totalBytes: number; truncated: boolean; }>",
+      "summary": "Read only a bounded byte range. This intentionally does not verify the",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "imports": [
+        "@proofblade/atoms",
+        "node:fs/promises",
+        "node:path"
+      ],
+      "testRefs": [
+        "packages/molecules/tests/molecules.test.ts"
+      ],
+      "structureHash": "6121e63f5f458df54066424a91129cfd18dd42fdae972f0792f1850bcc93a484",
       "parentId": "@proofblade/molecules::class::FileArtifactRepository"
     },
     {

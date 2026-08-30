@@ -8,6 +8,12 @@
       "command": "node --import tsx --test packages/atoms/tests/atoms.test.ts"
     },
     {
+      "id": "molecules-artifact-storage",
+      "sourceGlobs": ["packages/molecules/src/file-artifact.ts"],
+      "testGlobs": ["packages/molecules/tests/molecules.test.ts"],
+      "command": "node --import tsx --test packages/molecules/tests/molecules.test.ts"
+    },
+    {
       "id": "mcp-registry",
       "sourceGlobs": ["packages/materials/src/mcp/**"],
       "testGlobs": ["packages/materials/tests/mcp.test.ts"],
@@ -137,6 +143,12 @@
         "packages/materials/tests/demo.test.ts"
       ],
       "command": "node --import tsx --test packages/materials/tests/evaluation.test.ts packages/materials/tests/runtime-scenario-evaluator.test.ts packages/materials/tests/real-model-evaluator.test.ts packages/materials/tests/local-holdout.test.ts packages/materials/tests/demo.test.ts"
+    },
+    {
+      "id": "evolution-proposals",
+      "sourceGlobs": ["packages/materials/src/evolution/**"],
+      "testGlobs": ["packages/materials/tests/update-proposals.test.ts"],
+      "command": "node --import tsx --test packages/materials/tests/update-proposals.test.ts"
     },
     {
       "id": "gui-settings",

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { buildPromptCacheMetadata, cacheHitRate, capabilityCatalogHash, compileContextLayers, EventProjector, planContextMaintenance, snipText, type AgentTool, withCapabilityHash } from "../src/index.js";
+import { buildPromptCacheMetadata, cacheHitRate, capabilityCatalogHash, compileContextLayers, EventProjector, FileArtifactRepository, planContextMaintenance, snipText, type AgentTool, withCapabilityHash } from "../src/index.js";
 
 test("molecules extend atoms without application knowledge", async () => {
   const tool: AgentTool<object, { value: number }, number, undefined> = {
@@ -19,6 +22,28 @@ test("molecules extend atoms without application knowledge", async () => {
   assert.equal(snipped.truncated, true);
   assert.equal(snipped.text.length <= 80, true);
   assert.equal(snipped.originalChars, 200);
+});
+
+test("file artifact ranges enforce bounded byte-oriented reads", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-molecule-artifact-"));
+  try {
+    const repository = new FileArtifactRepository(root);
+    const artifact = await repository.put("artifact.txt", "A\u4f60B\u597dC", "text/plain");
+    const expected = Buffer.from("A\u4f60B\u597dC").subarray(2, 6);
+
+    const range = await repository.readRange(artifact, 2, 4);
+    assert.deepEqual(Buffer.from(range.content), expected);
+    assert.equal(range.totalBytes, artifact.bytes);
+    assert.equal(range.truncated, true);
+
+    const beyondEnd = await repository.readRange(artifact, artifact.bytes + 10, 4);
+    assert.equal(beyondEnd.content.byteLength, 0);
+    assert.equal(beyondEnd.truncated, false);
+    await assert.rejects(repository.readRange(artifact, -1, 4), /offset/);
+    await assert.rejects(repository.readRange(artifact, 0, 10_000_001), /maxBytes/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("context maintenance escalates deterministically", () => {

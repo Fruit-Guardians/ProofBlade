@@ -31,6 +31,10 @@ import type {
   DomainRecord,
   DomainRecordInput,
   VerificationRequest,
+  UpdateProposal,
+  UpdateEvaluationGate,
+  RunEventEnvelope,
+  RunEventStatus,
 } from "../domain/types.js";
 import type { Intent as SchedulerIntent } from "../domain/intent.js";
 import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } from "../domain/reasoning.js";
@@ -47,13 +51,15 @@ import { completedWorkItemForCompletion } from "../domain/work-item.js";
 import { maxReplansFor, phaseBudget } from "../domain/phase-budget.js";
 import { evaluatePhaseGate } from "../domain/phase-gate.js";
 import { isPwnDomainRecord, isWebDomainRecord, validateDomainRecordShape } from "../domain/records.js";
+import { validateUpdateEvaluationGate } from "../evolution/evaluation-gates.js";
 
 type WithoutLane<T> = T extends unknown ? Omit<T, "lane"> : never;
-type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "verifier_input" | "fixture" | "recovery" | "binding";
+type ControlAuthority = "public" | "verifier" | "verifier_artifact" | "verifier_input" | "fixture" | "recovery" | "binding" | "evaluation";
 type VerifierResultCommand = Extract<WithoutLane<DomainCommand>, { type: "evidence" | "completion_verified" | "fact" | "artifact_annotation" | "domain_record" }>;
 type VerifierEvidenceCommand = Extract<VerifierResultCommand, { type: "evidence" }>;
 type VerifierEffectCommand = Extract<WithoutLane<DomainCommand>, { type: "effect_proposed" | "effect_started" | "effect_finished" | "effect_reconciled" }>;
 type VerifierResultArtifactCommand = Extract<WithoutLane<DomainCommand>, { type: "artifact" }>;
+type UpdateEvaluationCommand = Extract<WithoutLane<DomainCommand>, { type: "update_proposal_evaluated" }>;
 
 export interface VerifierControlPort {
   /** Trusted harness-only channel. Never expose this port to a model lane. */
@@ -85,12 +91,18 @@ export interface VerificationRecoveryControlPort {
   markResolved(runId: string, input: { requestId: string; reason: string }): Promise<HarnessEvent[]>;
 }
 
+/** Evaluation-service-only capability for persisting canonical release gates. */
+export interface UpdateEvaluationControlPort {
+  dispatch(runId: string, command: UpdateEvaluationCommand): Promise<HarnessEvent[]>;
+}
+
 export interface ControlPlane {
   control: ControlStore;
   verifier: VerifierControlPort;
   verifierEffects: VerifierEffectControlPort;
   fixtureControl: FixtureControlPort;
   verificationRecovery: VerificationRecoveryControlPort;
+  updateEvaluation: UpdateEvaluationControlPort;
 }
 
 const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
@@ -102,12 +114,24 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "provider_request_slot_acquired",
   "provider_request_queue_cancelled",
   "provider_request_retried",
+  "provider_request_first_event",
+  "provider_request_first_token",
+  "provider_request_inter_event_idle",
+  "provider_request_stalled",
+  "provider_recovery_required",
   "provider_response_received",
   "request_epoch_context",
   "tool_call_recorded",
   "tool_result_recorded",
+  "consolidate_started",
+  "consolidate_summary",
+  "consolidate_finished",
+  "consolidate_failed",
   "compaction_recorded",
   "model_usage",
+  "event_ingress_received",
+  "event_ingress_processed",
+  "observation_consumed",
 ]);
 const VERIFIER_RESULT_COMMAND_TYPES = new Set(["evidence", "completion_verified", "fact", "artifact_annotation", "domain_record"]);
 const VERIFIER_EFFECT_COMMAND_TYPES = new Set(["effect_proposed", "effect_started", "effect_finished", "effect_reconciled"]);
@@ -123,6 +147,7 @@ export type DomainCommand =
   | { type: "fixture_reset"; generation: number; lane?: Lane }
   | { type: "pause"; reason: string; lane?: Lane }
   | { type: "resume"; lane?: Lane }
+  | { type: "cancel"; reason: string; lane?: Lane }
   | { type: "finish"; verified: true; completionId: string; evidenceIds: string[]; reason: string; lane?: Lane }
   | { type: "finish"; verified: false; evidenceIds?: string[]; reason: string; failureCategory?: PrimaryFailureCategory; lane?: Lane }
   | { type: "fail"; reason: string; category: PrimaryFailureCategory; lane?: Lane }
@@ -133,6 +158,12 @@ export type DomainCommand =
   | { type: "domain_record"; record: DomainRecordInput; lane?: Lane }
   | { type: "experiment"; experiment: Omit<ExperimentRecord, "createdSeq">; lane?: Lane }
   | { type: "replan_requested"; replan: Omit<RunSnapshot["replans"][string], "createdSeq" | "runId" | "generation">; lane?: Lane }
+  | { type: "update_proposal_created"; proposal: Omit<UpdateProposal, "createdSeq" | "updatedSeq" | "runId" | "status">; lane?: Lane }
+  | { type: "update_proposal_evaluated"; proposalId: string; evaluationHash: string; metrics?: UpdateProposal["metrics"]; gate: UpdateEvaluationGate; lane?: Lane }
+  | { type: "update_proposal_approved"; proposalId: string; reason?: string; lane?: Lane }
+  | { type: "update_proposal_activated"; proposalId: string; lane?: Lane }
+  | { type: "update_proposal_rejected"; proposalId: string; reason: string; lane?: Lane }
+  | { type: "update_proposal_rolled_back"; proposalId: string; candidateHash: string; reason?: string; lane?: Lane }
   | { type: "reasoning_node"; node: Omit<ReasoningNode, "createdSeq" | "updatedSeq">; lane?: Lane }
   | { type: "reasoning_edge"; edge: Omit<ReasoningEdge, "createdSeq">; lane?: Lane }
   | { type: "reasoning_tree"; tree: Omit<ReasoningTree, "createdSeq" | "updatedSeq">; lane?: Lane }
@@ -181,6 +212,16 @@ export type DomainCommand =
   | { type: "session_superseded"; sessionId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
+export interface IngressClaim {
+  ingressId: string;
+  envelope: RunEventEnvelope;
+  status: Extract<RunEventStatus, "claimed" | "coalesced" | "failed">;
+  safePoint: string;
+  leaseMs?: number;
+  claimToken?: string;
+  leaseExpiresAt?: string;
+}
+
 type WorkItemCommand = Extract<DomainCommand, { type: `work_item_${string}` }>;
 
 export class ControlStore {
@@ -200,6 +241,7 @@ export class ControlStore {
       verifierEffects: control.#createVerifierEffectPort(),
       fixtureControl: control.#createFixtureControlPort(),
       verificationRecovery: control.#createVerificationRecoveryPort(),
+      updateEvaluation: control.#createUpdateEvaluationPort(),
     };
   }
 
@@ -246,6 +288,172 @@ export class ControlStore {
     return await this.eventStore.events(runId);
   }
 
+  /** Atomically claim ingress events under the same Run lock used by writes. */
+  public async claimIngress(runId: string, claims: readonly IngressClaim[]): Promise<IngressClaim[]> {
+    if (claims.length === 0) return [];
+    if (claims.length > 256) throw new Error("At most 256 ingress events can be claimed in one batch");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const terminal = new Set(events
+        .filter((event) => event.type === "event_ingress_processed" && ["applied", "coalesced", "failed"].includes(String(event.payload?.status)))
+        .map((event) => String(event.payload?.ingressId ?? "")));
+      const activeClaims = new Map<string, { claimToken: string; leaseExpiresAt: string }>();
+      for (const event of events.filter((candidate) => candidate.type === "event_ingress_processed" && candidate.payload?.status === "claimed")) {
+        const ingressId = String(event.payload?.ingressId ?? "");
+        const claimToken = String(event.payload?.claimToken ?? "");
+        const leaseExpiresAt = String(event.payload?.leaseExpiresAt ?? "");
+        if (ingressId && claimToken && Number.isFinite(Date.parse(leaseExpiresAt)) && Date.parse(leaseExpiresAt) > Date.now()) {
+          activeClaims.set(ingressId, { claimToken, leaseExpiresAt });
+        }
+      }
+      const received = new Map(events
+        .filter((event) => event.type === "event_ingress_received" && event.envelope)
+        .map((event) => [event.envelope!.id, event]));
+      const accepted = [...new Map(claims.map((claim) => [claim.ingressId, claim])).values()]
+        .filter((claim) => !terminal.has(claim.ingressId) && !activeClaims.has(claim.ingressId) && received.has(claim.ingressId));
+      if (accepted.length === 0) return [];
+      const admitted = accepted.map((claim) => claim.status === "claimed"
+        ? { ...claim, claimToken: id("IC"), leaseExpiresAt: new Date(Date.now() + normalizeIngressLease(claim.leaseMs)).toISOString() }
+        : claim);
+      const materialized = admitted.map((claim, index) => {
+        const receivedEvent = received.get(claim.ingressId)!;
+        return makeEvent(runId, before.lastSeq + index + 1, "event_ingress_processed", "orchestrator", "main", {
+          ingressId: claim.ingressId,
+          status: claim.status,
+          safePoint: claim.safePoint,
+          ...(claim.claimToken ? { claimToken: claim.claimToken } : {}),
+          ...(claim.leaseExpiresAt ? { leaseExpiresAt: claim.leaseExpiresAt } : {}),
+        }, receivedEvent.correlationId, { ...claim.envelope, status: claim.status });
+      });
+      await writer.append(materialized, this.#authoritySecret);
+      await writer.saveProjection(materialized.reduce(reduce, before), this.#authoritySecret);
+      return admitted;
+    }));
+  }
+
+  /** Complete a previously claimed ingress action after its side effect ran. */
+  public async completeIngress(
+    runId: string,
+    input: { ingressId: string; claimToken: string; status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">; safePoint?: string; reason?: string },
+  ): Promise<void> {
+    if (!input.ingressId || !input.claimToken) throw new Error("Ingress completion requires ingressId and claimToken");
+    await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const received = events.find((event) => event.type === "event_ingress_received" && event.envelope?.id === input.ingressId);
+      if (!received?.envelope) throw new Error(`Unknown ingress event ${input.ingressId}`);
+      const processed = events.filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === input.ingressId).at(-1);
+      const currentStatus = String(processed?.payload?.status ?? "");
+      if (["applied", "coalesced", "failed"].includes(currentStatus)) {
+        if (currentStatus !== input.status) throw new Error(`Ingress ${input.ingressId} is already ${currentStatus}`);
+        return;
+      }
+      if (currentStatus !== "claimed" || String(processed?.payload?.claimToken ?? "") !== input.claimToken) {
+        throw new Error(`Ingress ${input.ingressId} claim is missing or owned by another worker`);
+      }
+      const leaseExpiresAt = String(processed?.payload?.leaseExpiresAt ?? "");
+      if (!Number.isFinite(Date.parse(leaseExpiresAt)) || Date.parse(leaseExpiresAt) <= Date.now()) throw new Error(`Ingress ${input.ingressId} claim lease expired`);
+      const completionGeneration = received.envelope.generation;
+      const currentGeneration = before.generation;
+      const staleGeneration = completionGeneration !== currentGeneration;
+      const completionStatus = staleGeneration ? "failed" : input.status;
+      const completionReason = staleGeneration
+        ? `Ingress generation ${completionGeneration} is stale; current Run generation is ${currentGeneration}`
+        : input.reason;
+      const materialized = makeEvent(runId, before.lastSeq + 1, "event_ingress_processed", "orchestrator", "main", {
+        ingressId: input.ingressId,
+        status: completionStatus,
+        safePoint: input.safePoint ?? String(processed?.payload?.safePoint ?? "unknown"),
+        ...(completionReason ? { reason: completionReason } : {}),
+      }, received.correlationId, { ...received.envelope, status: completionStatus });
+      const after = reduce(before, materialized);
+      await writer.append([materialized], this.#authoritySecret);
+      await writer.saveProjection(after, this.#authoritySecret);
+    }));
+  }
+
+  /**
+   * Append one received ingress event with idempotency checked inside the Run
+   * lock. The preflight read in the adapter is only an optimization; this
+   * method is the durable race boundary for two producers using the same key.
+   */
+  public async appendIngressReceived(
+    runId: string,
+    input: { envelope: RunEventEnvelope; payload?: Record<string, unknown> },
+  ): Promise<RunEventEnvelope> {
+    if (input.envelope.runId !== runId) throw new Error("Ingress envelope belongs to another Run");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const existing = events.find((event) => event.type === "event_ingress_received"
+        && event.envelope?.idempotencyKey === input.envelope.idempotencyKey);
+      if (existing?.envelope) return existing.envelope;
+      const materialized = makeEvent(
+        runId,
+        before.lastSeq + 1,
+        "event_ingress_received",
+        "orchestrator",
+        "main",
+        { envelope: input.envelope, ...(input.payload ? { payload: input.payload } : {}) },
+        input.envelope.correlationId,
+        input.envelope,
+      );
+      const after = reduce(before, materialized);
+      await writer.append([materialized], this.#authoritySecret);
+      await writer.saveProjection(after, this.#authoritySecret);
+      return materialized.envelope!;
+    }));
+  }
+
+  /** Wait for a durable event so long-running tools do not replay the full Run in a polling loop. */
+  public async waitForEvents(runId: string, afterSeq: number, timeoutMs = 30_000): Promise<HarnessEvent[]> {
+    return await this.eventStore.waitForEvents(runId, afterSeq, timeoutMs);
+  }
+
+  /**
+   * Atomically acknowledge model-visible observations. Queue state is derived
+   * from the event stream; these markers are the only durable cursor and keep
+   * restart/replay independent from process memory.
+   */
+  public async acknowledgeObservations(runId: string, observationIds: readonly string[], lane: Lane = "main"): Promise<string[]> {
+    const ids = [...new Set(observationIds.map((value) => String(value).trim()).filter(Boolean))];
+    if (ids.length === 0) return [];
+    if (ids.length > 128) throw new Error("At most 128 observations can be acknowledged in one batch");
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
+      const events = await this.eventStore.events(runId);
+      const observationEventIds = new Map<string, string>();
+      for (const event of events) {
+        if (event.type !== "observation_consumed") {
+          observationEventIds.set(event.id, event.id);
+          if (event.envelope?.id) observationEventIds.set(event.envelope.id, event.id);
+        }
+      }
+      const normalizedIds = [...new Set(ids.map((observationId) => observationEventIds.get(observationId) ?? observationId))];
+      const consumed = new Set(events.filter((event) => event.type === "observation_consumed").map((event) => String(event.payload?.observationId ?? "")));
+      const pending = normalizedIds.filter((observationId) => !consumed.has(observationId));
+      if (pending.length === 0) return [];
+      const materialized = pending.map((observationId, index) => makeEvent(
+        runId,
+        before.lastSeq + index + 1,
+        "observation_consumed",
+        "orchestrator",
+        lane,
+        { observationId },
+        `${runId}:${lane}:observation-consumed`,
+      ));
+      await writer.append(materialized, this.#authoritySecret);
+      // Telemetry does not change domain fields, but it still advances the
+      // replay cursor. Persist the reduced projection so the materialized
+      // snapshot cannot lag the durable event stream after acknowledgement.
+      const after = materialized.reduce(reduce, before);
+      await writer.saveProjection(after, this.#authoritySecret);
+      return pending;
+    }));
+  }
+
+  /** Serialize slow, replay-safe maintenance operations for one Run. */
+  public async withConsolidationLock<T>(runId: string, operation: () => Promise<T>): Promise<T> {
+    return await this.eventStore.withRunMaintenanceLock(runId, operation);
+  }
+
   public async dispatch(runId: string, command: DomainCommand): Promise<HarnessEvent[]> {
     return await this.dispatchBatch(runId, [command]);
   }
@@ -287,8 +495,8 @@ export class ControlStore {
     }));
   }
 
-  public async append(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<void> {
-    await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
+  public async append(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<HarnessEvent[]> {
+    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
       const forbidden = events.filter((event) => !TELEMETRY_EVENT_TYPES.has(event.type));
       if (forbidden.length > 0) {
         throw new Error(`Raw append is restricted to telemetry events; use a validated command for ${forbidden.map((event) => event.type).join(", ")}`);
@@ -301,11 +509,13 @@ export class ControlStore {
         event.lane,
         event.payload,
         event.correlationId,
+        { ...event.envelope, generation: event.envelope?.generation ?? snapshot.generation },
       ));
       let validated = snapshot;
       for (const event of materialized) validated = reduce(validated, event);
       await writer.append(materialized, this.#authoritySecret);
       await writer.saveProjection(validated, this.#authoritySecret);
+      return materialized;
     }));
   }
 
@@ -368,7 +578,13 @@ export class ControlStore {
       const seq = after.lastSeq + 1;
       const rawPayload = payloadFor(command, seq, after, lane, authority);
       const payload = after.task.mode === "coding_assistant" ? rawPayload : redactCtfEventPayload(rawPayload);
-      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payload);
+      const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payload, `${runId}:system`, {
+        generation: after.generation,
+        source: command.lane === "verifier" ? "verifier" : command.type === "pause" || command.type === "resume" ? "user" : undefined,
+        correlationId: `${runId}:command:${command.type}`,
+        kind: command.type,
+        priority: command.type === "pause" || command.type === "resume" || command.type === "finish" || command.type === "fail" || command.type === "exhaust" ? "urgent" : undefined,
+      });
       after = reduce(after, event);
       events.push(event);
     }
@@ -465,6 +681,17 @@ export class ControlStore {
       markResolved: async (runId: string, input: { requestId: string; reason: string }) => await mark(runId, { type: "verification_recovery_resolved", ...input }),
     });
   }
+
+  #createUpdateEvaluationPort(): UpdateEvaluationControlPort {
+    return Object.freeze({
+      dispatch: async (runId: string, command: UpdateEvaluationCommand): Promise<HarnessEvent[]> => await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
+        if (command.type !== "update_proposal_evaluated") throw new Error("Update evaluation capability only accepts evaluated proposal commands");
+        const trusted = { ...command, lane: "planner" } as DomainCommand;
+        const { events } = await this.#commitCommands(runId, snapshot, [trusted], "evaluation", writer);
+        return events;
+      })),
+    });
+  }
 }
 
 function eventType(command: DomainCommand): HarnessEvent["type"] {
@@ -476,6 +703,7 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "fixture_reset": return "fixture_reset";
     case "pause": return "run_paused";
     case "resume": return "run_resumed";
+    case "cancel": return "run_finished";
     case "finish": return "run_finished";
     case "fail": return "run_failed";
     case "exhaust": return "run_finished";
@@ -485,6 +713,12 @@ function eventType(command: DomainCommand): HarnessEvent["type"] {
     case "domain_record": return "domain_record_added";
     case "experiment": return "experiment_recorded";
     case "replan_requested": return "replan_requested";
+    case "update_proposal_created": return "update_proposal_created";
+    case "update_proposal_evaluated": return "update_proposal_evaluated";
+    case "update_proposal_approved": return "update_proposal_approved";
+    case "update_proposal_activated": return "update_proposal_activated";
+    case "update_proposal_rejected": return "update_proposal_rejected";
+    case "update_proposal_rolled_back": return "update_proposal_rolled_back";
     case "reasoning_node": return "reasoning_node_upserted";
     case "reasoning_edge": return "reasoning_edge_added";
     case "reasoning_tree": return "reasoning_tree_upserted";
@@ -564,6 +798,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
     case "fixture_reset": return { generation: command.generation };
     case "pause": return { reason: command.reason };
     case "resume": return {};
+    case "cancel": return { status: "CANCELLED", verified: false, evidenceIds: [], reason: command.reason };
     case "finish": {
       if (!command.verified) return { status: "FAILED", verified: false, evidenceIds: command.evidenceIds ?? [], reason: command.reason, failureCategory: command.failureCategory ?? "verification_missing" };
       const completion = snapshot.completions[command.completionId]!;
@@ -624,6 +859,22 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
         prohibitedRepeatKeys: [...command.replan.prohibitedRepeatKeys],
       },
     };
+    case "update_proposal_created": return {
+      proposal: {
+        ...command.proposal,
+        runId: snapshot.runId,
+        status: "PROPOSED",
+        sourceArtifactIds: [...command.proposal.sourceArtifactIds],
+        triggerFailureIds: [...command.proposal.triggerFailureIds],
+        createdSeq: seq,
+        updatedSeq: seq,
+      },
+    };
+    case "update_proposal_evaluated": return { proposalId: command.proposalId, evaluationHash: command.evaluationHash, metrics: command.metrics, gate: command.gate };
+    case "update_proposal_approved": return { proposalId: command.proposalId, reason: command.reason };
+    case "update_proposal_activated": return { proposalId: command.proposalId };
+    case "update_proposal_rejected": return { proposalId: command.proposalId, reason: command.reason };
+    case "update_proposal_rolled_back": return { proposalId: command.proposalId, candidateHash: command.candidateHash, reason: command.reason };
     case "reasoning_node": return { node: command.node };
     case "reasoning_edge": return { edge: command.edge };
     case "reasoning_tree": return { tree: command.tree };
@@ -702,6 +953,7 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   const trustedVerifierInput = authority === "verifier_input";
   const trustedRecovery = authority === "recovery";
   const bindingAuthority = authority === "binding";
+  const trustedEvaluation = authority === "evaluation";
   if (bindingAuthority && command.type !== "session_opened" && command.type !== "session_binding_completed") {
     throw new Error("Binding authority is restricted to session binding commands");
   }
@@ -716,6 +968,9 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   if (trustedVerifierInput && command.type !== "artifact") throw new Error("Verifier input authority is restricted to Artifact registration");
   if (trustedRecovery && command.lane !== "verifier") throw new Error("Recovery commands must use the verifier lane");
   if (trustedRecovery && command.type !== "verification_recovery_required" && command.type !== "verification_recovery_resolved") throw new Error("Recovery authority is restricted to verifier request recovery markers");
+  if (command.type === "update_proposal_evaluated" && !trustedEvaluation) throw new Error("Update proposal evaluation is restricted to the trusted evaluation service");
+  if (trustedEvaluation && command.type !== "update_proposal_evaluated") throw new Error("Update evaluation authority is restricted to evaluated proposal commands");
+  if (trustedEvaluation && command.lane !== "planner") throw new Error("Update evaluation commands must use the planner lane");
   if (command.type === "fixture_reset") {
     if (authority !== "fixture") throw new Error("fixture_reset is restricted to the trusted fixture lifecycle service");
     validateFixtureResetState(snapshot);
@@ -917,8 +1172,14 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     const job = snapshot.jobs[jobId];
     if (!job) throw new Error(`Unknown job ${jobId}`);
     if (command.type === "job_started" && job.status !== "QUEUED" && job.status !== "RUNNING") throw new Error(`Cannot start job in ${job.status}`);
+    if (command.type === "job_started" && job.generation !== snapshot.generation) throw new Error(`Cannot start job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
+    if (command.type === "job_finished" && job.generation !== snapshot.generation) throw new Error(`Cannot finish job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
+    if (command.type === "job_cancelled" && job.generation !== snapshot.generation) throw new Error(`Cannot cancel job ${jobId} from generation ${job.generation}; current generation is ${snapshot.generation}`);
     if (command.type === "job_finished" && job.status === "CANCELLED") return;
     if (command.type === "job_cancelled" && ["SUCCEEDED", "FAILED", "TIMED_OUT", "UNKNOWN"].includes(job.status)) throw new Error(`Cannot cancel job in ${job.status}`);
+  }
+  if ((command.type === "job_queued" || command.type === "job_queued_legacy") && command.job.generation !== snapshot.generation) {
+    throw new Error(`Cannot queue job ${command.job.id} for generation ${command.job.generation}; current generation is ${snapshot.generation}`);
   }
   if (command.type === "handoff_proposed") {
     if (isTerminal(snapshot.status)) throw new Error(`Cannot propose a handoff for terminal run ${snapshot.status}`);
@@ -943,6 +1204,25 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
   if (command.type === "record_tool_preparation") validateToolPreparation(snapshot, command.preparation);
   if (command.type === "experiment") validateExperimentCommand(snapshot, command);
   if (command.type === "replan_requested") validateReplanCommand(snapshot, command);
+  if (command.type === "update_proposal_created") validateUpdateProposalCommand(snapshot, command);
+  if (command.type === "update_proposal_evaluated") {
+    const proposal = snapshot.updateProposals[command.proposalId];
+    if (!proposal) throw new Error(`Unknown update proposal: ${command.proposalId}`);
+    if (proposal.status !== "PROPOSED") throw new Error(`Cannot evaluate update proposal in ${proposal.status}`);
+    if (!/^[a-f0-9]{64}$/i.test(command.evaluationHash)) throw new Error("Update proposal evaluation hash must be sha256");
+    validateProposalEvaluation(proposal, command);
+  }
+  if (command.type === "update_proposal_approved" || command.type === "update_proposal_activated" || command.type === "update_proposal_rejected") {
+    const proposal = snapshot.updateProposals[command.proposalId];
+    if (!proposal) throw new Error(`Unknown update proposal: ${command.proposalId}`);
+    if (command.type === "update_proposal_approved") validatePersistedProposalEvaluation(proposal, true);
+  }
+  if (command.type === "update_proposal_rolled_back") {
+    const proposal = snapshot.updateProposals[command.proposalId];
+    if (!proposal) throw new Error(`Unknown update proposal: ${command.proposalId}`);
+    if (!/^[a-f0-9]{64}$/i.test(command.candidateHash)) throw new Error("Rollback candidate hash must be sha256");
+    if (command.candidateHash !== proposal.candidateHash) throw new Error("Rollback candidate hash does not match proposal");
+  }
   if (command.type === "completion_verified") validateCompletionVerification(snapshot, command);
   if (command.type === "fact" && command.fact.status === "CONFIRMED" && command.lane !== "verifier") {
     throw new Error("Confirmed facts are restricted to the verifier lane");
@@ -1581,6 +1861,76 @@ function validateReplanCommand(snapshot: RunSnapshot, command: Extract<DomainCom
   }
 }
 
+function validateUpdateProposalCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "update_proposal_created" }>): void {
+  const proposal = command.proposal;
+  if (snapshot.updateProposals[proposal.id]) throw new Error(`Update proposal already exists: ${proposal.id}`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(proposal.id)) throw new Error("Update proposal id is invalid");
+  if (!["prompt", "tool", "skill", "knowledge", "program", "model"].includes(proposal.kind)) throw new Error(`Unknown update proposal kind: ${proposal.kind}`);
+  for (const [label, value] of [["baseVersion", proposal.baseVersion], ["candidateVersion", proposal.candidateVersion], ["retentionDataset", proposal.retentionDataset], ["migrationDataset", proposal.migrationDataset], ["safetyDataset", proposal.safetyDataset]] as const) {
+    if (!value.trim() || value.length > 256) throw new Error(`Update proposal ${label} is invalid`);
+  }
+  if (!/^[a-f0-9]{64}$/i.test(proposal.candidateHash)) throw new Error("Update proposal candidate hash must be sha256");
+  validateBoundedStringList(proposal.sourceArtifactIds, "update proposal source artifacts", 256, 128);
+  validateBoundedStringList(proposal.triggerFailureIds, "update proposal trigger failures", 256, 128);
+  if (!proposal.evaluationSets) throw new Error("Update proposal requires all evaluation sets");
+  if (Object.keys(proposal.evaluationSets).length !== 4) throw new Error("Update proposal requires exactly four evaluation sets");
+  for (const [name, values] of Object.entries(proposal.evaluationSets)) {
+    if (!["trigger", "retention", "migration", "safety"].includes(name)) throw new Error(`Unknown update proposal evaluation set: ${name}`);
+    validateBoundedStringList(values, `update proposal ${name} evaluation set`, 16, 256);
+  }
+}
+
+function validateProposalEvaluation(proposal: UpdateProposal, command: Extract<DomainCommand, { type: "update_proposal_evaluated" }>): void {
+  if (!command.gate) throw new Error("Update proposal evaluation requires a canonical gate report");
+  if (!proposal.evaluationSets) throw new Error("Update proposal evaluation sets are missing");
+  if (!command.metrics) throw new Error("Update proposal evaluation requires gate metrics");
+  validateUpdateEvaluationGate(command.gate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: command.evaluationHash,
+    gatePassed: command.metrics.gatePassed,
+  });
+  validateGateMetrics(command.gate, command.metrics);
+  validateProposalMetrics(command.metrics);
+}
+
+function validatePersistedProposalEvaluation(proposal: UpdateProposal, requirePassing: boolean): void {
+  if (!proposal.evaluationGate || !proposal.evaluationHash || !proposal.evaluationSets || !proposal.metrics) {
+    throw new Error("Update proposal approval requires a valid passing evaluation gate");
+  }
+  validateUpdateEvaluationGate(proposal.evaluationGate, {
+    candidateHash: proposal.candidateHash,
+    evaluationSets: proposal.evaluationSets,
+    evaluationHash: proposal.evaluationHash,
+    gatePassed: proposal.metrics.gatePassed,
+  });
+  validateGateMetrics(proposal.evaluationGate, proposal.metrics);
+  if (requirePassing && (!proposal.evaluationGate.passed || proposal.metrics.gatePassed !== 1)) {
+    throw new Error("Update proposal approval requires a valid passing evaluation gate");
+  }
+}
+
+function validateGateMetrics(gate: UpdateEvaluationGate, metrics: NonNullable<UpdateProposal["metrics"]>): void {
+  if (metrics.triggerPassRate !== gate.scores.triggerPassRate
+    || metrics.retentionPassRate !== gate.scores.retentionPassRate
+    || metrics.migrationPassRate !== gate.scores.migrationPassRate
+    || metrics.safetyPassRate !== gate.scores.safetyPassRate
+    || metrics.retentionRegressionRate !== gate.scores.retentionRegressionRate
+    || metrics.activationRate !== gate.activationRate
+    || metrics.followingRate !== gate.followingRate) {
+    throw new Error("Update proposal metrics do not match canonical gate report");
+  }
+}
+
+function validateProposalMetrics(metrics: UpdateProposal["metrics"]): void {
+  if (!metrics) return;
+  for (const [key, value] of Object.entries(metrics)) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || (key !== "p95LatencyMs" && key !== "costUsd" && value > 1)) {
+      throw new Error(`Update proposal metric is invalid: ${key}`);
+    }
+  }
+}
+
 function validateArtifactSemantic(snapshot: RunSnapshot, semantic: Omit<ArtifactSemanticMetadata, "updatedSeq"> | ArtifactSemanticMetadata): void {
   if (!semantic.name.trim() || semantic.name.length > 160) throw new Error("Artifact name must contain 1-160 characters");
   if (!semantic.summary.trim() || semantic.summary.length > 1_000) throw new Error("Artifact summary must contain 1-1000 characters");
@@ -1661,6 +2011,11 @@ function validateRequestEpochCommand(snapshot: RunSnapshot, command: Extract<Dom
   const epoch = command.epoch;
   if (snapshot.requestEpochs[epoch.id]) throw new Error(`Request epoch already exists: ${epoch.id}`);
   if (epoch.runId !== snapshot.runId) throw new Error(`Request epoch run identity mismatch: ${epoch.id}`);
+  // Legacy epochs omitted generation. New epochs must bind to the snapshot
+  // that produced the actual Provider request.
+  if (epoch.generation !== undefined && epoch.generation !== snapshot.generation) {
+    throw new Error(`Request epoch generation mismatch: expected ${snapshot.generation}, got ${epoch.generation}`);
+  }
   if (!epoch.requestId.trim() || !epoch.provider.trim() || !epoch.model.trim() || !epoch.adapter.trim()) throw new Error("Request epoch identity fields are required");
   if (epoch.status !== "STARTED") throw new Error(`New request epoch must be STARTED, got ${epoch.status}`);
   if (!Number.isFinite(Date.parse(epoch.createdAt))) throw new Error("Request epoch createdAt must be an ISO timestamp");
@@ -1731,4 +2086,10 @@ function sameStringArray(left: readonly string[], right: readonly string[]): boo
 export function createEffectInput(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string } {
   const normalizedArgs = canonicalJson(args);
   return { effectId: id("EF"), idempotencyKey: sha256(`${runId}:${operation}:${normalizedArgs}:${generation}:${replayPolicy}`) };
+}
+
+function normalizeIngressLease(value: number | undefined): number {
+  if (value === undefined) return 30_000;
+  if (!Number.isInteger(value) || value < 50 || value > 300_000) throw new Error("event ingress lease must be an integer from 50 to 300000ms");
+  return value;
 }

@@ -49,6 +49,10 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_started", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", contextEstimatedTokens: 800, retryLimit: 0 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_queued", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-queue", actor: "orchestrator", type: "provider_request_slot_acquired", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", maxConcurrentRequests: 1, queueDepth: 2, waitMs: 40 } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_first_event", payload: { requestId: "PR-1", elapsedMs: 15, attempt: 0, eventType: "start" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_first_token", payload: { requestId: "PR-1", elapsedMs: 20, attempt: 0, eventType: "text_delta" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_request_inter_event_idle", payload: { requestId: "PR-1", idleMs: 120, maxIdleMs: 120, eventType: "text_delta" } },
+      { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "orchestrator", type: "provider_request_retried", payload: { requestId: "PR-1", attempt: 1, delayMs: 5, reason: "transient" } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "provider_response_received", payload: { requestId: "PR-1", status: 200, headerNames: ["content-type"], responseHeaderCount: 1 } },
       { schemaVersion: 1, lane: "executor", correlationId: "provider-1", actor: "model", type: "model_usage", payload: { requestId: "PR-1", provider: "local", model: "fixture-model", phase: "intake", durationMs: 120, finishReason: "toolUse", toolCallCount: 1, usage: { input: 100, output: 20, reasoning: 5, cacheRead: 25, cacheWrite: 10, totalTokens: 120, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } },
       { schemaVersion: 1, lane: "executor", correlationId: "tool-1", actor: "model", type: "tool_call_recorded", payload: { toolCallId: "TC-1", toolName: "inspect_target", argsHash: sha256("{}"), waitMs: 4, executionMode: "sequential", sensitivity: "target", timeoutMs: 30_000 } },
@@ -91,6 +95,11 @@ test("run telemetry aggregates provider, tool, effect, version, and failure data
     assert.equal(report.provider.tokens.cacheRead, 25);
     assert.equal(report.provider.cacheHitRate, 0.2);
     assert.equal(report.provider.latencyMs.p95, 120);
+    assert.deepEqual(report.provider.stream.timeToFirstEventMs, { total: 15, average: 15, p95: 15 });
+    assert.deepEqual(report.provider.stream.timeToFirstTokenMs, { total: 20, average: 20, p95: 20 });
+    assert.deepEqual(report.provider.stream.interEventIdleMs, { total: 120, average: 120, p95: 120, max: 120 });
+    assert.equal(report.provider.stream.retryCount, 1);
+    assert.equal(report.provider.stream.retryDelayMs, 5);
     assert.equal(report.provider.cost.totalUsd, 0);
     assert.deepEqual(report.provider.scheduling, { queued: 1, cancelled: 0, maxQueueDepth: 2, waitMs: 40, averageWaitMs: 40 });
     assert.equal(report.tools.agentCalls, 1);
@@ -177,6 +186,8 @@ test("provider scheduling telemetry preserves request correlation when responses
     const second = await scheduling.observer.queued({ provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 1 });
     await scheduling.observer.started(first, { provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 0, waitMs: 0 });
     await scheduling.observer.started(second, { provider: "local", model: "fixture-model", endpoint: "endpoint", maxConcurrentRequests: 2, queueDepth: 1, waitMs: 0 });
+    await scheduling.observer.interEventIdle(first, { provider: "local", model: "fixture-model", endpoint: "endpoint", attempt: 0, idleMs: 120, maxIdleMs: 120, eventType: "text_delta" });
+    await scheduling.observer.interEventIdle(first, { provider: "local", model: "fixture-model", endpoint: "endpoint", attempt: 0, idleMs: 80, maxIdleMs: 120, eventType: "text_delta" });
     await scheduling.observer.response(second, { status: 202, headers: { "x-second": "yes" } });
     await scheduling.observer.completed(second, assistantMessage("fixture-model", "second"));
     await scheduling.observer.response(first, { status: 201, headers: { "x-first": "yes" } });
@@ -190,6 +201,12 @@ test("provider scheduling telemetry preserves request correlation when responses
       { requestId: "PR-second", httpStatus: 202, phase: "plan" },
       { requestId: "PR-first", httpStatus: 201, phase: "intake" },
     ]);
+    const firstUsage = events.find((event) => event.type === "model_usage" && event.payload?.requestId === "PR-first");
+    assert.equal(firstUsage?.payload?.maxInterEventIdleMs, 120);
+    assert.equal(firstUsage?.payload?.maxInterEventIdleAttempt, 0);
+    assert.equal(firstUsage?.payload?.maxInterEventIdleEventType, "text_delta");
+    assert.equal(events.some((event) => event.type === "provider_request_inter_event_idle"), false);
+    assert.deepEqual((await new RunTelemetry(services.control).report(runId)).provider.stream.interEventIdleMs, { total: 120, average: 120, p95: 120, max: 120 });
     const epochs = (await services.control.snapshot(runId)).requestEpochs;
     assert.equal(epochs["RE-first"]?.status, "COMPLETED");
     assert.equal(epochs["RE-second"]?.status, "COMPLETED");

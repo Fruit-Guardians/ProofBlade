@@ -41,6 +41,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     "invoke_capability",
     "run_background",
     "read_job_output",
+    "monitor_job",
     "stop_job",
     "load_skill",
     "propose_intent",
@@ -59,7 +60,7 @@ test("core solver tool contract has a stable ordered surface", () => {
     assert.match(String(contract.sensitivity), /^(public|target|secret)$/);
     assert.match(String(contract.replay), /^(pure|idempotent|resumable|reconcile|manual|forbidden-replay)$/);
   }
-  assert.equal(solverToolContractHash(), "de45f9ec53c2f8f4b5d946cfe7e7283e76486cedd1ca005b5d160fad8c25a3ac");
+  assert.equal(solverToolContractHash(), "5e7564286643f24dec5ff30af45bb90878cf58bf5177d1cb3315f541a8e302c4");
   assert.equal(bundledCapabilityCatalogHash(), "a8f993b8344a62572a7a3e643e0506edc301f8750f69609353d081eaeb2f3e9e");
 });
 
@@ -185,7 +186,7 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const task = fixtureTask(runId, "reverse-strings-1", root, config);
     await services.control.createRun(runId, task);
     const fixture = await services.sandbox.build(task);
-    const generation = await services.sandbox.reset(fixture);
+    let generation = await services.sandbox.reset(fixture);
     await services.fixtureControl.reset(runId, generation);
     runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
 
@@ -201,6 +202,15 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     assert.equal(completed.backendId, "proofblade-bundled");
     assert.equal(completed.backendVersion, "1.0.0");
     assert.match((await runtime.readJobOutput(completed.id)).output, /binary-info|strings/);
+    const completedOutput = await runtime.readJobOutput(completed.id);
+    const exitSignal = await runtime.monitorJob(completed.id, { sinceCursor: String(completedOutput.originalChars), triggers: ["exit"], waitMs: 100 });
+    assert.equal(exitSignal.trigger, "exit");
+    assert.equal(exitSignal.status, "SUCCEEDED");
+
+    const heartbeatJob = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 500 }, timeoutMs: 5_000 });
+    const heartbeat = await runtime.monitorJob(String(heartbeatJob.jobId), { triggers: ["heartbeat"], heartbeatMs: 50, waitMs: 500 });
+    assert.equal(heartbeat.trigger, "heartbeat");
+    await runtime.stopJob(String(heartbeatJob.jobId), "heartbeat test cleanup");
 
     const timeout = await runtime.runBackground({ capabilityId: "proofblade.target", operation: "delay", input: { milliseconds: 250 }, timeoutMs: 50 });
     const blockedUntil = Date.now() + 100;
@@ -223,6 +233,43 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     const snapshot = await services.control.snapshot(runId);
     assert.equal(snapshot.jobs["J-RECOVER"]?.status, "SUCCEEDED");
     assert.equal((await services.control.replay(runId)).jobs["J-RECOVER"]?.status, "SUCCEEDED");
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-STALE-RECOVER", capabilityId: "proofblade.target", operation: "list", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: {}, replayPolicy: "pure", status: "QUEUED", lane: "executor", generation: snapshot.generation },
+      lane: "executor",
+    });
+    const nextGeneration = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, nextGeneration);
+    generation = nextGeneration;
+    await runtime.recoverJobs();
+    const staleRecovered = await runtime.jobStatus("J-STALE-RECOVER");
+    assert.equal(staleRecovered.status, "UNKNOWN");
+    assert.match(staleRecovered.error ?? "", /belongs to generation/);
+    assert.equal((await services.control.events(runId)).filter((event) => event.type === "job_started" && event.payload.jobId === "J-STALE-RECOVER").length, 0);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-RECOVER-EXPIRED", capabilityId: "proofblade.target", operation: "delay", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: { milliseconds: 500 }, replayPolicy: "idempotent", status: "QUEUED", lane: "executor", generation, timeoutMs: 50 },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-RECOVER-EXPIRED", startedAt: new Date(Date.now() - 1_000).toISOString(), lane: "executor" });
+    await runtime.recoverJobs();
+    const expired = await runtime.jobStatus("J-RECOVER-EXPIRED");
+    assert.equal(expired.status, "TIMED_OUT");
+    assert.match(expired.error ?? "", /deadline elapsed before recovery/);
+
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: { id: "J-RECOVER-ACTIVE", capabilityId: "proofblade.target", operation: "delay", backendId: "proofblade-bundled", backendVersion: "1.0.0", args: { milliseconds: 100 }, replayPolicy: "idempotent", status: "QUEUED", lane: "executor", generation, timeoutMs: 2_000 },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-RECOVER-ACTIVE", startedAt: new Date().toISOString(), lane: "executor" });
+    await runtime.recoverJobs();
+    await runtime.recoverJobs();
+    assert.equal((await runtime.waitJob("J-RECOVER-ACTIVE", 2_000)).status, "SUCCEEDED");
+    const activeStarts = (await services.control.events(runId)).filter((event) => event.type === "job_started" && event.payload.jobId === "J-RECOVER-ACTIVE");
+    assert.equal(activeStarts.length, 1);
 
     await services.control.dispatch(runId, {
       type: "job_queued",
@@ -252,6 +299,48 @@ test("background jobs complete, timeout, cancel, and recover through durable rec
     await services.control.dispatch(runId, { type: "fail", reason: "terminal recovery fixture" });
     await runtime.recoverJobs();
     assert.equal((await runtime.jobStatus("J-TERMINAL")).status, "UNKNOWN");
+  } finally {
+    await runtime?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("monitor_job resumes at UTF-8 byte cursors without splitting multibyte output", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-job-utf8-"));
+  let runtime: ProofBladeToolRuntime | undefined;
+  try {
+    const services = createServices(root, config);
+    const runId = "JOBS-UTF8-001";
+    const task = fixtureTask(runId, "reverse-strings-1", root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    runtime = new ProofBladeToolRuntime(runId, fixture, services.runsRoot, services.control, services.artifacts, services.journal);
+    const artifact = await services.artifacts.putText(runId, "前缀\n命中结果", { filename: "job-output.txt", sensitivity: "public" });
+    await services.control.dispatch(runId, {
+      type: "job_queued",
+      job: {
+        id: "J-UTF8",
+        capabilityId: "proofblade.target",
+        operation: "list",
+        backendId: "proofblade-bundled",
+        backendVersion: "1.0.0",
+        args: {},
+        replayPolicy: "pure",
+        status: "QUEUED",
+        lane: "executor",
+        generation,
+      },
+      lane: "executor",
+    });
+    await services.control.dispatch(runId, { type: "job_started", jobId: "J-UTF8", lane: "executor" });
+    await services.control.dispatch(runId, { type: "job_finished", jobId: "J-UTF8", status: "SUCCEEDED", outcome: "success", artifactId: artifact.id, lane: "executor" });
+
+    const prefixBytes = Buffer.byteLength("前缀\n", "utf8");
+    const monitored = await runtime.monitorJob("J-UTF8", { sinceCursor: String(prefixBytes), triggers: ["new_output"], waitMs: 100 });
+    assert.equal(monitored.cursor, String(Buffer.byteLength("前缀\n命中结果", "utf8")));
+    assert.equal(monitored.output, "命中结果");
   } finally {
     await runtime?.close();
     await rm(root, { recursive: true, force: true });

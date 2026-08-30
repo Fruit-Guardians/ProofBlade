@@ -4,15 +4,15 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.22",
+  "version": "0.10.25",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-25T06:20:00.000Z",
+  "updatedAt": "2026-08-29T10:23:08.975Z",
   "qualityAudit": {
-    "bugAuditCount": 20,
-    "securityAuditCount": 20,
-    "lastBugAuditAt": "2026-08-25T06:20:00.000Z",
-    "lastSecurityAuditAt": "2026-08-25T06:20:00.000Z",
-    "sourceHash": "a8777e5cb18ddb06698725c84f680bfa8c8a52af9ae96ae20c43b3325d8504f2",
+    "bugAuditCount": 23,
+    "securityAuditCount": 23,
+    "lastBugAuditAt": "2026-08-29T10:23:08.975Z",
+    "lastSecurityAuditAt": "2026-08-29T10:23:08.975Z",
+    "sourceHash": "77d35f637162a1751b18e2856972d88e379277e457791fa7d150b2e12c3137ab",
     "result": "passed"
   }
 }
@@ -45,10 +45,12 @@
 - Coding `read` 与 `bash` 都为文本结果注册语义化中间 Artifact，并在模型可见结果中返回稳定 `A-*` 锚点；`evidence record` 使用该锚点一次完成命名、提升、Evidence 与可选 Fact。
 - Coding `read/bash` 接入 Evidence Curation Gate：4 个未审阅产物触发检查点，8 个触发硬门；Agent 必须 `record` 有价值发现或 `annotate` 已审阅的普通输出后才能继续侦察。
 - Coding 回合还对 `bash`/`shell_background` 的进程与网络实验做单回合预算（总调用、长任务、超时和归一化实验族）；触发后先持久化证据，再由 Competition Loop 发起一次替代假设重规划，最多恢复两次，不把题目级停滞误报为 Provider 故障。
+- `observation-queue.ts` 是事件流上的唯一观察投影：它从 ingress/Job/Provider/Verifier/Maintenance 事件生成有界脱敏摘要，按 urgent/normal/background 排序并支持 coalescing；`PiCodingLane` 在 context 安全点注入前 8 项，回合结束只确认实际展示项，避免把模型没有看到的观察误标记为已消费。
+- `monitor_job` 与 Coding `shell_job monitor` 都使用单调 UTF-8 字节 cursor，并支持 `new_output`、`keyword`、`exit`、`error`、`heartbeat` 和有界 `timeout`；后台 Job 的 `job_finished` 保留原始 Artifact 引用，GUI/重启通过 ControlStore 重建待处理观察，不需要第二套内存状态。
 
 ## 开发规则与验证
 
-模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。Pi 升级必须更新锁定快照与适配测试。
+模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。顶层 Tool schema 只能由不可变 `TaskContract.target_kind` 决定；每轮 CTF 分类、Challenge Profile、Preflight 和准备后的工作流必须进入最后一条 `proofblade-context` 动态消息，不能拼接用户原文或回写 System/Developer 消息。Pi 升级必须更新锁定快照与适配测试。
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 

@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.20",
+  "version": "0.12.22",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-13T04:00:00.000Z",
+  "updatedAt": "2026-08-29T10:18:09.178Z",
   "qualityAudit": {
-    "bugAuditCount": 16,
-    "securityAuditCount": 16,
-    "lastBugAuditAt": "2026-08-13T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-13T04:00:00.000Z",
-    "sourceHash": "468eba9e53cde4ec12c701469ee714dbf19d6fac3f675deeec2a3c3169e0161a",
+    "bugAuditCount": 18,
+    "securityAuditCount": 18,
+    "lastBugAuditAt": "2026-08-29T10:18:09.178Z",
+    "lastSecurityAuditAt": "2026-08-29T10:18:09.178Z",
+    "sourceHash": "74a9f8392832152c501f3b7385a067c685bf38ddd36da45069bcf94ca189d925",
     "result": "passed"
   }
 }
@@ -41,6 +41,7 @@
 - 配置字段必须有默认值、解析测试和密钥边界说明。
 - Provider Profile 必须显式选择 `openai-completions`、`openai-responses` 或 `anthropic-messages`；协议选择属于可持久化运行配置，不能从模型名称或中转站品牌猜测。
 - Coding Agent 的 Skill/MCP 通过固定代理契约进入 Provider；会话启用集合必须在执行时再次校验。
+- Coding Provider 请求的 System/Tool 前缀必须跨回合稳定；分类、预检、准备工作流和 Context Manifest 等动态内容统一追加到 transcript 最后，且不得改变真实用户消息。缓存前缀变化必须由 `RequestEpoch`/Telemetry 可解释。
 - 嵌套分发型 MCP Tool 在 Effect 前解析真实内层 Tool，未知项默认拒绝，并按内层策略记录副作用、重放、资源和脱敏元数据。
 - 显式 MCP 脱敏字段不受短值阈值限制；`secret` 调用结果保持 secret Artifact 分类，Solver/Coding 共用嵌套能力描述。
 - 后台 Job 只持久化 Provider 安全参数副本；原始参数仅用于当前进程执行，脱敏参数不能跨进程自动重放。

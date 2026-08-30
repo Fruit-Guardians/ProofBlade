@@ -4,15 +4,15 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-10T05:35:35.169Z",
+  "updatedAt": "2026-08-28T16:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 4,
-    "securityAuditCount": 4,
-    "lastBugAuditAt": "2026-08-10T05:35:35.169Z",
-    "lastSecurityAuditAt": "2026-08-10T05:35:35.169Z",
-    "sourceHash": "43da254dff53dfc024292106cd358573b73d8f65cf63d3751b6df502d45b7130",
+    "bugAuditCount": 5,
+    "securityAuditCount": 5,
+    "lastBugAuditAt": "2026-08-28T16:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-28T16:00:00.000Z",
+    "sourceHash": "d8899a59b40eebce607826d43616f19aebbdd25bbb0dbf21a0cb84fabd5df611",
     "result": "passed"
   }
 }

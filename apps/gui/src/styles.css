@@ -131,6 +131,24 @@ code, pre, textarea { font-family: "Cascadia Code", "SFMono-Regular", Consolas, 
 .loading-state { min-height: 50vh; }
 
 .conversation-page { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; height: 100%; min-height: 540px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.observation-queue-panel { border-bottom: 1px solid var(--line); background: #101713; }
+.observation-queue-panel > header { display: flex; align-items: center; justify-content: space-between; min-height: 37px; gap: 10px; padding: 0 11px; border-bottom: 1px solid var(--line-soft); }
+.observation-queue-panel > header > div { display: flex; align-items: center; gap: 7px; min-width: 0; color: #a7c7b2; }
+.observation-queue-panel > header strong { color: var(--text); font-size: 10px; }
+.observation-queue-panel > header span, .observation-queue-panel > header em { color: var(--faint); font-size: 8px; font-style: normal; }
+.observation-queue-panel > header em { color: var(--amber); }
+.observation-queue-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 7px 9px; max-height: 220px; overflow: auto; }
+.observation-queue-item { min-width: 0; padding: 7px 8px; border-left: 2px solid #63756b; background: #151d18; }
+.observation-queue-item.priority-urgent { border-left-color: var(--amber); background: #211c14; }
+.observation-queue-item.priority-background { border-left-color: #52655b; }
+.observation-queue-item-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.observation-queue-item-head strong, .observation-queue-item-head code, .observation-queue-item-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.observation-queue-item-head strong { color: #c3d0c8; font: 500 9px/1.2 "Cascadia Code", monospace; }
+.observation-queue-item-head code { color: var(--cyan); font-size: 8px; }
+.observation-queue-item-head > span { margin-left: auto; color: var(--faint); font: 8px/1 "Cascadia Code", monospace; }
+.observation-queue-item p { margin: 6px 0 0; color: #aebbb3; font-size: 9px; line-height: 14px; word-break: break-word; }
+.observation-queue-links { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.observation-queue-links code { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; overflow: hidden; padding: 2px 4px; color: #8cb99e; background: #1b2a21; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .conversation-page.inspector-open { grid-template-columns: minmax(340px, 1fr) minmax(400px, 47%); }
 .conversation-main { display: grid; grid-template-rows: 42px minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
 .conversation-toolbar { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 12px; border-bottom: 1px solid var(--line); background: #141a16; }
