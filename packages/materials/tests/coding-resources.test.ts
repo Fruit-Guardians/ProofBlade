@@ -25,7 +25,7 @@ import { CodingClaimVerifier, requiresClaimVerification } from "../src/verificat
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
@@ -661,9 +661,9 @@ test("shell_background returns immediately and shell_job polls then stops the re
     assert.ok(job.pid > 0, "a real pid must be returned");
     assert.equal(job.status, "running");
     const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
-    const record = JSON.parse(await readFile(recordPath, "utf8")) as { schemaVersion: number; runId: string; generation: number; ownerLane: string; pid: number; processGroupId: number; processStartTime: string; commandHash: string; status: string };
-    assert.deepEqual({ schemaVersion: record.schemaVersion, runId: record.runId, generation: record.generation, ownerLane: record.ownerLane }, { schemaVersion: 1, runId, generation: 0, ownerLane: "main" });
-    assert.ok(record.pid > 0 && record.processGroupId > 0);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { schemaVersion: number; runId: string; generation: number; ownerLane: string; pid: number; processGroupCreated: boolean; processGroupId?: number; processStartTime: string; commandHash: string; status: string };
+    assert.deepEqual({ schemaVersion: record.schemaVersion, runId: record.runId, generation: record.generation, ownerLane: record.ownerLane }, { schemaVersion: 2, runId, generation: 0, ownerLane: "main" });
+    assert.ok(record.pid > 0 && record.processGroupCreated && record.processGroupId && record.processGroupId > 0);
     assert.ok(record.processStartTime.length > 0 && record.commandHash.length === 64 && record.status === "RUNNING");
     assert.ok(startElapsed < 10_000, `starting must not block for the command's duration, took ${startElapsed}ms`);
 
@@ -702,6 +702,64 @@ test("shell_background returns immediately and shell_job polls then stops the re
 
     const listed = (await executeTool("shell_job", { operation: "list" }, context)).details as { jobs: string[] };
     assert.ok(listed.jobs.some((entry) => entry.includes(job.jobId)), "the job log must be listable");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("shell_job stop reaps descendants when setsid is unavailable", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-tree-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "base64", "cat", "date", "grep", "kill", "ls", "mkdir", "nohup", "ps", "sed", "sleep", "tail", "tr", "wc"];
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-TREE-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300 & child=$!; printf '%s' \"$child\" > child.pid; wait", label: "tree" }, context);
+    const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+    assert.equal(job.processGroupCreated, false);
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { processGroupCreated: boolean; processGroupId?: number };
+    assert.equal(record.processGroupCreated, false);
+    assert.equal(record.processGroupId, undefined);
+    const childPidResult = await env.exec("cat child.pid");
+    assert.ok(childPidResult.ok);
+    const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+    assert.match(childPid, /^\d+$/);
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(alive.ok);
+    assert.equal(alive.ok ? alive.value.stdout : "", "dead", "stop must terminate the descendant process");
   } finally {
     try {
       await env.cleanup();
