@@ -540,6 +540,14 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
     const paths = shellJobPaths(context.runtime.runId, snapshot.generation, jobId);
     const processStartTime = new Date().toISOString();
+    const fallbackCommand = [
+      `pid_file=${shellQuote(paths.pidPath)}`,
+      `collect_descendants() { parent="$1"; for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v parent="$parent" '$2 == parent { print $1 }'); do collect_descendants "$child"; printf '%s\\n' "$child"; done; }`,
+      `snapshot_pids() { now=$(date +%s 2>/dev/null); temporary="$pid_file.tmp.$$"; : > "$temporary"; printf '%s:%s\\n' "$$" "$(( now * 1000 ))" >> "$temporary"; for target in $(collect_descendants "$$"); do etimes=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); if [ -n "$etimes" ] && [ -n "$now" ]; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$temporary"; fi; done; mv "$temporary" "$pid_file"; }`,
+      `trap snapshot_pids EXIT`,
+      `snapshot_pids`,
+      input.command,
+    ].join("\n");
     const reservation: ShellJobRecord = {
       schemaVersion: 2,
       jobId,
@@ -548,6 +556,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
       ownerLane: context.ownerLane ?? "main",
       pid: 0,
       processGroupCreated: false,
+      processTreePath: paths.pidPath,
       processStartTime,
       processStartEpochMs: Date.now(),
       logPath: paths.logPath,
@@ -561,7 +570,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     const launcher = [
       `mkdir -p ${paths.rootPath}`,
       `printf %s ${shellQuote(JSON.stringify(reservation))} > ${paths.recordPath}`,
-      `if command -v setsid >/dev/null 2>&1; then setsid nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=true"; else nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=false"; fi`,
+      `if command -v setsid >/dev/null 2>&1; then setsid nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=true"; else nohup bash -c ${shellQuote(fallbackCommand)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=false"; fi`,
     ].join("\n");
     let started: string;
     try {
@@ -580,6 +589,7 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
       ...reservation,
       pid: Number(pid),
       processGroupCreated,
+      processTreePath: paths.pidPath,
       ...(processGroupCreated ? { processGroupId: Number(pid) } : {}),
       status: "RUNNING",
     };
@@ -679,14 +689,15 @@ interface ShellJobInspection {
 }
 
 interface ShellJobRecord {
-  schemaVersion: 2;
+  schemaVersion: 1 | 2;
   jobId: string;
   runId: string;
   generation: number;
   ownerLane: Lane;
   pid: number;
-  processGroupCreated: boolean;
+  processGroupCreated?: boolean;
   processGroupId?: number;
+  processTreePath?: string;
   processStartTime: string;
   processStartEpochMs: number;
   logPath: string;
@@ -812,12 +823,13 @@ interface ShellJobPaths {
   rootPath: string;
   recordPath: string;
   logPath: string;
+  pidPath: string;
 }
 
 function shellJobPaths(runId: string, generation: number, jobId?: string): ShellJobPaths {
   const rootPath = `${shellJobRunRoot(runId)}/${generation}`;
   const suffix = jobId ? `/${jobId}` : "";
-  return { rootPath, recordPath: `${rootPath}${suffix}.json`, logPath: `${rootPath}${suffix}.log` };
+  return { rootPath, recordPath: `${rootPath}${suffix}.json`, logPath: `${rootPath}${suffix}.log`, pidPath: `${rootPath}${suffix}.pids` };
 }
 
 function shellJobRunRoot(runId: string): string {
@@ -840,10 +852,10 @@ async function stopShellJob(
   const identity = shellRecordIdentity(runId, generation, ownerLane);
   return await runShell([
     `r=${paths.recordPath}; if [ ! -f "$r" ] || ! grep -Fq ${shellQuote(identity)} "$r"; then echo "__NO_JOB__"; else`,
-    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); g=$(sed -n 's/.*"processGroupId":\\([0-9][0-9]*\\).*/\\1/p' "$r"); group_created=$(sed -n 's/.*"processGroupCreated":\\(true\\|false\\).*/\\1/p' "$r");`,
-    `started=$(sed -n 's/.*"processStartEpochMs":\\([0-9][0-9]*\\).*/\\1/p' "$r"); now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ');`,
-    `if ! kill -0 "$p" 2>/dev/null; then sed -E -i 's/"status":"[^\"]+"/"status":"FINISHED"/' "$r" 2>/dev/null; echo finished; elif [ -z "$p" ] || [ "$p" = 0 ] || [ -z "$group_created" ] || [ -z "$started" ] || [ -z "$now" ] || [ -z "$etimes" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; then sed -E -i 's/"status":"[^\"]+"/"status":"UNKNOWN"/' "$r" 2>/dev/null; echo "__UNKNOWN_JOB__"; elif [ "$group_created" = true ] && [ -z "$g" ]; then sed -E -i 's/"status":"[^\"]+"/"status":"UNKNOWN"/' "$r" 2>/dev/null; echo "__UNKNOWN_JOB__"; elif [ "$group_created" = true ]; then kill -- -"$g" 2>/dev/null || kill "$p" 2>/dev/null; sleep 0.3; kill -0 -- -"$g" 2>/dev/null && kill -9 -- -"$g" 2>/dev/null; sed -E -i 's/"status":"[^\"]+"/"status":"STOPPED"/' "$r" 2>/dev/null; if kill -0 -- -"$g" 2>/dev/null || kill -0 "$p" 2>/dev/null; then echo "still-alive"; else echo stopped; fi; else`,
-    `if ! command -v ps >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1; then sed -E -i 's/"status":"[^\"]+"/"status":"UNKNOWN"/' "$r" 2>/dev/null; echo "__UNSUPPORTED__"; else descendants() { parent="$1"; for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v parent="$parent" '$2 == parent { print $1 }'); do descendants "$child"; printf '%s\\n' "$child"; done; }; targets=$(descendants "$p"); targets="$targets $p"; was_running=false; if kill -0 "$p" 2>/dev/null; then was_running=true; fi; for target in $targets; do kill "$target" 2>/dev/null || true; done; sleep 0.3; for target in $targets; do kill -0 "$target" 2>/dev/null && kill -9 "$target" 2>/dev/null || true; done; alive=false; for target in $targets; do if kill -0 "$target" 2>/dev/null; then alive=true; fi; done; if [ "$alive" = true ]; then sed -E -i 's/"status":"[^\"]+"/"status":"STOPPED"/' "$r" 2>/dev/null; echo "still-alive"; elif [ "$was_running" = true ]; then sed -E -i 's/"status":"[^\"]+"/"status":"STOPPED"/' "$r" 2>/dev/null; echo stopped; else sed -E -i 's/"status":"[^\"]+"/"status":"FINISHED"/' "$r" 2>/dev/null; echo finished; fi; fi; fi`,
+    `p=$(sed -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$r"); g=$(sed -n 's/.*"processGroupId":\\([0-9][0-9]*\\).*/\\1/p' "$r"); schema=$(sed -n 's/.*"schemaVersion":\\([0-9][0-9]*\\).*/\\1/p' "$r"); group_created=$(sed -n 's/.*"processGroupCreated":\\(true\\|false\\).*/\\1/p' "$r"); if [ -z "$group_created" ] && [ "$schema" = 1 ] && [ -n "$g" ] && [ "$g" != 0 ]; then group_created=true; fi;`,
+    `started=$(sed -n 's/.*"processStartEpochMs":\\([0-9][0-9]*\\).*/\\1/p' "$r"); mark_status() { status="$1"; sed -E -i 's/"status":"[^\"]+"/"status":"'"$status"'"/' "$r" 2>/dev/null; };`,
+    `if [ -z "$p" ] || [ "$p" = 0 ] || [ -z "$group_created" ] || [ -z "$started" ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif [ "$group_created" = true ]; then if [ -z "$g" ] || [ "$g" = 0 ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif kill -0 -- -"$g" 2>/dev/null; then now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' '); if kill -0 "$p" 2>/dev/null && { [ -z "$now" ] || [ -z "$etimes" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; }; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else kill -- -"$g" 2>/dev/null || true; sleep 0.3; kill -0 -- -"$g" 2>/dev/null && kill -9 -- -"$g" 2>/dev/null || true; if kill -0 -- -"$g" 2>/dev/null; then mark_status RUNNING; echo "still-alive"; else mark_status STOPPED; echo stopped; fi; fi; elif kill -0 "$p" 2>/dev/null; then now=$(date +%s 2>/dev/null); etimes=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' '); if [ -z "$now" ] || [ -z "$etimes" ] || [ $(( now - started / 1000 - etimes )) -gt 3 ] || [ $(( etimes - now + started / 1000 )) -gt 3 ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else kill "$p" 2>/dev/null || true; sleep 0.3; kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null || true; if kill -0 "$p" 2>/dev/null; then mark_status RUNNING; echo "still-alive"; else mark_status STOPPED; echo stopped; fi; fi; else mark_status FINISHED; echo finished; fi; elif [ "$group_created" != false ]; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; elif ! command -v ps >/dev/null 2>&1 || ! command -v awk >/dev/null 2>&1; then mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else`,
+    `pid_file=${shellQuote(paths.pidPath)}; descendants() { parent="$1"; for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v parent="$parent" '$2 == parent { print $1 }'); do descendants "$child"; printf '%s\\n' "$child"; done; }; matching_process() { target="$1"; expected="$2"; current=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); current_now=$(date +%s 2>/dev/null); if [ -z "$target" ] || [ -z "$expected" ] || [ -z "$current" ] || [ -z "$current_now" ] || ! kill -0 "$target" 2>/dev/null; then return 1; fi; actual=$(( (current_now - current) * 1000 )); delta=$(( actual - expected )); [ "$delta" -le 3000 ] && [ "$delta" -ge -3000 ]; }; targets_file="$pid_file.stop.$$"; : > "$targets_file"; if [ -f "$pid_file" ]; then while IFS=: read -r target expected; do [ -n "$target" ] && printf '%s:%s\\n' "$target" "$expected" >> "$targets_file"; done < "$pid_file"; fi; root_running=false; if kill -0 "$p" 2>/dev/null; then root_running=true; now=$(date +%s 2>/dev/null); for target in $(descendants "$p"); do etimes=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); if [ -n "$etimes" ] && [ -n "$now" ]; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$targets_file"; fi; done; fi; printf '%s:%s\\n' "$p" "$started" >> "$targets_file"; was_running=false; unverified=false; while IFS=: read -r target expected; do if kill -0 "$target" 2>/dev/null; then was_running=true; if ! matching_process "$target" "$expected"; then unverified=true; fi; fi; done < "$targets_file"; signal_targets() { signal="$1"; while IFS=: read -r target expected; do if [ "$target" != "$p" ] && matching_process "$target" "$expected"; then kill -s "$signal" "$target" 2>/dev/null || true; fi; done < "$targets_file"; if matching_process "$p" "$started"; then kill -s "$signal" "$p" 2>/dev/null || true; fi; }; if [ "$unverified" = true ]; then rm -f "$targets_file"; mark_status UNKNOWN; echo "__UNKNOWN_JOB__"; else signal_targets TERM; sleep 0.3; signal_targets KILL; alive=false; while IFS=: read -r target expected; do if matching_process "$target" "$expected"; then alive=true; fi; done < "$targets_file"; rm -f "$targets_file"; if [ "$alive" = true ]; then mark_status RUNNING; echo "still-alive"; elif [ "$was_running" = true ] || [ "$root_running" = true ]; then mark_status STOPPED; echo stopped; else mark_status FINISHED; echo finished; fi; fi; fi`,
   ].join("\n"), signal, onUpdate, context);
 }
 

@@ -769,6 +769,116 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
   }
 });
 
+test("shell_job stop reaps a descendant after the fallback parent exits", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-orphan-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sleep", "tr"];
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-ORPHAN-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300 & child=$!; printf '%s' \"$child\" > child.pid; exit 0", label: "orphan" }, context);
+    const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+    assert.equal(job.processGroupCreated, false);
+    const pidPath = `.proofblade/jobs/${sha256(runId).slice(0, 24)}/0/${job.jobId}.pids`;
+    const childPidResult = await env.exec(`while [ ! -s child.pid ] || [ ! -s ${pidPath} ]; do sleep 0.05; done; cat child.pid`);
+    assert.ok(childPidResult.ok);
+    const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+    assert.match(childPid, /^\d+$/);
+    const persistedPids = await readFile(join(dir, pidPath), "utf8");
+    assert.match(persistedPids, new RegExp(`^${job.pid}:`, "m"));
+    assert.match(persistedPids, new RegExp(`^${childPid}:`, "m"));
+    const parentAlive = await env.exec(`if kill -0 ${job.pid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(parentAlive.ok);
+    assert.equal(parentAlive.ok ? parentAlive.value.stdout : "", "dead", "the fallback parent must be gone before stop uses its PID snapshot");
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as { status: string };
+    assert.equal(record.status, "STOPPED");
+    const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(alive.ok);
+    assert.equal(alive.ok ? alive.value.stdout : "", "dead", "stop must terminate a descendant after its parent exits");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("shell_job stop accepts a schema 1 process-group record during upgrade", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process groups");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-legacy-test-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    if (!(await hasWorkingBash(env))) {
+      t.skip("requires a working Bash shell");
+      return;
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-LEGACY-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const startResult = await executeTool("shell_background", { command: "sleep 300", label: "legacy" }, context);
+    const job = startResult.details as { jobId: string; pid: number };
+    const recordPath = join(dir, ".proofblade", "jobs", sha256(runId).slice(0, 24), "0", `${job.jobId}.json`);
+    const current = JSON.parse(await readFile(recordPath, "utf8")) as Record<string, unknown>;
+    if (current.processGroupId === undefined) {
+      await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+      t.skip("requires setsid to exercise the legacy process-group record");
+      return;
+    }
+    delete current.processGroupCreated;
+    delete current.processTreePath;
+    current.schemaVersion = 1;
+    await writeFile(recordPath, JSON.stringify(current), "utf8");
+    const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+    assert.equal((stop.details as { stopped: boolean }).stopped, true);
+    assert.equal(JSON.parse(await readFile(recordPath, "utf8")).status, "STOPPED");
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("polling a background job stays read-only so it cannot mask a stalled agent", () => {
   const mcp = { summaries: () => [], resolveInvocation: () => ({ readOnly: true, sideEffect: "none" }) } as unknown as McpProjectRegistry;
   const resolve = createCodingToolEffectPolicyResolver(mcp);
