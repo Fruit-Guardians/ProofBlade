@@ -856,7 +856,7 @@ function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths
     `  "$setsid_bin" "$nohup_bin" "$bash_bin" -c ${shellQuote(groupWrapper)} > "$log" 2>&1 &`,
     `  mode=true`,
     `else`,
-    `  if [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo startup-failed; exit 70; fi`,
+    `  if [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo "startup-failed missing-tools ps=$ps_bin awk=$awk_bin date=$date_bin"; exit 70; fi`,
     `  "$nohup_bin" "$bash_bin" -c ${shellQuote(fallbackSupervisor)} > "$log" 2>&1 &`,
     `  mode=false`,
     `fi`,
