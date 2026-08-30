@@ -10,6 +10,7 @@ import { ProviderSettingsStore } from "./provider-settings.js";
 import { WorkspaceSettingsStore } from "./workspace-settings.js";
 import { listDirectories, requireDirectory } from "./directory-browser.js";
 import { closeGuiResources } from "./shutdown.js";
+import { AblationService } from "./ablation-service.js";
 import type { ConversationPreferences, ProviderCacheRetention, ProviderSettingsInput, ProviderThinkingLevel, WorkspaceSettings } from "./shared.js";
 
 const guiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,6 +23,7 @@ const providerSettings = await ProviderSettingsStore.create(config);
 config.modelProfiles.executor = providerSettings.modelProfile();
 const workspaceSettings = await WorkspaceSettingsStore.create();
 const data = new DebugDataService(projectRoot, config, configPath);
+const ablation = new AblationService(projectRoot, config, providerSettings);
 const competitionSettings = await CompetitionSettingsStore.create(projectRoot, config);
 const competitionBackend = competitionSettings.backend();
 const executionConfig = resolveExecutionConfig(config);
@@ -155,6 +157,23 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
     }
   }
   if (method === "GET" && url.pathname === "/api/runs") return sendJson(response, 200, await data.listRuns());
+  if (method === "GET" && url.pathname === "/api/ablation") return sendJson(response, 200, await ablation.list());
+  if (method === "POST" && url.pathname === "/api/ablation") {
+    const body = await readBody(request);
+    return sendJson(response, 201, await ablation.create(body as never));
+  }
+  if (parts[0] === "api" && parts[1] === "ablation" && parts[2]) {
+    const experimentId = parts[2];
+    if (method === "GET" && parts.length === 3) return sendJson(response, 200, await ablation.detail(experimentId));
+    if (method === "POST" && parts[3] === "preflight") {
+      const body = await readBody(request);
+      return sendJson(response, 200, await ablation.preflight(experimentId, body.probe === true));
+    }
+    if (method === "POST" && parts[3] === "run") {
+      const body = await readBody(request);
+      return sendJson(response, 202, await ablation.start(experimentId, body.allowLive === true, body.probe === true));
+    }
+  }
   if (method === "POST" && url.pathname === "/api/conversations") {
     const body = await readBody(request);
     const capabilities = await capabilityCatalog();
