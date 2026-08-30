@@ -1285,7 +1285,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1061](../../../packages/materials/src/runtime/coding-resources.ts:1061)
+- Source: [src/runtime/coding-resources.ts:1079](../../../packages/materials/src/runtime/coding-resources.ts:1079)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -2632,7 +2632,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1163](../../../packages/materials/src/runtime/coding-resources.ts:1163)
+- Source: [src/runtime/coding-resources.ts:1181](../../../packages/materials/src/runtime/coding-resources.ts:1181)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2641,7 +2641,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:980](../../../packages/materials/src/runtime/coding-resources.ts:980)
+- Source: [src/runtime/coding-resources.ts:998](../../../packages/materials/src/runtime/coding-resources.ts:998)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2650,7 +2650,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:997](../../../packages/materials/src/runtime/coding-resources.ts:997)
+- Source: [src/runtime/coding-resources.ts:1015](../../../packages/materials/src/runtime/coding-resources.ts:1015)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2694,7 +2694,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1075](../../../packages/materials/src/runtime/coding-resources.ts:1075)
+- Source: [src/runtime/coding-resources.ts:1093](../../../packages/materials/src/runtime/coding-resources.ts:1093)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2703,7 +2703,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1147](../../../packages/materials/src/runtime/coding-resources.ts:1147)
+- Source: [src/runtime/coding-resources.ts:1165](../../../packages/materials/src/runtime/coding-resources.ts:1165)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -2712,7 +2712,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1137](../../../packages/materials/src/runtime/coding-resources.ts:1137)
+- Source: [src/runtime/coding-resources.ts:1155](../../../packages/materials/src/runtime/coding-resources.ts:1155)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -2738,7 +2738,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:863](../../../packages/materials/src/runtime/coding-resources.ts:863)
+- Source: [src/runtime/coding-resources.ts:881](../../../packages/materials/src/runtime/coding-resources.ts:881)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
@@ -10032,7 +10032,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: export operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/workspace-search.test.ts`
+- Tests: `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/workspace-search.test.ts`
 
 ### RunEventIngress.complete
 - Kind: `method`

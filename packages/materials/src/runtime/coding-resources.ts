@@ -540,14 +540,6 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     const slug = (input.label ?? "job").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 40);
     const paths = shellJobPaths(context.runtime.runId, snapshot.generation, jobId);
     const processStartTime = new Date().toISOString();
-    const fallbackCommand = [
-      `pid_file=${shellQuote(paths.pidPath)}`,
-      `collect_descendants() { parent="$1"; for child in $(ps -eo pid=,ppid= 2>/dev/null | awk -v parent="$parent" '$2 == parent { print $1 }'); do collect_descendants "$child"; printf '%s\\n' "$child"; done; }`,
-      `snapshot_pids() { now=$(date +%s 2>/dev/null); temporary="$pid_file.tmp.$$"; : > "$temporary"; printf '%s:%s\\n' "$$" "$(( now * 1000 ))" >> "$temporary"; for target in $(collect_descendants "$$"); do etimes=$(ps -o etimes= -p "$target" 2>/dev/null | tr -d ' '); if [ -n "$etimes" ] && [ -n "$now" ]; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$temporary"; fi; done; mv "$temporary" "$pid_file"; }`,
-      `trap snapshot_pids EXIT`,
-      `snapshot_pids`,
-      input.command,
-    ].join("\n");
     const reservation: ShellJobRecord = {
       schemaVersion: 2,
       jobId,
@@ -565,13 +557,9 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
       label: slug,
       createdAt: processStartTime,
     };
-    // Write a reservation before spawning. A crash between spawn and the final
-    // metadata write is recovered as UNKNOWN instead of guessed from a PID.
-    const launcher = [
-      `mkdir -p ${paths.rootPath}`,
-      `printf %s ${shellQuote(JSON.stringify(reservation))} > ${paths.recordPath}`,
-      `if command -v setsid >/dev/null 2>&1; then setsid nohup bash -c ${shellQuote(input.command)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=true"; else nohup bash -c ${shellQuote(fallbackCommand)} > ${paths.logPath} 2>&1 & p=$!; echo "pid=$p"; echo "process-group-created=false"; fi`,
-    ].join("\n");
+    // The wrapper commits its real PID metadata before it starts user code.
+    // This removes the old spawn -> second host write failure window.
+    const launcher = buildShellJobLauncher(reservation, paths, input.command);
     let started: string;
     try {
       started = await runShell(launcher, signal, onUpdate, context);
@@ -585,15 +573,6 @@ const shellBackgroundTool: AgentHarnessTool<CodingResourceContext> = {
     if (!processGroupCreated && !/process-group-created=false/.test(started)) {
       throw new Error(`Could not determine process isolation mode: ${started.slice(0, 400)}`);
     }
-    const record: ShellJobRecord = {
-      ...reservation,
-      pid: Number(pid),
-      processGroupCreated,
-      processTreePath: paths.pidPath,
-      ...(processGroupCreated ? { processGroupId: Number(pid) } : {}),
-      status: "RUNNING",
-    };
-    await runShell(`printf %s ${shellQuote(JSON.stringify(record))} > ${paths.recordPath}`, signal, onUpdate, context);
     await context.experimentGate?.record({ runId: context.runtime.runId, action: "shell_background", input: { command: input.command, label: input.label }, outcome: "success", summary: "Background shell process started." });
     return toolResult({
       jobId,
@@ -838,6 +817,45 @@ function shellJobRunRoot(runId: string): string {
 
 function shellRecordIdentity(runId: string, generation: number, ownerLane: Lane): string {
   return `"runId":${JSON.stringify(runId)},"generation":${generation},"ownerLane":${JSON.stringify(ownerLane)}`;
+}
+
+function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths, userCommand: string): string {
+  const reservationJson = JSON.stringify(reservation);
+  const recordPath = shellQuote(paths.recordPath);
+  const logPath = shellQuote(paths.logPath);
+  const rootPath = shellQuote(paths.rootPath);
+  const pidPath = shellQuote(paths.pidPath);
+  const groupWrapper = [
+    `record=${recordPath}; temporary="$record.tmp.$$";`,
+    `printf %s ${shellQuote(reservationJson)} > "$temporary" || exit 70;`,
+    `"$sed_bin" -E -i 's/"pid":0/"pid":'$$'/; s/"processGroupCreated":false/"processGroupCreated":true,"processGroupId":'$$'/; s/"status":"STARTING"/"status":"RUNNING"/' "$temporary" || exit 70;`,
+    `"$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; exit 70; }`,
+    `exec "$bash_bin" -c ${shellQuote(userCommand)}`,
+  ].join("\n");
+  const fallbackSupervisor = [
+    `record=${recordPath}; pid_file=${pidPath}; temporary="$record.tmp.$$";`,
+    `printf %s ${shellQuote(reservationJson)} > "$temporary" || exit 70;`,
+    `"$sed_bin" -E -i 's/"pid":0/"pid":'$$'/; s/"status":"STARTING"/"status":"RUNNING"/' "$temporary" || exit 70;`,
+    `"$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; exit 70; }`,
+    `collect_descendants() { parent="$1"; for child in $("$ps_bin" -eo pid=,ppid= 2>/dev/null | "$awk_bin" -v parent="$parent" '$2 == parent { print $1 }'); do collect_descendants "$child"; printf '%s\\n' "$child"; done; }`,
+    `snapshot_pids() { now=$("$date_bin" +%s 2>/dev/null) || return 1; temporary="$pid_file.tmp.$$"; : > "$temporary" || return 1; printf '%s:%s\\n' "$$" "$(( now * 1000 ))" >> "$temporary" || return 1; for target in $(collect_descendants "$$"); do etimes=$("$ps_bin" -o etimes= -p "$target" 2>/dev/null | "$tr_bin" -d ' '); if [ -n "$etimes" ]; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$temporary" || return 1; fi; done; "$mv_bin" "$temporary" "$pid_file" || { "$rm_bin" -f "$temporary"; return 1; }; }`,
+    `terminate_child_tree() { if [ -n "$child_pid" ]; then for target in $(collect_descendants "$child_pid"); do kill "$target" 2>/dev/null || true; done; kill "$child_pid" 2>/dev/null || true; fi; }`,
+    `stop_supervisor() { terminate_child_tree; exit 143; }; trap terminate_child_tree EXIT; trap stop_supervisor HUP INT TERM`,
+    `"$bash_bin" -c ${shellQuote(userCommand)} > ${logPath} 2>&1 & child_pid=$!;`,
+    `snapshot_pids || { terminate_child_tree; exit 70; };`,
+    `while kill -0 "$child_pid" 2>/dev/null; do snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.1; done;`,
+    `snapshot_pids || { terminate_child_tree; exit 70; };`,
+    `wait "$child_pid"; exit $?`,
+  ].join("\n");
+  return [
+    `root=${rootPath}; record=${recordPath}; log=${logPath};`,
+    `mkdir -p "$root" || { echo startup-failed; exit 70; };`,
+    `bash_bin=$(command -v bash 2>/dev/null) || { echo startup-failed; exit 70; }; nohup_bin=$(command -v nohup 2>/dev/null) || { echo startup-failed; exit 70; }; sed_bin=$(command -v sed 2>/dev/null) || { echo startup-failed; exit 70; }; grep_bin=$(command -v grep 2>/dev/null) || { echo startup-failed; exit 70; }; sleep_bin=$(command -v sleep 2>/dev/null) || { echo startup-failed; exit 70; }; ps_bin=$(command -v ps 2>/dev/null) || true; awk_bin=$(command -v awk 2>/dev/null) || true; date_bin=$(command -v date 2>/dev/null) || true; tr_bin=$(command -v tr 2>/dev/null) || { echo startup-failed; exit 70; }; mv_bin=$(command -v mv 2>/dev/null) || { echo startup-failed; exit 70; }; rm_bin=$(command -v rm 2>/dev/null) || { echo startup-failed; exit 70; }; setsid_bin=$(command -v setsid 2>/dev/null) || true; export bash_bin sed_bin grep_bin sleep_bin ps_bin awk_bin date_bin tr_bin mv_bin rm_bin;`,
+    `temporary="$record.tmp.$$"; printf %s ${shellQuote(reservationJson)} > "$temporary" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; }; "$mv_bin" "$temporary" "$record" || { "$rm_bin" -f "$temporary"; echo startup-failed; exit 70; };`,
+    `if [ -n "$setsid_bin" ]; then "$setsid_bin" "$nohup_bin" "$bash_bin" -c ${shellQuote(groupWrapper)} > "$log" 2>&1 & mode=true; else if [ -z "$ps_bin" ] || [ -z "$awk_bin" ] || [ -z "$date_bin" ]; then echo startup-failed; exit 70; fi; "$nohup_bin" "$bash_bin" -c ${shellQuote(fallbackSupervisor)} > "$log" 2>&1 & mode=false; fi; launcher_pid=$!;`,
+    `cleanup_startup() { if kill -0 "$launcher_pid" 2>/dev/null; then if [ "$mode" = true ]; then kill -- -"$launcher_pid" 2>/dev/null || kill "$launcher_pid" 2>/dev/null || true; else kill "$launcher_pid" 2>/dev/null || true; fi; fi; };`,
+    `i=0; while [ "$i" -lt 100 ]; do if [ -f "$record" ] && "$grep_bin" -Fq '"status":"RUNNING"' "$record"; then committed_pid=$("$sed_bin" -n 's/.*"pid":\\([0-9][0-9]*\\).*/\\1/p' "$record"); if [ -n "$committed_pid" ] && [ "$committed_pid" != 0 ]; then echo "pid=$committed_pid"; if [ "$mode" = true ]; then echo process-group-created=true; else echo process-group-created=false; fi; exit 0; fi; fi; if ! kill -0 "$launcher_pid" 2>/dev/null; then "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-failed; exit 70; fi; "$sleep_bin" 0.05; i=$((i + 1)); done; cleanup_startup; "$sed_bin" -E -i 's/"status":"STARTING"/"status":"UNKNOWN"/' "$record" 2>/dev/null || true; echo startup-timeout; exit 70;`,
+  ].join("\n");
 }
 
 async function stopShellJob(

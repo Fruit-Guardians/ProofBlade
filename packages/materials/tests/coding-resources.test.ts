@@ -832,6 +832,75 @@ test("shell_job stop reaps a descendant after the fallback parent exits", async 
   }
 });
 
+test("fallback supervisor survives user trap, PATH changes, and exec", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process and parent-child semantics");
+    return;
+  }
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-supervisor-test-"));
+  const commandPath = join(dir, "path");
+  const env = new NodeExecutionEnv({ cwd: dir, shellPath: "/bin/bash", shellEnv: { PATH: commandPath } });
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  try {
+    await mkdir(commandPath, { recursive: true });
+    const availablePath = (process.env.PATH ?? "").split(":").map((entry) => entry.trim()).filter(Boolean);
+    const requiredCommands = ["awk", "bash", "date", "grep", "ls", "mkdir", "mv", "nohup", "ps", "rm", "sed", "sh", "sleep", "tr"];
+    const commandSources = new Map<string, string>();
+    for (const command of requiredCommands) {
+      const source = availablePath.map((entry) => join(entry, command)).find((candidate) => {
+        try { return readFileSync(candidate).length >= 0; } catch { return false; }
+      });
+      if (!source) {
+        t.skip(`requires ${command} on PATH`);
+        return;
+      }
+      commandSources.set(command, source);
+      await symlink(source, join(commandPath, command));
+    }
+    const services = createServices(dir, config);
+    const runId = "SHELL-JOB-SUPERVISOR-TEST";
+    await services.control.createRun(runId, demoTask(runId, dir, config));
+    const context = { env, controlStore: services.control, runtime: { runId }, enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+    const sleepPath = quote(commandSources.get("sleep")!);
+    const shPath = quote(commandSources.get("sh")!);
+    const cases = [
+      { id: "trap", command: `trap - EXIT; ${sleepPath} 300 & child=$!; printf '%s' "$child" > child-trap.pid; exit 0` },
+      { id: "path", command: `export PATH=/nonexistent; ${sleepPath} 300 & child=$!; printf '%s' "$child" > child-path.pid; exit 0` },
+      { id: "exec", command: `exec ${shPath} -c ${quote(`${sleepPath} 300 & child=$!; printf '%s' "$child" > child-exec.pid; exit 0`)}` },
+    ];
+    for (const item of cases) {
+      const tool = createCodingTools().find((candidate) => candidate.name === "shell_background");
+      assert.ok(tool);
+      const startResult = await (tool as AgentHarnessTool<CodingResourceContext>).execute(`test-${item.id}`, { command: item.command, label: item.id }, new AbortController().signal, () => undefined, context);
+      const job = startResult.details as { jobId: string; pid: number; processGroupCreated: boolean };
+      assert.equal(job.processGroupCreated, false);
+      const pidPath = `.proofblade/jobs/${sha256(runId).slice(0, 24)}/0/${job.jobId}.pids`;
+      const childPidResult = await env.exec(`while [ ! -s child-${item.id}.pid ] || [ ! -s ${pidPath} ]; do ${sleepPath} 0.05; done; cat child-${item.id}.pid`);
+      assert.ok(childPidResult.ok);
+      const childPid = childPidResult.ok ? childPidResult.value.stdout.trim() : "";
+      assert.match(childPid, /^\d+$/);
+      const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
+      assert.equal((stop.details as { stopped: boolean }).stopped, true, `${item.id} descendant should be stopped`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+      const alive = await env.exec(`if kill -0 ${childPid} 2>/dev/null; then printf alive; else printf dead; fi`);
+      assert.ok(alive.ok);
+      assert.equal(alive.ok ? alive.value.stdout : "", "dead", `${item.id} descendant must not survive stop`);
+    }
+  } finally {
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("shell_job stop accepts a schema 1 process-group record during upgrade", async (t) => {
   if (process.platform === "win32") {
     t.skip("requires POSIX process groups");
