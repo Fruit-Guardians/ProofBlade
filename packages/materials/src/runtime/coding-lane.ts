@@ -724,7 +724,7 @@ export class PiCodingLane implements AgentLanePort {
     const coordinator = new RunCoordinator(this.controlStore);
     // Admit durable user/control signals at the idle safe point before the
     // next Provider request. The queue itself remains projected from events.
-    await coordinator.drainEvents(this.runId, "idle");
+    await coordinator.drainEventsAndComplete(this.runId, "idle");
     await this.eventIngress.enqueue(this.runId, {
       source: "user",
       kind: "user.message",
@@ -771,7 +771,7 @@ export class PiCodingLane implements AgentLanePort {
     } finally {
       // Apply urgent control signals only after the Provider/tool pair has
       // reached a terminal boundary; never rewrite a half-finished turn.
-      await coordinator.drainEvents(this.runId, "provider_terminal").catch(() => undefined);
+      await coordinator.drainEventsAndComplete(this.runId, "provider_terminal").catch(() => undefined);
       const injected = this.maintenance.injectedObservationItems;
       this.maintenance.injectedObservationItems = [];
       if (injected.length > 0) await acknowledgeObservationItems(this.controlStore, this.runId, injected).catch(() => undefined);

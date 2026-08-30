@@ -74,6 +74,22 @@ export class RunCoordinator {
     return drained;
   }
 
+  /**
+   * Consume ingress at a single-agent safe point. Non-user signals have
+   * already happened outside the lane; admitting them to the durable
+   * observation stream is the default lane action, so close their claim after
+   * admission. Multi-agent callers can keep using drainEvents() and apply
+   * their own policy before completing each returned action.
+   */
+  public async drainEventsAndComplete(runId: string, safePoint: SafePoint, maxEvents = 32): Promise<RunEventDrainResult> {
+    const drained = await this.drainEvents(runId, safePoint, maxEvents);
+    for (const action of drained.admitted) {
+      if (action.source === "user") continue;
+      await this.completeEvent(runId, action, "applied");
+    }
+    return drained;
+  }
+
   /** Complete a non-user ingress action after the owning lane applies it. */
   public async completeEvent(runId: string, action: RunEventDrainResult["admitted"][number], status: "applied" | "failed" | "coalesced" = "applied", reason?: string): Promise<void> {
     await this.ingress.complete(runId, action, status, reason);

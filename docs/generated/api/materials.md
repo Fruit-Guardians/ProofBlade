@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 159
-- Symbols: 1655
+- Symbols: 1656
 
 ## Public Symbols
 
@@ -1670,7 +1670,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2079](../../../packages/materials/src/control/control-store.ts:2079)
+- Source: [src/control/control-store.ts:2086](../../../packages/materials/src/control/control-store.ts:2086)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -8688,7 +8688,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reset operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CompetitionSandbox.resolveReplayPolicy
 - Kind: `method`
@@ -9059,7 +9059,7 @@
 ### ControlStore.#commitCommands
 - Kind: `method`
 - Signature: `(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>`
-- Source: [src/control/control-store.ts:552](../../../packages/materials/src/control/control-store.ts:552)
+- Source: [src/control/control-store.ts:559](../../../packages/materials/src/control/control-store.ts:559)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #commit commands operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9067,7 +9067,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:644](../../../packages/materials/src/control/control-store.ts:644)
+- Source: [src/control/control-store.ts:651](../../../packages/materials/src/control/control-store.ts:651)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9075,7 +9075,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:678](../../../packages/materials/src/control/control-store.ts:678)
+- Source: [src/control/control-store.ts:685](../../../packages/materials/src/control/control-store.ts:685)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9083,7 +9083,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:659](../../../packages/materials/src/control/control-store.ts:659)
+- Source: [src/control/control-store.ts:666](../../../packages/materials/src/control/control-store.ts:666)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9091,7 +9091,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:621](../../../packages/materials/src/control/control-store.ts:621)
+- Source: [src/control/control-store.ts:628](../../../packages/materials/src/control/control-store.ts:628)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9099,7 +9099,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:589](../../../packages/materials/src/control/control-store.ts:589)
+- Source: [src/control/control-store.ts:596](../../../packages/materials/src/control/control-store.ts:596)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9115,7 +9115,7 @@
 ### ControlStore.#withWrite
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:547](../../../packages/materials/src/control/control-store.ts:547)
+- Source: [src/control/control-store.ts:554](../../../packages/materials/src/control/control-store.ts:554)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #with write operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9123,7 +9123,7 @@
 ### ControlStore.acknowledgeObservations
 - Kind: `method`
 - Signature: `(runId: string, observationIds: readonly string[], lane?: Lane): Promise<string[]>`
-- Source: [src/control/control-store.ts:409](../../../packages/materials/src/control/control-store.ts:409)
+- Source: [src/control/control-store.ts:416](../../../packages/materials/src/control/control-store.ts:416)
 - Export: `@proofblade/materials`
 - Summary: Atomically acknowledge model-visible observations. Queue state is derived
 - Summary source: `tsdoc`
@@ -9131,7 +9131,7 @@
 ### ControlStore.append
 - Kind: `method`
 - Signature: `(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:491](../../../packages/materials/src/control/control-store.ts:491)
+- Source: [src/control/control-store.ts:498](../../../packages/materials/src/control/control-store.ts:498)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: append operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9140,7 +9140,7 @@
 ### ControlStore.appendIngressReceived
 - Kind: `method`
 - Signature: `(runId: string, input: { envelope: RunEventEnvelope; payload?: Record<string, unknown>; }): Promise<RunEventEnvelope>`
-- Source: [src/control/control-store.ts:372](../../../packages/materials/src/control/control-store.ts:372)
+- Source: [src/control/control-store.ts:379](../../../packages/materials/src/control/control-store.ts:379)
 - Export: `@proofblade/materials`
 - Summary: Append one received ingress event with idempotency checked inside the Run
 - Summary source: `tsdoc`
@@ -9182,7 +9182,7 @@
 ### ControlStore.dispatch
 - Kind: `method`
 - Signature: `(runId: string, command: DomainCommand): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:450](../../../packages/materials/src/control/control-store.ts:450)
+- Source: [src/control/control-store.ts:457](../../../packages/materials/src/control/control-store.ts:457)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9191,7 +9191,7 @@
 ### ControlStore.dispatchBatch
 - Kind: `method`
 - Signature: `(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:454](../../../packages/materials/src/control/control-store.ts:454)
+- Source: [src/control/control-store.ts:461](../../../packages/materials/src/control/control-store.ts:461)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch batch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9200,7 +9200,7 @@
 ### ControlStore.dispatchBindingTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>`
-- Source: [src/control/control-store.ts:479](../../../packages/materials/src/control/control-store.ts:479)
+- Source: [src/control/control-store.ts:486](../../../packages/materials/src/control/control-store.ts:486)
 - Export: `@proofblade/materials`
 - Summary: Commit the final Control Store fence for a broker-owned session binding.
 - Summary source: `tsdoc`
@@ -9209,7 +9209,7 @@
 ### ControlStore.dispatchTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>`
-- Source: [src/control/control-store.ts:462](../../../packages/materials/src/control/control-store.ts:462)
+- Source: [src/control/control-store.ts:469](../../../packages/materials/src/control/control-store.ts:469)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch transaction operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9227,7 +9227,7 @@
 ### ControlStore.reconcileProjection
 - Kind: `method`
 - Signature: `(runId: string): Promise<{ repaired: boolean; replayHash: string; }>`
-- Source: [src/control/control-store.ts:526](../../../packages/materials/src/control/control-store.ts:526)
+- Source: [src/control/control-store.ts:533](../../../packages/materials/src/control/control-store.ts:533)
 - Export: `@proofblade/materials`
 - Summary: Rebuild the materialized projection after a process interruption. The
 - Summary source: `tsdoc`
@@ -9245,7 +9245,7 @@
 ### ControlStore.runHash
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/control/control-store.ts:515](../../../packages/materials/src/control/control-store.ts:515)
+- Source: [src/control/control-store.ts:522](../../../packages/materials/src/control/control-store.ts:522)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run hash operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9263,7 +9263,7 @@
 ### ControlStore.waitForEvents
 - Kind: `method`
 - Signature: `(runId: string, afterSeq: number, timeoutMs?: number): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:400](../../../packages/materials/src/control/control-store.ts:400)
+- Source: [src/control/control-store.ts:407](../../../packages/materials/src/control/control-store.ts:407)
 - Export: `@proofblade/materials`
 - Summary: Wait for a durable event so long-running tools do not replay the full Run in a polling loop.
 - Summary source: `tsdoc`
@@ -9271,7 +9271,7 @@
 ### ControlStore.withConsolidationLock
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: () => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:446](../../../packages/materials/src/control/control-store.ts:446)
+- Source: [src/control/control-store.ts:453](../../../packages/materials/src/control/control-store.ts:453)
 - Export: `@proofblade/materials`
 - Summary: Serialize slow, replay-safe maintenance operations for one Run.
 - Summary source: `tsdoc`
@@ -10269,7 +10269,7 @@
 ### RunCoordinator.block
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:135](../../../packages/materials/src/orchestration/run-coordinator.ts:135)
+- Source: [src/orchestration/run-coordinator.ts:151](../../../packages/materials/src/orchestration/run-coordinator.ts:151)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: block operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10278,7 +10278,7 @@
 ### RunCoordinator.blockAndQueue
 - Kind: `method`
 - Signature: `(runId: string, task: TaskContract, workItemId: string | undefined, reason: string, category?: PrimaryFailureCategory): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:139](../../../packages/materials/src/orchestration/run-coordinator.ts:139)
+- Source: [src/orchestration/run-coordinator.ts:155](../../../packages/materials/src/orchestration/run-coordinator.ts:155)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: block and queue operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10287,7 +10287,7 @@
 ### RunCoordinator.claim
 - Kind: `method`
 - Signature: `(runId: string, task: TaskContract, turn: number, intent?: SchedulerIntent): Promise<WorkItem>`
-- Source: [src/orchestration/run-coordinator.ts:123](../../../packages/materials/src/orchestration/run-coordinator.ts:123)
+- Source: [src/orchestration/run-coordinator.ts:139](../../../packages/materials/src/orchestration/run-coordinator.ts:139)
 - Export: `@proofblade/materials`
 - Summary: Claim one durable executor WorkItem for a model turn.
 - Summary source: `tsdoc`
@@ -10296,7 +10296,7 @@
 ### RunCoordinator.completeEvent
 - Kind: `method`
 - Signature: `(runId: string, action: RunEventDrainResult["admitted"][number], status?: "applied" | "failed" | "coalesced", reason?: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:78](../../../packages/materials/src/orchestration/run-coordinator.ts:78)
+- Source: [src/orchestration/run-coordinator.ts:94](../../../packages/materials/src/orchestration/run-coordinator.ts:94)
 - Export: `@proofblade/materials`
 - Summary: Complete a non-user ingress action after the owning lane applies it.
 - Summary source: `tsdoc`
@@ -10304,7 +10304,7 @@
 ### RunCoordinator.domainPhaseForTurn
 - Kind: `method`
 - Signature: `(turn: number): DomainPhase`
-- Source: [src/orchestration/run-coordinator.ts:108](../../../packages/materials/src/orchestration/run-coordinator.ts:108)
+- Source: [src/orchestration/run-coordinator.ts:124](../../../packages/materials/src/orchestration/run-coordinator.ts:124)
 - Export: `@proofblade/materials`
 - Summary: Select the durable investigation phase for a bounded model turn.
 - Summary source: `tsdoc`
@@ -10315,6 +10315,15 @@
 - Source: [src/orchestration/run-coordinator.ts:60](../../../packages/materials/src/orchestration/run-coordinator.ts:60)
 - Export: `@proofblade/materials`
 - Summary: Consume a bounded batch at a safe point. User control events are applied
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/event-ingress-scope.test.ts`
+
+### RunCoordinator.drainEventsAndComplete
+- Kind: `method`
+- Signature: `(runId: string, safePoint: SafePoint, maxEvents?: number): Promise<RunEventDrainResult>`
+- Source: [src/orchestration/run-coordinator.ts:84](../../../packages/materials/src/orchestration/run-coordinator.ts:84)
+- Export: `@proofblade/materials`
+- Summary: Consume ingress at a single-agent safe point. Non-user signals have
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/event-ingress-scope.test.ts`
 
@@ -10330,7 +10339,7 @@
 ### RunCoordinator.fail
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:131](../../../packages/materials/src/orchestration/run-coordinator.ts:131)
+- Source: [src/orchestration/run-coordinator.ts:147](../../../packages/materials/src/orchestration/run-coordinator.ts:147)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fail operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10339,7 +10348,7 @@
 ### RunCoordinator.finishAccepted
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, completionId: string, reason: string): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:164](../../../packages/materials/src/orchestration/run-coordinator.ts:164)
+- Source: [src/orchestration/run-coordinator.ts:180](../../../packages/materials/src/orchestration/run-coordinator.ts:180)
 - Export: `@proofblade/materials`
 - Summary: Commit an already verifier-accepted completion.  The WorkItem and domain
 - Summary source: `tsdoc`
@@ -10348,7 +10357,7 @@
 ### RunCoordinator.moveToPhase
 - Kind: `method`
 - Signature: `(runId: string, phase: Phase): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:100](../../../packages/materials/src/orchestration/run-coordinator.ts:100)
+- Source: [src/orchestration/run-coordinator.ts:116](../../../packages/materials/src/orchestration/run-coordinator.ts:116)
 - Export: `@proofblade/materials`
 - Summary: Advance the generic Run phase through the legal transition path.
 - Summary source: `tsdoc`
@@ -10356,7 +10365,7 @@
 ### RunCoordinator.recordToolPreparation
 - Kind: `method`
 - Signature: `(runId: string, preparation: RunToolPreparation): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:116](../../../packages/materials/src/orchestration/run-coordinator.ts:116)
+- Source: [src/orchestration/run-coordinator.ts:132](../../../packages/materials/src/orchestration/run-coordinator.ts:132)
 - Export: `@proofblade/materials`
 - Summary: Persist the bounded tool readiness snapshot before a model turn.
 - Summary source: `tsdoc`
@@ -10364,7 +10373,7 @@
 ### RunCoordinator.setDomainPhase
 - Kind: `method`
 - Signature: `(runId: string, domainPhase: DomainPhase): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:83](../../../packages/materials/src/orchestration/run-coordinator.ts:83)
+- Source: [src/orchestration/run-coordinator.ts:99](../../../packages/materials/src/orchestration/run-coordinator.ts:99)
 - Export: `@proofblade/materials`
 - Summary: Move the durable competition projection, tolerating an idempotent race.
 - Summary source: `tsdoc`
@@ -10373,7 +10382,7 @@
 ### RunCoordinator.settle
 - Kind: `method`
 - Signature: `(runId: string, workItemId: string | undefined, progressed: boolean, evidenceIds?: string[], artifactIds?: string[]): Promise<void>`
-- Source: [src/orchestration/run-coordinator.ts:127](../../../packages/materials/src/orchestration/run-coordinator.ts:127)
+- Source: [src/orchestration/run-coordinator.ts:143](../../../packages/materials/src/orchestration/run-coordinator.ts:143)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: settle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10382,7 +10391,7 @@
 ### RunCoordinator.verifyCompletion
 - Kind: `method`
 - Signature: `(runId: string, fixture: FixtureRef, completionId: string, signal?: AbortSignal): Promise<VerificationOutcome>`
-- Source: [src/orchestration/run-coordinator.ts:147](../../../packages/materials/src/orchestration/run-coordinator.ts:147)
+- Source: [src/orchestration/run-coordinator.ts:163](../../../packages/materials/src/orchestration/run-coordinator.ts:163)
 - Export: `@proofblade/materials`
 - Summary: Start the reproduction phase and run the independent verifier.  A model
 - Summary source: `tsdoc`
@@ -11567,7 +11576,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reset operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### LocalFixtureSandbox.resolveReplayPolicy
 - Kind: `method`

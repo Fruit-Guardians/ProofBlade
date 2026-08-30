@@ -216,7 +216,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 479,
+          "line": 486,
           "summary": "Commit the final Control Store fence for a broker-owned session binding."
         },
         {
@@ -226,7 +226,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 462,
+          "line": 469,
           "summary": "Inferred summary: dispatch transaction operation used to perform a durable write."
         }
       ],

@@ -26,6 +26,7 @@ import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
@@ -633,7 +634,7 @@ test("durable CTF task classification enables challenge guards without prompt ke
 });
 
 test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
-  const dir = await mkdtemp(join(process.cwd(), "shell-bg-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-shell-bg-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
   const config = {
     schemaVersion: 1,
@@ -702,8 +703,11 @@ test("shell_background returns immediately and shell_job polls then stops the re
     const listed = (await executeTool("shell_job", { operation: "list" }, context)).details as { jobs: string[] };
     assert.ok(listed.jobs.some((entry) => entry.includes(job.jobId)), "the job log must be listable");
   } finally {
-    await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 });
 
@@ -830,7 +834,7 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
 });
 
 test("bash anchors an artifact only when output was actually withheld", async (t) => {
-  const dir = await mkdtemp(join(process.cwd(), "anchor-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-anchor-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
   try {
     if (!(await hasWorkingBash(env))) {
@@ -870,8 +874,11 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     assert.match(withheldText, /do not re-run the command/);
     assert.equal(archived.length, 2);
   } finally {
-    await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    try {
+      await env.cleanup();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 });
 

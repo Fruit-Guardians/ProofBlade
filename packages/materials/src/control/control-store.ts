@@ -352,12 +352,19 @@ export class ControlStore {
       }
       const leaseExpiresAt = String(processed?.payload?.leaseExpiresAt ?? "");
       if (!Number.isFinite(Date.parse(leaseExpiresAt)) || Date.parse(leaseExpiresAt) <= Date.now()) throw new Error(`Ingress ${input.ingressId} claim lease expired`);
+      const completionGeneration = received.envelope.generation;
+      const currentGeneration = before.generation;
+      const staleGeneration = completionGeneration !== currentGeneration;
+      const completionStatus = staleGeneration ? "failed" : input.status;
+      const completionReason = staleGeneration
+        ? `Ingress generation ${completionGeneration} is stale; current Run generation is ${currentGeneration}`
+        : input.reason;
       const materialized = makeEvent(runId, before.lastSeq + 1, "event_ingress_processed", "orchestrator", "main", {
         ingressId: input.ingressId,
-        status: input.status,
+        status: completionStatus,
         safePoint: input.safePoint ?? String(processed?.payload?.safePoint ?? "unknown"),
-        ...(input.reason ? { reason: input.reason } : {}),
-      }, received.correlationId, { ...received.envelope, status: input.status });
+        ...(completionReason ? { reason: completionReason } : {}),
+      }, received.correlationId, { ...received.envelope, status: completionStatus });
       const after = reduce(before, materialized);
       await writer.append([materialized], this.#authoritySecret);
       await writer.saveProjection(after, this.#authoritySecret);

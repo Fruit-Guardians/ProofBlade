@@ -163,19 +163,62 @@ test("ingress claims are durable leases and only become applied after completion
     const services = createServices(root, config);
     const runId = "INGRESS-LEASE-001";
     await services.control.createRun(runId, demoTask(runId, root, config));
-    const ingress = new RunEventIngress(services.control, { leaseMs: 50 });
+    const ingress = new RunEventIngress(services.control, { leaseMs: 500 });
     const envelope = await ingress.enqueue(runId, { source: "user", kind: "user.pause", correlationId: "pause-lease" });
     const first = await ingress.drain(runId, "user_cancel", 8);
     assert.equal(first.admitted[0]?.ingressId, envelope.id);
     assert.equal((await services.control.events(runId)).at(-1)?.payload?.status, "claimed");
     assert.deepEqual((await ingress.drain(runId, "user_cancel", 8)).admitted, []);
-    await new Promise((resolve) => setTimeout(resolve, 70));
+    await new Promise((resolve) => setTimeout(resolve, 600));
     const second = await ingress.drain(runId, "user_cancel", 8);
     assert.equal(second.admitted[0]?.ingressId, envelope.id);
     await assert.rejects(() => ingress.complete(runId, first.admitted[0]!, "applied"), /lease expired|owned by another worker/);
     await ingress.complete(runId, second.admitted[0]!, "applied");
     const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id);
     assert.deepEqual(processed.map((event) => event.payload?.status), ["claimed", "claimed", "applied"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ingress completion fences a claim when fixture reset advances the generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-generation-race-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-GENERATION-RACE-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const ingress = new RunEventIngress(services.control);
+    await ingress.enqueue(runId, { source: "job", kind: "job.finished", correlationId: "job-generation-race", payload: { jobId: "job-1" } });
+    const drained = await ingress.drain(runId, "job_safe_point");
+    const action = drained.admitted[0]!;
+    await services.fixtureControl.reset(runId, 1);
+
+    await ingress.complete(runId, action, "applied");
+
+    const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === action.ingressId);
+    assert.deepEqual(processed.map((event) => event.payload?.status), ["claimed", "failed"]);
+    assert.match(String(processed.at(-1)?.payload?.reason), /generation 0 is stale|current Run generation is 1/);
+    assert.equal((await services.control.snapshot(runId)).generation, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("single-agent coordinator completes admitted non-user ingress actions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ingress-default-consumer-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "INGRESS-DEFAULT-CONSUMER-001";
+    await services.control.createRun(runId, demoTask(runId, root, config));
+    const coordinator = new RunCoordinator(services.control);
+    const ingress = new RunEventIngress(services.control);
+    const envelope = await ingress.enqueue(runId, { source: "job", kind: "job.output", correlationId: "job-default-consumer", payload: { cursor: 1 } });
+
+    const drained = await coordinator.drainEventsAndComplete(runId, "job_safe_point");
+    assert.deepEqual(drained.admitted.map((action) => action.ingressId), [envelope.id]);
+    const processed = (await services.control.events(runId)).filter((event) => event.type === "event_ingress_processed" && event.payload?.ingressId === envelope.id);
+    assert.deepEqual(processed.map((event) => event.payload?.status), ["claimed", "applied"]);
+    assert.deepEqual((await coordinator.drainEventsAndComplete(runId, "job_safe_point")).admitted, []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
