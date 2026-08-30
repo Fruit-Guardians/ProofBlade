@@ -34,6 +34,8 @@ import {
   AblationExperimentStore,
   preflightAblationExperiment,
   validateAblationExperiment,
+  AblationRunLedger,
+  loadRealEvaluationCorpus,
   LocalHoldoutEvaluationRunner,
   anonymizeRunReplay,
   anonymizeEvaluationSummary,
@@ -221,6 +223,20 @@ async function main(): Promise<void> {
         const result = await preflightAblationExperiment(experiment, config.modelProfiles.executor, { probe: rest.includes("--probe") });
         print(result);
         if (!result.ready) process.exitCode = 1;
+        break;
+      }
+      if (action === "init") {
+        const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
+        const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
+        const ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
+        print({ experimentId: experiment.experimentId, ledgerPath, summary: ledger.summary() });
+        break;
+      }
+      if (action === "status" || action === "resume") {
+        const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
+        const ledger = await AblationRunLedger.load(ledgerPath);
+        if (action === "resume") await ledger.markInterrupted();
+        print({ experimentId: experiment.experimentId, ...(action === "resume" ? { recovered: true } : {}), next: ledger.next(), summary: ledger.summary() });
         break;
       }
       throw new Error("ablation action must be list, create, or preflight");
@@ -723,7 +739,7 @@ function helpText(): string {
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--run-prefix ID] [--min-success-rate 0..1] [--enforce-gate]",
-    "  ablation list|create <experiment.json>|preflight <experiment-id> [--probe]",
+    "  ablation list|create <experiment.json>|preflight|init|status|resume <experiment-id> [--probe]",
     "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
     "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
