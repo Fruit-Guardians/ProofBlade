@@ -122,6 +122,7 @@ export * from "./evaluation/ablation.js";
 export * from "./evaluation/ablation-policy.js";
 export * from "./evaluation/information-value.js";
 export * from "./evaluation/ablation-ledger.js";
+export * from "./evaluation/ablation-report.js";
 export * from "./evaluation/anonymous-replay.js";
 export * from "./evaluation/local-holdout.js";
 export * from "./evaluation/runtime-scenario-evaluator.js";
