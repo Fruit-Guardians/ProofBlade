@@ -100,6 +100,7 @@ test("experiment store persists immutable snapshots and rejects tampering", asyn
     assert.match(path, /AB-20260831-001\.json$/);
     assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
     assert.equal((await store.load(experiment.experimentId)).experimentFingerprint, experiment.experimentFingerprint);
+    await assert.rejects(() => store.save(experiment), /already exists/);
     const original = await readFile(path, "utf8");
     await (await import("node:fs/promises")).writeFile(path, original.replace("Receipt comparison", "tampered"));
     await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);
