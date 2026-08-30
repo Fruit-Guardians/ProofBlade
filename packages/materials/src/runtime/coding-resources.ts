@@ -841,12 +841,13 @@ function buildShellJobLauncher(reservation: ShellJobRecord, paths: ShellJobPaths
     `snapshot_pids() { now=$("$date_bin" +%s 2>/dev/null) || return 1; temporary="$pid_file.tmp.$$"; if [ -f "$pid_file" ]; then "$cat_bin" "$pid_file" > "$temporary" || return 1; else : > "$temporary" || return 1; fi; if ! "$grep_bin" -Fq "$$:" "$temporary"; then printf '%s:%s\\n' "$$" "$(( now * 1000 ))" >> "$temporary" || return 1; fi; for target in $(collect_descendants "$$"); do etimes=$("$ps_bin" -o etimes= -p "$target" 2>/dev/null | "$tr_bin" -d ' '); if [ -n "$etimes" ] && ! "$grep_bin" -Fq "$target:" "$temporary"; then printf '%s:%s\\n' "$target" "$(( (now - etimes) * 1000 ))" >> "$temporary" || return 1; fi; done; "$mv_bin" "$temporary" "$pid_file" || { "$rm_bin" -f "$temporary"; return 1; }; }`,
     `terminate_child_tree() { if [ -n "$child_pid" ]; then for target in $(collect_descendants "$child_pid"); do kill "$target" 2>/dev/null || true; done; kill "$child_pid" 2>/dev/null || true; fi; }`,
     `stop_supervisor() { terminate_child_tree; exit 143; }; trap terminate_child_tree EXIT; trap stop_supervisor HUP INT TERM`,
+    `supervisor_pid=$$; snapshot_loop() { while kill -0 "$supervisor_pid" 2>/dev/null; do snapshot_pids || exit 70; "$sleep_bin" 0.01; done; }; snapshot_loop & snapshot_pid=$!;`,
     `"$bash_bin" -c ${shellQuote(userCommand)} > ${logPath} 2>&1 & child_pid=$!;`,
     `snapshot_pids || { terminate_child_tree; exit 70; };`,
     `warmup=0; while [ "$warmup" -lt 100 ]; do if ! kill -0 "$child_pid" 2>/dev/null; then break; fi; snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.01; warmup=$(( warmup + 1 )); done;`,
     `while kill -0 "$child_pid" 2>/dev/null; do snapshot_pids || { terminate_child_tree; exit 70; }; "$sleep_bin" 0.1; done;`,
     `snapshot_pids || { terminate_child_tree; exit 70; };`,
-    `wait "$child_pid"; exit $?`,
+    `kill "$snapshot_pid" 2>/dev/null || true; wait "$snapshot_pid" 2>/dev/null || true; wait "$child_pid"; exit $?`,
   ].join("\n");
   return [
     `root=${rootPath}; record=${recordPath}; log=${logPath};`,
