@@ -178,6 +178,7 @@ proofblade eval-real <corpus.json> --allow-live --variant ID=config.json --varia
 proofblade ablation list
 proofblade ablation create <experiment.json>
 proofblade ablation preflight <experiment-id> [--probe]
+proofblade ablation run <experiment-id> --allow-live [--probe]
 proofblade ablation init <experiment-id>
 proofblade ablation status <experiment-id>
 proofblade ablation resume <experiment-id>
