@@ -86,7 +86,7 @@ function AblationCreateForm({ providers, busy, onCancel, onSubmit }: { providers
   const [name, setName] = useState("首个动作建议消融");
   const [question, setQuestion] = useState("首个动作的软建议是否提升无答案泄漏语料上的验证成功率？");
   const [hypothesis, setHypothesis] = useState("软建议应减少错误起步，同时不改变固定安全边界。");
-  const [corpus, setCorpus] = useState("fixtures/holdout/manifest.json");
+  const [corpus, setCorpus] = useState(".proofblade/evaluation/private-holdout/manifest.json");
   const [profileId, setProfileId] = useState(profile?.id ?? "");
   const selectedProfile = providers?.profiles.find((item) => item.id === profileId) ?? profile;
   const [model, setModel] = useState(selectedProfile?.model === "auto" ? "" : selectedProfile?.model ?? "");
