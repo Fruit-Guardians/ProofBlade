@@ -769,7 +769,7 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
   }
 });
 
-test("shell_job stop reaps a descendant after the fallback parent exits", async (t) => {
+test("shell_job stop reaps a descendant after the fallback user command exits", async (t) => {
   if (process.platform === "win32") {
     t.skip("requires POSIX process and parent-child semantics");
     return;
@@ -813,9 +813,9 @@ test("shell_job stop reaps a descendant after the fallback parent exits", async 
     const recordBeforeStop = JSON.parse(await readFile(recordPath, "utf8")) as { processGroupCreated: boolean; processGroupId?: number };
     assert.equal(recordBeforeStop.processGroupCreated, true);
     assert.ok(Number.isInteger(recordBeforeStop.processGroupId) && recordBeforeStop.processGroupId! > 0);
-    const parentAlive = await env.exec(`if kill -0 ${job.pid} 2>/dev/null; then printf alive; else printf dead; fi`);
-    assert.ok(parentAlive.ok);
-    assert.equal(parentAlive.ok ? parentAlive.value.stdout : "", "dead", "the fallback parent must be gone before stop uses its PID snapshot");
+    const supervisorAlive = await env.exec(`if kill -0 ${job.pid} 2>/dev/null; then printf alive; else printf dead; fi`);
+    assert.ok(supervisorAlive.ok);
+    assert.equal(supervisorAlive.ok ? supervisorAlive.value.stdout : "", "alive", "the fallback supervisor must remain to manage the user command's process group");
     const stop = await executeTool("shell_job", { operation: "stop", jobId: job.jobId }, context);
     assert.equal((stop.details as { stopped: boolean }).stopped, true);
     const record = JSON.parse(await readFile(recordPath, "utf8")) as { status: string };
