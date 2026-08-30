@@ -68,12 +68,12 @@
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+    "src/evaluation/real-model-evaluator.ts": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "f6f91f0958a305d32efd5c8208579d212ba7d895f7282f681948458cccda7c76",
+    "src/index.ts": "3578f37b057fb82ff91c1e3be22a7ef86ac7bc141c7066a8599c6aa5024c65e6",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
@@ -96,7 +96,7 @@
     "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+    "src/orchestration/single-agent-loop.ts": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -117,9 +117,9 @@
     "src/recovery/verification-recovery.ts": "289fc66f69229e149a1f292b0d3eed7d43bd81a46538bf236a4c6f76fda08224",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
-    "src/runtime/coding-lane.ts": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+    "src/runtime/coding-lane.ts": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
     "src/runtime/coding-resources.ts": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
-    "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
+    "src/runtime/coding-turn-projection.ts": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "7a20212a0c4051593022955c9dc1058d0794c18c7b616fa74ccc744872e9f0bb",
@@ -831,7 +831,8 @@
       "line": 45,
       "moduleHash": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
       "testRefs": [
-        "packages/materials/tests/ablation-policy.test.ts"
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -892,8 +893,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 275,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 281,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -1285,8 +1286,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 84,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 88,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -1577,7 +1578,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 78,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -2336,7 +2337,8 @@
       "moduleHash": "277b5cbfc1f025868a86c1adc76a914900682d8599bad26ae9f1374a0d9836f0",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
-        "packages/materials/tests/ablation.test.ts"
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -2435,8 +2437,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 15,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 17,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -4263,8 +4265,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 712,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 732,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -4279,8 +4281,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 104,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 109,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -5354,8 +5356,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1124,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1126,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5370,8 +5372,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1191,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1193,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5386,8 +5388,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 856,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 858,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -5403,8 +5405,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 946,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 948,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -5419,8 +5421,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1016,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1018,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5435,8 +5437,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1011,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1013,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5644,6 +5646,70 @@
       "line": 894,
       "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
       "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::function::attachCodingTurnGuards",
+      "name": "attachCodingTurnGuards",
+      "kind": "function",
+      "signature": "<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, progressBreaker: NoProgressToolBreaker | undefined, termination: CodingTurnTermination, resolveEffectPolicy?: ToolEffectPolicyResolver, failureStormBreaker?: ToolFailureStormBreaker, experimentBudgetBreaker?: ExperimentBudgetBreaker, toolBudget?: ToolCallBudget, firstActionBudget?: FirstActionBudget, ablationPolicy?: AblationPolicyBinding): () => void",
+      "summary": "Inferred summary: attach coding turn guards operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 66,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::attachRepeatedToolFailureBreaker",
+      "name": "attachRepeatedToolFailureBreaker",
+      "kind": "function",
+      "signature": "<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, termination: CodingTurnTermination): () => void",
+      "summary": "Inferred summary: attach repeated tool failure breaker operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 58,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::finalizeCodingTurn",
+      "name": "finalizeCodingTurn",
+      "kind": "function",
+      "signature": "(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<CodingClaimVerifier, \"project\">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>",
+      "summary": "Inferred summary: finalize coding turn operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 363,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::projectCodingAssistantText",
+      "name": "projectCodingAssistantText",
+      "kind": "function",
+      "signature": "(output: string, termination: CodingTurnTermination): string",
+      "summary": "Inferred summary: project coding assistant text operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 54,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::function::reconcileRuntimeConfig",
@@ -10629,8 +10695,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 19,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 21,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10643,8 +10709,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 208,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 214,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10657,8 +10723,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 154,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 159,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10671,8 +10737,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 53,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 58,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10685,8 +10751,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 26,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 31,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10699,8 +10765,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 62,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 67,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10713,8 +10779,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 76,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 81,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10727,8 +10793,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 255,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 261,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10741,8 +10807,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 200,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 206,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10755,8 +10821,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 191,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 197,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -10769,8 +10835,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 222,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 228,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -11809,8 +11875,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 27,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 28,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -11823,8 +11889,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 51,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 53,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -11837,8 +11903,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 74,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 78,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -12946,6 +13012,64 @@
       "module": "src/runtime/coding-resources.ts",
       "line": 130,
       "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPolicyBinding",
+      "name": "AblationPolicyBinding",
+      "kind": "interface",
+      "signature": "AblationPolicyBinding",
+      "summary": "Inferred summary: ablation policy binding type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 29,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::CodingTurnTermination",
+      "name": "CodingTurnTermination",
+      "kind": "interface",
+      "signature": "CodingTurnTermination",
+      "summary": "Inferred summary: coding turn termination type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 40,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::FirstActionBudget",
+      "name": "FirstActionBudget",
+      "kind": "interface",
+      "signature": "FirstActionBudget",
+      "summary": "Guard for the first challenge action. It is intentionally independent from",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 22,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ToolCallBudget",
+      "name": "ToolCallBudget",
+      "kind": "interface",
+      "signature": "ToolCallBudget",
+      "summary": "Inferred summary: tool call budget type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 12,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
       "testRefs": []
     },
     {
@@ -16207,6 +16331,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -17678,6 +17803,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -22452,8 +22578,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 278,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 284,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -24417,6 +24543,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -25780,8 +25907,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 93,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 97,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -27075,6 +27202,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -29444,8 +29572,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 783,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 785,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -29476,8 +29604,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 795,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 797,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -29543,8 +29671,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 787,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 789,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -29561,14 +29689,14 @@
       "id": "@proofblade/materials::method::PiCodingLane.create",
       "name": "PiCodingLane.create",
       "kind": "method",
-      "signature": "(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>",
+      "signature": "(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; ablationPolicy?: AblationPolicyBinding; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>",
       "summary": "Inferred summary: create operation used to perform a durable write.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 115,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -29659,8 +29787,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 791,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 793,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -29680,8 +29808,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 705,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 707,
+      "moduleHash": "ff10f438872f34127a1abf0ddcbd26efa32ff13361d4abd1281496b038342fe4",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -33386,6 +33514,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -33799,6 +33928,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -34237,6 +34367,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -37102,8 +37233,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 17,
-      "moduleHash": "183c7569345c82628cf1c8264e5c6701f5315a661d5b3822d1741e1618e46bf3",
+      "line": 19,
+      "moduleHash": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
       "testRefs": []
     },
     {
@@ -37400,8 +37531,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 49,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 51,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
@@ -37813,6 +37944,20 @@
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 12,
       "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CodingTurnTerminationReason",
+      "name": "CodingTurnTerminationReason",
+      "kind": "type",
+      "signature": "CodingTurnTerminationReason",
+      "summary": "Inferred summary: coding turn termination reason type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 10,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
       "testRefs": []
     },
     {
