@@ -6,6 +6,7 @@ import type { McpProjectRegistry } from "../mcp/registry.js";
 import { executeBinaryCapability, executeGdbBatchCapability, validateBinaryInput, type BinaryCapabilityInput, type GdbBatchCapabilityInput } from "./binary.js";
 import { executeFirmwareCapability, validateFirmwareInput, type FirmwareCapabilityInput } from "./firmware.js";
 import { createRizinAvailability, executeRizinCapability, normalizeFunctions, normalizeInstructions, normalizeXrefs, reverseOperation, validateReverseInput, withStagedVisibleBinary, type ReverseCapabilityInput, type ReverseOperation, type RizinCapabilityOptions } from "./reverse.js";
+import { createObjdumpAvailability, executeObjdumpDisassembly, type ObjdumpCapabilityOptions } from "./objdump.js";
 import type { McpBinaryReverseOperation, McpReverseOutput } from "../mcp/registry.js";
 
 export type CapabilityBackendKind = "bundled" | "local-process" | "mcp" | "provider-native";
@@ -304,6 +305,56 @@ export class RizinCapabilityBackend implements CapabilityBackend {
       replayPolicy: operation.replay,
       cwd: context.fixture.path,
       execute: async (signal) => await executeRizinCapability(reverse, request.input as ReverseCapabilityInput, context.fixture.path, this.availabilityState.executable!, this.availabilityState.runner, signal),
+    };
+  }
+}
+
+/** Portable read-only disassembly fallback for hosts that have objdump but no Rizin/decompiler. */
+export class ObjdumpCapabilityBackend implements CapabilityBackend {
+  public readonly id = "proofblade-objdump";
+  public readonly kind = "local-process" as const;
+  public readonly priority = 82;
+  private readonly availabilityState: ReturnType<typeof createObjdumpAvailability>;
+
+  public constructor(options: ObjdumpCapabilityOptions = {}) {
+    this.availabilityState = createObjdumpAvailability(options);
+  }
+
+  public status(): CapabilityBackendStatus {
+    return {
+      id: this.id,
+      kind: this.kind,
+      version: this.availabilityState.version,
+      priority: this.priority,
+      available: this.availabilityState.available,
+      ...(this.availabilityState.reason ? { reason: this.availabilityState.reason } : {}),
+    };
+  }
+
+  public handles(capabilityId: string, operation: string): boolean {
+    return capabilityId === "proofblade.binary" && operation === "disassemble";
+  }
+
+  public availability(_request: CapabilityBackendRequest): CapabilityBackendAvailability {
+    return { available: this.availabilityState.available, reason: this.availabilityState.reason };
+  }
+
+  public versionFor(_request: CapabilityBackendRequest): string { return this.availabilityState.version; }
+
+  public preparePersistence(request: CapabilityBackendRequest, operation: CapabilityOperationAtom): CapabilityBackendPersistence {
+    validateReverseInput("disassemble", request.input);
+    return { operation, input: structuredClone(request.input), argsRedacted: false };
+  }
+
+  public prepareExecution(request: CapabilityBackendRequest, operation: CapabilityOperationAtom, context: CapabilityBackendContext): CapabilityBackendExecution {
+    validateReverseInput("disassemble", request.input);
+    if (!this.availabilityState.executable) throw new Error("objdump executable is unavailable");
+    return {
+      operation: "objdump:disassemble",
+      args: structuredClone(request.input),
+      replayPolicy: operation.replay,
+      cwd: context.fixture.path,
+      execute: async (signal) => await executeObjdumpDisassembly(request.input as ReverseCapabilityInput, context.fixture.path, this.availabilityState.executable!, this.availabilityState.runner, signal),
     };
   }
 }

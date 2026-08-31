@@ -307,7 +307,7 @@ const manifests: CapabilityManifest[] = [
       },
       {
         name: "disassemble",
-        description: "Disassemble a bounded instruction window at a hexadecimal virtual address.",
+        description: "Disassemble a bounded instruction window at a hexadecimal virtual address using an available read-only reverse backend (Rizin, MCP, or local objdump fallback).",
         parameters: reverseDisassembleParameters,
         readOnly: true,
         sideEffect: "process",

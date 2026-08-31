@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
 import type { CapabilityOperationAtom } from "@proofblade/molecules";
-import { McpReverseCapabilityBackend, RizinCapabilityBackend, type CapabilityBackend } from "../src/capabilities/backend.js";
+import { McpReverseCapabilityBackend, ObjdumpCapabilityBackend, RizinCapabilityBackend, type CapabilityBackend } from "../src/capabilities/backend.js";
 import { createRizinAvailability } from "../src/capabilities/reverse.js";
 import { McpProjectRegistry } from "../src/mcp/registry.js";
 import type { RawEffectResult } from "../src/domain/types.js";
@@ -63,6 +63,36 @@ test("Rizin deep reverse Backend rejects unsafe addresses before execution", () 
   assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "bogus", input: { path: "sample.bin", address: "0x401000" } }, operation, contextFor("fixture")), /Unsupported reverse operation/);
   assert.equal(backend.handles("proofblade.binary", "functions"), true);
   assert.equal(backend.handles("proofblade.binary", "identify"), false);
+});
+
+test("objdump fallback exposes bounded structured instructions from a staged fixture", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-objdump-core-"));
+  const calls: string[][] = [];
+  try {
+    await writeFile(join(root, "sample.bin"), Buffer.from("synthetic binary"));
+    const backend = new ObjdumpCapabilityBackend({
+      executable: "objdump-test",
+      version: "2.44",
+      runner: async (_executable, args) => {
+        calls.push(args);
+        return result("\n0000000000401000 <main>:\n  401000:\t55                   \tpush   %rbp\n  401001:\t48 89 e5             \tmov    %rsp,%rbp\n  401004:\tc3                   \tret\n");
+      },
+    });
+    assert.deepEqual(backend.status(), { id: "proofblade-objdump", kind: "local-process", version: "objdump-2.44-adapter-1", priority: 82, available: true });
+    const output = await invoke(backend, "disassemble", { path: "sample.bin", address: "0x401000", maxInstructions: 2 }, contextFor(root));
+    assert.deepEqual(output, {
+      format: "objdump",
+      address: "0x401000",
+      instructions: [
+        { address: "0x401000", bytes: "55", mnemonic: "push", operands: "%rbp" },
+        { address: "0x401001", bytes: "48 89 e5", mnemonic: "mov", operands: "%rsp,%rbp" },
+      ],
+    });
+    assert.deepEqual(calls[0]?.slice(0, 4), ["-d", "--start-address=0x401000", "--stop-address=0x401030", "--"]);
+    assert.throws(() => backend.prepareExecution({ capabilityId: "proofblade.binary", operation: "disassemble", input: { path: "sample.bin", address: "0x401000; quit" } }, operationFor("disassemble"), contextFor(root)), /hexadecimal address/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("Rizin availability resolves relative executable paths for tmpdir execution", () => {

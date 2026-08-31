@@ -10,7 +10,7 @@ import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
 import { snipText } from "@proofblade/molecules";
 import { CapabilityRegistry, ProofBladeCapabilityRouter, type CapabilityDiscoveryInput, type CapabilityInvocationResult } from "../capabilities/router.js";
 import { listBundledCapabilities } from "../capabilities/catalog.js";
-import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, FirmwareCapabilityBackend, McpCapabilityBackend, McpReverseCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
+import { BinaryCapabilityBackend, BundledCapabilityBackend, CapabilityBackendResolver, FirmwareCapabilityBackend, McpCapabilityBackend, McpReverseCapabilityBackend, ObjdumpCapabilityBackend, RizinCapabilityBackend } from "../capabilities/backend.js";
 import { BackgroundJobRunner, type BackgroundJobStartInput, type JobMonitorInput, type JobMonitorResult, type JobOutput } from "../jobs/background-runner.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
@@ -51,6 +51,7 @@ export class ProofBladeToolRuntime {
     const registry = new CapabilityRegistry([...listBundledCapabilities(), ...(includeMcp ? this.mcp.capabilityManifests() : [])]);
     const backends = new CapabilityBackendResolver([
       new RizinCapabilityBackend(),
+      new ObjdumpCapabilityBackend(),
       ...(includeMcp ? [new McpReverseCapabilityBackend(this.mcp)] : []),
       new BinaryCapabilityBackend(),
       new FirmwareCapabilityBackend(),
