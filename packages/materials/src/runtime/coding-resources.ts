@@ -1686,7 +1686,7 @@ function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<Cod
  * reaches the model. Passing the whole journal receipt through toolResult made
  * function lists both escaped and likely to be truncated before `main`.
  */
-function runtimeMcpToolResult(result: Record<string, unknown>): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+function runtimeMcpToolResult(result: { output?: unknown; stderr?: unknown; exitCode?: unknown }): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
   const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output ?? {});
   const stderr = typeof result.stderr === "string" ? result.stderr : "";
   const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
