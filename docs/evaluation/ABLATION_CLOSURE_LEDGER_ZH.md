@@ -173,3 +173,26 @@
 - 首错归因：040--042 连续排除了“错误不可见”和“参数名未知”。可达路径仍被卡在通用 `capability` 的多阶段、嵌套 union schema（search -> describe/invoke）上；这是 Harness 工具人体工学缺陷，而非模型权限、IDALIB 环境、Evidence policy 或应以门禁压制的探索行为。042 中 advice 的更多调用是未采用回退后的随机循环，不是 curation 的负效应证据。
 - 修复：新增一等只读 `binary_disassemble { path, address, maxInstructions? }`。它固定映射到 `proofblade.binary.disassemble`，仍穿过同一 runtime 解析、fixture-relative scope 校验、effect journal、Experiment gate、成本与取消边界；Rizin/MCP/objdump 后端选择保持原逻辑。它只消除嵌套代理表达摩擦，不授予新权限，也不删除 bash 或 generic capability。
 - 043 验收：以新不可变快照固定 042 条件，记录 `binary_disassemble` 真实调用、后端、非错误指令 observation、从入口到 input-check/reveal 的证据链、候选和 `verify_claim`。若仍不调用一等工具，下一首错应记录为模型工具选择；若调用但无代码，才排查后端/输出质量。该运行仍是 F02 能力恢复 smoke，不推断 curation 因果。
+
+### AB-TERRA-OBJDUMP-MAGIC-044：Provider 连接失败污染 F02 smoke（已完成，诊断无效）
+
+- 固定条件：`magic` 二进制、AIHub `gpt-5.6-terra` / Responses / max、同一 Verifier、`maxTurns=5`、每条轨迹 `$0.50`；`direct-disassembly-baseline` 与 `direct-disassembly-curation-advice` 只用于获得两条独立轨迹，不能解释为 curation 对照。快照指纹为 `93f569f6efc0a13c7b06183e700a928fd65598567b2e975874253339255367db`。
+- 观察：两条 pairing 都显示 `failed` / `EXHAUSTED`，均未调用 `binary_disassemble` 或 `verify_claim`。baseline 有 8 次 Provider start / 4 次响应，advice 有 21 次 start / 17 次响应；两条轨迹各自都发生了真实的 `Connection error.`，且没有产生可供 F02 判断的结构化 objdump observation。
+- 首错归因：这不是“模型没有采用一等手柄”的有效证据，也不是 curation 比较。`SingleAgentCtfLoop` 在 Provider 已完成自身重试并返回 `stopReason=error` 后仍继续回合，最终把传输错误持久化为 `budget_exhausted`。这既污染失败分类，也会诱导错误的 Harness 修复方向。
+- 修复：新增 durable `provider_error` failure category，并让单 Agent Loop 在非上下文溢出的 terminal Provider error 后立即失败，保存 Provider 原始消息。`provider_error` 的 policy 允许在新 Run 中重试，但同一 Run 不会继续消耗模型回合；最小回归断言 `maxTurns=3` 时只 prompt 一次、终态 `FAILED`、类别为 `provider_error`、原因为 `Connection error.`。
+- 045 验收：使用新的 immutable 快照和相同 F02 条件复跑。若再发生 Provider 错误，它必须被标为 `provider_error`，且该 pairing 从 F02 分析排除；只有无此污染的 pairing 才记录 `binary_disassemble` 的调用、后端、代码 observation、候选及 verifier 路径。无论结果如何，下一步须针对首个可证伪边修复，不能只报告成功率。
+
+### AB-TERRA-OBJDUMP-MAGIC-045：一等手柄可达，归因修复通过，预算阻断后续回合（已完成，机制 smoke）
+
+- 固定条件：`magic`、AIHub `gpt-5.6-terra` / Responses / max、`maxTurns=5`、总预算 `$0.50`，快照指纹 `e793d63326f39745e0cb79bafc67bc651ff24d7bb8e1d160eeabc640aac92bfd`。前台命令观察窗口曾中断首批进程，按 ledger 协议标记 unknown 后，以同一不可变快照重新完整执行；最终 R2 配对是唯一纳入分析的运行。
+- baseline：11 次真实 Provider 响应、2 次 Provider 重试、12 次工具调用（bash 4、metadata 3、entry/list/decompile 各 1），随后 `Connection error.`。Run 立即终态 `FAILED/provider_error`，不再错误标记为 `EXHAUSTED/budget_exhausted`。这验证了 F13 的 durable 归因修复；该 pairing 排除出 F02 行为结论。
+- advice：5 次真实 Provider 响应、4 次重试、7 次工具调用；在 `decompile_function` 的 Qt/PySide6 失败后，实际调用一次 `binary_disassemble`。该调用选中 `proofblade-objdump`，`exitCode=0`，返回非错误的 128 条结构化指令，其中包含 16 字节校验、`xor $0x5a`、目标常量比较和 reveal 缓冲构造。F02 的“模型可找到并调用一等只读手柄、后端返回代码事实”接受条件成立。
+- 未完成边：这不是 end-to-end solve。代码 observation 返回后，下一 Provider 请求被保守预算拒绝：总 `$0.50` 被公平分配为每 pairing `$0.25`，该运行已花 `$0.026272`，下一请求的 reservation 为 `$0.272032`。因此没有让模型消费代码、生成候选或调用 `verify_claim`。这不是工具错误，也不是 curation 成败。
+- 修复与 046：Provider budget refusal 现在给出 `Reason / No Provider request was sent / Next` 及所需最小可用预算。046 固定其它条件，仅将总预算提高到 `$1.00`，以便每 pairing 获得 `$0.50`，测试代码观察后的推理和 verifier 路径；仍不从这两个采样轨迹推断 curation 效果。
+
+### AB-TERRA-OBJDUMP-MAGIC-046：提高预算后仍受 Provider 连接错误污染（已完成，F13 真实回归）
+
+- 固定条件：只将 045 的总预算由 `$0.50` 改为 `$1.00`，使两个 pairing 各有 `$0.50`；语料、Terra Responses/max、Verifier、五回合、安全边界和变体均未变化。快照指纹 `ae3f4070b5e105dd5bb4bc41ba073d205f6298cc9e1119100a51f2b840a3e45b`，预检和 `/models` probe 为 200。
+- 结果：baseline 在 4 次真实响应、6 次工具调用后出现 `Connection error.`；advice 在 15 次真实响应、17 次工具调用后也出现 `Connection error.`。二者都立即持久化为 `FAILED/provider_error`，未出现 `budget_exhausted`、候选或 `verify_claim`。这是 044 修复在真实 Responses 流上的第二次验证。
+- F02 边界：baseline 在基础 metadata/entry/list 观察前中断，advice 仅执行一次 generic `capability` 与重复 metadata/entry/list/Evidence，未调用 `binary_disassemble`。因此 046 既不能否定 045 的一等手柄成功 observation，也不能提供 curation、模型工具选择或端到端成功率结论；两条都从 F02 分母排除。
+- 下一步：047 先要求同一 profile 的连续 Responses 健康检查，再以新的 immutable 快照固定 046 的预算重跑。只有不存在 Provider 污染时，才检验 `binary_disassemble` 后的模型响应、候选和 verifier 路径；如果模型在稳定轨迹仍不调用该手柄，首错才转为工具选择/提示投影，而非权限或硬门禁。
