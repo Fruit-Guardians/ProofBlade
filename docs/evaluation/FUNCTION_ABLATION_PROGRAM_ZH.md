@@ -1,5 +1,7 @@
 # ProofBlade 功能消融与闭环评测计划
 
+完整的组件清单、每项功能的实现入口、固定边界、执行批次和成功/失败归因模板见 [`ABLATION_FUNCTION_CATALOG_ZH.md`](./ABLATION_FUNCTION_CATALOG_ZH.md)。本文保留可消融 Harness 因子的紧凑矩阵。
+
 状态：执行中。本文是现有 Harness 功能的评测登记册和运行顺序，不以单次成功率代替结论。原始事实、每次真实运行、首错和修复结果追加到 `ABLATION_CLOSURE_LEDGER_ZH.md`。
 
 ## 1. 评测边界

@@ -43,6 +43,14 @@
 
 ## 4. 已登记案例
 
+### EVAL-CONTINUE-20260901：provider-free baseline-v4 全功能控制基线（已完成）
+
+- 固定条件：当前 Git revision `64dcbf6`，六个内置 Web/Reverse fixture、每题 3 次、`maxTurns=1`，运行时场景目录保持当前 19 项；run prefix 为 `EVAL-CONTINUE-20260901`，报告哈希 `283f0bd4e8c16e45dcdd8b06b8f9474e3d0a782e3a0b4cdab86849599694a57`。
+- 结果：18/18 Fixture 和 19/19 runtime scenario 成功，总计 37/37，gate 通过。18 个 Fixture 全部 `SUCCEEDED/report`，Evidence-backed 18/18，Replay parity 18/18，candidate leak 0，Fact-Evidence coverage 1.0。
+- 行为解释：deterministic lane 每例完成 `inspect -> propose_hypothesis -> submit_candidate -> hidden reproduction`，有效动作比为 1.0；运行时场景分别验证 cache/context、三种 convergence breaker、Evidence 去重/背压、暂停重放、Verifier authority、Lease fencing、event ingress、Job observation queue 和五类 recovery。Provider requests、tokens、cost 均为 0，因此这条记录只证明控制平面和验证链可复现，不证明任何模型策略或 curation 收益。
+- 失败分析：本批无失败；这不是“所有功能都已证明有效”，而是为后续故障注入和模型消融建立无 Provider 污染的参照。若后续实验在同一 fixture 上失败，必须先对照本基线检查工具/schema、事件投影、预算、Provider telemetry 和 verifier 代次。
+- 后续：以此报告哈希作为 C0–C12 回归参照；F04 的 048 仍需独立 verifier-ready fixture 和 `manual`/`advice` 配对，不能把本控制基线当作认知因果证据。
+
 ### AB-TERRA-MAX-RESPONSES-027：过度证据整理与验证交接回归
 
 - 配置：AIHub `gpt-5.6-terra`，`openai-responses`，`thinkingLevel=max`；2 个 base64 control-plane fixture，两个策略变体，`maxTurns=4`。

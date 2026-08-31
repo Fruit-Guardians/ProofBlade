@@ -230,6 +230,8 @@ proofblade ablation report AB-20260831-001 --results runs/ablation-results.json 
 
 `--probe` 只访问 Provider 的模型元数据接口，不发送题目内容。API Key 只能通过 Provider Profile 或环境变量提供；实验快照、事件、Artifact、账本和报告只保存环境变量名及 `credentialPresent`，不会保存 Key 明文、Authorization Header 或候选答案。
 
+功能全目录、组件到消融批次的映射、执行顺序以及成功/失败归因和修复模板见 [`docs/evaluation/ABLATION_FUNCTION_CATALOG_ZH.md`](docs/evaluation/ABLATION_FUNCTION_CATALOG_ZH.md)。
+
 ## 分层结构
 
 ```text
