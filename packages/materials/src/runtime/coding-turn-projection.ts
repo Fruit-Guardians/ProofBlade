@@ -330,7 +330,13 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
     if (toolBudget.count >= toolBudget.max) {
       if (termination.continuousRecovery) {
-        return { block: true, reason: `[ProofBlade tool budget advisory: ${toolBudget.max} calls reached] Continue only after consolidating current findings into one bounded next action.` };
+        // Blocking only this tool call causes Pi to ask the Provider again in
+        // the same turn, which can spin through a costly sequence of rejected
+        // calls. Preserve the run for a later replan, but end this turn.
+        termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Preserve the strongest evidence and replan before another Provider request.`;
+        termination.reason = "tool_budget_exhausted";
+        termination.requested = true;
+        return { block: true, reason: termination.message };
       }
       termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Stop probing and preserve the strongest evidence.`;
       termination.reason = "tool_budget_exhausted";

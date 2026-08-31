@@ -992,6 +992,41 @@ test("tool-call budget blocks and terminates the next inner turn", async () => {
   }
 });
 
+test("continuous recovery still ends a Provider turn at the total tool-call cap", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-continuous-tool-budget-"));
+  const env = new NodeExecutionEnv({ cwd: root });
+  try {
+    const faux = fauxProvider({ provider: "faux-continuous-tool-budget" });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("bash", { command: "probe-1" }, { id: "continuous-budget-1" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("bash", { command: "probe-2" }, { id: "continuous-budget-2" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("must not request a third provider response", { stopReason: "stop" }),
+    ]);
+    let executions = 0;
+    const bash: AgentHarnessTool<undefined> = {
+      name: "bash", label: "bash", description: "bounded probe", parameters: Type.Object({ command: Type.String() }),
+      async execute() { executions += 1; return { content: [{ type: "text" as const, text: "probe completed" }] }; },
+    };
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "continuous-tool-budget", cwd: root });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
+    const termination: CodingTurnTermination = { continuousRecovery: true };
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, { max: 1, count: 0 });
+
+    const response = await harness.prompt("continue");
+    assert.equal(executions, 1);
+    assert.equal(faux.state.callCount, 2);
+    assert.equal(response.stopReason, "error");
+    assert.equal(termination.reason, "tool_budget_exhausted");
+    assert.equal(termination.requested, true);
+  } finally {
+    await env.cleanup();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:first-action-budget] blocks broad tools until the prepared probe produces an observation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-first-action-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });

@@ -32,7 +32,8 @@ import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodi
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
-import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { configuredModelCost, createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { ProviderRequestBudget, recoverProviderSpend } from "./provider-budget.js";
 import { contextSnapshot, type AgentLanePort, type AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type AblationPolicyBinding, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
@@ -189,9 +190,24 @@ export class PiCodingLane implements AgentLanePort {
         cwd: options.projectRoot,
         metadata: { runId: options.runId, lane: "main", purpose: sessionId === `${options.runId}-chat` ? "chat" : "ctf" },
       });
+    const snapshot = await options.controlStore.snapshot(options.runId);
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
-    const { models, model, closeTransport } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
+    const startedAt = Date.parse(snapshot.startedAt ?? new Date().toISOString());
+    const providerBudget = new ProviderRequestBudget({
+      ...(snapshot.task.constraints.max_cost_usd > 0 ? { maxCostUsd: snapshot.task.constraints.max_cost_usd } : {}),
+      deadlineAt: startedAt + snapshot.task.constraints.deadline_ms,
+      initialSpentUsd: recoverProviderSpend(
+        await options.controlStore.events(options.runId),
+        { cost: configuredModelCost(profile), contextWindow: profile.contextWindow, maxTokens: profile.maxTokens },
+      ),
+    });
+    const configured = createConfiguredModels(profile, providerBudget, { observer: scheduling.observer });
+    const { models, model } = configured;
+    const closeTransport = async (): Promise<void> => {
+      providerBudget.close();
+      await configured.closeTransport();
+    };
     // skills/ and .mcp.json live in the ProofBlade install root, NOT the challenge
     // workspace. runDir is <installRoot>/runs/<runId>, so dirname(dirname(runDir))
     // recovers the install root when it is not passed explicitly.
@@ -207,7 +223,6 @@ export class PiCodingLane implements AgentLanePort {
     // model chasing ENOENTs.
     const inContainer = options.executionEnv instanceof ContainerExecutionEnv;
     const toolCatalog = await ProofBladeToolCatalogRegistry.load(installRoot, { container: inContainer });
-    const snapshot = await options.controlStore.snapshot(options.runId);
     const sessionPreflight = options.sessionRuntimePreflight
       ?? await preflightSessionRuntimeBrokers(sessionRuntimeBrokersForTask(snapshot.task, options.sessionRuntimeBrokers ?? []));
     const sessionRuntimeBrokers = sessionPreflight.brokers;
