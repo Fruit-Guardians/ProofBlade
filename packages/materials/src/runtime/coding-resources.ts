@@ -217,7 +217,7 @@ export async function createMcpFirstClassTools(
               operation: "call",
               input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             }, sig);
-            return appendToolAdvice(toolResult(invocation), idalibProgressAdvice(server, tool.name, params, repeatedCalls));
+            return appendToolAdvice(runtimeMcpToolResult(invocation), idalibProgressAdvice(server, tool.name, params, repeatedCalls, invocation.output));
           }
           const result = await context.mcp.execute(
             capabilityId,
@@ -225,7 +225,7 @@ export async function createMcpFirstClassTools(
             { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             sig,
           );
-          return appendToolAdvice(mcpToolResult(result), idalibProgressAdvice(server, tool.name, params, repeatedCalls));
+          return appendToolAdvice(mcpToolResult(result), idalibProgressAdvice(server, tool.name, params, repeatedCalls, result.stdout));
         },
       });
     }
@@ -1680,6 +1680,23 @@ function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<Cod
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
 }
 
+/**
+ * Journaled MCP calls retain the original untrusted-observation envelope in
+ * `output`. Keep that boundary, but render the nested MCP payload before it
+ * reaches the model. Passing the whole journal receipt through toolResult made
+ * function lists both escaped and likely to be truncated before `main`.
+ */
+function runtimeMcpToolResult(result: Record<string, unknown>): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output ?? {});
+  const stderr = typeof result.stderr === "string" ? result.stderr : "";
+  const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
+  return {
+    content: [{ type: "text", text: renderRuntimeMcpPayload(output, stderr) }],
+    details: result,
+    isError: exitCode !== 0,
+  } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
 function appendToolAdvice<TResult extends { content: Array<{ type: string; text?: string }>; details?: unknown }>(result: TResult, advice?: string): TResult {
   if (!advice) return result;
   return {
@@ -1689,19 +1706,76 @@ function appendToolAdvice<TResult extends { content: Array<{ type: string; text?
   };
 }
 
-function idalibProgressAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>): string | undefined {
+function idalibProgressAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>, output?: unknown): string | undefined {
   if (!/idalib/i.test(server) || !["get_metadata", "get_entry_points", "list_functions"].includes(tool)) return undefined;
   const key = `${server}:${tool}:${sha256(canonicalJson(params ?? {}))}`;
   const count = (calls.get(key) ?? 0) + 1;
   calls.set(key, count);
+  const candidates = idalibFunctionCandidateAdvice(server, tool, output);
   if (count > 1) {
     const label = tool === "get_metadata" ? "metadata" : tool === "get_entry_points" ? "entry-point inventory" : "function inventory";
-    return `[ProofBlade advisory: this repeats IDALIB ${label} for the same target and adds no new code fact. The call was allowed and its earlier result remains available. Next, select a target-relevant address and call decompile_function or disassemble_function; only repeat this inventory after the target changes.]`;
+    return [`[ProofBlade advisory: this repeats IDALIB ${label} for the same target and adds no new code fact. The call was allowed and its earlier result remains available. Next, select a target-relevant address and call decompile_function or disassemble_function; only repeat this inventory after the target changes.]`, candidates].filter(Boolean).join("\n");
   }
   if (tool === "get_metadata") {
     return "[ProofBlade advisory: metadata establishes binary identity, not program logic. Next, inspect entry points or list functions, then select a target-relevant address for decompile_function or disassemble_function.]";
   }
-  return "[ProofBlade advisory: this inventory is not yet code analysis. Select main, an entry-point target, or an input-check/flag-related function address from this result, then call decompile_function or disassemble_function on it.]";
+  return ["[ProofBlade advisory: this inventory is not yet code analysis. Select main, an entry-point target, or an input-check/flag-related function address from this result, then call decompile_function or disassemble_function on it.]", candidates].filter(Boolean).join("\n");
+}
+
+function renderRuntimeMcpPayload(output: string, stderr: string): string {
+  const wrapped = splitUntrustedObservation(output);
+  const rendered = renderMcpPayload({ stdout: wrapped?.body ?? output, stderr, exitCode: 0, durationMs: 0 });
+  return wrapped ? `${wrapped.open}\n${rendered}\n${wrapped.close}` : rendered;
+}
+
+function splitUntrustedObservation(value: string): { open: string; body: string; close: string } | undefined {
+  const match = /^(<untrusted-observation\b[^>]*>)\r?\n?([\s\S]*?)\r?\n?(<\/untrusted-observation>)$/.exec(value.trim());
+  return match ? { open: match[1], body: match[2], close: match[3] } : undefined;
+}
+
+function idalibFunctionCandidateAdvice(server: string, tool: string, output: unknown): string | undefined {
+  if (!/idalib/i.test(server) || !["get_entry_points", "list_functions"].includes(tool) || typeof output !== "string") return undefined;
+  const candidates = idalibFunctionCandidates(tool, output);
+  if (candidates.length === 0) return undefined;
+  const selected = candidates[0];
+  const display = candidates.map((candidate) => `${candidate.name} @ ${candidate.address}`).join(", ");
+  return `[ProofBlade advisory: extracted code-analysis candidates: ${display}. This is optional guidance; choose any in-scope path. For the first candidate, direct calls are mcp__${server}__decompile_function {"address":"${selected.address}"} or mcp__${server}__disassemble_function {"start_address":"${selected.address}"}.]`;
+}
+
+function idalibFunctionCandidates(tool: string, output: string): Array<{ address: string; name: string }> {
+  const wrapped = splitUntrustedObservation(output);
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(wrapped?.body ?? output);
+  } catch {
+    return [];
+  }
+  const structured = isRecord(envelope) && isRecord(envelope.result) && isRecord(envelope.result.structuredContent)
+    ? envelope.result.structuredContent
+    : undefined;
+  if (!structured) return [];
+  const values = tool === "list_functions"
+    ? [structured.data, isRecord(structured.result) ? structured.result.data : undefined]
+    : [structured.result, structured.data];
+  const seen = new Set<string>();
+  const candidates: Array<{ address: string; name: string; rank: number }> = [];
+  for (const value of values) {
+    if (!Array.isArray(value)) continue;
+    for (const entry of value) {
+      if (!isRecord(entry) || typeof entry.address !== "string" || typeof entry.name !== "string" || !/^0x[0-9a-f]+$/i.test(entry.address)) continue;
+      if (seen.has(entry.address)) continue;
+      seen.add(entry.address);
+      candidates.push({ address: entry.address, name: entry.name, rank: idalibCandidateRank(entry.name) });
+    }
+  }
+  return candidates.sort((left, right) => left.rank - right.rank || left.address.localeCompare(right.address)).slice(0, 4).map(({ address, name }) => ({ address, name }));
+}
+
+function idalibCandidateRank(name: string): number {
+  if (/^main$/i.test(name)) return 0;
+  if (/(?:flag|check|valid|verify|auth|pass|input|magic|win|success)/i.test(name)) return 1;
+  if (/^(?:start|entry|_start)$/i.test(name)) return 2;
+  return 3;
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {

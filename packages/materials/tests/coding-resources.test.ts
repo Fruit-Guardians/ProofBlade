@@ -1127,13 +1127,19 @@ test("an initial IDALIB function inventory directs the model to inspect code", a
     describeServer: async () => ({ server: "idalib-mcp", configHash: "ida-hash", tools: [{ name: "list_functions", description: "Functions", inputSchema: { type: "object" }, readOnlyHint: true }] }),
     execute: async () => { throw new Error("direct MCP execution must not be used when runtime is available"); },
   } as unknown as McpProjectRegistry;
-  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output: "functions", stderr: "", outputTier: "small" as const, truncated: false, originalChars: 9, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
+  const output = `<untrusted-observation capability="mcp.idalib" operation="call" artifact="A-1">\n${JSON.stringify({ server: "idalib-mcp", tool: "list_functions", result: { content: [{ type: "text", text: JSON.stringify({ data: [{ address: "0x40129e", name: "main" }, { address: "0x401237", name: "sub_401237" }] }) }], structuredContent: { result: { data: [{ address: "0x40129e", name: "main" }, { address: "0x401237", name: "sub_401237" }] } } } })}\n</untrusted-observation>`;
+  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output, stderr: "", outputTier: "small" as const, truncated: false, originalChars: output.length, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
   const functions = (await createMcpFirstClassTools(mcp, ["idalib-mcp"])).find((tool) => tool.name === "mcp__idalib-mcp__list_functions");
   assert.ok(functions);
   const result = await functions.execute("call-1", {}, new AbortController().signal, () => undefined, context);
   const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
   assert.match(text, /not yet code analysis/);
   assert.match(text, /decompile_function/);
+  assert.match(text, /main @ 0x40129e/);
+  assert.match(text, /decompile_function \{"address":"0x40129e"\}/);
+  assert.match(text, /disassemble_function \{"start_address":"0x40129e"\}/);
+  assert.match(text, /<untrusted-observation capability="mcp.idalib"/);
+  assert.equal(text.includes('\\\\"data\\\\"'), false, "runtime MCP output must not be re-escaped into unreadable JSON");
 });
 
 test("bash anchors an artifact only when output was actually withheld", async (t) => {
