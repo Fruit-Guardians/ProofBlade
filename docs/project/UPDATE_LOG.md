@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-29T11:55:00+08:00
+> 状态更新时间：2026-08-31T18:30:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260831-001 | 2026-08-31T18:30:00+08:00 | PLAN-120, PLAN-200, PLAN-230 | codex/ablation-policy-integration-clean | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -55,6 +56,29 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260831-001
+
+时间：2026-08-31T18:30:00+08:00
+
+摘要：修复消融评测审计发现，完善组件消融、快照、报告、Ledger、预算和 GUI 运行接线。
+
+### 变更
+
+- Receipt/Recall、Context 候选、VOI/uplift 增加硬边界和敏感数据脱敏
+- 11 个 HarnessPolicy 因子接入 Agent 决策或 ContextCompiler，并修复硬限制优先级
+- 实验快照、Provider probe、corpus hash、pairing/report 校验和全局预算边界加固
+- Ledger 增加并发锁、恢复校验和 CLI/GUI 真实运行进度接线
+- GUI 增加启动互斥、stale running 恢复和语料快照绑定
+
+### 验证
+
+- [x] npm run build passed
+- [x] npm run api:index and npm run api:index:check passed
+- [x] npm run check:components passed
+- [x] npm run check:change-contracts passed
+- [x] npm run check:changed-tests passed
+- [x] 消融/评测/GUI 关键回归通过；完整 npm test 仅有既有 Windows EBUSY 清理波动
 
 ## UPDATE-20260829-009
 

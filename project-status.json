@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-29T11:55:00+08:00",
+  "updatedAt": "2026-08-31T18:30:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -274,6 +274,33 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260831-001",
+      "occurredAt": "2026-08-31T18:30:00+08:00",
+      "summary": "修复消融评测审计发现，完善组件消融、快照、报告、Ledger、预算和 GUI 运行接线。",
+      "branch": "codex/ablation-policy-integration-clean",
+      "commit": "self",
+      "planIds": [
+        "PLAN-120",
+        "PLAN-200",
+        "PLAN-230"
+      ],
+      "changes": [
+        "Receipt/Recall、Context 候选、VOI/uplift 增加硬边界和敏感数据脱敏",
+        "11 个 HarnessPolicy 因子接入 Agent 决策或 ContextCompiler，并修复硬限制优先级",
+        "实验快照、Provider probe、corpus hash、pairing/report 校验和全局预算边界加固",
+        "Ledger 增加并发锁、恢复校验和 CLI/GUI 真实运行进度接线",
+        "GUI 增加启动互斥、stale running 恢复和语料快照绑定"
+      ],
+      "validation": [
+        "npm run build passed",
+        "npm run api:index and npm run api:index:check passed",
+        "npm run check:components passed",
+        "npm run check:change-contracts passed",
+        "npm run check:changed-tests passed",
+        "消融/评测/GUI 关键回归通过；完整 npm test 仅有既有 Windows EBUSY 清理波动"
+      ]
+    },
     {
       "id": "UPDATE-20260829-009",
       "occurredAt": "2026-08-29T11:55:00+08:00",
