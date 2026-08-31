@@ -69,6 +69,20 @@
 - 变体解释：candidate 少 1 次模型请求、p95 用时低 `7847ms`，但总成本高 `$0.001859`，首次证据平均更慢（`7942.5ms` 对 `7110.5ms`）。两题各一次、均为 misc/base64，差异受随机采样影响，不能归因给 `firstAction`，更不能作为正式策略上线依据。
 - 后续：保留该 fixture 为 Provider budget/hidden-scorer handoff 回归；策略因果实验转入 20+ holdout、3--5 attempts、含 Web/Pwn 的分层语料。
 
+### AB-TERRA-IDALIB-MAGIC-021：逆向调查配额过严（待复测的 Harness 修复）
+
+- 旧结果：`magic` 的 baseline 与 candidate 均为 `0/1`，但不能作为模型或策略比较。baseline 首先完成 ELF 初检、MCP 工具发现和接口描述；下一批 `strings` 与 `objdump` 在实际运行前被 `Phase action budget exhausted: RECON` 拒绝。candidate 的首错是 Provider `503`，同样不能与 baseline 对比。
+- 更正归因：此前若把这一失败写作“模型没有完成逆向调查”是不准确的。直接原因是 Harness 把 reverse 复用为通用 `recon-surface(maxCalls=3)`；三次合理的初检/工具发现已耗尽 RECON，尚未允许一次实际 IDALIB 或反汇编分析。这是任务契约过严，不是需要模型克制的无效探索。
+- 修复假设：reverse 使用专属的 `reverse-static-and-decompiler` 合同。首步和 RECON 各允许 8 次有界调用，且 RECON 成功标准要求获取目标相关的静态/反编译路径，明确规定“工具发现本身不充分”。其余类别保持原配额，运行总工具数、只读 MCP、独立 hidden scorer、成本和期限限制不变。
+- 回归与复测：profile 单测锁定该预算和成功条件；随后以同一 `magic`、AIHub Terra max、同一预算重跑为新的 Harness 回归实验。该复测首先验证修复能抵达真实代码分析，不把单例成功率写成策略效果结论。
+
+### AB-TERRA-IDALIB-MAGIC-031：工具暴露与提示合同不一致（中止，不计入样本）
+
+- 配置与连通性：AIHub `gpt-5.6-terra`、`openai-responses`、`thinking=max` 经 GUI 同一代理预检成功，Provider metadata `200`；IDALIB MCP 的 `initialize` 也返回真实 `ida-pro-mcp#idalib`。因此本条记录不是密钥、模型权限或 MCP 进程不可用。
+- 观察到的行为：baseline 完成 ELF64/x86-64 初检后，连续请求 `mcp_call list/describe`，并多次尝试宽泛 `evidence record` 参数；它没有执行实际 IDALIB `get_metadata`、`decompile_function` 或反汇编。为避免将无效循环继续计费，运行在 candidate 开始前被主动停止，故**没有**成功率、成本比较或策略结论。
+- 首错归因：Harness 的系统提示声称已暴露 `mcp__<server>__<tool>` 一等工具并要求直接调用；该 Run 的实际 Provider tool surface 只有 `mcp_call`，没有任何 `mcp__*`。模型只好重新发现代理接口，而代理目录中并不存在它猜测的 `list_tools` / `initialize` 工具。此前的 3-call RECON 限制确实过严，已被 8-call reverse 合同修复；但该修复暴露了更早的“提示合同与可调用工具不一致”问题，不能把后续循环归咎为模型无效探索。
+- 下一步修复：先让 reverse Run 在启动时验证并发布 IDALIB 的一等 schema；若枚举失败，则提示中只暴露已验证的 `mcp_call` 调用格式和一个预绑定 `get_metadata` 路径，禁止宣称不存在的 `mcp__*`。完成此修复后再建立新的不可变实验快照并复跑；`031` 保留为中止的环境/Harness 诊断记录。
+
 ## 5. 执行顺序
 
 1. 将 AB-TERRA-MAX-RESPONSES-029 的 Provider budget/hidden-scorer handoff fixture 固化为回归控制用例，并在 Provider 502、缺失 usage 与恢复路径上补充故障注入。

@@ -48,7 +48,10 @@ export interface ChallengeClassification {
 const COMMON_HOST_TOOLS = ["python311", "python", "jq", "xxd"];
 
 const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
-  reverse: { id: "reverse-recon", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
+  // Native reversing commonly needs one static identification plus a real
+  // decompiler/disassembler probe. Three calls can be consumed before that
+  // analysis begins by file metadata and MCP discovery alone.
+  reverse: { id: "reverse-static-and-decompiler", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 8 },
   mobile: { id: "mobile-manifest", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
   pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "capability", "pwn_open", "pwn_recv"], maxCalls: 2 },
   web: { id: "web-request-or-artifact", allowedToolNames: ["read", "bash", "web_open", "web_request"], maxCalls: 2 },
@@ -114,6 +117,66 @@ function genericActionBundles(toolNames: string[], capabilityIds: string[]): Act
       preconditions: ["A candidate is derived from current-generation evidence."],
       successCriteria: ["A clean reproduction produces verifier-accepted evidence."],
       failureCriteria: ["The candidate depends on stale state, prompt text, or a non-reproducible side effect."],
+      maxCalls: 2,
+    },
+  ];
+}
+
+function reverseActionBundles(): ActionBundle[] {
+  return [
+    {
+      id: "reverse-static-and-decompiler",
+      domainPhase: "RECON",
+      objective: "Establish the binary format and architecture, then inspect at least one target-relevant input-check or flag-reveal path with a disassembler or decompiler.",
+      toolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"],
+      capabilityIds: ["reverse.binary", "mcp.reverse"],
+      preconditions: ["The challenge binary and its prepared reverse tools are available."],
+      successCriteria: ["Format/architecture facts and one target-relevant code path are captured; tool discovery alone is not sufficient."],
+      failureCriteria: ["Only tool discovery, unrelated strings, or a missing-tool error was recorded without inspecting target code."],
+      maxCalls: 8,
+    },
+    {
+      id: "reverse-target-model",
+      domainPhase: "TARGET_MODEL",
+      objective: "Relate the observed input-check path to a concrete candidate derivation and one falsifiable condition.",
+      toolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"],
+      capabilityIds: ["reverse.binary", "mcp.reverse"],
+      preconditions: ["RECON contains a target-relevant static or decompiler observation."],
+      successCriteria: ["The candidate derivation cites an observed comparison, transform, or reveal path and names a check that could refute it."],
+      failureCriteria: ["The proposed candidate is inferred from prompt text or generic reversing lore rather than target code."],
+      maxCalls: 4,
+    },
+    {
+      id: "reverse-hypothesis",
+      domainPhase: "HYPOTHESIS",
+      objective: "Choose one bounded derivation or execution check with explicit success and failure predicates.",
+      toolNames: ["read", "bash", "mcp_call", "mcp__*"],
+      capabilityIds: ["reverse.binary", "mcp.reverse"],
+      preconditions: ["A target-model observation identifies the candidate derivation or input condition."],
+      successCriteria: ["The next check has concrete inputs, an expected observation, and a stop condition."],
+      failureCriteria: ["The plan broadens to unrelated functions or changes multiple assumptions at once."],
+      maxCalls: 3,
+    },
+    {
+      id: "reverse-bounded-experiment",
+      domainPhase: "EXPERIMENT",
+      objective: "Execute one targeted static, dynamic, or decompiler-backed check that confirms or rejects the active derivation.",
+      toolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"],
+      capabilityIds: ["reverse.binary", "mcp.reverse"],
+      preconditions: ["An open hypothesis has explicit success and failure predicates."],
+      successCriteria: ["The observation confirms the derivation or yields a durable negative result."],
+      failureCriteria: ["The probe repeats a prior observation or treats an unverified string as the answer."],
+      maxCalls: 5,
+    },
+    {
+      id: "reverse-clean-reproduce",
+      domainPhase: "REPRODUCE",
+      objective: "Submit the verifier-ready candidate for independent clean reproduction.",
+      toolNames: ["verify_claim", "read", "bash"],
+      capabilityIds: ["verifier.reproduce"],
+      preconditions: ["A candidate is derived from current-generation target observations."],
+      successCriteria: ["The hidden scorer accepts independent reproductions."],
+      failureCriteria: ["The candidate depends on prompt text, stale state, or an unverified partial step."],
       maxCalls: 2,
     },
   ];
@@ -234,7 +297,7 @@ const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
       maxCalls: 2,
     },
   ],
-  reverse: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["reverse.binary", "mcp.reverse"]),
+  reverse: reverseActionBundles(),
   mobile: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["reverse.android", "mcp.reverse"]),
   crypto: genericActionBundles(["read", "bash"], ["crypto.python", "crypto.solver"]),
   forensics: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["forensics.files", "forensics.pcap", "forensics.memory"]),

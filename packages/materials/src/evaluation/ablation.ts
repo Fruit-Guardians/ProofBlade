@@ -4,6 +4,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { ModelProfileConfig, ProofBladeConfig } from "../config.js";
 import type { TargetKind } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+import { createProviderTransport } from "../runtime/provider-transport.js";
 
 export const ABLATION_SCHEMA_VERSION = 1 as const;
 export const ABLATION_PROTOCOL_VERSION = "ablation-v1" as const;
@@ -265,18 +266,24 @@ export function preflightAblationExperiment(experiment: AblationExperimentSnapsh
 export interface AblationProviderProbe { ok: boolean; status: number | string; modelId?: string; modelsHash?: string; }
 
 /** Probe only the model-discovery endpoint; task content is never sent. */
-export async function probeAblationProvider(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch: typeof globalThis.fetch = fetch): Promise<AblationProviderProbe> {
-  const path = profile.modelDiscoveryPath.startsWith("/") ? profile.modelDiscoveryPath : `/${profile.modelDiscoveryPath}`;
+export async function probeAblationProvider(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch?: typeof globalThis.fetch): Promise<AblationProviderProbe> {
+  // Older valid provider profiles rely on the runtime's conventional /models
+  // discovery endpoint and omit this optional serialized field.
+  const discoveryPath = profile.modelDiscoveryPath || "/models";
+  const path = discoveryPath.startsWith("/") ? discoveryPath : `/${discoveryPath}`;
   const endpoint = `${profile.baseUrl.replace(/\/+$/, "")}${path}`;
   const headers: Record<string, string> = profile.api === "anthropic-messages" ? { "x-api-key": process.env[profile.apiKeyEnv] ?? "", "anthropic-version": "2023-06-01" } : { authorization: `Bearer ${process.env[profile.apiKeyEnv] ?? ""}` };
+  const transport = providerFetch ? undefined : createProviderTransport(profile.proxyUrl);
+  const request = providerFetch ?? transport?.fetch ?? fetch;
   try {
-    const response = await providerFetch(endpoint, { headers, signal: AbortSignal.timeout(10_000) });
+    const response = await request(endpoint, { headers, signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return { ok: false, status: response.status };
     const body = await response.json() as { data?: Array<{ id?: string }> };
     const ids = (body.data ?? []).map((item) => item.id).filter((item): item is string => Boolean(item)).sort();
     const modelId = ids.find((id) => id === experiment.model.model);
     return { ok: Boolean(modelId), status: response.status, ...(modelId ? { modelId } : {}), modelsHash: sha256(canonicalJson(ids)) };
   } catch (error) { return { ok: false, status: error instanceof Error ? error.name : "error" }; }
+  finally { await transport?.close(); }
 }
 
 export class AblationExperimentStore {

@@ -95,6 +95,21 @@ test("preflight exposes credential presence without exposing its value and probe
   delete process.env.TEST_KEY;
 });
 
+test("preflight defaults an omitted model discovery path to /models", async () => {
+  process.env.TEST_KEY = "secret-value-that-must-not-be-returned";
+  const experiment = validateAblationExperiment(input(), profile);
+  const legacyProfile = { ...profile, modelDiscoveryPath: undefined } as unknown as typeof profile;
+  const result = await preflightAblationExperiment(experiment, legacyProfile, {
+    probe: true,
+    fetch: async (url) => {
+      assert.match(String(url), /\/models$/);
+      return new Response(JSON.stringify({ data: [{ id: "luna-1" }] }), { status: 200 });
+    },
+  });
+  assert.equal(result.ready, true);
+  delete process.env.TEST_KEY;
+});
+
 test("snapshot inherits model behavior and preflight rejects profile drift or wrong probe model", async () => {
   const inherited = validateAblationExperiment(input({ model: { profileId: "relay-a", model: "luna-1" } }), { ...profile, baseUrl: "https://aihub.top/v1/", thinkingLevel: "low", proxyUrl: "http://proxy.local", cacheRetention: "long" });
   assert.equal(inherited.model.thinkingLevel, "low");
