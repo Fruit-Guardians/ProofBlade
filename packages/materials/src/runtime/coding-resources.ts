@@ -217,7 +217,7 @@ export async function createMcpFirstClassTools(
               operation: "call",
               input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             }, sig);
-            return appendToolAdvice(toolResult(invocation), repeatedIdalibMetadataAdvice(server, tool.name, params, repeatedCalls));
+            return appendToolAdvice(toolResult(invocation), idalibProgressAdvice(server, tool.name, params, repeatedCalls));
           }
           const result = await context.mcp.execute(
             capabilityId,
@@ -225,7 +225,7 @@ export async function createMcpFirstClassTools(
             { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             sig,
           );
-          return appendToolAdvice(mcpToolResult(result), repeatedIdalibMetadataAdvice(server, tool.name, params, repeatedCalls));
+          return appendToolAdvice(mcpToolResult(result), idalibProgressAdvice(server, tool.name, params, repeatedCalls));
         },
       });
     }
@@ -1689,13 +1689,19 @@ function appendToolAdvice<TResult extends { content: Array<{ type: string; text?
   };
 }
 
-function repeatedIdalibMetadataAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>): string | undefined {
-  if (tool !== "get_metadata" || !/idalib/i.test(server)) return undefined;
+function idalibProgressAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>): string | undefined {
+  if (!/idalib/i.test(server) || !["get_metadata", "get_entry_points", "list_functions"].includes(tool)) return undefined;
   const key = `${server}:${tool}:${sha256(canonicalJson(params ?? {}))}`;
   const count = (calls.get(key) ?? 0) + 1;
   calls.set(key, count);
-  if (count < 2) return undefined;
-  return "[ProofBlade advisory: this repeats IDALIB metadata for the same target and adds no new code fact. The call was allowed and its earlier result remains available. Next, prefer list_functions, decompile_function, or disassemble_function on a target-relevant function; only request metadata again after the target changes.]";
+  if (count > 1) {
+    const label = tool === "get_metadata" ? "metadata" : tool === "get_entry_points" ? "entry-point inventory" : "function inventory";
+    return `[ProofBlade advisory: this repeats IDALIB ${label} for the same target and adds no new code fact. The call was allowed and its earlier result remains available. Next, select a target-relevant address and call decompile_function or disassemble_function; only repeat this inventory after the target changes.]`;
+  }
+  if (tool === "get_metadata") {
+    return "[ProofBlade advisory: metadata establishes binary identity, not program logic. Next, inspect entry points or list functions, then select a target-relevant address for decompile_function or disassemble_function.]";
+  }
+  return "[ProofBlade advisory: this inventory is not yet code analysis. Select main, an entry-point target, or an input-check/flag-related function address from this result, then call decompile_function or disassemble_function on it.]";
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {

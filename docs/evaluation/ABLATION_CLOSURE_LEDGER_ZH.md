@@ -114,3 +114,17 @@
 - 机制归因：提示把“持久化 observation”写成了几乎逐步的流程要求，同时 evidence 工具描述过度强调其图整理能力。模型将自动归档误当作每步后需要调用 `evidence` 的手续。软建议样本减少了 Evidence 调用，却改为重复相同参数的 `get_metadata`；这说明缺口不是“缺少更多门控”，而是工具结果没有提供足够明确的、非阻断的下一步方向。
 - 修复：prepared CTF 文案改为“自动归档，只有改变假设/解决冲突/支持验证时才提升为 Evidence”；reverse profile 明确建议 metadata 后转向函数列表、反编译或反汇编；同参数 IDALIB `get_metadata` 第二次及以后仍允许执行，但返回下一步建议和已有结果可复用提示。没有改变 workspace/network scope、凭据、effect journal、总成本、deadline 或 hidden scorer。
 - 034 复测准则：固定同一 Provider、模型、二进制、预算和默认策略，比较修复前的 033 soft 轨迹与修复后的机制回归。接受条件不是单次 flag，而是：重复 metadata 不超过一次、Evidence 不作为每步确认、出现 `list_functions` 或 `decompile_function`，并保持无泄漏和隐藏评分边界；若仍失败，则依据新的第一处偏离继续修复。
+
+### AB-TERRA-IDALIB-MAGIC-034：每配对预算不足的无效 curation 消融（已完成，不计入比较）
+
+- 设置：`manual` 对 `advice`，唯一策略差异为 `evidenceCuration`，但总预算仅 `$0.12`、两个变体各两回合。
+- 结果：每个变体只得到一次真实 Provider `200`，随后在没有 HTTP 请求和没有 token 花费的情况下结束。两条均 `budget_exhausted`，不能形成 curation 行为比较。
+- 归因：实验预算按四个配对分配。第一次请求实际只花约 `$0.012`，但下一请求的最大输出/上下文预留超过该配对剩余额度；这是预检估计“最多请求数”与实际多步最坏情况预留不相称，不是模型拒绝整理建议。
+- 处置：创建新 immutable `035`，固定所有条件但把总预算恢复到已验证可容纳多步的 `$0.40`。034 保留为 evaluator budget 配置诊断，禁止加入成功率或策略比较图。
+
+### AB-TERRA-IDALIB-MAGIC-035：Curation 因子多步烟测与函数级停滞（已完成，非泛化结论）
+
+- 固定条件：同一 Terra Responses/max、IDALIB、二进制、4 回合与 `$0.40`；`manual-curation` 为默认基线，`advice-curation` 只将 `evidenceCuration` 改为 `advice`。两者均 `0/1` verified、无隐藏评分调用、以 `budget_exhausted` 结束。
+- 过程：`advice` 使用 14 次 Provider `200`、21 次工具调用、6 次 Evidence、2 次 metadata、2 次 `list_functions`、3 次入口点查询、成本 `$0.102277`；`manual` 使用 13 次 Provider `200`、19 次工具调用、7 次 Evidence、3 次 metadata、2 次 `list_functions`、1 次入口点查询、成本 `$0.154495`。两者都比 033 soft 的“8 次 metadata、无函数列表”推进到函数/入口目录。
+- 解释边界：成本差 `$0.052218` 和一次 Evidence/metadata 差异来自各一次随机采样，不能宣称 curation advice 更好；但两变体共享的新行为（函数列表和入口点）与 033 相比符合新提示和 metadata feedback 的预期。共同第一处未完成边是：已经得到函数地址清单，却没有执行 `decompile_function` 或 `disassemble_function`，所以还没有目标相关代码路径。
+- 修复与后续：首次 `list_functions` / `get_entry_points` 现在返回非阻断提示，要求从结果选择 `main`、入口或检查函数地址进入反编译/反汇编；重复 inventory 说明无新代码事实并保留调用能力。`036` 应固定 035 的配置和 corpus，以该修复后的 Harness 复测；首要接受条件是一次函数级代码分析，而不是单次 flag。对 curation 的因果比较仍需 20+ 分层 holdout、3--5 attempts。

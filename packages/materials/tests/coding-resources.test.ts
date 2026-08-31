@@ -1114,7 +1114,25 @@ test("repeated IDALIB metadata remains available and names the next code-analysi
   const repeated = await metadata.execute("call-2", {}, new AbortController().signal, () => undefined, context);
   const text = (repeated.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
   assert.match(text, /call was allowed/);
-  assert.match(text, /list_functions/);
+  assert.match(text, /target-relevant address/);
+  assert.match(text, /decompile_function/);
+});
+
+test("an initial IDALIB function inventory directs the model to inspect code", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({ server: "idalib-mcp", configHash: "ida-hash", tools: [{ name: "list_functions", description: "Functions", inputSchema: { type: "object" }, readOnlyHint: true }] }),
+    execute: async () => { throw new Error("direct MCP execution must not be used when runtime is available"); },
+  } as unknown as McpProjectRegistry;
+  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output: "functions", stderr: "", outputTier: "small" as const, truncated: false, originalChars: 9, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
+  const functions = (await createMcpFirstClassTools(mcp, ["idalib-mcp"])).find((tool) => tool.name === "mcp__idalib-mcp__list_functions");
+  assert.ok(functions);
+  const result = await functions.execute("call-1", {}, new AbortController().signal, () => undefined, context);
+  const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+  assert.match(text, /not yet code analysis/);
   assert.match(text, /decompile_function/);
 });
 
