@@ -1,15 +1,15 @@
 {
   "mcpServers": {
     "idalib-mcp": {
-      "url": "http://127.0.0.1:8745/mcp",
+      "url": "http://127.0.0.1:18745/mcp",
       "includeTools": [
-        "idalib_open", "idalib_switch", "idalib_current", "idalib_list",
-        "survey_binary", "list_funcs", "lookup_funcs", "func_query",
-        "decompile", "disasm", "analyze_batch", "analyze_function",
-        "imports", "xrefs_to", "xref_query",
-        "get_bytes", "get_string", "read_struct", "search_text", "find"
+        "get_metadata", "get_function_by_name", "get_function_by_address",
+        "list_functions", "list_globals", "list_imports", "list_strings",
+        "decompile_function", "disassemble_function", "get_xrefs_to",
+        "get_callees", "get_callers", "get_entry_points",
+        "read_memory_bytes", "data_read_string"
       ],
-      "description": "Headless IDA decompiler via idalib (streamable HTTP, no GUI, serves many binaries concurrently). USAGE PROTOCOL: (1) mcp_call describe once to see tools; (2) FIRST bind the target with idalib_open (absolute path to the binary) — analyze/decompile fail with 'No session bound' until you do; (3) then call analyze_batch (include_decompile:true) / decompile / disasm / xrefs to get pseudocode for native PE/ELF. Do not repeat describe. Server must already be running on 127.0.0.1:8745.",
+      "description": "Read-only IDA Pro decompiler through idalib. Start scripts/idalib-mcp-streamable.py once per target binary with an available port; the server opens exactly that binary and exposes real upstream tool names over Streamable HTTP /mcp. Port 8745 is excluded by the local Windows policy, so the project default is 18745.",
       "readOnly": true,
       "sideEffect": "process",
       "replay": "manual",
