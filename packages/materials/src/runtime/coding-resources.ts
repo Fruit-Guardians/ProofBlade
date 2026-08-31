@@ -1676,7 +1676,7 @@ function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<Cod
   return {
     content: [{ type: "text", text: renderMcpPayload(result) }],
     details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}) },
-    isError: result.exitCode !== 0,
+    isError: result.exitCode !== 0 || mcpPayloadIsError(result.stdout),
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
 }
 
@@ -1693,7 +1693,7 @@ function runtimeMcpToolResult(result: { output?: unknown; stderr?: unknown; exit
   return {
     content: [{ type: "text", text: renderRuntimeMcpPayload(output, stderr) }],
     details: result,
-    isError: exitCode !== 0,
+    isError: exitCode !== 0 || mcpPayloadIsError(output),
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
 }
 
@@ -1707,6 +1707,9 @@ function appendToolAdvice<TResult extends { content: Array<{ type: string; text?
 }
 
 function idalibProgressAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>, output?: unknown): string | undefined {
+  if (/idalib/i.test(server) && typeof output === "string" && /can't import pyside6|qt without gui/i.test(mcpPayloadText(output))) {
+    return `[ProofBlade tool feedback: IDALIB ${tool} was not executed because this MCP instance lacks the GUI/Qt dependency required by its decompiler. No code fact was obtained. Next: call mcp__${server}__disassemble_function on the same address, or use a bounded local static command; do not repeat decompile_function until a headless-capable IDALIB environment is installed.]`;
+  }
   if (!/idalib/i.test(server) || !["get_metadata", "get_entry_points", "list_functions"].includes(tool)) return undefined;
   const key = `${server}:${tool}:${sha256(canonicalJson(params ?? {}))}`;
   const count = (calls.get(key) ?? 0) + 1;
@@ -1720,6 +1723,25 @@ function idalibProgressAdvice(server: string, tool: string, params: unknown, cal
     return "[ProofBlade advisory: metadata establishes binary identity, not program logic. Next, inspect entry points or list functions, then select a target-relevant address for decompile_function or disassemble_function.]";
   }
   return ["[ProofBlade advisory: this inventory is not yet code analysis. Select main, an entry-point target, or an input-check/flag-related function address from this result, then call decompile_function or disassemble_function on it.]", candidates].filter(Boolean).join("\n");
+}
+
+function mcpPayloadIsError(output: string): boolean {
+  const wrapped = splitUntrustedObservation(output);
+  try {
+    const envelope = JSON.parse(wrapped?.body ?? output);
+    return isRecord(envelope) && isRecord(envelope.result) && envelope.result.isError === true;
+  } catch {
+    return false;
+  }
+}
+
+function mcpPayloadText(output: string): string {
+  const wrapped = splitUntrustedObservation(output);
+  try {
+    return JSON.stringify(JSON.parse(wrapped?.body ?? output));
+  } catch {
+    return output;
+  }
 }
 
 function renderRuntimeMcpPayload(output: string, stderr: string): string {
