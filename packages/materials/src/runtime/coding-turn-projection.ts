@@ -339,7 +339,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   });
   const unsubscribeProvider = harness.on("before_provider_request", () => {
     if (!termination.requested) return undefined;
-    throw new Error(termination.message ?? "ProofBlade stopped a non-converging tool loop.");
+    throw new Error(termination.message ?? "[ProofBlade turn stopped]\nReason: the prior tool sequence requires a replan before another Provider request. No Provider request was made.\nNext: preserve the strongest observation, choose a materially different probe, and start the next authorized turn.");
   });
   return () => {
     unsubscribeEvents();

@@ -1495,12 +1495,16 @@ const capabilityTool: AgentHarnessTool<CodingResourceContext> = {
       input?: Record<string, unknown>;
       maxResults?: number;
     };
-    if (!(["search", "describe", "invoke"] as const).includes(input.operation)) throw new Error("Unsupported capability proxy operation: " + String(input.operation));
+    if (!(["search", "describe", "invoke"] as const).includes(input.operation)) {
+      throw new Error(toolContractRefusal("capability", `operation ${String(input.operation)} is unsupported`, "choose search, describe, or invoke"));
+    }
     if (input.operation === "search") {
       assertAbsent(input, ["capabilityId", "capabilityOperation", "input"], "capability search");
       return toolResult(context.runtime.discoverCapabilities({ query: input.query, maxResults: input.maxResults }));
     }
-    if (!input.capabilityId || !input.capabilityOperation) throw new Error("Capability " + input.operation + " requires capabilityId and capabilityOperation");
+    if (!input.capabilityId || !input.capabilityOperation) {
+      throw new Error(toolContractRefusal("capability", `${input.operation} requires both capabilityId and capabilityOperation`, "call capability search first, then copy the returned capability id and operation into this request"));
+    }
     if (input.operation === "describe") {
       assertAbsent(input, ["query", "input", "maxResults"], "capability describe");
       return toolResult(context.runtime.discoverCapabilities({
@@ -1511,7 +1515,9 @@ const capabilityTool: AgentHarnessTool<CodingResourceContext> = {
       }));
     }
     assertAbsent(input, ["query", "maxResults"], "capability invoke");
-    if (!isRecord(input.input)) throw new Error("Capability invoke requires an input object");
+    if (!isRecord(input.input)) {
+      throw new Error(toolContractRefusal("capability", "invoke requires an input object", "call capability describe for the input schema, then pass an object in input"));
+    }
     await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: `capability:${input.capabilityId}.${input.capabilityOperation}`, input: input.input });
     let result: Awaited<ReturnType<ProofBladeToolRuntime["invokeCapability"]>>;
     try {
@@ -1569,18 +1575,24 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     const input = params as { operation: "list" | "describe" | "call"; server?: string; tool?: string; arguments?: Record<string, unknown> };
-    if (!(["list", "describe", "call"] as const).includes(input.operation)) throw new Error(`Unsupported MCP operation: ${String(input.operation)}`);
+    if (!(["list", "describe", "call"] as const).includes(input.operation)) {
+      throw new Error(toolContractRefusal("mcp_call", `operation ${String(input.operation)} is unsupported`, "choose list, describe, or call"));
+    }
     if (input.operation === "list") {
       assertAbsent(input, ["server", "tool", "arguments"], "MCP list");
       return toolResult({ servers: enabledMcpSummaries(context) });
     }
-    if (!input.server) throw new Error(`MCP ${input.operation} requires server`);
+    if (!input.server) {
+      throw new Error(toolContractRefusal("mcp_call", `${input.operation} requires server`, "call mcp_call with operation=list, then pass one enabled server name"));
+    }
     assertMcpEnabled(context, input.server);
     if (input.operation === "describe") {
       assertAbsent(input, ["tool", "arguments"], "MCP describe");
       return toolResult(await context.mcp.describeServer(input.server, signal));
     }
-    if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) throw new Error("MCP call requires tool and object arguments");
+    if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) {
+      throw new Error(toolContractRefusal("mcp_call", "call requires tool and an object arguments value", "describe the selected server, then pass the advertised tool name and an arguments object"));
+    }
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
     if (!capabilityId) throw new Error(unavailableToolMessage("mcp_call", `MCP server ${input.server} is unknown`, "call mcp_call with operation=list to inspect enabled servers, then describe the selected server before invoking it"));
     if (context.runtime && typeof context.runtime.invokeCapability === "function") {
@@ -1606,6 +1618,11 @@ function unavailableToolMessage(tool: string, reason: string, next: string): str
   return `[ProofBlade tool unavailable: ${tool}]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`;
 }
 
+/** Return contract denials as actionable tool feedback instead of a bare parser error. */
+function toolContractRefusal(tool: string, reason: string, next: string): string {
+  return `[ProofBlade tool request rejected: ${tool}]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`;
+}
+
 function enabledMcpSummaries(context: CodingResourceContext): ReturnType<McpProjectRegistry["summaries"]> {
   return context.mcp.summaries().filter((server) => context.enabledMcpServers.has(server.name) && !server.disabled);
 }
@@ -1613,12 +1630,16 @@ function enabledMcpSummaries(context: CodingResourceContext): ReturnType<McpProj
 function assertOnly(input: Record<string, unknown>, allowed: string[], operation: string): void {
   const allowedKeys = new Set(allowed);
   const unexpected = Object.keys(input).filter((key) => input[key] !== undefined && !allowedKeys.has(key));
-  if (unexpected.length > 0) throw new Error(`${operation} does not accept: ${unexpected.join(", ")}`);
+  if (unexpected.length > 0) {
+    throw new Error(toolContractRefusal(operation, `these fields are not accepted: ${unexpected.join(", ")}`, `remove them and retry with only: ${allowed.join(", ")}`));
+  }
 }
 
 function assertAbsent(input: Record<string, unknown>, keys: string[], operation: string): void {
   const unexpected = keys.filter((key) => input[key] !== undefined);
-  if (unexpected.length > 0) throw new Error(`${operation} does not accept: ${unexpected.join(", ")}`);
+  if (unexpected.length > 0) {
+    throw new Error(toolContractRefusal(operation, `these fields are not accepted for this operation: ${unexpected.join(", ")}`, `remove them and retry this ${operation} request`));
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

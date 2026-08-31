@@ -415,8 +415,8 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   assert.equal((described.details as { nestedTools: Array<{ name: string }> }).nestedTools[0]?.name, "page_eval");
   assert.deepEqual(calls, [{ kind: "describe", value: "echo" }]);
   await assert.rejects(() => executeTool("mcp_call", { operation: "describe", server: "browser" }, context), /not enabled.*not executed[\s\S]*Next:/);
-  await assert.rejects(() => executeTool("mcp_call", { operation: "list", server: "echo" }, context), /does not accept/);
-  await assert.rejects(() => executeTool("mcp_call", { operation: "delete", server: "echo" }, context), /Unsupported MCP operation/);
+  await assert.rejects(() => executeTool("mcp_call", { operation: "list", server: "echo" }, context), /Reason:.*not executed[\s\S]*Next:/);
+  await assert.rejects(() => executeTool("mcp_call", { operation: "delete", server: "echo" }, context), /Reason:.*not executed[\s\S]*Next:/);
 
   const called = await executeTool("mcp_call", { operation: "call", server: "echo", tool: "echo_text", arguments: { text: "hello" } }, context);
   assert.equal(called.content.map((part) => part.text ?? "").join(""), "called");
