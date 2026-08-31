@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 165
-- Symbols: 1760
+- Symbols: 1761
 
 ## Public Symbols
 
@@ -276,7 +276,7 @@
 ### ContextCompiler
 - Kind: `class`
 - Signature: `ContextCompiler`
-- Source: [src/context/compiler.ts:19](../../../packages/materials/src/context/compiler.ts:19)
+- Source: [src/context/compiler.ts:20](../../../packages/materials/src/context/compiler.ts:20)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context compiler class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1066,7 +1066,7 @@
 ### CONTEXT_COMPILER_VERSION
 - Kind: `constant`
 - Signature: `"proofblade-context@8"`
-- Source: [src/context/compiler.ts:8](../../../packages/materials/src/context/compiler.ts:8)
+- Source: [src/context/compiler.ts:9](../../../packages/materials/src/context/compiler.ts:9)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context compiler version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1074,7 +1074,7 @@
 ### CONTEXT_MANIFEST_VERSION
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/context/compiler.ts:9](../../../packages/materials/src/context/compiler.ts:9)
+- Source: [src/context/compiler.ts:10](../../../packages/materials/src/context/compiler.ts:10)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context manifest version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1082,7 +1082,7 @@
 ### MAX_LEDGER_BLOCK_TOKENS
 - Kind: `constant`
 - Signature: `10000`
-- Source: [src/context/compiler.ts:11](../../../packages/materials/src/context/compiler.ts:11)
+- Source: [src/context/compiler.ts:12](../../../packages/materials/src/context/compiler.ts:12)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max ledger block tokens constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1091,7 +1091,7 @@
 ### MAX_TASK_LAYER_TOKENS
 - Kind: `constant`
 - Signature: `4096`
-- Source: [src/context/compiler.ts:10](../../../packages/materials/src/context/compiler.ts:10)
+- Source: [src/context/compiler.ts:11](../../../packages/materials/src/context/compiler.ts:11)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max task layer tokens constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1100,7 +1100,7 @@
 ### PROOFBLADE_STANDING_INSTRUCTIONS
 - Kind: `constant`
 - Signature: `string`
-- Source: [src/context/compiler.ts:12](../../../packages/materials/src/context/compiler.ts:12)
+- Source: [src/context/compiler.ts:13](../../../packages/materials/src/context/compiler.ts:13)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: proofblade standing instructions constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1696,7 +1696,7 @@
 ### contextText
 - Kind: `function`
 - Signature: `(output: ContextBuildOutput): string`
-- Source: [src/context/compiler.ts:613](../../../packages/materials/src/context/compiler.ts:613)
+- Source: [src/context/compiler.ts:658](../../../packages/materials/src/context/compiler.ts:658)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context text operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1705,7 +1705,7 @@
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:617](../../../packages/materials/src/context/compiler.ts:617)
+- Source: [src/context/compiler.ts:662](../../../packages/materials/src/context/compiler.ts:662)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2779,7 +2779,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1126](../../../packages/materials/src/runtime/coding-lane.ts:1126)
+- Source: [src/runtime/coding-lane.ts:1128](../../../packages/materials/src/runtime/coding-lane.ts:1128)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -2788,7 +2788,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1193](../../../packages/materials/src/runtime/coding-lane.ts:1193)
+- Source: [src/runtime/coding-lane.ts:1195](../../../packages/materials/src/runtime/coding-lane.ts:1195)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2797,7 +2797,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:858](../../../packages/materials/src/runtime/coding-lane.ts:858)
+- Source: [src/runtime/coding-lane.ts:860](../../../packages/materials/src/runtime/coding-lane.ts:860)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -2806,7 +2806,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:948](../../../packages/materials/src/runtime/coding-lane.ts:948)
+- Source: [src/runtime/coding-lane.ts:950](../../../packages/materials/src/runtime/coding-lane.ts:950)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2815,7 +2815,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:1018](../../../packages/materials/src/runtime/coding-lane.ts:1018)
+- Source: [src/runtime/coding-lane.ts:1020](../../../packages/materials/src/runtime/coding-lane.ts:1020)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -2824,7 +2824,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1013](../../../packages/materials/src/runtime/coding-lane.ts:1013)
+- Source: [src/runtime/coding-lane.ts:1015](../../../packages/materials/src/runtime/coding-lane.ts:1015)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -4720,7 +4720,7 @@
 ### ContextBuildOutput
 - Kind: `interface`
 - Signature: `ContextBuildOutput`
-- Source: [src/domain/types.ts:1312](../../../packages/materials/src/domain/types.ts:1312)
+- Source: [src/domain/types.ts:1314](../../../packages/materials/src/domain/types.ts:1314)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context build output type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4728,7 +4728,7 @@
 ### ContextMaintenancePolicy
 - Kind: `interface`
 - Signature: `ContextMaintenancePolicy`
-- Source: [src/domain/types.ts:1304](../../../packages/materials/src/domain/types.ts:1304)
+- Source: [src/domain/types.ts:1306](../../../packages/materials/src/domain/types.ts:1306)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context maintenance policy type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9576,7 +9576,7 @@
 ### ContextCompiler.build
 - Kind: `method`
 - Signature: `(input: ContextBuildInput): ContextBuildOutput`
-- Source: [src/context/compiler.ts:20](../../../packages/materials/src/context/compiler.ts:20)
+- Source: [src/context/compiler.ts:21](../../../packages/materials/src/context/compiler.ts:21)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10121,7 +10121,7 @@
 ### AblationPolicyController.decide
 - Kind: `method`
 - Signature: `(input: AblationPolicyDecisionInput): AblationDecisionEvent`
-- Source: [src/evaluation/ablation-policy.ts:50](../../../packages/materials/src/evaluation/ablation-policy.ts:50)
+- Source: [src/evaluation/ablation-policy.ts:53](../../../packages/materials/src/evaluation/ablation-policy.ts:53)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: decide operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10130,16 +10130,25 @@
 ### AblationPolicyController.eventsSnapshot
 - Kind: `method`
 - Signature: `(): AblationDecisionEvent[]`
-- Source: [src/evaluation/ablation-policy.ts:74](../../../packages/materials/src/evaluation/ablation-policy.ts:74)
+- Source: [src/evaluation/ablation-policy.ts:77](../../../packages/materials/src/evaluation/ablation-policy.ts:77)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: events snapshot operation used to provide a reusable operation.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/ablation-policy.test.ts`
 
+### AblationPolicyController.policySnapshot
+- Kind: `method`
+- Signature: `(): HarnessPolicy`
+- Source: [src/evaluation/ablation-policy.ts:51](../../../packages/materials/src/evaluation/ablation-policy.ts:51)
+- Export: `@proofblade/materials`
+- Summary: Returns a defensive copy for adapters that project policy into context.
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/ablation.test.ts`
+
 ### AblationPolicyController.recordOutcome
 - Kind: `method`
 - Signature: `(event: AblationDecisionEvent, accepted: boolean, evidenceIds?: string[], outcome?: string): AblationDecisionEvent`
-- Source: [src/evaluation/ablation-policy.ts:67](../../../packages/materials/src/evaluation/ablation-policy.ts:67)
+- Source: [src/evaluation/ablation-policy.ts:70](../../../packages/materials/src/evaluation/ablation-policy.ts:70)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record outcome operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12018,7 +12027,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:785](../../../packages/materials/src/runtime/coding-lane.ts:785)
+- Source: [src/runtime/coding-lane.ts:787](../../../packages/materials/src/runtime/coding-lane.ts:787)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12027,7 +12036,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:797](../../../packages/materials/src/runtime/coding-lane.ts:797)
+- Source: [src/runtime/coding-lane.ts:799](../../../packages/materials/src/runtime/coding-lane.ts:799)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12036,7 +12045,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:789](../../../packages/materials/src/runtime/coding-lane.ts:789)
+- Source: [src/runtime/coding-lane.ts:791](../../../packages/materials/src/runtime/coding-lane.ts:791)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12054,7 +12063,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:793](../../../packages/materials/src/runtime/coding-lane.ts:793)
+- Source: [src/runtime/coding-lane.ts:795](../../../packages/materials/src/runtime/coding-lane.ts:795)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12063,7 +12072,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:707](../../../packages/materials/src/runtime/coding-lane.ts:707)
+- Source: [src/runtime/coding-lane.ts:709](../../../packages/materials/src/runtime/coding-lane.ts:709)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`

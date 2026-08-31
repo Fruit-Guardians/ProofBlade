@@ -47,6 +47,9 @@ export class AblationPolicyController {
 
   public constructor(private readonly policy: HarnessPolicy, private readonly clock: () => string = () => new Date().toISOString()) {}
 
+  /** Returns a defensive copy for adapters that project policy into context. */
+  public policySnapshot(): HarnessPolicy { return { ...this.policy }; }
+
   public decide(input: AblationPolicyDecisionInput): AblationDecisionEvent {
     const result = this.evaluate(input);
     const event: AblationDecisionEvent = {
@@ -94,4 +97,3 @@ export class AblationPolicyController {
     return { decision: "allow", policyName: "none", policyMode: "off", reasonCode: "no_policy_intervention" };
   }
 }
-

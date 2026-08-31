@@ -4,6 +4,7 @@ import { evaluatePhaseGate } from "../domain/phase-gate.js";
 import { phaseBudget } from "../domain/phase-budget.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
+import type { HarnessPolicy } from "../evaluation/ablation.js";
 
 export const CONTEXT_COMPILER_VERSION = "proofblade-context@8";
 export const CONTEXT_MANIFEST_VERSION = 2 as const;
@@ -22,7 +23,9 @@ export class ContextCompiler {
     const facts = Object.values(snapshot.facts).filter((fact) => fact.runId === snapshot.runId && fact.generation === snapshot.generation && fact.status === "CONFIRMED").sort(bySeq);
     const proposedFacts = Object.values(snapshot.facts).filter((fact) => fact.runId === snapshot.runId && fact.generation === snapshot.generation && fact.status === "PROPOSED").sort(bySeq);
     const rejectedHypotheses = Object.values(snapshot.hypotheses).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation && item.status === "REJECTED").sort(bySeq);
-    const observations = Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-12);
+    const policy = input.harnessPolicy;
+    const allObservations = Object.values(snapshot.observations).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq);
+    const observations = selectPolicyObservations(allObservations, policy);
     const reasoningTrees = Object.values(snapshot.reasoningTrees).filter((item) => item.generation === snapshot.generation).sort((a, b) => b.updatedSeq - a.updatedSeq).slice(0, 24);
     const organizedNodeIds = new Set(reasoningTrees.flatMap((tree) => tree.nodeIds));
     // Automatic bash/read observations remain searchable through L4 and the artifact index.
@@ -31,7 +34,7 @@ export class ContextCompiler {
       .filter((item) => item.provenance?.runId === snapshot.runId && item.provenance.generation === snapshot.generation && !organizedNodeIds.has(item.id))
       .filter((item) => item.source.tool === "evidence" || item.provenance?.recordedBy === "verifier" || !["bash", "bash:error", "read"].includes(item.source.tool ?? ""))
       .sort(bySeq)
-      .slice(-16);
+      .slice(policy?.evidenceCuration === "draft" ? -24 : policy?.evidenceCuration === "advice" ? -20 : -16);
     const domainRecords = Object.values(snapshot.domainRecords ?? {}).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-24);
     const completions = Object.values(snapshot.completions).filter((item) => item.runId === snapshot.runId && item.generation === snapshot.generation).sort(bySeq).slice(-6);
     const jobs = Object.values(snapshot.jobs).filter((job) => job.generation === snapshot.generation && ["QUEUED", "RUNNING", "UNKNOWN"].includes(job.status)).sort(bySeq);
@@ -116,6 +119,7 @@ export class ContextCompiler {
           block_reason: item.blockReason,
         })),
         prohibited_repeat_keys: prohibitedRepeatKeys,
+        cognitive_policy: policySummary(policy, allObservations.length, observations.length, evidence.length),
       },
     });
     const activeLeases = Object.values(snapshot.leases).filter((lease) => lease.generation === snapshot.generation);
@@ -123,7 +127,7 @@ export class ContextCompiler {
     const ledgerBudget = Math.max(512, Math.floor(availableInput * 0.4));
     const l3aBudget = Math.min(MAX_LEDGER_BLOCK_TOKENS, Math.max(128, Math.floor(ledgerBudget * 0.6)));
     const l3bBudget = Math.min(MAX_LEDGER_BLOCK_TOKENS, Math.max(128, ledgerBudget - l3aBudget));
-    const visibleObservationQueue = observationQueue.slice(0, 8);
+    const visibleObservationQueue = selectPolicyObservationQueue(observationQueue, policy);
     const l3a = buildLedger({ facts, proposedFacts, rejectedHypotheses, observations, evidence, domainRecords, reasoningTrees, completions, jobs: [], inFlightEffects: [], leases: [], tokenBudget: l3aBudget });
     const l3b = buildActiveControls({ jobs, handoffs, inFlightEffects, leases: activeLeases, observationQueue: visibleObservationQueue, tokenBudget: l3bBudget });
     const l3 = `<durable-ledger>\n${l3a}\n</durable-ledger>\n<active-controls>\n${l3b}\n</active-controls>`;
@@ -131,8 +135,9 @@ export class ContextCompiler {
     let remaining = Math.max(0, availableInput - requiredTokens);
     const dropped: ContextManifest["dropped"] = [];
 
-    const maintenancePolicy = normalizeMaintenancePolicy(input.maintenancePolicy);
-    const recent = selectRecentMessages(input.recentMessages ?? [], Math.floor(remaining * 0.65), dropped, maintenancePolicy.keepRecentTurns);
+    const maintenancePolicy = applyPolicyCompression(normalizeMaintenancePolicy(input.maintenancePolicy), policy);
+    const recentBudgetRatio = policy?.contextSelection === "receipt" ? 0.5 : policy?.contextSelection === "deterministic_broker" ? 0.8 : 0.65;
+    const recent = selectRecentMessages(input.recentMessages ?? [], Math.floor(remaining * recentBudgetRatio), dropped, maintenancePolicy.keepRecentTurns);
     const l4Text = recent.map((message) => message.content).join("\n");
     remaining = Math.max(0, remaining - estimateTokens(l4Text));
     const selectedArtifacts = selectArtifacts(artifacts, remaining, dropped);
@@ -219,7 +224,7 @@ export class ContextCompiler {
       blocks,
       observationQueue: observationQueueSummary(observationQueue),
       firstChangedBlock: firstChangedBlock(blocks, input.previousBlocks),
-      compressionTarget: compressionTarget(blocks, estimatedTokens / Math.max(1, availableInput)),
+      compressionTarget: policy?.compression === "off" ? undefined : compressionTarget(blocks, estimatedTokens / Math.max(1, availableInput)),
       sourceIds: [...new Set(blocks.flatMap((block) => block.sourceIds))].sort(),
       dropped,
       budget,
@@ -275,6 +280,46 @@ function firstChangedBlock(blocks: ContextBlock[], previous?: ContextBlock[]): s
 function compressionTarget(blocks: ContextBlock[], ratio: number): ContextBlock["band"] | undefined {
   if (ratio < 0.6) return undefined;
   return blocks.filter((block) => block.compressible).sort((left, right) => right.estimatedTokens - left.estimatedTokens || left.band.localeCompare(right.band))[0]?.band;
+}
+
+function selectPolicyObservations<T extends { createdSeq: number }>(observations: readonly T[], policy: HarnessPolicy | undefined): T[] {
+  if (policy?.contextSelection === "receipt") return observations.slice(-6);
+  if (policy?.contextSelection === "deterministic_broker") {
+    return [...observations].sort((left, right) => right.createdSeq - left.createdSeq).slice(0, 8).sort((left, right) => left.createdSeq - right.createdSeq);
+  }
+  return observations.slice(-12);
+}
+
+function selectPolicyObservationQueue<T>(queue: readonly T[], policy: HarnessPolicy | undefined): T[] {
+  if (policy?.recall === "automatic") return queue.slice(0, 12);
+  if (policy?.recall === "advice") return queue.slice(0, 10);
+  return queue.slice(0, 8);
+}
+
+function policySummary(policy: HarnessPolicy | undefined, availableObservations: number, selectedObservations: number, selectedEvidence: number): Record<string, unknown> | undefined {
+  if (!policy) return undefined;
+  const informationValue = policy.informationValue === "off"
+    ? undefined
+    : { estimator: policy.informationValue, observationNovelty: availableObservations === 0 ? 0 : selectedObservations / availableObservations, evidenceCoverage: selectedEvidence / Math.max(1, selectedObservations) };
+  return {
+    context_selection: policy.contextSelection,
+    recall: policy.recall,
+    evidence_curation: policy.evidenceCuration,
+    information_value: informationValue,
+    compression: policy.compression,
+    selected_observations: selectedObservations,
+    available_observations: availableObservations,
+    selected_evidence: selectedEvidence,
+  };
+}
+
+function applyPolicyCompression(policy: MoleculeContextMaintenancePolicy & ContextMaintenancePolicy, harnessPolicy: HarnessPolicy | undefined): MoleculeContextMaintenancePolicy & ContextMaintenancePolicy {
+  if (!harnessPolicy || harnessPolicy.compression === "off") return policy;
+  if (harnessPolicy.compression === "bounded_summary") return { ...policy, selectedTarget: "tool-results" };
+  if (harnessPolicy.compression === "query_aware") return { ...policy, selectedTarget: "recent-transcript" };
+  // Rate-distortion starts maintenance earlier while preserving the same hard stop.
+  const targetRatio = Math.max(0.05, policy.targetRatio - 0.1);
+  return { ...policy, targetRatio, selectedTarget: "all" };
 }
 
 function formatSkillCatalog(resources: ContextManifest["resources"]): string {

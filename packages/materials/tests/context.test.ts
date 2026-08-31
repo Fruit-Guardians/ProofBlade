@@ -7,6 +7,20 @@ import type { TaskContract } from "../src/domain/types.js";
 import { estimateTokens } from "../src/domain/utils.js";
 import { MAX_LEDGER_BLOCK_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
 
+const ablationPolicy = {
+  firstAction: "hard_gate",
+  phaseRoute: "hard_gate",
+  actionBundle: "hard_gate",
+  duplicateFailure: "hard_stop",
+  circuitBreaker: "hard_stop",
+  contextSelection: "fixed_recent",
+  recall: "manual",
+  evidenceCuration: "manual",
+  informationValue: "off",
+  compression: "off",
+  stopSuggestion: "off",
+} as const;
+
 const task: TaskContract = {
   schema_version: 1,
   task_id: "CTX-001",
@@ -82,6 +96,47 @@ test("context projection excludes facts and evidence from stale fixture generati
   assert.doesNotMatch(rendered, /stale conclusion/);
   assert.match(rendered, /current conclusion/);
   assert.deepEqual(compiled.manifest.factIds, ["F-CURRENT"]);
+});
+
+test("ablation context policies change only cognitive context selection and maintenance", () => {
+  const snapshot = createInitialSnapshot("CTX-POLICY", task);
+  snapshot.status = "RUNNING";
+  snapshot.observations = Object.fromEntries(Array.from({ length: 18 }, (_, index) => [`O-${index}`, {
+    id: `O-${index}`, runId: snapshot.runId, generation: snapshot.generation, summary: `observation ${index}`,
+    source: { tool: "read", operation: "fixture_inspect", artifactId: `A-${index}`, generation: snapshot.generation }, candidateKinds: [], createdSeq: index + 1,
+  }]));
+  snapshot.evidence = Object.fromEntries(Array.from({ length: 22 }, (_, index) => [`EV-${index}`, {
+    id: `EV-${index}`, kind: "observation", summary: `curated evidence ${index}`,
+    source: { tool: "evidence", generation: snapshot.generation },
+    provenance: { schemaVersion: 1, runId: snapshot.runId, generation: snapshot.generation, recordedBy: "agent", artifactIds: [] },
+    confidence: 0.5, supports: [], refutes: [], createdSeq: index + 100,
+  }]));
+  const queue = Array.from({ length: 12 }, (_, index) => ({
+    id: `observation:${index}`, sourceEventIds: [`event-${index}`], source: "job" as const, kind: "job.finished",
+    priority: "normal" as const, generation: snapshot.generation, sequence: index + 1, summary: `queued ${index}`,
+    relatedIds: [], artifactIds: [], createdAt: new Date(0).toISOString(),
+  }));
+  const build = (policy: Partial<typeof ablationPolicy>) => new ContextCompiler().build({
+    runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, observationQueue: queue,
+    contextWindow: 20_000, harnessPolicy: { ...ablationPolicy, ...policy },
+  });
+  const baseline = build({});
+  const receipt = build({ contextSelection: "receipt" });
+  const broker = build({ contextSelection: "deterministic_broker", recall: "automatic", evidenceCuration: "draft", informationValue: "heuristic", compression: "rate_distortion" });
+  const bounded = build({ compression: "bounded_summary" });
+  const rendered = broker.messages.map((message) => message.content).join("\n");
+  const activeControls = broker.manifest.blocks?.find((block) => block.id === "context.l3b")?.content ?? "";
+  assert.equal(baseline.manifest.observationIds.length, 12);
+  assert.equal(receipt.manifest.observationIds.length, 6);
+  assert.equal(broker.manifest.observationIds.length, 8);
+  assert.equal(baseline.manifest.evidenceIds.length, 16);
+  assert.equal(broker.manifest.evidenceIds.length, 22);
+  assert.notEqual(baseline.manifest.hash, receipt.manifest.hash);
+  assert.match(rendered, /"context_selection":"deterministic_broker"/);
+  assert.match(rendered, /"estimator":"heuristic"/);
+  assert.match(activeControls, /queued 11/);
+  assert.equal(broker.manifest.maintenance.target, "all");
+  assert.equal(bounded.manifest.maintenance.target, "tool-results");
 });
 
 test("context control view exposes bounded recovery and work constraints", () => {

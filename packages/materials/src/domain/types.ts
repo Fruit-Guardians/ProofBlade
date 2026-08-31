@@ -1299,6 +1299,8 @@ export interface ContextBuildInput {
   previousBlocks?: ContextBlock[];
   maintenancePolicy?: ContextMaintenancePolicy;
   observationQueue?: readonly ObservationQueueItem[];
+  /** Variant cognitive policy projected into model context; safety is never controlled here. */
+  harnessPolicy?: import("../evaluation/ablation.js").HarnessPolicy;
 }
 
 export interface ContextMaintenancePolicy {

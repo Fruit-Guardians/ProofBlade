@@ -607,6 +607,7 @@ export class PiCodingLane implements AgentLanePort {
         resources: contextResources,
         observationQueue: queue.items,
         previousBlocks: previousContextBlocks,
+        ...(options.ablationPolicy ? { harnessPolicy: options.ablationPolicy.controller.policySnapshot() } : {}),
       });
       previousContextBlocks = compiled.manifest.blocks;
       const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
@@ -661,6 +662,7 @@ export class PiCodingLane implements AgentLanePort {
           resources: contextResources,
           observationQueue: observationQueue.items,
           previousBlocks: previousContextBlocks,
+          ...(options.ablationPolicy ? { harnessPolicy: options.ablationPolicy.controller.policySnapshot() } : {}),
         });
         previousContextBlocks = compiled.manifest.blocks;
         const summary = contextSnapshot(compiled.manifest);
