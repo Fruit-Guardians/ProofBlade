@@ -321,7 +321,7 @@ test("real model evaluator aborts a provider turn when the case deadline expires
       && item.error
       && ["FAILED", "EXHAUSTED"].includes(item.status)
       && item.failureCategory === "budget_exhausted"
-      && item.turns === 1
+      && item.turns <= 1
       && item.providerDiagnostics.deadlineBeforeCompletion)));
   } finally {
     await rm(root, { recursive: true, force: true });

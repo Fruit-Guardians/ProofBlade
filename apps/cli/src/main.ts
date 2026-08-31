@@ -236,6 +236,13 @@ async function main(): Promise<void> {
         }
         const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
         if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("Ablation corpus snapshot changed; create a new experiment version before running");
+        const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
+        let ledger: AblationRunLedger;
+        try { ledger = await AblationRunLedger.load(ledgerPath, experiment); }
+        catch (error) {
+          if ((error as { code?: string }).code !== "ENOENT") throw error;
+          ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
+        }
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
@@ -268,6 +275,13 @@ async function main(): Promise<void> {
           baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
           runOrder: experiment.runOrder,
         });
+        for (const variant of summary.variants) for (const item of variant.cases) {
+          const pairingId = `${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${variant.id}`;
+          const current = ledger.snapshot().attempts[pairingId];
+          if (!current || (current.status !== "ready" && current.status !== "unknown")) continue;
+          await ledger.claim(pairingId, item.runId);
+          await ledger.complete(pairingId, item.success ? "succeeded" : "failed", item.error);
+        }
         print(summary);
         if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
         break;

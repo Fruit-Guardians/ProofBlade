@@ -69,7 +69,7 @@
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "b93bc30cf838d4a49d111dde215bb13ad6d0389756cfb2f1e96f7a12957fa42b",
+    "src/evaluation/real-model-evaluator.ts": "0eacecb2babfb7be993060d1ac21558764c333e277d24a4a51dbf807fd4b5467",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
@@ -6384,7 +6384,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 743,
+      "line": 768,
       "signature": "(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics",
       "summary": "Projects provider traffic onto durable executor turns without relying on",
       "summarySource": "tsdoc",
@@ -33100,7 +33100,7 @@
         "packages/materials/tests/web-tools.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ],
-      "structureHash": "334dc6cbe4783240567468ff9296d56a866472827aa7d2bd6e308eba7b840095",
+      "structureHash": "23e235466868e61cd001a5bdc7652d6a7cbe1447f11531c3593958c54cde0376",
       "parentId": "@proofblade/materials::class::RealModelEvaluationRunner"
     },
     {

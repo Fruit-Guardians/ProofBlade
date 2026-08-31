@@ -2169,7 +2169,7 @@
 ### deriveProviderDiagnostics
 - Kind: `function`
 - Signature: `(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:743](../../../packages/materials/src/evaluation/real-model-evaluator.ts:743)
+- Source: [src/evaluation/real-model-evaluator.ts:768](../../../packages/materials/src/evaluation/real-model-evaluator.ts:768)
 - Export: `@proofblade/materials`
 - Summary: Projects provider traffic onto durable executor turns without relying on
 - Summary source: `tsdoc`

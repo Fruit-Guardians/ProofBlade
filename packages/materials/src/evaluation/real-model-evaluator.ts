@@ -301,6 +301,10 @@ export class RealModelEvaluationRunner {
     const gatePolicy = gatePolicyFor(options, variants, minimumCorpusCases);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
+    const useExperimentBudget = options.requireProviderTraffic === true;
+    const totalPairings = variants.length * corpus.cases.length * attempts;
+    const perCaseMaxCostUsd = useExperimentBudget ? maxCostUsd / Math.max(1, totalPairings) : maxCostUsd;
+    const experimentDeadlineAt = useExperimentBudget ? Date.now() + deadlineMs : Number.POSITIVE_INFINITY;
     const casesByVariant = new Map(variants.map((variant) => [variant.id, [] as RealModelEvaluationCase[]]));
     const servicesByVariant = new Map(variants.map((variant) => [variant.id, createServices(this.root, variant.config)]));
     try {
@@ -309,9 +313,18 @@ export class RealModelEvaluationRunner {
         const services = servicesByVariant.get(variant.id)!;
         const runId = `${runPrefix}-${variant.id}-${item.corpusCase.id}-a${item.attempt}`;
         assertRunId(runId);
+        if (useExperimentBudget && Date.now() >= experimentDeadlineAt) {
+          casesByVariant.get(variant.id)!.push(expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId));
+          continue;
+        }
         await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, item.corpusCase);
-        const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
-        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, deadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
+        const remainingDeadlineMs = useExperimentBudget ? Math.max(1, experimentDeadlineAt - Date.now()) : deadlineMs;
+        if (useExperimentBudget && remainingDeadlineMs <= 1) {
+          casesByVariant.get(variant.id)!.push(expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId));
+          continue;
+        }
+        const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd: perCaseMaxCostUsd, deadlineMs: remainingDeadlineMs });
+        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, remainingDeadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
       }
     } finally {
       await Promise.all([...servicesByVariant.values()].map((services) => services.sandbox.close()));
@@ -333,7 +346,7 @@ export class RealModelEvaluationRunner {
         ">=1",
       )),
       check("candidate_leaks", results.every((item) => item.candidateLeakCount === 0), sum(results.map((item) => item.candidateLeakCount)), 0),
-      check("case_cost_cap", results.every((item) => item.cases.every((candidate) => candidate.costUsd <= maxCostUsd + 1e-9)), highestCaseCost(results), `<=${maxCostUsd}`),
+      check("case_cost_cap", results.every((item) => item.cases.every((candidate) => candidate.costUsd <= perCaseMaxCostUsd + 1e-9)), highestCaseCost(results), `<=${perCaseMaxCostUsd}`),
       ...(options.requireProviderTraffic === true
         ? results.map((item) => check(`provider_traffic:${item.id}`, item.metrics.providerRequests > 0, item.metrics.providerRequests, ">0"))
         : []),
@@ -532,6 +545,18 @@ export class RealModelEvaluationRunner {
       ...(ablationDecisions.length > 0 ? { ablationDecisions } : {}),
     };
   }
+}
+
+function expiredEvaluationCase(variantId: string, corpusCase: LoadedRealEvaluationCase, attempt: number, runId: string): RealModelEvaluationCase {
+  return {
+    variantId, corpusCaseId: corpusCase.id, targetKind: corpusCase.targetKind, runId, attempt,
+    status: "FAILED", phase: "intake", turns: 0, durationMs: 0, success: false, evidenceBacked: false,
+    replayParity: true, candidateLeaked: false, providerRequests: 0, totalTokens: 0, costUsd: 0,
+    effectCount: 0, effectiveActions: 0, effectiveActionRatio: 0, repeatedExperimentCount: 0,
+    submissionCount: 0, contextTokens: 0, confirmedFacts: 0, evidenceLinkedFacts: 0,
+    factEvidenceCoverage: 0, providerDiagnostics: emptyProviderDiagnostics(true), failureCategory: "budget_exhausted",
+    error: "Error: Real evaluation experiment deadline exhausted.",
+  };
 }
 
 function realEvaluationTask(runId: string, corpusCase: LoadedRealEvaluationCase, root: string, config: ProofBladeConfig, budget: { maxCostUsd: number; deadlineMs: number }): TaskContract {
