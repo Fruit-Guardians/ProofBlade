@@ -162,7 +162,10 @@ export class ProviderRequestBudget {
     const maximumUsd = maximumProviderRequestCost(model, options?.maxTokens);
     if (this.options.maxCostUsd !== undefined && this.spentUsd + this.reservedUsd + maximumUsd > this.options.maxCostUsd + 1e-9) {
       this.stoppedAs = "budget_exhausted";
-      throw new ProviderBudgetExceededError(`Provider cost budget exhausted before request: reserved=${round(this.spentUsd + this.reservedUsd + maximumUsd)} USD limit=${this.options.maxCostUsd} USD`);
+      const reserved = round(this.spentUsd + this.reservedUsd + maximumUsd);
+      throw new ProviderBudgetExceededError(
+        `[ProofBlade Provider request blocked]\nReason: the conservative request reservation is ${reserved} USD, above this Run's ${this.options.maxCostUsd} USD limit. No Provider request was sent.\nNext: start a new authorized Run with at least ${reserved} USD available, or reduce the configured context/output ceiling before retrying.`,
+      );
     }
     this.reservedUsd += maximumUsd;
     return { maximumUsd, settled: false };

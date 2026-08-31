@@ -28,10 +28,16 @@ test("provider budget rejects an over-budget request before the Provider starts"
   const budget = new ProviderRequestBudget({ maxCostUsd: 0.0012, deadlineAt: Date.now() + 10_000 });
   const provider = budget.wrap(completingProvider(() => { starts += 1; return message(0); }));
   try {
+    let message = "";
     assert.throws(
       () => provider.stream(model, { messages: [] }, { maxTokens: 500 }),
-      ProviderBudgetExceededError,
+      (error: unknown) => {
+        message = error instanceof Error ? error.message : String(error);
+        return error instanceof ProviderBudgetExceededError;
+      },
     );
+    assert.match(message, /Reason:.*No Provider request was sent[\s\S]*Next:/);
+    assert.match(message, /at least 0\.0015 USD available/);
     assert.equal(starts, 0);
     assert.equal(budget.termination, "budget_exhausted");
   } finally {
