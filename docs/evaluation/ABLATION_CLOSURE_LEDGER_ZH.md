@@ -98,6 +98,16 @@
 - 硬边界保持不变：工作区与网络 scope、凭据隔离、generation fence、effect journal、用户取消、总成本/工具/提交额度、deadline、隐藏评分与答案防泄漏。它们拒绝时必须返回可操作反馈：触发原因、未执行的动作、已保留的状态，以及允许的替代路径或所需授权；不得只给出抽象的拒绝码。
 - `hard_gate` / `hard_stop` 不再代表默认能力配置，只作为明确标记的消融对照。它们的作用是量化“锁链”是否真的带来收益，而不是把失败归因给模型。
 
+### AB-TERRA-IDALIB-MAGIC-037/038：函数地址投影与评测账本恢复
+
+- 036 的首错复核：两个变体都取得了 `list_functions` / `get_entry_points` 的真实结果，却没有一次 `decompile_function` 或 `disassemble_function`。原始运行时把 journal 中的 MCP observation 再次 JSON 化，函数列表可读性差且可能在 `main` 前截断；提示又只说“选择地址”，没有给出已验证的参数名。这是 Harness 的观察/手柄表达问题，不是应以硬门控限制模型的原因。
+- 修复：保留 `<untrusted-observation>` 边界，但在内部渲染 MCP payload；从 `structuredContent` 投影最多四个小的候选（优先 `main`），附带已核对的调用形状：`decompile_function {"address":"..."}` 和 `disassemble_function {"start_address":"..."}`。候选只作为建议，不选择函数、不拒绝其他 scope 内工具。单元测试同时锁定未二次转义、候选地址和两个 schema 参数。
+- 037 的第一次调用窗口中断后留下非终态 Run；其后 RETRY1 的两条真实轨迹都完成，且均进入反编译，但旧 ablation CLI 在全部 Provider 流量结束后才 claim ledger，导致这些轨迹无法成为正式 pairing。该批次保留为机制诊断，不计入比较。
+- 账本修复：CLI 现在在任何 live Provider 请求前 claim 全部 immutable pairing；中途退出保留 `running`，操作者必须显式 `ablation resume` 才能标为 `unknown`。它拒绝把已终态与未执行 pairing 混在一次新运行中，避免重复计费和伪比较。
+- 038（快照 `9f68f3a0…`）是修复后的正式单题复测：AIHub `gpt-5.6-terra` / Responses / max、同一 IDALIB 与 `magic`、两个变体各一次。Provider 均为 200，无工具 schema 或权限错误；两个 ledger pairing 均完整落账为 failed / `EXHAUSTED`，并且都没有 `verify_claim`，所以都没有 hidden-scorer 成功。
+- 038 行为：`advice-curation` 21 次 Provider 200、22 次工具调用，其中 `decompile_function=4`，从 036 的零次代码分析转为持续函数级分析；`manual-curation` 15 次 Provider 200、39 次工具调用，以 `bash=20`、`read=5` 为主，只有 metadata/entry-point/list_functions，`decompile_function=0`。因此地址投影确实使代码路径可达，但单例、单次采样不能证明 curation advice 的因果收益。
+- 当前首错：advice 轨迹虽读到代码却重复 metadata/entry points，未把反编译观察收敛为候选和 `verify_claim`；manual 轨迹主要绕行 shell/泛型工具，未采用已可用的一等反编译工具。下一项修复应当是从 decompiler result 提取可追溯的输入比较、变换、常量与 call target，作为**可选的**小型“下一步可验证事实”投影；不得用 phase 预算或强制函数选择阻断其他合法逆向路径。修复后建立 039 快照，并用更多不泄漏样本与重复 attempt 才评估能力影响。
+
 ### AB-TERRA-IDALIB-MAGIC-032：一等 IDALIB 已可达，Evidence 联合 schema 仍构成摩擦（中止，不计入样本）
 
 - 配置：与 031 相同的 AIHub Terra Responses max、GUI 代理、`magic` 语料和只读 IDALIB MCP。
