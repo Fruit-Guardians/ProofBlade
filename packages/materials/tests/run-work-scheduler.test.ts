@@ -141,7 +141,7 @@ test("replans are atomically linked to the blocked item and survive replay", asy
   }
 });
 
-test("phase action bundles enforce their durable experiment budget", async () => {
+test("phase action bundles retain over-budget experiments as planning telemetry", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-phase-budget-"));
   try {
     const services = createServices(root, config);
@@ -171,10 +171,11 @@ test("phase action bundles enforce their durable experiment budget", async () =>
     await services.control.dispatch(runId, { type: "record_tool_preparation", preparation: { ...unsigned, hash: sha256(canonicalJson(unsigned)) }, lane: "executor" });
     const gate = new ExperimentGate(services.control);
     await gate.record({ runId, action: "one", input: { id: 1 }, outcome: "failure", summary: "one probe" });
-    await assert.rejects(gate.record({ runId, action: "two", input: { id: 2 }, outcome: "failure", summary: "second probe" }), /Phase action budget exhausted/);
+    await gate.record({ runId, action: "two", input: { id: 2 }, outcome: "failure", summary: "second probe" });
     const snapshot = await services.control.snapshot(runId);
-    assert.equal(phaseBudget(snapshot).phaseActionsUsed, 1);
+    assert.equal(phaseBudget(snapshot).phaseActionsUsed, 2);
     assert.equal(phaseBudget(snapshot).phaseActionsRemaining, 0);
+    assert.equal(phaseBudget(snapshot).exhausted, false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -407,7 +407,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
-    const input = params as {
+    const rawInput = params as {
       operation: "curation_status" | "inspect_forest" | "inspect_tree" | "search" | "read" | "inspect_uri" | "search_uri" | "consolidate" | "annotate" | "record" | "link" | "create_tree" | "update_tree";
       query?: string;
       artifactId?: string;
@@ -438,7 +438,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    if (!("operation" in rawInput) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(rawInput.operation)) throw new Error(`Unsupported evidence operation: ${String(rawInput.operation)}`);
+    // OpenAI-compatible tool calling frequently fills optional fields from a
+    // wide union schema. These known-but-irrelevant fields have no authority
+    // of their own, so discard them before validating the selected operation.
+    const input = relevantEvidenceInput(rawInput);
     if (input.operation === "curation_status") {
       assertOnly(input, ["operation"], "evidence curation_status");
       return toolResult({ curation: await context.evidenceCurationGate?.inspect({ includeReviewEvents: true }) ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
@@ -502,6 +506,27 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     return toolResult(await context.evidenceGraph.updateTree({ treeId: input.treeId, name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
   },
 };
+
+const EVIDENCE_OPERATION_FIELDS: Record<string, readonly string[]> = {
+  curation_status: ["operation"],
+  inspect_forest: ["operation", "maxChars"],
+  inspect_tree: ["operation", "treeId"],
+  search: ["operation", "query", "tags"],
+  read: ["operation", "artifactId", "maxChars"],
+  inspect_uri: ["operation", "uri", "level", "maxChars"],
+  search_uri: ["operation", "query", "maxResults", "maxChars", "includeStale"],
+  consolidate: ["operation", "artifactIds", "policy", "maxArtifacts"],
+  annotate: ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"],
+  record: ["operation", "artifactIds", "name", "summary", "tags", "dependsOn", "claim"],
+  link: ["operation", "from", "to", "relation", "explanation", "confidence"],
+  create_tree: ["operation", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
+  update_tree: ["operation", "treeId", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
+};
+
+function relevantEvidenceInput<T extends { operation: string }>(input: T): T {
+  const allowed = new Set(EVIDENCE_OPERATION_FIELDS[input.operation] ?? ["operation"]);
+  return Object.fromEntries(Object.entries(input).filter(([key]) => allowed.has(key))) as T;
+}
 
 /**
  * Submit a flag candidate to the live competition platform.

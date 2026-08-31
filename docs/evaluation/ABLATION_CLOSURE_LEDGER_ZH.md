@@ -90,3 +90,18 @@
 2. 在不少于 20 个不泄漏 holdout 用例、每例 3--5 次尝试并覆盖 Web/Pwn 前，依次做 `firstAction`、`duplicateFailure`、`circuitBreaker`、`evidenceCuration`、`contextSelection`、`recall`、`compression` 与 `informationValue` 单因素实验。
 3. 每项先做 mechanism smoke，再做配对、交错的真实实验；按任务种类、上下文长度、证据冲突和恢复需求分层报告。
 4. 只有重复结果同时满足 verified success、证据/复放护栏、成本和 p95 延迟约束，才可作功能有效或上线建议。
+
+## 6. Harness 设计原则与后续复测
+
+- Harness 的职责是提供**眼睛**（目标相关的只读工具与可观察输出）、**纸笔**（Artifact、Evidence、草稿与可回放事件）、**记忆**（有出处的检索、压缩与恢复）和**手**（经 scope、权限与 effect journal 约束的行动能力），而不是把预先猜测的调查顺序变成锁链。
+- 因此 `firstAction`、`phaseRoute`、`actionBundle`、证据整理及相邻的重复/无进展提醒，默认均为可记录、可比较的建议。动作包计数耗尽仍会出现在 phase telemetry 中，但不会拒绝一项合法、在 scope 内且仍有总预算的实验。
+- 硬边界保持不变：工作区与网络 scope、凭据隔离、generation fence、effect journal、用户取消、总成本/工具/提交额度、deadline、隐藏评分与答案防泄漏。它们拒绝时必须返回可操作反馈：触发原因、未执行的动作、已保留的状态，以及允许的替代路径或所需授权；不得只给出抽象的拒绝码。
+- `hard_gate` / `hard_stop` 不再代表默认能力配置，只作为明确标记的消融对照。它们的作用是量化“锁链”是否真的带来收益，而不是把失败归因给模型。
+
+### AB-TERRA-IDALIB-MAGIC-032：一等 IDALIB 已可达，Evidence 联合 schema 仍构成摩擦（中止，不计入样本）
+
+- 配置：与 031 相同的 AIHub Terra Responses max、GUI 代理、`magic` 语料和只读 IDALIB MCP。
+- 已确认行为：Provider surface 已出现 `mcp__idalib-mcp__get_metadata`；Terra 实际调用它并获得 `magic` 的真实 IDA 元数据。此结果验证了 031 的 schema 暴露修复，也证明模型并非只能在 MCP 目录循环。
+- 首错归因：模型在每条 observation 后提交宽 `evidence` 联合 schema，并携带其他 operation 的已知字段；旧 `assertOnly` 将其拒绝，导致没有继续到 `list_functions` / `decompile_function`。这不是未知参数越权、模型缺乏逆向能力或 IDALIB 不可用，而是工具 schema 对常见 OpenAI-compatible 填充行为过度严格。
+- 修复：在按 operation 校验前移除“已知但与该 operation 无关”的字段；未知字段和必填字段仍由严格 schema 校验。该变更保留证据工具的权威边界，却不把表达上的联合 schema 噪声变成调查中断。
+- 下一步：提交该回归后，在解除首步/阶段硬阻断的默认 Harness 上建立 `033` 不可变快照，验证 `get_metadata -> list_functions/decompile_function -> verify_claim` 是否可完整抵达。单题只记录机制证据，不报告策略成功率结论。

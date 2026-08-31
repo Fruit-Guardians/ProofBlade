@@ -1835,10 +1835,9 @@ function validateExperimentCommand(snapshot: RunSnapshot, command: Extract<Domai
   if (!experiment.inputHash.trim() || experiment.inputHash.length > 256) throw new Error("Experiment inputHash must contain 1-256 characters");
   if (!experiment.summary.trim() || experiment.summary.length > 1_000) throw new Error("Experiment summary must contain 1-1000 characters");
   if (experiment.hypothesisId && !snapshot.hypotheses[experiment.hypothesisId]) throw new Error(`Unknown experiment hypothesis: ${experiment.hypothesisId}`);
-  const budget = phaseBudget(snapshot);
-  if (budget.phaseActionsRemaining !== undefined && budget.phaseActionsRemaining <= 0) {
-    throw new Error(`Phase action budget exhausted: ${snapshot.domainPhase}`);
-  }
+  // Action-bundle limits are planning telemetry, not an authority boundary.
+  // Recording an additional in-scope probe lets the agent recover from an
+  // inaccurate route and gives the evaluator an observable policy deviation.
 }
 
 function validateReplanCommand(snapshot: RunSnapshot, command: Extract<DomainCommand, { type: "replan_requested" }>): void {

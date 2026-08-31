@@ -108,7 +108,7 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /generic suffix/);
   assert.match(source, /PB_READY/);
   assert.match(source, /PYTHONIOENCODING=utf-8/);
-  assert.match(source, /First action contract/);
+  assert.match(source, /Opening guidance/);
   assert.match(source, /PREPARED_CTF_WORKFLOW_PROMPT/);
   assert.match(source, /first assistant action MUST be one allowed tool call/);
   assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
@@ -216,10 +216,8 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
   const curation = await executeTool("evidence", { operation: "curation_status" }, context);
   assert.equal((curation.details as { curation: { stage: string } }).curation.stage, "clear");
   try {
-    await assert.rejects(
-      () => executeTool("evidence", { operation: "inspect_forest", query: "unexpected cross-operation field" }, context),
-      /evidence inspect_forest does not accept: query/,
-    );
+    const tolerantForest = await executeTool("evidence", { operation: "inspect_forest", query: "ignored cross-operation field" }, context);
+    assert.ok((tolerantForest.content[0]?.text ?? "").length > 0, "known cross-operation fields must not block an observation read");
     const analysisArtifact = await services.artifacts.putText(runId, "EF01 offset=0xD4 length=0x26 nonce=fc99899b203e3fb7e7a36312", {
       filename: "ncal-ef01-analysis.txt",
       semantic: { name: "NCAL EF01 初步解析", summary: "从校准文件解析出的受保护 DID 记录。", tags: ["ncal", "ef01"], role: "intermediate", relatedIds: [], annotatedBy: "harness" },
@@ -722,7 +720,7 @@ test("shell_background returns immediately and shell_job polls then stops the re
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeWindowsBusyTempDir(dir);
     }
   }
 });
@@ -780,7 +778,7 @@ test("shell_job stop reaps descendants when setsid is unavailable", async (t) =>
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeWindowsBusyTempDir(dir);
     }
   }
 });
@@ -1130,7 +1128,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     try {
       await env.cleanup();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeWindowsBusyTempDir(dir);
     }
   }
 });
@@ -1145,4 +1143,18 @@ async function executeTool(name: string, params: Record<string, unknown>, contex
 async function hasWorkingBash(env: NodeExecutionEnv): Promise<boolean> {
   const result = await env.exec("printf proofblade-shell-ready");
   return result.ok && result.value.stdout.includes("proofblade-shell-ready");
+}
+
+/**
+ * WSL-backed child processes can release a temp-directory handle shortly after
+ * their parent exits on Windows. Keep cleanup deterministic without masking a
+ * real assertion failure from the test body.
+ */
+async function removeWindowsBusyTempDir(dir: string): Promise<void> {
+  await rm(dir, {
+    recursive: true,
+    force: true,
+    maxRetries: process.platform === "win32" ? 12 : 0,
+    retryDelay: 250,
+  });
 }

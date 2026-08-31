@@ -304,25 +304,16 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       reasonInputs: { toolName: event.toolName, firstActionViolation: Boolean(firstActionViolation) },
     });
     if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
-    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") return { block: true, reason: `[ProofBlade ablation] ${policyEvent.reasonCode}` };
-    const ablationRelaxesFirstAction = policyEvent?.policyName === "first_action"
-      && (policyEvent.decision === "allow" || policyEvent.decision === "advise");
-    if (firstActionBudget && !firstActionBudget.completed && !ablationRelaxesFirstAction) {
-      if (isFirstActionCompletionTool(event.toolName)) {
-        firstActionBudget.completed = true;
-      } else if (!matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
-        return {
-          block: true,
-          reason: `[ProofBlade first action] Use one bounded first-action tool (${firstActionBudget.allowedToolNames.join(", ")}) before ${event.toolName}. Persist its result, then continue with the next hypothesis.`,
-        };
-      } else if (firstActionBudget.count >= firstActionBudget.maxCalls) {
-        return {
-          block: true,
-          reason: `[ProofBlade first action budget exhausted] The initial probe is limited to ${firstActionBudget.maxCalls} tool calls; preserve the strongest observation and continue on the next bounded step.`,
-        };
-      } else {
-        firstActionBudget.count += 1;
-      }
+    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") {
+      return { block: true, reason: ablationBlockMessage(policyEvent, firstActionBudget) };
+    }
+    // First-action plans rank useful opening probes. They do not restrict
+    // in-scope hands-on investigation: a model may have evidence that makes a
+    // different first call better. The counter is retained as evaluation
+    // telemetry; hard experimental variants are enforced above with feedback.
+    if (firstActionBudget && !firstActionBudget.completed) {
+      if (isFirstActionCompletionTool(event.toolName)) firstActionBudget.completed = true;
+      else if (matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) firstActionBudget.count += 1;
     }
     if (!toolBudget || (termination.reason === "tool_budget_exhausted" && !termination.continuousRecovery)) {
       if (termination.reason === "tool_budget_exhausted") return { block: true, reason: termination.message };
@@ -333,12 +324,12 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         // Blocking only this tool call causes Pi to ask the Provider again in
         // the same turn, which can spin through a costly sequence of rejected
         // calls. Preserve the run for a later replan, but end this turn.
-        termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Preserve the strongest evidence and replan before another Provider request.`;
+        termination.message = `[ProofBlade tool budget blocked this call]\nReason: the run has used all ${toolBudget.max} permitted tool calls. No tool was executed.\nNext: preserve the strongest observation and candidate in the run record, then replan or start a new run with an authorized larger budget before requesting another Provider turn.`;
         termination.reason = "tool_budget_exhausted";
         termination.requested = true;
         return { block: true, reason: termination.message };
       }
-      termination.message = `[ProofBlade tool budget exhausted: ${toolBudget.max} calls per run] Stop probing and preserve the strongest evidence.`;
+      termination.message = `[ProofBlade tool budget blocked this call]\nReason: the run has used all ${toolBudget.max} permitted tool calls. No tool was executed.\nNext: preserve the strongest observation and candidate; a new authorized run or replan is required before more probing.`;
       termination.reason = "tool_budget_exhausted";
       termination.requested = true;
       return { block: true, reason: termination.message };
@@ -364,6 +355,25 @@ function isFirstActionCompletionTool(toolName: string): boolean {
 
 function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {
   return allowedToolNames.some((allowed) => allowed === toolName || (allowed === "mcp__*" && toolName.startsWith("mcp__")));
+}
+
+/** Give hard experimental gates an actionable tool result, never a bare denial. */
+export function ablationBlockMessage(event: AblationDecisionEvent, firstAction?: FirstActionBudget): string {
+  const prefix = "[ProofBlade policy blocked this call]";
+  if (event.policyName === "first_action") {
+    const suggested = firstAction?.allowedToolNames.join(", ") || "the prepared opening tools";
+    return `${prefix}\nReason: this explicit ablation hard gate requires an initial observation before ${event.requestedTool ?? "this tool"}; the call was not executed.\nNext: use ${suggested} to establish one target fact, persist its result, then retry the next hypothesis. If existing evidence makes that route wrong, record the deviation for the evaluation run.`;
+  }
+  if (event.policyName === "phase_route" || event.policyName === "action_bundle") {
+    return `${prefix}\nReason: this explicit ablation hard gate found that ${event.requestedTool ?? "the requested tool"} is outside the prepared phase route; the call was not executed.\nNext: use the current phase's suggested observation first, or persist the evidence that justifies a route change and then replan.`;
+  }
+  if (event.policyName === "duplicate_failure") {
+    return `${prefix}\nReason: this explicit ablation hard gate detected a repeated failed call; the call was not executed.\nNext: change the input, tool, or hypothesis and record the prior negative result before retrying.`;
+  }
+  if (event.policyName === "circuit_breaker") {
+    return `${prefix}\nReason: this explicit ablation stop detected a non-converging tool sequence; the call was not executed.\nNext: preserve the strongest observation, choose a materially different probe, and replan before continuing.`;
+  }
+  return `${prefix}\nReason: ${event.reasonCode}. The call was not executed.\nNext: inspect the current task scope and use an in-scope alternative or request an authorized task update.`;
 }
 
 export async function finalizeCodingTurn(options: {

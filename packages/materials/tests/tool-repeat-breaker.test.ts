@@ -9,7 +9,7 @@ import { Type } from "typebox";
 import { ControlStore } from "../src/control/control-store.js";
 import { sha256 } from "../src/domain/utils.js";
 import type { TaskContract } from "../src/domain/types.js";
-import { attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
+import { ablationBlockMessage, attachCodingTurnGuards, attachRepeatedToolFailureBreaker, finalizeCodingTurn, projectCodingAssistantText, type CodingTurnTermination } from "../src/runtime/coding-turn-projection.js";
 import { AblationPolicyController } from "../src/evaluation/ablation-policy.js";
 import { DEFAULT_HARNESS_POLICY } from "../src/evaluation/ablation.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage } from "../src/runtime/tool-repeat-breaker.js";
@@ -1027,7 +1027,7 @@ test("continuous recovery still ends a Provider turn at the total tool-call cap"
   }
 });
 
-test("[contract:first-action-budget] blocks broad tools until the prepared probe produces an observation", async () => {
+test("[contract:first-action-budget] permits an in-scope alternate probe before the suggested opening action", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-first-action-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
@@ -1057,7 +1057,7 @@ test("[contract:first-action-budget] blocks broad tools until the prepared probe
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, undefined, firstActionBudget);
 
     const response = await harness.prompt("CTF challenge: inspect the target");
-    assert.equal(evidenceExecutions, 0);
+    assert.equal(evidenceExecutions, 1);
     assert.equal(bashExecutions, 1);
     assert.equal(firstActionBudget.completed, true);
     assert.equal(response.stopReason, "stop");
@@ -1101,6 +1101,26 @@ test("[contract:ablation-policy-binding] soft first-action advice records a deci
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("[contract:ablation-hard-gate-feedback] a rejected cognitive action explains the boundary and recovery", () => {
+  const controller = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "hard_gate" }, () => "2026-09-01T00:00:00.000Z");
+  const event = controller.decide({
+    experimentId: "AB-FEEDBACK",
+    variantId: "hard-gate",
+    caseId: "case-1",
+    attempt: 1,
+    runId: "run-1",
+    turn: 1,
+    requestedAction: "tool_call",
+    requestedTool: "evidence",
+    firstActionViolation: true,
+  });
+  const message = ablationBlockMessage(event, { allowedToolNames: ["bash"], maxCalls: 2, count: 0, completed: false });
+  assert.match(message, /Reason:/);
+  assert.match(message, /not executed/);
+  assert.match(message, /Next:/);
+  assert.match(message, /bash/);
 });
 
 function task(runId: string, root: string): TaskContract {

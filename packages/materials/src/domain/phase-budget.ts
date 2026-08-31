@@ -49,7 +49,8 @@ export function phaseBudget(snapshot: RunSnapshot, now?: number): PhaseBudgetVie
     replanLimit,
     replansRemaining,
     ...(deadlineRemainingMs === undefined ? {} : { deadlineRemainingMs }),
-    exhausted: runToolCallsRemaining === 0 || submissionsRemaining === 0 || replansRemaining === 0 || phaseActionsRemaining === 0 || deadlineRemainingMs === 0,
+    // A phase bundle is a recommendation, unlike the run-level resource caps.
+    exhausted: runToolCallsRemaining === 0 || submissionsRemaining === 0 || replansRemaining === 0 || deadlineRemainingMs === 0,
   };
 }
 
