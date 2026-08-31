@@ -249,6 +249,21 @@ export class SingleAgentCtfLoop {
           }
           continue;
         }
+        // Provider retries have already been exhausted inside one lane prompt.
+        // Treat a terminal transport/provider error as its own durable outcome;
+        // continuing to maxTurns only disguises it as an agent budget failure.
+        if (agentOutcome.stopReason === "error") {
+          const reason = agentOutcome.errorMessage?.trim() || "Provider request failed.";
+          await coordinator.fail(options.runId, activeWorkItemId, reason);
+          await this.services.control.dispatch(options.runId, {
+            type: "fail",
+            reason,
+            category: "provider_error",
+            lane: "executor",
+          });
+          activeWorkItemId = undefined;
+          break;
+        }
         const after = await this.services.control.snapshot(options.runId);
         if (after.status === "PAUSED") break;
         const acceptedClaim = latestAcceptedClaim(after, options.task);

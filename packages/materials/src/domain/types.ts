@@ -165,6 +165,7 @@ export type PrimaryFailureCategory =
   | "wrong_hypothesis"
   | "verification_missing"
   | "permission_or_environment"
+  | "provider_error"
   | "budget_exhausted"
   | "effect_outcome_unknown"
   | "environment_drift"

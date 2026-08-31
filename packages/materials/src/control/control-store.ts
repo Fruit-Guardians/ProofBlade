@@ -136,7 +136,7 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
 const VERIFIER_RESULT_COMMAND_TYPES = new Set(["evidence", "completion_verified", "fact", "artifact_annotation", "domain_record"]);
 const VERIFIER_EFFECT_COMMAND_TYPES = new Set(["effect_proposed", "effect_started", "effect_finished", "effect_reconciled"]);
 const FAILURE_CATEGORIES = new Set<PrimaryFailureCategory>([
-  "model_no_tool_call", "bad_tool_args", "tool_timeout", "tool_schema_mismatch", "context_overflow", "context_amnesia", "wrong_hypothesis", "verification_missing", "permission_or_environment", "budget_exhausted", "effect_outcome_unknown", "environment_drift", "prompt_injection_followed", "duplicate_submission", "verifier_disagreement",
+  "model_no_tool_call", "bad_tool_args", "tool_timeout", "tool_schema_mismatch", "context_overflow", "context_amnesia", "wrong_hypothesis", "verification_missing", "permission_or_environment", "provider_error", "budget_exhausted", "effect_outcome_unknown", "environment_drift", "prompt_injection_followed", "duplicate_submission", "verifier_disagreement",
 ]);
 
 export type DomainCommand =

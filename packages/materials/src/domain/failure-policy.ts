@@ -24,6 +24,7 @@ const POLICIES: Readonly<Record<PrimaryFailureCategory, FailurePolicy>> = {
   wrong_hypothesis: { category: "wrong_hypothesis", disposition: "replan", retryable: true },
   verification_missing: { category: "verification_missing", disposition: "replan", retryable: true },
   permission_or_environment: { category: "permission_or_environment", disposition: "escalate", retryable: false },
+  provider_error: { category: "provider_error", disposition: "retry", retryable: true },
   budget_exhausted: { category: "budget_exhausted", disposition: "stop", retryable: false },
   effect_outcome_unknown: { category: "effect_outcome_unknown", disposition: "escalate", retryable: false },
   environment_drift: { category: "environment_drift", disposition: "replan", retryable: true },

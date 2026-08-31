@@ -421,6 +421,39 @@ test("an unexpected coding lane failure terminalizes the Run for replay", async 
   }
 });
 
+test("a terminal Provider error stops after one turn and keeps its provider classification", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-provider-error-terminal-"));
+  const services = createServices(root, config);
+  let prompts = 0;
+  const failingProviderLane: AgentLaneFactory = async () => ({
+    async prompt() {
+      prompts += 1;
+      return { text: "", stopReason: "error", errorMessage: "Connection error.", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "PROVIDER-ERROR-web-source-1";
+    const result = await new SingleAgentCtfLoop(root, config, services, failingProviderLane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 3,
+    });
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(prompts, 1);
+    assert.equal(result.status, "FAILED");
+    assert.equal(snapshot.failureCategory, "provider_error");
+    assert.equal(snapshot.terminalReason, "Connection error.");
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:pause-during-verifier] pause during verifier remains PAUSED instead of completing successfully", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-pause-during-verifier-"));
   const services = createServices(root, config);

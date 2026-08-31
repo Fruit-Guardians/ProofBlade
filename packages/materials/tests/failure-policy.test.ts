@@ -21,4 +21,9 @@ test("turn guards map to the durable taxonomy used at Run termination", () => {
     disposition: "escalate",
     retryable: false,
   });
+  assert.deepEqual(failurePolicy("provider_error"), {
+    category: "provider_error",
+    disposition: "retry",
+    retryable: true,
+  });
 });
