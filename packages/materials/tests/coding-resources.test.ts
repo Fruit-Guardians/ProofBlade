@@ -115,6 +115,8 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
   assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
   assert.match(source, /<proofblade-turn-guidance>/);
+  assert.match(source, /proofblade\.binary\.disassemble/);
+  assert.match(source, /--disassemble=main/);
 });
 
 test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
@@ -1128,7 +1130,7 @@ test("IDALIB GUI dependency failures say whether the requested code action ran a
     execute: async () => { throw new Error("direct MCP execution must not be used when runtime is available"); },
   } as unknown as McpProjectRegistry;
   const output = `<untrusted-observation capability="mcp.idalib" operation="call" artifact="A-1">${JSON.stringify({ server: "idalib-mcp", tool: "disassemble_function", result: { content: [{ type: "text", text: "Error executing tool disassemble_function: Can't import PySide6. Are you trying to use Qt without GUI?" }], isError: true } })}</untrusted-observation>`;
-  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output, stderr: "MCP tool reported an error: idalib-mcp.disassemble_function. Error executing tool disassemble_function: Can't import PySide6. Are you trying to use Qt without GUI?\nThe requested static-analysis action was not executed, and no code fact was obtained. Next: call capability search with query binary disassemble.", exitCode: 0, outputTier: "small" as const, truncated: false, originalChars: output.length, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
+  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output, stderr: "MCP tool reported an error: idalib-mcp.disassemble_function. Error executing tool disassemble_function: Can't import PySide6. Are you trying to use Qt without GUI?\nThe requested static-analysis action was not executed, and no code fact was obtained. Next: call capability with { operation:\"invoke\", capabilityId:\"proofblade.binary\", capabilityOperation:\"disassemble\" }.", exitCode: 0, outputTier: "small" as const, truncated: false, originalChars: output.length, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
   const disassemble = (await createMcpFirstClassTools(mcp, ["idalib-mcp"])).find((tool) => tool.name === "mcp__idalib-mcp__disassemble_function");
   assert.ok(disassemble);
   const result = await disassemble.execute("call-1", { start_address: "0x4010d0" }, new AbortController().signal, () => undefined, context);
@@ -1138,6 +1140,7 @@ test("IDALIB GUI dependency failures say whether the requested code action ran a
   assert.match(text, /No code fact was obtained/);
   assert.match(text, /Next:/);
   assert.match(text, /capability search/);
+  assert.match(text, /capabilityOperation:\"disassemble\"/);
 });
 
 test("an initial IDALIB function inventory directs the model to inspect code", async () => {

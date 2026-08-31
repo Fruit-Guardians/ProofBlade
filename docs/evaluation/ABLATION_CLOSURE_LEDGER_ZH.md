@@ -155,3 +155,12 @@
 - 固定 035 的配置和 curation 单因素设计，仅加入 035 后的函数级 IDALIB advice。`advice-curation` 产生 20 次 Provider `200`、28 次工具调用；`manual-curation` 产生 16 次 Provider `200`、37 次工具调用。两者均为 `0/1` verified、`budget_exhausted`，且 `decompile_function=0`、`disassemble_function=0`。
 - 结论：函数列表/入口点后附加“请选择地址进入反编译”的文字建议具有单元合同覆盖，但没有驱动 Terra 在本题执行函数级工具，不能写作 Harness 能力提升；这也说明不能用更多强制语气取代可操作的工具支架。
 - 后续修复假设：在只读、安全的 IDALIB 结果中投影有限、结构化的候选函数地址和一键对应的反编译工具输入，使模型不必自行从大清单中完成地址选择；同时保留模型可改选其它函数的自由。该设计需要单元 fixture、隐藏评分回归和新的 immutable 037 快照验证。
+
+### AB-TERRA-OBJDUMP-MAGIC-041：发现回退能力后未完成调用（已完成，能力恢复烟测）
+
+- 固定条件：`magic` 二进制、AIHub `gpt-5.6-terra` / Responses / max、`maxTurns=5`、总成本上限 `$0.50`；快照指纹为 `d1a6fa6834fad25fa035d9ff65dccd2b58168afbaa6f06c80a11d49fa5b42aaa`，语料哈希为 `7218a8780e286252f7038adc4955a236bdd1705a3a4a7334d1208c7d8fd5f95b`。`manual-curation` 与 `advice-curation` 仅用来收集独立轨迹，本单题不推断 curation 因果。
+- 结果：两个 immutable pairing 均已终态入账为 `failed` / `EXHAUSTED`，均为 `0` verified、`0` 次 `verify_claim`。advice 有 23 次真实 Provider 请求，工具调用为 `bash=6`、`evidence=5`、`capability=3`、`get_entry_points=2`、`get_metadata=2`、`decompile=1`、IDALIB `disassemble=1`、`list_functions=1`；manual 有 19 次 Provider 请求，工具调用为 `bash=7`、`evidence=6`、`decompile=3`、`get_metadata=2`、`list_functions=2`、`capability=1`、IDALIB `disassemble=1`、`get_entry_points=1`、`function_by_address=1`。
+- 行为证据：advice 轨迹明确写出“GUI dependency prevents both decompilation and disassembly”，随后实际调用 `capability search` 和 `describe`。返回结果明确标明 `proofblade.binary.disassemble` 已选中 `proofblade-objdump` 后端且可用；但两条轨迹都没有调用该 capability。模型转而运行完整的 shell `objdump`，取得了入口、`main`、比较和 reveal 路径以及 `0x5a` 变换的真实观察，却未在五个 turn 内推出并验证候选。其后把 stripped ELF 当成有 `main` 符号处理，使用 `objdump --disassemble=main`，没有取得有效代码窗口。
+- 首错归因：不是 IDALIB 可用性、模型权限、认知策略或 curation。IDALIB 的 Qt 失败已被正确反馈，备用 `objdump` 后端也确实可用；第一处未完成边是 `search -> describe -> invoke` 的调用摩擦，以及缺少 stripped ELF 的地址窗口调用提示。不得把此现象修成更严的工具配额或强制门控。
+- 修复：在 IDALIB 拒绝反馈中提供可直接执行的 `capability` 调用形状，包含 `operation:"invoke"`、`capabilityId:"proofblade.binary"`、`capabilityOperation:"disassemble"`、fixture-relative `path`、同地址和 `maxInstructions:128`；reverse 指引同时说明 stripped ELF 必须用入口点或发现地址窗口，不能使用 `objdump --disassemble=main`。这仍是建议与恢复手柄，未修改 scope、审批、成本、隐藏评分或任一权限边界。
+- 042 复测准则：保持语料、Provider、模型和预算，记录 `proofblade.binary.disassemble` 调用次数、选择 `proofblade-objdump` 后端、非错误结构化指令观察、候选推导及 `verify_claim`。它仍是能力恢复 smoke，而非策略因果实验；若模型仍能发现却不调用该能力，再评估是否应额外提供一等只读反汇编工具。
