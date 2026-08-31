@@ -328,6 +328,57 @@ test("real model evaluator aborts a provider turn when the case deadline expires
   }
 });
 
+test("strict paired evaluation gives later variants a fair case deadline", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-fair-deadline-"));
+  const source = "candidate flag{fair_pairing}";
+  let laneCalls = 0;
+  const fairnessSolver: AgentLaneFactory = async ({ runtime }) => {
+    laneCalls += 1;
+    if (laneCalls !== 1) return testAgentLane(runtime, true);
+    let abortPrompt: (() => void) | undefined;
+    return {
+      prompt: () => new Promise((_resolve, reject) => {
+        abortPrompt = () => reject(new Error("test lane aborted"));
+      }),
+      compact: async () => {},
+      abort: async () => abortPrompt?.(),
+      isIdle: async () => false,
+      close: async () => {},
+    };
+  };
+  try {
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "fair-deadline-corpus",
+      cases: [corpusCase("fair-case", "target.bin", "flag{fair_pairing}", source)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, fairnessSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      requireProviderTraffic: true,
+      requireAnswerLiteralsAbsent: false,
+      minimumCorpusCases: 1,
+      requiredTargetKinds: [],
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      deadlineMs: 6_000,
+      runPrefix: "REAL-FAIR-DEADLINE",
+    });
+    const alpha = summary.variants.find((variant) => variant.id === "alpha")?.cases[0];
+    const beta = summary.variants.find((variant) => variant.id === "beta")?.cases[0];
+    assert.equal(alpha?.failureCategory, "budget_exhausted");
+    assert.equal(alpha?.providerDiagnostics.deadlineBeforeCompletion, true);
+    assert.equal(laneCalls, 2);
+    assert.ok((beta?.effectCount ?? 0) > 0);
+    assert.ok(beta?.firstEvidenceMs !== undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("provider diagnostics replay requests, tokens, phases, and first-turn evidence", () => {
   const events = [
     diagnosticEvent(1, "run_started", "main", {}),

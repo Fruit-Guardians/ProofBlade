@@ -304,6 +304,12 @@ export class RealModelEvaluationRunner {
     const useExperimentBudget = options.requireProviderTraffic === true;
     const totalPairings = variants.length * corpus.cases.length * attempts;
     const perCaseMaxCostUsd = useExperimentBudget ? maxCostUsd / Math.max(1, totalPairings) : maxCostUsd;
+    // Strict paired runs must give every pairing a fair chance. A single
+    // stalled provider call must not consume the experiment's entire deadline
+    // and starve variants later in the deterministic evaluation order.
+    const perPairingDeadlineMs = useExperimentBudget
+      ? Math.max(1, Math.floor(deadlineMs / Math.max(1, totalPairings)))
+      : deadlineMs;
     const experimentDeadlineAt = useExperimentBudget ? Date.now() + deadlineMs : Number.POSITIVE_INFINITY;
     const casesByVariant = new Map(variants.map((variant) => [variant.id, [] as RealModelEvaluationCase[]]));
     const servicesByVariant = new Map(variants.map((variant) => [variant.id, createServices(this.root, variant.config)]));
@@ -318,13 +324,16 @@ export class RealModelEvaluationRunner {
           continue;
         }
         await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, item.corpusCase);
-        const remainingDeadlineMs = useExperimentBudget ? Math.max(1, experimentDeadlineAt - Date.now()) : deadlineMs;
-        if (useExperimentBudget && remainingDeadlineMs <= 1) {
+        const remainingExperimentDeadlineMs = useExperimentBudget ? experimentDeadlineAt - Date.now() : deadlineMs;
+        if (useExperimentBudget && remainingExperimentDeadlineMs <= 0) {
           casesByVariant.get(variant.id)!.push(expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId));
           continue;
         }
-        const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd: perCaseMaxCostUsd, deadlineMs: remainingDeadlineMs });
-        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, remainingDeadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
+        const caseDeadlineMs = useExperimentBudget
+          ? Math.max(1, Math.min(perPairingDeadlineMs, remainingExperimentDeadlineMs))
+          : deadlineMs;
+        const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd: perCaseMaxCostUsd, deadlineMs: caseDeadlineMs });
+        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, caseDeadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
       }
     } finally {
       await Promise.all([...servicesByVariant.values()].map((services) => services.sandbox.close()));
