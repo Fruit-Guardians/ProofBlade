@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { ModelProfileConfig, ProofBladeConfig } from "../config.js";
@@ -224,10 +224,10 @@ export function snapshotModel(input: AblationModelInput, profile?: ModelProfileC
   const snapshot = {
     profileId: input.profileId.trim(), provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl,
     apiKeyEnv: resolved.apiKeyEnv, ...(resolved.endpointMode === undefined ? {} : { endpointMode: resolved.endpointMode }), model,
-    ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
+    ...(input.thinkingLevel === undefined && resolved.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel ?? resolved.thinkingLevel }),
     ...(input.sampling === undefined ? {} : { sampling: input.sampling }), contextWindow: input.contextWindow ?? resolved.contextWindow, maxTokens: input.maxTokens ?? resolved.maxTokens,
   } as Omit<AblationModelSnapshot, "profileFingerprint">;
-  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl.replace(/\/+$/, ""), endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, requestTimeoutMs: resolved.requestTimeoutMs, maxRetries: resolved.maxRetries, maxRetryDelayMs: resolved.maxRetryDelayMs ?? 0, maxConcurrentRequests: resolved.maxConcurrentRequests ?? 1, input: resolved.input, thinkingLevel: snapshot.thinkingLevel ?? "", reasoning: resolved.reasoning ?? false, supportsReasoningEffort: resolved.supportsReasoningEffort ?? false, maxTokensField: resolved.maxTokensField ?? "", cacheRetention: resolved.cacheRetention ?? "", sampling: snapshot.sampling ?? {}, pricing: resolved.pricing ?? {} })) };
 }
 
 export interface AblationPreflightCheck { id: string; passed: boolean; actual: string | number; expected: string | number; }
@@ -248,7 +248,7 @@ export function preflightAblationExperiment(experiment: AblationExperimentSnapsh
     const pricingPresent = profile.pricing !== undefined && profile.pricing.inputUsdPerMillion > 0 && profile.pricing.outputUsdPerMillion > 0;
     const checks: AblationPreflightCheck[] = [
       { id: "concrete_model", passed: experiment.model.model !== "auto", actual: experiment.model.model, expected: "concrete model" },
-      { id: "provider_match", passed: experiment.model.provider === profile.provider && experiment.model.api === profile.api && experiment.model.baseUrl === profile.baseUrl.replace(/\/+$/, ""), actual: `${experiment.model.provider}/${experiment.model.api}/${experiment.model.baseUrl}`, expected: `${profile.provider}/${profile.api}/${profile.baseUrl.replace(/\/+$/, "")}` },
+      { id: "provider_match", passed: experiment.model.profileFingerprint === snapshotModel({ profileId: experiment.model.profileId, model: experiment.model.model, thinkingLevel: experiment.model.thinkingLevel, sampling: experiment.model.sampling, contextWindow: experiment.model.contextWindow, maxTokens: experiment.model.maxTokens }, profile).profileFingerprint, actual: experiment.model.profileFingerprint, expected: "current profile fingerprint" },
       { id: "credential", passed: credentialPresent, actual: credentialPresent ? "present" : "missing", expected: "present" },
       { id: "pricing", passed: pricingPresent, actual: pricingPresent ? "valid" : "missing_or_invalid", expected: "valid" },
     ];
@@ -272,7 +272,7 @@ export async function probeAblationProvider(experiment: AblationExperimentSnapsh
     if (!response.ok) return { ok: false, status: response.status };
     const body = await response.json() as { data?: Array<{ id?: string }> };
     const ids = (body.data ?? []).map((item) => item.id).filter((item): item is string => Boolean(item)).sort();
-    const modelId = ids.find((id) => id === experiment.model.model) ?? ids.find((id) => !id.toLowerCase().includes("embed"));
+    const modelId = ids.find((id) => id === experiment.model.model);
     return { ok: Boolean(modelId), status: response.status, ...(modelId ? { modelId } : {}), modelsHash: sha256(canonicalJson(ids)) };
   } catch (error) { return { ok: false, status: error instanceof Error ? error.name : "error" }; }
 }
@@ -289,9 +289,7 @@ export class AblationExperimentStore {
     } catch (error) {
       if ((error as { code?: string }).code !== "ENOENT") throw error;
     }
-    const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
-    await writeFile(temporary, `${JSON.stringify(experiment, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
-    await rename(temporary, path);
+    await writeFile(path, `${JSON.stringify(experiment, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
     return path;
   }
   public async load(experimentId: string): Promise<AblationExperimentSnapshot> {
@@ -320,8 +318,10 @@ function assertSnapshotIntegrity(snapshot: AblationExperimentSnapshot): void {
 }
 
 export function buildAblationPairings(experiment: Pick<AblationExperimentSnapshot, "experimentId" | "variants" | "runOrder" | "budget">, cases: readonly AblationCaseRef[]): AblationPairing[] {
-  const sortedCases = [...cases].sort((a, b) => a.id.localeCompare(b.id));
-  const variants = [...experiment.variants].sort((a, b) => a.id.localeCompare(b.id));
+  const ids = new Set<string>();
+  for (const item of cases) { if (ids.has(item.id)) throw new Error(`Ablation case ids must be unique: ${item.id}`); ids.add(item.id); }
+  const sortedCases = [...cases].sort(compareStableId);
+  const variants = [...experiment.variants].sort(compareStableId);
   const rows: AblationPairing[] = [];
   for (let attempt = 1; attempt <= experiment.budget.attempts; attempt += 1) {
     for (const item of sortedCases) for (const variant of variants) rows.push({ pairingId: `${experiment.experimentId}:${item.id}:${attempt}:${variant.id}`, caseId: item.id, attempt, variantId: variant.id, ordinal: rows.length });
@@ -347,7 +347,8 @@ function validateVariants(value: unknown, model: AblationModelSnapshot, profile?
     if (modelOverride?.model && modelOverride.model !== model.model) throw new Error(`Variant ${id} changes the concrete model; strict ablation variants must share one model`);
     const changedFactors = policyDiff(policy);
     const multiFactor = raw.multiFactor === true || changedFactor === "composite" || changedFactors.length > 1;
-    if (changedFactor !== "none" && changedFactor !== "composite" && changedFactors.some((item) => item !== changedFactor)) throw new Error(`Variant ${id} changes ${changedFactors.join(", ")} but declares ${changedFactor}`);
+    if (changedFactor !== "none" && changedFactor !== "composite" && (changedFactors.length !== 1 || changedFactors[0] !== changedFactor)) throw new Error(`Variant ${id} changes ${changedFactors.join(", ")} but declares ${changedFactor}`);
+    if (changedFactor === "none" && (changedFactors.length > 0 || modelOverride !== undefined)) throw new Error(`Baseline variant ${id} must not change policy or model settings`);
     if (changedFactor === "composite" && !multiFactor) throw new Error(`Variant ${id} must set multiFactor for composite experiments`);
     const variantModel = modelOverride ? snapshotModel({ profileId: model.profileId, model: modelOverride.model ?? model.model, thinkingLevel: modelOverride.thinkingLevel ?? model.thinkingLevel, contextWindow: model.contextWindow, maxTokens: model.maxTokens }, profile) : model;
     const policySnapshot = { policy, policyFingerprint: sha256(canonicalJson(policy)), changedFactors, multiFactor };
@@ -419,6 +420,7 @@ function validateBudget(value: unknown): AblationExperimentInput["budget"] {
 function validateRunOrder(value: unknown): Required<NonNullable<AblationExperimentInput["runOrder"]>> {
   if (value !== undefined && !isRecord(value)) throw new Error("runOrder must be an object");
   const input = (value ?? {}) as Record<string, unknown>;
+  for (const key of Object.keys(input)) if (key !== "mode" && key !== "seed") throw new Error(`Unknown runOrder field: ${key}`);
   const mode = input.mode === undefined ? "interleaved" : input.mode;
   if (mode !== "interleaved" && mode !== "stratified") throw new Error("runOrder.mode must be interleaved or stratified");
   const seed = input.seed === undefined ? 0 : integer(input.seed, "runOrder.seed");
@@ -429,7 +431,7 @@ function validateSafety(value: unknown): FixedSafetyBoundary {
   if (value !== undefined && !isRecord(value)) throw new Error("safety must be an object");
   for (const [key, expected] of Object.entries(FIXED_SAFETY_BOUNDARY)) if (value !== undefined && (value as Record<string, unknown>)[key] !== undefined && (value as Record<string, unknown>)[key] !== expected) throw new Error(`Safety boundary ${key} cannot be disabled or changed`);
   if (value !== undefined) for (const key of Object.keys(value)) if (!(key in FIXED_SAFETY_BOUNDARY)) throw new Error(`Unknown safety boundary: ${key}`);
-  return FIXED_SAFETY_BOUNDARY;
+  return { ...FIXED_SAFETY_BOUNDARY };
 }
 
 function allowedPolicyValues(key: keyof HarnessPolicy): string[] {
@@ -438,12 +440,19 @@ function allowedPolicyValues(key: keyof HarnessPolicy): string[] {
 }
 
 function interleaveByCase(rows: AblationPairing[], cases: readonly AblationCaseRef[], variants: readonly AblationVariantSnapshot[]): AblationPairing[] {
+  const byKey = new Map(rows.map((row) => [`${row.attempt}\u0000${row.caseId}\u0000${row.variantId}`, row]));
   const output: AblationPairing[] = [];
-  for (let attempt = 1; attempt <= Math.max(...rows.map((item) => item.attempt), 0); attempt += 1) for (const item of [...cases].sort((a, b) => a.id.localeCompare(b.id))) for (const variant of [...variants].sort((a, b) => a.id.localeCompare(b.id))) {
-    const row = rows.find((candidate) => candidate.attempt === attempt && candidate.caseId === item.id && candidate.variantId === variant.id);
+  const maxAttempt = rows.reduce((max, item) => Math.max(max, item.attempt), 0);
+  for (let attempt = 1; attempt <= maxAttempt; attempt += 1) for (const item of cases) for (const variant of variants) {
+    const row = byKey.get(`${attempt}\u0000${item.id}\u0000${variant.id}`);
     if (row) output.push({ ...row, ordinal: output.length });
   }
   return output;
+}
+
+function compareStableId(left: { id: string }, right: { id: string }): number {
+  const a = left.id.normalize("NFC"); const b = right.id.normalize("NFC");
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function stableShuffle(rows: AblationPairing[], seed: number): AblationPairing[] {
@@ -453,7 +462,7 @@ function stableShuffle(rows: AblationPairing[], seed: number): AblationPairing[]
 function isRecord(value: unknown): value is Record<string, any> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function requiredText(value: unknown, label: string, max: number): string { if (typeof value !== "string" || value.trim().length === 0 || value.trim().length > max) throw new Error(`${label} must be non-empty and at most ${max} characters`); return value.trim(); }
 function requiredId(value: unknown, label: string): string { const text = requiredText(value, label, 128); if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(text)) throw new Error(`${label} must be a stable alphanumeric identifier`); return text; }
-function positiveInt(value: unknown, label: string): number { if (!Number.isInteger(value) || (value as number) < 1) throw new Error(`${label} must be a positive integer`); return value as number; }
+function positiveInt(value: unknown, label: string): number { if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > 1_000_000) throw new Error(`${label} must be a positive safe integer no greater than 1000000`); return value as number; }
 function integer(value: unknown, label: string): number { if (!Number.isInteger(value)) throw new Error(`${label} must be an integer`); return value as number; }
 function positiveNumber(value: unknown, label: string): number { if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive finite number`); return value; }
 function finiteRange(value: unknown, label: string, min: number, max: number): number { if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new Error(`${label} must be between ${min} and ${max}`); return value; }

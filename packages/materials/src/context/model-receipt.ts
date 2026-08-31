@@ -2,6 +2,11 @@ import type { ArtifactRef } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 
+const MAX_RECEIPT_INLINE_CHARS = 2_048;
+const MAX_RECEIPT_PREVIEW_CHARS = 1_024;
+const MAX_RECEIPT_SERIALIZED_CHARS = 12_000;
+const MAX_RECALL_BYTES = 6_000;
+
 export type ContextLevel = "L0" | "L1" | "L2";
 export type ContextTrust = "untrusted" | "observed" | "proposed" | "verified";
 export type ContextSensitivity = "public" | "secret" | "flag_candidate";
@@ -61,21 +66,23 @@ export interface ModelReceiptOptions {
 export function artifactUri(runId: string, artifactId: string, content = true): string { return `pb://run/${encodeURIComponent(runId)}/artifact/${encodeURIComponent(artifactId)}${content ? "/content" : ""}`; }
 
 export function createModelReceipt(options: ModelReceiptOptions): ModelReceipt {
-  const maxInlineChars = positive(options.maxInlineChars ?? 2_048, "maxInlineChars");
-  const maxPreviewChars = positive(options.maxPreviewChars ?? 1_024, "maxPreviewChars");
-  if (maxPreviewChars > maxInlineChars * 4) throw new Error("maxPreviewChars is unreasonably large");
+  const maxInlineChars = boundedPositive(options.maxInlineChars ?? MAX_RECEIPT_INLINE_CHARS, "maxInlineChars", MAX_RECEIPT_INLINE_CHARS);
+  const maxPreviewChars = boundedPositive(options.maxPreviewChars ?? MAX_RECEIPT_PREVIEW_CHARS, "maxPreviewChars", Math.min(MAX_RECEIPT_PREVIEW_CHARS, maxInlineChars));
   const content = options.content;
   const resultHash = sha256(content);
   const sensitivity = options.sensitivity ?? options.artifact?.sensitivity ?? "public";
   const ref: ContextRef | undefined = options.artifact ? {
-    uri: artifactUri(options.runId, options.artifact.id), kind: "artifact", runId: options.runId, generation: options.generation, scope: "current-run", level: "L2", contentHash: options.artifact.sha256, sourceIds: [options.artifact.id], trust: options.trust ?? "observed", sensitivity, stale: options.artifact.generation !== options.generation, readPolicy: { maxChars: 6_000, maxBytes: 64 * 1024, allowRange: true },
+    uri: artifactUri(options.runId, options.artifact.id), kind: "artifact", runId: options.runId, generation: options.generation, scope: "current-run", level: "L2", contentHash: options.artifact.sha256, sourceIds: [options.artifact.id], trust: options.trust ?? "observed", sensitivity, stale: options.artifact.generation !== options.generation, readPolicy: { maxChars: MAX_RECALL_BYTES, maxBytes: MAX_RECALL_BYTES, allowRange: true },
   } : undefined;
   const mode = options.mode ?? "receipt";
-  const preview = mode === "path_only" || sensitivity === "secret" ? undefined : boundedPreview(content, maxPreviewChars, maxInlineChars);
+  const restricted = mode === "path_only" || sensitivity !== "public";
+  const preview = restricted ? undefined : boundedPreview(content, maxPreviewChars, maxInlineChars);
   const receiptBase = {
-    schemaVersion: 1 as const, operationId: options.operationId, state: options.state ?? "success", title: bounded(options.title, 256), summary: bounded(options.summary ?? summarize(content), 1_024), keyFacts: (options.keyFacts ?? []).slice(0, 16).map((item) => ({ key: bounded(item.key, 128), value: bounded(item.value, 512) })), refs: ref ? [ref] : [], ...(preview ? { preview } : {}), nextActions: [...new Set(options.nextActions ?? (ref ? ["recall"] : ["none"]))] as ReceiptNextAction[], resultHash, generatedAt: options.generatedAt ?? new Date().toISOString(),
+    schemaVersion: 1 as const, operationId: options.operationId, state: options.state ?? "success", title: bounded(options.title, 256), summary: restricted ? "restricted artifact receipt" : bounded(options.summary ?? summarize(content), 1_024), keyFacts: restricted ? [] : (options.keyFacts ?? []).slice(0, 16).map((item) => ({ key: bounded(item.key, 128), value: bounded(item.value, 512) })), refs: ref ? [ref] : [], ...(preview ? { preview } : {}), nextActions: [...new Set(options.nextActions ?? (ref ? ["recall"] : ["none"]))] as ReceiptNextAction[], resultHash, generatedAt: options.generatedAt ?? new Date().toISOString(),
   };
-  return { ...receiptBase, presentationHash: sha256(canonicalJson(receiptBase)) };
+  const receipt: ModelReceipt = { ...receiptBase, presentationHash: sha256(canonicalJson(withoutGeneratedAt(receiptBase))) };
+  if (JSON.stringify(receipt).length > MAX_RECEIPT_SERIALIZED_CHARS) throw new Error("Model receipt exceeds the serialized size limit");
+  return receipt;
 }
 
 export interface RecallRecord {
@@ -109,7 +116,7 @@ export async function recallArtifact(options: { artifactStore: ArtifactStore; ar
   if (options.artifact.runId !== options.runId) return failedRecall(base, "NOT_FOUND", "artifact belongs to another run");
   if (options.artifact.generation !== options.generation) return failedRecall(base, "STALE", "artifact belongs to an older generation");
   if (options.artifact.sensitivity !== "public" && !options.allowSensitive) return failedRecall(base, "DENIED", "sensitive artifacts require explicit capability");
-  if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 64 * 1024) return failedRecall(base, "RANGE_EXCEEDED", "recall range exceeds the bounded read policy");
+  if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > MAX_RECALL_BYTES) return failedRecall(base, "RANGE_EXCEEDED", "recall range exceeds the bounded read policy");
   try {
     const range = await options.artifactStore.readTextRange(options.runId, options.artifact, limit, offset);
     const content = range.content;
@@ -140,6 +147,7 @@ export interface BrokerSelection { selected: ContextCandidate[]; omitted: Array<
 export function selectContextCandidates(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection {
   if (!Number.isInteger(maxTokens) || maxTokens < 1) throw new Error("maxTokens must be a positive integer");
   const scored = candidates.map((candidate) => {
+    validateCandidate(candidate);
     const cost = Math.min(1, candidate.estimatedTokens / maxTokens);
     const total = candidate.relevance * 0.32 + candidate.coverage * 0.24 + candidate.novelty * 0.16 + Math.min(1, candidate.independentSources / 3) * 0.12 + candidate.conflict * 0.08 + trustWeight(candidate.trust) * 0.08 - cost * 0.12;
     return { candidate, score: { relevance: candidate.relevance, coverage: candidate.coverage, novelty: candidate.novelty, independence: candidate.independentSources, conflict: candidate.conflict, cost, total } };
@@ -148,7 +156,8 @@ export function selectContextCandidates(candidates: readonly ContextCandidate[],
   const ordered = [...scored.filter((item) => item.candidate.required), ...scored.filter((item) => !item.candidate.required)];
   for (const item of ordered) {
     scores[item.candidate.id] = item.score;
-    if (item.candidate.required || totalTokens + item.candidate.estimatedTokens <= maxTokens) { selected.push(item.candidate); totalTokens += item.candidate.estimatedTokens; }
+    if (totalTokens + item.candidate.estimatedTokens <= maxTokens) { selected.push(item.candidate); totalTokens += item.candidate.estimatedTokens; }
+    else if (item.candidate.required) throw new Error(`Required context candidate exceeds token budget: ${item.candidate.id}`);
     else omitted.push({ id: item.candidate.id, reason: "token_budget" });
   }
   return { selected, omitted, scores, totalTokens };
@@ -162,9 +171,15 @@ function recallMarker(record: RecallRecord, sensitivity: ContextSensitivity): st
 function boundedPreview(content: string, maxPreviewChars: number, maxInlineChars: number): NonNullable<ModelReceipt["preview"]> {
   if (content.length <= maxInlineChars) return { text: content };
   const headSize = Math.ceil(maxPreviewChars / 2); const tailSize = Math.floor(maxPreviewChars / 2);
-  return { head: content.slice(0, headSize), tail: content.slice(-tailSize), omittedChars: Math.max(0, content.length - headSize - tailSize) };
+  return { head: content.slice(0, headSize), tail: tailSize === 0 ? "" : content.slice(-tailSize), omittedChars: Math.max(0, content.length - headSize - tailSize) };
 }
 function summarize(content: string): string { const line = content.split(/\r?\n/).map((item) => item.trim()).find(Boolean) ?? "empty result"; return bounded(line, 1_024); }
 function bounded(value: string, max: number): string { return value.length <= max ? value : `${value.slice(0, Math.max(0, max - 3))}...`; }
-function positive(value: number, label: string): number { if (!Number.isInteger(value) || value < 1) throw new Error(`${label} must be a positive integer`); return value; }
+function boundedPositive(value: number, label: string, max: number): number { if (!Number.isInteger(value) || value < 1 || value > max) throw new Error(`${label} must be a positive integer no greater than ${max}`); return value; }
 function trustWeight(trust: ContextTrust): number { return trust === "verified" ? 1 : trust === "proposed" ? 0.7 : trust === "observed" ? 0.5 : 0.2; }
+function withoutGeneratedAt<T extends { generatedAt: string }>(value: T): Omit<T, "generatedAt"> { const { generatedAt: _generatedAt, ...stable } = value; return stable; }
+function validateCandidate(candidate: ContextCandidate): void {
+  for (const [key, value] of Object.entries({ relevance: candidate.relevance, coverage: candidate.coverage, novelty: candidate.novelty, conflict: candidate.conflict })) if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error(`Context candidate ${candidate.id} has invalid ${key}`);
+  if (!Number.isSafeInteger(candidate.independentSources) || candidate.independentSources < 0) throw new Error(`Context candidate ${candidate.id} has invalid independentSources`);
+  if (!Number.isSafeInteger(candidate.estimatedTokens) || candidate.estimatedTokens < 1) throw new Error(`Context candidate ${candidate.id} has invalid estimatedTokens`);
+}

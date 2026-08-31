@@ -157,6 +157,12 @@
       "command": "node --import tsx --test apps/gui/tests/competition-settings.test.ts"
     },
     {
+      "id": "gui-ablation",
+      "sourceGlobs": ["apps/gui/src/ablation-service.ts"],
+      "testGlobs": ["apps/gui/tests/ablation-service.test.ts"],
+      "command": "node --import tsx --test apps/gui/tests/ablation-service.test.ts"
+    },
+    {
       "id": "capability-routing",
       "sourceGlobs": ["packages/materials/src/capabilities/**"],
       "testGlobs": [

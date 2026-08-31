@@ -78,21 +78,32 @@ export class AblationPolicyController {
 
   private evaluate(input: AblationPolicyDecisionInput): { decision: AblationDecision; policyName: AblationDecisionEvent["policyName"]; policyMode: string; reasonCode: string } {
     if (input.safetyViolation) return { decision: "block", policyName: "safety_boundary", policyMode: "enforced", reasonCode: input.safetyViolation };
-    if (input.circuitBreakerTriggered) {
-      if (this.policy.circuitBreaker === "hard_stop") return { decision: "terminate", policyName: "circuit_breaker", policyMode: this.policy.circuitBreaker, reasonCode: "circuit_breaker_triggered" };
-      if (this.policy.circuitBreaker === "adaptive" || this.policy.circuitBreaker === "advice") return { decision: "advise", policyName: "circuit_breaker", policyMode: this.policy.circuitBreaker, reasonCode: "circuit_breaker_advice" };
-    }
     const checks: Array<{ active: boolean | undefined; mode: string; factor: AblationChangedFactor; hard: string; advice: string; off: string }> = [
       { active: input.firstActionViolation, mode: this.policy.firstAction, factor: "first_action", hard: "first_action_gate", advice: "first_action_advice", off: "first_action_disabled" },
       { active: input.phaseRouteViolation, mode: this.policy.phaseRoute, factor: "phase_route", hard: "phase_route_gate", advice: "phase_route_advice", off: "phase_route_disabled" },
       { active: input.actionBundleViolation, mode: this.policy.actionBundle, factor: "action_bundle", hard: "action_bundle_gate", advice: "action_bundle_advice", off: "action_bundle_disabled" },
       { active: input.duplicateFailure, mode: this.policy.duplicateFailure, factor: "duplicate_failure", hard: "duplicate_failure_stop", advice: "duplicate_failure_advice", off: "duplicate_failure_recorded" },
     ];
-    for (const check of checks) if (check.active) {
-      if (check.mode === "hard_gate" || check.mode === "hard_stop") return { decision: "block", policyName: check.factor, policyMode: check.mode, reasonCode: check.hard };
-      if (check.mode === "soft_advice" || check.mode === "advice") return { decision: "advise", policyName: check.factor, policyMode: check.mode, reasonCode: check.advice };
-      return { decision: "allow", policyName: check.factor, policyMode: check.mode, reasonCode: check.off };
+    const candidates: Array<{ decision: AblationDecision; policyName: AblationDecisionEvent["policyName"]; policyMode: string; reasonCode: string; priority: number }> = [];
+    if (input.circuitBreakerTriggered) {
+      const mode = this.policy.circuitBreaker;
+      candidates.push(mode === "hard_stop"
+        ? { decision: "terminate", policyName: "circuit_breaker", policyMode: mode, reasonCode: "circuit_breaker_triggered", priority: 4 }
+        : mode === "adaptive" || mode === "advice"
+          ? { decision: "advise", policyName: "circuit_breaker", policyMode: mode, reasonCode: "circuit_breaker_advice", priority: 2 }
+          : { decision: "allow", policyName: "circuit_breaker", policyMode: mode, reasonCode: "circuit_breaker_disabled", priority: 1 });
     }
+    for (const check of checks) if (check.active) {
+      const hard = check.mode === "hard_gate" || check.mode === "hard_stop";
+      const advice = check.mode === "soft_advice" || check.mode === "advice";
+      candidates.push(hard
+        ? { decision: "block", policyName: check.factor, policyMode: check.mode, reasonCode: check.hard, priority: 3 }
+        : advice
+          ? { decision: "advise", policyName: check.factor, policyMode: check.mode, reasonCode: check.advice, priority: 2 }
+          : { decision: "allow", policyName: check.factor, policyMode: check.mode, reasonCode: check.off, priority: 1 });
+    }
+    const strongest = candidates.sort((left, right) => right.priority - left.priority || String(left.policyName).localeCompare(String(right.policyName)))[0];
+    if (strongest) { const { priority: _priority, ...result } = strongest; return result; }
     if (input.stopSuggested && this.policy.stopSuggestion !== "off") return { decision: "advise", policyName: "stop_suggestion", policyMode: this.policy.stopSuggestion, reasonCode: "stop_suggestion" };
     return { decision: "allow", policyName: "none", policyMode: "off", reasonCode: "no_policy_intervention" };
   }

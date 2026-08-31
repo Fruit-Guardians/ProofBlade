@@ -19,6 +19,11 @@ test("path-only and secret receipts never expose inline content", () => {
   assert.equal(pathOnly.preview, undefined);
   const secret = createModelReceipt({ runId: "R-1", generation: 2, operationId: "O-1", title: "Secret", content: "secret text", artifact: { ...artifact, sensitivity: "secret" }, mode: "full" });
   assert.equal(secret.preview, undefined);
+  assert.equal(secret.summary, "restricted artifact receipt");
+  assert.deepEqual(secret.keyFacts, []);
+  assert.throws(() => createModelReceipt({ runId: "R-1", generation: 2, operationId: "O-1", title: "Too large", content: "x", maxInlineChars: 2049 }), /no greater/);
+  const one = createModelReceipt({ runId: "R-1", generation: 2, operationId: "O-1", title: "One", content: "abcdef", maxInlineChars: 64, maxPreviewChars: 1 });
+  assert.ok((one.preview?.head?.length ?? 0) + (one.preview?.tail?.length ?? 0) <= 1);
 });
 
 test("broker selection is deterministic and keeps required evidence within the budget", () => {
@@ -32,6 +37,8 @@ test("broker selection is deterministic and keeps required evidence within the b
   assert.equal(result.totalTokens, 50);
   assert.equal(result.omitted[0]?.id, "z");
   assert.deepEqual(result, selectContextCandidates(candidates, 50));
+  assert.throws(() => selectContextCandidates([{ ...candidates[0]!, required: true, estimatedTokens: 51 }], 50), /exceeds token budget/);
+  assert.throws(() => selectContextCandidates([{ ...candidates[0]!, relevance: Number.NaN }], 50), /invalid relevance/);
 });
 
 test("recall enforces run, generation, sensitivity and bounded range before reading", async () => {
@@ -44,4 +51,5 @@ test("recall enforces run, generation, sensitivity and bounded range before read
   assert.equal((await recallArtifact({ ...common, generation: 3 })).record.status, "STALE");
   assert.equal((await recallArtifact({ ...common, artifact: { ...artifact, sensitivity: "secret" } })).record.status, "DENIED");
   assert.equal((await recallArtifact({ ...common, offset: -1 })).record.status, "RANGE_EXCEEDED");
+  assert.equal((await recallArtifact({ ...common, limit: 6_001 })).record.status, "RANGE_EXCEEDED");
 });

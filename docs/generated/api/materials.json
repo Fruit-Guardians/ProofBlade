@@ -36,7 +36,7 @@
     "src/context/compiler.ts": "7c106ec830fd6d4a61a01eb0de26c3609450b5c8e707ee22368930d940b2b997",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
-    "src/context/model-receipt.ts": "6f657d88a00b22a1ecf95ace95307f9e7399cdd41b0b039e9f590f06a0b2ff67",
+    "src/context/model-receipt.ts": "d505c421e624f0360633fd87560df652f8b42a8248e5bb7d878d39ab70260d1a",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
     "src/control/control-store.ts": "c400082af8f0b6ed00ed84502c6eb06724aaefa7a8406154c0e3c638eea17645",
@@ -58,18 +58,18 @@
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
-    "src/evaluation/ablation-ledger.ts": "b1a75ede36002034ffdf0e0997384470825e3302f9ca19120541ae377a7dae3a",
-    "src/evaluation/ablation-policy.ts": "53ba6803bdaffc76927822be86824b6e3d249aa63ed014bfa792a9e42e519020",
-    "src/evaluation/ablation-report.ts": "f9277062459ba6f5d27730dc6109b050cee874ae501ef5e352a5d2810d028a79",
-    "src/evaluation/ablation.ts": "277b5cbfc1f025868a86c1adc76a914900682d8599bad26ae9f1374a0d9836f0",
+    "src/evaluation/ablation-ledger.ts": "c13ec09ab7066b9d4049e5b1ced15f8eae57695834784424b7d06efad3252bd4",
+    "src/evaluation/ablation-policy.ts": "d3faf895f06dfaca469c0d4bf71a26d41464509c67a447a64a09422322f1b5c4",
+    "src/evaluation/ablation-report.ts": "2d113f9fc184ec70d54289c2682b93a9c8bb8f669cb5e62ac5ba85b0d2fc6b24",
+    "src/evaluation/ablation.ts": "ec55426ca1010a517282ada035572732a4660aad9b4b9b5ec84470b0d075c33f",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
-    "src/evaluation/information-value.ts": "e4a934481431f78a6f5fd0ab8e34c2024ffc99a4bdfee747025ab64f64a37b04",
+    "src/evaluation/information-value.ts": "8e13b5e362b9d891fb1693f1210ecf19ec84227ce8b9f7655287a81b6d63c87c",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "1efa3cc6032dddccd7bfd775069d8bc223466f480ad46d2c28790dc4bd8bbf7d",
+    "src/evaluation/real-model-evaluator.ts": "b93bc30cf838d4a49d111dde215bb13ad6d0389756cfb2f1e96f7a12957fa42b",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
@@ -1217,7 +1217,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 281,
+      "line": 284,
       "signature": "RealModelEvaluationRunner",
       "summary": "Runs real provider-backed Coding lanes only after an explicit caller opt-in.",
       "summarySource": "tsdoc",
@@ -5273,7 +5273,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 61,
+      "line": 66,
       "signature": "(runId: string, artifactId: string, content?: boolean): string",
       "summary": "Inferred summary: artifact uri operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -5292,7 +5292,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 63,
+      "line": 68,
       "signature": "(options: ModelReceiptOptions): ModelReceipt",
       "summary": "Inferred summary: create model receipt operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -5305,7 +5305,7 @@
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ],
-      "structureHash": "6345f5e8ae33f101ad7d460c7016acef8dd1c0f995bc8321711f582d89de9047"
+      "structureHash": "ee48da93dc75668058f848dc6eb98524550dbab2b37ccdff90a5aa8ac98aff3f"
     },
     {
       "id": "@proofblade/materials::function::recallArtifact",
@@ -5314,7 +5314,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 103,
+      "line": 110,
       "signature": "(options: { artifactStore: ArtifactStore; artifact: ArtifactRef; runId: string; generation: number; requester: RecallRecord[\"requester\"]; operationId?: string; level?: ContextLevel; offset?: number; limit?: number; allowSensitive?: boolean; recordId?: string; }): Promise<RecallResult>",
       "summary": "Inferred summary: recall artifact operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -5327,7 +5327,7 @@
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ],
-      "structureHash": "22657a5d884c856817997242c6fac6cc525a86cc20fe4f6b58d48dfba7ed9922"
+      "structureHash": "d73f97a31ba49dd475d9888deee83947f814730fedf1c80c6b8c08f4ebb56e89"
     },
     {
       "id": "@proofblade/materials::function::selectContextCandidates",
@@ -5336,7 +5336,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 140,
+      "line": 147,
       "signature": "(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection",
       "summary": "Deterministic, provenance-aware selection; scores are ranking signals, not trust.",
       "summarySource": "tsdoc",
@@ -5349,7 +5349,7 @@
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ],
-      "structureHash": "8d0af6a9a06297d281b4c015f8e23a6a73a9cacf4b4f2245573e832574d82e35"
+      "structureHash": "2fcef9c3ae2a3da2b260f9d5ca392632aafc3b10c8555d02b29784421c55c36b"
     },
     {
       "id": "@proofblade/materials::function::appServerApproval",
@@ -5901,7 +5901,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 52,
+      "line": 54,
       "signature": "(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport",
       "summary": "Inferred summary: build ablation report operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -5913,7 +5913,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts"
       ],
-      "structureHash": "f474e496c4a717b10cf6f3619271f1ca3a98ad7d9c6f64fdd2cfc3c287b55939"
+      "structureHash": "838a40db7344f04d17f5fe0e4f3d680f6f248c47290c53ada0cb36eab9309153"
     },
     {
       "id": "@proofblade/materials::function::renderAblationReportZh",
@@ -5922,7 +5922,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 66,
+      "line": 87,
       "signature": "(report: AblationReport): string",
       "summary": "Inferred summary: render ablation report zh operation used to produce a deterministic value.",
       "summarySource": "inferred",
@@ -5943,9 +5943,9 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 322,
+      "line": 320,
       "signature": "(experiment: Pick<AblationExperimentSnapshot, \"experimentId\" | \"variants\" | \"runOrder\" | \"budget\">, cases: readonly AblationCaseRef[]): AblationPairing[]",
-      "summary": "Inferred summary: build ablation pairings operation used to provide a reusable operation.",
+      "summary": "Inferred summary: build ablation pairings operation used to perform a durable write.",
       "summarySource": "inferred",
       "tags": [],
       "imports": [
@@ -5959,7 +5959,7 @@
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ],
-      "structureHash": "19b5577cfee469c30f288dc8846d56748d41a8d95ddcae9929ab4aabb9e15df2"
+      "structureHash": "dd6d9e3b3439f7cdd8e758e7f06319c2cc7da255b6adfad6a3578c54ae8bb59e"
     },
     {
       "id": "@proofblade/materials::function::preflightAblationExperiment",
@@ -5984,7 +5984,7 @@
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ],
-      "structureHash": "654dc0f59d896776753293c7508e4a4383b6bb575df54277c05cf816665d4445"
+      "structureHash": "b2dff7415135bc397f6b843096669e64fe15cd975b829161ba53850d4a48d20e"
     },
     {
       "id": "@proofblade/materials::function::probeAblationProvider",
@@ -6007,7 +6007,7 @@
         "node:path"
       ],
       "testRefs": [],
-      "structureHash": "daf1bccc973abd0028772851bac45acec182d7c38e96e5438a42198f4f665f74"
+      "structureHash": "e32c585aba3c07546fb0fc87418e27b8814c7b97bd3f9cda50b67c5efe7d7881"
     },
     {
       "id": "@proofblade/materials::function::snapshotModel",
@@ -6030,7 +6030,7 @@
         "node:path"
       ],
       "testRefs": [],
-      "structureHash": "edecf51ffa0e88a1fc9f2498d4f0bf23b7c3efffd5322d6c582d36fa6ea24cd3"
+      "structureHash": "de80c0eaa2137300fe4d19bc5a54ad9df1528744dd9a8a18b58b05fe9896de4d"
     },
     {
       "id": "@proofblade/materials::function::validateAblationExperiment",
@@ -6163,7 +6163,7 @@
       "testRefs": [
         "packages/materials/tests/information-value.test.ts"
       ],
-      "structureHash": "36d0f08d17312ec33f6fa334b3466114a300f9262e60e8082875865697f1bfc8"
+      "structureHash": "a932c22624f509c6f0da0ae211f213a86e1da656b52a16b79e1573006ae08c25"
     },
     {
       "id": "@proofblade/materials::function::estimateHeuristicInformation",
@@ -6232,7 +6232,7 @@
       "visibility": "public",
       "module": "src/evaluation/information-value.ts",
       "exportPath": "@proofblade/materials",
-      "line": 69,
+      "line": 71,
       "signature": "(input: VerifiedUpliftInput): InformationValueEstimate",
       "summary": "Inferred summary: estimate verified uplift operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -6243,7 +6243,7 @@
       "testRefs": [
         "packages/materials/tests/information-value.test.ts"
       ],
-      "structureHash": "115680f4e978f9b0626a181a5f7b35706cb947f66342d08b2b06b86fb42ec09b"
+      "structureHash": "00e7227429e5070b360a043761277e60c0409e8e2d8ffe41c4f4f88e809d158c"
     },
     {
       "id": "@proofblade/materials::function::compareEvaluationAttempts",
@@ -6384,7 +6384,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 732,
+      "line": 743,
       "signature": "(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics",
       "summary": "Projects provider traffic onto durable executor turns without relying on",
       "summarySource": "tsdoc",
@@ -6418,7 +6418,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 109,
+      "line": 111,
       "signature": "(options: RealModelEvaluationPreflightOptions): Promise<RealModelEvaluationPreflightSummary>",
       "summary": "Validate a live evaluation setup without creating a Run or contacting a",
       "summarySource": "tsdoc",
@@ -6443,7 +6443,7 @@
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ],
-      "structureHash": "b66c8147d1e9b67f7439fae6779180c89ef60095d5beaa8dd81a2a5412454993"
+      "structureHash": "0670f22aec58560d80664d5318410e48419636bd4eb9ba2acec9e4750c8e8204"
     },
     {
       "id": "@proofblade/materials::function::compareReplayStats",
@@ -12898,7 +12898,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 137,
+      "line": 144,
       "signature": "BrokerSelection",
       "summary": "Inferred summary: broker selection type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12917,7 +12917,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 122,
+      "line": 129,
       "signature": "ContextCandidate",
       "summary": "Inferred summary: context candidate type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12938,7 +12938,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 9,
+      "line": 14,
       "signature": "ContextRef",
       "summary": "Inferred summary: context ref type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12957,7 +12957,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 27,
+      "line": 32,
       "signature": "ModelReceipt",
       "summary": "Inferred summary: model receipt type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12978,7 +12978,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 42,
+      "line": 47,
       "signature": "ModelReceiptOptions",
       "summary": "Inferred summary: model receipt options type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12997,7 +12997,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 81,
+      "line": 88,
       "signature": "RecallRecord",
       "summary": "Inferred summary: recall record type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -13016,7 +13016,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 101,
+      "line": 108,
       "signature": "RecallResult",
       "summary": "Inferred summary: recall result type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -13933,6 +13933,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/run-work-scheduler.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
@@ -15049,7 +15050,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 41,
+      "line": 43,
       "signature": "AblationReport",
       "summary": "Inferred summary: ablation report type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -15087,7 +15088,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 20,
+      "line": 22,
       "signature": "AblationVariantReport",
       "summary": "Inferred summary: ablation variant report type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -15754,7 +15755,7 @@
       "visibility": "public",
       "module": "src/evaluation/information-value.ts",
       "exportPath": "@proofblade/materials",
-      "line": 68,
+      "line": 70,
       "signature": "VerifiedUpliftInput",
       "summary": "Inferred summary: verified uplift input type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16104,7 +16105,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 214,
+      "line": 217,
       "signature": "RealModelCategorySummary",
       "summary": "Inferred summary: real model category summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16135,7 +16136,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 159,
+      "line": 162,
       "signature": "RealModelEvaluationCase",
       "summary": "Inferred summary: real model evaluation case type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16166,7 +16167,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 58,
+      "line": 59,
       "signature": "RealModelEvaluationGatePolicy",
       "summary": "Inferred summary: real model evaluation gate policy type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16228,7 +16229,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 67,
+      "line": 68,
       "signature": "RealModelEvaluationPreflightOptions",
       "summary": "Inferred summary: real model evaluation preflight options type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16259,7 +16260,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 81,
+      "line": 83,
       "signature": "RealModelEvaluationPreflightSummary",
       "summary": "Inferred summary: real model evaluation preflight summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16290,7 +16291,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 261,
+      "line": 264,
       "signature": "RealModelEvaluationSummary",
       "summary": "Inferred summary: real model evaluation summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16321,7 +16322,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 206,
+      "line": 209,
       "signature": "RealModelProviderDiagnostics",
       "summary": "Inferred summary: real model provider diagnostics type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16352,7 +16353,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 197,
+      "line": 200,
       "signature": "RealModelTurnDiagnostics",
       "summary": "Inferred summary: real model turn diagnostics type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -16383,7 +16384,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 228,
+      "line": 231,
       "signature": "RealModelVariantSummary",
       "summary": "Inferred summary: real model variant summary type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -23086,6 +23087,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -23340,6 +23343,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -23721,6 +23726,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -23975,6 +23982,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24229,6 +24238,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24483,6 +24494,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -25143,6 +25156,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -27130,6 +27144,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -27686,6 +27701,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -28743,6 +28759,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -31971,7 +31988,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 42,
+      "line": 43,
       "signature": "(pairingId: string, runId: string, clock?: () => string): Promise<AblationAttemptRecord>",
       "summary": "Inferred summary: claim operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32010,7 +32027,7 @@
         "packages/materials/tests/verification-recovery.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
-      "structureHash": "b9199e6befb372269d194df2546462744cd5887c47e5fa2e89d10e298d709c6c",
+      "structureHash": "042cb4bb65e782ad1ff16583bb6755de7eec82b7f955880345f1570d222877d3",
       "parentId": "@proofblade/materials::class::AblationRunLedger"
     },
     {
@@ -32020,7 +32037,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 51,
+      "line": 55,
       "signature": "(pairingId: string, status: Extract<AblationAttemptRecord[\"status\"], \"succeeded\" | \"failed\" | \"cancelled\">, error?: string, clock?: () => string): Promise<AblationAttemptRecord>",
       "summary": "Inferred summary: complete operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32065,7 +32082,7 @@
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ],
-      "structureHash": "da3a044361964742709f5a330cd05396715e033c903905d7ce8356ec9ca73c81",
+      "structureHash": "a96fe5a0234da0ecd44b284a4ced6522d9e2605b467756cc310c28c55ac2bf06",
       "parentId": "@proofblade/materials::class::AblationRunLedger"
     },
     {
@@ -32176,7 +32193,7 @@
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
       "line": 30,
-      "signature": "(path: string): Promise<AblationRunLedger>",
+      "signature": "(path: string, expectedExperiment?: Pick<AblationExperimentSnapshot, \"experimentId\" | \"experimentFingerprint\">): Promise<AblationRunLedger>",
       "summary": "Inferred summary: load operation used to read or inspect state.",
       "summarySource": "inferred",
       "tags": [],
@@ -32235,7 +32252,7 @@
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-session.test.ts"
       ],
-      "structureHash": "ceab2c4efd1333fe29a03cc564847e6abcb268f3bea367814fd85266c987c667",
+      "structureHash": "6c4d92bd50ea8c2488a95eb46796f1f0ee80fd50cc17ad697eb676101d7b9bb1",
       "parentId": "@proofblade/materials::class::AblationRunLedger"
     },
     {
@@ -32245,7 +32262,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 60,
+      "line": 67,
       "signature": "(clock?: () => string): Promise<number>",
       "summary": "Inferred summary: mark interrupted operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32259,7 +32276,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts"
       ],
-      "structureHash": "809173f7f962e506266d3c2bbca23efff411bef57b032f8ae2e658104779a69b",
+      "structureHash": "c8c9d52ebaec628ad9c76b8bf1db85e300919d954a1212a81a4ad515b8462853",
       "parentId": "@proofblade/materials::class::AblationRunLedger"
     },
     {
@@ -32269,7 +32286,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 37,
+      "line": 38,
       "signature": "(): AblationAttemptRecord | undefined",
       "summary": "Inferred summary: next operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -32308,7 +32325,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 73,
+      "line": 83,
       "signature": "(): AblationLedgerDocument",
       "summary": "Inferred summary: snapshot operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -32381,7 +32398,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-ledger.ts",
       "exportPath": "@proofblade/materials",
-      "line": 67,
+      "line": 77,
       "signature": "(): AblationLedgerSummary",
       "summary": "Inferred summary: summary operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -32547,7 +32564,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 303,
+      "line": 301,
       "signature": "(): Promise<Array<Pick<AblationExperimentSnapshot, \"experimentId\" | \"name\" | \"experimentFingerprint\">>>",
       "summary": "Inferred summary: list operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32608,7 +32625,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 297,
+      "line": 295,
       "signature": "(experimentId: string): Promise<AblationExperimentSnapshot>",
       "summary": "Inferred summary: load operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -32699,7 +32716,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts"
       ],
-      "structureHash": "fd515b528c869a17560f33f73bc2cb0d6a7b199360a607783360e497c0d29743",
+      "structureHash": "2e5eeb4381e93f532b8b6ddbf842059d8fe6cd9930353851ae0ed7300471fa10",
       "parentId": "@proofblade/materials::class::AblationExperimentStore"
     },
     {
@@ -32732,6 +32749,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -32853,6 +32871,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -32959,7 +32978,7 @@
       "visibility": "public",
       "module": "src/evaluation/real-model-evaluator.ts",
       "exportPath": "@proofblade/materials",
-      "line": 284,
+      "line": 287,
       "signature": "(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary>",
       "summary": "Inferred summary: run operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -32984,6 +33003,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33080,7 +33100,7 @@
         "packages/materials/tests/web-tools.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ],
-      "structureHash": "a340097500e7b9042c0bdac1d369c0f2d0d46090255c7505491831d2ba978f7e",
+      "structureHash": "334dc6cbe4783240567468ff9296d56a866472827aa7d2bd6e308eba7b840095",
       "parentId": "@proofblade/materials::class::RealModelEvaluationRunner"
     },
     {
@@ -33125,6 +33145,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33921,6 +33942,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -33994,6 +34016,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -35804,6 +35827,8 @@
         "../domain/intent.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -36895,6 +36920,7 @@
         "./run-work-scheduler.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37346,6 +37372,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -37474,6 +37501,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -38790,6 +38818,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -40165,6 +40194,7 @@
         "./verification-recovery.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -43759,6 +43789,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -46773,6 +46804,8 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -48244,6 +48277,8 @@
         "./browser-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -49634,6 +49669,8 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -51322,7 +51359,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 5,
+      "line": 10,
       "signature": "ContextLevel",
       "summary": "Inferred summary: context level type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -51341,7 +51378,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 7,
+      "line": 12,
       "signature": "ContextSensitivity",
       "summary": "Inferred summary: context sensitivity type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -51360,7 +51397,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 6,
+      "line": 11,
       "signature": "ContextTrust",
       "summary": "Inferred summary: context trust type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -51379,7 +51416,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 25,
+      "line": 30,
       "signature": "ReceiptNextAction",
       "summary": "Inferred summary: receipt next action type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -51398,7 +51435,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 24,
+      "line": 29,
       "signature": "ReceiptState",
       "summary": "Inferred summary: receipt state type contract used to provide a reusable operation.",
       "summarySource": "inferred",

@@ -234,6 +234,8 @@ async function main(): Promise<void> {
           const failed = preflight.checks.filter((item) => !item.passed).map((item) => `${item.id} (actual=${item.actual}, expected=${item.expected})`).join("; ");
           throw new Error(`ablation preflight failed before any Provider request: ${failed}`);
         }
+        const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
+        if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("Ablation corpus snapshot changed; create a new experiment version before running");
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
@@ -264,6 +266,7 @@ async function main(): Promise<void> {
           runPrefix: option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`,
           requireAnswerLiteralsAbsent: true,
           baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
+          runOrder: experiment.runOrder,
         });
         print(summary);
         if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
@@ -278,7 +281,7 @@ async function main(): Promise<void> {
       }
       if (action === "status" || action === "resume") {
         const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
-        const ledger = await AblationRunLedger.load(ledgerPath);
+        const ledger = await AblationRunLedger.load(ledgerPath, experiment);
         if (action === "resume") await ledger.markInterrupted();
         print({ experimentId: experiment.experimentId, ...(action === "resume" ? { recovered: true } : {}), next: ledger.next(), summary: ledger.summary() });
         break;

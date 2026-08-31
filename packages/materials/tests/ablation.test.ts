@@ -52,6 +52,9 @@ test("rejects auto model, duplicate baselines, policy mismatch and disabled safe
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], baseline: true }] }), profile), /exactly one baseline/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], changedFactor: "recall" }] }), profile), /declares recall/);
   assert.throws(() => validateAblationExperiment(input({ safety: { verifierCompletion: "disabled" } }), profile), /cannot be disabled/);
+  assert.throws(() => validateAblationExperiment(input({ variants: [{ ...input().variants[0], policy: { recall: "automatic" } }, input().variants[1]] }), profile), /Baseline variant/);
+  assert.throws(() => validateAblationExperiment(input({ runOrder: { mdoe: "stratified" } }), profile), /Unknown runOrder/);
+  assert.throws(() => validateAblationExperiment(input({ budget: { attempts: 1e20, maxTurns: 1, maxCostUsd: 1, deadlineMs: 1000 } }), profile), /safe integer/);
 });
 
 test("marks composite policy changes and rejects a concrete model override", () => {
@@ -72,6 +75,7 @@ test("builds deterministic interleaved and seeded stratified pairings", () => {
   const stratified = buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases);
   assert.deepEqual(stratified, buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases));
   assert.deepEqual(stratified.map((item) => item.ordinal), stratified.map((_, index) => index));
+  assert.throws(() => buildAblationPairings(experiment, [{ id: "same" }, { id: "same" }]), /case ids must be unique/);
 });
 
 test("preflight exposes credential presence without exposing its value and probes only model metadata", async () => {
@@ -91,6 +95,15 @@ test("preflight exposes credential presence without exposing its value and probe
   delete process.env.TEST_KEY;
 });
 
+test("snapshot inherits model behavior and preflight rejects profile drift or wrong probe model", async () => {
+  const inherited = validateAblationExperiment(input({ model: { profileId: "relay-a", model: "luna-1" } }), { ...profile, baseUrl: "https://aihub.top/v1/", thinkingLevel: "low", proxyUrl: "http://proxy.local", cacheRetention: "long" });
+  assert.equal(inherited.model.thinkingLevel, "low");
+  const drift = await preflightAblationExperiment(inherited, { ...profile, baseUrl: "https://aihub.top/v1/", thinkingLevel: "high", proxyUrl: "http://proxy.local", cacheRetention: "long" });
+  assert.equal(drift.ready, false);
+  const probe = await preflightAblationExperiment(inherited, { ...profile, baseUrl: "https://aihub.top/v1/", thinkingLevel: "low", proxyUrl: "http://proxy.local", cacheRetention: "long" }, { probe: true, fetch: async () => new Response(JSON.stringify({ data: [{ id: "different-model" }] }), { status: 200 }) });
+  assert.equal(probe.ready, false);
+});
+
 test("experiment store persists immutable snapshots and rejects tampering", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-store-"));
   try {
@@ -101,6 +114,8 @@ test("experiment store persists immutable snapshots and rejects tampering", asyn
     assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
     assert.equal((await store.load(experiment.experimentId)).experimentFingerprint, experiment.experimentFingerprint);
     await assert.rejects(() => store.save(experiment), /already exists/);
+    const concurrent = await Promise.allSettled([store.save(validateAblationExperiment(input({ experimentId: "AB-CONCURRENT" }), profile)), store.save(validateAblationExperiment(input({ experimentId: "AB-CONCURRENT" }), profile))]);
+    assert.equal(concurrent.filter((item) => item.status === "fulfilled").length, 1);
     const original = await readFile(path, "utf8");
     await (await import("node:fs/promises")).writeFile(path, original.replace("Receipt comparison", "tampered"));
     await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);

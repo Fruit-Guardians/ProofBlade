@@ -31,4 +31,8 @@ test("PMI, VOI and verified uplift preserve estimator identity and components", 
   assert.equal(uplift.estimatorKind, "verified_uplift");
   assert.ok(uplift.confidenceInterval);
   assert.equal(uplift.online, false);
+  assert.throws(() => estimateDecisionVoi({ currentUtility: 0, outcomeUtilities: [Number.NaN], outcomeProbabilities: [1], cost: 0 }), /utilities/);
+  assert.throws(() => estimateDecisionVoi({ currentUtility: 0, outcomeUtilities: [1], outcomeProbabilities: [-1], cost: 0 }), /probabilities/);
+  const interval = estimateVerifiedUplift({ baselineSuccessRate: .5, candidateSuccessRate: 0, baselineEvidenceCoverage: .5, candidateEvidenceCoverage: 0, sampleSize: 4 }).confidenceInterval!;
+  assert.ok(interval.high - interval.low > 0.5);
 });

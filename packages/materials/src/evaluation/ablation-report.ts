@@ -14,6 +14,8 @@ export interface AblationResultRecord {
   contextTokens: number;
   costUsd: number;
   durationMs: number;
+  /** Non-terminal records are excluded from success and paired denominators. */
+  status?: string;
   failureCategory?: string;
 }
 
@@ -50,17 +52,36 @@ export interface AblationReport {
 }
 
 export function buildAblationReport(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport {
-  const byVariant = new Map(experiment.variants.map((variant) => [variant.id, records.filter((record) => record.variantId === variant.id)]));
+  validateRecords(experiment, records);
+  const completedRecords = records.filter(isTerminalRecord);
+  const byVariant = new Map(experiment.variants.map((variant) => [variant.id, completedRecords.filter((record) => record.variantId === variant.id)]));
   const variants = experiment.variants.map((variant) => summarizeVariant(variant, byVariant.get(variant.id) ?? []));
   const baseline = experiment.variants.find((variant) => variant.baseline);
-  const pairedComparisons = baseline ? experiment.variants.filter((variant) => !variant.baseline).map((variant) => comparePaired(baseline.id, variant.id, records)) : [];
+  const pairedComparisons = baseline ? experiment.variants.filter((variant) => !variant.baseline).map((variant) => comparePaired(baseline.id, variant.id, completedRecords)) : [];
   const validityWarnings: string[] = [];
-  if (records.some((record) => record.candidateLeaked)) validityWarnings.push("存在候选答案泄漏，不能将成功率作为有效结论");
+  if (completedRecords.some((record) => record.candidateLeaked)) validityWarnings.push("存在候选答案泄漏，不能将成功率作为有效结论");
+  if (completedRecords.length !== records.length) validityWarnings.push("存在运行中或未知 Attempt，已从成功率与配对分母排除");
   if (experiment.variants.some((variant) => variant.policySnapshot.multiFactor)) validityWarnings.push("存在组合策略 Variant，不能作为单因素因果证据");
   if (variants.some((variant) => variant.total === 0)) validityWarnings.push("存在尚未完成 Attempt 的 Variant");
   if (new Set(experiment.variants.map((variant) => variant.modelSnapshot.profileFingerprint)).size > 1) validityWarnings.push("Variant 的 Provider/模型快照不一致，可能混入模型因素");
   const base = { schemaVersion: 1 as const, reportVersion: "ablation-report-v1" as const, experimentId: experiment.experimentId, experimentFingerprint: experiment.experimentFingerprint, variants, pairedComparisons, validityWarnings };
   return { ...base, reportHash: sha256(canonicalJson(base)) };
+}
+
+function validateRecords(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): void {
+  const variants = new Set(experiment.variants.map((variant) => variant.id));
+  const seen = new Set<string>();
+  for (const record of records) {
+    if (!variants.has(record.variantId)) throw new Error(`Ablation report record has unknown variant: ${record.variantId}`);
+    const expected = `${experiment.experimentId}:${record.caseId}:${record.attempt}:${record.variantId}`;
+    if (record.pairingId !== expected) throw new Error(`Ablation report record pairing id mismatch: ${record.pairingId}`);
+    if (seen.has(record.pairingId)) throw new Error(`Ablation report has duplicate pairing record: ${record.pairingId}`);
+    seen.add(record.pairingId);
+  }
+}
+
+function isTerminalRecord(record: AblationResultRecord): boolean {
+  return record.status === undefined || ["SUCCEEDED", "FAILED", "CANCELLED", "succeeded", "failed", "cancelled"].includes(record.status);
 }
 
 export function renderAblationReportZh(report: AblationReport): string {
@@ -94,4 +115,3 @@ function rate(value: number, total: number): number { return total > 0 ? value /
 function sum(values: readonly number[]): number { return values.reduce((total, value) => total + value, 0); }
 function round(value: number): number { return Math.round(value * 1e6) / 1e6; }
 function counts(values: readonly string[]): Record<string, number> { return Object.fromEntries([...new Set(values)].sort().map((key) => [key, values.filter((value) => value === key).length])); }
-

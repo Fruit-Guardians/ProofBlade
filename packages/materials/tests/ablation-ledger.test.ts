@@ -22,3 +22,23 @@ test("ledger claims in deterministic order and never reclaims terminal attempts"
     assert.equal((await AblationRunLedger.load(join(root, "ledger.json"))).summary().unknown, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("ledger rejects concurrent claims and resets interrupted ownership metadata", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-ledger-lock-"));
+  try {
+    const path = join(root, "ledger.json");
+    await AblationRunLedger.create(path, experiment, [{ id: "case-a" }]);
+    const left = await AblationRunLedger.load(path, experiment);
+    const right = await AblationRunLedger.load(path, experiment);
+    const pairing = left.next()!.pairingId;
+    const results = await Promise.allSettled([left.claim(pairing, "run-left"), right.claim(pairing, "run-right")]);
+    assert.equal(results.filter((item) => item.status === "fulfilled").length, 1);
+    assert.equal(results.filter((item) => item.status === "rejected").length, 1);
+    const current = await AblationRunLedger.load(path, experiment);
+    await current.markInterrupted();
+    const recovered = (await AblationRunLedger.load(path, experiment)).next()!;
+    assert.equal(recovered.status, "unknown");
+    assert.equal(recovered.runId, undefined);
+    assert.equal(recovered.startedAt, undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

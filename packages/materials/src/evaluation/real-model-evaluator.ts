@@ -53,6 +53,7 @@ export interface RealModelEvaluationOptions {
   requiredTargetKinds?: readonly TargetKind[];
   /** Reject corpora whose target files contain the expected answer literally. */
   requireAnswerLiteralsAbsent?: boolean;
+  runOrder?: { mode: "interleaved" | "stratified"; seed?: number };
 }
 
 export interface RealModelEvaluationGatePolicy {
@@ -76,6 +77,7 @@ export interface RealModelEvaluationPreflightOptions {
   deadlineMs?: number;
   /** Reject corpora whose target files contain the expected answer literally. */
   requireAnswerLiteralsAbsent?: boolean;
+  allowSharedProviderProfile?: boolean;
 }
 
 export interface RealModelEvaluationPreflightSummary {
@@ -119,9 +121,10 @@ export async function preflightRealModelEvaluation(options: RealModelEvaluationP
   const targetKinds = orderedCounts(corpus.cases.map((item) => item.targetKind)) as Record<string, number>;
   const answerLiteralLeakCount = requireAnswerLiteralsAbsent ? await countAnswerLiteralLeaks(corpus.cases) : 0;
   const distinctProfiles = new Set(variants.map((variant) => fingerprint(variant.config))).size;
+  const strategyFingerprints = new Set(variants.map((variant) => variant.strategyFingerprint).filter((value): value is string => Boolean(value)));
   const checks = [
     check("minimum_variants", variants.length >= 2, variants.length, ">=2"),
-    check("distinct_profile_variants", distinctProfiles >= 2, distinctProfiles, ">=2"),
+    check("distinct_profile_variants", distinctProfiles >= 2 || (options.allowSharedProviderProfile === true && strategyFingerprints.size === variants.length && strategyFingerprints.size >= 2), distinctProfiles, options.allowSharedProviderProfile === true ? ">=2 profiles or distinct strategy fingerprints" : ">=2"),
     ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
     ...requiredTargetKinds.map((targetKind) => check(`target_kind_coverage:${targetKind}`, targetKinds[targetKind] !== undefined, targetKinds[targetKind] ?? 0, ">=1")),
     ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", answerLiteralLeakCount === 0, answerLiteralLeakCount, 0)] : []),
@@ -298,32 +301,28 @@ export class RealModelEvaluationRunner {
     const gatePolicy = gatePolicyFor(options, variants, minimumCorpusCases);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
-    const results: RealModelVariantSummary[] = [];
-    for (const variant of variants) {
-      const profileFingerprint = fingerprint(variant.config);
-      const services = createServices(this.root, variant.config);
-      const cases: RealModelEvaluationCase[] = [];
-      try {
-        for (const corpusCase of corpus.cases) {
-          for (let attempt = 1; attempt <= attempts; attempt += 1) {
-            const runId = `${runPrefix}-${variant.id}-${corpusCase.id}-a${attempt}`;
-            assertRunId(runId);
-            await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, corpusCase);
-            const task = realEvaluationTask(runId, corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
-            cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
-          }
-        }
-      } finally {
-        await services.sandbox.close();
+    const casesByVariant = new Map(variants.map((variant) => [variant.id, [] as RealModelEvaluationCase[]]));
+    const servicesByVariant = new Map(variants.map((variant) => [variant.id, createServices(this.root, variant.config)]));
+    try {
+      for (const item of evaluationOrder(variants, corpus.cases, attempts, options.runOrder)) {
+        const variant = item.variant;
+        const services = servicesByVariant.get(variant.id)!;
+        const runId = `${runPrefix}-${variant.id}-${item.corpusCase.id}-a${item.attempt}`;
+        assertRunId(runId);
+        await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, item.corpusCase);
+        const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
+        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, deadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
       }
-      results.push(summarizeVariant(variant.id, profileFingerprint, cases, variant.strategyFingerprint));
+    } finally {
+      await Promise.all([...servicesByVariant.values()].map((services) => services.sandbox.close()));
     }
+    const results = variants.map((variant) => summarizeVariant(variant.id, fingerprint(variant.config), casesByVariant.get(variant.id)!, variant.strategyFingerprint));
     const comparisons = compareVariants(results, gatePolicy.baselineVariantId);
     const baseline = results.find((item) => item.id === gatePolicy.baselineVariantId)!;
     const distinctProfiles = new Set(results.map((variant) => variant.profileFingerprint)).size;
     const checks = [
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
-      check("distinct_profile_variants", options.allowSharedProviderProfile === true || distinctProfiles >= 2, distinctProfiles, options.allowSharedProviderProfile === true ? ">=1 (shared profile allowed)" : ">=2"),
+      check("distinct_profile_variants", distinctProfiles >= 2 || (options.allowSharedProviderProfile === true && variants.every((variant) => Boolean(variant.strategyFingerprint)) && new Set(variants.map((variant) => variant.strategyFingerprint)).size === variants.length), distinctProfiles, options.allowSharedProviderProfile === true ? ">=2 profiles or distinct strategy fingerprints" : ">=2"),
       check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
       ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
       ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", true, 0, 0)] : []),
@@ -688,7 +687,10 @@ function stableReportHash(summary: Omit<RealModelEvaluationSummary, "reportHash"
         failureCategories: metrics.failureCategories,
       }])),
       failureCategories: variant.failureCategories,
-      cases: variant.cases.map(({ runId: _runId, durationMs: _durationMs, firstEvidenceMs: _firstEvidenceMs, error: _error, ...item }) => item),
+      cases: variant.cases.map(({ runId: _runId, durationMs: _durationMs, firstEvidenceMs: _firstEvidenceMs, error: _error, ablationDecisions, ...item }) => ({
+        ...item,
+        ...(ablationDecisions ? { ablationDecisions: ablationDecisions.map(({ createdAt: _createdAt, ...decision }) => decision) } : {}),
+      })),
     })),
     comparisons: summary.comparisons.map(({ p95DurationMsDelta: _p95DurationMsDelta, ...comparison }) => comparison),
     gate: summary.gate,
@@ -705,6 +707,15 @@ function normalizeVariants(variants: RealEvaluationVariant[]): RealEvaluationVar
     ids.add(variant.id);
   }
   return sorted;
+}
+
+function evaluationOrder(variants: RealEvaluationVariant[], cases: readonly LoadedRealEvaluationCase[], attempts: number, order: RealModelEvaluationOptions["runOrder"]): Array<{ variant: RealEvaluationVariant; corpusCase: LoadedRealEvaluationCase; attempt: number }> {
+  const rows: Array<{ variant: RealEvaluationVariant; corpusCase: LoadedRealEvaluationCase; attempt: number }> = [];
+  const orderedVariants = [...variants].sort((a, b) => a.id.localeCompare(b.id));
+  const orderedCases = [...cases].sort((a, b) => a.id.normalize("NFC") < b.id.normalize("NFC") ? -1 : a.id.normalize("NFC") > b.id.normalize("NFC") ? 1 : 0);
+  for (let attempt = 1; attempt <= attempts; attempt += 1) for (const corpusCase of orderedCases) for (const variant of orderedVariants) rows.push({ variant, corpusCase, attempt });
+  if (order?.mode !== "stratified") return rows;
+  return rows.map((row, index) => ({ row, key: sha256(`${order.seed ?? 0}:${row.variant.id}:${row.corpusCase.id}:${row.attempt}`), index })).sort((a, b) => a.key.localeCompare(b.key) || a.index - b.index).map(({ row }) => row);
 }
 
 function gatePolicyFor(options: RealModelEvaluationOptions, variants: RealEvaluationVariant[], minimumCorpusCases: number): RealModelEvaluationGatePolicy {

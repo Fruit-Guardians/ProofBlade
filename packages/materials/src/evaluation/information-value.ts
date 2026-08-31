@@ -57,6 +57,8 @@ export function estimatePosteriorEIG(hypotheses: readonly PosteriorHypothesis[])
 export interface DecisionVoiInput { currentUtility: number; outcomeUtilities: readonly number[]; outcomeProbabilities: readonly number[]; cost: number; }
 export function estimateDecisionVoi(input: DecisionVoiInput): InformationValueEstimate {
   if (input.outcomeUtilities.length === 0 || input.outcomeUtilities.length !== input.outcomeProbabilities.length) throw new Error("decision VOI outcomes and probabilities must have equal non-zero length");
+  for (const probability of input.outcomeProbabilities) if (!Number.isFinite(probability) || probability < 0 || probability > 1) throw new Error("decision VOI probabilities must be finite values between 0 and 1");
+  for (const utility of input.outcomeUtilities) if (!Number.isFinite(utility)) throw new Error("decision VOI utilities must be finite");
   const total = input.outcomeProbabilities.reduce((sum, probability) => sum + probability, 0);
   if (Math.abs(total - 1) > 1e-6) throw new Error("decision VOI probabilities must sum to 1");
   if (!Number.isFinite(input.currentUtility) || !Number.isFinite(input.cost) || input.cost < 0) throw new Error("decision VOI utility and cost must be finite");
@@ -70,7 +72,7 @@ export function estimateVerifiedUplift(input: VerifiedUpliftInput): InformationV
   for (const [key, value] of Object.entries(input)) if (!Number.isFinite(value) || (key !== "sampleSize" && (value < 0 || value > 1)) || (key === "sampleSize" && value < 1)) throw new Error(`verified uplift ${key} is invalid`);
   const successUplift = input.candidateSuccessRate - input.baselineSuccessRate;
   const evidenceUplift = input.candidateEvidenceCoverage - input.baselineEvidenceCoverage;
-  const standardError = Math.sqrt(Math.max(1e-12, input.candidateSuccessRate * (1 - input.candidateSuccessRate) / input.sampleSize));
+  const standardError = Math.sqrt(Math.max(1e-12, (input.baselineSuccessRate * (1 - input.baselineSuccessRate) + input.candidateSuccessRate * (1 - input.candidateSuccessRate)) / input.sampleSize));
   return estimate("verified_uplift", successUplift, { successUplift, evidenceUplift, standardError }, input, false, false, { low: successUplift - 1.96 * standardError, high: successUplift + 1.96 * standardError }, { outcomes: input });
 }
 

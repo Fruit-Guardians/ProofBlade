@@ -33,3 +33,14 @@ test("hard circuit breaker terminates and event outcomes can be linked", () => {
   assert.equal(controller.eventsSnapshot()[0]?.modelAcceptedSuggestion, false);
   assert.equal(controller.eventsSnapshot()[0]?.subsequentOutcome, "blocked");
 });
+
+test("hard violations take precedence over soft advice and disabled breakers remain auditable", () => {
+  const controller = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "soft_advice" });
+  const event = controller.decide({ ...base, firstActionViolation: true, duplicateFailure: true });
+  assert.equal(event.decision, "block");
+  assert.equal(event.policyName, "duplicate_failure");
+  const disabled = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, circuitBreaker: "off" }).decide({ ...base, circuitBreakerTriggered: true });
+  assert.equal(disabled.decision, "allow");
+  assert.equal(disabled.policyName, "circuit_breaker");
+  assert.equal(disabled.reasonCode, "circuit_breaker_disabled");
+});
