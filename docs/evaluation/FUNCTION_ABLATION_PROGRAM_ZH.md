@@ -21,7 +21,7 @@ Harness 提供眼睛、纸笔、记忆和手：目标相关的只读观察、可
 | 编号 | 功能 / 实现面 | 任务分层 | 基线与唯一变量 | 主要行为指标 | 失败解释与修复门槛 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | F01 | 目标与二进制基础观察：`read/glob/grep`、`proofblade.binary.identify/sections/symbols/strings/inspect_elf` | reverse、pwn | 基线为直接结构化观察；变量为工具投影/输出可读性 | 首个目标事实时间、错误路径、重复读取、候选来源 | 先确认输出和 schema 是否到达模型；修复可读性/截断或真实工具故障 | 已有控制题；需扩大 holdout |
-| F02 | 深度逆向眼睛：IDALIB MCP、Rizin、本地受限静态分析、`binary_disassemble` 一等手柄 | native reverse | 先做能力可用性实验，不与认知策略混合；后续比较同一可用后端的提示/投影 | 成功 code observation、反编译/反汇编错误率、从代码到 verifier 的路径 | 工具 `isError`、依赖缺失或 schema 错误优先归为环境/工具；Provider 错误必须与模型/预算失败分离；必须修好或切换可验证后端 | 045 证明一等手柄被 Terra 调用并返回代码事实；044/046 含 Provider 错误，端到端 verifier 路径待稳定窗口复测 |
+| F02 | 深度逆向眼睛：IDALIB MCP、Rizin、本地受限静态分析、`binary_disassemble` 一等手柄 | native reverse | 先做能力可用性实验，不与认知策略混合；后续比较同一可用后端的提示/投影 | 成功 code observation、反编译/反汇编错误率、从代码到 verifier 的路径 | 工具 `isError`、依赖缺失或 schema 错误优先归为环境/工具；Provider 错误必须与模型/预算失败分离；必须修好或切换可验证后端 | 047 在连续流成功后再次证明 Terra 经拒绝反馈调用一等手柄并取得代码；baseline 被 deadline、advice 被 Provider 错误中断，端到端 verifier 路径仍待稳定窗口复测 |
 | F03 | MCP 一等工具 surface、schema 与错误投影 | reverse、mobile、web | 直接 schema 对照；变量为一等工具 vs 代理投影，仅在工具都可用时 | 首次正确参数率、MCP 发现回合、payload 可读性、错误后回退采纳 | schema/提示不一致先修 Harness；远端 error 必须原样有界传达 | 031--040 已闭环部分路径 |
 | F04 | Artifact / Evidence 图、检索、树和 curation | 证据冲突、跨轮任务 | `manual` 对 `advice`；固定其它 policy | 引用 Evidence 的候选比例、错误 artifact/evidence 混用、验证时延、无效整理回合 | verifier-ready candidate 被整理阻塞则修复交接；不要恢复 curation 硬门禁 | 027--029 已有控制回归；需 holdout |
 | F05 | recall、context receipt、压缩与恢复 | 长上下文、跨轮恢复 | `manual/fixed_recent/off` 对一个候选策略 | 召回命中后采纳、事实保持率、重读率、上下文 token、resume parity | 先对比来源丢失、召回不可见和模型未采纳；修复引用或索引，而非强制路径 | 待建立长上下文语料 |
@@ -31,13 +31,13 @@ Harness 提供眼睛、纸笔、记忆和手：目标相关的只读观察、可
 | F09 | `verify_claim`、hidden scorer、Completion handoff | 全部可复现题 | 不是策略开关；故障注入/回归 | 候选到 verifier 时延、独立复现次数、错误候选拒绝、重复验证 | 任何正确候选被 handoff/预算阻断先修控制平面 | 027--029 已修复；继续回归 |
 | F10 | Pwn 持久 session、后台 shell、reproduce | pwn | session 可用与无 session 的明确降级，不把能力缺失当策略效应 | IO 同步、超时、会话复用、reproduce 成功 | broker/container 缺失必须清楚说明并给 bash fallback；不能假装有 tube | 待有可复现 pwn 语料 |
 | F11 | Web session、origin scope、browser/web reproduce | web | interactive session 对 bounded curl fallback；verifier 固定 | cookie/CSRF 持续性、scope 拒绝、reproduce 成功 | target/broker 缺失归环境；请求越界归 scope，均带恢复建议 | 待有 web 语料 |
-| F12 | approval、effect journal、恢复与可操作拒绝 | platform / side effect | 故障注入而非能力增益对照 | no-effect proof、批准后重试、恢复一致性、敏感信息泄漏 | 任何 bare denial 是 UX/控制平面 defect；保留 fail-closed | approval、工具契约/禁用、交互 bash、Provider 预算/截止时间及 IDALIB 依赖拒绝均已回归；待端到端 |
-| F13 | Provider transport、预算和重试 | 全部真实 Provider 任务 | 固定任务下模拟 502/usage 缺失与正常对照 | 请求数、预算预留、错误后的 verifier 可达性、费用归因 | Provider 失败不得被错误标为模型失败或错误预算耗尽 | 044 发现单 Agent Loop 将连接错误误记为 `budget_exhausted`；045--046 真实 Responses 错误均正确为 `provider_error`；预算拒绝已有可操作反馈回归 |
+| F12 | approval、effect journal、恢复与可操作拒绝 | platform / side effect | 故障注入而非能力增益对照 | no-effect proof、批准后重试、恢复一致性、敏感信息泄漏 | 任何 bare denial 是 UX/控制平面 defect；保留 fail-closed | approval、工具契约/禁用、交互 bash、Provider 预算/截止时间均有回归；047 真实 IDALIB decompile 拒绝后 Terra 采纳 `binary_disassemble`，无越权 effect；approval/budget 的真实后续采纳待测 |
+| F13 | Provider transport、预算和重试 | 全部真实 Provider 任务 | 固定任务下模拟 502/usage 缺失与正常对照 | 请求数、预算预留、错误后的 verifier 可达性、费用归因 | Provider 失败不得被错误标为模型失败或错误预算耗尽 | 044 发现单 Agent Loop 将连接错误误记为 `budget_exhausted`；045--047 的真实 Responses 连接错误均正确为 `provider_error`；047 还区分了错误 GUI credential 的 401 与 AIHub 正确凭据下的后续流错误 |
 
 ## 4. 近期运行顺序
 
-1. **047，F02 稳定窗口复测**：在同一 AIHub Responses profile 连续健康检查通过后，固定 046 的预算和条件重跑独立轨迹。验收是无 Provider 污染的 `binary_disassemble -> 后续模型响应 -> 候选或 verify_claim`；连接错误仍只记 F13，不能写入 F02 分母。不得把两个 curation 轨迹作效果比较。
-2. **048，F04 机制 smoke**：在至少一个有证据冲突的 fixture 上 `manual` 对 `advice`，记录 curation 是否改变 verifier-ready path；未达可用工具基线的 reverse 题不混入该比较。
+1. **047，F02/F12/F13 稳定窗口复测**：已完成。三次连续健康流成功后，advice 出现 `decompile` 拒绝 -> `binary_disassemble` -> 后续模型响应；baseline 未采用一等手柄并耗尽 pair deadline，advice 随后发生 Provider error。仅将一等手柄可达和拒绝反馈采纳记为通过，不作 curation 或端到端成功率结论。
+2. **048，F04 机制 smoke**：在至少一个有证据冲突且 verifier-ready path 已可用的 fixture 上 `manual` 对 `advice`，记录 curation 是否改变 verifier-ready path；不得把 Provider 错误或未达候选的 reverse 题混入比较。
 3. **049--052，F07/F08**：按 reverse、web、pwn 分层，先 `soft_advice` 对 `off`，最后才以单独标记的 `hard_*` 做反事实；硬模式的更高成功率也必须报告被拒绝的合法路线与损失。
 4. **053--056，F05/F06**：使用长上下文、恢复和高分支语料，先检查事实保持和投影采纳，再比较成本/成功。
 5. 达到每层足够 holdout 和 3--5 attempts 后再报告 Pass@k、Pass^k、分层置信区间与成本；此前只报告机制证据和修复状态。

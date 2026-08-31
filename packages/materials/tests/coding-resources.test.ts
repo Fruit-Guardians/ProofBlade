@@ -1165,18 +1165,22 @@ test("IDALIB GUI dependency failures say whether the requested code action ran a
   assert.match(text, /not executed/);
   assert.match(text, /No code fact was obtained/);
   assert.match(text, /Next:/);
-  assert.match(text, /capability search/);
+  assert.match(text, /binary_disassemble/);
   assert.match(text, /capabilityOperation:\"disassemble\"/);
 });
 
-test("IDALIB dependency refusals retain an actionable source-level MCP message", () => {
-  const text = mcpToolErrorMessage("idalib-mcp", "disassemble_function", {
-    content: [{ type: "text", text: "Can't import PySide6. Are you trying to use Qt without GUI?" }],
-  });
-  assert.match(text, /Reason:/);
-  assert.match(text, /not executed/);
-  assert.match(text, /Next:/);
-  assert.match(text, /binary disassemble/);
+test("IDALIB dependency refusals retain an actionable direct-disassembly recovery", () => {
+  for (const tool of ["disassemble_function", "decompile_function"]) {
+    const text = mcpToolErrorMessage("idalib-mcp", tool, {
+      content: [{ type: "text", text: "Can't import PySide6. Are you trying to use Qt without GUI?" }],
+    });
+    assert.match(text, /Reason:/);
+    assert.match(text, /not executed/);
+    assert.match(text, /Next:/);
+    assert.match(text, /binary_disassemble/);
+    assert.match(text, /capabilityOperation:"disassemble"/);
+    assert.doesNotMatch(text, /make at most one disassemble_function probe/);
+  }
 });
 
 test("an initial IDALIB function inventory directs the model to inspect code", async () => {

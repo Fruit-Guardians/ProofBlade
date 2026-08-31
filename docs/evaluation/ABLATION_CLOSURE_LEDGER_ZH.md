@@ -98,12 +98,13 @@
 - 硬边界保持不变：工作区与网络 scope、凭据隔离、generation fence、effect journal、用户取消、总成本/工具/提交额度、deadline、隐藏评分与答案防泄漏。它们拒绝时必须返回可操作反馈：触发原因、未执行的动作、已保留的状态，以及允许的替代路径或所需授权；不得只给出抽象的拒绝码。
 - `hard_gate` / `hard_stop` 不再代表默认能力配置，只作为明确标记的消融对照。它们的作用是量化“锁链”是否真的带来收益，而不是把失败归因给模型。
 
-### F12：拒绝反馈契约回归（已完成源级矩阵，待端到端）
+### F12：拒绝反馈契约回归（源级矩阵完成，IDALIB 端到端反馈采纳已验证）
 
 - 范围：approval pending/denied、未启用或参数不合约的 Skill/MCP/Capability、交互式 bash 边界、Provider 预算与请求前 deadline、以及 IDALIB-MCP 缺少 Qt/PySide 依赖。
 - 结果：上述拒绝面均有最小回归，反馈统一保留 `Reason:`、明确的未执行事实（例如 `not executed` 或 `No Provider request was sent`）和 `Next:` 恢复手柄。IDALIB 的底层 MCP `isError` 现在也由 registry 直接投影这一格式，避免绕过上层工具适配时退化为原始 GUI 依赖报错。
 - 设计判断：这不放宽 scope、审批、预算、deadline 或依赖检查；它只将 fail-closed 的结果变成模型可以据此换工具、申请授权、调整预算/期限或保留当前证据的反馈。对于已经发出的 Provider 请求，系统不得谎称“未执行”，而应报告中断和不确定的远端状态。
-- 剩余验证：需在真实 Provider 与真实 IDALIB 环境中记录一次拒绝后的下一轮采纳，验证模型使用恢复建议且没有产生越权 effect；该验证属于 F12 控制平面 smoke，不得混入 F02/F13 的能力或 Provider 成功率。
+- 真实采纳：`AB-TERRA-OBJDUMP-MAGIC-047` 的 advice 轨迹在 IDALIB `decompile_function` 返回 Qt/PySide 拒绝后，下一轮实际调用了 `binary_disassemble`；该调用走 `proofblade-objdump`、是只读 journaled effect，未产生平台提交或越权 effect。这验证了“原因 / 未执行 / 下一步”对真实 Terra 的可消费性，但不代表模型一定完成候选推导。
+- 剩余验证：approval 与 Provider budget 的真实后续采纳仍需独立故障注入；不得以 platform 真实提交测试 approval。该验证属于 F12 控制平面 smoke，不得混入 F02/F13 的能力或 Provider 成功率。
 
 ### AB-TERRA-IDALIB-MAGIC-037/038：函数地址投影与评测账本恢复
 
@@ -203,3 +204,12 @@
 - 结果：baseline 在 4 次真实响应、6 次工具调用后出现 `Connection error.`；advice 在 15 次真实响应、17 次工具调用后也出现 `Connection error.`。二者都立即持久化为 `FAILED/provider_error`，未出现 `budget_exhausted`、候选或 `verify_claim`。这是 044 修复在真实 Responses 流上的第二次验证。
 - F02 边界：baseline 在基础 metadata/entry/list 观察前中断，advice 仅执行一次 generic `capability` 与重复 metadata/entry/list/Evidence，未调用 `binary_disassemble`。因此 046 既不能否定 045 的一等手柄成功 observation，也不能提供 curation、模型工具选择或端到端成功率结论；两条都从 F02 分母排除。
 - 下一步：047 先要求同一 profile 的连续 Responses 健康检查，再以新的 immutable 快照固定 046 的预算重跑。只有不存在 Provider 污染时，才检验 `binary_disassemble` 后的模型响应、候选和 verifier 路径；如果模型在稳定轨迹仍不调用该手柄，首错才转为工具选择/提示投影，而非权限或硬门禁。
+
+### AB-TERRA-OBJDUMP-MAGIC-047：稳定流下的拒绝恢复采纳与未完成候选交接（已完成，F02/F12/F13）
+
+- 固定条件：`magic`、AIHub `gpt-5.6-terra` / Responses / max、同一 hidden scorer、五个外层 turn、两个独立轨迹；总预算提高到 `$2.00`，使每 pairing 有 `$1.00`，实验快照指纹为 `b4c9d35d7d534813a42b9d884ba04e514234d9fb0c6cdbd984a00594f12686cd`。此前三次低输出真实 Responses 健康探针均返回成功；一次错误地将另一个 GUI provider 的 key 用到 AIHub 得到 3 次 `401`、零 token，已按配置错误排除，未写入 F02。
+- baseline：20 次成功 Provider 响应、59 次工具调用、约 `$0.240192`，无 `binary_disassemble`、无候选、无 `verify_claim`。它在拿到 metadata、入口点、函数列表和本地代码窗口后继续走 bash/read/evidence，最终命中每 pairing 的 deadline，终态为 `FAILED/budget_exhausted`。这不是 Provider 不稳定或 IDALIB 权限问题，而是模型没有把已可见的一等只读手柄纳入路径；也不能据一条采样把 curation 归因为原因。
+- advice：22 次成功 Provider 响应、27 次工具调用、约 `$0.259208`。IDALIB `decompile_function` 返回 Qt/PySide 拒绝后，模型在下一轮调用 `binary_disassemble`；该调用选择 `proofblade-objdump` 并返回非错误结构化代码 observation，随后仍继续获得 Provider 响应。最后一个 Provider 请求报 `Connection error.`，Run 立即终态为 `FAILED/provider_error`，没有候选或 `verify_claim`。该路径验证 F12 的真实反馈采纳和 F02 的一等手柄可达，但 Provider 终态使其不能支持端到端 solve 或 curation 成功率结论。
+- 比较与首错：advice 比 baseline 少 32 次工具调用和 21 条 Evidence，但多 2 次 Provider 请求、成本高 `$0.019016`；样本为一题一次且终态原因不同，不能称为 `evidenceCuration` 的因果收益。baseline 的首个可修复边是已出现入口点和 code-analysis 建议后仍反复使用外围工具；advice 的首个可修复边是拿到代码后没有迅速把 transform/reveal 归结为单一候选，其最终 Provider 错误必须单列为 F13。
+- 修复：删除 IDALIB decompile 拒绝后的“先再试一次同依赖 disassemble”建议，改为优先给出一等 `binary_disassemble { path, address, maxInstructions }`，并在它未暴露时保留 generic `capability` 调用形状。该变更不禁用 bash/MCP、不开新权限，也不把调查路径变为硬 gate；回归覆盖 decompile 和 disassemble 两类 Qt 拒绝。
+- 下一步：先在一个不受 Provider 错误影响、且已有 verifier-ready candidate 的独立 fixture 上进行 F04 `manual`/`advice` smoke；F02 的端到端复测必须等待新的连续流稳定窗口，并记录 `binary_disassemble -> candidate -> verify_claim` 的完整链路。
