@@ -51,6 +51,14 @@
 - 失败分析：本批无失败；这不是“所有功能都已证明有效”，而是为后续故障注入和模型消融建立无 Provider 污染的参照。若后续实验在同一 fixture 上失败，必须先对照本基线检查工具/schema、事件投影、预算、Provider telemetry 和 verifier 代次。
 - 后续：以此报告哈希作为 C0–C12 回归参照；F04 的 048 仍需独立 verifier-ready fixture 和 `manual`/`advice` 配对，不能把本控制基线当作认知因果证据。
 
+### F04-CURATION-MECHANISM-20260901：Evidence curation provider-free 机制 smoke（已完成）
+
+- 固定条件：本地临时 Run、无 Provider 请求、无外部网络；执行 `evidence-curation-gate.test.ts` 与 `evidence-bypass-regressions.test.ts`。
+- 结果：21/21 测试通过。覆盖 backlog 的 `clear/checkpoint/required` 投影、Agent annotation 保持 pending、可信 harness/user review 或 `evidence record` promotion 才能清理、重复 Artifact 按内容去重、并发 evidence/annotation 幂等，以及 verifier Effect/Completion 的跨绑定拒绝。
+- 行为解释：Gate 现在在 required 阈值返回带 Artifact ID、状态计数和 `Next` 的 advisory notice，继续调查仍可执行；整理只改变可追溯状态，不授予 verifier 权限。并发相同 finding 复用同一 Evidence/Reasoning node，避免模型或重试制造重复证据。
+- 失败分析：本 smoke 无失败；它只能证明 F04 的状态机、反伪造和幂等机制，不能证明 Terra 在 `manual` 与 `advice` 之间会选择更少调用或更快到达 verifier。模型行为比较仍需 048 的独立 verifier-ready fixture、同一 Provider 和交错配对。
+- 后续：若 048 发现整理建议导致候选交接延迟，首查候选是否已 ready、evidence schema 是否产生循环，再修复交接而不是恢复硬 curation gate。
+
 ### AB-TERRA-MAX-RESPONSES-027：过度证据整理与验证交接回归
 
 - 配置：AIHub `gpt-5.6-terra`，`openai-responses`，`thinkingLevel=max`；2 个 base64 control-plane fixture，两个策略变体，`maxTurns=4`。

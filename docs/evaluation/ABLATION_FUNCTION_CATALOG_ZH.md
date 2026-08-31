@@ -96,6 +96,6 @@ Harness 的职责是给模型提供眼睛（目标相关观察）、纸笔（Art
 
 ## 7. 当前结论与未完成项
 
-当前最强结论是：ProofBlade 的本地控制平面已能稳定完成 37/37 基线，真实 Terra 轨迹已证明 IDALIB Qt/PySide 拒绝可被模型采纳并切换到 `binary_disassemble`。尚无足够证据说明 `evidenceCuration`、`recall`、`compression` 或任何认知策略的因果收益；047 的 Provider error 和单题样本必须排除在这些结论之外。
+当前最强结论是：ProofBlade 的本地控制平面已能稳定完成 37/37 基线，F04 provider-free 机制 smoke 的 21 项测试通过，真实 Terra 轨迹也已证明 IDALIB Qt/PySide 拒绝可被模型采纳并切换到 `binary_disassemble`。尚无足够证据说明 `evidenceCuration`、`recall`、`compression` 或任何认知策略的因果收益；047 的 Provider error 和单题样本必须排除在这些结论之外。
 
 下一次提交完成 048 时，必须增加独立的 verifier-ready fixture、记录 `manual/advice` 的候选交接行为，并在发现整理阻塞或 schema 摩擦时先修复，再用同一条件复测。所有功能最终都要回到本目录的批次表和闭环模板，不能只留下一个成功率数字。
