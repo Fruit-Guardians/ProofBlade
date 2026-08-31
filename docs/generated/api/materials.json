@@ -60,7 +60,7 @@
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
     "src/evaluation/ablation-ledger.ts": "c13ec09ab7066b9d4049e5b1ced15f8eae57695834784424b7d06efad3252bd4",
     "src/evaluation/ablation-policy.ts": "d3faf895f06dfaca469c0d4bf71a26d41464509c67a447a64a09422322f1b5c4",
-    "src/evaluation/ablation-report.ts": "2d113f9fc184ec70d54289c2682b93a9c8bb8f669cb5e62ac5ba85b0d2fc6b24",
+    "src/evaluation/ablation-report.ts": "6d679d20c216061819d5e9c02f81d2f27e8b61d13e473cdd1da032df23397763",
     "src/evaluation/ablation.ts": "3ed17a3914d7b8f0922fbd07e4b2cd49850937cc30a9b3e7f094be95e5afd247",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
@@ -5901,7 +5901,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 54,
+      "line": 65,
       "signature": "(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport",
       "summary": "Inferred summary: build ablation report operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -5913,7 +5913,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts"
       ],
-      "structureHash": "838a40db7344f04d17f5fe0e4f3d680f6f248c47290c53ada0cb36eab9309153"
+      "structureHash": "d1d4cf934fba541d154ba6bf386a6ab8752335d00d9cd49e8a859e38f3afccfb"
     },
     {
       "id": "@proofblade/materials::function::renderAblationReportZh",
@@ -5922,9 +5922,9 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 87,
+      "line": 128,
       "signature": "(report: AblationReport): string",
-      "summary": "Inferred summary: render ablation report zh operation used to produce a deterministic value.",
+      "summary": "Inferred summary: render ablation report zh operation used to read or inspect state.",
       "summarySource": "inferred",
       "tags": [],
       "imports": [
@@ -5934,7 +5934,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts"
       ],
-      "structureHash": "355ca4f93a3470814a66547d3512a2850419924fcb177c9ef855a26069aff7fa"
+      "structureHash": "7cfb1d71f448c46285c30001d97beff6f00e3786ee738104cd717eed72ea59b4"
     },
     {
       "id": "@proofblade/materials::function::buildAblationPairings",
@@ -15070,7 +15070,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 43,
+      "line": 47,
       "signature": "AblationReport",
       "summary": "Inferred summary: ablation report type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -15108,7 +15108,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation-report.ts",
       "exportPath": "@proofblade/materials",
-      "line": 22,
+      "line": 26,
       "signature": "AblationVariantReport",
       "summary": "Inferred summary: ablation variant report type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -52485,6 +52485,24 @@
       "line": 4,
       "signature": "AblationDecision",
       "summary": "Inferred summary: ablation decision type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationEvaluationStage",
+      "name": "AblationEvaluationStage",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 24,
+      "signature": "AblationEvaluationStage",
+      "summary": "Inferred summary: ablation evaluation stage type contract used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "imports": [

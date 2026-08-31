@@ -13,7 +13,12 @@ test("builds paired report with Wilson intervals and Chinese rendering", () => {
   assert.equal(report.variants[0]?.successRate, 1);
   assert.equal(report.variants[1]?.successRate, 0);
   assert.equal(report.pairedComparisons[0]?.baselineOnlySuccess, 1);
+  assert.equal(report.stage, "smoke");
+  assert.equal(report.metrics.byVariant.baseline?.passAtK, 1);
+  assert.equal(report.metrics.byVariant.candidate?.passAtK, 0);
+  assert.match(report.validityWarnings.join("\n"), /冒烟阶段/);
   assert.match(renderAblationReportZh(report), /消融实验报告/);
+  assert.match(renderAblationReportZh(report), /Pass@k/);
   assert.equal(report.reportHash.length, 64);
 });
 

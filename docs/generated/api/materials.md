@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 165
-- Symbols: 1763
+- Symbols: 1764
 
 ## Public Symbols
 
@@ -1975,7 +1975,7 @@
 ### buildAblationReport
 - Kind: `function`
 - Signature: `(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport`
-- Source: [src/evaluation/ablation-report.ts:54](../../../packages/materials/src/evaluation/ablation-report.ts:54)
+- Source: [src/evaluation/ablation-report.ts:65](../../../packages/materials/src/evaluation/ablation-report.ts:65)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build ablation report operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1984,9 +1984,9 @@
 ### renderAblationReportZh
 - Kind: `function`
 - Signature: `(report: AblationReport): string`
-- Source: [src/evaluation/ablation-report.ts:87](../../../packages/materials/src/evaluation/ablation-report.ts:87)
+- Source: [src/evaluation/ablation-report.ts:128](../../../packages/materials/src/evaluation/ablation-report.ts:128)
 - Export: `@proofblade/materials`
-- Summary: Inferred summary: render ablation report zh operation used to produce a deterministic value.
+- Summary: Inferred summary: render ablation report zh operation used to read or inspect state.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/ablation-report.test.ts`
 
@@ -5287,7 +5287,7 @@
 ### AblationReport
 - Kind: `interface`
 - Signature: `AblationReport`
-- Source: [src/evaluation/ablation-report.ts:43](../../../packages/materials/src/evaluation/ablation-report.ts:43)
+- Source: [src/evaluation/ablation-report.ts:47](../../../packages/materials/src/evaluation/ablation-report.ts:47)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation report type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5304,7 +5304,7 @@
 ### AblationVariantReport
 - Kind: `interface`
 - Signature: `AblationVariantReport`
-- Source: [src/evaluation/ablation-report.ts:22](../../../packages/materials/src/evaluation/ablation-report.ts:22)
+- Source: [src/evaluation/ablation-report.ts:26](../../../packages/materials/src/evaluation/ablation-report.ts:26)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation variant report type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -14320,6 +14320,14 @@
 - Source: [src/evaluation/ablation-policy.ts:4](../../../packages/materials/src/evaluation/ablation-policy.ts:4)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation decision type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### AblationEvaluationStage
+- Kind: `type`
+- Signature: `AblationEvaluationStage`
+- Source: [src/evaluation/ablation-report.ts:24](../../../packages/materials/src/evaluation/ablation-report.ts:24)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: ablation evaluation stage type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### AblationAttemptStatus
