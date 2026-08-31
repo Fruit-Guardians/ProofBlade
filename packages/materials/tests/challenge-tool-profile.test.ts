@@ -52,9 +52,11 @@ test("profiles keep direction-specific tools and fallback order bounded", () => 
   assert.match(profile.firstAction, /file.*strings/i);
   assert.equal(profile.firstActionPlan.id, "reverse-static-and-decompiler");
   assert.equal(profile.firstActionPlan.maxCalls, 8, "reverse must reach one real code-analysis probe after static identification");
+  assert.ok(profile.firstActionPlan.allowedToolNames.includes("binary_disassemble"), "reverse must expose the direct bounded static-analysis fallback as an opening option");
   const reverseRecon = actionBundleForPhase(profile, "RECON");
   assert.equal(reverseRecon?.id, "reverse-static-and-decompiler");
   assert.equal(reverseRecon?.maxCalls, 8, "reverse RECON must not spend its complete budget on tool discovery");
+  assert.ok(reverseRecon?.toolNames.includes("binary_disassemble"), "reverse RECON must preserve the direct bounded static-analysis fallback");
   assert.match(reverseRecon?.successCriteria.join(" ") ?? "", /tool discovery alone is not sufficient/i);
   assert.equal(actionBundleForPhase(challengeToolProfile("pwn"), "EXPERIMENT")?.id, "pwn-experiment");
   assert.ok(actionBundleForPhase(challengeToolProfile("web"), "REPRODUCE")?.toolNames.includes("web_reproduce"));

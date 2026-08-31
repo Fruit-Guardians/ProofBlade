@@ -51,7 +51,7 @@ const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
   // Native reversing commonly needs one static identification plus a real
   // decompiler/disassembler probe. Three calls can be consumed before that
   // analysis begins by file metadata and MCP discovery alone.
-  reverse: { id: "reverse-static-and-decompiler", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 8 },
+  reverse: { id: "reverse-static-and-decompiler", allowedToolNames: ["read", "bash", "capability", "binary_disassemble", "mcp_call", "mcp__*"], maxCalls: 8 },
   mobile: { id: "mobile-manifest", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
   pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "capability", "pwn_open", "pwn_recv"], maxCalls: 2 },
   web: { id: "web-request-or-artifact", allowedToolNames: ["read", "bash", "web_open", "web_request"], maxCalls: 2 },
@@ -128,7 +128,7 @@ function reverseActionBundles(): ActionBundle[] {
       id: "reverse-static-and-decompiler",
       domainPhase: "RECON",
       objective: "Establish the binary format and architecture, then inspect at least one target-relevant input-check or flag-reveal path with a disassembler or decompiler.",
-      toolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"],
+      toolNames: ["read", "bash", "capability", "binary_disassemble", "mcp_call", "mcp__*"],
       capabilityIds: ["reverse.binary", "mcp.reverse"],
       preconditions: ["The challenge binary and its prepared reverse tools are available."],
       successCriteria: ["Format/architecture facts and one target-relevant code path are captured; tool discovery alone is not sufficient."],
@@ -317,7 +317,7 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id" | 
     optionalToolIds: ["readelf", "objdump", "gdb", "upx", "patchelf", "qemu", "ghidra-headless", "jq", "xxd"],
     mcpServers: ["idalib-mcp", "jadx"],
     capabilities: ["reverse.binary", "mcp.reverse"],
-    fallbackStrategies: ["static:packed_probe-then-file-strings-readelf-objdump", "packed:local-upx-test-then-gdb-memory-dump", "decompiler:mcp-first-class-then-mcp-call", "dynamic:qemu-or-gdb"],
+    fallbackStrategies: ["static:packed_probe-then-file-strings-readelf-objdump", "packed:local-upx-test-then-gdb-memory-dump", "decompiler:mcp-first-class-then-binary_disassemble", "dynamic:qemu-or-gdb"],
   },
   mobile: {
     targetKind: "reverse",
