@@ -386,7 +386,8 @@ export class McpProjectRegistry {
       const result = await connection.client.callTool({ name: tool, arguments: args as Record<string, unknown> }, requestOptions(entry.definition, signal));
       const secrets = [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain), ...sensitiveArgumentValues(args as Record<string, unknown>, new Set(policy.redactArguments))];
       const stdout = redactText(JSON.stringify({ server: entry.name, tool, result }, null, 2), secrets);
-      return { stdout, stderr: result.isError ? `MCP tool reported an error: ${entry.name}.${tool}` : "", exitCode: result.isError ? 1 : 0, durationMs: Date.now() - started, externalId: externalId(connection) };
+      const stderr = result.isError ? redactText(mcpToolErrorMessage(entry.name, tool, result), secrets) : "";
+      return { stdout, stderr, exitCode: result.isError ? 1 : 0, durationMs: Date.now() - started, externalId: externalId(connection) };
     } catch (error) {
       if (connection && isTransportFailure(error)) await this.invalidateConnection(entry.name, connection);
       return { stdout: "", stderr: redactText(error instanceof Error ? error.message : String(error), [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain)]), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
@@ -863,6 +864,25 @@ const DEFAULT_TOOLCHAIN_PATH_KINDS: Record<McpToolchainKind, "file" | "directory
 function redactText(value: string, secrets: string[]): string {
   const variants = [...new Set(secrets.flatMap((secret) => escapedVariants(secret)))];
   return variants.sort((a, b) => b.length - a.length).reduce((text, secret) => text.split(secret).join("[REDACTED]"), value);
+}
+
+function mcpToolErrorMessage(server: string, tool: string, result: { content?: unknown }): string {
+  const detail = mcpTextContent(result.content);
+  const prefix = `MCP tool reported an error: ${server}.${tool}`;
+  if (/idalib/i.test(server) && /decompile/i.test(tool) && /can't import pyside6|qt without gui/i.test(detail)) {
+    return `${prefix}. ${detail}\nNo code fact was obtained. Next: use disassemble_function on the same address or a bounded local static command; do not repeat decompile_function until a headless-capable IDALIB environment is installed.`;
+  }
+  return detail ? `${prefix}. ${detail}` : prefix;
+}
+
+function mcpTextContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part): part is { type?: unknown; text?: unknown } => Boolean(part) && typeof part === "object")
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text as string)
+    .join("\n")
+    .slice(0, 4_000);
 }
 
 function escapedVariants(secret: string): string[] {

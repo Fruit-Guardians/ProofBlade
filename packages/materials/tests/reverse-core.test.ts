@@ -157,6 +157,9 @@ test("MCP reverse adapter maps and normalizes the logical operations", async () 
       { from: "0x401020", to: "0x401000", type: "CALL" },
       { from: "0x401030", to: "0x401000", type: "JMP" },
     ]);
+    const failed = await registry.execute("mcp.reverse", "call", { tool: "reverse", arguments: { operation: "functions", path: "missing.bin" } });
+    assert.equal(failed.exitCode, 1);
+    assert.match(failed.stderr, /MCP reverse path must be an existing absolute staged file/);
     await assertStagedPathsCleaned(pathMarker, fixtureRoot, 3);
   } finally {
     await registry?.close().catch(() => undefined);
