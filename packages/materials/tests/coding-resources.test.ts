@@ -54,6 +54,22 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
 });
 
+test("coding tool refusals explain the reason and recovery path", async () => {
+  const verify = createCodingTools().find((tool) => tool.name === "verify_claim");
+  assert.ok(verify);
+  await assert.rejects(() => verify.execute("call-refusal", {
+    candidate: "flag{candidate}",
+    command: "printf 'flag{candidate}'",
+  }, new AbortController().signal, () => undefined, {} as CodingResourceContext), (error: unknown) => {
+    const text = error instanceof Error ? error.message : String(error);
+    assert.match(text, /Reason:/);
+    assert.match(text, /not executed/);
+    assert.match(text, /Next:/);
+    assert.match(text, /derive it from workspace inputs/);
+    return true;
+  });
+});
+
 test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
   const tools = [
     { name: "mcp__idalib-mcp__idalib_open" },

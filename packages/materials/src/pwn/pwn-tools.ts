@@ -301,7 +301,7 @@ export class PwnToolHandler {
   }
 
   private async reproduceInternal(stages: ExploitStage[]): Promise<PwnReproduceOutcome> {
-    if (!this.reproductionPolicy) throw new Error("pwn reproduction is unavailable because this task has no immutable target and flag verifier configuration");
+    if (!this.reproductionPolicy) throw new Error("[ProofBlade tool unavailable: pwn_reproduce]\nReason: this task has no immutable target and flag verifier configuration, so an exploit cannot be independently judged.\nNext: use pwn_open/pwn_send/pwn_recv for bounded exploration and record a hypothesis, or configure a task-bound verifier before requesting reproduction.");
     const { target, flagPath, flagPattern } = this.reproductionPolicy;
     if (target.kind === "remote") this.assertEndpointAllowed(target.endpoint);
     const recipe: ExploitRecipe = { stages, flagPath, flagPattern };
@@ -372,7 +372,7 @@ export class PwnToolHandler {
     artifactIds?: string[];
     evidenceIds?: string[];
   }): Promise<{ recordId: string }> {
-    if (!this.controlStore) throw new Error("pwn primitive recording is unavailable without the Control Store");
+    if (!this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_record_primitive]\nReason: primitive recording requires the durable Control Store, which is not attached to this run.\nNext: continue with bounded pwn observations, or restart the task with a Control Store-enabled profile.");
     const primitive = redactCtfCandidates(input.primitive.replace(/[\u0000\r\n]/g, " ").trim(), () => "[candidate]").slice(0, 256);
     if (!primitive) throw new Error("pwn primitive requires a non-empty description");
     if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence >= 1) throw new Error("pwn primitive confidence must be in [0,1)");
@@ -381,7 +381,7 @@ export class PwnToolHandler {
     if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error("pwn primitive requires supporting artifactIds or evidenceIds");
     const preconditionRecordIds = [...new Set(input.preconditionRecordIds ?? [])].slice(0, 32);
     const snapshot = await this.controlStore.snapshot(this.runId);
-    if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(`Pwn primitive is not allowed for target kind ${snapshot.task.target_kind}`);
+    if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(`[ProofBlade tool request rejected: pwn_record_primitive]\nReason: target kind ${snapshot.task.target_kind} is outside the pwn primitive scope; no hypothesis was recorded.\nNext: use the task's target-appropriate tools, or run this primitive on a pwn/mixed target.`);
     const recordId = id("PWN-PRIMITIVE");
     await this.controlStore.dispatch(this.runId, {
       type: "domain_record",

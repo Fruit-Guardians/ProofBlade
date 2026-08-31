@@ -48,7 +48,7 @@ const pwnOpenTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, params, _signal, _onUpdate, context) {
     const input = params as { kind: "local" | "remote"; command: string[]; endpoint?: string; idleSilenceMs?: number; waitTimeoutMs?: number };
-    if (input.kind === "remote" && !input.endpoint) throw new Error("pwn_open kind=remote requires an endpoint (host:port)");
+    if (input.kind === "remote" && !input.endpoint) throw new Error("[ProofBlade tool request rejected: pwn_open]\nReason: kind=remote requires an endpoint in host:port form; the session was not opened.\nNext: provide the task-scoped endpoint and retry, or use kind=local with a bounded command.");
     return pwnResult(await requireHandler(context).open(input));
   },
 };

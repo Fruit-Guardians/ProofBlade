@@ -340,8 +340,8 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
     const input = params as { candidate: string; command: string; evidenceIds?: string[]; timeout?: number };
     const candidate = input.candidate.trim();
     const command = input.command.trim();
-    if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
-    if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
+    if (!candidate || !command) throw new Error(toolContractRefusal("verify_claim", "candidate and reproduction command are required", "provide both fields and derive the candidate from workspace inputs"));
+    if (command.includes(candidate)) throw new Error(toolContractRefusal("verify_claim", "the reproduction command embeds the candidate literal", "derive it from workspace inputs instead of hard-coding the answer"));
     const executor = createBashTool<CodingResourceContext>();
     let output = "";
     const reproduction = await context.claimVerifier.record({
@@ -449,7 +449,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in rawInput) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(rawInput.operation)) throw new Error(`Unsupported evidence operation: ${String(rawInput.operation)}`);
+    if (!("operation" in rawInput) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(rawInput.operation)) throw new Error(toolContractRefusal("evidence", `operation ${String(rawInput.operation)} is unsupported`, "choose curation_status, inspect_forest, inspect_tree, search, read, inspect_uri, search_uri, consolidate, annotate, record, link, create_tree, or update_tree"));
     // OpenAI-compatible tool calling frequently fills optional fields from a
     // wide union schema. These known-but-irrelevant fields have no authority
     // of their own, so discard them before validating the selected operation.
@@ -464,7 +464,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "inspect_tree") {
       assertOnly(input, ["operation", "treeId"], "evidence inspect_tree");
-      if (!input.treeId) throw new Error("evidence inspect_tree requires treeId");
+      if (!input.treeId) throw new Error(toolContractRefusal("evidence inspect_tree", "treeId is required", "call evidence inspect_forest first, then pass a returned treeId"));
       return toolResult(await context.evidenceGraph.inspectTree(input.treeId));
     }
     if (input.operation === "search") {
@@ -473,12 +473,12 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
-      if (!input.artifactId) throw new Error("evidence read requires artifactId");
+      if (!input.artifactId) throw new Error(toolContractRefusal("evidence read", "artifactId is required", "use an A-* artifact id returned by read, bash, or evidence search"));
       return toolResult(await context.evidenceGraph.readArtifact(input.artifactId, boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
     }
     if (input.operation === "inspect_uri") {
       assertOnly(input, ["operation", "uri", "level", "maxChars"], "evidence inspect_uri");
-      if (!input.uri) throw new Error("evidence inspect_uri requires uri");
+      if (!input.uri) throw new Error(toolContractRefusal("evidence inspect_uri", "uri is required", "pass a pb:// URI returned by the knowledge index"));
       return toolResult(await context.runtime.inspectKnowledge(input.uri, input.level ?? "L0", boundedRequestedChars(input.maxChars, 6_000, KNOWLEDGE_READ_MAX_TOKENS)));
     }
     if (input.operation === "search_uri") {
@@ -492,28 +492,28 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "annotate") {
       assertOnly(input, ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"], "evidence annotate");
-      if (!input.artifactId || !input.name || !input.summary) throw new Error("evidence annotate requires artifactId, name, and summary");
+      if (!input.artifactId || !input.name || !input.summary) throw new Error(toolContractRefusal("evidence annotate", "artifactId, name, and summary are required", "pass the A-* artifact id plus a concise name and summary"));
       const result = await context.evidenceGraph.annotateArtifact({ artifactId: input.artifactId, name: input.name, summary: input.summary, tags: input.tags, role: input.role, relatedIds: input.relatedIds });
       return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
     }
     if (input.operation === "record") {
       assertOnly(input, ["operation", "artifactIds", "name", "summary", "tags", "dependsOn", "claim"], "evidence record");
-      if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
+      if (!input.artifactIds || !input.name || !input.summary) throw new Error(toolContractRefusal("evidence record", "artifactIds, name, and summary are required", "pass artifactIds as an array of A-* ids; do not use artifactId or file paths"));
       const result = await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn });
       return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
     }
     if (input.operation === "link") {
       assertOnly(input, ["operation", "from", "to", "relation", "explanation", "confidence"], "evidence link");
-      if (!input.from || !input.to || !input.relation) throw new Error("evidence link requires from, to, and relation");
+      if (!input.from || !input.to || !input.relation) throw new Error(toolContractRefusal("evidence link", "from, to, and relation are required", "link the upstream and downstream node ids with one supported relation"));
       return toolResult(await context.evidenceGraph.linkNodes({ from: input.from, to: input.to, relation: input.relation, explanation: input.explanation, confidence: input.confidence }));
     }
     if (input.operation === "create_tree") {
       assertOnly(input, ["operation", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"], "evidence create_tree");
-      if (!input.name || !input.summary || !input.purpose || !input.explanation || !input.rootNodeId || !input.nodeIds) throw new Error("evidence create_tree requires name, summary, purpose, explanation, rootNodeId, and nodeIds");
+      if (!input.name || !input.summary || !input.purpose || !input.explanation || !input.rootNodeId || !input.nodeIds) throw new Error(toolContractRefusal("evidence create_tree", "name, summary, purpose, explanation, rootNodeId, and nodeIds are required", "build the tree from existing DAG node ids; use inspect_forest to recover them"));
       return toolResult(await context.evidenceGraph.createTree({ name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
     }
     assertOnly(input, ["operation", "treeId", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"], "evidence update_tree");
-    if (!input.treeId) throw new Error("evidence update_tree requires treeId");
+    if (!input.treeId) throw new Error(toolContractRefusal("evidence update_tree", "treeId is required", "pass an existing treeId from inspect_forest or inspect_tree"));
     return toolResult(await context.evidenceGraph.updateTree({ treeId: input.treeId, name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
   },
 };
@@ -657,12 +657,12 @@ const shellJobTool: AgentHarnessTool<CodingResourceContext> = {
       const listed = await runShell(`ls -1 ${paths.rootPath}/*.json 2>/dev/null || echo "(no jobs)"`, signal, onUpdate, context);
       return toolResult({ jobs: listed.trim().split(/\r?\n/).filter(Boolean) });
     }
-    if (!input.jobId) throw new Error(`shell_job ${input.operation} requires jobId`);
-    if (!/^[A-Za-z0-9._-]+$/.test(input.jobId)) throw new Error("shell_job jobId contains unsupported characters");
+    if (!input.jobId) throw new Error(toolContractRefusal(`shell_job ${input.operation}`, "jobId is required", "use the job id returned by shell_background, or call shell_job with operation=list"));
+    if (!/^[A-Za-z0-9._-]+$/.test(input.jobId)) throw new Error(toolContractRefusal("shell_job", "jobId contains unsupported characters", "use the exact id returned by shell_background"));
     const generation = (await context.controlStore.snapshot(context.runtime.runId)).generation;
     if (input.operation === "stop") {
       const stopped = await stopShellJob(shellJobPaths(context.runtime.runId, generation, input.jobId), context.runtime.runId, generation, context.ownerLane ?? "main", signal, onUpdate, context);
-      if (stopped.includes("__NO_JOB__") || stopped.includes("__UNKNOWN_JOB__")) throw new Error(`Background job ${input.jobId} is unknown or belongs to another Run/lane`);
+      if (stopped.includes("__NO_JOB__") || stopped.includes("__UNKNOWN_JOB__")) throw new Error(unavailableToolMessage("shell_job", `background job ${input.jobId} is unknown or belongs to another Run/lane`, "call shell_job with operation=list, then use a job id from this Run"));
       const observationId = await recordShellJobObservation(context, input.jobId, { status: "finished", cursor: 0, trigger: "exit" });
       if (observationId) await context.controlStore.acknowledgeObservations(context.runtime.runId, [observationId]);
       return toolResult({ jobId: input.jobId, stopped: stopped.includes("stopped"), detail: stopped.trim() });

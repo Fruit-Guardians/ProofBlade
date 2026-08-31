@@ -77,7 +77,7 @@ export class PwnReproductionVerifier implements PwnTrustedReproducer {
   public async reproduce(runId: string, stages: ExploitStage[], signal?: AbortSignal): Promise<PwnReproduceOutcome> {
     const before = await this.controlStore.snapshot(runId);
     if (before.task.target_kind !== "pwn" && before.task.target_kind !== "mixed" && before.task.target_kind !== "unknown") {
-      throw new Error(`Pwn reproduction is not allowed for target kind ${before.task.target_kind}`);
+      throw new Error(`[ProofBlade tool request rejected: pwn_reproduce]\nReason: target kind ${before.task.target_kind} is not a pwn or mixed target; no reproduction process was started.\nNext: use the target-appropriate verifier, or run pwn reproduction on a task whose immutable target kind is pwn or mixed.`);
     }
     if (before.generation !== this.refProvider().generation) throw new Error("Pwn reproduction target is from a stale generation");
     this.assertTargetAllowed(before.task.scope);
