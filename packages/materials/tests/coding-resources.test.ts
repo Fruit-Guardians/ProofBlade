@@ -155,9 +155,14 @@ test("a timed-out interactive bash command yields a targeted remediation hint", 
   assert.equal(interactiveTimeoutHint("timed out", "python3 -c 'print(2**900000)'", true), undefined);
 });
 
-test("interactive bash is rejected before execution with a bounded remediation", () => {
-  assert.match(interactiveCommandHint("python -c 'from pwn import *; remote(\"h\",1).recvuntil(b\"> \")'", true) ?? "", /pwn_open/);
-  assert.match(interactiveCommandHint("nc host 31337", false) ?? "", /shell_background/);
+test("interactive bash refusal explains the boundary, non-execution, and recovery", () => {
+  const tubeRefusal = interactiveCommandHint("python -c 'from pwn import *; remote(\"h\",1).recvuntil(b\"> \")'", true) ?? "";
+  assert.match(tubeRefusal, /Reason:/);
+  assert.match(tubeRefusal, /not executed/);
+  assert.match(tubeRefusal, /Next:/);
+  assert.match(tubeRefusal, /pwn_open/);
+  const backgroundRefusal = interactiveCommandHint("nc host 31337", false) ?? "";
+  assert.match(backgroundRefusal, /shell_background/);
   assert.equal(interactiveCommandHint("python -c 'print(2 + 2)'", true), undefined);
 });
 
@@ -654,9 +659,13 @@ test("CTF-shaped prompts opt into the bounded challenge path without matching or
   assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
 });
 
-test("bash remains an untrusted escape hatch and cannot write the control ledger", () => {
-  assert.match(bashEscapeHatchViolation("node -e 'controlStore.dispatchTransaction(run, { type: \\\"domain_record\\\" })'") ?? "", /cannot write ProofBlade control records/);
-  assert.match(bashEscapeHatchViolation("python -c 'open(\\\"runs/CONTROL/events.jsonl\\\", \\\"a\\\").write(\\\"fake\\\")'") ?? "", /cannot write ProofBlade control records/);
+test("control-ledger refusal explains the protected boundary and recovery", () => {
+  const directWrite = bashEscapeHatchViolation("node -e 'controlStore.dispatchTransaction(run, { type: \\\"domain_record\\\" })'") ?? "";
+  assert.match(directWrite, /cannot write ProofBlade control records/);
+  assert.match(directWrite, /Reason:/);
+  assert.match(directWrite, /not executed/);
+  assert.match(directWrite, /Next:/);
+  assert.match(bashEscapeHatchViolation("python -c 'open(\\\"runs/CONTROL/events.jsonl\\\", \\\"a\\\").write(\\\"fake\\\")'") ?? "", /not executed/);
   assert.equal(bashEscapeHatchViolation("rg -n domain_record packages/materials/src"), undefined);
   assert.equal(bashEscapeHatchViolation("python -c 'print(2 + 2)'"), undefined);
 });

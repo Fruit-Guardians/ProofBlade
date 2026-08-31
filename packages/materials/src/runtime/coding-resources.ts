@@ -1223,8 +1223,8 @@ export function interactiveCommandHint(command: string, pwnToolsAvailable: boole
   const interactive = /(recvuntil|recvline|recvall|interactive\(|\.recv\(|sendlineafter|sendafter|remote\(|process\(|pwn import|\bnc\s|\bncat\s|\bsocat\b)/i.test(command);
   if (!interactive) return undefined;
   return pwnToolsAvailable
-    ? "[guard] Foreground bash contains an interactive connection. Use pwn_open/pwn_send/pwn_recv/pwn_reproduce for bounded tube steps; reserve bash for payload computation."
-    : "[guard] Foreground bash contains an interactive connection. Use shell_background and shell_job, or split the probe into bounded commands.";
+    ? "[ProofBlade bash blocked this call]\nReason: foreground bash contains an interactive connection, which can consume the whole turn while waiting for target input. The command was not executed.\nNext: use pwn_open/pwn_send/pwn_recv/pwn_reproduce for bounded tube steps; reserve bash for payload computation."
+    : "[ProofBlade bash blocked this call]\nReason: foreground bash contains an interactive connection, which can consume the whole turn while waiting for target input. The command was not executed.\nNext: use shell_background and shell_job, or split the probe into bounded commands.";
 }
 
 /**
@@ -1240,7 +1240,7 @@ export function bashEscapeHatchViolation(command: string): string | undefined {
   const trustedWriter = /(?:dispatch(?:Transaction|Batch)?\s*\(|domain_record_added|type\s*[:=]\s*["']domain_record["']|JsonlControlStore|control-store\.js|(?:events|projection|control)\.jsonl)/i.test(command);
   const writeOperation = /(?:>>?|tee\s|Set-Content|Out-File|writeFile|appendFile|fs\.(?:write|append)File|open\s*\([^)]*,\s*["']a)/i.test(command);
   if ((executable && trustedWriter) || (writeOperation && /(?:events|projection|control)\.jsonl/i.test(command))) {
-    return "Bash is an analysis escape hatch and cannot write ProofBlade control records. Use the structured Web/Pwn tools or ControlStore-owned verifier path; bash output remains untrusted Artifact/Observation data.";
+    return "[ProofBlade bash blocked this call]\nReason: bash is an analysis escape hatch and cannot write ProofBlade control records. The command was not executed.\nNext: use the structured Web/Pwn tools or the ControlStore-owned verifier path; bash output remains untrusted Artifact/Observation data.";
   }
   return undefined;
 }
