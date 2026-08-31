@@ -245,6 +245,22 @@ async function main(): Promise<void> {
           if ((error as { code?: string }).code !== "ENOENT") throw error;
           ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
         }
+        // Claim the whole paired batch before any live request.  Recording
+        // outcomes only after the runner returned allowed two CLI processes to
+        // send the same provider traffic and left an interrupted run invisible
+        // to the ledger. A partial batch is not a valid ablation comparison;
+        // callers must explicitly `ablation resume` (which marks all running
+        // pairings unknown) before re-running the complete immutable snapshot.
+        const pending = Object.values(ledger.snapshot().attempts).filter((item) => item.status === "ready" || item.status === "unknown");
+        const ledgerSummary = ledger.summary();
+        if (pending.length !== ledgerSummary.total) {
+          throw new Error(`Ablation experiment has non-pending pairings (succeeded=${ledgerSummary.succeeded}, failed=${ledgerSummary.failed}, cancelled=${ledgerSummary.cancelled}, running=${ledgerSummary.running}). Create a new immutable experiment snapshot instead of mixing partial batches.`);
+        }
+        if (pending.length === 0) throw new Error("Ablation experiment has no pending pairings; create a new immutable experiment snapshot for another run.");
+        const ablationRunPrefix = option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`;
+        for (const pairing of pending) {
+          await ledger.claim(pairing.pairingId, `${ablationRunPrefix}-${pairing.variantId}-${pairing.caseId}-a${pairing.attempt}`);
+        }
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
@@ -272,7 +288,7 @@ async function main(): Promise<void> {
           maxTurns: experiment.budget.maxTurns,
           maxCostUsd: experiment.budget.maxCostUsd,
           deadlineMs: experiment.budget.deadlineMs,
-          runPrefix: option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`,
+          runPrefix: ablationRunPrefix,
           requireAnswerLiteralsAbsent: true,
           baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
           runOrder: experiment.runOrder,
@@ -280,8 +296,7 @@ async function main(): Promise<void> {
         for (const variant of summary.variants) for (const item of variant.cases) {
           const pairingId = `${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${variant.id}`;
           const current = ledger.snapshot().attempts[pairingId];
-          if (!current || (current.status !== "ready" && current.status !== "unknown")) continue;
-          await ledger.claim(pairingId, item.runId);
+          if (!current || current.status !== "running") throw new Error(`Ablation pairing ${pairingId} was not claimed before evaluation`);
           await ledger.complete(pairingId, item.success ? "succeeded" : "failed", item.error);
         }
         print(summary);
