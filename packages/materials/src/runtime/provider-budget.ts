@@ -215,7 +215,9 @@ export class ProviderRequestBudget {
   private throwIfDeadlineExpired(): void {
     if (this.signal.aborted) {
       this.stoppedAs = "deadline_exhausted";
-      throw new ProviderBudgetExceededError("Provider deadline exhausted before request");
+      throw new ProviderBudgetExceededError(
+        "[ProofBlade Provider request blocked]\nReason: this Run's deadline elapsed before the Provider request could start. No Provider request was sent.\nNext: preserve the current observations and candidate, then start a new authorized Run with a later deadline before retrying.",
+      );
     }
   }
 

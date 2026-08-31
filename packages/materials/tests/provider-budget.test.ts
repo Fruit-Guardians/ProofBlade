@@ -106,6 +106,28 @@ test("provider budget aborts an in-flight Provider request at the Run deadline",
   }
 });
 
+test("provider deadline refusal explains that no request started and how to recover", () => {
+  let starts = 0;
+  const budget = new ProviderRequestBudget({ deadlineAt: Date.now() - 1 });
+  const provider = budget.wrap(completingProvider(() => { starts += 1; return message(0); }));
+  try {
+    let refusal = "";
+    assert.throws(
+      () => provider.stream(model, { messages: [] }),
+      (error: unknown) => {
+        refusal = error instanceof Error ? error.message : String(error);
+        return error instanceof ProviderBudgetExceededError;
+      },
+    );
+    assert.match(refusal, /Reason:.*No Provider request was sent[\s\S]*Next:/);
+    assert.match(refusal, /new authorized Run with a later deadline/);
+    assert.equal(starts, 0);
+    assert.equal(budget.termination, "deadline_exhausted");
+  } finally {
+    budget.close();
+  }
+});
+
 test("provider budget retains settled usage and an unfinished reservation after restart", () => {
   const history: Array<Pick<HarnessEvent, "type" | "payload">> = [
     { type: "provider_request_started", payload: { requestId: "PR-settled" } },

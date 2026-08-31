@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { NodeExecutionEnv, type AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
 import { canonicalJson, sha256 } from "@proofblade/atoms";
-import type { McpProjectRegistry, McpServerSummary } from "../src/mcp/registry.js";
+import { mcpToolErrorMessage, type McpProjectRegistry, type McpServerSummary } from "../src/mcp/registry.js";
 import {
   codingActiveToolNames,
   codingProviderToolContractSnapshot,
@@ -1167,6 +1167,16 @@ test("IDALIB GUI dependency failures say whether the requested code action ran a
   assert.match(text, /Next:/);
   assert.match(text, /capability search/);
   assert.match(text, /capabilityOperation:\"disassemble\"/);
+});
+
+test("IDALIB dependency refusals retain an actionable source-level MCP message", () => {
+  const text = mcpToolErrorMessage("idalib-mcp", "disassemble_function", {
+    content: [{ type: "text", text: "Can't import PySide6. Are you trying to use Qt without GUI?" }],
+  });
+  assert.match(text, /Reason:/);
+  assert.match(text, /not executed/);
+  assert.match(text, /Next:/);
+  assert.match(text, /binary disassemble/);
 });
 
 test("an initial IDALIB function inventory directs the model to inspect code", async () => {

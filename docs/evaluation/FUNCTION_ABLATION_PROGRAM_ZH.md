@@ -31,7 +31,7 @@ Harness 提供眼睛、纸笔、记忆和手：目标相关的只读观察、可
 | F09 | `verify_claim`、hidden scorer、Completion handoff | 全部可复现题 | 不是策略开关；故障注入/回归 | 候选到 verifier 时延、独立复现次数、错误候选拒绝、重复验证 | 任何正确候选被 handoff/预算阻断先修控制平面 | 027--029 已修复；继续回归 |
 | F10 | Pwn 持久 session、后台 shell、reproduce | pwn | session 可用与无 session 的明确降级，不把能力缺失当策略效应 | IO 同步、超时、会话复用、reproduce 成功 | broker/container 缺失必须清楚说明并给 bash fallback；不能假装有 tube | 待有可复现 pwn 语料 |
 | F11 | Web session、origin scope、browser/web reproduce | web | interactive session 对 bounded curl fallback；verifier 固定 | cookie/CSRF 持续性、scope 拒绝、reproduce 成功 | target/broker 缺失归环境；请求越界归 scope，均带恢复建议 | 待有 web 语料 |
-| F12 | approval、effect journal、恢复与可操作拒绝 | platform / side effect | 故障注入而非能力增益对照 | no-effect proof、批准后重试、恢复一致性、敏感信息泄漏 | 任何 bare denial 是 UX/控制平面 defect；保留 fail-closed | 拒绝反馈已补回归；待端到端 |
+| F12 | approval、effect journal、恢复与可操作拒绝 | platform / side effect | 故障注入而非能力增益对照 | no-effect proof、批准后重试、恢复一致性、敏感信息泄漏 | 任何 bare denial 是 UX/控制平面 defect；保留 fail-closed | approval、工具契约/禁用、交互 bash、Provider 预算/截止时间及 IDALIB 依赖拒绝均已回归；待端到端 |
 | F13 | Provider transport、预算和重试 | 全部真实 Provider 任务 | 固定任务下模拟 502/usage 缺失与正常对照 | 请求数、预算预留、错误后的 verifier 可达性、费用归因 | Provider 失败不得被错误标为模型失败或错误预算耗尽 | 044 发现单 Agent Loop 将连接错误误记为 `budget_exhausted`；045--046 真实 Responses 错误均正确为 `provider_error`；预算拒绝已有可操作反馈回归 |
 
 ## 4. 近期运行顺序

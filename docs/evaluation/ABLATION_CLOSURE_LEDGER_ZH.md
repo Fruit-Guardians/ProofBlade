@@ -98,6 +98,13 @@
 - 硬边界保持不变：工作区与网络 scope、凭据隔离、generation fence、effect journal、用户取消、总成本/工具/提交额度、deadline、隐藏评分与答案防泄漏。它们拒绝时必须返回可操作反馈：触发原因、未执行的动作、已保留的状态，以及允许的替代路径或所需授权；不得只给出抽象的拒绝码。
 - `hard_gate` / `hard_stop` 不再代表默认能力配置，只作为明确标记的消融对照。它们的作用是量化“锁链”是否真的带来收益，而不是把失败归因给模型。
 
+### F12：拒绝反馈契约回归（已完成源级矩阵，待端到端）
+
+- 范围：approval pending/denied、未启用或参数不合约的 Skill/MCP/Capability、交互式 bash 边界、Provider 预算与请求前 deadline、以及 IDALIB-MCP 缺少 Qt/PySide 依赖。
+- 结果：上述拒绝面均有最小回归，反馈统一保留 `Reason:`、明确的未执行事实（例如 `not executed` 或 `No Provider request was sent`）和 `Next:` 恢复手柄。IDALIB 的底层 MCP `isError` 现在也由 registry 直接投影这一格式，避免绕过上层工具适配时退化为原始 GUI 依赖报错。
+- 设计判断：这不放宽 scope、审批、预算、deadline 或依赖检查；它只将 fail-closed 的结果变成模型可以据此换工具、申请授权、调整预算/期限或保留当前证据的反馈。对于已经发出的 Provider 请求，系统不得谎称“未执行”，而应报告中断和不确定的远端状态。
+- 剩余验证：需在真实 Provider 与真实 IDALIB 环境中记录一次拒绝后的下一轮采纳，验证模型使用恢复建议且没有产生越权 effect；该验证属于 F12 控制平面 smoke，不得混入 F02/F13 的能力或 Provider 成功率。
+
 ### AB-TERRA-IDALIB-MAGIC-037/038：函数地址投影与评测账本恢复
 
 - 036 的首错复核：两个变体都取得了 `list_functions` / `get_entry_points` 的真实结果，却没有一次 `decompile_function` 或 `disassemble_function`。原始运行时把 journal 中的 MCP observation 再次 JSON 化，函数列表可读性差且可能在 `main` 前截断；提示又只说“选择地址”，没有给出已验证的参数名。这是 Harness 的观察/手柄表达问题，不是应以硬门控限制模型的原因。
