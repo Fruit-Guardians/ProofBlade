@@ -35,17 +35,17 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "be26a99bb64ca672c8792ac6601a58c7d6e668ea03c55a056eed40efa037d61e";
+const CODING_TOOL_CONTRACT_HASH = "b300527bca35f8ebfb47fbda3500b03c44810b04b1f0247dac01653409c17ebe";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "binary_disassemble", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "capability", "binary_disassemble", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
   // submit_flag is gated on the run being platform-judged, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
@@ -115,7 +115,7 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
   assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
   assert.match(source, /<proofblade-turn-guidance>/);
-  assert.match(source, /proofblade\.binary\.disassemble/);
+  assert.match(source, /binary_disassemble/);
   assert.match(source, /--disassemble=main/);
 });
 
@@ -395,6 +395,7 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   assert.deepEqual(resolveEffect("capability", { operation: "search", query: "binary" }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolveEffect("capability", { operation: "invoke", capabilityId: "proofblade.binary", capabilityOperation: "identify", input: { path: "sample.bin" } }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolveEffect("capability", { operation: "invoke", capabilityId: "proofblade.binary", capabilityOperation: "disassemble", input: { path: "sample.bin", address: "0x1000" } }), { readOnly: false, sideEffect: "process" });
+  assert.deepEqual(resolveEffect("binary_disassemble", { path: "sample.bin", address: "0x1000" }), { readOnly: false, sideEffect: "process" });
   assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_info", arguments: {} }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolveEffect("mcp_call", { operation: "call", server: "echo", tool: "page_eval", arguments: {} }), { readOnly: false, sideEffect: "network" });
   assert.deepEqual(resolveEffect("web_request", { sessionId: "HTTP-1", path: "/" }), { readOnly: false, sideEffect: "network" });
@@ -492,6 +493,22 @@ test("[contract:coding-capability-proxy] coding capability proxy discovers lazil
     await runtime.close();
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("binary_disassemble is a direct journaled handle for the bounded reverse fallback", async () => {
+  const calls: Array<{ capabilityId: string; operation: string; input: Record<string, unknown> }> = [];
+  const context = {
+    runtime: {
+      runId: "BINARY-DISASSEMBLE-TEST",
+      async invokeCapability(request: { capabilityId: string; operation: string; input: Record<string, unknown> }) {
+        calls.push(request);
+        return { backendId: "proofblade-objdump", output: "structured instructions", exitCode: 0 };
+      },
+    },
+  } as unknown as CodingResourceContext;
+  const result = await executeTool("binary_disassemble", { path: "magic", address: "0x4010d0", maxInstructions: 96 }, context);
+  assert.equal((result.details as { backendId: string }).backendId, "proofblade-objdump");
+  assert.deepEqual(calls, [{ capabilityId: "proofblade.binary", operation: "disassemble", input: { path: "magic", address: "0x4010d0", maxInstructions: 96 } }]);
 });
 
 test("coding bash archives raw output before returning RTK-compressed content", async () => {

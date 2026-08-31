@@ -21,7 +21,7 @@ Harness 提供眼睛、纸笔、记忆和手：目标相关的只读观察、可
 | 编号 | 功能 / 实现面 | 任务分层 | 基线与唯一变量 | 主要行为指标 | 失败解释与修复门槛 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | F01 | 目标与二进制基础观察：`read/glob/grep`、`proofblade.binary.identify/sections/symbols/strings/inspect_elf` | reverse、pwn | 基线为直接结构化观察；变量为工具投影/输出可读性 | 首个目标事实时间、错误路径、重复读取、候选来源 | 先确认输出和 schema 是否到达模型；修复可读性/截断或真实工具故障 | 已有控制题；需扩大 holdout |
-| F02 | 深度逆向眼睛：IDALIB MCP、Rizin、本地受限静态分析 | native reverse | 先做能力可用性实验，不与认知策略混合；后续比较同一可用后端的提示/投影 | 成功 code observation、反编译/反汇编错误率、从代码到 verifier 的路径 | 工具 `isError`、依赖缺失或 schema 错误优先归为环境/工具；必须修好或切换可验证后端 | 040 证明 IDALIB headless 不可用；041 待执行 |
+| F02 | 深度逆向眼睛：IDALIB MCP、Rizin、本地受限静态分析、`binary_disassemble` 一等手柄 | native reverse | 先做能力可用性实验，不与认知策略混合；后续比较同一可用后端的提示/投影 | 成功 code observation、反编译/反汇编错误率、从代码到 verifier 的路径 | 工具 `isError`、依赖缺失或 schema 错误优先归为环境/工具；必须修好或切换可验证后端 | 040 证明 IDALIB headless 不可用；041--042 证明通用 capability 代理未被采用；043 待复测一等手柄 |
 | F03 | MCP 一等工具 surface、schema 与错误投影 | reverse、mobile、web | 直接 schema 对照；变量为一等工具 vs 代理投影，仅在工具都可用时 | 首次正确参数率、MCP 发现回合、payload 可读性、错误后回退采纳 | schema/提示不一致先修 Harness；远端 error 必须原样有界传达 | 031--040 已闭环部分路径 |
 | F04 | Artifact / Evidence 图、检索、树和 curation | 证据冲突、跨轮任务 | `manual` 对 `advice`；固定其它 policy | 引用 Evidence 的候选比例、错误 artifact/evidence 混用、验证时延、无效整理回合 | verifier-ready candidate 被整理阻塞则修复交接；不要恢复 curation 硬门禁 | 027--029 已有控制回归；需 holdout |
 | F05 | recall、context receipt、压缩与恢复 | 长上下文、跨轮恢复 | `manual/fixed_recent/off` 对一个候选策略 | 召回命中后采纳、事实保持率、重读率、上下文 token、resume parity | 先对比来源丢失、召回不可见和模型未采纳；修复引用或索引，而非强制路径 | 待建立长上下文语料 |
@@ -36,10 +36,10 @@ Harness 提供眼睛、纸笔、记忆和手：目标相关的只读观察、可
 
 ## 4. 近期运行顺序
 
-1. **041，F02 能力复测**：不比较认知策略。固定 Terra、`magic`、Verifier 和预算，仅让任务获得经探测可用的、受 scope 限制的本地静态分析眼睛；验收条件是获取真实代码观察并能进入候选/验证路径。若不能，记录是模型、工具投影还是题目可解性问题。
-2. **042，F04 机制 smoke**：在至少一个有证据冲突的 fixture 上 `manual` 对 `advice`，记录 curation 是否改变 verifier-ready path；未达可用工具基线的 reverse 题不混入该比较。
-3. **043--046，F07/F08**：按 reverse、web、pwn 分层，先 `soft_advice` 对 `off`，最后才以单独标记的 `hard_*` 做反事实；硬模式的更高成功率也必须报告被拒绝的合法路线与损失。
-4. **047--050，F05/F06**：使用长上下文、恢复和高分支语料，先检查事实保持和投影采纳，再比较成本/成功。
+1. **043，F02 一等手柄复测**：固定 042 的 Terra、`magic`、Verifier、预算和变体，仅增加 `binary_disassemble`。验收是至少一次真实调用、选中后端与非错误结构化代码 observation；其次才是候选/验证。不得把两条 curation 轨迹用作效果比较。
+2. **044，F04 机制 smoke**：在至少一个有证据冲突的 fixture 上 `manual` 对 `advice`，记录 curation 是否改变 verifier-ready path；未达可用工具基线的 reverse 题不混入该比较。
+3. **045--048，F07/F08**：按 reverse、web、pwn 分层，先 `soft_advice` 对 `off`，最后才以单独标记的 `hard_*` 做反事实；硬模式的更高成功率也必须报告被拒绝的合法路线与损失。
+4. **049--052，F05/F06**：使用长上下文、恢复和高分支语料，先检查事实保持和投影采纳，再比较成本/成功。
 5. 达到每层足够 holdout 和 3--5 attempts 后再报告 Pass@k、Pass^k、分层置信区间与成本；此前只报告机制证据和修复状态。
 
 ## 5. 每次运行的记录模板

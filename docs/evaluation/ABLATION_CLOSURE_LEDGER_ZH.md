@@ -164,3 +164,12 @@
 - 首错归因：不是 IDALIB 可用性、模型权限、认知策略或 curation。IDALIB 的 Qt 失败已被正确反馈，备用 `objdump` 后端也确实可用；第一处未完成边是 `search -> describe -> invoke` 的调用摩擦，以及缺少 stripped ELF 的地址窗口调用提示。不得把此现象修成更严的工具配额或强制门控。
 - 修复：在 IDALIB 拒绝反馈中提供可直接执行的 `capability` 调用形状，包含 `operation:"invoke"`、`capabilityId:"proofblade.binary"`、`capabilityOperation:"disassemble"`、fixture-relative `path`、同地址和 `maxInstructions:128`；reverse 指引同时说明 stripped ELF 必须用入口点或发现地址窗口，不能使用 `objdump --disassemble=main`。这仍是建议与恢复手柄，未修改 scope、审批、成本、隐藏评分或任一权限边界。
 - 042 复测准则：保持语料、Provider、模型和预算，记录 `proofblade.binary.disassemble` 调用次数、选择 `proofblade-objdump` 后端、非错误结构化指令观察、候选推导及 `verify_claim`。它仍是能力恢复 smoke，而非策略因果实验；若模型仍能发现却不调用该能力，再评估是否应额外提供一等只读反汇编工具。
+
+### AB-TERRA-OBJDUMP-MAGIC-042：精确调用文本仍未跨过通用代理摩擦（已完成，修复输入）
+
+- 固定条件：语料、`magic` 二进制、AIHub `gpt-5.6-terra` / Responses / max、Verifier、两个 curation 变体、`maxTurns=5`、每 pairing `$0.50` 与 041 相同；新 immutable 指纹为 `168c0c5eabc9059938b1be9ea18bfdb04f6298c783523b93553d086dfc510456`。唯一变化是 IDALIB 失败反馈给出完整的 generic `capability` invoke 参数，reverse 指引加入 stripped ELF 地址窗口规则。
+- 结果：两条 pairing 均终态 `failed` / `EXHAUSTED`，无 `verify_claim`。advice 有 21 次 Provider 请求、40 次工具调用：`bash=14`、`capability=7`、`read=6`、`evidence=3`、`glob=2`、IDALIB metadata/entry-point 各 2、decompile/disassemble 各 1；manual 只有 7 次 Provider 请求和 3 次工具调用（`bash=1`、metadata/list_functions 各 1）。所有 Provider 请求均为真实流量。
+- 机制证据：advice 在 IDALIB decompile 与同地址 disassemble 均返回 Qt/PySide6 后，看到了包含 `operation:"invoke"`、`capabilityId:"proofblade.binary"`、`capabilityOperation:"disassemble"`、`path/address/maxInstructions` 的完整恢复文本。它也 7 次搜索 capability，并至少一次看到了 selected backend `proofblade-objdump` 可用；但 `capability` 的 `invoke` 计数为 **0**，结构化 objdump observation 为 **0**。它反而重复 shell 初检、无关 Evidence 联合参数与 IDA 状态探测。manual 在更早的函数清单后即结束，不能与 advice 的调用量或成本做 curation 效果比较。
+- 首错归因：040--042 连续排除了“错误不可见”和“参数名未知”。可达路径仍被卡在通用 `capability` 的多阶段、嵌套 union schema（search -> describe/invoke）上；这是 Harness 工具人体工学缺陷，而非模型权限、IDALIB 环境、Evidence policy 或应以门禁压制的探索行为。042 中 advice 的更多调用是未采用回退后的随机循环，不是 curation 的负效应证据。
+- 修复：新增一等只读 `binary_disassemble { path, address, maxInstructions? }`。它固定映射到 `proofblade.binary.disassemble`，仍穿过同一 runtime 解析、fixture-relative scope 校验、effect journal、Experiment gate、成本与取消边界；Rizin/MCP/objdump 后端选择保持原逻辑。它只消除嵌套代理表达摩擦，不授予新权限，也不删除 bash 或 generic capability。
+- 043 验收：以新不可变快照固定 042 条件，记录 `binary_disassemble` 真实调用、后端、非错误指令 observation、从入口到 input-check/reveal 的证据链、候选和 `verify_claim`。若仍不调用一等工具，下一首错应记录为模型工具选择；若调用但无代码，才排查后端/输出质量。该运行仍是 F02 能力恢复 smoke，不推断 curation 因果。

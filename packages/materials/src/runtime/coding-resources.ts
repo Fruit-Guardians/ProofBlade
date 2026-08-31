@@ -31,7 +31,7 @@ import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSear
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "binary_disassemble", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -153,6 +153,7 @@ export function createCodingTools(options: { platformJudged?: boolean; webReprod
     evidenceTool,
     loadSkillTool,
     capabilityTool,
+    binaryDisassembleTool,
     mcpCallTool,
     shellBackgroundTool,
     shellJobTool,
@@ -295,6 +296,15 @@ export function createCodingToolEffectPolicyResolver(
       if (!runtime || typeof input.capabilityId !== "string" || typeof input.capabilityOperation !== "string" || !isRecord(input.input)) return undefined;
       try {
         const policy = runtime.resolveCapabilityPolicy({ capabilityId: input.capabilityId, operation: input.capabilityOperation, input: input.input });
+        return { readOnly: policy.readOnly, sideEffect: policy.sideEffect };
+      } catch {
+        return undefined;
+      }
+    }
+    if (toolName === "binary_disassemble") {
+      if (!runtime || !isRecord(input)) return undefined;
+      try {
+        const policy = runtime.resolveCapabilityPolicy({ capabilityId: "proofblade.binary", operation: "disassemble", input });
         return { readOnly: policy.readOnly, sideEffect: policy.sideEffect };
       } catch {
         return undefined;
@@ -1511,6 +1521,37 @@ const capabilityTool: AgentHarnessTool<CodingResourceContext> = {
       throw error;
     }
     await context.experimentGate?.record({ runId: context.runtime.runId, action: `capability:${input.capabilityId}.${input.capabilityOperation}`, input: input.input, outcome: result ? "success" : "unknown", summary: "Capability invocation completed." });
+    return toolResult(result);
+  },
+};
+
+/**
+ * A direct, read-only handle for the common reverse fallback. The generic
+ * capability proxy remains available for the rest of the catalog, while this
+ * avoids making a model construct a nested three-stage invocation after a
+ * decompiler environment failure.
+ */
+const binaryDisassembleTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "binary_disassemble",
+  label: "binary_disassemble",
+  description: "Disassemble a bounded window of a visible binary at a known hexadecimal address. Uses the selected read-only reverse backend (Rizin, MCP, or local objdump) and returns structured instructions.",
+  parameters: Type.Object({
+    path: Type.String({ minLength: 1, maxLength: 1_024, description: "Fixture-relative path of the visible binary." }),
+    address: Type.String({ pattern: "^0x[0-9a-fA-F]{1,16}$", description: "Start virtual address as hexadecimal, for example 0x4010d0." }),
+    maxInstructions: Type.Optional(Type.Integer({ minimum: 1, maximum: 512, description: "Maximum structured instructions to return; defaults to 128." })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
+    const input = params as { path: string; address: string; maxInstructions?: number };
+    await context.experimentGate?.assertAllowed({ runId: context.runtime.runId, action: "capability:proofblade.binary.disassemble", input });
+    let result: Awaited<ReturnType<ProofBladeToolRuntime["invokeCapability"]>>;
+    try {
+      result = await context.runtime.invokeCapability({ capabilityId: "proofblade.binary", operation: "disassemble", input }, signal);
+    } catch (error) {
+      await context.experimentGate?.record({ runId: context.runtime.runId, action: "capability:proofblade.binary.disassemble", input, outcome: /timed out|timeout/i.test(String(error)) ? "timeout" : "failure", summary: String(error).slice(0, 1_000) });
+      throw error;
+    }
+    await context.experimentGate?.record({ runId: context.runtime.runId, action: "capability:proofblade.binary.disassemble", input, outcome: "success", summary: "Binary disassembly completed." });
     return toolResult(result);
   },
 };
