@@ -35,7 +35,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "cfa2b18e8646a4326e55620fd84e1ab8778ba72c885da7fd3c498b6047e8e2db";
+const CODING_TOOL_CONTRACT_HASH = "be26a99bb64ca672c8792ac6601a58c7d6e668ea03c55a056eed40efa037d61e";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -110,7 +110,8 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /PYTHONIOENCODING=utf-8/);
   assert.match(source, /Opening guidance/);
   assert.match(source, /PREPARED_CTF_WORKFLOW_PROMPT/);
-  assert.match(source, /first assistant action MUST be one allowed tool call/);
+  assert.match(source, /Start with an in-scope observation/);
+  assert.doesNotMatch(source, /first assistant action MUST be one allowed tool call/);
   assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
   assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
   assert.match(source, /<proofblade-turn-guidance>/);
@@ -1082,6 +1083,39 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
   const result = await disasm.execute("call-1", { addr: "0x1bc" }, new AbortController().signal, () => undefined, context);
   assert.deepEqual(invocation, { capabilityId: "mcp.idalib", operation: "call", input: { tool: "disasm", arguments: { addr: "0x1bc" } } });
   assert.equal((result.details as { artifactId: string }).artifactId, "A-1");
+});
+
+test("repeated IDALIB metadata remains available and names the next code-analysis tools", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "idalib-mcp",
+      configHash: "ida-hash",
+      tools: [{ name: "get_metadata", description: "Metadata", inputSchema: { type: "object" }, readOnlyHint: true }],
+    }),
+    execute: async () => { throw new Error("direct MCP execution must not be used when runtime is available"); },
+  } as unknown as McpProjectRegistry;
+  const context = {
+    mcp,
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set(["idalib-mcp"]),
+    runtime: {
+      async invokeCapability() {
+        return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output: "metadata", stderr: "", outputTier: "small" as const, truncated: false, originalChars: 8, progressKey: "a".repeat(64) };
+      },
+    },
+  } as unknown as CodingResourceContext;
+  const metadata = (await createMcpFirstClassTools(mcp, ["idalib-mcp"])).find((tool) => tool.name === "mcp__idalib-mcp__get_metadata");
+  assert.ok(metadata);
+  await metadata.execute("call-1", {}, new AbortController().signal, () => undefined, context);
+  const repeated = await metadata.execute("call-2", {}, new AbortController().signal, () => undefined, context);
+  const text = (repeated.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+  assert.match(text, /call was allowed/);
+  assert.match(text, /list_functions/);
+  assert.match(text, /decompile_function/);
 });
 
 test("bash anchors an artifact only when output was actually withheld", async (t) => {

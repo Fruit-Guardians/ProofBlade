@@ -1047,16 +1047,17 @@ const CTF_FAST_PATH_PROMPT = [
 
 const PREPARED_CTF_FAST_PATH_PROMPT = [
   "[ProofBlade prepared CTF path]",
-  "Treat this as one bounded challenge-solving turn using the already selected and preflighted direction.",
-  "Execute the prepared first-action contract with the listed tools, persist its observation, and do not reclassify the challenge, scan unrelated playbooks, discover tools, install packages, or retry missing binaries.",
+  "Treat this as one bounded challenge-solving turn using the already selected and preflighted direction as a strong starting point.",
+  "Begin with its suggested first action when it fits the observed target. Tool outputs are already archived, so record or curate only facts that materially change a hypothesis; do not use the notebook as an acknowledgement after every call.",
+  "Do not scan unrelated playbooks, install packages, or retry known-missing binaries. Change direction when concrete target evidence contradicts the preparation.",
   "After the first useful structure or constraint is extracted, write a small solver or reproducer and validate a candidate through the verifier before reporting it.",
 ].join("\n");
 
 const PREPARED_CTF_WORKFLOW_PROMPT = [
   "## CTF solving workflow (prepared direction)",
   "When the task is to solve this prepared CTF challenge:",
-  "1. Use the durable profile and first-action contract below; do not reclassify the challenge, read unrelated playbooks, discover tools, install packages, or retry missing binaries.",
-  "2. The first assistant action MUST be one allowed tool call, not a prose plan or another classification. Persist its observation before choosing a second action.",
+  "1. Use the durable profile and opening guidance below; avoid unrelated playbooks, package installation, and known-missing retries, but revise the route when target evidence warrants it.",
+  "2. Start with an in-scope observation rather than a prose-only plan. Its output is automatically archived; promote it to Evidence only when it changes a hypothesis, resolves a conflict, or supports verification.",
   "3. Once the first useful structure or constraint is observed, write the smallest solver or reproducer that can test it. Change the hypothesis when a probe does not add a fact.",
   "4. Validate the candidate through the verifier and only then report or submit it.",
   "## Interactive native/Pwn protocol discipline",
@@ -1123,7 +1124,10 @@ function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?
   const actionBundleBlock = actionBundles.length > 0
     ? `\nPhase action bundles (planning guidance; adapt when observations contradict the route):\n${actionBundles.map((bundle) => `- ${bundle.domainPhase} / ${bundle.id}: ${bundle.objective} Suggested tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Suggested calls: ${bundle.maxCalls}.`).join("\n")}`
     : "";
-  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight provides the current classification and ready tool surface. Treat it as a strong starting point, not a substitute for the evidence you observe. Avoid unrelated playbooks, package installation, and known-missing retries; investigate or re-route when target evidence justifies it. Opening guidance: ${profile.firstAction}${firstActionBudget} Persist each material fact before choosing the next action. Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}.${actionBundleBlock} ${required}${optional}${readiness}${mcp}`;
+  const reverseProgression = profile.id === "reverse"
+    ? " Reverse progression: after one successful metadata call for the current binary, move to a target-relevant function list, decompilation, or disassembly. Do not repeat metadata unless the target or binary changes."
+    : "";
+  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight provides the current classification and ready tool surface. Treat it as a strong starting point, not a substitute for the evidence you observe. Avoid unrelated playbooks, package installation, and known-missing retries; investigate or re-route when target evidence justifies it. Opening guidance: ${profile.firstAction}${firstActionBudget} The output of every tool is automatically archived; promote only material facts before choosing the next action.${reverseProgression} Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}.${actionBundleBlock} ${required}${optional}${readiness}${mcp}`;
 }
 
 /**

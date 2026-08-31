@@ -105,3 +105,12 @@
 - 首错归因：模型在每条 observation 后提交宽 `evidence` 联合 schema，并携带其他 operation 的已知字段；旧 `assertOnly` 将其拒绝，导致没有继续到 `list_functions` / `decompile_function`。这不是未知参数越权、模型缺乏逆向能力或 IDALIB 不可用，而是工具 schema 对常见 OpenAI-compatible 填充行为过度严格。
 - 修复：在按 operation 校验前移除“已知但与该 operation 无关”的字段；未知字段和必填字段仍由严格 schema 校验。该变更保留证据工具的权威边界，却不把表达上的联合 schema 噪声变成调查中断。
 - 下一步：提交该回归后，在解除首步/阶段硬阻断的默认 Harness 上建立 `033` 不可变快照，验证 `get_metadata -> list_functions/decompile_function -> verify_claim` 是否可完整抵达。单题只记录机制证据，不报告策略成功率结论。
+
+### AB-TERRA-IDALIB-MAGIC-033：首步门控未实际触发，自动归档被误解为整理流程（已完成，非因果结论）
+
+- 固定条件：AIHub `gpt-5.6-terra`、Responses/max、GUI 同一代理、IDALIB MCP、`magic` 二进制、4 个外层模型回合、双变体各 `$0.20` 的实验预算。预检 Provider `/models` 为 `200`；语料、模型、策略和预算的不可变快照指纹为 `8c70d704…`。
+- 结果：默认 `soft-first-action` 与显式 `hard-first-action` 都是 `0/1` verified，均以 `budget_exhausted` / `No verified completion after 4 model turns` 结束，未到 hidden scorer。硬门控为 18 个 Provider `200`、36 次工具调用、21 次 `evidence`、2 次 `get_metadata`、各 1 次 `list_functions` / `list_strings`，成本 `$0.157363`；软建议为 22 个 Provider `200`、23 次工具调用、9 次 `evidence`、8 次重复 `get_metadata`，成本 `$0.154012`。
+- 首错与可识别性：两条轨迹的首个 `bash/read/mcp__*` 都属于 reverse profile 的允许首步集合，因此硬门控**从未拒绝实际选择**。不能把两者的工具数或成本差异归因给 `firstAction`；差异更可能来自采样轨迹。该实验仍证实 032 的一等 MCP/schema 修复有效，因为两变体都实际调用了 IDALIB；但没有抵达 `decompile_function`。
+- 机制归因：提示把“持久化 observation”写成了几乎逐步的流程要求，同时 evidence 工具描述过度强调其图整理能力。模型将自动归档误当作每步后需要调用 `evidence` 的手续。软建议样本减少了 Evidence 调用，却改为重复相同参数的 `get_metadata`；这说明缺口不是“缺少更多门控”，而是工具结果没有提供足够明确的、非阻断的下一步方向。
+- 修复：prepared CTF 文案改为“自动归档，只有改变假设/解决冲突/支持验证时才提升为 Evidence”；reverse profile 明确建议 metadata 后转向函数列表、反编译或反汇编；同参数 IDALIB `get_metadata` 第二次及以后仍允许执行，但返回下一步建议和已有结果可复用提示。没有改变 workspace/network scope、凭据、effect journal、总成本、deadline 或 hidden scorer。
+- 034 复测准则：固定同一 Provider、模型、二进制、预算和默认策略，比较修复前的 033 soft 轨迹与修复后的机制回归。接受条件不是单次 flag，而是：重复 metadata 不超过一次、Evidence 不作为每步确认、出现 `list_functions` 或 `decompile_function`，并保持无泄漏和隐藏评分边界；若仍失败，则依据新的第一处偏离继续修复。

@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-agent-core/node";
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
-import { sha256 } from "../domain/utils.js";
+import { canonicalJson, sha256 } from "../domain/utils.js";
 import { boundedRequestedChars } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -185,6 +185,7 @@ export async function createMcpFirstClassTools(
   signal?: AbortSignal,
 ): Promise<AgentHarnessTool<CodingResourceContext>[]> {
   const tools: AgentHarnessTool<CodingResourceContext>[] = [];
+  const repeatedCalls = new Map<string, number>();
   const summaries = mcp.summaries();
   for (const server of enabledServers) {
     const summary = summaries.find((item) => item.name === server && !item.disabled);
@@ -216,7 +217,7 @@ export async function createMcpFirstClassTools(
               operation: "call",
               input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             }, sig);
-            return toolResult(invocation);
+            return appendToolAdvice(toolResult(invocation), repeatedIdalibMetadataAdvice(server, tool.name, params, repeatedCalls));
           }
           const result = await context.mcp.execute(
             capabilityId,
@@ -224,7 +225,7 @@ export async function createMcpFirstClassTools(
             { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
             sig,
           );
-          return mcpToolResult(result);
+          return appendToolAdvice(mcpToolResult(result), repeatedIdalibMetadataAdvice(server, tool.name, params, repeatedCalls));
         },
       });
     }
@@ -367,7 +368,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence and knowledge proxy for durable observations, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Optional notebook and retrieval proxy for durable observations, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Tool outputs are already archived automatically: do not call evidence merely to acknowledge each observation. Use it when you need to recover an archived result, connect material facts, resolve a conflict, or prepare a verifier-ready claim. curation_status shows exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
       enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"],
@@ -1677,6 +1678,24 @@ function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<Cod
     details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}) },
     isError: result.exitCode !== 0,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+function appendToolAdvice<TResult extends { content: Array<{ type: string; text?: string }>; details?: unknown }>(result: TResult, advice?: string): TResult {
+  if (!advice) return result;
+  return {
+    ...result,
+    content: [...result.content, { type: "text", text: advice }],
+    details: isRecord(result.details) ? { ...result.details, advisory: advice } : { details: result.details, advisory: advice },
+  };
+}
+
+function repeatedIdalibMetadataAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>): string | undefined {
+  if (tool !== "get_metadata" || !/idalib/i.test(server)) return undefined;
+  const key = `${server}:${tool}:${sha256(canonicalJson(params ?? {}))}`;
+  const count = (calls.get(key) ?? 0) + 1;
+  calls.set(key, count);
+  if (count < 2) return undefined;
+  return "[ProofBlade advisory: this repeats IDALIB metadata for the same target and adds no new code fact. The call was allowed and its earlier result remains available. Next, prefer list_functions, decompile_function, or disassemble_function on a target-relevant function; only request metadata again after the target changes.]";
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
