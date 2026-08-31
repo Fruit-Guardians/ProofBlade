@@ -82,6 +82,7 @@
 - 观察到的行为：baseline 完成 ELF64/x86-64 初检后，连续请求 `mcp_call list/describe`，并多次尝试宽泛 `evidence record` 参数；它没有执行实际 IDALIB `get_metadata`、`decompile_function` 或反汇编。为避免将无效循环继续计费，运行在 candidate 开始前被主动停止，故**没有**成功率、成本比较或策略结论。
 - 首错归因：Harness 的系统提示声称已暴露 `mcp__<server>__<tool>` 一等工具并要求直接调用；该 Run 的实际 Provider tool surface 只有 `mcp_call`，没有任何 `mcp__*`。模型只好重新发现代理接口，而代理目录中并不存在它猜测的 `list_tools` / `initialize` 工具。此前的 3-call RECON 限制确实过严，已被 8-call reverse 合同修复；但该修复暴露了更早的“提示合同与可调用工具不一致”问题，不能把后续循环归咎为模型无效探索。
 - 下一步修复：先让 reverse Run 在启动时验证并发布 IDALIB 的一等 schema；若枚举失败，则提示中只暴露已验证的 `mcp_call` 调用格式和一个预绑定 `get_metadata` 路径，禁止宣称不存在的 `mcp__*`。完成此修复后再建立新的不可变实验快照并复跑；`031` 保留为中止的环境/Harness 诊断记录。
+- 已完成的最小修复：本机 IDALIB schema 已验证可枚举；筛选表补入其实际只读分析工具名（`get_metadata`、`decompile_function`、`disassemble_function`、`list_functions` 等），并有单测防止这些名称再次被全部筛掉。下一次复测仍须确认 Provider surface 中确实出现 `mcp__idalib-mcp__*`，然后才解释模型轨迹。
 
 ## 5. 执行顺序
 

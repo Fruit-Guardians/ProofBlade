@@ -38,8 +38,13 @@ export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_re
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
 
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
+  // Legacy ida-pro-mcp schemas.
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
   "analyze_batch", "analyze_function", "imports", "xrefs_to", "get_string", "search_text",
+  // Current upstream idalib schemas exposed by scripts/idalib-mcp-streamable.py.
+  "get_metadata", "get_function_by_name", "get_function_by_address", "list_functions", "list_globals", "list_imports", "list_strings",
+  "decompile_function", "disassemble_function", "get_xrefs_to", "get_callees", "get_callers", "get_entry_points",
+  "read_memory_bytes", "data_read_string",
 ]);
 const JADX_FIRST_CLASS_TOOLS = new Set([
   "get_android_manifest", "get_main_activity_class", "get_main_application_classes_names", "get_main_application_classes_code",

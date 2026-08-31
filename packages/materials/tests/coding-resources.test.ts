@@ -70,6 +70,22 @@ test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
   assert.deepEqual(selectFirstClassMcpTools(tools, "web", "sample").map((tool) => tool.name), []);
 });
 
+test("first-class MCP tools retain the current IDALIB streamable schema", () => {
+  const tools = [
+    { name: "mcp__idalib-mcp__get_metadata" },
+    { name: "mcp__idalib-mcp__decompile_function" },
+    { name: "mcp__idalib-mcp__disassemble_function" },
+    { name: "mcp__idalib-mcp__list_functions" },
+    { name: "mcp__idalib-mcp__rename_function" },
+  ];
+  assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.elf").map((tool) => tool.name), [
+    "mcp__idalib-mcp__get_metadata",
+    "mcp__idalib-mcp__decompile_function",
+    "mcp__idalib-mcp__disassemble_function",
+    "mcp__idalib-mcp__list_functions",
+  ]);
+});
+
 test("mobile profile selects JADX first-class tools even when the durable task kind is unknown", () => {
   const tools = [
     { name: "mcp__jadx__get_class_source" },
