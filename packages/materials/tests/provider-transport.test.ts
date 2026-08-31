@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { connect } from "node:net";
 import test from "node:test";
-import { createProviderTransport } from "../src/runtime/provider-transport.js";
+import { createProviderTransport, wrapJsonResponsesFetch } from "../src/runtime/provider-transport.js";
 
 test("provider transport sends HTTP requests through the configured CONNECT proxy", async () => {
   const target = createServer((_request, response) => {
@@ -41,6 +41,34 @@ test("provider transport sends HTTP requests through the configured CONNECT prox
     await transport.close();
     await Promise.all([close(proxy), close(target)]);
   }
+});
+
+test("JSON Responses compatibility adapts a completed response to Pi SSE events", async () => {
+  let requestBody = "";
+  const server = createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requestBody = Buffer.concat(chunks).toString("utf8");
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ id: "resp-test", status: "completed", output: [{ type: "message", id: "msg-test", role: "assistant", status: "completed", content: [{ type: "output_text", text: "OK" }] }], usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } }));
+  });
+  await listen(server);
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  try {
+    const fetch = wrapJsonResponsesFetch(`http://127.0.0.1:${address.port}`);
+    const request = new Request(`http://127.0.0.1:${address.port}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: new TextEncoder().encode(JSON.stringify({ model: "test", stream: true })),
+    });
+    const response = await fetch(request);
+    const text = await response.text();
+    assert.equal(JSON.parse(requestBody).stream, false);
+    assert.equal(response.headers.get("content-type"), "text/event-stream");
+    assert.match(text, /response\.output_item\.done/);
+    assert.match(text, /response\.completed/);
+  } finally { await close(server); }
 });
 
 function listen(server: ReturnType<typeof createServer>): Promise<void> {

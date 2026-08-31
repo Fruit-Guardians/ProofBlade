@@ -10,6 +10,7 @@ export type ContainerProfile = "web" | "pwn" | "pwn-kernel";
 export type ContainerNetworkPolicy = "none" | "bridge" | "target-only";
 /** Provider protocols that ProofBlade can send through Pi's audited tool loop. */
 export type ProviderApi = "openai-completions" | "openai-responses" | "anthropic-messages";
+export type ResponsesStreamingMode = "sse" | "json";
 
 export interface OutputRewriteConfig {
   provider: OutputRewriteProvider;
@@ -66,6 +67,8 @@ export interface ModelProfileConfig {
   reasoning?: boolean;
   supportsReasoningEffort?: boolean;
   maxTokensField?: "max_tokens" | "max_completion_tokens";
+  /** Some OpenAI-compatible gateways only support completed JSON Responses. */
+  responsesStreaming?: ResponsesStreamingMode;
   /** Provider-published USD prices per one million tokens. Required for live cost-capped evaluation. */
   pricing?: ModelPricingConfig;
 }
@@ -221,6 +224,7 @@ function validateConfig(config: Partial<ProofBladeConfig>, path: string): void {
   if (profile.thinkingLevel !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(profile.thinkingLevel)) throw new Error(`Invalid thinkingLevel in ${path}`);
   if (profile.cacheRetention !== undefined && !["none", "short", "long"].includes(profile.cacheRetention)) throw new Error(`Invalid cacheRetention in ${path}`);
   if (profile.maxTokensField !== undefined && profile.maxTokensField !== "max_tokens" && profile.maxTokensField !== "max_completion_tokens") throw new Error(`Invalid maxTokensField in ${path}`);
+  if (profile.responsesStreaming !== undefined && profile.responsesStreaming !== "sse" && profile.responsesStreaming !== "json") throw new Error(`Invalid responsesStreaming in ${path}`);
   if (profile.pricing !== undefined) validatePricing(profile.pricing, path);
   const rewrite = config.tools?.outputRewrite;
   if (rewrite !== undefined) {

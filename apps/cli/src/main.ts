@@ -215,7 +215,9 @@ async function main(): Promise<void> {
       }
       if (action === "create") {
         const configFile = required(rest[0], "experiment config path");
-        const experiment = validateAblationExperiment(JSON.parse(await readFile(resolve(root, configFile), "utf8")), config.modelProfiles.executor);
+        const input = JSON.parse(await readFile(resolve(root, configFile), "utf8")) as import("@proofblade/materials").AblationExperimentInput;
+        const corpus = await loadRealEvaluationCorpus(resolve(root, input.corpus.path));
+        const experiment = validateAblationExperiment({ ...input, corpus: { path: corpus.manifestPath, hash: corpus.snapshot.hash } }, config.modelProfiles.executor);
         print({ experimentId: experiment.experimentId, path: await store.save(experiment), experimentFingerprint: experiment.experimentFingerprint });
         break;
       }

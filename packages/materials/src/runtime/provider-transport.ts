@@ -58,3 +58,64 @@ export function createProviderTransport(proxyUrl?: string): ProviderTransport | 
     close: async () => { await dispatcher.close(); },
   };
 }
+
+/** Adapt a completed JSON Responses response to the SSE events consumed by Pi. */
+export function wrapJsonResponsesFetch(baseUrl: string, inner: typeof globalThis.fetch = globalThis.fetch): typeof globalThis.fetch {
+  const base = baseUrl.replace(/\/+$/, "");
+  return async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (!url.startsWith(`${base}/responses`)) return inner(input, init);
+    const request = input instanceof Request ? input : undefined;
+    const requestInit: RequestInit = {
+      ...(request ? { method: request.method, headers: request.headers, signal: request.signal } : {}),
+      ...(init ?? {}),
+    };
+    const rawBody = typeof requestInit.body === "string"
+      ? requestInit.body
+      : requestInit.body instanceof Uint8Array
+        ? new TextDecoder().decode(requestInit.body)
+        : requestInit.body instanceof ArrayBuffer
+          ? new TextDecoder().decode(new Uint8Array(requestInit.body))
+          : request
+            ? await request.clone().text()
+            : undefined;
+    if (!rawBody) return inner(input, init);
+    let payload: Record<string, unknown>;
+    try { payload = JSON.parse(rawBody) as Record<string, unknown>; } catch { return inner(input, init); }
+    if (payload.stream !== true) return inner(input, init);
+    payload.stream = false;
+    const headers = new Headers(requestInit.headers);
+    // The body changes from `stream:true` to `stream:false`; never forward
+    // framing headers calculated for the original SDK request.
+    headers.delete("content-length");
+    headers.delete("transfer-encoding");
+    headers.delete("host");
+    headers.delete("accept");
+    headers.set("accept", "application/json");
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Return stream headers immediately. Pi can then establish the turn and
+        // apply its normal request timeout while this gateway completes JSON.
+        void (async () => {
+          try {
+            const response = await inner(url, { ...requestInit, headers, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`JSON Responses request failed: HTTP ${response.status}`);
+            const completed = await response.json() as { output?: Array<Record<string, unknown>> } & Record<string, unknown>;
+            for (const [output_index, item] of (completed.output ?? []).entries()) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "response.output_item.done", output_index, item })}\n\n`));
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "response.completed", response: completed })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", code: "json_responses_transport", message })}\n\n`));
+            controller.close();
+          }
+        })();
+      },
+    });
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+  };
+}

@@ -11,7 +11,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import type { ModelProfileConfig, ProviderApi } from "../config.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
-import { createProviderTransport, wrapExactEndpointFetch } from "./provider-transport.js";
+import { createProviderTransport, wrapExactEndpointFetch, wrapJsonResponsesFetch } from "./provider-transport.js";
 import type { ProviderRequestBudget } from "./provider-budget.js";
 import { configuredMaxConcurrentRequests, providerRequestScheduler, type ProviderRequestScheduler, type ProviderRequestSchedulingObserver } from "./provider-scheduler.js";
 
@@ -61,9 +61,11 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   // In "exact" mode the baseUrl is already the full gateway endpoint, so strip
   // the operation path the SDK appends. Compose over the proxy transport (or the
   // global fetch) so both features can be on at once.
-  const effectiveFetch = config.endpointMode === "exact"
-    ? wrapExactEndpointFetch(config.baseUrl, transport?.fetch)
-    : transport?.fetch;
+  const transportFetch = transport?.fetch ?? globalThis.fetch;
+  const endpointFetch = config.endpointMode === "exact" ? wrapExactEndpointFetch(config.baseUrl, transportFetch) : transportFetch;
+  const effectiveFetch = config.api === "openai-responses" && config.responsesStreaming === "json"
+    ? wrapJsonResponsesFetch(config.baseUrl, endpointFetch)
+    : endpointFetch;
   const rawApi: ProviderStreams = effectiveFetch ? {
     stream: (streamModel: Model<ProviderApi>, context: Parameters<ProviderStreams["stream"]>[1], options?: Parameters<ProviderStreams["stream"]>[2]) =>
       baseApi.stream(streamModel, context, { ...options, fetch: effectiveFetch }),
