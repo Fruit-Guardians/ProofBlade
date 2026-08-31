@@ -1006,7 +1006,7 @@ const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     const input = params as { flag: string };
-    if (!context.submitFlag) throw new Error("submit_flag is unavailable: this run is not judged by a competition platform");
+    if (!context.submitFlag) throw new Error(unavailableToolMessage("submit_flag", "this run is not judged by a competition platform", "derive and verify the candidate locally with verify_claim, or run the task with a trusted competition platform verifier"));
     return toolResult(await context.submitFlag(input.flag, signal));
   },
 };
@@ -1036,7 +1036,7 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    if (!context.webReproduce) throw new Error("web_reproduce is unavailable because this task has no immutable web verifier");
+    if (!context.webReproduce) throw new Error(unavailableToolMessage("web_reproduce", "this task has no immutable web verifier", "use in-scope inspection tools to gather evidence, or configure an immutable web verifier before claiming a web exploit"));
     const input = params as WebExploitRecipe;
     return toolResult(await context.webReproduce(input, signal));
   },
@@ -1458,7 +1458,7 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
-    if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);
+    if (!context.enabledSkills.has(input.name)) throw new Error(unavailableToolMessage("load_skill", `Skill ${input.name} is not enabled for this conversation`, "use an enabled Skill or the currently exposed tools; request a scoped Skill enablement only when it is necessary"));
     return toolResult(context.skills.loadForModel(input.name, input.maxChars));
   },
 };
@@ -1541,7 +1541,7 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (!input.tool || !input.arguments || typeof input.arguments !== "object" || Array.isArray(input.arguments)) throw new Error("MCP call requires tool and object arguments");
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
-    if (!capabilityId) throw new Error(`Unknown MCP server: ${input.server}`);
+    if (!capabilityId) throw new Error(unavailableToolMessage("mcp_call", `MCP server ${input.server} is unknown`, "call mcp_call with operation=list to inspect enabled servers, then describe the selected server before invoking it"));
     if (context.runtime && typeof context.runtime.invokeCapability === "function") {
       const invocation = await context.runtime.invokeCapability({
         capabilityId,
@@ -1556,8 +1556,13 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
 };
 
 function assertMcpEnabled(context: CodingResourceContext, server: string): void {
-  if (!context.enabledMcpServers.has(server)) throw new Error(`MCP server is not enabled for this conversation: ${server}`);
-  if (!enabledMcpSummaries(context).some((item) => item.name === server)) throw new Error(`Unknown or disabled MCP server: ${server}`);
+  if (!context.enabledMcpServers.has(server)) throw new Error(unavailableToolMessage("mcp_call", `MCP server ${server} is not enabled for this conversation`, "use mcp_call operation=list to choose an enabled server, or request scoped enablement if this server is required"));
+  if (!enabledMcpSummaries(context).some((item) => item.name === server)) throw new Error(unavailableToolMessage("mcp_call", `MCP server ${server} is unknown or disabled`, "use mcp_call operation=list to choose an enabled server, or repair its configuration before retrying"));
+}
+
+/** Make configuration and capability refusals actionable without weakening their boundary. */
+function unavailableToolMessage(tool: string, reason: string, next: string): string {
+  return `[ProofBlade tool unavailable: ${tool}]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`;
 }
 
 function enabledMcpSummaries(context: CodingResourceContext): ReturnType<McpProjectRegistry["summaries"]> {
@@ -1708,7 +1713,10 @@ function appendToolAdvice<TResult extends { content: Array<{ type: string; text?
 
 function idalibProgressAdvice(server: string, tool: string, params: unknown, calls: Map<string, number>, output?: unknown): string | undefined {
   if (/idalib/i.test(server) && typeof output === "string" && /can't import pyside6|qt without gui/i.test(mcpPayloadText(output))) {
-    return `[ProofBlade tool feedback: IDALIB ${tool} was not executed because this MCP instance lacks the GUI/Qt dependency required by its decompiler. No code fact was obtained. Next: call mcp__${server}__disassemble_function on the same address, or use a bounded local static command; do not repeat decompile_function until a headless-capable IDALIB environment is installed.]`;
+    if (/disassemble/i.test(tool)) {
+      return `[ProofBlade tool feedback: IDALIB ${tool} was not executed because this MCP instance lacks the GUI/Qt dependency required by its static-analysis path. No code fact was obtained. Next: use a bounded local static command (for example objdump/rizin when installed), or install a headless-capable IDALIB environment; do not repeat this IDALIB code-analysis call until that dependency is available.]`;
+    }
+    return `[ProofBlade tool feedback: IDALIB ${tool} was not executed because this MCP instance lacks the GUI/Qt dependency required by its decompiler. No code fact was obtained. Next: make at most one mcp__${server}__disassemble_function call on the same address to test that fallback; if it has the same dependency error, use a bounded local static command or install a headless-capable IDALIB environment. Do not repeat decompile_function until that dependency is available.]`;
   }
   if (!/idalib/i.test(server) || !["get_metadata", "get_entry_points", "list_functions"].includes(tool)) return undefined;
   const key = `${server}:${tool}:${sha256(canonicalJson(params ?? {}))}`;

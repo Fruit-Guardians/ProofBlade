@@ -869,8 +869,11 @@ function redactText(value: string, secrets: string[]): string {
 function mcpToolErrorMessage(server: string, tool: string, result: { content?: unknown }): string {
   const detail = mcpTextContent(result.content);
   const prefix = `MCP tool reported an error: ${server}.${tool}`;
+  if (/idalib/i.test(server) && /disassemble/i.test(tool) && /can't import pyside6|qt without gui/i.test(detail)) {
+    return `${prefix}. ${detail}\nThe requested static-analysis action was not executed, and no code fact was obtained. Next: use a bounded local static command (for example objdump/rizin when installed) or install a headless-capable IDALIB environment; do not repeat this IDALIB code-analysis call until that dependency is available.`;
+  }
   if (/idalib/i.test(server) && /decompile/i.test(tool) && /can't import pyside6|qt without gui/i.test(detail)) {
-    return `${prefix}. ${detail}\nNo code fact was obtained. Next: use disassemble_function on the same address or a bounded local static command; do not repeat decompile_function until a headless-capable IDALIB environment is installed.`;
+    return `${prefix}. ${detail}\nThe requested decompilation action was not executed, and no code fact was obtained. Next: make at most one disassemble_function probe on the same address to check whether this endpoint's static-analysis path is usable; if it reports the same dependency error, use a bounded local static command or install a headless-capable IDALIB environment. Do not repeat decompile_function until that dependency is available.`;
   }
   return detail ? `${prefix}. ${detail}` : prefix;
 }

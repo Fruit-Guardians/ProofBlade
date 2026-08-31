@@ -42,6 +42,11 @@ interface ApprovalLedger {
 export interface ApprovalDecision {
   allowed: boolean;
   approvalId?: string;
+  /**
+   * Model- and operator-visible explanation for a denied external effect.
+   * It names the boundary, states that no effect ran, and gives the recovery
+   * path instead of leaving callers with a bare fail-closed result.
+   */
   reason?: string;
 }
 
@@ -134,8 +139,20 @@ export class ApprovalPolicy {
    */
   public async check(input: ApprovalRequest): Promise<ApprovalDecision> {
     const requested = await this.request(input);
-    if (requested.status === "PENDING") return { allowed: false, approvalId: requested.id, reason: "Operator approval is required before this external effect." };
-    if (requested.status === "DENIED") return { allowed: false, approvalId: requested.id, reason: "Operator denied this external effect." };
+    if (requested.status === "PENDING") {
+      return {
+        allowed: false,
+        approvalId: requested.id,
+        reason: "Reason: this external effect requires operator approval. The external effect was not executed and no quota was spent. Next: ask the operator to grant this approval, then retry the same bounded action.",
+      };
+    }
+    if (requested.status === "DENIED") {
+      return {
+        allowed: false,
+        approvalId: requested.id,
+        reason: "Reason: the operator denied this external effect. The external effect was not executed and no quota was spent. Next: use an in-scope read-only alternative, revise the proposed effect, or request a new approval with a clear justification.",
+      };
+    }
     if (requested.status === "CONSUMED") return { allowed: true, approvalId: requested.id };
     await this.consume(requested.id);
     return { allowed: true, approvalId: requested.id };

@@ -12,6 +12,9 @@ test("approval policy persists pending requests without storing sensitive resour
     const first = await policy.check({ runId: "RUN-1", operation: "platform.submit", resource: "flag{secret}", reason: "submit candidate" });
     assert.equal(first.allowed, false);
     assert.ok(first.approvalId);
+    assert.match(first.reason ?? "", /Reason:/);
+    assert.match(first.reason ?? "", /not executed/);
+    assert.match(first.reason ?? "", /Next:/);
     assert.deepEqual(await policy.pending("RUN-1"), [await policy.request({ runId: "RUN-1", operation: "platform.submit", resource: "flag{secret}", reason: "submit candidate" })]);
     const ledger = await readFile(join(root, "approvals.json"), "utf8");
     assert.equal(ledger.includes("flag{secret}"), false);
@@ -47,7 +50,11 @@ test("denied or expired approvals fail closed", async () => {
     const policy = new ApprovalPolicy({ ledgerPath: join(root, "approvals.json"), now: () => now, defaultTtlMs: 1_000 });
     const denied = await policy.request({ runId: "RUN-3", operation: "session.open", reason: "open tube" });
     await policy.deny(denied.id);
-    assert.equal((await policy.check({ runId: "RUN-3", operation: "session.open", reason: "open tube" })).allowed, false);
+    const rejected = await policy.check({ runId: "RUN-3", operation: "session.open", reason: "open tube" });
+    assert.equal(rejected.allowed, false);
+    assert.match(rejected.reason ?? "", /operator denied/i);
+    assert.match(rejected.reason ?? "", /not executed/);
+    assert.match(rejected.reason ?? "", /Next:/);
     const expired = await policy.request({ runId: "RUN-4", operation: "environment.start", reason: "start target" });
     now += 1_001;
     await assert.rejects(() => policy.grant(expired.id), /expired/);

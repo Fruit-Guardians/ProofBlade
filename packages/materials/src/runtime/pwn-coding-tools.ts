@@ -23,7 +23,7 @@ export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
-  if (!context.pwnTools) throw new Error("pwn tools are unavailable: this run has no Docker-backed pwn container or durable session broker. Use bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
+  if (!context.pwnTools) throw new Error("[ProofBlade tool unavailable: pwn_*]\nReason: this run has no Docker-backed pwn container or durable session broker. The requested session action was not executed.\nNext: use bounded bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
   return context.pwnTools;
 }
 

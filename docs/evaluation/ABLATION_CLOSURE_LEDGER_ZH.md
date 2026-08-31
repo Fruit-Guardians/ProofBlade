@@ -107,6 +107,17 @@
 - 038（快照 `9f68f3a0…`）是修复后的正式单题复测：AIHub `gpt-5.6-terra` / Responses / max、同一 IDALIB 与 `magic`、两个变体各一次。Provider 均为 200，两个 ledger pairing 均完整落账为 failed / `EXHAUSTED`，且没有 `verify_claim`，所以没有 hidden-scorer 成功。
 - 归因更正：`advice-curation` 的 `decompile_function=4` 不代表得到代码观察。Artifact 显示 IDALIB 每次返回 `Can't import PySide6 ... Qt without GUI`，其 MCP 内层 `isError=true`，但旧 Harness 将外层 effect 的 0 exit code 误报为成功。这是 headless IDALIB 环境/错误投影缺陷；`manual-curation` 则以 `bash=20`、`read=5` 为主，未选择一等反编译工具。二者均不能用于 curation 因果结论。
 - 修复与 039 准则：MCP 内层 `isError` 现在会成为真实工具错误；Qt/PySide6 失败明确说明“未获得代码事实”，并建议同地址 `disassemble_function` 或受限本地静态分析，直到安装 headless-capable IDALIB。它不拒绝合法探索。039 先验证该失败不再被记为进展、模型能收到替代路径；只有反编译或反汇编产生真实代码 observation 后，才讨论从代码提取可验证事实。
+- 039（快照 `3855c00c…`）结果：两个变体均 `EXHAUSTED`、0 verified；advice 产生 2 次 `decompile_function`，两个 `tool_result_recorded` 均为 `isError=true`、`evidenceAdded=false`，所以错误分类修复成立。但 Pi 会把 `isError` 结果压缩成泛化的 `MCP tool reported an error`，导致具体 PySide6/Qt 原因和回退建议没有进入模型上下文；它仍重复反编译，未调用 `disassemble_function`。manual 在 20 次 Provider 请求后主要做 shell/清单调用，未抵达反编译。故 039 不支持“文字回退建议已被模型采纳”的结论。
+- 后续修复：MCP registry 现在保留远端 text error，并为 IDALIB decompile headless 失败加入原因、未获得代码事实与 `disassemble_function` / bounded static fallback。040 固定 039 的其它条件，仅评估这条真实错误反馈是否被模型看见并改变下一步；若仍不转向，应检查 `disassemble_function` 本身可用性或安装 headless-capable IDALIB，而不是继续增加认知门控。
+
+### AB-TERRA-IDALIB-MAGIC-040：完整错误反馈已送达，但回退能力本身不可用
+
+- 配置：快照 `AB-TERRA-IDALIB-MAGIC-040`，语料和模型固定为 `magic`、AIHub `gpt-5.6-terra` / Responses / max；`manual-curation` 与 `advice-curation` 各一次、最多 4 个模型 turn。唯一实验变化仍是 evidence curation 建议，040 的主要目的是复测 039 中 MCP 错误正文的可见性，不将单例作为该策略的因果比较。
+- 结果：两条 Run 均以 `EXHAUSTED`（4 turn 后无 verified completion）结束，均为 `0` verified、`0` 次 `verify_claim`、`0` 次 `disassemble_function`。Provider 请求均为真实 200：`advice-curation=22`、`manual-curation=24`。工具轨迹分别为 advice `decompile_function=4 / get_entry_points=4 / get_metadata=3 / list_functions=3 / bash=6 / evidence=5`，manual `decompile_function=3 / get_metadata=5 / get_entry_points=4 / list_functions=3 / bash=6 / evidence=5`。
+- 行为与首错：每次 `decompile_function` 都是 `isError=true`、`evidenceAdded=false`；Pi session 与归档 Artifact 均表明模型看到了完整文本：PySide6/Qt 原因、"未获得代码事实"、同地址反汇编或本地受限静态分析的下一步。两个变体仍重复反编译、没有选择反汇编，因此“反馈可见”修复成立，但“Terra 会采纳文字回退建议”不成立。这个样本也不足以推断 curation 的效果。
+- 能力复核：在同一 `http://127.0.0.1:18745/mcp` 端点对 `magic` 的 `0x4010d0` 直接执行只读 `disassemble_function {"start_address":"0x4010d0"}`，得到 HTTP 200 内层 `isError=true` 和相同的 `Can't import PySide6 ... Qt without GUI`。因此该 IDALIB endpoint 的反编译和反汇编两条代码分析路径当前都不可用；这首先是 headless 工具环境问题，而非模型选择或认知策略问题。
+- 修复：MCP 失败反馈现在统一包含原因、明确的“请求动作未执行”、未得到代码事实及恢复步骤。反汇编遇到同一 Qt 依赖错误时，直接建议受限本地静态命令（`objdump`/`rizin`）或安装 headless-capable IDALIB，而不是把不可用的反汇编再伪装成回退。审批、未启用 Skill/MCP、无 verifier 的 `submit_flag`/`web_reproduce` 及无 session backend 的 Pwn/Web 工具也使用相同的原因/未执行/下一步契约；这些改动保持 scope、权限、预算和 effect 边界，没有添加认知硬门禁。
+- 回归：`approval-policy.test.ts` 断言 pending/denied approval 说明不执行与恢复；`coding-resources.test.ts` 覆盖未启用 MCP/Skill 和 IDALIB 反汇编 Qt 失败的模型可见反馈；`reverse-core.test.ts` 保持反向后端契约。下一轮逆向能力评测须先安装并探测真正 headless 可用的 IDALIB，或明确使用经 scope 限制的本地 `objdump`/Rizin 后端作为“眼睛”；不得再把当前 endpoint 作为可用代码分析路径，也不得为弥补它而收紧 agent 的探索自由。
 
 ### AB-TERRA-IDALIB-MAGIC-032：一等 IDALIB 已可达，Evidence 联合 schema 仍构成摩擦（中止，不计入样本）
 

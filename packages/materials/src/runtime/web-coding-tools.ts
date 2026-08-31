@@ -20,7 +20,7 @@ export function createWebSessionTools(): AgentHarnessTool<CodingResourceContext>
 }
 
 function requireHandler(context: CodingResourceContext): WebToolHandler {
-  if (!context.webSession) throw new Error("web session tools are unavailable: this task has no resolvable web target. Use bash with curl/python-requests as a fallback.");
+  if (!context.webSession) throw new Error("[ProofBlade tool unavailable: web_*]\nReason: this task has no resolvable web target. The requested session action was not executed.\nNext: use bounded bash with curl/python-requests as a fallback, or configure a scoped web target.");
   return context.webSession;
 }
 

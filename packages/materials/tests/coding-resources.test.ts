@@ -406,7 +406,7 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   assert.equal((described.details as { server: string }).server, "echo");
   assert.equal((described.details as { nestedTools: Array<{ name: string }> }).nestedTools[0]?.name, "page_eval");
   assert.deepEqual(calls, [{ kind: "describe", value: "echo" }]);
-  await assert.rejects(() => executeTool("mcp_call", { operation: "describe", server: "browser" }, context), /not enabled/);
+  await assert.rejects(() => executeTool("mcp_call", { operation: "describe", server: "browser" }, context), /not enabled.*not executed[\s\S]*Next:/);
   await assert.rejects(() => executeTool("mcp_call", { operation: "list", server: "echo" }, context), /does not accept/);
   await assert.rejects(() => executeTool("mcp_call", { operation: "delete", server: "echo" }, context), /Unsupported MCP operation/);
 
@@ -415,7 +415,7 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   assert.equal((called.details as { exitCode: number }).exitCode, 0);
   assert.deepEqual(calls.at(-1), { kind: "execute", value: { capabilityId: "mcp.echo", operation: "call", input: { tool: "echo_text", arguments: { text: "hello" } } } });
 
-  await assert.rejects(() => executeTool("load_skill", { name: "triage" }, context), /not enabled/);
+  await assert.rejects(() => executeTool("load_skill", { name: "triage" }, context), /not enabled.*not executed[\s\S]*Next:/);
   context.enabledSkills.add("triage");
   const loaded = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
   assert.deepEqual(loaded.details, { name: "triage", maxChars: 2_000, content: "loaded" });
@@ -1116,6 +1116,28 @@ test("repeated IDALIB metadata remains available and names the next code-analysi
   assert.match(text, /call was allowed/);
   assert.match(text, /target-relevant address/);
   assert.match(text, /decompile_function/);
+});
+
+test("IDALIB GUI dependency failures say whether the requested code action ran and how to recover", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({ server: "idalib-mcp", configHash: "ida-hash", tools: [{ name: "disassemble_function", description: "Disassemble", inputSchema: { type: "object" }, readOnlyHint: true }] }),
+    execute: async () => { throw new Error("direct MCP execution must not be used when runtime is available"); },
+  } as unknown as McpProjectRegistry;
+  const output = `<untrusted-observation capability="mcp.idalib" operation="call" artifact="A-1">${JSON.stringify({ server: "idalib-mcp", tool: "disassemble_function", result: { content: [{ type: "text", text: "Error executing tool disassemble_function: Can't import PySide6. Are you trying to use Qt without GUI?" }], isError: true } })}</untrusted-observation>`;
+  const context = { mcp, enabledSkills: new Set<string>(), enabledMcpServers: new Set(["idalib-mcp"]), runtime: { async invokeCapability() { return { capabilityId: "mcp.idalib", operation: "call", manifestHash: "manifest", effectId: "FX-1", artifactId: "A-1", output, stderr: "MCP tool reported an error: idalib-mcp.disassemble_function. Error executing tool disassemble_function: Can't import PySide6. Are you trying to use Qt without GUI?\nThe requested static-analysis action was not executed, and no code fact was obtained. Next: use a bounded local static command.", exitCode: 0, outputTier: "small" as const, truncated: false, originalChars: output.length, progressKey: "a".repeat(64) }; } } } as unknown as CodingResourceContext;
+  const disassemble = (await createMcpFirstClassTools(mcp, ["idalib-mcp"])).find((tool) => tool.name === "mcp__idalib-mcp__disassemble_function");
+  assert.ok(disassemble);
+  const result = await disassemble.execute("call-1", { start_address: "0x4010d0" }, new AbortController().signal, () => undefined, context);
+  const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+  assert.equal(result.isError, true);
+  assert.match(text, /not executed/);
+  assert.match(text, /No code fact was obtained/);
+  assert.match(text, /Next:/);
+  assert.match(text, /bounded local static command/);
 });
 
 test("an initial IDALIB function inventory directs the model to inspect code", async () => {
