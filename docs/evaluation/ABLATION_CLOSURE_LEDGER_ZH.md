@@ -128,3 +128,9 @@
 - 过程：`advice` 使用 14 次 Provider `200`、21 次工具调用、6 次 Evidence、2 次 metadata、2 次 `list_functions`、3 次入口点查询、成本 `$0.102277`；`manual` 使用 13 次 Provider `200`、19 次工具调用、7 次 Evidence、3 次 metadata、2 次 `list_functions`、1 次入口点查询、成本 `$0.154495`。两者都比 033 soft 的“8 次 metadata、无函数列表”推进到函数/入口目录。
 - 解释边界：成本差 `$0.052218` 和一次 Evidence/metadata 差异来自各一次随机采样，不能宣称 curation advice 更好；但两变体共享的新行为（函数列表和入口点）与 033 相比符合新提示和 metadata feedback 的预期。共同第一处未完成边是：已经得到函数地址清单，却没有执行 `decompile_function` 或 `disassemble_function`，所以还没有目标相关代码路径。
 - 修复与后续：首次 `list_functions` / `get_entry_points` 现在返回非阻断提示，要求从结果选择 `main`、入口或检查函数地址进入反编译/反汇编；重复 inventory 说明无新代码事实并保留调用能力。`036` 应固定 035 的配置和 corpus，以该修复后的 Harness 复测；首要接受条件是一次函数级代码分析，而不是单次 flag。对 curation 的因果比较仍需 20+ 分层 holdout、3--5 attempts。
+
+### AB-TERRA-IDALIB-MAGIC-036：函数级文字建议未被真实轨迹采纳（已完成，反证）
+
+- 固定 035 的配置和 curation 单因素设计，仅加入 035 后的函数级 IDALIB advice。`advice-curation` 产生 20 次 Provider `200`、28 次工具调用；`manual-curation` 产生 16 次 Provider `200`、37 次工具调用。两者均为 `0/1` verified、`budget_exhausted`，且 `decompile_function=0`、`disassemble_function=0`。
+- 结论：函数列表/入口点后附加“请选择地址进入反编译”的文字建议具有单元合同覆盖，但没有驱动 Terra 在本题执行函数级工具，不能写作 Harness 能力提升；这也说明不能用更多强制语气取代可操作的工具支架。
+- 后续修复假设：在只读、安全的 IDALIB 结果中投影有限、结构化的候选函数地址和一键对应的反编译工具输入，使模型不必自行从大清单中完成地址选择；同时保留模型可改选其它函数的自由。该设计需要单元 fixture、隐藏评分回归和新的 immutable 037 快照验证。
