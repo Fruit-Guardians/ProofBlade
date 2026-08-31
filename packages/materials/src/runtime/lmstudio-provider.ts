@@ -74,8 +74,12 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   } : baseApi;
   // Scheduling is deliberately outermost: a waiting request has not yet made
   // a billable reservation, and cannot call the Provider until it owns a slot.
+  // AgentHarness may supply a provider default that is larger than the
+  // configured profile ceiling. Clamp it before the budget wrapper so the
+  // outgoing request and the conservative reservation describe the same work.
+  const cappedApi = limitProviderOutputTokens(budget ? budget.wrap(rawApi) : rawApi, config.maxTokens);
   const api = (scheduling?.scheduler ?? providerRequestScheduler()).wrap(
-    budget ? budget.wrap(rawApi) : rawApi,
+    cappedApi,
     {
       provider: config.provider,
       model: config.modelId,
@@ -96,6 +100,18 @@ export function createConfiguredModels(config: ResolvedModelProfile, budget?: Pr
   const models = createModels();
   models.setProvider(provider);
   return { models, model, closeTransport: async () => { await transport?.close(); } };
+}
+
+/** Enforce the explicit profile completion limit across all Pi request paths. */
+export function limitProviderOutputTokens(streams: ProviderStreams, maxTokens: number): ProviderStreams {
+  const capped = (options: Parameters<ProviderStreams["stream"]>[2]) => ({
+    ...options,
+    maxTokens: Math.min(maxTokens, options?.maxTokens ?? maxTokens),
+  });
+  return {
+    stream: (model, context, options) => streams.stream(model, context, capped(options)),
+    streamSimple: (model, context, options) => streams.streamSimple(model, context, capped(options)),
+  };
 }
 
 /** Non-secret pool identity: credentials are intentionally excluded. */

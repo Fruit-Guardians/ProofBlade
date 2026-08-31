@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createConfiguredModels, discoveryPathForApi, normalizeProviderBaseUrl, resolveModelProfile } from "../src/runtime/lmstudio-provider.js";
+import { createConfiguredModels, discoveryPathForApi, limitProviderOutputTokens, normalizeProviderBaseUrl, resolveModelProfile } from "../src/runtime/lmstudio-provider.js";
+import { createAssistantMessageEventStream, type ProviderStreams } from "@earendil-works/pi-ai";
 
 test("Anthropic profiles use a root base URL while discovery retains the API version", async () => {
   assert.equal(normalizeProviderBaseUrl("https://api.anthropic.com/v1/", "anthropic-messages"), "https://api.anthropic.com");
@@ -42,4 +43,21 @@ test("configured models retain the selected Provider API", async () => {
     assert.equal(configured.model.api, api);
     await configured.closeTransport();
   }
+});
+
+test("configured provider ceiling overrides a larger harness completion default", () => {
+  let seen: number | undefined;
+  const source: ProviderStreams = {
+    stream: (_model, _context, options) => {
+      seen = options?.maxTokens;
+      return createAssistantMessageEventStream();
+    },
+    streamSimple: (_model, _context, options) => {
+      seen = options?.maxTokens;
+      return createAssistantMessageEventStream();
+    },
+  };
+  const capped = limitProviderOutputTokens(source, 1_024);
+  capped.stream({} as never, { messages: [] }, { maxTokens: 135_168 });
+  assert.equal(seen, 1_024);
 });

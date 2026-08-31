@@ -312,11 +312,11 @@ export function createCodingToolEffectPolicyResolver(
 const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
   name: "verify_claim",
   label: "verify_claim",
-  description: "Run the task's deterministic workspace verifier and journal its exact candidate output. A task-bound command creates trusted reproduction Evidence and accepts a Completion; when a task has no verifier policy, the same call is retained as an explicitly unverified observation.",
+  description: "Run the task's deterministic workspace verifier and journal its exact candidate output. A task-bound command creates trusted reproduction Evidence and accepts a Completion; when a hidden scorer owns the task verdict, this creates a candidate proposal for that scorer. Supporting evidence is optional: do not call evidence record merely to invoke verification.",
   parameters: Type.Object({
     candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
     command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
-    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the reproduction." })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Optional supporting evidence ids used by the reproduction." })),
     timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
@@ -352,7 +352,10 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
-    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
+    // The outer CTF loop owns hidden-scorer verification. Continuing to ask the
+    // model after a durable Completion proposal only invites redundant evidence
+    // curation and verifier calls, delaying the authoritative scorer.
+    return context.deferClaimAcceptance ? { ...result, terminate: true } : result;
   },
 };
 

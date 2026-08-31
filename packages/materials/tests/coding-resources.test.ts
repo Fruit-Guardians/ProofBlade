@@ -35,7 +35,7 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "a2995bca1a1a56aaf44126e4ee5b95c994053d1e32689762b19d7497c0dc7f43";
+const CODING_TOOL_CONTRACT_HASH = "cfa2b18e8646a4326e55620fd84e1ab8778ba72c885da7fd3c498b6047e8e2db";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -258,7 +258,7 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       deferClaimAcceptance: true,
       continuousRecovery: true,
     });
-    assert.equal(continuous.terminate, undefined, "continuous recovery keeps claim verification in the same lane");
+    assert.equal(continuous.terminate, true, "deferred claim verification returns control to the outer verifier even during recovery");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });

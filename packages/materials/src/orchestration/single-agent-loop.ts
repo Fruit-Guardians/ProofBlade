@@ -559,7 +559,7 @@ function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerInten
     "Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.",
     "Inspect every visible target file with read or a bounded bash command; do not guess from the task description.",
     "Preserve useful Artifact/Evidence ids and use them to support your reasoning.",
-    "When a candidate is ready, call verify_claim with the exact candidate and a deterministic command that derives it from workspace inputs without embedding the candidate literal.",
+    "When a candidate is ready, call verify_claim immediately with the exact candidate and a deterministic command that derives it from workspace inputs without embedding the candidate literal. Supporting evidence ids are optional; do not spend calls on manual evidence curation first.",
     "Do not stop at a prose answer; the verify_claim tool is required.",
   ].join("\n");
 }
