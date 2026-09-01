@@ -33,8 +33,15 @@ export interface AblationPolicyBinding {
   caseId: string;
   runId: string;
   attempt: number;
+  /** Current durable route, refreshed before each provider turn. */
+  route?: () => AblationRouteSnapshot | undefined;
   turn?: () => number;
   onDecision?: (event: AblationDecisionEvent) => void | Promise<void>;
+}
+
+export interface AblationRouteSnapshot {
+  domainPhase: string;
+  actionBundles: Array<{ domainPhase: string; toolNames: readonly string[] }>;
 }
 
 export interface CodingTurnTermination {
@@ -317,6 +324,11 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     const firstActionViolation = firstActionBudget && !firstActionBudget.completed
       && !isFirstActionCompletionTool(event.toolName)
       && !matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames);
+    const route = ablationPolicy?.route?.();
+    const completionTool = isCompletionTool(event.toolName);
+    const activeBundle = route?.actionBundles.find((bundle) => bundle.domainPhase === route.domainPhase);
+    const matchesActiveBundle = activeBundle ? matchesActionBundleTool(event.toolName, activeBundle.toolNames) : true;
+    const appearsInAnotherPhase = route?.actionBundles.some((bundle) => bundle.domainPhase !== route.domainPhase && matchesActionBundleTool(event.toolName, bundle.toolNames)) ?? false;
     const policyEvent = ablationPolicy && ablationPolicy.controller.decide({
       experimentId: ablationPolicy.experimentId,
       variantId: ablationPolicy.variantId,
@@ -327,7 +339,16 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       requestedAction: "tool_call",
       requestedTool: event.toolName,
       ...(firstActionViolation ? { firstActionViolation: true } : {}),
-      reasonInputs: { toolName: event.toolName, firstActionViolation: Boolean(firstActionViolation) },
+      ...(activeBundle && !completionTool && !matchesActiveBundle ? { actionBundleViolation: true } : {}),
+      ...(activeBundle && !completionTool && !matchesActiveBundle && appearsInAnotherPhase ? { phaseRouteViolation: true } : {}),
+      reasonInputs: {
+        toolName: event.toolName,
+        firstActionViolation: Boolean(firstActionViolation),
+        domainPhase: route?.domainPhase ?? "",
+        activeBundleId: activeBundle?.domainPhase ?? "",
+        actionBundleViolation: Boolean(activeBundle && !completionTool && !matchesActiveBundle),
+        phaseRouteViolation: Boolean(activeBundle && !completionTool && !matchesActiveBundle && appearsInAnotherPhase),
+      },
     });
     if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
     if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") return { block: true, reason: `[ProofBlade ablation] ${policyEvent.reasonCode}` };
@@ -379,6 +400,10 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
 }
 
 function isFirstActionCompletionTool(toolName: string): boolean {
+  return isCompletionTool(toolName);
+}
+
+function isCompletionTool(toolName: string): boolean {
   return toolName === "verify_claim" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
 }
 
