@@ -108,7 +108,26 @@ test("pwn tools fail closed with a clear message when no container is attached",
   const open = toolByName("pwn_open");
   await assert.rejects(
     open.execute!("t1", { kind: "remote", command: ["tube"], endpoint: "1.2.3.4:1337" }, new AbortController().signal, () => {}, contextWith(undefined)),
-    /no Docker-backed pwn container|unavailable/,
+    (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /no Docker-backed pwn container|unavailable/);
+      assert.match(text, /not executed/);
+      assert.match(text, /Next:/);
+      return true;
+    },
+  );
+});
+
+test("pwn_open explains how to repair a missing remote endpoint", async () => {
+  await assert.rejects(
+    toolByName("pwn_open").execute!("t-endpoint", { kind: "remote", command: ["tube"] }, new AbortController().signal, () => {}, contextWith()),
+    (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /Reason:.*endpoint/);
+      assert.match(text, /not opened/);
+      assert.match(text, /Next:.*task-scoped endpoint/);
+      return true;
+    },
   );
 });
 

@@ -106,7 +106,7 @@ export class PwnToolHandler {
     try {
       const ref = this.refProvider();
       if (input.kind === "remote") this.assertEndpointAllowed(input.endpoint);
-      if (this.sessionRuntimeRequired && !this.sessionBroker) throw new Error("Session runtime broker is configured but unavailable");
+      if (this.sessionRuntimeRequired && !this.sessionBroker) throw new Error(pwnRequestRefusal("Session runtime broker is configured but unavailable", "use the configured session broker or restart this run with a local Docker-backed pwn profile"));
       session = this.sessionBroker
         ? await this.openBrokerSession(input, ref)
         : input.kind === "remote"
@@ -344,16 +344,16 @@ export class PwnToolHandler {
    * allowed_ports (empty lists / no scope = unrestricted, e.g. GUI chat).
    */
   private assertEndpointAllowed(endpoint: string | undefined): void {
-    if (!endpoint) throw new Error("pwn remote requires an endpoint (host:port)");
+    if (!endpoint) throw new Error(pwnRequestRefusal("pwn remote requires an endpoint (host:port)", "provide the task-scoped endpoint and retry, or use kind=local"));
     const parsed = parseEndpoint(endpoint);
-    if (!parsed) throw new Error(`pwn endpoint is not a valid host:port: ${endpoint}`);
+    if (!parsed) throw new Error(pwnRequestRefusal(`pwn endpoint is not a valid host:port: ${endpoint}`, "provide an endpoint such as host:port with a port from 1 to 65535"));
     if (!this.scope) return;
     const { allowedHosts, allowedPorts } = this.scope;
     if (allowedHosts.length > 0 && !allowedHosts.some((pattern) => hostMatches(parsed.host, pattern))) {
-      throw new Error(`pwn endpoint host ${parsed.host} is outside the task scope`);
+      throw new Error(pwnRequestRefusal(`pwn endpoint host ${parsed.host} is outside the task scope`, "choose a host from the task's allowed scope or use a local target"));
     }
     if (allowedPorts.length > 0 && !allowedPorts.includes(parsed.port)) {
-      throw new Error(`pwn endpoint port ${parsed.port} is outside the task scope`);
+      throw new Error(pwnRequestRefusal(`pwn endpoint port ${parsed.port} is outside the task scope`, "choose a port from the task's allowed scope or use a local target"));
     }
   }
 
@@ -372,16 +372,16 @@ export class PwnToolHandler {
     artifactIds?: string[];
     evidenceIds?: string[];
   }): Promise<{ recordId: string }> {
-    if (!this.controlStore) throw new Error("pwn primitive recording is unavailable without the Control Store");
+    if (!this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_record_primitive]\nReason: primitive recording requires the durable Control Store, which is not attached to this run. The requested record was not created.\nNext: continue with bounded pwn observations, or restart the task with a Control Store-enabled profile.");
     const primitive = redactCtfCandidates(input.primitive.replace(/[\u0000\r\n]/g, " ").trim(), () => "[candidate]").slice(0, 256);
-    if (!primitive) throw new Error("pwn primitive requires a non-empty description");
-    if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence >= 1) throw new Error("pwn primitive confidence must be in [0,1)");
+    if (!primitive) throw new Error(pwnRequestRefusal("pwn primitive requires a non-empty description", "provide a short hypothesis grounded in the observed behavior"));
+    if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence >= 1) throw new Error(pwnRequestRefusal("pwn primitive confidence must be in [0,1)", "use a finite confidence from 0 (inclusive) up to but excluding 1"));
     const artifactIds = [...new Set(input.artifactIds ?? [])].slice(0, 32);
     const evidenceIds = [...new Set(input.evidenceIds ?? [])].slice(0, 32);
-    if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error("pwn primitive requires supporting artifactIds or evidenceIds");
+    if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error(pwnRequestRefusal("pwn primitive requires supporting artifactIds or evidenceIds", "read or inspect a supporting Artifact/Evidence first, then pass its A-* or EV-* id"));
     const preconditionRecordIds = [...new Set(input.preconditionRecordIds ?? [])].slice(0, 32);
     const snapshot = await this.controlStore.snapshot(this.runId);
-    if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(`Pwn primitive is not allowed for target kind ${snapshot.task.target_kind}`);
+    if (!["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) throw new Error(pwnRequestRefusal(`Pwn primitive is not allowed for target kind ${snapshot.task.target_kind}`, "use the task's target-appropriate tools, or run this primitive on a pwn/mixed target"));
     const recordId = id("PWN-PRIMITIVE");
     await this.controlStore.dispatch(this.runId, {
       type: "domain_record",
@@ -471,10 +471,14 @@ export class PwnToolHandler {
 
   private require(sessionId: string, allowExited = false): PwnSession {
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error(`Unknown pwn session: ${sessionId}`);
-    if (!allowExited && this.exited.has(sessionId)) throw new Error(`Pwn session has exited: ${sessionId}; only pwn_close is allowed`);
+    if (!session) throw new Error(pwnRequestRefusal(`Unknown pwn session: ${sessionId}`, "call pwn_list and use a session id from this Run, or call pwn_open to start one"));
+    if (!allowExited && this.exited.has(sessionId)) throw new Error(pwnRequestRefusal(`Pwn session has exited: ${sessionId}; only pwn_close is allowed`, "call pwn_close, then open a fresh session and replay one bounded stage"));
     return session;
   }
+}
+
+function pwnRequestRefusal(reason: string, next: string): string {
+  return `[ProofBlade tool request rejected: pwn]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`;
 }
 
 /** Parse "host:port" (rejecting IPv6/garbage) for scope checks. */

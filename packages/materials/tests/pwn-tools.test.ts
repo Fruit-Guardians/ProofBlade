@@ -196,7 +196,13 @@ test("handler rejects operations on an unknown session", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-pwn-tool-unknown-"));
   try {
     const { handler } = await makeHandler(root, "PWN-TOOL-UNK");
-    await assert.rejects(handler.send("SES-missing", "x", true), /Unknown pwn session/);
+    await assert.rejects(handler.send("SES-missing", "x", true), (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /Unknown pwn session/);
+      assert.match(text, /not executed/);
+      assert.match(text, /Next:.*pwn_list/);
+      return true;
+    });
     await assert.rejects(handler.recv("SES-missing", "\n"), /Unknown pwn session/);
   } finally {
     await rm(root, { recursive: true, force: true });

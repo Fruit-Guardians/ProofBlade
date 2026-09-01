@@ -23,7 +23,7 @@ export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
-  if (!context.pwnTools) throw new Error("pwn tools are unavailable: this run has no Docker-backed pwn container or durable session broker. Use bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
+  if (!context.pwnTools) throw new Error("[ProofBlade tool unavailable: pwn_*]\nReason: this run has no Docker-backed pwn container or durable session broker. The requested session action was not executed.\nNext: use bounded bash with pwntools as a fallback, or run in a pwn/pwn-kernel profile.");
   return context.pwnTools;
 }
 
@@ -48,7 +48,7 @@ const pwnOpenTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, params, _signal, _onUpdate, context) {
     const input = params as { kind: "local" | "remote"; command: string[]; endpoint?: string; idleSilenceMs?: number; waitTimeoutMs?: number };
-    if (input.kind === "remote" && !input.endpoint) throw new Error("pwn_open kind=remote requires an endpoint (host:port)");
+    if (input.kind === "remote" && !input.endpoint) throw new Error("[ProofBlade tool request rejected: pwn_open]\nReason: kind=remote requires an endpoint in host:port form; the session was not opened.\nNext: provide the task-scoped endpoint and retry, or use kind=local with a bounded command.");
     return pwnResult(await requireHandler(context).open(input));
   },
 };

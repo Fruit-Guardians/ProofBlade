@@ -68,7 +68,14 @@ export class ExperimentGate {
     const snapshot = await this.controlStore.snapshot(input.runId);
     const repeatKey = repeatKeyFor({ domainPhase: input.domainPhase ?? snapshot.domainPhase, generation: snapshot.generation, hypothesisId: input.hypothesisId, action: input.action, inputHash: sha256(canonicalJson(clearCallArguments(input.input))) });
     const previousFailures = Object.values(snapshot.experiments).filter((item) => item.repeatKey === repeatKey && item.outcome !== "success").length;
-    if (previousFailures >= 2) throw new Error(`Experiment repeat gate blocked action after ${previousFailures} failed attempts: ${repeatKey}`);
+    if (previousFailures >= 2) {
+      throw new Error(
+        `[ProofBlade experiment repeat gate blocked action for this call]\n`
+        + `Reason: this exact action and material input have already failed ${previousFailures} times in the current run generation, so repeating it is unlikely to add evidence. The requested action was not executed.\n`
+        + `Next: change the hypothesis or material input and retry; or record the strongest prior output as evidence before trying a meaningfully different probe. If an exact replay is necessary for diagnosis, start a new authorized run with an explicitly larger repeat budget.\n`
+        + `Reference: repeat key ${repeatKey}.`,
+      );
+    }
     return { repeatKey, previousFailures };
   }
 }
