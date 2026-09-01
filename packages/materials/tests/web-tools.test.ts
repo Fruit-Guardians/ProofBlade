@@ -196,9 +196,31 @@ test("url outside task scope is rejected before connecting (host, port, scheme)"
   try {
     const handler = await makeHandler(root, "WEB-TOOL-SCOPE", { allowedHosts: ["1.14.76.59"], allowedPorts: [80] });
     // In-scope host+port passes the app-layer check (connection may fail later, but scope is fine).
-    await assert.rejects(handler.open({ baseUrl: "http://8.8.8.8:80/" }), /outside the task scope/);
-    await assert.rejects(handler.open({ baseUrl: "http://1.14.76.59:9999/" }), /outside the task scope/);
-    await assert.rejects(handler.open({ baseUrl: "file:///etc/passwd" }), /scheme .* is not allowed|not a valid URL/);
+    for (const input of ["http://8.8.8.8:80/", "http://1.14.76.59:9999/", "file:///etc/passwd"]) {
+      await assert.rejects(handler.open({ baseUrl: input }), (error: unknown) => {
+        const text = error instanceof Error ? error.message : String(error);
+        assert.match(text, /outside the task scope|scheme .* is not allowed|not a valid URL/);
+        assert.match(text, /not executed/);
+        assert.match(text, /Next:/);
+        return true;
+      });
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unknown Web sessions explain recovery instead of returning a bare error", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-tool-unknown-session-"));
+  try {
+    const handler = await makeHandler(root, "WEB-TOOL-UNKNOWN");
+    await assert.rejects(() => handler.request({ sessionId: "missing-session", path: "/" }), (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /Unknown web session/);
+      assert.match(text, /not executed/);
+      assert.match(text, /Next:.*web_list/);
+      return true;
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
