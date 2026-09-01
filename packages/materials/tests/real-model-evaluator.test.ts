@@ -38,6 +38,15 @@ const deadlineSolver: AgentLaneFactory = async () => {
   };
 };
 
+/** A hostile Provider/tool stand-in: acknowledges abort but never settles prompt. */
+const abortIgnoringDeadlineSolver: AgentLaneFactory = async () => ({
+  prompt: () => new Promise(() => {}),
+  async compact() {},
+  async abort() {},
+  async isIdle() { return false; },
+  async close() {},
+});
+
 function testAgentLane(runtime: Parameters<AgentLaneFactory>[0]["runtime"], succeeds: boolean) {
   return {
   async prompt() {
@@ -296,6 +305,34 @@ test("real model evaluator aborts a provider turn when the case deadline expires
       && item.failureCategory === "budget_exhausted"
       && item.turns === 1
       && item.providerDiagnostics.deadlineBeforeCompletion)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("real model evaluator continues after a lane ignores abort and never settles prompt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-unresponsive-deadline-"));
+  const startedAt = Date.now();
+  try {
+    const source = "unresponsive deadline fixture";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({
+      schemaVersion: 1,
+      id: "unresponsive-deadline-corpus",
+      cases: [corpusCase("unresponsive", "target.bin", "flag{unresponsive_deadline}", source)],
+    }), "utf8");
+    const summary = await new RealModelEvaluationRunner(root, abortIgnoringDeadlineSolver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      deadlineMs: 750,
+      maxCostUsd: 1,
+      runPrefix: "REAL-UNRESPONSIVE-DEADLINE",
+    });
+    assert.ok(Date.now() - startedAt < 5_000, "case deadlines must not wait forever for an unresponsive lane");
+    assert.ok(summary.variants.every((variant) => variant.cases.every((item) => item.failureCategory === "budget_exhausted" && item.providerDiagnostics.deadlineBeforeCompletion)));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
