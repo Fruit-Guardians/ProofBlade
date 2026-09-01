@@ -13,7 +13,9 @@ test("ledger claims in deterministic order and never reclaims terminal attempts"
     const ledger = await AblationRunLedger.create(join(root, "ledger.json"), experiment, [{ id: "case-b" }, { id: "case-a" }], () => "2026-08-31T00:00:00.000Z");
     assert.equal(ledger.next()?.caseId, "case-a");
     const first = await ledger.claim(ledger.next()!.pairingId, "run-a", () => "2026-08-31T00:00:01.000Z");
-    await ledger.complete(first.pairingId, "succeeded", undefined, () => "2026-08-31T00:00:02.000Z");
+    await ledger.complete(first.pairingId, "succeeded", undefined, () => "2026-08-31T00:00:02.000Z", { success: true, candidate: "secret", providerRequests: 1 });
+    const completed = (await AblationRunLedger.load(join(root, "ledger.json"))).snapshot().attempts[first.pairingId];
+    assert.deepEqual(completed?.result, { success: true, providerRequests: 1 });
     await assert.rejects(() => ledger.claim(first.pairingId, "run-again"), /terminal or running/);
     assert.equal(ledger.summary().succeeded, 1);
     const second = await ledger.claim(ledger.next()!.pairingId, "run-b");

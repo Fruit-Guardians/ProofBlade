@@ -2,7 +2,7 @@ import { Type } from "typebox";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core/node";
 import { snipText } from "@proofblade/molecules";
 import type { CodingResourceContext } from "./coding-resources.js";
-import type { WebToolHandler, WebRequestInput } from "../web/web-tools.js";
+import { WebToolHandler, type WebRequestInput } from "../web/web-tools.js";
 
 /**
  * Model-facing interactive web session tools.  They route to `context.webSession`,
@@ -66,7 +66,14 @@ const webRequestTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, params, signal, _onUpdate, context) {
     await gateInvestigation(context);
-    return webResult(await requireHandler(context).request(params as WebRequestInput, signal));
+    try {
+      return webResult(await requireHandler(context).request(params as WebRequestInput, signal));
+    } catch (error) {
+      if (WebToolHandler.requestPersistenceError(error)) {
+        return webResult({ error: "request_sent_result_unknown", message: "The HTTP request was sent. Durable local recording failed, so the remote outcome is unknown; do not blindly retry a non-idempotent request. Inspect the target or reconcile the exchange before retrying." }, true);
+      }
+      throw error;
+    }
   },
 };
 
@@ -81,7 +88,14 @@ const webReplayTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, params, signal, _onUpdate, context) {
     await gateInvestigation(context);
-    return webResult(await requireHandler(context).replay(params as WebRequestInput, signal));
+    try {
+      return webResult(await requireHandler(context).replay(params as WebRequestInput, signal));
+    } catch (error) {
+      if (WebToolHandler.requestPersistenceError(error)) {
+        return webResult({ error: "request_sent_result_unknown", message: "The replay HTTP request was sent, but durable local recording failed; the remote outcome is unknown. Do not blindly retry a non-idempotent request." }, true);
+      }
+      throw error;
+    }
   },
 };
 

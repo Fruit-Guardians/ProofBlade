@@ -343,10 +343,10 @@ export class SingleAgentCtfLoop {
     } finally {
       removeAbortListener?.();
       const results: PromiseSettledResult<void>[] = [];
-      if (abortPromise) results.push(...await Promise.allSettled([abortPromise]));
-      if (lane) results.push(...await Promise.allSettled([lane.close()]));
-      results.push(...await Promise.allSettled([runtime.close()]));
-      const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+      if (abortPromise) results.push(await settleWithTimeout(abortPromise, "coding lane abort"));
+      if (lane) results.push(await settleWithTimeout(lane.close(), "coding lane close"));
+      results.push(await settleWithTimeout(runtime.close(), "tool runtime close"));
+      const failures = results.flatMap((result) => result.status === "rejected" && !isCleanupTimeout(result.reason) ? [result.reason] : []);
       if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more run resources");
     }
     snapshot = await this.services.control.snapshot(options.runId);
@@ -516,6 +516,26 @@ export class SingleAgentCtfLoop {
       if ((await this.services.control.snapshot(runId)).status !== "PAUSED") throw error;
     }
   }
+}
+
+/** Cleanup must not extend a caller-owned deadline indefinitely. The original
+ * operation remains observed so a late rejection cannot become unhandled. */
+async function settleWithTimeout<T>(operation: Promise<T>, label: string, timeoutMs = 2_000): Promise<PromiseSettledResult<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const observed = operation.then(
+    (value) => ({ status: "fulfilled", value } as PromiseFulfilledResult<T>),
+    (reason) => ({ status: "rejected", reason } as PromiseRejectedResult),
+  );
+  const timeout = new Promise<PromiseRejectedResult>((resolve) => {
+    timer = setTimeout(() => resolve({ status: "rejected", reason: Object.assign(new Error(`${label} timed out after ${timeoutMs}ms`), { cleanupTimeout: true }) }), timeoutMs);
+  });
+  const result = await Promise.race([observed, timeout]);
+  if (timer) clearTimeout(timer);
+  return result;
+}
+
+function isCleanupTimeout(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { cleanupTimeout?: unknown }).cleanupTimeout === true;
 }
 
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {

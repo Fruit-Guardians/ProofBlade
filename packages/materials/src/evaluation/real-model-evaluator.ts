@@ -54,6 +54,11 @@ export interface RealModelEvaluationOptions {
   /** Reject corpora whose target files contain the expected answer literally. */
   requireAnswerLiteralsAbsent?: boolean;
   runOrder?: { mode: "interleaved" | "stratified"; seed?: number };
+  /** Restrict a resumable run to these immutable pairings. */
+  pairingFilter?: readonly { variantId: string; corpusCaseId: string; attempt: number }[];
+  /** Called immediately before and after each selected pairing. */
+  onCaseStart?: (pairing: { variantId: string; corpusCaseId: string; attempt: number; runId: string }) => Promise<void> | void;
+  onCaseComplete?: (result: RealModelEvaluationCase) => Promise<void> | void;
 }
 
 export interface RealModelEvaluationGatePolicy {
@@ -314,26 +319,36 @@ export class RealModelEvaluationRunner {
     const casesByVariant = new Map(variants.map((variant) => [variant.id, [] as RealModelEvaluationCase[]]));
     const servicesByVariant = new Map(variants.map((variant) => [variant.id, createServices(this.root, variant.config)]));
     try {
+      const selectedPairings = options.pairingFilter ? new Set(options.pairingFilter.map((item) => `${item.variantId}\u0000${item.corpusCaseId}\u0000${item.attempt}`)) : undefined;
       for (const item of evaluationOrder(variants, corpus.cases, attempts, options.runOrder)) {
         const variant = item.variant;
         const services = servicesByVariant.get(variant.id)!;
         const runId = `${runPrefix}-${variant.id}-${item.corpusCase.id}-a${item.attempt}`;
         assertRunId(runId);
+        if (selectedPairings && !selectedPairings.has(`${variant.id}\u0000${item.corpusCase.id}\u0000${item.attempt}`)) continue;
+        await options.onCaseStart?.({ variantId: variant.id, corpusCaseId: item.corpusCase.id, attempt: item.attempt, runId });
+        let result: RealModelEvaluationCase;
         if (useExperimentBudget && Date.now() >= experimentDeadlineAt) {
-          casesByVariant.get(variant.id)!.push(expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId));
+          result = expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId);
+          casesByVariant.get(variant.id)!.push(result);
+          await options.onCaseComplete?.(result);
           continue;
         }
         await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, item.corpusCase);
         const remainingExperimentDeadlineMs = useExperimentBudget ? experimentDeadlineAt - Date.now() : deadlineMs;
         if (useExperimentBudget && remainingExperimentDeadlineMs <= 0) {
-          casesByVariant.get(variant.id)!.push(expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId));
+          result = expiredEvaluationCase(variant.id, item.corpusCase, item.attempt, runId);
+          casesByVariant.get(variant.id)!.push(result);
+          await options.onCaseComplete?.(result);
           continue;
         }
         const caseDeadlineMs = useExperimentBudget
           ? Math.max(1, Math.min(perPairingDeadlineMs, remainingExperimentDeadlineMs))
           : deadlineMs;
         const task = realEvaluationTask(runId, item.corpusCase, this.root, variant.config, { maxCostUsd: perCaseMaxCostUsd, deadlineMs: caseDeadlineMs });
-        casesByVariant.get(variant.id)!.push(await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, caseDeadlineMs, variant.ablationPolicy, variant.ablationExperimentId));
+        result = await this.runCase(variant.id, item.corpusCase, item.attempt, runId, task, variant.config, services, maxTurns, caseDeadlineMs, variant.ablationPolicy, variant.ablationExperimentId);
+        casesByVariant.get(variant.id)!.push(result);
+        await options.onCaseComplete?.(result);
       }
     } finally {
       await Promise.all([...servicesByVariant.values()].map((services) => services.sandbox.close()));

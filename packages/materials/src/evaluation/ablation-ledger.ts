@@ -52,12 +52,12 @@ export class AblationRunLedger {
     });
   }
 
-  public async complete(pairingId: string, status: Extract<AblationAttemptRecord["status"], "succeeded" | "failed" | "cancelled">, error?: string, clock: () => string = () => new Date().toISOString()): Promise<AblationAttemptRecord> {
+  public async complete(pairingId: string, status: Extract<AblationAttemptRecord["status"], "succeeded" | "failed" | "cancelled">, error?: string, clock: () => string = () => new Date().toISOString(), result?: Record<string, unknown>): Promise<AblationAttemptRecord> {
     return await this.withLock(async () => {
       await this.refresh();
       const current = this.require(pairingId);
       if (current.status !== "running") throw new Error(`Ablation pairing ${pairingId} is not running`);
-      const updated = { ...current, status, finishedAt: clock(), ...(error === undefined ? {} : { error: redactError(error) }) };
+      const updated = { ...current, status, finishedAt: clock(), ...(error === undefined ? {} : { error: redactError(error) }), ...(result === undefined ? {} : { result: boundedResult(result) }) };
       this.document.attempts[pairingId] = updated;
       await this.persist();
       return { ...updated };
@@ -115,4 +115,10 @@ function redactError(error: string): string {
     .replace(/((?:api[_-]?key|token|cookie)\s*[:=]\s*)[^\s,;}]+/gi, "$1[REDACTED]")
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, "[REDACTED]")
     .slice(0, 2_000);
+}
+
+function boundedResult(result: Record<string, unknown>): Record<string, unknown> {
+  // Ledger recovery must never persist prompts, candidates, or provider bodies.
+  const allowed = ["corpusCaseId", "variantId", "attempt", "runId", "status", "success", "evidenceBacked", "candidateLeaked", "failureCategory", "providerRequests", "totalTokens", "contextTokens", "costUsd", "durationMs", "firstEvidenceMs"];
+  return Object.fromEntries(allowed.filter((key) => result[key] !== undefined).map((key) => [key, result[key]]));
 }

@@ -242,6 +242,32 @@ test("strict ablation mode allows shared Provider profiles when strategy fingerp
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("resumable evaluator filters pairings and emits start/complete callbacks in order", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-resume-"));
+  try {
+    const source = "resume fixture";
+    const expected = "flag{resume}";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({ schemaVersion: 1, id: "resume-corpus", cases: [corpusCase("resume-case", "target.bin", expected, source)] }), "utf8");
+    const events: string[] = [];
+    const summary = await new RealModelEvaluationRunner(root, solver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "baseline", config: config("alpha") }, { id: "candidate", config: config("beta") }],
+      allowLive: true,
+      requireProviderTraffic: false,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-RESUME",
+      pairingFilter: [{ variantId: "candidate", corpusCaseId: "resume-case", attempt: 1 }],
+      onCaseStart: ({ variantId, corpusCaseId, attempt, runId }) => { events.push(`start:${variantId}:${corpusCaseId}:${attempt}:${runId}`); },
+      onCaseComplete: (result) => { events.push(`complete:${result.variantId}:${result.corpusCaseId}:${result.attempt}`); },
+    });
+    assert.deepEqual(summary.variants.map((variant) => variant.cases.length), [0, 1]);
+    assert.deepEqual(events.map((event) => event.split(":").slice(0, 4).join(":")), ["start:candidate:resume-case:1", "complete:candidate:resume-case:1"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("real evaluation rejects two ids that point to the same provider profile", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-duplicate-profile-"));
   try {

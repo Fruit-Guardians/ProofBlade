@@ -5,7 +5,7 @@ import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { ExternalResourceRecord, ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateRequest } from "../recovery/session-runtime-wire.js";
-import { HttpSessionBackend } from "./http-session.js";
+import { HttpRequestPersistenceError, HttpSessionBackend } from "./http-session.js";
 import { hostMatches } from "../pwn/pwn-tools.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 
@@ -172,8 +172,16 @@ export class WebToolHandler {
       ...(input.headers ? { headers: input.headers } : {}),
       ...(input.body !== undefined ? { body: input.body } : {}),
     }, signal);
-    await this.recordExchange(input, resp, this.sessions.get(input.sessionId)?.baseUrl);
+    try {
+      await this.recordExchange(input, resp, this.sessions.get(input.sessionId)?.baseUrl);
+    } catch (error) {
+      throw new HttpRequestPersistenceError("HTTP request was sent, but web exchange domain recording failed; remote outcome is unknown.", error);
+    }
     return this.view(input.sessionId, resp);
+  }
+
+  public static requestPersistenceError(error: unknown): error is HttpRequestPersistenceError {
+    return error instanceof HttpRequestPersistenceError || (typeof error === "object" && error !== null && (error as { requestSent?: unknown }).requestSent === true);
   }
 
   /**
@@ -205,7 +213,11 @@ export class WebToolHandler {
         ...(input.headers ? { headers: input.headers } : {}),
         ...(input.body !== undefined ? { body: input.body } : {}),
       }, signal);
-      await this.recordExchange(input, resp, baseUrl, clean.sessionId);
+      try {
+        await this.recordExchange(input, resp, baseUrl, clean.sessionId);
+      } catch (error) {
+        throw new HttpRequestPersistenceError("Replay HTTP request was sent, but web exchange domain recording failed; remote outcome is unknown.", error);
+      }
       return this.view(clean.sessionId, resp);
     } finally {
       await clean.close("replay-complete").catch(() => undefined);

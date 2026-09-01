@@ -5,6 +5,7 @@ import {
   AblationRunLedger,
   RealModelEvaluationRunner,
   buildAblationReport,
+  ablationRecordsFromRealModelSummary,
   loadRealEvaluationCorpus,
   preflightAblationExperiment,
   renderAblationReportZh,
@@ -116,12 +117,19 @@ export class AblationService {
       this.activeRuns.add(experimentId);
       const corpus = await loadRealEvaluationCorpus(resolve(this.root, experiment.corpus.path));
       const ledgerPath = join(this.directory, `${experimentId}.ledger.json`);
+      let ledger: AblationRunLedger;
       try {
         await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
+        ledger = await AblationRunLedger.load(ledgerPath, experiment);
       } catch (error) {
         if ((error as { code?: string }).code !== "EEXIST" && !/already exists/.test(String(error))) { this.activeRuns.delete(experimentId); throw error; }
-        await AblationRunLedger.load(ledgerPath, experiment);
+        ledger = await AblationRunLedger.load(ledgerPath, experiment);
       }
+      // A GUI restart turns an orphaned claim into an explicit retryable
+      // unknown state before the next run claims only pending pairings.
+      await ledger.markInterrupted();
+      if (ledger.summary().running > 0) throw new Error("消融实验仍有运行中的 pairing，请确认旧进程已停止后再恢复");
+      if (!ledger.next()) throw new Error("消融实验没有待执行 pairing；请创建新的实验版本");
       await this.writeStatus(experimentId, { status: "running", startedAt });
       void this.run(experiment, startedAt).catch(async (error: unknown) => {
         await this.writeStatus(experimentId, { status: "failed", startedAt, finishedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) });
@@ -145,6 +153,10 @@ export class AblationService {
       };
       return { id: variant.id, strategyFingerprint: variant.policySnapshot.policyFingerprint, ablationPolicy: variant.policySnapshot.policy, ablationExperimentId: experiment.experimentId, config: variantConfig };
     });
+    const ledger = await AblationRunLedger.load(join(this.directory, `${experiment.experimentId}.ledger.json`), experiment);
+    const pending = Object.values(ledger.snapshot().attempts).filter((item) => item.status === "ready" || item.status === "unknown");
+    if (ledger.summary().running > 0) throw new Error("消融实验存在未恢复的运行中 pairing");
+    if (pending.length === 0) throw new Error("消融实验没有待执行 pairing；请创建新的实验版本");
     const summary = await new RealModelEvaluationRunner(this.root).run({
       corpusPath: resolve(this.root, experiment.corpus.path),
       variants,
@@ -159,8 +171,14 @@ export class AblationService {
       requireAnswerLiteralsAbsent: true,
       baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
       runOrder: experiment.runOrder,
+      pairingFilter: pending.map((pairing) => ({ variantId: pairing.variantId, corpusCaseId: pairing.caseId, attempt: pairing.attempt })),
+      onCaseStart: async ({ variantId, corpusCaseId, attempt, runId }) => {
+        await ledger.claim(`${experiment.experimentId}:${corpusCaseId}:${attempt}:${variantId}`, runId);
+      },
+      onCaseComplete: async (item) => {
+        await ledger.complete(`${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${item.variantId}`, item.success ? "succeeded" : "failed", item.error, undefined, item as unknown as Record<string, unknown>);
+      },
     });
-    await this.persistLedgerResults(experiment, summary);
     await writeFile(join(this.directory, `${experiment.experimentId}.results.json`), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
     await this.writeStatus(experiment.experimentId, { status: "completed", startedAt, finishedAt: new Date().toISOString() });
   }
@@ -186,22 +204,7 @@ export class AblationService {
     try {
       const experiment = await this.store.load(experimentId);
       const parsed = JSON.parse(await readFile(join(this.directory, `${experimentId}.results.json`), "utf8")) as RealModelEvaluationSummary;
-      const records: AblationResultRecord[] = parsed.variants.flatMap((variant) => variant.cases.map((item) => ({
-        pairingId: `${experimentId}:${item.corpusCaseId}:${item.attempt}:${variant.id}`,
-        variantId: variant.id,
-        caseId: item.corpusCaseId,
-        attempt: item.attempt,
-        success: item.success,
-        status: item.status,
-        durationMs: item.durationMs,
-        totalTokens: item.totalTokens,
-        costUsd: item.costUsd,
-        providerRequests: item.providerRequests,
-        contextTokens: item.contextTokens,
-        evidenceBacked: item.evidenceBacked,
-        candidateLeaked: item.candidateLeaked,
-        failureCategory: item.failureCategory,
-      })));
+      const records: AblationResultRecord[] = ablationRecordsFromRealModelSummary(experiment, parsed);
       const report = buildAblationReport(experiment, records);
       return { report, markdown: renderAblationReportZh(report) };
     } catch { return undefined; }
@@ -217,19 +220,6 @@ export class AblationService {
 
   private async writeStatus(experimentId: string, status: StatusFile): Promise<void> {
     await writeFile(join(this.directory, `${experimentId}.status.json`), `${JSON.stringify(status, null, 2)}\n`, "utf8");
-  }
-
-  private async persistLedgerResults(experiment: AblationExperimentSnapshot, summary: RealModelEvaluationSummary): Promise<void> {
-    const ledgerPath = join(this.directory, `${experiment.experimentId}.ledger.json`);
-    const ledger = await AblationRunLedger.load(ledgerPath, experiment);
-    for (const variant of summary.variants) for (const item of variant.cases) {
-      const pairingId = `${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${variant.id}`;
-      const current = ledger.snapshot().attempts[pairingId];
-      if (!current || (current.status !== "ready" && current.status !== "unknown")) continue;
-      const claimed = await ledger.claim(pairingId, item.runId, () => new Date().toISOString());
-      await ledger.complete(pairingId, item.success ? "succeeded" : "failed", item.error, () => new Date().toISOString());
-      void claimed;
-    }
   }
 
   private async markLedgerInterrupted(experimentId: string): Promise<void> {

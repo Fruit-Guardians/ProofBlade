@@ -37,6 +37,7 @@ import {
   AblationRunLedger,
   loadRealEvaluationCorpus,
   buildAblationReport,
+  ablationRecordsFromRealModelSummary,
   renderAblationReportZh,
   LocalHoldoutEvaluationRunner,
   anonymizeRunReplay,
@@ -245,22 +246,14 @@ async function main(): Promise<void> {
           if ((error as { code?: string }).code !== "ENOENT") throw error;
           ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
         }
-        // Claim the whole paired batch before any live request.  Recording
-        // outcomes only after the runner returned allowed two CLI processes to
-        // send the same provider traffic and left an interrupted run invisible
-        // to the ledger. A partial batch is not a valid ablation comparison;
-        // callers must explicitly `ablation resume` (which marks all running
-        // pairings unknown) before re-running the complete immutable snapshot.
+        // Claim and complete one pairing at a time. A process crash therefore
+        // leaves only the in-flight pairing unknown; terminal pairings remain
+        // durable and are skipped by the next resume.
         const pending = Object.values(ledger.snapshot().attempts).filter((item) => item.status === "ready" || item.status === "unknown");
         const ledgerSummary = ledger.summary();
-        if (pending.length !== ledgerSummary.total) {
-          throw new Error(`Ablation experiment has non-pending pairings (succeeded=${ledgerSummary.succeeded}, failed=${ledgerSummary.failed}, cancelled=${ledgerSummary.cancelled}, running=${ledgerSummary.running}). Create a new immutable experiment snapshot instead of mixing partial batches.`);
-        }
+        if (ledgerSummary.running > 0) throw new Error("Ablation experiment has running pairings; run `ablation resume` after confirming the previous process stopped.");
         if (pending.length === 0) throw new Error("Ablation experiment has no pending pairings; create a new immutable experiment snapshot for another run.");
         const ablationRunPrefix = option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`;
-        for (const pairing of pending) {
-          await ledger.claim(pairing.pairingId, `${ablationRunPrefix}-${pairing.variantId}-${pairing.caseId}-a${pairing.attempt}`);
-        }
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
@@ -292,13 +285,16 @@ async function main(): Promise<void> {
           requireAnswerLiteralsAbsent: true,
           baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
           runOrder: experiment.runOrder,
+          pairingFilter: pending.map((pairing) => ({ variantId: pairing.variantId, corpusCaseId: pairing.caseId, attempt: pairing.attempt })),
+          onCaseStart: async ({ variantId, corpusCaseId, attempt, runId }) => {
+            const pairingId = `${experiment.experimentId}:${corpusCaseId}:${attempt}:${variantId}`;
+            await ledger.claim(pairingId, runId);
+          },
+          onCaseComplete: async (item) => {
+            const pairingId = `${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${item.variantId}`;
+            await ledger.complete(pairingId, item.success ? "succeeded" : "failed", item.error, undefined, item as unknown as Record<string, unknown>);
+          },
         });
-        for (const variant of summary.variants) for (const item of variant.cases) {
-          const pairingId = `${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${variant.id}`;
-          const current = ledger.snapshot().attempts[pairingId];
-          if (!current || current.status !== "running") throw new Error(`Ablation pairing ${pairingId} was not claimed before evaluation`);
-          await ledger.complete(pairingId, item.success ? "succeeded" : "failed", item.error);
-        }
         print(summary);
         if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
         break;
@@ -320,7 +316,13 @@ async function main(): Promise<void> {
       if (action === "report") {
         const resultsPath = option(rest, "--results");
         const parsed = resultsPath ? JSON.parse(await readFile(resolve(root, resultsPath), "utf8")) as unknown : [];
-        const records = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" && Array.isArray((parsed as { records?: unknown }).records) ? (parsed as { records: unknown[] }).records : []);
+        const records = Array.isArray(parsed)
+          ? parsed
+          : parsed && typeof parsed === "object" && Array.isArray((parsed as { variants?: unknown }).variants)
+            ? ablationRecordsFromRealModelSummary(experiment, parsed as Parameters<typeof ablationRecordsFromRealModelSummary>[1])
+            : parsed && typeof parsed === "object" && Array.isArray((parsed as { records?: unknown }).records)
+              ? (parsed as { records: unknown[] }).records
+              : [];
         const report = buildAblationReport(experiment, records as Parameters<typeof buildAblationReport>[1]);
         if (rest.includes("--markdown")) console.log(renderAblationReportZh(report));
         else print(report);
