@@ -182,6 +182,26 @@ Next: 可执行的替代工具、参数、授权或复测动作
 - 结论：024 证明评测器能记录并隔离 Provider 首错，也提供了自动 Recall 可能减少请求的探索信号；它没有证明 Recall 提升成功率。正式确认需要至少 20 个不泄漏 Case、覆盖 long_context/recovery_required，并将 Provider error 单独分层。
 - 修复状态：上次 `RECALL-022` 的 deadline/并发槽位问题已由 PR #109 的 Lane abort 观察修复；024 没有重现 deadline starvation。下一轮若仍出现 502，应先做 Provider 稳定性分层或换同一 Provider 的稳定窗口，不修改 Recall 归因。
 
+### 5.3 Evidence Curation 通道复测：050 与 051
+
+#### `AB-TERRA-CURATION-050`：低成本 smoke
+
+- 固定条件：AIHub `openai-responses`、`gpt-5.6-terra`、`thinking=max`、同一 `terra-ablation-017` 语料、同一 Verifier 和安全边界；仅切换 `evidenceCuration=manual` / `advice`；每 Variant 1 次、2 turns、总 deadline 240 秒。
+- 预检：concrete model、Provider match、credential、pricing 和 `/models=200` 均通过。
+- 结果：manual `1/1`、4 requests、46,487 tokens、`$0.026519`、first Evidence `13,135ms`、62,234ms；advice `1/1`、6 requests、72,437 tokens、`$0.032501`、first Evidence `7,688ms`、60,585ms。两条均 evidence-backed、replay parity、零泄漏、effective action ratio=1。
+- 行为解释：两组都能在第一轮完成 `read -> bash -> verify_claim` 并由 hidden scorer 复现。advice 没有阻塞候选，但本次多 2 个 Provider 请求、成本高 `$0.005982`；first Evidence 更快约 5.4 秒。单题单次不足以判断整理建议是否真正减少整理成本，且 advice 的额外请求可能只是模型采样差异。
+- 结论级别：通道 smoke 通过；不作 curation 因果结论。下一步需要 3--5 attempts 和多类证据冲突任务。
+
+#### `AB-TERRA-CURATION-051`：三次配对复测
+
+- 固定条件：与 050 相同，`attempts=3`、`maxTurns=2`、总 deadline 900 秒；实验 fingerprint 为 `704fb9977c42135e8d28b8a923e254b54c0215868bd504bda6762650b8518f54`。
+- 结果：manual `3/3`，11 requests、129,849 tokens、`$0.076601`，平均 first Evidence `10,749ms`（p95 `14,801ms`）；advice `3/3`，11 requests、128,503 tokens、`$0.075255`，平均 first Evidence `7,801ms`（p95 `8,345ms`）。两组每个成功样本均 evidence-backed、replay parity、candidate leak=0、fact-evidence coverage=1。
+- 事件级行为：manual 的三条工具序列分别为 `glob -> read -> bash -> verify_claim`、`read -> bash -> verify_claim`、`read -> bash -> verify_claim`；advice 分别为 `read -> bash -> verify_claim`、`read -> bash -> verify_claim`、`bash -> read -> bash -> verify_claim`。六条轨迹均在第一轮到达 `verify_claim`，没有因 curation backlog 被阻断；advice 没有产生额外 `evidence` 整理调用。
+- 成功样本为什么好：成功轨迹都把候选交接放在整理之前，模型使用当前 Artifact 输出直接构造 verifier 命令；Verifier 产生独立 reproduction，Evidence 来源闭包和 replay parity 完整。advice 主要改变上下文可见的整理提示，没有把合法探索变成硬门。
+- 差异与限制：advice 相比 manual 少 1,346 tokens、低 `$0.001346`，平均 first Evidence 快约 2,947ms，p95 快约 6,456ms，但总 Provider 请求数相同，且只有一个 misc Case。这个过程差异可能由 `glob` 是否被调用、Provider 时延和采样轨迹造成，不能归因于 curation 本身。
+- 结论：051 证明 Evidence curation advice 在当前可直接验证任务上不会阻塞 `verify_claim`，并出现小幅过程收益信号；没有证明成功率或证据质量提升。正式确认必须使用至少 20 个 Case，覆盖 `evidence_conflict`、`long_context` 和 `recovery_required`，同时记录 curation backlog、annotation、promotion 和冲突保留数量。
+- 修复判断：本批没有发现需要修改的 curation 阻塞；保留现有 advisory gate。若后续任务出现整理后才允许验证的路径，应先修为“候选就绪优先”，并为该根因创建独立 PR。
+
 ## 6. 修复闭环与独立 PR 规则
 
 每个问题必须有自己的闭环记录：
