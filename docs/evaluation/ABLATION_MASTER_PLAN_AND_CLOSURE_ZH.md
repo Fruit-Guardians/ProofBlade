@@ -212,6 +212,18 @@ Next: 可执行的替代工具、参数、授权或复测动作
 - 结论级别：F08 机制有效性已确认，默认配置是 `duplicateFailure=advice`、`circuitBreaker=adaptive`，即提供提示而不是硬锁链；尚未证明真实 Terra 成功率、成本或 p95 改善。正式 live 实验必须使用会自然产生重复失败和恢复机会的 Web/Pwn/Reverse 语料，并将 Provider error 与模型重复分层。
 - 下一步：建立一个含“第一次探测失败、第二次改输入可成功”的不泄漏恢复 Case，比较 `record`、`advice` 和 `hard_stop`；验收同时看恢复成功、正确路径损失、重复调用数、尾部成本和拒绝反馈采纳率。
 
+### 5.5 F05/F06 上下文、Receipt、Recall、压缩与信息价值：机制消融 smoke
+
+- 固定条件：无 Provider、确定性 `ContextCompiler`、`ModelReceipt`、Recall 和信息价值估计器；命令 `node --import tsx --test packages/materials/tests/context.test.ts packages/materials/tests/model-receipt.test.ts packages/materials/tests/information-value.test.ts`。
+- 结果：24 个测试通过、0 失败。覆盖 stale generation 隔离、任务字段和 L3 ledger token 上限、观察队列隐藏项、上下文块隔离、snip/prune/compact 顺序、tool-call/result 成对保留、单调 Provider prefix、Receipt 有界预览与稳定 hash、path-only/secret 不泄漏、确定性候选选择、Recall 范围/Run/generation/sensitivity/hash 校验，以及 heuristic/PMI/VOI/posterior-EIG 的类型和校验。
+- 上下文选择差异：同一 18 条 Observation、22 条 Evidence、12 条观察队列在 `fixed_recent`、`receipt`、`deterministic_broker` 下分别选择 12、6、8 条 Observation；Evidence 保留窗口分别为 16、16、22 条；每种策略的 ContextManifest hash 不同，且策略字段被写入可回放的控制视图。该结果证明消融开关确实改变模型输入，而不是只改变标签。
+- Receipt/Recall 证据：大型结果被压成 head/tail preview 并保留 `pb://run/.../artifact/.../content`、内容 hash、projection hash 和 `nextActions`；path-only 或 secret receipt 不返回原文。Recall 对跨 Run、旧 generation、敏感 Artifact、越界 range 和完整内容 hash 不匹配分别返回结构化状态，不会静默读出错误内容。
+- 压缩/缓存证据：维护先 snip 再 prune，重新测量后才 compact；旧 Tool Call/Result 不会被拆开；新增 Tool 结果不会重写此前 Provider prefix。Context cache 的 prefix hash 和 dynamic hash 分离，动态 Evidence 不改变稳定 prefix，避免把“客户端 prefix 稳定”误写成 Provider 一定命中缓存。
+- 信息价值证据：heuristic 明确标记 `calibrated=false`，posterior EIG 在合法先验/似然下计算熵下降并拒绝非法分布，PMI/VOI/verified uplift 保留 estimator identity 和组成项。当前分数是排序/机制信号，不是模型真实收益或可信度。
+- 成功样本为什么好：策略变化只影响认知上下文投影，关键事实、Evidence 来源、Tool pair、generation fence 和安全控制保持可见；因此模型可以用较小上下文继续工作，同时通过 URI 恢复原文。
+- 坏样本与风险：仅有 path/summary 时模型可能不主动 Recall，过度 deterministic broker 可能裁掉关键 Observation，摘要若丢失命令或 source ID 会导致候选无法复现。当前机制测试只证明边界和可恢复性，没有真实 Terra 的长上下文采纳率、Recall 命中率或成本因果证据。
+- 结论级别：F05/F06 机制有效性已确认；不能据此声称 Recall、压缩、Receipt 或信息价值提高成功率。下一步建立至少 20 个 `long_context`、`recovery_required`、`evidence_conflict` Case，固定 Terra/max，分别比较 `manual/advice/automatic` Recall、`fixed_recent/receipt/broker` 选择和 compression off/query-aware，并用首次候选、Recall 采纳、关键事实保持和 replay parity 做验收。
+
 ## 6. 修复闭环与独立 PR 规则
 
 每个问题必须有自己的闭环记录：
