@@ -202,6 +202,16 @@ Next: 可执行的替代工具、参数、授权或复测动作
 - 结论：051 证明 Evidence curation advice 在当前可直接验证任务上不会阻塞 `verify_claim`，并出现小幅过程收益信号；没有证明成功率或证据质量提升。正式确认必须使用至少 20 个 Case，覆盖 `evidence_conflict`、`long_context` 和 `recovery_required`，同时记录 curation backlog、annotation、promotion 和冲突保留数量。
 - 修复判断：本批没有发现需要修改的 curation 阻塞；保留现有 advisory gate。若后续任务出现整理后才允许验证的路径，应先修为“候选就绪优先”，并为该根因创建独立 PR。
 
+### 5.4 F08 重复失败/无进展检测：机制消融 smoke
+
+- 固定条件：无 Provider、注入式 Tool/Observation 序列；命令 `node --import tsx --test packages/materials/tests/ablation-policy.test.ts packages/materials/tests/tool-repeat-breaker.test.ts packages/materials/tests/competition-convergence.test.ts`；Materials 构建同时通过。
+- 结果：41 个测试通过、0 失败。覆盖 `RepeatedToolFailureBreaker`（相同失败第 3 次终止）、`NoProgressToolBreaker`（相同只读观察第 3 次终止）、`ToolFailureStormBreaker`（不同失败第 4 次终止）、`ExperimentBudgetBreaker`（长运行/超时/实验族预算）、软提示不终止、硬模式终止、并发失败序列化，以及成功 mutation/evidence 重置无进展窗口。
+- 策略对照：相同 `duplicateFailure=true` 输入下，`record` 允许并记录，`advice` 返回建议但保留当前动作，`hard_stop` 终止当前路径；相同 `circuitBreakerTriggered=true` 输入下，`off` 允许、`adaptive/advice` 提示、`hard_stop` 终止。所有事件都保留 policy name、mode、reason code 和 outcome，便于回放。
+- 成功样本为什么好：当模型产生真实 workspace/evidence mutation 时，Breaker 清除旧的无进展计数；当只读结果重复时，系统只在阈值后终止并保留 Artifact/Evidence。因此“有新进展的手”不会被“眼睛重复看到同一内容”锁死。
+- 坏样本与修复风险：如果把 Provider 瞬态错误、不同输入或一次性 schema 错误误归为相同失败，会提前终止合法调查。现有实现通过输入和错误正文生成 repeat key，并将 Provider/环境首错单独记录；重复提示明确要求改变假设/输入或先记录 Evidence。该机制 smoke 没有发现错误分类回归。
+- 结论级别：F08 机制有效性已确认，默认配置是 `duplicateFailure=advice`、`circuitBreaker=adaptive`，即提供提示而不是硬锁链；尚未证明真实 Terra 成功率、成本或 p95 改善。正式 live 实验必须使用会自然产生重复失败和恢复机会的 Web/Pwn/Reverse 语料，并将 Provider error 与模型重复分层。
+- 下一步：建立一个含“第一次探测失败、第二次改输入可成功”的不泄漏恢复 Case，比较 `record`、`advice` 和 `hard_stop`；验收同时看恢复成功、正确路径损失、重复调用数、尾部成本和拒绝反馈采纳率。
+
 ## 6. 修复闭环与独立 PR 规则
 
 每个问题必须有自己的闭环记录：
