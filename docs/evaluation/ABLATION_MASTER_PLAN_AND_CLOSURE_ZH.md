@@ -223,6 +223,15 @@ Next: 可执行的替代工具、参数、授权或复测动作
 - 坏样本与风险：仅有 path/summary 时模型可能不主动 Recall，过度 deterministic broker 可能裁掉关键 Observation，摘要若丢失命令或 source ID 会导致候选无法复现。当前机制测试只证明边界和可恢复性，没有真实 Terra 的长上下文采纳率、Recall 命中率或成本因果证据。
 - 结论级别：F05/F06 机制有效性已确认；不能据此声称 Recall、压缩或 Receipt 提高成功率。下一步建立至少 20 个 `long_context`、`recovery_required`、`evidence_conflict` Case，固定 Terra/max，分别比较 `manual/advice/automatic` Recall、`fixed_recent/receipt/broker` 选择和 compression off/query-aware，并用首次候选、Recall 采纳、关键事实保持和 replay parity 做验收。
 
+### 5.6 F07 Information Value：机制消融 smoke
+
+- 固定条件：无 Provider，使用确定性信息价值估计器；命令 `node --import tsx --test packages/materials/tests/information-value.test.ts`。
+- 结果：3 个测试通过、0 失败。覆盖 heuristic、posterior EIG、PMI、Decision VOI 和 verified uplift 的 estimator identity、参数边界、先验/似然归一化、熵下降、置信区间和组成项。
+- 策略差异：`off` 不产生估计；`heuristic` 只输出未校准排序分（`calibrated=false`）；`pmi`、`decision_voi` 和 `verified_uplift` 保留各自的统计组成；`posterior_eig` 仅在至少两个假设、合法先验和完整 outcome likelihood 下计算。估计值不能提升 Evidence trust，也不能绕过 Verifier。
+- 成功样本为什么好：估计器保留“信息价值”和“可信度”的边界，模型可以按 novelty、evidence gap、预期效用和成本选择下一步，同时仍需通过真实 Artifact/Evidence 与独立 Verifier 证明结论。
+- 坏样本与风险：把 heuristic 分数当作校准 EIG、用缺失/未归一化似然计算后验，或把相似度当真实性，会导致错误排序和错误归因。现有测试主动拒绝这些输入，避免信息价值层成为隐形权限或验证器。
+- 结论级别：F07 机制契约已确认，尚无真实模型收益证据。下一步创建选择空间较大的 Web/Pwn/Reverse 语料，固定 Terra/max，比较 `informationValue=off` 与 `heuristic`，并记录候选动作、实际信息增益、有效动作比、成本和首错；`posterior_eig/decision_voi` 只在有明确假设分布的 Case 上使用。
+
 ## 6. 修复闭环与独立 PR 规则
 
 每个问题必须有自己的闭环记录：
