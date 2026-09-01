@@ -74,6 +74,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   toolBudget?: ToolCallBudget,
   firstActionBudget?: FirstActionBudget,
   ablationPolicy?: AblationPolicyBinding,
+  deferClaimAcceptance = false,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -109,6 +110,31 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         details: event.details,
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
+      const details = isRecord(event.details) ? event.details : {};
+      const verifierReady = event.toolName === "verify_claim" && details.verified === true;
+      if (verifierReady && ablationPolicy) {
+        const policyEvent = ablationPolicy.controller.decide({
+          experimentId: ablationPolicy.experimentId,
+          variantId: ablationPolicy.variantId,
+          caseId: ablationPolicy.caseId,
+          attempt: ablationPolicy.attempt,
+          runId: ablationPolicy.runId,
+          turn: ablationPolicy.turn?.() ?? 1,
+          requestedAction: "tool_result",
+          requestedTool: event.toolName,
+          stopSuggested: true,
+          reasonInputs: { toolName: event.toolName, verified: true, completionId: typeof details.completionId === "string" ? details.completionId : "" },
+        });
+        void ablationPolicy.onDecision?.(policyEvent);
+        if (policyEvent.decision === "advise") {
+          return {
+            content: [...event.content, { type: "text" as const, text: stopSuggestionMessage(policyEvent.policyMode) }],
+            details: { ...details, stopSuggestion: true, stopSuggestionMode: policyEvent.policyMode },
+            isError: false,
+            ...(deferClaimAcceptance ? { terminate: true } : {}),
+          };
+        }
+      }
       const experiment = experimentBudgetBreaker?.observe(observation);
       if (experiment?.terminate) {
         if (termination.continuousRecovery) {
