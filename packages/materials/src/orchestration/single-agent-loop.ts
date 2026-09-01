@@ -223,7 +223,12 @@ export class SingleAgentCtfLoop {
         activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
-        const agentOutcome = await lane.prompt(turnPrompt(turnContext, turns, activeIntent, options.userPrompt));
+        // Lane.abort() is cooperative: a provider transport or tool process can
+        // ignore it while its prompt promise remains pending. Do not make the
+        // Run deadline merely advisory by waiting forever for that promise. The
+        // abort listener above still asks the lane to release its resources;
+        // this race only lets the durable loop terminalize and proceed.
+        const agentOutcome = await awaitWithAbort(lane.prompt(turnPrompt(turnContext, turns, activeIntent, options.userPrompt)), options.signal);
         await options.onTurn?.(agentOutcome);
         throwIfAborted(options.signal);
         if (agentOutcome.termination === "budget_exhausted" || agentOutcome.termination === "deadline_exhausted") {
@@ -616,4 +621,20 @@ async function exists(path: string): Promise<boolean> {
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
   throw signal.reason instanceof Error ? signal.reason : new Error("Run aborted");
+}
+
+/**
+ * Make caller-owned cancellation observable even when a Lane never settles its
+ * prompt promise after `abort()`. The original promise has rejection handling
+ * through this wrapper, so a late Provider/tool failure cannot become an
+ * unhandled rejection after the Run has already reached its terminal state.
+ */
+function awaitWithAbort<T>(pending: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return pending;
+  if (signal.aborted) return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error("Run aborted"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason instanceof Error ? signal.reason : new Error("Run aborted"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    void pending.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
