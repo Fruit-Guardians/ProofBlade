@@ -164,6 +164,24 @@ Next: 可执行的替代工具、参数、授权或复测动作
 
 **好但不可外推样本：IDALIB/OBJDUMP。** Terra 在收到 Qt/PySide 缺失的明确拒绝后采纳 `Next`，调用受 scope 限制的 `binary_disassemble` 并获得真实代码观察。这证明反馈和 fallback 可消费；如果后续 Provider error、预算或样本不足，则只能说“恢复路径可达”，不能说“逆向成功率提升”。
 
+### 5.2 Recall 通道复测：023 与 024
+
+#### `AB-TERRA-RECALL-023`：低成本 smoke（可用通道，不能作因果结论）
+
+- 固定条件：AIHub `openai-responses`、`gpt-5.6-terra`、`thinking=max`、同一 `terra-ablation-017` 语料、同一 Verifier 和安全边界；只切换 `recall=manual` / `recall=automatic`；每 Variant 1 次、2 turns、总 deadline 240 秒。
+- 预检：concrete model、Provider match、credential、pricing 和 `/models` 均通过（`200`）；估计最多 4 个 Provider 请求。
+- 结果：baseline `1/1`、5 requests、59,164 tokens、`$0.045852`、first Evidence `7,238ms`、89,047ms；automatic `1/1`、3 requests、35,193 tokens、`$0.035193`、first Evidence `8,132ms`、27,979ms。两条均 `evidence-backed=true`、`replayParity=true`、`candidateLeak=false`，有效动作比均为 `1.0`。
+- 解释：automatic 少 2 次请求、约 `$0.010659` 和 61 秒，但单题单次差异可能来自模型轨迹/Provider 时延；没有看到足够的跨轮 Recall 命中与采纳证据。因此只能证明通道、Verifier 交接和遥测可用，不能宣布自动 Recall 更好。
+
+#### `AB-TERRA-RECALL-024`：三次配对复测（探索性，受 Provider 波动污染）
+
+- 固定条件：与 023 相同，`attempts=3`、`maxTurns=2`、总 deadline 900 秒；实验 fingerprint 为 `cf7b5fd23fac66fc12816cdd2bcac5a9926400d72147efa5f85d8d5dd8433d48`。
+- 完整结果：baseline `3/3`，11 requests，127,874 tokens，`$0.114562`，平均 first Evidence `6,922ms`；automatic `2/3`，9 requests，92,556 tokens，`$0.089484`，平均 first Evidence `7,896ms`。所有成功样本均 evidence-backed、replay parity、零泄漏；automatic 的失败样本为 `provider_error`，不是 budget、tool schema、Harness policy 或 Verifier failure。
+- 首错证据：`ABLATION-AB-TERRA-RECALL-024-candidate-terra-case-1-a1` 在第一轮 `provider_request_started` 后收到 AIHub `502`，随后出现 3 次 Provider retry 和 `provider_recovery_required`，`toolCallCount=0`，最终 `run_failed(failureCategory=provider_error)`。正确调查路径尚未被模型看到，因此该样本不能计入 Recall 的能力失败。
+- 可比较分母：排除这 1 个 Provider 污染样本后，baseline `3/3`、automatic `2/2`；两组成功样本的有效动作比、事实证据覆盖和重放一致性均相同。automatic 少 2 个请求、低约 `$0.025078` 总成本，但 first Evidence 平均慢约 `973ms`，且样本仍只有一个 misc Case。
+- 结论：024 证明评测器能记录并隔离 Provider 首错，也提供了自动 Recall 可能减少请求的探索信号；它没有证明 Recall 提升成功率。正式确认需要至少 20 个不泄漏 Case、覆盖 long_context/recovery_required，并将 Provider error 单独分层。
+- 修复状态：上次 `RECALL-022` 的 deadline/并发槽位问题已由 PR #109 的 Lane abort 观察修复；024 没有重现 deadline starvation。下一轮若仍出现 502，应先做 Provider 稳定性分层或换同一 Provider 的稳定窗口，不修改 Recall 归因。
+
 ## 6. 修复闭环与独立 PR 规则
 
 每个问题必须有自己的闭环记录：
