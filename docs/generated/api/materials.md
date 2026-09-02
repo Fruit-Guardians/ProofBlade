@@ -3,8 +3,8 @@
 # @proofblade/materials API Index
 
 - Package: `@proofblade/materials`
-- Module hashes: 162
-- Symbols: 1727
+- Module hashes: 163
+- Symbols: 1739
 
 ## Public Symbols
 
@@ -2068,6 +2068,51 @@
 - Summary: Inferred summary: create trajectory prefix operation used to produce a deterministic value.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/runtime-contracts.test.ts`
+
+### estimateDecisionVoi
+- Kind: `function`
+- Signature: `(input: DecisionVoiInput): InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:58](../../../packages/materials/src/evaluation/information-value.ts:58)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: estimate decision voi operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/information-value.test.ts`
+
+### estimateHeuristicInformation
+- Kind: `function`
+- Signature: `(input: HeuristicInformationInput): InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:18](../../../packages/materials/src/evaluation/information-value.ts:18)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: estimate heuristic information operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/information-value.test.ts`
+
+### estimatePmi
+- Kind: `function`
+- Signature: `(input: PmiInput): InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:25](../../../packages/materials/src/evaluation/information-value.ts:25)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: estimate pmi operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/information-value.test.ts`
+
+### estimatePosteriorEIG
+- Kind: `function`
+- Signature: `(hypotheses: readonly PosteriorHypothesis[]): InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:33](../../../packages/materials/src/evaluation/information-value.ts:33)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: estimate posterior eig operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/information-value.test.ts`
+
+### estimateVerifiedUplift
+- Kind: `function`
+- Signature: `(input: VerifiedUpliftInput): InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:69](../../../packages/materials/src/evaluation/information-value.ts:69)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: estimate verified uplift operation used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/information-value.test.ts`
 
 ### compareEvaluationAttempts
 - Kind: `function`
@@ -4701,7 +4746,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: evidence type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation-policy.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation-policy.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/information-value.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ExperimentRecord
 - Kind: `interface`
@@ -5379,6 +5424,54 @@
 - Source: [src/evaluation/fixture-evaluator.ts:71](../../../packages/materials/src/evaluation/fixture-evaluator.ts:71)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture evaluation summary type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### DecisionVoiInput
+- Kind: `interface`
+- Signature: `DecisionVoiInput`
+- Source: [src/evaluation/information-value.ts:57](../../../packages/materials/src/evaluation/information-value.ts:57)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: decision voi input type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### HeuristicInformationInput
+- Kind: `interface`
+- Signature: `HeuristicInformationInput`
+- Source: [src/evaluation/information-value.ts:17](../../../packages/materials/src/evaluation/information-value.ts:17)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: heuristic information input type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### InformationValueEstimate
+- Kind: `interface`
+- Signature: `InformationValueEstimate`
+- Source: [src/evaluation/information-value.ts:5](../../../packages/materials/src/evaluation/information-value.ts:5)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: information value estimate type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### PmiInput
+- Kind: `interface`
+- Signature: `PmiInput`
+- Source: [src/evaluation/information-value.ts:24](../../../packages/materials/src/evaluation/information-value.ts:24)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: pmi input type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### PosteriorHypothesis
+- Kind: `interface`
+- Signature: `PosteriorHypothesis`
+- Source: [src/evaluation/information-value.ts:32](../../../packages/materials/src/evaluation/information-value.ts:32)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: posterior hypothesis type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### VerifiedUpliftInput
+- Kind: `interface`
+- Signature: `VerifiedUpliftInput`
+- Source: [src/evaluation/information-value.ts:68](../../../packages/materials/src/evaluation/information-value.ts:68)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: verified uplift input type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### LocalHoldoutEvaluationOptions
@@ -10583,7 +10676,7 @@
 - Export: `@proofblade/materials`
 - Summary: 计算 Intent 总分
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-evaluation-gates.test.ts`, `packages/materials/tests/update-proposals.test.ts`
+- Tests: `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/information-value.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-evaluation-gates.test.ts`, `packages/materials/tests/update-proposals.test.ts`
 
 ### IntentScorer.scoreAndRank
 - Kind: `method`
@@ -14156,6 +14249,14 @@
 - Source: [src/evaluation/fixture-evaluator.ts:24](../../../packages/materials/src/evaluation/fixture-evaluator.ts:24)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: evaluation failure category type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### InformationEstimatorKind
+- Kind: `type`
+- Signature: `InformationEstimatorKind`
+- Source: [src/evaluation/information-value.ts:3](../../../packages/materials/src/evaluation/information-value.ts:3)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: information estimator kind type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### EvaluationOutcome
