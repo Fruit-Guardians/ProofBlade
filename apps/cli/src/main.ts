@@ -234,7 +234,7 @@ async function main(): Promise<void> {
       }
       if (action === "status" || action === "resume") {
         const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
-        const ledger = await AblationRunLedger.load(ledgerPath);
+        const ledger = await AblationRunLedger.load(ledgerPath, experiment);
         if (action === "resume") await ledger.markInterrupted();
         print({ experimentId: experiment.experimentId, ...(action === "resume" ? { recovered: true } : {}), next: ledger.next(), summary: ledger.summary() });
         break;
