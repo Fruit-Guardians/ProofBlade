@@ -255,6 +255,7 @@ function validateVariants(value: unknown, model: AblationModelSnapshot, profile?
     if (modelOverride?.model && modelOverride.model !== model.model) throw new Error(`Variant ${id} changes the concrete model; strict ablation variants must share one model`);
     const changedFactors = policyDiff(policy);
     const multiFactor = raw.multiFactor === true || changedFactor === "composite" || changedFactors.length > 1;
+    if (changedFactor !== "none" && changedFactors.length === 0) throw new Error(`Variant ${id} declares ${changedFactor} but does not change any ablation policy`);
     if (changedFactor !== "none" && changedFactor !== "composite" && changedFactors.some((item) => item !== changedFactor)) throw new Error(`Variant ${id} changes ${changedFactors.join(", ")} but declares ${changedFactor}`);
     if (changedFactor === "composite" && !multiFactor) throw new Error(`Variant ${id} must set multiFactor for composite experiments`);
     const variantModel = modelOverride ? snapshotModel({ profileId: model.profileId, model: modelOverride.model ?? model.model, thinkingLevel: modelOverride.thinkingLevel ?? model.thinkingLevel, contextWindow: model.contextWindow, maxTokens: model.maxTokens }, profile) : model;

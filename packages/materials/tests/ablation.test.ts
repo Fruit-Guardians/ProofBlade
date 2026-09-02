@@ -47,6 +47,7 @@ test("rejects auto model, duplicate baselines, policy mismatch and disabled safe
   assert.throws(() => validateAblationExperiment(input({ model: { profileId: "relay-a", model: "auto" } }), profile), /concrete model/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], baseline: true }] }), profile), /exactly one baseline/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], changedFactor: "recall" }] }), profile), /declares recall/);
+  assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { id: "noop", name: "No-op", changedFactor: "recall", policy: {} }] }), profile), /does not change any ablation policy/);
   assert.throws(() => validateAblationExperiment(input({ safety: { verifierCompletion: "disabled" } }), profile), /cannot be disabled/);
 });
 
