@@ -91,7 +91,7 @@
     "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+    "src/orchestration/single-agent-loop.ts": "8bbd6f110166ed29efbd84ba2226671d78cac1b8807453be1c00a944d187d166",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -22040,6 +22040,7 @@
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -23501,6 +23502,7 @@
         "packages/materials/tests/session-resource-adapter.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -34752,6 +34754,7 @@
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
       ],
       "structureHash": "62fc3d10ced8566c126d47c449394f6a7f5ad9c855b43f096d1b5b973a2e07bc",
@@ -35078,6 +35081,7 @@
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
       ],
       "structureHash": "ea3c6a894069014f845877c86a1975272f842ff80b0df40500cc6998a64d3b2b",
@@ -35217,7 +35221,7 @@
         "packages/materials/tests/web-tools.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ],
-      "structureHash": "ccb9d9db66e6eb3336fe1b252cf8ae4c6b26e3d4c65b197e21eb0d842154b981",
+      "structureHash": "92b9eb14425f7bc3bfb12e6a151032f78c096cebccb6dce230e52333a061f08f",
       "parentId": "@proofblade/materials::class::SingleAgentCtfLoop"
     },
     {
