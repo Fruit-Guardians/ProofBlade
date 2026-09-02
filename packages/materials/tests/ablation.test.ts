@@ -106,3 +106,16 @@ test("experiment store persists immutable snapshots and rejects tampering", asyn
     await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("experiment store ignores mutable ledger, results, and status projections", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-store-list-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const experiment = validateAblationExperiment(input(), profile);
+    await store.save(experiment);
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.ledger.json`), JSON.stringify({ schemaVersion: 1, attempts: {} }));
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.results.json`), JSON.stringify({ variants: [] }));
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.status.json`), JSON.stringify({ status: "running" }));
+    assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
