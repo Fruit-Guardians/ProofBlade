@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 162
-- Symbols: 1725
+- Symbols: 1727
 
 ## Public Symbols
 
@@ -276,7 +276,7 @@
 ### ContextCompiler
 - Kind: `class`
 - Signature: `ContextCompiler`
-- Source: [src/context/compiler.ts:19](../../../packages/materials/src/context/compiler.ts:19)
+- Source: [src/context/compiler.ts:21](../../../packages/materials/src/context/compiler.ts:21)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context compiler class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1073,16 +1073,34 @@
 ### MAX_LEDGER_BLOCK_TOKENS
 - Kind: `constant`
 - Signature: `10000`
-- Source: [src/context/compiler.ts:11](../../../packages/materials/src/context/compiler.ts:11)
+- Source: [src/context/compiler.ts:13](../../../packages/materials/src/context/compiler.ts:13)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max ledger block tokens constant used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/context.test.ts`
+
+### MAX_PHASE_LAYER_TOKENS
+- Kind: `constant`
+- Signature: `2048`
+- Source: [src/context/compiler.ts:12](../../../packages/materials/src/context/compiler.ts:12)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: max phase layer tokens constant used to provide a reusable operation.
+- Summary source: `inferred`
+- Tests: `packages/materials/tests/context.test.ts`
+
+### MAX_STANDING_LAYER_TOKENS
+- Kind: `constant`
+- Signature: `4096`
+- Source: [src/context/compiler.ts:10](../../../packages/materials/src/context/compiler.ts:10)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: max standing layer tokens constant used to provide a reusable operation.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/context.test.ts`
 
 ### MAX_TASK_LAYER_TOKENS
 - Kind: `constant`
 - Signature: `4096`
-- Source: [src/context/compiler.ts:10](../../../packages/materials/src/context/compiler.ts:10)
+- Source: [src/context/compiler.ts:11](../../../packages/materials/src/context/compiler.ts:11)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max task layer tokens constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1091,7 +1109,7 @@
 ### PROOFBLADE_STANDING_INSTRUCTIONS
 - Kind: `constant`
 - Signature: `string`
-- Source: [src/context/compiler.ts:12](../../../packages/materials/src/context/compiler.ts:12)
+- Source: [src/context/compiler.ts:14](../../../packages/materials/src/context/compiler.ts:14)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: proofblade standing instructions constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1686,17 +1704,17 @@
 
 ### contextText
 - Kind: `function`
-- Signature: `(output: ContextBuildOutput): string`
-- Source: [src/context/compiler.ts:613](../../../packages/materials/src/context/compiler.ts:613)
+- Signature: `(output: ContextBuildOutput, maxTokens?: number): string`
+- Source: [src/context/compiler.ts:620](../../../packages/materials/src/context/compiler.ts:620)
 - Export: `@proofblade/materials`
-- Summary: Inferred summary: context text operation used to provide a reusable operation.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/handoff.test.ts`
+- Summary: Render the compiler output for providers that accept one system prompt.
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/handoff.test.ts`
 
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:617](../../../packages/materials/src/context/compiler.ts:617)
+- Source: [src/context/compiler.ts:625](../../../packages/materials/src/context/compiler.ts:625)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9355,7 +9373,7 @@
 ### ContextCompiler.build
 - Kind: `method`
 - Signature: `(input: ContextBuildInput): ContextBuildOutput`
-- Source: [src/context/compiler.ts:20](../../../packages/materials/src/context/compiler.ts:20)
+- Source: [src/context/compiler.ts:22](../../../packages/materials/src/context/compiler.ts:22)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`

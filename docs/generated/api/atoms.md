@@ -76,11 +76,10 @@
 ### estimateTokens
 - Kind: `function`
 - Signature: `(value: string): number`
-- Source: [src/value.ts:43](../../../packages/atoms/src/value.ts:43)
+- Source: [src/value.ts:49](../../../packages/atoms/src/value.ts:49)
 - Export: `@proofblade/atoms`
-- Summary: Estimate token count with a bounded character-based approximation.
+- Summary: Return a conservative upper bound for UTF-8 tokenizer input.
 - Summary source: `tsdoc`
-- Tags: `invariant`
 
 ### sha256
 - Kind: `function`

@@ -8,7 +8,7 @@
     "src/storage/atomic.ts": "19bad46fb1c1bdc500c6e9bcacf98d1c92a5327e8956b8522729f5150ba798f9",
     "src/storage/file-lock.ts": "3827a3b482b9519cfd5157fb508fe72c2ca8293202825cdcc9b6979b138908e2",
     "src/storage/operation-queue.ts": "f90a7e642c7fea1d157d2301dc1854118828d5ebe4005cd593dfdd4723297f3a",
-    "src/value.ts": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b"
+    "src/value.ts": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5"
   },
   "instructions": [
     "Prefer an existing canonical export before adding a new helper.",
@@ -120,7 +120,7 @@
       "exportPath": "@proofblade/atoms",
       "module": "src/value.ts",
       "line": 23,
-      "moduleHash": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b",
+      "moduleHash": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5",
       "testRefs": [
         "packages/atoms/tests/atoms.test.ts"
       ]
@@ -141,7 +141,7 @@
       "exportPath": "@proofblade/atoms",
       "module": "src/value.ts",
       "line": 7,
-      "moduleHash": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b",
+      "moduleHash": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5",
       "testRefs": []
     },
     {
@@ -149,18 +149,13 @@
       "name": "estimateTokens",
       "kind": "function",
       "signature": "(value: string): number",
-      "summary": "Estimate token count with a bounded character-based approximation.",
+      "summary": "Return a conservative upper bound for UTF-8 tokenizer input.",
       "summarySource": "tsdoc",
-      "tags": [
-        {
-          "name": "invariant",
-          "text": "This is not an exact provider tokenizer count."
-        }
-      ],
+      "tags": [],
       "exportPath": "@proofblade/atoms",
       "module": "src/value.ts",
-      "line": 43,
-      "moduleHash": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b",
+      "line": 49,
+      "moduleHash": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5",
       "testRefs": []
     },
     {
@@ -179,7 +174,7 @@
       "exportPath": "@proofblade/atoms",
       "module": "src/value.ts",
       "line": 15,
-      "moduleHash": "91e884dc394af4dfa4a7374ace3228bac36536696a1ca88a66807c4d3b22422b",
+      "moduleHash": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5",
       "testRefs": [
         "packages/atoms/tests/atoms.test.ts"
       ]

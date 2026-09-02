@@ -32,7 +32,7 @@
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
     "src/context/agent-pruner.ts": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
     "src/context/checkpoint.ts": "2f3f775ce80a274cd4972399a89ff745e75e065cb0f376f0f38a7a2f0899574b",
-    "src/context/compiler.ts": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+    "src/context/compiler.ts": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
     "src/context/model-receipt.ts": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
@@ -672,8 +672,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 19,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 21,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
@@ -2181,7 +2181,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 8,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": []
     },
     {
@@ -2195,7 +2195,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
       "line": 9,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": []
     },
     {
@@ -2208,8 +2208,40 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 11,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 13,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
+      "testRefs": [
+        "packages/materials/tests/context.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::constant::MAX_PHASE_LAYER_TOKENS",
+      "name": "MAX_PHASE_LAYER_TOKENS",
+      "kind": "constant",
+      "signature": "2048",
+      "summary": "Inferred summary: max phase layer tokens constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/compiler.ts",
+      "line": 12,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
+      "testRefs": [
+        "packages/materials/tests/context.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::constant::MAX_STANDING_LAYER_TOKENS",
+      "name": "MAX_STANDING_LAYER_TOKENS",
+      "kind": "constant",
+      "signature": "4096",
+      "summary": "Inferred summary: max standing layer tokens constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/compiler.ts",
+      "line": 10,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2224,8 +2256,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 10,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 11,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -2240,8 +2272,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 12,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 14,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": []
     },
     {
@@ -3373,15 +3405,16 @@
       "id": "@proofblade/materials::function::contextText",
       "name": "contextText",
       "kind": "function",
-      "signature": "(output: ContextBuildOutput): string",
-      "summary": "Inferred summary: context text operation used to provide a reusable operation.",
-      "summarySource": "inferred",
+      "signature": "(output: ContextBuildOutput, maxTokens?: number): string",
+      "summary": "Render the compiler output for providers that accept one system prompt.",
+      "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 613,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 620,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": [
+        "packages/materials/tests/context.test.ts",
         "packages/materials/tests/handoff.test.ts"
       ]
     },
@@ -3395,8 +3428,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 617,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 625,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": []
     },
     {
@@ -19852,8 +19885,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/compiler.ts",
-      "line": 20,
-      "moduleHash": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
+      "line": 22,
+      "moduleHash": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
