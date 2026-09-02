@@ -48,6 +48,11 @@ export interface RealModelEvaluationOptions {
   requiredTargetKinds?: readonly TargetKind[];
   /** Reject corpora whose target files contain the expected answer literally. */
   requireAnswerLiteralsAbsent?: boolean;
+  /** Restrict a resumable evaluation to immutable pairings. */
+  pairingFilter?: readonly { variantId: string; corpusCaseId: string; attempt: number }[];
+  /** Durable hooks around each selected pairing. */
+  onCaseStart?: (pairing: { variantId: string; corpusCaseId: string; attempt: number; runId: string }) => Promise<void> | void;
+  onCaseComplete?: (result: RealModelEvaluationCase) => Promise<void> | void;
 }
 
 export interface RealModelEvaluationGatePolicy {
@@ -298,13 +303,18 @@ export class RealModelEvaluationRunner {
       const services = createServices(this.root, variant.config);
       const cases: RealModelEvaluationCase[] = [];
       try {
+        const selectedPairings = options.pairingFilter ? new Set(options.pairingFilter.map((item) => `${item.variantId}\u0000${item.corpusCaseId}\u0000${item.attempt}`)) : undefined;
         for (const corpusCase of corpus.cases) {
           for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            if (selectedPairings && !selectedPairings.has(`${variant.id}\u0000${corpusCase.id}\u0000${attempt}`)) continue;
             const runId = `${runPrefix}-${variant.id}-${corpusCase.id}-a${attempt}`;
             assertRunId(runId);
+            await options.onCaseStart?.({ variantId: variant.id, corpusCaseId: corpusCase.id, attempt, runId });
             await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, corpusCase);
             const task = realEvaluationTask(runId, corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
-            cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs));
+            const result = await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs);
+            cases.push(result);
+            await options.onCaseComplete?.(result);
           }
         }
       } finally {
