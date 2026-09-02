@@ -57,7 +57,7 @@
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
-    "src/evaluation/ablation.ts": "fec2b53e2bd3f7831f7bd686fba0d95f638a7a0a862d44d0673eb6cb44650b3b",
+    "src/evaluation/ablation.ts": "baec98a6cb4dc2b96050e4be85703f828d6d8329870c8df130843fb7d13df4af",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
@@ -1090,7 +1090,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 283,
+      "line": 291,
       "signature": "AblationExperimentStore",
       "summary": "Inferred summary: ablation experiment store class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -5753,7 +5753,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 321,
+      "line": 329,
       "signature": "(experiment: Pick<AblationExperimentSnapshot, \"experimentId\" | \"variants\" | \"runOrder\" | \"budget\">, cases: readonly AblationCaseRef[]): AblationPairing[]",
       "summary": "Inferred summary: build ablation pairings operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -5794,7 +5794,7 @@
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ],
-      "structureHash": "654dc0f59d896776753293c7508e4a4383b6bb575df54277c05cf816665d4445"
+      "structureHash": "222a6d9dbd46605462e41c16315817578ddb491b7bd60a7eb0dcbb4d7a774d7e"
     },
     {
       "id": "@proofblade/materials::function::probeAblationProvider",
@@ -5803,7 +5803,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 269,
+      "line": 277,
       "signature": "(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch?: typeof globalThis.fetch): Promise<AblationProviderProbe>",
       "summary": "Probe only the model-discovery endpoint; task content is never sent.",
       "summarySource": "tsdoc",
@@ -5817,7 +5817,7 @@
         "node:path"
       ],
       "testRefs": [],
-      "structureHash": "daf1bccc973abd0028772851bac45acec182d7c38e96e5438a42198f4f665f74"
+      "structureHash": "e32c585aba3c07546fb0fc87418e27b8814c7b97bd3f9cda50b67c5efe7d7881"
     },
     {
       "id": "@proofblade/materials::function::snapshotModel",
@@ -5840,7 +5840,7 @@
         "node:path"
       ],
       "testRefs": [],
-      "structureHash": "97c4c3adbab7b1b45423e317c2dbceadbb6cf4921306bb5b49d86c9cf602e265"
+      "structureHash": "ea3cc90d155cf3cab8d6ae5ec05602a2c8fdfbccee6fffb2fd4dd354f9441246"
     },
     {
       "id": "@proofblade/materials::function::validateAblationExperiment",
@@ -14672,7 +14672,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 266,
+      "line": 274,
       "signature": "AblationProviderProbe",
       "summary": "Inferred summary: ablation provider probe type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -24230,6 +24230,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -24387,6 +24388,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -31023,7 +31025,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 300,
+      "line": 308,
       "signature": "(): Promise<Array<Pick<AblationExperimentSnapshot, \"experimentId\" | \"name\" | \"experimentFingerprint\">>>",
       "summary": "Inferred summary: list operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -31084,7 +31086,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 294,
+      "line": 302,
       "signature": "(experimentId: string): Promise<AblationExperimentSnapshot>",
       "summary": "Inferred summary: load operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -31155,7 +31157,7 @@
       "visibility": "public",
       "module": "src/evaluation/ablation.ts",
       "exportPath": "@proofblade/materials",
-      "line": 285,
+      "line": 293,
       "signature": "(experiment: AblationExperimentSnapshot): Promise<string>",
       "summary": "Inferred summary: save operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -42232,6 +42234,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",

@@ -230,7 +230,7 @@ export function snapshotModel(input: AblationModelInput, profile?: ModelProfileC
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
     ...(input.sampling === undefined ? {} : { sampling: input.sampling }), contextWindow: input.contextWindow ?? resolved.contextWindow, maxTokens: input.maxTokens ?? resolved.maxTokens,
   } as Omit<AblationModelSnapshot, "profileFingerprint">;
-  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: resolved.contextWindow, maxTokens: resolved.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
 }
 
 export interface AblationPreflightCheck { id: string; passed: boolean; actual: string | number; expected: string | number; }
@@ -249,9 +249,17 @@ export function preflightAblationExperiment(experiment: AblationExperimentSnapsh
     const envName = profile.apiKeyEnv.trim();
     const credentialPresent = envName.length > 0 && Boolean(process.env[envName]?.trim());
     const pricingPresent = profile.pricing !== undefined && profile.pricing.inputUsdPerMillion > 0 && profile.pricing.outputUsdPerMillion > 0;
+    const currentSnapshot = snapshotModel({
+      profileId: experiment.model.profileId,
+      model: experiment.model.model,
+      ...(experiment.model.thinkingLevel === undefined ? {} : { thinkingLevel: experiment.model.thinkingLevel }),
+      ...(experiment.model.sampling === undefined ? {} : { sampling: experiment.model.sampling }),
+      contextWindow: experiment.model.contextWindow,
+      maxTokens: experiment.model.maxTokens,
+    }, profile);
     const checks: AblationPreflightCheck[] = [
       { id: "concrete_model", passed: experiment.model.model !== "auto", actual: experiment.model.model, expected: "concrete model" },
-      { id: "provider_match", passed: experiment.model.provider === profile.provider && experiment.model.api === profile.api && experiment.model.baseUrl === profile.baseUrl.replace(/\/+$/, ""), actual: `${experiment.model.provider}/${experiment.model.api}/${experiment.model.baseUrl}`, expected: `${profile.provider}/${profile.api}/${profile.baseUrl.replace(/\/+$/, "")}` },
+      { id: "provider_match", passed: experiment.model.profileFingerprint === currentSnapshot.profileFingerprint, actual: experiment.model.profileFingerprint, expected: currentSnapshot.profileFingerprint },
       { id: "credential", passed: credentialPresent, actual: credentialPresent ? "present" : "missing", expected: "present" },
       { id: "pricing", passed: pricingPresent, actual: pricingPresent ? "valid" : "missing_or_invalid", expected: "valid" },
     ];
@@ -275,7 +283,7 @@ export async function probeAblationProvider(experiment: AblationExperimentSnapsh
     if (!response.ok) return { ok: false, status: response.status };
     const body = await response.json() as { data?: Array<{ id?: string }> };
     const ids = (body.data ?? []).map((item) => item.id).filter((item): item is string => Boolean(item)).sort();
-    const modelId = ids.find((id) => id === experiment.model.model) ?? ids.find((id) => !id.toLowerCase().includes("embed"));
+    const modelId = ids.find((id) => id === experiment.model.model);
     return { ok: Boolean(modelId), status: response.status, ...(modelId ? { modelId } : {}), modelsHash: sha256(canonicalJson(ids)) };
   } catch (error) { return { ok: false, status: error instanceof Error ? error.name : "error" }; }
 }

@@ -53,6 +53,22 @@ test("provider proxy transport is included in the immutable model snapshot", () 
   assert.notEqual(proxied.model.profileFingerprint, validateAblationExperiment(input(), profile).model.profileFingerprint);
 });
 
+test("preflight compares every immutable provider snapshot field", async () => {
+  process.env.TEST_KEY = "test-key";
+  const experiment = validateAblationExperiment(input(), profile);
+  for (const changedProfile of [
+    { ...profile, proxyUrl: "http://127.0.0.1:7897" },
+    { ...profile, apiKeyEnv: "OTHER_KEY" },
+    { ...profile, endpointMode: "exact" as const },
+    { ...profile, contextWindow: profile.contextWindow + 1 },
+    { ...profile, maxTokens: profile.maxTokens + 1 },
+  ]) {
+    const result = await preflightAblationExperiment(experiment, changedProfile);
+    assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, false);
+  }
+  delete process.env.TEST_KEY;
+});
+
 test("rejects auto model, duplicate baselines, policy mismatch and disabled safety", () => {
   assert.throws(() => validateAblationExperiment(input({ model: { profileId: "relay-a", model: "auto" } }), profile), /concrete model/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], baseline: true }] }), profile), /exactly one baseline/);
@@ -95,6 +111,17 @@ test("preflight exposes credential presence without exposing its value and probe
   assert.equal(result.ready, true);
   assert.equal(result.provider.credentialPresent, true);
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
+  delete process.env.TEST_KEY;
+});
+
+test("provider probe rejects a discovery response that omits the requested model", async () => {
+  process.env.TEST_KEY = "probe-key";
+  const result = await preflightAblationExperiment(validateAblationExperiment(input(), profile), profile, {
+    probe: true,
+    fetch: async () => new Response(JSON.stringify({ data: [{ id: "other-chat-model" }] }), { status: 200 }),
+  });
+  assert.equal(result.checks.find((check) => check.id === "provider_probe")?.passed, false);
+  assert.equal(result.ready, false);
   delete process.env.TEST_KEY;
 });
 
