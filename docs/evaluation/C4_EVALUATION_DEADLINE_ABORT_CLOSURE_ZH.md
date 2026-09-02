@@ -11,6 +11,7 @@
 - `SingleAgentCtfLoop` 将 caller-owned `AbortSignal` 与正在等待的 `lane.prompt()` 竞争。
 - deadline 触发时仍先调用 `lane.abort()` 进行协作式资源释放；即使 Provider 或工具忽略 abort 且 prompt 永不 settle，外层 Run 也会终止并记录 `budget_exhausted`。
 - 晚到的 Provider/tool rejection 由 wrapper 吸收，避免在 Run 已终态后形成未处理 rejection。
+- `finally` 阶段对 `lane.close()` 和 tool runtime cleanup 使用独立 2 秒上限；超时被记录为 cleanup timeout，不会重新阻塞 Run，也不会把迟到的 close rejection 变成未处理 rejection。
 - 既有公平 deadline 分片保持不变：严格配对运行不会让前一条 stall 消耗整个实验 deadline。
 
 ## 验证
@@ -20,7 +21,7 @@ npm run build --workspace=@proofblade/materials
 node --import tsx --test packages/materials/tests/real-model-evaluator.test.ts
 ```
 
-结果：Materials 构建成功；21 个测试通过、0 失败。新增回归使用一个 `abort()` 返回但 `prompt()` 永不 settle 的 Lane，两个 Variant 都在 case deadline 后返回，整个评测不再挂死。严格配对公平 deadline、Provider diagnostics、预算/失败分类和 replay 也同时通过。
+结果：Materials 构建成功；新增回归使用一个 `close()` 永不 settle 的 Lane，Run 在 5 秒内仍返回 `EXHAUSTED`；原有 deadline abort、严格配对公平 deadline、Provider diagnostics、预算/失败分类和 replay 测试保持通过。
 
 ## 真实复测证据
 
