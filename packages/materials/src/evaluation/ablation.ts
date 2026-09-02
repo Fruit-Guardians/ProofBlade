@@ -202,6 +202,8 @@ export interface AblationAttemptRecord extends AblationPairing {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+  /** Bounded, prompt/candidate-free result snapshot for crash recovery. */
+  result?: Record<string, unknown>;
 }
 
 export interface AblationCaseRef {
