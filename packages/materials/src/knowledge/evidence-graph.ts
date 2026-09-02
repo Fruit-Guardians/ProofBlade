@@ -75,6 +75,22 @@ export interface LinkReasoningNodesInput {
 /** Cap on artifact text pulled into a content search, per artifact. */
 const MAX_SEARCHED_ARTIFACT_BYTES = 512_000;
 
+export interface RetrievalTrace {
+  schemaVersion: 1;
+  traceId: string;
+  runId: string;
+  generation: number;
+  query: string;
+  normalizedQuery: string;
+  mode: "keyword";
+  candidates: Array<{ id: string; kind: string; selected: boolean; score: number; reason: "exact" | "keyword" | "metadata" }>;
+  selectedRefs: string[];
+  injectedRefs: string[];
+  modelUsedRecall: boolean;
+  latencyMs: number;
+  createdAt: string;
+}
+
 export class CodingEvidenceGraph {
   private readonly artifactIndex = new DeterministicArtifactIndex();
   private indexedGeneration?: number;
@@ -485,6 +501,50 @@ export class CodingEvidenceGraph {
       .sort((a, b) => b.score - a.score || b.createdSeq - a.createdSeq)
       .slice(0, 40)
       .map(({ search: _search, createdSeq: _createdSeq, score: _score, ...row }) => row);
+  }
+
+  /** Return the same deterministic results plus a provenance-only retrieval trace. */
+  public async searchWithTrace(query = "", tags: string[] = []): Promise<{ results: Array<Record<string, unknown>>; trace: RetrievalTrace }> {
+    const startedAt = Date.now();
+    const normalizedQuery = query.trim().toLowerCase();
+    const results = await this.search(query, tags);
+    const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+    const candidates = results.map((result) => {
+      const idValue = String(result.id ?? "");
+      const haystack = JSON.stringify(result).toLowerCase();
+      const score = queryTerms.filter((term) => haystack.includes(term)).length;
+      return {
+        id: idValue,
+        kind: String(result.kind ?? "unknown"),
+        selected: true,
+        score,
+        reason: queryTerms.length === 0 ? "metadata" as const : score === queryTerms.length ? "exact" as const : "keyword" as const,
+      };
+    });
+    const selectedRefs = candidates.map((candidate) => candidate.id).filter(Boolean);
+    const injectedRefs = results.flatMap((result) => [
+      ...(typeof result.id === "string" && result.kind === "artifact" ? [result.id] : []),
+      ...(Array.isArray(result.artifactIds) ? result.artifactIds.filter((value): value is string => typeof value === "string") : []),
+      ...(typeof result.id === "string" && result.kind === "evidence" ? [result.id] : []),
+    ]);
+    return {
+      results,
+      trace: {
+        schemaVersion: 1,
+        traceId: id("RT"),
+        runId: this.runId,
+        generation: (await this.controlStore.snapshot(this.runId)).generation,
+        query: query.slice(0, 256),
+        normalizedQuery: normalizedQuery.slice(0, 256),
+        mode: "keyword",
+        candidates,
+        selectedRefs: [...new Set(selectedRefs)],
+        injectedRefs: [...new Set(injectedRefs)],
+        modelUsedRecall: false,
+        latencyMs: Math.max(0, Date.now() - startedAt),
+        createdAt: new Date().toISOString(),
+      },
+    };
   }
 
   public async readArtifact(artifactId: string, maxChars = 6_000): Promise<Record<string, unknown>> {

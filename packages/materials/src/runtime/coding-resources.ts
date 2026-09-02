@@ -447,7 +447,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "search") {
       assertOnly(input, ["operation", "query", "tags"], "evidence search");
-      return toolResult({ results: await context.evidenceGraph.search(input.query, input.tags) });
+      return toolResult(await context.evidenceGraph.searchWithTrace(input.query, input.tags));
     }
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");

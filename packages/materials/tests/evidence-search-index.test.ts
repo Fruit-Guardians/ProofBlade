@@ -25,7 +25,14 @@ test("evidence search indexes Artifact text once per content hash within a gener
     let reads = 0;
     services.artifacts.readText = async (...args: Parameters<typeof services.artifacts.readText>) => { reads += 1; return await originalRead(...args); };
     const graph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
-    assert.equal((await graph.search("reveal_marker")).some((item) => item.id === artifact.id), true);
+    const firstSearch = await graph.searchWithTrace("reveal_marker");
+    assert.equal(firstSearch.results.some((item) => item.id === artifact.id), true);
+    assert.equal(firstSearch.trace.runId, runId);
+    assert.equal(firstSearch.trace.mode, "keyword");
+    assert.equal(firstSearch.trace.selectedRefs.includes(artifact.id), true);
+    assert.equal(firstSearch.trace.injectedRefs.includes(artifact.id), true);
+    assert.equal(firstSearch.trace.modelUsedRecall, false);
+    assert.ok(firstSearch.trace.latencyMs >= 0);
     assert.equal(reads, 1);
     assert.equal((await graph.search("verify_magic")).some((item) => item.id === artifact.id), true);
     assert.equal(reads, 1);
