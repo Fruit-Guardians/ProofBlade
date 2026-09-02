@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ContextCompiler } from "../src/context/compiler.js";
+import { ContextCompiler, contextText } from "../src/context/compiler.js";
 import { prepareContextMaintenance } from "../src/context/maintenance-coordinator.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { estimateTokens } from "../src/domain/utils.js";
-import { MAX_LEDGER_BLOCK_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
+import { MAX_LEDGER_BLOCK_TOKENS, MAX_PHASE_LAYER_TOKENS, MAX_STANDING_LAYER_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
 
 const task: TaskContract = {
   schema_version: 1,
@@ -166,6 +166,35 @@ test("context task contract bounds oversized model-facing fields", () => {
   assert.equal(parsed.bounds?.max_tokens, MAX_TASK_LAYER_TOKENS);
   assert.ok((parsed.bounds?.truncated_fields.length ?? 0) > 0);
   assert.equal(compiled.manifest.layerTokens.L1 <= MAX_TASK_LAYER_TOKENS, true);
+});
+
+test("context bounds standing and phase layers before the final provider envelope", () => {
+  const snapshot = createInitialSnapshot("CTX-STATIC-BOUNDS", task);
+  snapshot.status = "RUNNING";
+  snapshot.workItems = Object.fromEntries(Array.from({ length: 128 }, (_, index) => [`WI-${index}`, {
+    id: `WI-${index}`,
+    runId: snapshot.runId,
+    title: `work-${index}`,
+    objective: "x".repeat(2_000),
+    role: "executor" as const,
+    status: "READY" as const,
+    dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 1, createdSeq: index, updatedSeq: index,
+  }]));
+  const resources = {
+    version: 1 as const,
+    skillCatalogHash: "s".repeat(64),
+    skills: Array.from({ length: 64 }, (_, index) => ({ name: `skill-${index}`, description: "y".repeat(2_000), contentHash: "a".repeat(64) })),
+    mcpCatalogHash: "m".repeat(64),
+    mcpServers: [],
+    toolCatalogHash: "t".repeat(64),
+    toolCatalog: [],
+  };
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, resources, contextWindow: 100_000 });
+  const l0 = compiled.manifest.blocks?.find((block) => block.id === "context.l0")?.content ?? "";
+  const l2 = compiled.manifest.blocks?.find((block) => block.id === "context.l2")?.content ?? "";
+  assert.ok(estimateTokens(l0) <= MAX_STANDING_LAYER_TOKENS);
+  assert.ok(estimateTokens(l2) <= MAX_PHASE_LAYER_TOKENS);
+  assert.ok(estimateTokens(contextText(compiled, 512)) <= 512);
 });
 
 test("context keeps each durable ledger block below the absolute token cap", () => {
