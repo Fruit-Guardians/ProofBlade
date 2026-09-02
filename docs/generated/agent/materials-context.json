@@ -17,7 +17,7 @@
     "src/competition/api.ts": "00a3ead1c7666780af72153fce3012082e120436029dae5445431ca9d07e06d7",
     "src/competition/dasctf-api.ts": "538036302b118f2cf9942927c8ba5ca263384326d59b42d82586b1abb46af7b1",
     "src/competition/environment-janitor.ts": "e4d15beb8a2bb5e342fb453e42b5ba6916832493da525c848fb8ede334cac056",
-    "src/competition/experiment-gate.ts": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+    "src/competition/experiment-gate.ts": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
     "src/competition/fleet.ts": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
     "src/competition/loop.ts": "36d2a1a30da6e5ca893512f197fb057267b1979fc6ec9e7b3aa677ccb12beda2",
@@ -95,7 +95,7 @@
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
     "src/pwn/pwn-session.ts": "f8b58bead54d35cd7281e6787bb0f7173c7adb83339765c1c204901a65baa726",
-    "src/pwn/pwn-tools.ts": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+    "src/pwn/pwn-tools.ts": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
     "src/recovery/binding-transaction-coordinator.ts": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
     "src/recovery/binding-transaction.ts": "95a0a2e4cdc5a5cd71ab265ef482f79ded99378a800f7b3f735396e3f481d4fd",
     "src/recovery/external-resource-registry.ts": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
@@ -122,7 +122,7 @@
     "src/runtime/provider-native.ts": "58b941e0c710aa193f370425ab926bb77adb5b5588c09f02fb879ab40fcd3092",
     "src/runtime/provider-scheduler.ts": "e4f36a666b297dd0dccf81f1fccaae7bf06f65cb4176ec24a8f592402b5dfaa5",
     "src/runtime/provider-transport.ts": "0c1652999beba307d5a760f294935fd85bee8c402f8cff3dfc0f61c477d891b3",
-    "src/runtime/pwn-coding-tools.ts": "79fcdab70723d3c2a01d6aae6c231bf375e7e9c993a028538c1eed99c617abe9",
+    "src/runtime/pwn-coding-tools.ts": "9b9b349924c263bc68d0dd6704b081877846d0f39de87ebdd737616b5318dbfb",
     "src/runtime/request-epoch.ts": "5f23637da690c7c69af1fd1327edef03f4795041be55738502d67f616da41816",
     "src/runtime/scope.ts": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
     "src/runtime/solver-tools.ts": "d0c024edb46d433479553a7ba949277b7d8587addcda257d8526f65c6bad03b4",
@@ -483,7 +483,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 23,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -1268,7 +1268,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 63,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-tools.test.ts"
@@ -3127,8 +3127,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
-      "line": 85,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "line": 92,
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": []
     },
     {
@@ -4596,8 +4596,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 491,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "line": 495,
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -4610,8 +4610,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
-      "line": 481,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "line": 485,
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -7139,7 +7139,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 5,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": []
     },
     {
@@ -7153,7 +7153,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 15,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": []
     },
     {
@@ -11012,7 +11012,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 27,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -11026,7 +11026,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 41,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -11040,7 +11040,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 48,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -11054,7 +11054,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 53,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -17035,13 +17035,13 @@
       "name": "ExperimentGate.assertAllowed",
       "kind": "method",
       "signature": "(input: Omit<ExperimentGateInput, \"outcome\" | \"summary\">): Promise<{ repeatKey: string; previousFailures: number; }>",
-      "summary": "Inferred summary: assert allowed operation used to read or inspect state.",
+      "summary": "Inferred summary: assert allowed operation used to perform a durable write.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 67,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -17057,7 +17057,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 48,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -17118,7 +17118,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/experiment-gate.ts",
       "line": 34,
-      "moduleHash": "0cb527b35f1300c4e3327f1585730cc45d0d7cca6994a30687e3abf03117c39e",
+      "moduleHash": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
       "testRefs": []
     },
     {
@@ -17563,6 +17563,7 @@
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -17576,6 +17577,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -20476,6 +20478,7 @@
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -20489,6 +20492,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -22444,6 +22448,7 @@
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -22457,6 +22462,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -24538,7 +24544,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 89,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -24579,7 +24585,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 272,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24646,7 +24652,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 283,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -24696,7 +24702,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 99,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -24769,7 +24775,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 368,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
@@ -24783,7 +24789,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 211,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -24803,7 +24809,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 299,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
@@ -24834,7 +24840,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 183,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
@@ -24857,7 +24863,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 253,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/pwn-layer.test.ts",
@@ -24875,7 +24881,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 233,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28772,6 +28778,7 @@
         "packages/materials/tests/challenge-tool-profile.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-lifecycle-replay.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -28785,6 +28792,7 @@
         "packages/materials/tests/provider-retry-harness.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
         "packages/materials/tests/reverse-core.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts",
@@ -35454,7 +35462,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/pwn/pwn-tools.ts",
       "line": 36,
-      "moduleHash": "acdd42a0613244fdd301db0eb7b90d66a7cad8e510da0630fb4cebb538fc2ed8",
+      "moduleHash": "7a4b769216196b9199eb9339a0cf848bc73343581962c152128ef57497040886",
       "testRefs": []
     },
     {
