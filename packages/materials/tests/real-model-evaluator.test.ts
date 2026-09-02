@@ -127,6 +127,31 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
   }
 });
 
+test("resumable evaluator runs only selected pairings and records durable callbacks", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-resume-"));
+  const source = "resume fixture";
+  const expected = "flag{resume}";
+  try {
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({ schemaVersion: 1, id: "resume-corpus", cases: [corpusCase("sample", "target.bin", expected, source)] }), "utf8");
+    const events: string[] = [];
+    const summary = await new RealModelEvaluationRunner(root, solver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-RESUME",
+      pairingFilter: [{ variantId: "beta", corpusCaseId: "sample", attempt: 1 }],
+      onCaseStart: ({ variantId, corpusCaseId, attempt, runId }) => events.push(`start:${variantId}:${corpusCaseId}:${attempt}:${runId}`),
+      onCaseComplete: (result) => events.push(`complete:${result.variantId}:${result.corpusCaseId}:${result.attempt}`),
+    });
+    assert.deepEqual(summary.variants.map((variant) => variant.cases.length), [0, 1]);
+    assert.deepEqual(events.map((event) => event.split(":").slice(0, 4).join(":")), ["start:beta:sample:1", "complete:beta:sample:1"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("real evaluation preflight validates Web/Pwn coverage and never contacts a Provider", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-"));
   try {
