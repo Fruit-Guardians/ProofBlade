@@ -327,11 +327,27 @@ export class SingleAgentCtfLoop {
       throw error;
     } finally {
       removeAbortListener?.();
-      const results: PromiseSettledResult<void>[] = [];
-      if (abortPromise) results.push(await settleWithTimeout(abortPromise, "coding lane abort"));
-      if (lane) results.push(await settleWithTimeout(Promise.resolve().then(() => lane!.close()), "coding lane close"));
-      results.push(await settleWithTimeout(Promise.resolve().then(() => runtime.close()), "tool runtime close"));
-      const failures = results.flatMap((result) => result.status === "rejected" && !isCleanupTimeout(result.reason) ? [result.reason] : []);
+      const results: Array<{ resource: string; result: PromiseSettledResult<void> }> = [];
+      if (abortPromise) results.push({ resource: "coding_lane_abort", result: await settleWithTimeout(abortPromise, "coding lane abort") });
+      if (lane) results.push({ resource: "coding_lane_close", result: await settleWithTimeout(Promise.resolve().then(() => lane!.close()), "coding lane close") });
+      results.push({ resource: "tool_runtime_close", result: await settleWithTimeout(Promise.resolve().then(() => runtime.close()), "tool runtime close") });
+      const timedOutResources = results.flatMap(({ resource, result }) => result.status === "rejected" && isCleanupTimeout(result.reason) ? [resource] : []);
+      if (timedOutResources.length > 0) {
+        await this.services.control.append(options.runId, [{
+          schemaVersion: 1,
+          lane: "executor",
+          actor: "orchestrator",
+          correlationId: `${options.runId}:resource-cleanup`,
+          type: "resource_cleanup_recovery_required",
+          payload: {
+            status: "UNKNOWN",
+            recoveryRequired: true,
+            resources: timedOutResources,
+            reason: "Cleanup did not settle before the run deadline; reconcile resources before reuse.",
+          },
+        }]);
+      }
+      const failures = results.flatMap(({ result }) => result.status === "rejected" && !isCleanupTimeout(result.reason) ? [result.reason] : []);
       if (failures.length > 0) throw new AggregateError(failures, "Failed to close one or more run resources");
     }
     snapshot = await this.services.control.snapshot(options.runId);

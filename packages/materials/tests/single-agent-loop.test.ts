@@ -324,6 +324,13 @@ test("[contract:deadline-cleanup] a stuck lane close cannot extend run completio
     });
     assert.ok(Date.now() - started < 5_000);
     assert.equal(result.status, "EXHAUSTED");
+    const cleanupEvent = (await services.control.events("STUCK-CLOSE-web-source-1")).find((event) => event.type === "resource_cleanup_recovery_required");
+    assert.deepEqual(cleanupEvent?.payload, {
+      status: "UNKNOWN",
+      recoveryRequired: true,
+      resources: ["coding_lane_close"],
+      reason: "Cleanup did not settle before the run deadline; reconcile resources before reuse.",
+    });
     releaseClose();
   } finally {
     await services.sandbox.close();
