@@ -4,6 +4,7 @@ import { buildAblationPairings, DEFAULT_HARNESS_POLICY, preflightAblationExperim
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { canonicalJson, sha256 } from "../src/domain/utils.js";
 
 const profile = {
   provider: "relay",
@@ -66,6 +67,9 @@ test("preflight compares every immutable provider snapshot field", async () => {
     const result = await preflightAblationExperiment(experiment, changedProfile);
     assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, false);
   }
+  delete process.env.TEST_KEY;
+});
+
 test("canonicalizes Provider baseUrl consistently across snapshots and preflight", async () => {
   process.env.TEST_KEY = "secret";
   const profileWithSlash = { ...profile, baseUrl: `${profile.baseUrl}/` };
@@ -144,6 +148,26 @@ test("experiment store persists immutable snapshots and rejects tampering", asyn
     const original = await readFile(path, "utf8");
     await (await import("node:fs/promises")).writeFile(path, original.replace("Receipt comparison", "tampered"));
     await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("v1 snapshots missing expanded policy fields retain historical hard-policy defaults", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-v1-policy-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const current = validateAblationExperiment(input(), profile);
+    const legacy = {
+      ...current,
+      protocolVersion: "ablation-v1" as const,
+      variants: current.variants.map(({ policy: _policy, policySnapshot: _policySnapshot, ...variant }) => variant),
+    };
+    const { experimentFingerprint: _fingerprint, ...content } = legacy;
+    const persisted = { ...content, experimentFingerprint: sha256(canonicalJson(content)) };
+    await (await import("node:fs/promises")).writeFile(join(root, `${current.experimentId}.json`), JSON.stringify(persisted), "utf8");
+    const loaded = await store.load(current.experimentId);
+    assert.equal(loaded.protocolVersion, "ablation-v1");
+    assert.equal(loaded.variants[0]?.policy.firstAction, "hard_gate");
+    assert.equal(loaded.variants[0]?.policy.circuitBreaker, "hard_stop");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

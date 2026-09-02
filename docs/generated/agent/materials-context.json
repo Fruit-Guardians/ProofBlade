@@ -57,7 +57,7 @@
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
     "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
-    "src/evaluation/ablation.ts": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+    "src/evaluation/ablation.ts": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
@@ -824,8 +824,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 298,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 308,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -2278,14 +2278,14 @@
       "id": "@proofblade/materials::constant::ABLATION_PROTOCOL_VERSION",
       "name": "ABLATION_PROTOCOL_VERSION",
       "kind": "constant",
-      "signature": "\"ablation-v1\"",
+      "signature": "\"ablation-v2\"",
       "summary": "Inferred summary: ablation protocol version constant used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 9,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -2299,7 +2299,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 8,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -2312,8 +2312,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 53,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 54,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts"
@@ -2329,8 +2329,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 81,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 91,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -3835,8 +3835,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 336,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 368,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -3851,8 +3851,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 254,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 264,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -3867,8 +3867,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 284,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 294,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -3881,8 +3881,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 229,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 239,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -3895,8 +3895,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 206,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 216,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -9604,8 +9604,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 189,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 199,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9618,8 +9618,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 197,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 207,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9632,8 +9632,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 92,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 102,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9646,8 +9646,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 118,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 128,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9660,8 +9660,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 162,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 172,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9674,8 +9674,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 97,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 107,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9688,8 +9688,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 132,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 142,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9702,8 +9702,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 181,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 191,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -9718,8 +9718,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 149,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 159,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9732,8 +9732,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 243,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 253,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9746,8 +9746,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 244,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 254,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9760,8 +9760,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 281,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 291,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9774,8 +9774,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 106,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 116,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9788,8 +9788,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 156,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 166,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9802,8 +9802,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 70,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 80,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -9816,8 +9816,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 39,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 40,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -21180,8 +21180,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 315,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 325,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -21231,8 +21231,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 309,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 319,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -21292,8 +21292,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 300,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 310,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -35770,8 +35770,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 179,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 189,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35784,8 +35784,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 12,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 13,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35798,8 +35798,22 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 178,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 188,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationProtocolVersion",
+      "name": "AblationProtocolVersion",
+      "kind": "type",
+      "signature": "AblationProtocolVersion",
+      "summary": "Inferred summary: ablation protocol version type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation.ts",
+      "line": 10,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35812,8 +35826,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 11,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 12,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35826,8 +35840,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 29,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 30,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35840,8 +35854,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 31,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 32,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35854,8 +35868,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 36,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 37,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35868,8 +35882,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 32,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 33,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35882,8 +35896,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 30,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 31,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35896,8 +35910,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 34,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 35,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35910,8 +35924,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 27,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 28,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35924,8 +35938,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 35,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 36,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35938,8 +35952,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 28,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 29,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35952,8 +35966,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 33,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 34,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {
@@ -35966,8 +35980,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 37,
-      "moduleHash": "e865cc4b40f96d42d44f11119bb80f19b51988d2c0864e48c17acc4dcfb3333d",
+      "line": 38,
+      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": []
     },
     {

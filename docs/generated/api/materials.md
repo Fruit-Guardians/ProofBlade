@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 161
-- Symbols: 1707
+- Symbols: 1708
 
 ## Public Symbols
 
@@ -347,7 +347,7 @@
 ### AblationExperimentStore
 - Kind: `class`
 - Signature: `AblationExperimentStore`
-- Source: [src/evaluation/ablation.ts:298](../../../packages/materials/src/evaluation/ablation.ts:298)
+- Source: [src/evaluation/ablation.ts:308](../../../packages/materials/src/evaluation/ablation.ts:308)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation experiment store class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1115,7 +1115,7 @@
 
 ### ABLATION_PROTOCOL_VERSION
 - Kind: `constant`
-- Signature: `"ablation-v1"`
+- Signature: `"ablation-v2"`
 - Source: [src/evaluation/ablation.ts:9](../../../packages/materials/src/evaluation/ablation.ts:9)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation protocol version constant used to provide a reusable operation.
@@ -1132,7 +1132,7 @@
 ### DEFAULT_HARNESS_POLICY
 - Kind: `constant`
 - Signature: `HarnessPolicy`
-- Source: [src/evaluation/ablation.ts:53](../../../packages/materials/src/evaluation/ablation.ts:53)
+- Source: [src/evaluation/ablation.ts:54](../../../packages/materials/src/evaluation/ablation.ts:54)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: default harness policy constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1141,7 +1141,7 @@
 ### FIXED_SAFETY_BOUNDARY
 - Kind: `constant`
 - Signature: `FixedSafetyBoundary`
-- Source: [src/evaluation/ablation.ts:81](../../../packages/materials/src/evaluation/ablation.ts:81)
+- Source: [src/evaluation/ablation.ts:91](../../../packages/materials/src/evaluation/ablation.ts:91)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixed safety boundary constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1931,7 +1931,7 @@
 ### buildAblationPairings
 - Kind: `function`
 - Signature: `(experiment: Pick<AblationExperimentSnapshot, "experimentId" | "variants" | "runOrder" | "budget">, cases: readonly AblationCaseRef[]): AblationPairing[]`
-- Source: [src/evaluation/ablation.ts:336](../../../packages/materials/src/evaluation/ablation.ts:336)
+- Source: [src/evaluation/ablation.ts:368](../../../packages/materials/src/evaluation/ablation.ts:368)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build ablation pairings operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1940,7 +1940,7 @@
 ### preflightAblationExperiment
 - Kind: `function`
 - Signature: `(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, options?: { probe?: boolean; fetch?: typeof globalThis.fetch; }): Promise<AblationPreflightSummary>`
-- Source: [src/evaluation/ablation.ts:254](../../../packages/materials/src/evaluation/ablation.ts:254)
+- Source: [src/evaluation/ablation.ts:264](../../../packages/materials/src/evaluation/ablation.ts:264)
 - Export: `@proofblade/materials`
 - Summary: Validate an immutable snapshot against the selected local Provider profile.
 - Summary source: `tsdoc`
@@ -1949,7 +1949,7 @@
 ### probeAblationProvider
 - Kind: `function`
 - Signature: `(experiment: AblationExperimentSnapshot, profile: ModelProfileConfig, providerFetch?: typeof globalThis.fetch): Promise<AblationProviderProbe>`
-- Source: [src/evaluation/ablation.ts:284](../../../packages/materials/src/evaluation/ablation.ts:284)
+- Source: [src/evaluation/ablation.ts:294](../../../packages/materials/src/evaluation/ablation.ts:294)
 - Export: `@proofblade/materials`
 - Summary: Probe only the model-discovery endpoint; task content is never sent.
 - Summary source: `tsdoc`
@@ -1957,7 +1957,7 @@
 ### snapshotModel
 - Kind: `function`
 - Signature: `(input: AblationModelInput, profile?: ModelProfileConfig): AblationModelSnapshot`
-- Source: [src/evaluation/ablation.ts:229](../../../packages/materials/src/evaluation/ablation.ts:229)
+- Source: [src/evaluation/ablation.ts:239](../../../packages/materials/src/evaluation/ablation.ts:239)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot model operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1965,7 +1965,7 @@
 ### validateAblationExperiment
 - Kind: `function`
 - Signature: `(value: unknown, profile?: ModelProfileConfig): AblationExperimentSnapshot`
-- Source: [src/evaluation/ablation.ts:206](../../../packages/materials/src/evaluation/ablation.ts:206)
+- Source: [src/evaluation/ablation.ts:216](../../../packages/materials/src/evaluation/ablation.ts:216)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: validate ablation experiment operation used to read or inspect state.
 - Summary source: `inferred`
@@ -5061,7 +5061,7 @@
 ### AblationAttemptRecord
 - Kind: `interface`
 - Signature: `AblationAttemptRecord`
-- Source: [src/evaluation/ablation.ts:189](../../../packages/materials/src/evaluation/ablation.ts:189)
+- Source: [src/evaluation/ablation.ts:199](../../../packages/materials/src/evaluation/ablation.ts:199)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation attempt record type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5069,7 +5069,7 @@
 ### AblationCaseRef
 - Kind: `interface`
 - Signature: `AblationCaseRef`
-- Source: [src/evaluation/ablation.ts:197](../../../packages/materials/src/evaluation/ablation.ts:197)
+- Source: [src/evaluation/ablation.ts:207](../../../packages/materials/src/evaluation/ablation.ts:207)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation case ref type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5077,7 +5077,7 @@
 ### AblationCorpusRef
 - Kind: `interface`
 - Signature: `AblationCorpusRef`
-- Source: [src/evaluation/ablation.ts:92](../../../packages/materials/src/evaluation/ablation.ts:92)
+- Source: [src/evaluation/ablation.ts:102](../../../packages/materials/src/evaluation/ablation.ts:102)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation corpus ref type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5085,7 +5085,7 @@
 ### AblationExperimentInput
 - Kind: `interface`
 - Signature: `AblationExperimentInput`
-- Source: [src/evaluation/ablation.ts:118](../../../packages/materials/src/evaluation/ablation.ts:118)
+- Source: [src/evaluation/ablation.ts:128](../../../packages/materials/src/evaluation/ablation.ts:128)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation experiment input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5093,7 +5093,7 @@
 ### AblationExperimentSnapshot
 - Kind: `interface`
 - Signature: `AblationExperimentSnapshot`
-- Source: [src/evaluation/ablation.ts:162](../../../packages/materials/src/evaluation/ablation.ts:162)
+- Source: [src/evaluation/ablation.ts:172](../../../packages/materials/src/evaluation/ablation.ts:172)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation experiment snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5101,7 +5101,7 @@
 ### AblationModelInput
 - Kind: `interface`
 - Signature: `AblationModelInput`
-- Source: [src/evaluation/ablation.ts:97](../../../packages/materials/src/evaluation/ablation.ts:97)
+- Source: [src/evaluation/ablation.ts:107](../../../packages/materials/src/evaluation/ablation.ts:107)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation model input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5109,7 +5109,7 @@
 ### AblationModelSnapshot
 - Kind: `interface`
 - Signature: `AblationModelSnapshot`
-- Source: [src/evaluation/ablation.ts:132](../../../packages/materials/src/evaluation/ablation.ts:132)
+- Source: [src/evaluation/ablation.ts:142](../../../packages/materials/src/evaluation/ablation.ts:142)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation model snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5117,7 +5117,7 @@
 ### AblationPairing
 - Kind: `interface`
 - Signature: `AblationPairing`
-- Source: [src/evaluation/ablation.ts:181](../../../packages/materials/src/evaluation/ablation.ts:181)
+- Source: [src/evaluation/ablation.ts:191](../../../packages/materials/src/evaluation/ablation.ts:191)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation pairing type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5126,7 +5126,7 @@
 ### AblationPolicySnapshot
 - Kind: `interface`
 - Signature: `AblationPolicySnapshot`
-- Source: [src/evaluation/ablation.ts:149](../../../packages/materials/src/evaluation/ablation.ts:149)
+- Source: [src/evaluation/ablation.ts:159](../../../packages/materials/src/evaluation/ablation.ts:159)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation policy snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5134,7 +5134,7 @@
 ### AblationPreflightCheck
 - Kind: `interface`
 - Signature: `AblationPreflightCheck`
-- Source: [src/evaluation/ablation.ts:243](../../../packages/materials/src/evaluation/ablation.ts:243)
+- Source: [src/evaluation/ablation.ts:253](../../../packages/materials/src/evaluation/ablation.ts:253)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation preflight check type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5142,7 +5142,7 @@
 ### AblationPreflightSummary
 - Kind: `interface`
 - Signature: `AblationPreflightSummary`
-- Source: [src/evaluation/ablation.ts:244](../../../packages/materials/src/evaluation/ablation.ts:244)
+- Source: [src/evaluation/ablation.ts:254](../../../packages/materials/src/evaluation/ablation.ts:254)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation preflight summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5150,7 +5150,7 @@
 ### AblationProviderProbe
 - Kind: `interface`
 - Signature: `AblationProviderProbe`
-- Source: [src/evaluation/ablation.ts:281](../../../packages/materials/src/evaluation/ablation.ts:281)
+- Source: [src/evaluation/ablation.ts:291](../../../packages/materials/src/evaluation/ablation.ts:291)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation provider probe type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5158,7 +5158,7 @@
 ### AblationVariantInput
 - Kind: `interface`
 - Signature: `AblationVariantInput`
-- Source: [src/evaluation/ablation.ts:106](../../../packages/materials/src/evaluation/ablation.ts:106)
+- Source: [src/evaluation/ablation.ts:116](../../../packages/materials/src/evaluation/ablation.ts:116)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation variant input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5166,7 +5166,7 @@
 ### AblationVariantSnapshot
 - Kind: `interface`
 - Signature: `AblationVariantSnapshot`
-- Source: [src/evaluation/ablation.ts:156](../../../packages/materials/src/evaluation/ablation.ts:156)
+- Source: [src/evaluation/ablation.ts:166](../../../packages/materials/src/evaluation/ablation.ts:166)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation variant snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5174,7 +5174,7 @@
 ### FixedSafetyBoundary
 - Kind: `interface`
 - Signature: `FixedSafetyBoundary`
-- Source: [src/evaluation/ablation.ts:70](../../../packages/materials/src/evaluation/ablation.ts:70)
+- Source: [src/evaluation/ablation.ts:80](../../../packages/materials/src/evaluation/ablation.ts:80)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixed safety boundary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5182,7 +5182,7 @@
 ### HarnessPolicy
 - Kind: `interface`
 - Signature: `HarnessPolicy`
-- Source: [src/evaluation/ablation.ts:39](../../../packages/materials/src/evaluation/ablation.ts:39)
+- Source: [src/evaluation/ablation.ts:40](../../../packages/materials/src/evaluation/ablation.ts:40)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: harness policy type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9753,7 +9753,7 @@
 ### AblationExperimentStore.list
 - Kind: `method`
 - Signature: `(): Promise<Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">>>`
-- Source: [src/evaluation/ablation.ts:315](../../../packages/materials/src/evaluation/ablation.ts:315)
+- Source: [src/evaluation/ablation.ts:325](../../../packages/materials/src/evaluation/ablation.ts:325)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9762,7 +9762,7 @@
 ### AblationExperimentStore.load
 - Kind: `method`
 - Signature: `(experimentId: string): Promise<AblationExperimentSnapshot>`
-- Source: [src/evaluation/ablation.ts:309](../../../packages/materials/src/evaluation/ablation.ts:309)
+- Source: [src/evaluation/ablation.ts:319](../../../packages/materials/src/evaluation/ablation.ts:319)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: load operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9771,7 +9771,7 @@
 ### AblationExperimentStore.save
 - Kind: `method`
 - Signature: `(experiment: AblationExperimentSnapshot): Promise<string>`
-- Source: [src/evaluation/ablation.ts:300](../../../packages/materials/src/evaluation/ablation.ts:300)
+- Source: [src/evaluation/ablation.ts:310](../../../packages/materials/src/evaluation/ablation.ts:310)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: save operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13864,7 +13864,7 @@
 ### AblationAttemptStatus
 - Kind: `type`
 - Signature: `AblationAttemptStatus`
-- Source: [src/evaluation/ablation.ts:179](../../../packages/materials/src/evaluation/ablation.ts:179)
+- Source: [src/evaluation/ablation.ts:189](../../../packages/materials/src/evaluation/ablation.ts:189)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation attempt status type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13872,7 +13872,7 @@
 ### AblationChangedFactor
 - Kind: `type`
 - Signature: `AblationChangedFactor`
-- Source: [src/evaluation/ablation.ts:12](../../../packages/materials/src/evaluation/ablation.ts:12)
+- Source: [src/evaluation/ablation.ts:13](../../../packages/materials/src/evaluation/ablation.ts:13)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation changed factor type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13880,15 +13880,23 @@
 ### AblationExperimentStatus
 - Kind: `type`
 - Signature: `AblationExperimentStatus`
-- Source: [src/evaluation/ablation.ts:178](../../../packages/materials/src/evaluation/ablation.ts:178)
+- Source: [src/evaluation/ablation.ts:188](../../../packages/materials/src/evaluation/ablation.ts:188)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation experiment status type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
+### AblationProtocolVersion
+- Kind: `type`
+- Signature: `AblationProtocolVersion`
+- Source: [src/evaluation/ablation.ts:10](../../../packages/materials/src/evaluation/ablation.ts:10)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: ablation protocol version type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### AblationRunOrder
 - Kind: `type`
 - Signature: `AblationRunOrder`
-- Source: [src/evaluation/ablation.ts:11](../../../packages/materials/src/evaluation/ablation.ts:11)
+- Source: [src/evaluation/ablation.ts:12](../../../packages/materials/src/evaluation/ablation.ts:12)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: ablation run order type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13896,7 +13904,7 @@
 ### ActionBundleMode
 - Kind: `type`
 - Signature: `ActionBundleMode`
-- Source: [src/evaluation/ablation.ts:29](../../../packages/materials/src/evaluation/ablation.ts:29)
+- Source: [src/evaluation/ablation.ts:30](../../../packages/materials/src/evaluation/ablation.ts:30)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: action bundle mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13904,7 +13912,7 @@
 ### CircuitBreakerMode
 - Kind: `type`
 - Signature: `CircuitBreakerMode`
-- Source: [src/evaluation/ablation.ts:31](../../../packages/materials/src/evaluation/ablation.ts:31)
+- Source: [src/evaluation/ablation.ts:32](../../../packages/materials/src/evaluation/ablation.ts:32)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: circuit breaker mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13912,7 +13920,7 @@
 ### CompressionMode
 - Kind: `type`
 - Signature: `CompressionMode`
-- Source: [src/evaluation/ablation.ts:36](../../../packages/materials/src/evaluation/ablation.ts:36)
+- Source: [src/evaluation/ablation.ts:37](../../../packages/materials/src/evaluation/ablation.ts:37)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compression mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13920,7 +13928,7 @@
 ### ContextSelectionMode
 - Kind: `type`
 - Signature: `ContextSelectionMode`
-- Source: [src/evaluation/ablation.ts:32](../../../packages/materials/src/evaluation/ablation.ts:32)
+- Source: [src/evaluation/ablation.ts:33](../../../packages/materials/src/evaluation/ablation.ts:33)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context selection mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13928,7 +13936,7 @@
 ### DuplicateFailureMode
 - Kind: `type`
 - Signature: `DuplicateFailureMode`
-- Source: [src/evaluation/ablation.ts:30](../../../packages/materials/src/evaluation/ablation.ts:30)
+- Source: [src/evaluation/ablation.ts:31](../../../packages/materials/src/evaluation/ablation.ts:31)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: duplicate failure mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13936,7 +13944,7 @@
 ### EvidenceCurationMode
 - Kind: `type`
 - Signature: `EvidenceCurationMode`
-- Source: [src/evaluation/ablation.ts:34](../../../packages/materials/src/evaluation/ablation.ts:34)
+- Source: [src/evaluation/ablation.ts:35](../../../packages/materials/src/evaluation/ablation.ts:35)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: evidence curation mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13944,7 +13952,7 @@
 ### FirstActionMode
 - Kind: `type`
 - Signature: `FirstActionMode`
-- Source: [src/evaluation/ablation.ts:27](../../../packages/materials/src/evaluation/ablation.ts:27)
+- Source: [src/evaluation/ablation.ts:28](../../../packages/materials/src/evaluation/ablation.ts:28)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: first action mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13952,7 +13960,7 @@
 ### InformationValueEstimator
 - Kind: `type`
 - Signature: `InformationValueEstimator`
-- Source: [src/evaluation/ablation.ts:35](../../../packages/materials/src/evaluation/ablation.ts:35)
+- Source: [src/evaluation/ablation.ts:36](../../../packages/materials/src/evaluation/ablation.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: information value estimator type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13960,7 +13968,7 @@
 ### PhaseRouteMode
 - Kind: `type`
 - Signature: `PhaseRouteMode`
-- Source: [src/evaluation/ablation.ts:28](../../../packages/materials/src/evaluation/ablation.ts:28)
+- Source: [src/evaluation/ablation.ts:29](../../../packages/materials/src/evaluation/ablation.ts:29)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: phase route mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13968,7 +13976,7 @@
 ### RecallMode
 - Kind: `type`
 - Signature: `RecallMode`
-- Source: [src/evaluation/ablation.ts:33](../../../packages/materials/src/evaluation/ablation.ts:33)
+- Source: [src/evaluation/ablation.ts:34](../../../packages/materials/src/evaluation/ablation.ts:34)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: recall mode type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13976,7 +13984,7 @@
 ### StopSuggestionMode
 - Kind: `type`
 - Signature: `StopSuggestionMode`
-- Source: [src/evaluation/ablation.ts:37](../../../packages/materials/src/evaluation/ablation.ts:37)
+- Source: [src/evaluation/ablation.ts:38](../../../packages/materials/src/evaluation/ablation.ts:38)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: stop suggestion mode type contract used to provide a reusable operation.
 - Summary source: `inferred`

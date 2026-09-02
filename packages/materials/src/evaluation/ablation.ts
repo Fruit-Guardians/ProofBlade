@@ -6,7 +6,8 @@ import type { TargetKind } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 
 export const ABLATION_SCHEMA_VERSION = 1 as const;
-export const ABLATION_PROTOCOL_VERSION = "ablation-v1" as const;
+export const ABLATION_PROTOCOL_VERSION = "ablation-v2" as const;
+export type AblationProtocolVersion = "ablation-v1" | typeof ABLATION_PROTOCOL_VERSION;
 
 export type AblationRunOrder = "interleaved" | "stratified";
 export type AblationChangedFactor =
@@ -65,6 +66,15 @@ export const DEFAULT_HARNESS_POLICY: HarnessPolicy = {
   informationValue: "off",
   compression: "off",
   stopSuggestion: "off",
+};
+
+const LEGACY_V1_HARNESS_POLICY: HarnessPolicy = {
+  ...DEFAULT_HARNESS_POLICY,
+  firstAction: "hard_gate",
+  phaseRoute: "hard_gate",
+  actionBundle: "hard_gate",
+  duplicateFailure: "hard_stop",
+  circuitBreaker: "hard_stop",
 };
 
 export interface FixedSafetyBoundary {
@@ -160,7 +170,7 @@ export interface AblationVariantSnapshot extends AblationVariantInput {
 }
 
 export interface AblationExperimentSnapshot {
-  protocolVersion: typeof ABLATION_PROTOCOL_VERSION;
+  protocolVersion: AblationProtocolVersion;
   schemaVersion: 1;
   experimentId: string;
   name: string;
@@ -310,7 +320,7 @@ export class AblationExperimentStore {
     const id = requiredId(experimentId, "experimentId");
     const parsed = JSON.parse(await readFile(join(resolve(this.directory), `${id}.json`), "utf8")) as AblationExperimentSnapshot;
     assertSnapshotIntegrity(parsed);
-    return parsed;
+    return hydrateLegacySnapshot(parsed);
   }
   public async list(): Promise<Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">>> {
     let names: string[];
@@ -328,9 +338,31 @@ export class AblationExperimentStore {
 }
 
 function assertSnapshotIntegrity(snapshot: AblationExperimentSnapshot): void {
-  if (!snapshot || snapshot.schemaVersion !== 1 || snapshot.protocolVersion !== ABLATION_PROTOCOL_VERSION) throw new Error("Invalid ablation experiment snapshot");
+  if (!snapshot || snapshot.schemaVersion !== 1 || (snapshot.protocolVersion !== "ablation-v1" && snapshot.protocolVersion !== ABLATION_PROTOCOL_VERSION)) throw new Error("Invalid ablation experiment snapshot");
   const { experimentFingerprint: _fingerprint, ...content } = snapshot;
   if (_fingerprint !== sha256(canonicalJson(content))) throw new Error("Ablation experiment snapshot fingerprint mismatch");
+}
+
+/** v1 snapshots preceded advisory defaults. Preserve their historical meaning
+ * when an old file omitted an expanded policy object. */
+function hydrateLegacySnapshot(snapshot: AblationExperimentSnapshot): AblationExperimentSnapshot {
+  if (snapshot.protocolVersion !== "ablation-v1") return snapshot;
+  return {
+    ...snapshot,
+    variants: snapshot.variants.map((variant) => {
+      const policy = normalizePolicy(variant.policy ?? variant.policySnapshot?.policy, LEGACY_V1_HARNESS_POLICY);
+      return {
+        ...variant,
+        policy,
+        policySnapshot: {
+          policy,
+          policyFingerprint: sha256(canonicalJson(policy)),
+          changedFactors: policyDiff(policy, LEGACY_V1_HARNESS_POLICY),
+          multiFactor: variant.multiFactor === true || variant.changedFactor === "composite" || policyDiff(policy, LEGACY_V1_HARNESS_POLICY).length > 1,
+        },
+      };
+    }),
+  };
 }
 
 export function buildAblationPairings(experiment: Pick<AblationExperimentSnapshot, "experimentId" | "variants" | "runOrder" | "budget">, cases: readonly AblationCaseRef[]): AblationPairing[] {
@@ -370,23 +402,23 @@ function validateVariants(value: unknown, model: AblationModelSnapshot, profile?
   });
 }
 
-function normalizePolicy(value: unknown): HarnessPolicy {
+function normalizePolicy(value: unknown, defaults: HarnessPolicy = DEFAULT_HARNESS_POLICY): HarnessPolicy {
   if (value !== undefined && !isRecord(value)) throw new Error("Variant policy must be an object");
   const input = (value ?? {}) as Record<string, unknown>;
-  const policy = { ...DEFAULT_HARNESS_POLICY } as HarnessPolicy;
-  for (const key of Object.keys(DEFAULT_HARNESS_POLICY) as Array<keyof HarnessPolicy>) {
+  const policy = { ...defaults } as HarnessPolicy;
+  for (const key of Object.keys(defaults) as Array<keyof HarnessPolicy>) {
     if (input[key] !== undefined) {
       if (!allowedPolicyValues(key).includes(String(input[key]))) throw new Error(`Invalid harness policy ${key}: ${String(input[key])}`);
       (policy[key] as string) = String(input[key]);
     }
   }
-  for (const key of Object.keys(input)) if (!(key in DEFAULT_HARNESS_POLICY)) throw new Error(`Unknown harness policy field: ${key}`);
+  for (const key of Object.keys(input)) if (!(key in defaults)) throw new Error(`Unknown harness policy field: ${key}`);
   return policy;
 }
 
-function policyDiff(policy: HarnessPolicy): AblationChangedFactor[] {
+function policyDiff(policy: HarnessPolicy, defaults: HarnessPolicy = DEFAULT_HARNESS_POLICY): AblationChangedFactor[] {
   const mapping: Array<[keyof HarnessPolicy, AblationChangedFactor]> = [["firstAction", "first_action"], ["phaseRoute", "phase_route"], ["actionBundle", "action_bundle"], ["duplicateFailure", "duplicate_failure"], ["circuitBreaker", "circuit_breaker"], ["contextSelection", "context_delivery"], ["recall", "recall"], ["evidenceCuration", "evidence_curation"], ["informationValue", "information_value"], ["compression", "compression"], ["stopSuggestion", "stop_suggestion"]];
-  return mapping.filter(([key]) => policy[key] !== DEFAULT_HARNESS_POLICY[key]).map(([, factor]) => factor);
+  return mapping.filter(([key]) => policy[key] !== defaults[key]).map(([, factor]) => factor);
 }
 
 function validateCorpus(value: unknown): Required<AblationCorpusRef> {
