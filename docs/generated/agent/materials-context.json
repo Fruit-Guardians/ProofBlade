@@ -74,7 +74,7 @@
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
-    "src/knowledge/evidence-graph.ts": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+    "src/knowledge/evidence-graph.ts": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
     "src/knowledge/observer.ts": "63cc7ab6bec68a56931e6c3068f961ed9aa075da0f9fec1bcd0de92e4822ccb8",
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "5e089cbde628eaa3cb15b85b917261798290376be1a04b26f9479e2d36088cab",
@@ -986,7 +986,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 72,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -4371,8 +4371,10 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 509,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
-      "testRefs": []
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
+      "testRefs": [
+        "packages/materials/tests/reasoning-forest.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::function::formatReasoningForestContext",
@@ -4384,8 +4386,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 553,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "line": 556,
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -10885,7 +10887,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 43,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -10899,7 +10901,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 61,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -10913,7 +10915,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 19,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -10927,7 +10929,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 28,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -10941,7 +10943,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 38,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -10955,7 +10957,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 55,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -18119,6 +18121,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -19909,6 +19912,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -22928,7 +22932,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 79,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/evidence-curation-gate.test.ts"
       ]
@@ -22944,7 +22948,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 367,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -22960,7 +22964,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 418,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -22976,7 +22980,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 422,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -22992,7 +22996,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 317,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23008,7 +23012,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 336,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -23022,7 +23026,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 475,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts"
       ]
@@ -23038,7 +23042,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 119,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -23058,7 +23062,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 263,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts"
       ]
@@ -23074,7 +23078,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 438,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
@@ -23101,7 +23105,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 391,
-      "moduleHash": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+      "moduleHash": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
       "testRefs": []
     },
     {
@@ -29585,6 +29589,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"

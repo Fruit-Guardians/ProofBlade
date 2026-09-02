@@ -75,7 +75,7 @@
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
-    "src/knowledge/evidence-graph.ts": "618c81517ca85bb2a772a016279231760be353151022c1f50dfaa8026cfb313d",
+    "src/knowledge/evidence-graph.ts": "577c1b2f04776585ecea1ec8e656ccef7664d6b5a89e086a3c7c33262bd47b49",
     "src/knowledge/observer.ts": "63cc7ab6bec68a56931e6c3068f961ed9aa075da0f9fec1bcd0de92e4822ccb8",
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "5e089cbde628eaa3cb15b85b917261798290376be1a04b26f9479e2d36088cab",
@@ -6572,8 +6572,10 @@
         "@proofblade/molecules",
         "node:path"
       ],
-      "testRefs": [],
-      "structureHash": "37ccb7ea92a371d52def786118bf14a963ed011c85ca804c5d98c12408e2a3ad"
+      "testRefs": [
+        "packages/materials/tests/reasoning-forest.test.ts"
+      ],
+      "structureHash": "e18002e5a0480ca0d642beb47b493b29bc21f7d9f8a37b22d471cd1b32ffb463"
     },
     {
       "id": "@proofblade/materials::function::formatReasoningForestContext",
@@ -6582,7 +6584,7 @@
       "visibility": "public",
       "module": "src/knowledge/evidence-graph.ts",
       "exportPath": "@proofblade/materials",
-      "line": 553,
+      "line": 556,
       "signature": "(index: ReasoningForestIndex): string",
       "summary": "Inferred summary: format reasoning forest context operation used to produce a deterministic value.",
       "summarySource": "inferred",
@@ -26860,6 +26862,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -29166,6 +29169,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"
@@ -42385,6 +42389,7 @@
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/verification-recovery.test.ts"

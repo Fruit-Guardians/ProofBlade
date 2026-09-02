@@ -5,7 +5,7 @@ import test from "node:test";
 import type { AgentMessage } from "@earendil-works/pi-agent-core/node";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { CodingEvidenceGraph, formatReasoningForestContext } from "../src/knowledge/evidence-graph.js";
+import { buildReasoningForest, CodingEvidenceGraph, formatReasoningForestContext } from "../src/knowledge/evidence-graph.js";
 import { injectReasoningForestContext } from "../src/runtime/coding-lane.js";
 
 test("reasoning forest reuses evidence across trees and rejects invalid graph edges", async () => {
@@ -76,6 +76,8 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     const firstHash = (await services.control.replay(runId)).projectionHash;
     const secondHash = (await services.control.replay(runId)).projectionHash;
     assert.equal(firstHash, secondHash);
+    const currentSnapshot = await services.control.snapshot(runId);
+    assert.equal(buildReasoningForest(currentSnapshot).hash, buildReasoningForest({ ...currentSnapshot, lastSeq: currentSnapshot.lastSeq + 1 }).hash);
 
     const longClaimArtifact = await services.artifacts.putText(runId, "long claim source", { filename: "long-claim.txt", mime: "text/plain", sensitivity: "public" });
     const longClaim = `完整权威主张：${"保持完整内容用于验证，展示标题应单独截断。".repeat(12)}`;

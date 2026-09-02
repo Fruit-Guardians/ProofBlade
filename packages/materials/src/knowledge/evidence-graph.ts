@@ -547,7 +547,10 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
     orphanNodeIds: orphanNodes.map((node) => node.id),
     orphanNodes,
   };
-  return { ...base, hash: sha256(canonicalJson(base)) };
+  // The sequence is an audit position, not visible forest content. Excluding
+  // it keeps the cache identity stable when unrelated events advance the Run.
+  const { generatedSeq: _generatedSeq, ...content } = base;
+  return { ...base, hash: sha256(canonicalJson(content)) };
 }
 
 export function formatReasoningForestContext(index: ReasoningForestIndex): string {
