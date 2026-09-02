@@ -30,11 +30,11 @@
     "src/container/docker.ts": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
     "src/container/execution-env.ts": "578182c5ae5f0b4f6db939b91b582f90dfefe59534d37a2e133b2b5fbf4fb07a",
     "src/container/session-registry.ts": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
-    "src/context/agent-pruner.ts": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+    "src/context/agent-pruner.ts": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
     "src/context/checkpoint.ts": "2f3f775ce80a274cd4972399a89ff745e75e065cb0f376f0f38a7a2f0899574b",
     "src/context/compiler.ts": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
-    "src/context/maintenance-coordinator.ts": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+    "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
     "src/context/model-receipt.ts": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
@@ -3363,8 +3363,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 74,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 77,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts"
       ]
@@ -3379,8 +3379,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 24,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 27,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": [
         "packages/materials/tests/interruption-recovery.test.ts"
       ]
@@ -3395,8 +3395,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 33,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 36,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": [
         "packages/materials/tests/interruption-recovery.test.ts"
       ]
@@ -3443,7 +3443,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/maintenance-coordinator.ts",
       "line": 34,
-      "moduleHash": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+      "moduleHash": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
       ]
@@ -8065,8 +8065,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 14,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 17,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": []
     },
     {
@@ -8079,8 +8079,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 6,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 9,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": []
     },
     {
@@ -8093,8 +8093,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 18,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 21,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": []
     },
     {
@@ -8166,7 +8166,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/maintenance-coordinator.ts",
       "line": 5,
-      "moduleHash": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+      "moduleHash": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
       "testRefs": []
     },
     {
@@ -8180,7 +8180,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/maintenance-coordinator.ts",
       "line": 16,
-      "moduleHash": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+      "moduleHash": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
       "testRefs": []
     },
     {
@@ -16029,6 +16029,7 @@
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-authority-migration.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -23925,6 +23926,7 @@
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context.test.ts",
         "packages/materials/tests/control-store-concurrency.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/demo.test.ts",
@@ -35197,8 +35199,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/agent-pruner.ts",
-      "line": 12,
-      "moduleHash": "091b4c0307064f03f8522917b2ddb9f822f9f075d250beb4751a452eeef6fc1f",
+      "line": 15,
+      "moduleHash": "6be4142df1ada15f816cd48bc57799219bccdf2c6af4b7605bbd57684f2eee6b",
       "testRefs": []
     },
     {

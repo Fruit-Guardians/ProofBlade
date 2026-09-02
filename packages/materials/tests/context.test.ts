@@ -303,7 +303,7 @@ test("context maintenance coordinator repairs every view and defers compaction",
   assert.equal(prepared.plan.shouldSnip, true);
   assert.equal(prepared.nextAction, "compact");
   assert.equal(prepared.checkpointRecommended, true);
-  assert.equal(prepared.messages.some((message) => message.role === "toolResult"), true);
+  assert.ok(prepared.estimatedTokens <= 256);
 });
 
 test("context maintenance compacts proactively below the provider hard limit", () => {
@@ -391,6 +391,28 @@ test("context maintenance keeps pruning after snipping drops below the prune thr
   assert.equal(prepared.plan.shouldPrune, true);
   assert.ok(prepared.estimatedTokens <= messageBudget);
   assert.match(JSON.stringify(prepared.messages), /call-7/);
+});
+
+test("context maintenance enforces a final hard cap for an oversized retained tail", () => {
+  const refs = Array.from({ length: 200 }, (_, index) => `A-${String(index).padStart(4, "0")}`).join(" ");
+  const messages = [
+    { role: "user", content: `task ${"x".repeat(8_000)}`, timestamp: 1 },
+    { role: "assistant", content: [{ type: "toolCall", id: "call-tail", name: "bash", arguments: { command: "x".repeat(8_000) } }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 2 },
+    { role: "toolResult", toolCallId: "call-tail", toolName: "bash", content: [{ type: "text", text: `${"output ".repeat(4_000)} ${refs}` }], details: { refs }, isError: false, timestamp: 3 },
+    { role: "user", content: `follow-up ${"y".repeat(8_000)}`, timestamp: 4 },
+  ] as never[];
+  const prepared = prepareContextMaintenance({ messages, availableTokens: 1_024, messageBudget: 512 });
+  assert.ok(prepared.estimatedTokens <= 512);
+  const rendered = JSON.stringify(prepared.messages);
+  assert.doesNotMatch(rendered, /x{1000}/);
+  assert.doesNotMatch(rendered, /y{1000}/);
+  const maintenanceRefs = prepared.messages
+    .filter((message) => message.role === "toolResult")
+    .flatMap((message) => {
+      const details = message.details as { contextMaintenance?: { refs?: unknown } } | undefined;
+      return Array.isArray(details?.contextMaintenance?.refs) ? [details.contextMaintenance.refs] : [];
+    });
+  assert.ok(maintenanceRefs.every((refs) => refs.length <= 32));
 });
 
 function zeroUsage() {
