@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createModelReceipt, recallArtifact, selectContextCandidates } from "../src/index.js";
+import { createModelReceipt, recallArtifact, renderModelReceipt, selectContextCandidates } from "../src/index.js";
 import { boundModelText } from "../src/domain/text-bounds.js";
 
 const artifact = { id: "A-1", runId: "R-1", generation: 2, path: "artifacts/A-1.txt", sha256: "f".repeat(64), bytes: 100, mime: "text/plain", sensitivity: "public" as const, origin: { schemaVersion: 1 as const, registeredBy: "agent" as const, tags: [] } };
@@ -20,6 +20,16 @@ test("path-only and secret receipts never expose inline content", () => {
   assert.equal(pathOnly.preview, undefined);
   const secret = createModelReceipt({ runId: "R-1", generation: 2, operationId: "O-1", title: "Secret", content: "secret text", artifact: { ...artifact, sensitivity: "secret" }, mode: "full" });
   assert.equal(secret.preview, undefined);
+});
+
+test("rendered receipts expose an explicit Artifact recall path", () => {
+  const receipt = createModelReceipt({ runId: "R-1", generation: 2, operationId: "bash-1", title: "Large output", summary: "Large output archived", content: "x".repeat(5000), artifact, maxInlineChars: 64, maxPreviewChars: 20 });
+  const rendered = renderModelReceipt(receipt);
+  assert.match(rendered, /visible=bounded/);
+  assert.match(rendered, /artifact=pb:\/\/run\/R-1\/artifact\/A-1\/content/);
+  assert.match(rendered, /next=recall/);
+  assert.match(rendered, /omitted_chars=4980/);
+  assert.doesNotMatch(rendered, /x{100}/);
 });
 
 test("broker selection is deterministic and keeps required evidence within the budget", () => {

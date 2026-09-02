@@ -10,6 +10,7 @@ import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@pro
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
 import { boundedRequestedChars } from "../domain/text-bounds.js";
+import { createModelReceipt, renderModelReceipt } from "../context/model-receipt.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
@@ -1149,9 +1150,10 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
+      const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content)],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
       };
     },
@@ -1242,19 +1244,21 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
+        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
+        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
+      const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0))],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
@@ -1263,6 +1267,47 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       };
     },
   };
+}
+
+function isBoundedReadResult(result: { details?: unknown }): boolean {
+  return Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true);
+}
+
+async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0): Promise<string | undefined> {
+  try {
+    const runId = context.runtime?.runId ?? context.outputRewrite?.runId;
+    if (!runId) return undefined;
+    const snapshot = context.controlStore
+      ? await context.controlStore.snapshot(runId).catch(() => undefined)
+      : undefined;
+    const artifact = snapshot?.artifacts[artifactId] ?? ({
+      id: artifactId,
+      runId,
+      generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
+      path: `artifacts/${artifactId}`,
+      sha256: artifactHash || "0".repeat(64),
+      bytes: artifactBytes,
+      mime: "text/plain",
+      sensitivity: "public",
+      origin: { schemaVersion: 1, registeredBy: "agent", tags: [] },
+    } as never);
+    return renderModelReceipt(createModelReceipt({
+      runId,
+      generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
+      operationId,
+      title,
+      content,
+      artifact,
+      summary: `${title} 已归档；完整内容请沿 Artifact URI 使用 evidence.read/Recall。`,
+      mode: bounded ? "receipt" : "full",
+      ...(bounded ? { omittedChars: Math.max(omittedChars, artifactBytes - content.length) } : {}),
+      maxInlineChars: 2_048,
+      maxPreviewChars: 512,
+      nextActions: bounded ? ["recall"] : ["none"],
+    }));
+  } catch {
+    return undefined;
+  }
 }
 
 interface AutomaticArtifactDetails {

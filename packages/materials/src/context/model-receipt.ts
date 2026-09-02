@@ -55,6 +55,8 @@ export interface ModelReceiptOptions {
   trust?: ContextTrust;
   sensitivity?: ContextSensitivity;
   nextActions?: ReceiptNextAction[];
+  /** Caller-known omitted character/byte count for an externally bounded result. */
+  omittedChars?: number;
   generatedAt?: string;
 }
 
@@ -71,11 +73,35 @@ export function createModelReceipt(options: ModelReceiptOptions): ModelReceipt {
     uri: artifactUri(options.runId, options.artifact.id), kind: "artifact", runId: options.runId, generation: options.generation, scope: "current-run", level: "L2", contentHash: options.artifact.sha256, sourceIds: [options.artifact.id], trust: options.trust ?? "observed", sensitivity, stale: options.artifact.generation !== options.generation, readPolicy: { maxChars: 6_000, maxBytes: 64 * 1024, allowRange: true },
   } : undefined;
   const mode = options.mode ?? "receipt";
-  const preview = mode === "path_only" || sensitivity === "secret" ? undefined : boundedPreview(content, maxPreviewChars, maxInlineChars);
+  const preview = mode === "path_only" || sensitivity === "secret"
+    ? undefined
+    : options.omittedChars !== undefined
+      ? { omittedChars: Math.max(0, Math.floor(options.omittedChars)) }
+      : boundedPreview(content, maxPreviewChars, maxInlineChars);
   const receiptBase = {
     schemaVersion: 1 as const, operationId: options.operationId, state: options.state ?? "success", title: bounded(options.title, 256), summary: bounded(options.summary ?? summarize(content), 1_024), keyFacts: (options.keyFacts ?? []).slice(0, 16).map((item) => ({ key: bounded(item.key, 128), value: bounded(item.value, 512) })), refs: ref ? [ref] : [], ...(preview ? { preview } : {}), nextActions: [...new Set(options.nextActions ?? (ref ? ["recall"] : ["none"]))] as ReceiptNextAction[], resultHash, generatedAt: options.generatedAt ?? new Date().toISOString(),
   };
   return { ...receiptBase, presentationHash: sha256(canonicalJson(receiptBase)) };
+}
+
+/** Render a bounded, machine-readable receipt for direct model consumption. */
+export function renderModelReceipt(receipt: ModelReceipt): string {
+  const ref = receipt.refs[0];
+  const preview = receipt.preview?.text
+    ?? [receipt.preview?.head, receipt.preview?.tail].filter(Boolean).join(" ... ");
+  return [
+    "[ProofBlade receipt]",
+    `operation=${receipt.operationId}`,
+    `state=${receipt.state}`,
+    `visible=${receipt.preview?.omittedChars ? "bounded" : "complete"}`,
+    `content_sha256=${receipt.resultHash}`,
+    `artifact=${ref?.uri ?? "none"}`,
+    `omitted_chars=${receipt.preview?.omittedChars ?? 0}`,
+    `next=${receipt.nextActions.join(",")}`,
+    `summary=${receipt.summary}`,
+    ...(preview && !receipt.preview?.omittedChars ? [`preview=${preview}`] : []),
+    "[/ProofBlade receipt]",
+  ].join("\n");
 }
 
 export interface RecallRecord {
