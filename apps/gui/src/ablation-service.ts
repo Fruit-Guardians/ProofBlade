@@ -114,6 +114,18 @@ export class AblationService {
   }
 
   private async run(experiment: AblationExperimentSnapshot): Promise<void> {
+    const corpus = await loadRealEvaluationCorpus(resolve(this.root, experiment.corpus.path));
+    if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("消融语料快照已变化；请创建新的实验版本");
+    const ledgerPath = join(this.directory, `${experiment.experimentId}.ledger.json`);
+    let ledger: AblationRunLedger;
+    try { ledger = await AblationRunLedger.load(ledgerPath); }
+    catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+      ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
+    }
+    await ledger.markInterrupted();
+    const pending = Object.values(ledger.snapshot().attempts).filter((item) => item.status === "ready" || item.status === "unknown");
+    if (pending.length === 0) throw new Error("消融实验没有待执行 pairing；请创建新的实验版本");
     const variants = experiment.variants.map((variant) => {
       const profile = this.profileFor(experiment.model.profileId, experiment.model.model, variant.modelSnapshot.thinkingLevel);
       const variantConfig: ProofBladeConfig = {
@@ -138,6 +150,13 @@ export class AblationService {
       runPrefix: `ABLATION-${experiment.experimentId}`,
       requireAnswerLiteralsAbsent: true,
       baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
+      pairingFilter: pending.map((pairing) => ({ variantId: pairing.variantId, corpusCaseId: pairing.caseId, attempt: pairing.attempt })),
+      onCaseStart: async ({ variantId, corpusCaseId, attempt, runId }) => {
+        await ledger.claim(`${experiment.experimentId}:${corpusCaseId}:${attempt}:${variantId}`, runId);
+      },
+      onCaseComplete: async (item) => {
+        await ledger.complete(`${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${item.variantId}`, item.success ? "succeeded" : "failed", item.error);
+      },
     });
     await writeFile(join(this.directory, `${experiment.experimentId}.results.json`), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
     await this.writeStatus(experiment.experimentId, { status: "completed", finishedAt: new Date().toISOString() });
@@ -186,7 +205,12 @@ export class AblationService {
   }
 
   private async readStatus(experimentId: string): Promise<StatusFile> {
-    try { return JSON.parse(await readFile(join(this.directory, `${experimentId}.status.json`), "utf8")) as StatusFile; }
+    try {
+      const status = JSON.parse(await readFile(join(this.directory, `${experimentId}.status.json`), "utf8")) as StatusFile;
+      // A process restart cannot leave a pairing truthfully RUNNING. The
+      // ledger is authoritative and resume will reclassify interrupted work.
+      return status.status === "running" ? { ...status, status: "paused" } : status;
+    }
     catch { return { status: "draft" }; }
   }
 
