@@ -3,7 +3,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { captureProviderPrefixShape, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { ContextManifest, Lane } from "../domain/types.js";
-import { buildModelContextFrame, type ModelContextFrame } from "../context/model-context-frame.js";
+import { buildModelContextFrame, type ModelContextFrame, type ModelContextItem } from "../context/model-context-frame.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
@@ -26,6 +26,8 @@ export interface PiObservabilityOptions {
     capabilityCatalogHash?: string;
     parentEpochId?: string;
     manifestSummary?: ContextManifestSummary;
+    /** Metadata for transcript items removed before this exact request. */
+    omittedItems?: readonly ModelContextItem[];
   } | undefined>;
   requestContext?: {
     contextWindow?: number;
@@ -71,6 +73,7 @@ interface PendingProvider {
   maxInterEventIdleAttempt?: number;
   maxInterEventIdleEventType?: string;
   contextFrame?: ModelContextFrame;
+  omittedItems?: readonly ModelContextItem[];
 }
 
 /** Correlates Pi's pre-request hook with the scheduler's later slot grant. */
@@ -213,6 +216,7 @@ export class ProviderSchedulingTelemetry {
         api: pending.api,
         payload,
         ...(pending.contextManifestHash ? { contextManifestHash: pending.contextManifestHash } : {}),
+        ...(pending.omittedItems ? { omittedItems: pending.omittedItems } : {}),
       });
       await append(this.options, "model_context_frame_recorded", "model", { frame: pending.contextFrame });
       if (pending.epochId) await append(this.options, "request_epoch_context", "model", {
@@ -296,6 +300,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
           : {}),
       ...(context?.manifestHash ? { contextManifestHash: context.manifestHash } : {}),
       ...(context?.cache ? { contextCache: context.cache } : {}),
+      ...(context?.omittedItems ? { omittedItems: context.omittedItems } : {}),
       api: event.model.api,
       retryLimit: event.streamOptions.maxRetries ?? 0,
       cacheRetention: event.streamOptions.cacheRetention ?? "short",
@@ -371,6 +376,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
         api: pending.api,
         payload: event.payload,
         ...(pending.contextManifestHash ? { contextManifestHash: pending.contextManifestHash } : {}),
+        ...(pending.omittedItems ? { omittedItems: pending.omittedItems } : {}),
       });
       await append(options, "model_context_frame_recorded", "model", { frame: pending.contextFrame });
       await append(options, "request_epoch_context", "model", {
