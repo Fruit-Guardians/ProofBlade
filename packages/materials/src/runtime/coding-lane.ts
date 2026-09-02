@@ -17,6 +17,7 @@ import { latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
+import { boundModelText } from "../domain/text-bounds.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
@@ -60,6 +61,8 @@ import type { ExternalResourceRegistry } from "../recovery/external-resource-reg
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
+
+const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -972,7 +975,15 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
     turnGuidance ? `<proofblade-turn-guidance>\n${turnGuidance}\n</proofblade-turn-guidance>` : "",
   ].filter(Boolean).join("\n\n");
   const dynamicHash = sha256(dynamicContent);
-  const content = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n${dynamicContent}\n</proofblade-context>`;
+  const prefix = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n`;
+  const suffix = "\n</proofblade-context>";
+  // ContextCompiler bounds individual blocks, but the provider receives this
+  // projection as one message. Bound the final envelope as well.
+  const emptyMessage = createCustomMessage("proofblade_context_projection", `${prefix}${suffix}`, false, undefined, new Date(0).toISOString());
+  const envelopeTokens = estimateTokens(JSON.stringify(emptyMessage));
+  const dynamicBudget = Math.max(16, MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS - envelopeTokens);
+  const bounded = boundModelText(dynamicContent, Math.max(64, dynamicContent.length), dynamicBudget);
+  const content = `${prefix}${bounded.text}${suffix}`;
   return createCustomMessage(
     "proofblade_context_projection",
     content,
@@ -980,8 +991,9 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
     {
       manifestHash: compiled.manifest.hash,
       dynamicSuffixHash: dynamicHash,
-      sourceIds: compiled.manifest.sourceIds ?? [],
-      blockIds: compiled.manifest.blocks?.map((block) => block.id) ?? [],
+        sourceIds: compiled.manifest.sourceIds ?? [],
+        blockIds: compiled.manifest.blocks?.map((block) => block.id) ?? [],
+        ...(bounded.truncated ? { truncated: true, maxTokens: MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS } : {}),
     },
     new Date(0).toISOString(),
   );
