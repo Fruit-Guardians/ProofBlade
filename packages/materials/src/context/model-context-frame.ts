@@ -1,0 +1,147 @@
+import { canonicalJson, estimateTokens, id, sha256 } from "../domain/utils.js";
+
+export type ContextSourceKind = "session" | "task" | "ledger" | "observation" | "evidence" | "artifact" | "job" | "queue" | "user" | "system" | "context" | "unknown";
+
+export interface ModelContextItem {
+  itemId: string;
+  role: string;
+  source: ContextSourceKind;
+  sourceIds: string[];
+  contentHash: string;
+  visibleChars: number;
+  estimatedTokens: number;
+  included: boolean;
+  artifactRefs: string[];
+  evidenceRefs: string[];
+}
+
+/** Metadata-only proof of the exact provider payload after adapter conversion. */
+export interface ModelContextFrame {
+  schemaVersion: 1;
+  frameId: string;
+  runId: string;
+  generation: number;
+  requestId: string;
+  epochId?: string;
+  provider: string;
+  model: string;
+  api: string;
+  systemPromptHash?: string;
+  toolCatalogHash?: string;
+  contextManifestHash?: string;
+  sourceMessages: ModelContextItem[];
+  finalMessages: ModelContextItem[];
+  omittedItems: ModelContextItem[];
+  totalVisibleChars: number;
+  estimatedVisibleTokens: number;
+  messageCount: number;
+  frameHash: string;
+  createdAt: string;
+}
+
+export interface ModelContextFrameInput {
+  runId: string;
+  generation: number;
+  requestId: string;
+  epochId?: string;
+  provider: string;
+  model: string;
+  api: string;
+  payload: unknown;
+  systemPromptHash?: string;
+  toolCatalogHash?: string;
+  contextManifestHash?: string;
+  /** IDs intentionally omitted by the final payload adapter. */
+  omittedItems?: readonly ModelContextItem[];
+  createdAt?: string;
+}
+
+export function buildModelContextFrame(input: ModelContextFrameInput): ModelContextFrame {
+  const messages = extractMessages(input.payload);
+  const sourceMessages = messages.map((message, index) => {
+    const contentHash = sha256(message.content);
+    const artifactRefs = [...new Set(message.content.match(/\bA-[A-Za-z0-9_-]{3,128}\b/g) ?? [])].sort();
+    const evidenceRefs = [...new Set(message.content.match(/\bEV-[A-Za-z0-9_-]{3,128}\b/g) ?? [])].sort();
+    const source = message.content.includes("<proofblade-context") ? "context" : roleSource(message.role);
+    return {
+      itemId: `${input.requestId}:message:${index}`,
+      role: message.role,
+      source,
+      sourceIds: [...new Set([...artifactRefs, ...evidenceRefs])].sort(),
+      contentHash,
+      visibleChars: message.content.length,
+      estimatedTokens: estimateTokens(message.content),
+      included: true,
+      artifactRefs,
+      evidenceRefs,
+    } satisfies ModelContextItem;
+  });
+  const omittedItems = [...(input.omittedItems ?? [])].map((item) => ({ ...item, included: false }));
+  const base = {
+    schemaVersion: 1 as const,
+    frameId: id("MCF"),
+    runId: input.runId,
+    generation: input.generation,
+    requestId: input.requestId,
+    ...(input.epochId ? { epochId: input.epochId } : {}),
+    provider: input.provider,
+    model: input.model,
+    api: input.api,
+    ...(input.systemPromptHash ? { systemPromptHash: input.systemPromptHash } : {}),
+    ...(input.toolCatalogHash ? { toolCatalogHash: input.toolCatalogHash } : {}),
+    ...(input.contextManifestHash ? { contextManifestHash: input.contextManifestHash } : {}),
+    sourceMessages,
+    finalMessages: sourceMessages,
+    omittedItems,
+    totalVisibleChars: sourceMessages.reduce((sum, item) => sum + item.visibleChars, 0),
+    estimatedVisibleTokens: sourceMessages.reduce((sum, item) => sum + item.estimatedTokens, 0),
+    messageCount: sourceMessages.length,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+  };
+  // The request identity and timestamp are intentionally excluded from the
+  // content hash so identical final payloads can be compared across retries.
+  const hashInput = {
+    provider: base.provider,
+    model: base.model,
+    api: base.api,
+    ...(base.systemPromptHash ? { systemPromptHash: base.systemPromptHash } : {}),
+    ...(base.toolCatalogHash ? { toolCatalogHash: base.toolCatalogHash } : {}),
+    ...(base.contextManifestHash ? { contextManifestHash: base.contextManifestHash } : {}),
+    sourceMessages: base.sourceMessages.map(({ itemId: _itemId, ...item }) => item),
+    finalMessages: base.finalMessages.map(({ itemId: _itemId, ...item }) => item),
+    omittedItems: base.omittedItems,
+  };
+  return { ...base, frameHash: sha256(canonicalJson(hashInput)) };
+}
+
+function extractMessages(payload: unknown): Array<{ role: string; content: string }> {
+  if (!payload || typeof payload !== "object") return [{ role: "user", content: String(payload ?? "") }];
+  const value = payload as Record<string, unknown>;
+  const messages = Array.isArray(value.messages) ? value.messages : Array.isArray(value.input) ? value.input : [];
+  const extracted = messages.flatMap((message) => {
+    if (!message || typeof message !== "object") return [];
+    const item = message as Record<string, unknown>;
+    return [{ role: typeof item.role === "string" ? item.role : "unknown", content: contentText(item.content ?? item) }];
+  });
+  if (typeof value.system === "string") extracted.unshift({ role: "system", content: value.system });
+  return extracted.length > 0 ? extracted : [{ role: "user", content: contentText(value.input ?? value) }];
+}
+
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map((item) => contentText(item)).join("\n");
+  if (value && typeof value === "object") {
+    const item = value as Record<string, unknown>;
+    if (typeof item.text === "string") return item.text;
+    if (typeof item.content === "string") return item.content;
+  }
+  try { return JSON.stringify(value) ?? ""; } catch { return String(value); }
+}
+
+function roleSource(role: string): ContextSourceKind {
+  if (role === "system") return "system";
+  if (role === "user") return "user";
+  if (role === "tool") return "artifact";
+  if (role === "assistant") return "session";
+  return "unknown";
+}
