@@ -451,13 +451,13 @@ export class CodingEvidenceGraph {
     if (tree.generation !== snapshot.generation) throw new Error(`Reasoning tree is from generation ${tree.generation}`);
     const nodeIds = new Set(tree.nodeIds);
     const usage = nodeTreeUsage(snapshot);
-    return {
+    return boundedRetrievalRecord({
       tree,
       root: snapshot.reasoningNodes[tree.rootNodeId],
       nodes: tree.nodeIds.map((nodeId) => ({ ...snapshot.reasoningNodes[nodeId], adoptedByTrees: usage.get(nodeId) ?? [] })),
       edges: Object.values(snapshot.reasoningEdges).filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to)).sort((a, b) => a.createdSeq - b.createdSeq),
       relatedTrees: relatedTreeIds(snapshot, tree.id).map((id) => snapshot.reasoningTrees[id]).filter(Boolean).map((item) => ({ id: item.id, name: item.name, summary: item.summary, status: item.status })),
-    };
+    });
   }
 
   public async search(query = "", tags: string[] = []): Promise<Array<Record<string, unknown>>> {
@@ -500,7 +500,7 @@ export class CodingEvidenceGraph {
       .filter((row) => normalizedTagSet.size === 0 || [...normalizedTagSet].every((tag) => row.tags.map((item) => item.toLowerCase()).includes(tag)))
       .sort((a, b) => b.score - a.score || b.createdSeq - a.createdSeq)
       .slice(0, 40)
-      .map(({ search: _search, createdSeq: _createdSeq, score: _score, ...row }) => row);
+      .map(({ search: _search, createdSeq: _createdSeq, score: _score, ...row }) => boundedRetrievalRecord(row));
   }
 
   /** Return the same deterministic results plus a provenance-only retrieval trace. */
@@ -579,6 +579,25 @@ export class CodingEvidenceGraph {
     if (Object.values(snapshot.reasoningEdges).some((edge) => edge.from === from && edge.to === to && edge.relation === relation)) return;
     await this.linkNodes({ from, to, relation, explanation, confidence });
   }
+}
+
+const MAX_RETRIEVAL_FIELD_CHARS = 1_024;
+const MAX_RETRIEVAL_ARRAY_ITEMS = 32;
+const MAX_RETRIEVAL_OBJECT_FIELDS = 32;
+
+/** Keep inspect/search payloads useful while reserving large evidence for explicit reads. */
+function boundedRetrievalRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return boundedRetrievalValue(value, 0) as Record<string, unknown>;
+}
+
+function boundedRetrievalValue(value: unknown, depth: number): unknown {
+  if (typeof value === "string") return snipText(value, MAX_RETRIEVAL_FIELD_CHARS).text;
+  if (Array.isArray(value)) return value.slice(0, MAX_RETRIEVAL_ARRAY_ITEMS).map((item) => boundedRetrievalValue(item, depth + 1));
+  if (!value || typeof value !== "object") return value;
+  if (depth >= 4) return "[nested retrieval data omitted]";
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .slice(0, MAX_RETRIEVAL_OBJECT_FIELDS)
+    .map(([key, item]) => [key.slice(0, 128), boundedRetrievalValue(item, depth + 1)]));
 }
 
 export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestIndex {
