@@ -173,6 +173,12 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
     assert.equal(telemetry.provider.byModel[0]?.provider, "mock-http");
     assert.equal(telemetry.provider.byModel[0]?.model, "mock-model");
     assert.equal(telemetry.provider.tokens.total, 4);
+    const frameEvents = (await services.control.events(runId)).filter((event) => event.type === "model_context_frame_recorded");
+    assert.equal(frameEvents.length, 1);
+    const frame = (frameEvents[0]?.payload as { frame?: { messageCount?: number; frameHash?: string } }).frame;
+    assert.ok((frame?.messageCount ?? 0) > 0);
+    assert.equal(frame?.frameHash?.length, 64);
+    assert.doesNotMatch(JSON.stringify(frameEvents[0]?.payload), /Say ok\.|Reply with one short word/);
   } finally {
     await closeTransport?.();
     delete process.env[apiKeyEnv];

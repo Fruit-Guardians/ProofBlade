@@ -683,6 +683,9 @@ export interface RequestEpoch {
   stablePrefixHash?: string;
   dynamicSuffixHash?: string;
   requestBodyHash?: string;
+  /** Metadata-only reference to the final provider-visible context frame. */
+  modelContextFrameId?: string;
+  modelContextFrameHash?: string;
   parentEpochId?: string;
   status: RequestEpochStatus;
   createdAt: string;
@@ -1080,6 +1083,7 @@ export type EventType =
   | "session_superseded"
   | "request_epoch_started"
   | "request_epoch_context"
+  | "model_context_frame_recorded"
   | "context_overflow_recovered"
   | "completion_proposed"
   | "verification_requested"
