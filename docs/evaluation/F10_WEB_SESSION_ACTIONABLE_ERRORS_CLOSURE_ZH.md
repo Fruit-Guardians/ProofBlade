@@ -10,7 +10,7 @@
 
 - WebToolHandler 的模型入口统一返回 `Reason`、`The requested action was not executed` 和 `Next`。
 - 保留原始诊断词（例如 `Unknown web session`、`outside the task scope`、`generation drift`），并根据错误类型给出 `web_list`、新建 session、修正 scope/method/body 或检查 broker 的恢复路径。
-- 已发出的 HTTP 请求错误不会被伪装成未执行；请求前的 scope、session、generation 和参数拒绝明确标注未执行。
+- 请求前的 scope、session、generation 和参数拒绝明确标注未执行；fetch 已成功后若 Artifact、Evidence 或 ControlStore 持久化失败，则返回 `request_sent_result_unknown`，明确远端结果未知并禁止非幂等请求盲重试。
 - HTTP/Browser 的硬 scope、cookie/CSRF、Artifact、generation fence 和 Verifier 行为没有放宽。
 
 ## 验证
@@ -20,7 +20,7 @@ npm run build --workspace=@proofblade/materials
 node --import tsx --test packages/materials/tests/web-tools.test.ts packages/materials/tests/web-session.test.ts
 ```
 
-新增回归覆盖未知 session 和 host/port/scheme 越界反馈；原有 Web session、cookie/CSRF、replay、generation、Browser scope、Artifact/Evidence 和 clean reproduction 测试保持通过。
+新增回归覆盖未知 session、host/port/scheme 越界反馈，以及远端已收到但 Artifact 持久化失败的 POST；原有 Web session、cookie/CSRF、replay、generation、Browser scope、Artifact/Evidence 和 clean reproduction 测试保持通过。
 
 ## 归因与后续实验
 

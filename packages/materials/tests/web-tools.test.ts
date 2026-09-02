@@ -7,6 +7,8 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { WebToolHandler, type WebScope } from "../src/web/web-tools.js";
+import { createWebSessionTools } from "../src/runtime/web-coding-tools.js";
+import type { CodingResourceContext } from "../src/runtime/coding-resources.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 import type { ExternalResourceRecord } from "../src/recovery/external-resource-registry.js";
 
@@ -222,6 +224,37 @@ test("unknown Web sessions explain recovery instead of returning a bare error", 
       return true;
     });
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("web_request reports sent-but-unrecorded requests without encouraging blind retry", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-tool-sent-unknown-"));
+  let received = 0;
+  const server = createServer((_request, response) => { received += 1; response.end("accepted"); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("server did not bind");
+  try {
+    const runId = "WEB-TOOL-SENT-UNKNOWN";
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "web" });
+    const originalPutText = services.artifacts.putText.bind(services.artifacts);
+    services.artifacts.putText = async (...args: Parameters<typeof services.artifacts.putText>) => {
+      if (String(args[1]).includes("http_exchange")) throw new Error("artifact disk unavailable");
+      return await originalPutText(...args);
+    };
+    const handler = new WebToolHandler({ runId, controlStore: services.control, artifactStore: services.artifacts, ownerLane: "main" });
+    const opened = await handler.open({ baseUrl: `http://127.0.0.1:${address.port}/` });
+    const tool = createWebSessionTools().find((item) => item.name === "web_request")!;
+    const result = await tool.execute!("sent-unknown", { sessionId: opened.sessionId, path: "/submit", method: "POST", body: "value=1" }, new AbortController().signal, () => {}, { webSession: handler } as unknown as CodingResourceContext);
+    assert.equal(received, 1);
+    assert.equal(result.isError, true);
+    const text = result.content.filter((item): item is { type: "text"; text: string } => item.type === "text").map((item) => item.text).join("\n");
+    assert.match(text, /request_sent_result_unknown/);
+    assert.match(text, /do not blindly retry/i);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(root, { recursive: true, force: true });
   }
 });
