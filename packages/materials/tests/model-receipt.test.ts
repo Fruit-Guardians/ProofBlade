@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createModelReceipt, recallArtifact, selectContextCandidates } from "../src/index.js";
+import { boundModelText } from "../src/domain/text-bounds.js";
 
 const artifact = { id: "A-1", runId: "R-1", generation: 2, path: "artifacts/A-1.txt", sha256: "f".repeat(64), bytes: 100, mime: "text/plain", sensitivity: "public" as const, origin: { schemaVersion: 1 as const, registeredBy: "agent" as const, tags: [] } };
 
@@ -44,4 +45,10 @@ test("recall enforces run, generation, sensitivity and bounded range before read
   assert.equal((await recallArtifact({ ...common, generation: 3 })).record.status, "STALE");
   assert.equal((await recallArtifact({ ...common, artifact: { ...artifact, sensitivity: "secret" } })).record.status, "DENIED");
   assert.equal((await recallArtifact({ ...common, offset: -1 })).record.status, "RANGE_EXCEEDED");
+});
+
+test("model-facing context bounds use the token budget even for oversized dynamic text", () => {
+  const bounded = boundModelText("context block\n" + "x".repeat(100_000), 100_000, 10_000);
+  assert.equal(bounded.truncated, true);
+  assert.ok(bounded.text.length < 100_000);
 });
