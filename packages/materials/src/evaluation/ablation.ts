@@ -131,6 +131,8 @@ export interface AblationModelSnapshot {
   provider: string;
   api: ModelProfileConfig["api"];
   baseUrl: string;
+  /** Optional proxy endpoint used by the immutable Provider transport. */
+  proxyUrl?: string;
   apiKeyEnv: string;
   endpointMode?: "exact";
   model: string;
@@ -223,11 +225,12 @@ export function snapshotModel(input: AblationModelInput, profile?: ModelProfileC
   if (profile && profile.model !== "auto" && model !== profile.model && model !== "auto") throw new Error(`Experiment model ${model} does not match Provider profile model ${profile.model}`);
   const snapshot = {
     profileId: input.profileId.trim(), provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl,
+    ...(resolved.proxyUrl ? { proxyUrl: resolved.proxyUrl } : {}),
     apiKeyEnv: resolved.apiKeyEnv, ...(resolved.endpointMode === undefined ? {} : { endpointMode: resolved.endpointMode }), model,
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
     ...(input.sampling === undefined ? {} : { sampling: input.sampling }), contextWindow: input.contextWindow ?? resolved.contextWindow, maxTokens: input.maxTokens ?? resolved.maxTokens,
   } as Omit<AblationModelSnapshot, "profileFingerprint">;
-  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: snapshot.contextWindow, maxTokens: snapshot.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
 }
 
 export interface AblationPreflightCheck { id: string; passed: boolean; actual: string | number; expected: string | number; }

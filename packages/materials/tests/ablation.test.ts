@@ -47,6 +47,12 @@ test("validates a strict same-model ablation and produces stable fingerprints", 
   assert.equal(first.safety.secretIsolation, "enforced");
 });
 
+test("provider proxy transport is included in the immutable model snapshot", () => {
+  const proxied = validateAblationExperiment(input(), { ...profile, proxyUrl: "http://127.0.0.1:7897" });
+  assert.equal(proxied.model.proxyUrl, "http://127.0.0.1:7897");
+  assert.notEqual(proxied.model.profileFingerprint, validateAblationExperiment(input(), profile).model.profileFingerprint);
+});
+
 test("rejects auto model, duplicate baselines, policy mismatch and disabled safety", () => {
   assert.throws(() => validateAblationExperiment(input({ model: { profileId: "relay-a", model: "auto" } }), profile), /concrete model/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], baseline: true }] }), profile), /exactly one baseline/);
