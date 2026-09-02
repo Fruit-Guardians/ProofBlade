@@ -66,6 +66,13 @@ test("preflight compares every immutable provider snapshot field", async () => {
     const result = await preflightAblationExperiment(experiment, changedProfile);
     assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, false);
   }
+test("canonicalizes Provider baseUrl consistently across snapshots and preflight", async () => {
+  process.env.TEST_KEY = "secret";
+  const profileWithSlash = { ...profile, baseUrl: `${profile.baseUrl}/` };
+  const experiment = validateAblationExperiment(input(), profileWithSlash);
+  assert.equal(experiment.model.baseUrl, profile.baseUrl);
+  const result = await preflightAblationExperiment(experiment, profileWithSlash);
+  assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, true);
   delete process.env.TEST_KEY;
 });
 

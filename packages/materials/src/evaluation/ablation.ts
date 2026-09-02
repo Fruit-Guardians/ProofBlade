@@ -199,6 +199,10 @@ export interface AblationCaseRef {
   targetKind?: TargetKind;
 }
 
+function canonicalProviderBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, "");
+}
+
 export function validateAblationExperiment(value: unknown, profile?: ModelProfileConfig): AblationExperimentSnapshot {
   if (!isRecord(value)) throw new Error("Ablation experiment must be a JSON object");
   if (value.schemaVersion !== 1) throw new Error("Ablation experiment schemaVersion must be 1");
@@ -227,13 +231,13 @@ export function snapshotModel(input: AblationModelInput, profile?: ModelProfileC
   const model = input.model.trim();
   if (profile && profile.model !== "auto" && model !== profile.model && model !== "auto") throw new Error(`Experiment model ${model} does not match Provider profile model ${profile.model}`);
   const snapshot = {
-    profileId: input.profileId.trim(), provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl,
+    profileId: input.profileId.trim(), provider: resolved.provider, api: resolved.api, baseUrl: canonicalProviderBaseUrl(resolved.baseUrl),
     ...(resolved.proxyUrl ? { proxyUrl: resolved.proxyUrl } : {}),
     apiKeyEnv: resolved.apiKeyEnv, ...(resolved.endpointMode === undefined ? {} : { endpointMode: resolved.endpointMode }), model,
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
     ...(input.sampling === undefined ? {} : { sampling: input.sampling }), contextWindow: input.contextWindow ?? resolved.contextWindow, maxTokens: input.maxTokens ?? resolved.maxTokens,
   } as Omit<AblationModelSnapshot, "profileFingerprint">;
-  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: resolved.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: resolved.contextWindow, maxTokens: resolved.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
+  return { ...snapshot, profileFingerprint: sha256(canonicalJson({ provider: resolved.provider, api: resolved.api, baseUrl: snapshot.baseUrl, endpointMode: resolved.endpointMode ?? "", apiKeyEnv: resolved.apiKeyEnv, proxyUrl: resolved.proxyUrl ?? "", model, contextWindow: resolved.contextWindow, maxTokens: resolved.maxTokens, thinkingLevel: snapshot.thinkingLevel ?? "", sampling: snapshot.sampling ?? {} })) };
 }
 
 export interface AblationPreflightCheck { id: string; passed: boolean; actual: string | number; expected: string | number; }
