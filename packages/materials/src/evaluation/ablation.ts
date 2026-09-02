@@ -51,11 +51,14 @@ export interface HarnessPolicy {
 }
 
 export const DEFAULT_HARNESS_POLICY: HarnessPolicy = {
-  firstAction: "hard_gate",
-  phaseRoute: "hard_gate",
-  actionBundle: "hard_gate",
-  duplicateFailure: "hard_stop",
-  circuitBreaker: "hard_stop",
+  // Cognitive scaffolding should guide a capable agent without turning a
+  // preparation guess into a denial of service. Hard modes remain explicit
+  // ablation variants; safety and resource boundaries stay enforced.
+  firstAction: "soft_advice",
+  phaseRoute: "soft_advice",
+  actionBundle: "soft_advice",
+  duplicateFailure: "advice",
+  circuitBreaker: "adaptive",
   contextSelection: "fixed_recent",
   recall: "manual",
   evidenceCuration: "manual",

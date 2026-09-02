@@ -7,15 +7,15 @@ const base = {
   requestedAction: "probe", requestedTool: "bash", reasonInputs: { commandHash: "x" },
 };
 
-test("records hard cognitive gates and soft advice distinctly", () => {
+test("defaults cognitive scaffolding to advice while retaining hard gates as explicit variants", () => {
   const controller = new AblationPolicyController(DEFAULT_HARNESS_POLICY, () => "2026-08-31T00:00:00.000Z");
-  const blocked = controller.decide({ ...base, firstActionViolation: true });
+  const advised = controller.decide({ ...base, firstActionViolation: true });
+  assert.equal(advised.decision, "advise");
+  assert.notEqual(advised.decision, "block");
+  const blocked = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "hard_gate" }).decide({ ...base, firstActionViolation: true });
   assert.equal(blocked.decision, "block");
   assert.equal(blocked.policyName, "first_action");
   assert.equal(blocked.policyMode, "hard_gate");
-  const advised = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "soft_advice" }).decide({ ...base, firstActionViolation: true });
-  assert.equal(advised.decision, "advise");
-  assert.notEqual(advised.decision, "block");
 });
 
 test("safety boundary blocks even when cognitive policies are disabled", () => {
@@ -24,8 +24,8 @@ test("safety boundary blocks even when cognitive policies are disabled", () => {
   assert.deepEqual({ decision: event.decision, policyName: event.policyName, policyMode: event.policyMode }, { decision: "block", policyName: "safety_boundary", policyMode: "enforced" });
 });
 
-test("hard circuit breaker terminates and event outcomes can be linked", () => {
-  const controller = new AblationPolicyController(DEFAULT_HARNESS_POLICY);
+test("hard circuit breaker remains an explicit experimental mode and event outcomes can be linked", () => {
+  const controller = new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, circuitBreaker: "hard_stop" });
   const event = controller.decide({ ...base, circuitBreakerTriggered: true });
   assert.equal(event.decision, "terminate");
   const updated = controller.recordOutcome(event, false, ["E-2", "E-1"], "blocked");
