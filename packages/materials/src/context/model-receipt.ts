@@ -94,7 +94,9 @@ export function renderModelReceipt(receipt: ModelReceipt): string {
     `operation=${receipt.operationId}`,
     `state=${receipt.state}`,
     `visible=${receipt.preview?.omittedChars ? "bounded" : "complete"}`,
-    `content_sha256=${receipt.resultHash}`,
+    // Prefer the canonical L2 Artifact hash; resultHash is the visible
+    // projection hash and may intentionally cover only a bounded viewport.
+    `content_sha256=${ref?.contentHash ?? receipt.resultHash}`,
     `artifact=${ref?.uri ?? "none"}`,
     `omitted_chars=${receipt.preview?.omittedChars ?? 0}`,
     `next=${receipt.nextActions.join(",")}`,

@@ -29,6 +29,7 @@ test("rendered receipts expose an explicit Artifact recall path", () => {
   assert.match(rendered, /artifact=pb:\/\/run\/R-1\/artifact\/A-1\/content/);
   assert.match(rendered, /next=recall/);
   assert.match(rendered, /omitted_chars=4980/);
+  assert.match(rendered, new RegExp(`content_sha256=${artifact.sha256}`));
   assert.doesNotMatch(rendered, /x{100}/);
 });
 
