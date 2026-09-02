@@ -35,6 +35,7 @@
     "src/context/compiler.ts": "878a16cf05c06cb0bd99e10f9ca2358b3bbab990f6765ba5d67775fde949e55d",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+    "src/context/model-receipt.ts": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
     "src/control/control-store.ts": "c400082af8f0b6ed00ed84502c6eb06724aaefa7a8406154c0e3c638eea17645",
@@ -69,7 +70,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "e02b2c26d3b536245f987e89dfaa330dd734ea02719888e4984bef8e0068089e",
+    "src/index.ts": "cbdc79fd6218b6c6cda0266313e0be57095566fc62d40f254aef4e073b7f88e3",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
@@ -113,8 +114,8 @@
     "src/recovery/verification-recovery.ts": "289fc66f69229e149a1f292b0d3eed7d43bd81a46538bf236a4c6f76fda08224",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
-    "src/runtime/coding-lane.ts": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
-    "src/runtime/coding-resources.ts": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+    "src/runtime/coding-lane.ts": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
+    "src/runtime/coding-resources.ts": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
     "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -1556,8 +1557,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 78,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 81,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -2599,8 +2600,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 33,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 34,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -2613,8 +2614,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 34,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 35,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -2627,8 +2628,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 38,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 39,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -2643,8 +2644,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 37,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 38,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/web-coding-tools.test.ts"
       ]
@@ -2659,8 +2660,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 35,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 36,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -2673,8 +2674,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1092,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1093,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -3412,6 +3413,84 @@
       "moduleHash": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
       "testRefs": [
         "packages/materials/tests/context.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::artifactUri",
+      "name": "artifactUri",
+      "kind": "function",
+      "signature": "(runId: string, artifactId: string, content?: boolean): string",
+      "summary": "Inferred summary: artifact uri operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 63,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::function::createModelReceipt",
+      "name": "createModelReceipt",
+      "kind": "function",
+      "signature": "(options: ModelReceiptOptions): ModelReceipt",
+      "summary": "Inferred summary: create model receipt operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 65,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::recallArtifact",
+      "name": "recallArtifact",
+      "kind": "function",
+      "signature": "(options: { artifactStore: ArtifactStore; artifact: ArtifactRef; runId: string; generation: number; requester: RecallRecord[\"requester\"]; operationId?: string; level?: ContextLevel; offset?: number; limit?: number; allowSensitive?: boolean; recordId?: string; }): Promise<RecallResult>",
+      "summary": "Inferred summary: recall artifact operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 131,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::renderModelReceipt",
+      "name": "renderModelReceipt",
+      "kind": "function",
+      "signature": "(receipt: ModelReceipt): string",
+      "summary": "Render a bounded, machine-readable receipt for direct model consumption.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 88,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::selectContextCandidates",
+      "name": "selectContextCandidates",
+      "kind": "function",
+      "signature": "(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection",
+      "summary": "Deterministic, provenance-aware selection; scores are ranking signals, not trust.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 167,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
       ]
     },
     {
@@ -5158,8 +5237,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1124,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1136,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5174,8 +5253,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1191,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1203,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5190,8 +5269,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 856,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 859,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -5207,8 +5286,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 946,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 949,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -5223,8 +5302,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1016,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1028,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5239,8 +5318,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1011,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 1023,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5255,8 +5334,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1194,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1196,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5271,8 +5350,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1011,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1012,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -5289,8 +5368,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1028,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1029,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5305,8 +5384,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 136,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 137,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -5319,8 +5398,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 261,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 262,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5335,8 +5414,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 144,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 145,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5351,8 +5430,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 177,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 178,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5367,8 +5446,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1106,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1107,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -5383,8 +5462,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1178,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1180,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5399,8 +5478,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1168,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 1170,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5415,8 +5494,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 164,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 165,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -5429,8 +5508,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 235,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 236,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5445,8 +5524,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 894,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 895,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -8069,6 +8148,108 @@
       "module": "src/context/maintenance-coordinator.ts",
       "line": 16,
       "moduleHash": "3da633bca5884d761b37efb844edf3f51409667bd189c349035d2d0fe52ab1d6",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::BrokerSelection",
+      "name": "BrokerSelection",
+      "kind": "interface",
+      "signature": "BrokerSelection",
+      "summary": "Inferred summary: broker selection type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 164,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ContextCandidate",
+      "name": "ContextCandidate",
+      "kind": "interface",
+      "signature": "ContextCandidate",
+      "summary": "Inferred summary: context candidate type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 149,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::ContextRef",
+      "name": "ContextRef",
+      "kind": "interface",
+      "signature": "ContextRef",
+      "summary": "Inferred summary: context ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 9,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ModelReceipt",
+      "name": "ModelReceipt",
+      "kind": "interface",
+      "signature": "ModelReceipt",
+      "summary": "Inferred summary: model receipt type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 27,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": [
+        "packages/materials/tests/model-receipt.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::ModelReceiptOptions",
+      "name": "ModelReceiptOptions",
+      "kind": "interface",
+      "signature": "ModelReceiptOptions",
+      "summary": "Inferred summary: model receipt options type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 42,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::RecallRecord",
+      "name": "RecallRecord",
+      "kind": "interface",
+      "signature": "RecallRecord",
+      "summary": "Inferred summary: recall record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 109,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::RecallResult",
+      "name": "RecallResult",
+      "kind": "interface",
+      "signature": "RecallResult",
+      "summary": "Inferred summary: recall result type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 129,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
       "testRefs": []
     },
     {
@@ -12454,8 +12635,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 51,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 52,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -12468,8 +12649,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 64,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 65,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -12487,8 +12668,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 130,
-      "moduleHash": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
+      "line": 131,
+      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
     },
     {
@@ -14642,6 +14823,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -14823,6 +15005,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -14886,6 +15069,7 @@
       "testRefs": [
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/provider-native.test.ts",
         "packages/materials/tests/tool-catalog.test.ts"
       ]
@@ -15094,6 +15278,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -15275,6 +15460,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -15456,6 +15642,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -15637,6 +15824,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -15824,6 +16012,7 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -15920,6 +16109,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -16486,6 +16676,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -17237,6 +17428,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -17517,6 +17709,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -17717,6 +17910,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -18498,6 +18692,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -18921,6 +19116,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -19382,6 +19578,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -19608,6 +19805,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -19820,6 +20018,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -20125,6 +20324,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -20712,6 +20912,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -20731,6 +20932,7 @@
       "moduleHash": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
       "testRefs": [
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts"
       ]
     },
@@ -20872,6 +21074,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -21368,6 +21571,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21478,6 +21682,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21588,6 +21793,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21698,6 +21904,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -21829,6 +22036,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -22012,6 +22220,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -22509,6 +22718,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -22878,6 +23088,7 @@
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
@@ -23325,6 +23536,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -24117,6 +24329,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -24284,6 +24497,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -24610,6 +24824,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-scheduler.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
@@ -24890,6 +25105,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -25660,6 +25876,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -25896,6 +26113,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -26146,6 +26364,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -26311,6 +26530,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -26625,6 +26845,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -27163,6 +27384,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -27451,6 +27673,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -27827,6 +28050,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -28208,6 +28432,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -28473,8 +28698,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 783,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 786,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -28505,8 +28730,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 795,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 798,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28572,8 +28797,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 787,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 790,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -28596,8 +28821,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 115,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 118,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28640,6 +28865,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -28686,8 +28912,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 791,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 794,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -28707,8 +28933,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 705,
-      "moduleHash": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
+      "line": 708,
+      "moduleHash": "fb4d0456bf0a0e7ed2dfbc71a49fc9dd52897a2d2e05b9e19910b89ff17d4c4d",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -28904,6 +29130,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -29262,6 +29489,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/provider-api.test.ts",
         "packages/materials/tests/provider-native.test.ts",
@@ -29778,6 +30006,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -30152,6 +30381,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -30600,6 +30830,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -30725,6 +30956,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -31536,6 +31768,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -31879,6 +32112,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -32688,6 +32922,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -32885,6 +33120,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -33307,6 +33543,7 @@
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -33870,6 +34107,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/pi-session.test.ts",
@@ -34164,6 +34402,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -34555,6 +34794,7 @@
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
@@ -34954,6 +35194,76 @@
       "module": "src/context/durable-compaction.ts",
       "line": 35,
       "moduleHash": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextLevel",
+      "name": "ContextLevel",
+      "kind": "type",
+      "signature": "ContextLevel",
+      "summary": "Inferred summary: context level type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 5,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextSensitivity",
+      "name": "ContextSensitivity",
+      "kind": "type",
+      "signature": "ContextSensitivity",
+      "summary": "Inferred summary: context sensitivity type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 7,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextTrust",
+      "name": "ContextTrust",
+      "kind": "type",
+      "signature": "ContextTrust",
+      "summary": "Inferred summary: context trust type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 6,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ReceiptNextAction",
+      "name": "ReceiptNextAction",
+      "kind": "type",
+      "signature": "ReceiptNextAction",
+      "summary": "Inferred summary: receipt next action type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 25,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ReceiptState",
+      "name": "ReceiptState",
+      "kind": "type",
+      "signature": "ReceiptState",
+      "summary": "Inferred summary: receipt state type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/context/model-receipt.ts",
+      "line": 24,
+      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
       "testRefs": []
     },
     {
