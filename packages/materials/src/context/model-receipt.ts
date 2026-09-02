@@ -139,11 +139,20 @@ export async function recallArtifact(options: { artifactStore: ArtifactStore; ar
   if (options.artifact.sensitivity !== "public" && !options.allowSensitive) return failedRecall(base, "DENIED", "sensitive artifacts require explicit capability");
   if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 64 * 1024) return failedRecall(base, "RANGE_EXCEEDED", "recall range exceeds the bounded read policy");
   try {
+    // A bounded range read deliberately cannot prove the immutable Artifact
+    // digest. Verify the complete stored bytes before exposing any projection.
+    const verifiedContent = await options.artifactStore.readText(options.runId, options.artifact);
+    if (sha256(verifiedContent) !== options.artifact.sha256) {
+      return failedRecall(base, "HASH_MISMATCH", "artifact contents do not match declared sha256");
+    }
     const range = await options.artifactStore.readTextRange(options.runId, options.artifact, limit, offset);
     const content = range.content;
     const record: RecallRecord = { ...base, returnedBytes: range.bytesRead, returnedChars: content.length, contentHash: options.artifact.sha256, projectionHash: sha256(content), truncated: range.truncated, status: "SUCCEEDED" };
     return { record, content, marker: recallMarker(record, options.artifact.sensitivity) };
-  } catch (error) { return failedRecall(base, "FAILED", error instanceof Error ? error.message : String(error)); }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return failedRecall(base, /hash mismatch/i.test(reason) ? "HASH_MISMATCH" : "FAILED", reason);
+  }
 }
 
 export interface ContextCandidate {
@@ -175,8 +184,12 @@ export function selectContextCandidates(candidates: readonly ContextCandidate[],
   const ordered = [...scored.filter((item) => item.candidate.required), ...scored.filter((item) => !item.candidate.required)];
   for (const item of ordered) {
     scores[item.candidate.id] = item.score;
-    if (item.candidate.required || totalTokens + item.candidate.estimatedTokens <= maxTokens) { selected.push(item.candidate); totalTokens += item.candidate.estimatedTokens; }
-    else omitted.push({ id: item.candidate.id, reason: "token_budget" });
+    if (item.candidate.estimatedTokens > maxTokens || totalTokens + item.candidate.estimatedTokens > maxTokens) {
+      omitted.push({ id: item.candidate.id, reason: item.candidate.required ? "required_token_budget" : "token_budget" });
+      continue;
+    }
+    selected.push(item.candidate);
+    totalTokens += item.candidate.estimatedTokens;
   }
   return { selected, omitted, scores, totalTokens };
 }

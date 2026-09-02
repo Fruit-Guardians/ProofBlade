@@ -36,7 +36,7 @@
     "src/context/compiler.ts": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
-    "src/context/model-receipt.ts": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+    "src/context/model-receipt.ts": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
     "src/control/control-store.ts": "c400082af8f0b6ed00ed84502c6eb06724aaefa7a8406154c0e3c638eea17645",
@@ -5343,7 +5343,7 @@
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ],
-      "structureHash": "e640efdf8436c73e404f2c3ca59fd5813f7fff2f80932ce9e94524a055ccf608"
+      "structureHash": "fbf9eb186dffbf75e04200483e5ffc8f8e65b3b50fb87e37f5d2d235ac712cac"
     },
     {
       "id": "@proofblade/materials::function::renderModelReceipt",
@@ -5374,7 +5374,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 167,
+      "line": 176,
       "signature": "(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection",
       "summary": "Deterministic, provenance-aware selection; scores are ranking signals, not trust.",
       "summarySource": "tsdoc",
@@ -5387,7 +5387,7 @@
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ],
-      "structureHash": "8d0af6a9a06297d281b4c015f8e23a6a73a9cacf4b4f2245573e832574d82e35"
+      "structureHash": "b66c7bc5cbfefafb90db1b43fbddd42a9d870147a7189cdf17364320692292c2"
     },
     {
       "id": "@proofblade/materials::function::appServerApproval",
@@ -12699,7 +12699,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 164,
+      "line": 173,
       "signature": "BrokerSelection",
       "summary": "Inferred summary: broker selection type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -12718,7 +12718,7 @@
       "visibility": "public",
       "module": "src/context/model-receipt.ts",
       "exportPath": "@proofblade/materials",
-      "line": 149,
+      "line": 158,
       "signature": "ContextCandidate",
       "summary": "Inferred summary: context candidate type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -32584,6 +32584,7 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -34652,6 +34653,7 @@
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -36219,6 +36221,7 @@
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createModelReceipt, recallArtifact, renderModelReceipt, selectContextCandidates } from "../src/index.js";
 import { boundModelText } from "../src/domain/text-bounds.js";
+import { sha256 } from "../src/domain/utils.js";
 
 const artifact = { id: "A-1", runId: "R-1", generation: 2, path: "artifacts/A-1.txt", sha256: "f".repeat(64), bytes: 100, mime: "text/plain", sensitivity: "public" as const, origin: { schemaVersion: 1 as const, registeredBy: "agent" as const, tags: [] } };
 
@@ -46,9 +47,23 @@ test("broker selection is deterministic and keeps required evidence within the b
   assert.deepEqual(result, selectContextCandidates(candidates, 50));
 });
 
+test("broker omits required candidates that exceed the hard token budget", () => {
+  const result = selectContextCandidates([
+    { id: "oversized-required", uri: "pb://required", summary: "required", sourceIds: ["r"], relevance: 1, coverage: 1, novelty: 1, independentSources: 1, conflict: 0, trust: "verified" as const, estimatedTokens: 51, required: true },
+    { id: "fits", uri: "pb://fits", summary: "fits", sourceIds: ["f"], relevance: .5, coverage: .5, novelty: .5, independentSources: 1, conflict: 0, trust: "observed" as const, estimatedTokens: 20 },
+  ], 50);
+  assert.deepEqual(result.selected.map((item) => item.id), ["fits"]);
+  assert.deepEqual(result.omitted, [{ id: "oversized-required", reason: "required_token_budget" }]);
+  assert.ok(result.totalTokens <= 50);
+});
+
 test("recall enforces run, generation, sensitivity and bounded range before reading", async () => {
-  const artifactStore = { readTextRange: async (_runId: string, _artifact: unknown, limit: number, offset: number) => ({ content: "bounded", offset, bytesRead: limit, totalBytes: 99, truncated: true }) };
-  const common = { artifactStore: artifactStore as never, artifact, runId: "R-1", generation: 2, requester: "agent" as const, limit: 32 };
+  const recalledArtifact = { ...artifact, sha256: sha256("complete artifact") };
+  const artifactStore = {
+    readText: async () => "complete artifact",
+    readTextRange: async (_runId: string, _artifact: unknown, limit: number, offset: number) => ({ content: "bounded", offset, bytesRead: limit, totalBytes: 99, truncated: true }),
+  };
+  const common = { artifactStore: artifactStore as never, artifact: recalledArtifact, runId: "R-1", generation: 2, requester: "agent" as const, limit: 32 };
   const success = await recallArtifact(common);
   assert.equal(success.record.status, "SUCCEEDED");
   assert.equal(success.content, "bounded");
@@ -56,6 +71,22 @@ test("recall enforces run, generation, sensitivity and bounded range before read
   assert.equal((await recallArtifact({ ...common, generation: 3 })).record.status, "STALE");
   assert.equal((await recallArtifact({ ...common, artifact: { ...artifact, sensitivity: "secret" } })).record.status, "DENIED");
   assert.equal((await recallArtifact({ ...common, offset: -1 })).record.status, "RANGE_EXCEEDED");
+});
+
+test("recall rejects a tampered Artifact before reading its visible range", async () => {
+  let rangeReads = 0;
+  const recalledArtifact = { ...artifact, sha256: sha256("complete artifact") };
+  const artifactStore = {
+    readText: async () => "tampered artifact",
+    readTextRange: async () => {
+      rangeReads += 1;
+      return { content: "must not be exposed", offset: 0, bytesRead: 19, totalBytes: 19, truncated: false };
+    },
+  };
+  const result = await recallArtifact({ artifactStore: artifactStore as never, artifact: recalledArtifact, runId: "R-1", generation: 2, requester: "agent" });
+  assert.equal(result.record.status, "HASH_MISMATCH");
+  assert.equal(rangeReads, 0);
+  assert.equal(result.content, undefined);
 });
 
 test("model-facing context bounds use the token budget even for oversized dynamic text", () => {

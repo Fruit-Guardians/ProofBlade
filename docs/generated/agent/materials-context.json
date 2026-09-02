@@ -35,7 +35,7 @@
     "src/context/compiler.ts": "7bfcd45ec1299f110b030465ea4f2db2c425c5186556d1badb6ec210137cbab3",
     "src/context/durable-compaction.ts": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
     "src/context/maintenance-coordinator.ts": "b809ae68f2e7998253365469961c89b0757f950fddcca2f39d5df0183af423de",
-    "src/context/model-receipt.ts": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+    "src/context/model-receipt.ts": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
     "src/context/user-task-anchor.ts": "5f3c9590523a86fb19b34af9e5ddbb3ceb34fb85d076b74e8f14c864dd0ba081",
     "src/control/app-server.ts": "8b5b227ad2488122f64b11ab7454cfef972c76bdee3961cdd44467012572f9d7",
     "src/control/control-store.ts": "c400082af8f0b6ed00ed84502c6eb06724aaefa7a8406154c0e3c638eea17645",
@@ -3459,7 +3459,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 63,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -3473,7 +3473,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 65,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -3489,7 +3489,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 131,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -3505,7 +3505,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 88,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -3520,8 +3520,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
-      "line": 167,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "line": 176,
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -8193,8 +8193,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
-      "line": 164,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "line": 173,
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -8207,8 +8207,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
-      "line": 149,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "line": 158,
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -8224,7 +8224,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 9,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -8238,7 +8238,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 27,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": [
         "packages/materials/tests/model-receipt.test.ts"
       ]
@@ -8254,7 +8254,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 42,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -8268,7 +8268,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 109,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -8282,7 +8282,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 129,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -22332,6 +22332,7 @@
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/outcome-envelope.test.ts",
         "packages/materials/tests/output-rewrite.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -23845,6 +23846,7 @@
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -24956,6 +24958,7 @@
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
         "packages/materials/tests/observability.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-retry-harness.test.ts",
@@ -35242,7 +35245,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 5,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -35256,7 +35259,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 7,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -35270,7 +35273,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 6,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -35284,7 +35287,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 25,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
@@ -35298,7 +35301,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/context/model-receipt.ts",
       "line": 24,
-      "moduleHash": "30c91070311d60126b9ba6f5c0d7189ba7a706b86411956de324728544e59730",
+      "moduleHash": "461866d6e5015c9a243340bbfe75da1792252ddc6bfda484744878a0bf636537",
       "testRefs": []
     },
     {
