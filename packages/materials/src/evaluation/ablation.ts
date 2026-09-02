@@ -298,7 +298,9 @@ export class AblationExperimentStore {
     let names: string[];
     try { names = await readdir(resolve(this.directory)); } catch (error) { if ((error as { code?: string }).code === "ENOENT") return []; throw error; }
     const results: Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">> = [];
-    for (const name of names.filter((item) => item.endsWith(".json")).sort()) {
+    // Mutable runtime projections share this directory; only an exact
+    // experiment snapshot is valid input to list().
+    for (const name of names.filter((item) => item.endsWith(".json") && !item.endsWith(".ledger.json") && !item.endsWith(".results.json") && !item.endsWith(".status.json")).sort()) {
       const parsed = JSON.parse(await readFile(join(resolve(this.directory), name), "utf8")) as AblationExperimentSnapshot;
       assertSnapshotIntegrity(parsed);
       results.push({ experimentId: parsed.experimentId, name: parsed.name, experimentFingerprint: parsed.experimentFingerprint });
