@@ -16,6 +16,7 @@ import { canonicalJson, estimateTokens, id, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { LeakRecord } from "../pwn/leak.js";
+import { DeterministicArtifactIndex } from "./deterministic-index.js";
 
 export interface RecordCodingEvidenceInput {
   name: string;
@@ -75,6 +76,9 @@ export interface LinkReasoningNodesInput {
 const MAX_SEARCHED_ARTIFACT_BYTES = 512_000;
 
 export class CodingEvidenceGraph {
+  private readonly artifactIndex = new DeterministicArtifactIndex();
+  private indexedGeneration?: number;
+
   public constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
@@ -442,6 +446,10 @@ export class CodingEvidenceGraph {
 
   public async search(query = "", tags: string[] = []): Promise<Array<Record<string, unknown>>> {
     const snapshot = await this.controlStore.snapshot(this.runId);
+    if (this.indexedGeneration !== snapshot.generation) {
+      this.artifactIndex.clear();
+      this.indexedGeneration = snapshot.generation;
+    }
     const normalizedQuery = query.trim().toLowerCase();
     const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
     const normalizedTagSet = new Set(normalizedTags(tags).map((tag) => tag.toLowerCase()));
@@ -462,7 +470,9 @@ export class CodingEvidenceGraph {
         const artifact = snapshot.artifacts[String(row.id)];
         if (!artifact || !artifact.mime.startsWith("text/") || artifact.bytes > MAX_SEARCHED_ARTIFACT_BYTES) return;
         try {
-          row.search += ` ${(await this.artifactStore.readText(this.runId, artifact)).toLowerCase()}`;
+          const indexed = this.artifactIndex.get(artifact.id, artifact.sha256)
+            ?? this.artifactIndex.set(artifact.id, artifact.sha256, await this.artifactStore.readText(this.runId, artifact));
+          row.search += ` ${indexed.normalizedText}`;
         } catch {
           // unreadable artifact stays metadata-only
         }
