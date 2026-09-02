@@ -1,5 +1,9 @@
 import { canonicalJson, estimateTokens, id, sha256 } from "../domain/utils.js";
 
+const MAX_FRAME_MESSAGES = 128;
+const MAX_FRAME_REFS_PER_ITEM = 32;
+const MAX_FRAME_OMITTED_ITEMS = 128;
+
 export type ContextSourceKind = "session" | "task" | "ledger" | "observation" | "evidence" | "artifact" | "job" | "queue" | "user" | "system" | "context" | "unknown";
 
 export interface ModelContextItem {
@@ -58,10 +62,10 @@ export interface ModelContextFrameInput {
 
 export function buildModelContextFrame(input: ModelContextFrameInput): ModelContextFrame {
   const messages = extractMessages(input.payload);
-  const sourceMessages = messages.map((message, index) => {
+  const sourceMessages = messages.slice(0, MAX_FRAME_MESSAGES).map((message, index) => {
     const contentHash = sha256(message.content);
-    const artifactRefs = [...new Set(message.content.match(/\bA-[A-Za-z0-9_-]{3,128}\b/g) ?? [])].sort();
-    const evidenceRefs = [...new Set(message.content.match(/\bEV-[A-Za-z0-9_-]{3,128}\b/g) ?? [])].sort();
+    const artifactRefs = boundedRefs(message.content.match(/\bA-[A-Za-z0-9_-]{3,128}\b/g) ?? []);
+    const evidenceRefs = boundedRefs(message.content.match(/\bEV-[A-Za-z0-9_-]{3,128}\b/g) ?? []);
     const source = message.content.includes("<proofblade-context") ? "context" : roleSource(message.role);
     return {
       itemId: `${input.requestId}:message:${index}`,
@@ -76,7 +80,9 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
       evidenceRefs,
     } satisfies ModelContextItem;
   });
-  const omittedItems = [...(input.omittedItems ?? [])].map((item) => ({ ...item, included: false }));
+  const omittedItems = [...(input.omittedItems ?? [])]
+    .slice(0, MAX_FRAME_OMITTED_ITEMS)
+    .map((item) => boundedFrameItem({ ...item, included: false }));
   const base = {
     schemaVersion: 1 as const,
     frameId: id("MCF"),
@@ -95,7 +101,7 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
     omittedItems,
     totalVisibleChars: sourceMessages.reduce((sum, item) => sum + item.visibleChars, 0),
     estimatedVisibleTokens: sourceMessages.reduce((sum, item) => sum + item.estimatedTokens, 0),
-    messageCount: sourceMessages.length,
+    messageCount: messages.length,
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
   // The request identity and timestamp are intentionally excluded from the
@@ -109,9 +115,25 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
     ...(base.contextManifestHash ? { contextManifestHash: base.contextManifestHash } : {}),
     sourceMessages: base.sourceMessages.map(({ itemId: _itemId, ...item }) => item),
     finalMessages: base.finalMessages.map(({ itemId: _itemId, ...item }) => item),
-    omittedItems: base.omittedItems,
   };
   return { ...base, frameHash: sha256(canonicalJson(hashInput)) };
+}
+
+function boundedFrameItem(item: ModelContextItem): ModelContextItem {
+  return {
+    ...item,
+    itemId: item.itemId.slice(0, 256),
+    role: item.role.slice(0, 64),
+    sourceIds: boundedRefs(item.sourceIds),
+    artifactRefs: boundedRefs(item.artifactRefs),
+    evidenceRefs: boundedRefs(item.evidenceRefs),
+    visibleChars: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, item.visibleChars)),
+    estimatedTokens: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, item.estimatedTokens)),
+  };
+}
+
+function boundedRefs(refs: readonly string[]): string[] {
+  return [...new Set(refs)].sort().slice(0, MAX_FRAME_REFS_PER_ITEM).map((ref) => ref.slice(0, 128));
 }
 
 function extractMessages(payload: unknown): Array<{ role: string; content: string }> {
