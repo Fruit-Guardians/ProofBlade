@@ -234,6 +234,18 @@ async function main(): Promise<void> {
           const failed = preflight.checks.filter((item) => !item.passed).map((item) => `${item.id} (actual=${item.actual}, expected=${item.expected})`).join("; ");
           throw new Error(`ablation preflight failed before any Provider request: ${failed}`);
         }
+        const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
+        if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("Ablation corpus snapshot changed; create a new immutable experiment version before running");
+        const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
+        let ledger: AblationRunLedger;
+        try { ledger = await AblationRunLedger.load(ledgerPath); }
+        catch (error) {
+          if ((error as { code?: string }).code !== "ENOENT") throw error;
+          ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
+        }
+        const pending = Object.values(ledger.snapshot().attempts).filter((item) => item.status === "ready" || item.status === "unknown");
+        if (ledger.summary().running > 0) throw new Error("Ablation experiment has running pairings; run `ablation resume` after confirming the previous process stopped.");
+        if (pending.length === 0) throw new Error("Ablation experiment has no pending pairings; create a new immutable experiment snapshot for another run.");
         const variants = experiment.variants.map((variant) => ({
           id: variant.id,
           strategyFingerprint: variant.policySnapshot.policyFingerprint,
@@ -262,6 +274,13 @@ async function main(): Promise<void> {
           runPrefix: option(rest, "--run-prefix") ?? `ABLATION-${experiment.experimentId}`,
           requireAnswerLiteralsAbsent: true,
           baselineVariantId: experiment.variants.find((variant) => variant.baseline)?.id,
+          pairingFilter: pending.map((pairing) => ({ variantId: pairing.variantId, corpusCaseId: pairing.caseId, attempt: pairing.attempt })),
+          onCaseStart: async ({ variantId, corpusCaseId, attempt, runId }) => {
+            await ledger.claim(`${experiment.experimentId}:${corpusCaseId}:${attempt}:${variantId}`, runId);
+          },
+          onCaseComplete: async (item) => {
+            await ledger.complete(`${experiment.experimentId}:${item.corpusCaseId}:${item.attempt}:${item.variantId}`, item.success ? "succeeded" : "failed", item.error);
+          },
         });
         print(summary);
         if (rest.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
