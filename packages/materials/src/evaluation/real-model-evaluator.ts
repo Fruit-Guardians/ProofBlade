@@ -297,13 +297,18 @@ export class RealModelEvaluationRunner {
     const gatePolicy = gatePolicyFor(options, variants, minimumCorpusCases);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
+    const selectedPairings = options.pairingFilter
+      ? new Set(options.pairingFilter.map((item) => `${item.variantId}\u0000${item.corpusCaseId}\u0000${item.attempt}`))
+      : undefined;
+    const expectedCasesFor = (variantId: string): number => selectedPairings
+      ? [...selectedPairings].filter((item) => item.startsWith(`${variantId}\u0000`)).length
+      : corpus.cases.length * attempts;
     const results: RealModelVariantSummary[] = [];
     for (const variant of variants) {
       const profileFingerprint = fingerprint(variant.config);
       const services = createServices(this.root, variant.config);
       const cases: RealModelEvaluationCase[] = [];
       try {
-        const selectedPairings = options.pairingFilter ? new Set(options.pairingFilter.map((item) => `${item.variantId}\u0000${item.corpusCaseId}\u0000${item.attempt}`)) : undefined;
         for (const corpusCase of corpus.cases) {
           for (let attempt = 1; attempt <= attempts; attempt += 1) {
             if (selectedPairings && !selectedPairings.has(`${variant.id}\u0000${corpusCase.id}\u0000${attempt}`)) continue;
@@ -328,7 +333,12 @@ export class RealModelEvaluationRunner {
     const checks = [
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
       check("distinct_profile_variants", options.allowSharedProviderProfile === true || distinctProfiles >= 2, distinctProfiles, options.allowSharedProviderProfile === true ? ">=1 (shared profile allowed)" : ">=2"),
-      check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
+      check(
+        selectedPairings ? "selected_pairing_coverage" : "full_corpus_coverage",
+        results.every((item) => item.total === expectedCasesFor(item.id)),
+        results.map((item) => `${item.id}:${item.total}`).join(","),
+        results.map((item) => `${item.id}:${expectedCasesFor(item.id)}`).join(","),
+      ),
       ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
       ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", true, 0, 0)] : []),
       ...gatePolicy.requiredTargetKinds.map((targetKind) => check(

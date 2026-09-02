@@ -149,6 +149,8 @@ test("resumable evaluator runs only selected pairings and records durable callba
     });
     assert.deepEqual(summary.variants.map((variant) => variant.cases.length), [0, 1]);
     assert.deepEqual(events.map((event) => event.split(":").slice(0, 4).join(":")), ["start:beta:sample:1", "complete:beta:sample:1"]);
+    assert.equal(summary.gate.checks.some((item) => item.id === "full_corpus_coverage"), false);
+    assert.equal(summary.gate.checks.find((item) => item.id === "selected_pairing_coverage")?.passed, true);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
