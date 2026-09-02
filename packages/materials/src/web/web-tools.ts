@@ -5,7 +5,7 @@ import type { ExperimentGate } from "../competition/experiment-gate.js";
 import type { ExternalResourceRecord, ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateRequest } from "../recovery/session-runtime-wire.js";
-import { HttpRequestPersistenceError, HttpSessionBackend } from "./http-session.js";
+import { HttpSessionBackend } from "./http-session.js";
 import { hostMatches } from "../pwn/pwn-tools.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 
@@ -184,8 +184,8 @@ export class WebToolHandler {
     }
   }
 
-  public static requestPersistenceError(error: unknown): error is HttpRequestPersistenceError {
-    return error instanceof HttpRequestPersistenceError || (typeof error === "object" && error !== null && (error as { requestSent?: unknown }).requestSent === true);
+  public static requestPersistenceError(error: unknown): error is Error & { requestSent: true } {
+    return typeof error === "object" && error !== null && (error as { requestSent?: unknown }).requestSent === true;
   }
 
   /**
@@ -379,7 +379,7 @@ function webError(reason: string, next: string): Error {
 }
 
 function asWebActionableError(error: unknown, fallbackNext: string): Error {
-  if (WebToolHandler.requestPersistenceError(error)) return error as Error;
+  if (WebToolHandler.requestPersistenceError(error)) return error;
   if (error instanceof Error && error.message.startsWith("[ProofBlade")) return error;
   const reason = error instanceof Error ? error.message : String(error);
   const next = /generation drift|not OPEN|closed/i.test(reason)

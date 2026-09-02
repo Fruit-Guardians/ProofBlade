@@ -19,7 +19,7 @@ export interface HttpSessionResponse {
 }
 
 /** The remote request completed, but durable local recording failed. */
-export class HttpRequestPersistenceError extends Error {
+class HttpRequestPersistenceError extends Error {
   public readonly requestSent = true;
 
   public constructor(message: string, public readonly cause?: unknown) {
