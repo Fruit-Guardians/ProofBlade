@@ -66,4 +66,23 @@ test("context frame supports chat-completions messages and records omitted items
     createdAt: "2026-09-02T00:00:00.000Z",
   });
   assert.equal(noOmitted.frameHash, repeated.frameHash);
+  assert.equal(frame.frameHash, noOmitted.frameHash, "omitted metadata must not alter the provider-visible payload hash");
+});
+
+test("context frame bounds metadata arrays while retaining the final payload count", () => {
+  const frame = buildModelContextFrame({
+    runId: "FRAME-BOUNDS",
+    generation: 0,
+    requestId: "PR-BOUNDS",
+    provider: "local",
+    model: "test",
+    api: "openai-completions",
+    payload: { messages: Array.from({ length: 200 }, (_, index) => ({ role: "user", content: `A-${String(index).padStart(3, "0")} ${"EV-123 ".repeat(64)}` })) },
+    omittedItems: Array.from({ length: 200 }, (_, index) => ({ itemId: `old-${index}`, role: "tool", source: "artifact" as const, sourceIds: Array.from({ length: 64 }, (_, ref) => `A-${index}-${ref}`), contentHash: "b".repeat(64), visibleChars: 10, estimatedTokens: 3, included: true, artifactRefs: [], evidenceRefs: [] })),
+  });
+  assert.equal(frame.messageCount, 200);
+  assert.equal(frame.finalMessages.length, 128);
+  assert.equal(frame.omittedItems.length, 128);
+  assert.ok(frame.finalMessages.every((item) => item.evidenceRefs.length <= 32));
+  assert.ok(frame.omittedItems.every((item) => item.sourceIds.length <= 32));
 });
