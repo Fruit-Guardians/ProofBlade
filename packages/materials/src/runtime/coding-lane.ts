@@ -232,8 +232,11 @@ export class PiCodingLane implements AgentLanePort {
     if (options.browserRuntimeRequired && snapshot.task.verification.web?.transport === "browser" && !options.browserVerifierFactory) {
       throw new Error("Browser runtime broker is configured but unavailable for browser verification");
     }
-    const challengeMode = isChallengeTask(snapshot.task);
-    const challengeProfile = options.challengeProfile ?? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`);
+    // Domain labels may recommend optional tools, but they do not turn a
+    // general coding task into a CTF workflow. Only an explicit challenge task
+    // or caller-supplied profile enables challenge preparation and guidance.
+    const challengeMode = isChallengeTask(snapshot.task) || Boolean(options.challengeProfile);
+    const challengeProfile = options.challengeProfile ?? (challengeMode ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
     let preflight: ChallengeToolPreflight | undefined;
     let preparation: RunToolPreparation | undefined;
@@ -541,7 +544,9 @@ export class PiCodingLane implements AgentLanePort {
       },
     );
     const categoryGuidance = codingCtfCategoryGuidance(dynamicTargetKind, snapshot.task.target, Boolean(pwnTools), Boolean(pwnTools && pwnReproductionPolicy), Boolean(webSession));
-    const ctfTurnGuidance = challengeProfile
+    const ctfTurnGuidance = !challengeMode
+      ? ""
+      : challengeProfile
       ? [
           PREPARED_CTF_FAST_PATH_PROMPT,
           PREPARED_CTF_WORKFLOW_PROMPT,
@@ -726,7 +731,10 @@ export class PiCodingLane implements AgentLanePort {
     // A generated executor prompt may not repeat the words "CTF" or "flag";
     // falling back to text-only detection would silently disable the hard
     // experiment budget for Competition/Fixture evaluation.
-    const ctfMode = this.challengeMode || isLikelyCtfPrompt(text);
+    // Prompt wording is not a runtime mode switch. This prevents a normal
+    // coding conversation mentioning "challenge" or "flag" from receiving
+    // CTF workflow constraints or hard experiment semantics.
+    const ctfMode = this.challengeMode;
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();
@@ -1033,7 +1041,9 @@ export function isLikelyCtfPrompt(text: string): boolean {
 
 /** Durable task classification used when generated executor prompts omit CTF keywords. */
 export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind">): boolean {
-  return task.mode !== "coding_assistant" || task.target_kind !== "unknown";
+  // Target kind is a domain label for optional capabilities, not a mode
+  // switch. General coding tasks may legitimately analyze web or binary data.
+  return task.mode !== "coding_assistant";
 }
 
 const CTF_FAST_PATH_PROMPT = [

@@ -668,11 +668,12 @@ test("coding read creates a searchable source artifact for the evidence graph", 
   }
 });
 
-test("CTF-shaped prompts opt into the bounded challenge path without matching ordinary coding", () => {
+test("legacy CTF prompt detection remains descriptive and does not redefine general task mode", () => {
   assert.equal(isLikelyCtfPrompt("题目描述：求解flag"), true);
   assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
   assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
   assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
 });
 
 test("control-ledger refusal explains the protected boundary and recovery", () => {
@@ -688,7 +689,7 @@ test("control-ledger refusal explains the protected boundary and recovery", () =
 
 test("durable CTF task classification enables challenge guards without prompt keywords", () => {
   assert.equal(isChallengeTask({ mode: "ctf_solve", target_kind: "unknown" }), true);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), true);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
   assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
