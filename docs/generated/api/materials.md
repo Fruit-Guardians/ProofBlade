@@ -276,11 +276,11 @@
 ### ContextCompiler
 - Kind: `class`
 - Signature: `ContextCompiler`
-- Source: [src/context/compiler.ts:21](../../../packages/materials/src/context/compiler.ts:21)
+- Source: [src/context/compiler.ts:22](../../../packages/materials/src/context/compiler.ts:22)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context compiler class used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/skills.test.ts`
+- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/skills.test.ts`
 
 ### DurableCompactionCoordinator
 - Kind: `class`
@@ -436,7 +436,7 @@
 ### CodingEvidenceGraph
 - Kind: `class`
 - Signature: `CodingEvidenceGraph`
-- Source: [src/knowledge/evidence-graph.ts:72](../../../packages/materials/src/knowledge/evidence-graph.ts:72)
+- Source: [src/knowledge/evidence-graph.ts:77](../../../packages/materials/src/knowledge/evidence-graph.ts:77)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding evidence graph class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1109,7 +1109,7 @@
 ### PROOFBLADE_STANDING_INSTRUCTIONS
 - Kind: `constant`
 - Signature: `string`
-- Source: [src/context/compiler.ts:14](../../../packages/materials/src/context/compiler.ts:14)
+- Source: [src/context/compiler.ts:15](../../../packages/materials/src/context/compiler.ts:15)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: proofblade standing instructions constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1705,16 +1705,16 @@
 ### contextText
 - Kind: `function`
 - Signature: `(output: ContextBuildOutput, maxTokens?: number): string`
-- Source: [src/context/compiler.ts:620](../../../packages/materials/src/context/compiler.ts:620)
+- Source: [src/context/compiler.ts:621](../../../packages/materials/src/context/compiler.ts:621)
 - Export: `@proofblade/materials`
 - Summary: Render the compiler output for providers that accept one system prompt.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/handoff.test.ts`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`
 
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:625](../../../packages/materials/src/context/compiler.ts:625)
+- Source: [src/context/compiler.ts:626](../../../packages/materials/src/context/compiler.ts:626)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`
@@ -1812,7 +1812,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create initial snapshot operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/skills.test.ts`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/skills.test.ts`
 
 ### projectionHash
 - Kind: `function`
@@ -1830,7 +1830,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reduce operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/update-proposals.test.ts`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/update-proposals.test.ts`
 
 ### containsCtfCandidate
 - Kind: `function`
@@ -2231,7 +2231,7 @@
 ### buildReasoningForest
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot): ReasoningForestIndex`
-- Source: [src/knowledge/evidence-graph.ts:509](../../../packages/materials/src/knowledge/evidence-graph.ts:509)
+- Source: [src/knowledge/evidence-graph.ts:514](../../../packages/materials/src/knowledge/evidence-graph.ts:514)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build reasoning forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2240,7 +2240,7 @@
 ### formatReasoningForestContext
 - Kind: `function`
 - Signature: `(index: ReasoningForestIndex): string`
-- Source: [src/knowledge/evidence-graph.ts:556](../../../packages/materials/src/knowledge/evidence-graph.ts:556)
+- Source: [src/knowledge/evidence-graph.ts:561](../../../packages/materials/src/knowledge/evidence-graph.ts:561)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: format reasoning forest context operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -2735,7 +2735,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1136](../../../packages/materials/src/runtime/coding-lane.ts:1136)
+- Source: [src/runtime/coding-lane.ts:1138](../../../packages/materials/src/runtime/coding-lane.ts:1138)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -2744,7 +2744,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1203](../../../packages/materials/src/runtime/coding-lane.ts:1203)
+- Source: [src/runtime/coding-lane.ts:1205](../../../packages/materials/src/runtime/coding-lane.ts:1205)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2771,7 +2771,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:1028](../../../packages/materials/src/runtime/coding-lane.ts:1028)
+- Source: [src/runtime/coding-lane.ts:1030](../../../packages/materials/src/runtime/coding-lane.ts:1030)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -2780,7 +2780,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1023](../../../packages/materials/src/runtime/coding-lane.ts:1023)
+- Source: [src/runtime/coding-lane.ts:1025](../../../packages/materials/src/runtime/coding-lane.ts:1025)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -5790,7 +5790,7 @@
 ### CreateReasoningTreeInput
 - Kind: `interface`
 - Signature: `CreateReasoningTreeInput`
-- Source: [src/knowledge/evidence-graph.ts:43](../../../packages/materials/src/knowledge/evidence-graph.ts:43)
+- Source: [src/knowledge/evidence-graph.ts:48](../../../packages/materials/src/knowledge/evidence-graph.ts:48)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create reasoning tree input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5798,7 +5798,7 @@
 ### LinkReasoningNodesInput
 - Kind: `interface`
 - Signature: `LinkReasoningNodesInput`
-- Source: [src/knowledge/evidence-graph.ts:61](../../../packages/materials/src/knowledge/evidence-graph.ts:61)
+- Source: [src/knowledge/evidence-graph.ts:66](../../../packages/materials/src/knowledge/evidence-graph.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: link reasoning nodes input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5806,7 +5806,7 @@
 ### RecordCodingEvidenceInput
 - Kind: `interface`
 - Signature: `RecordCodingEvidenceInput`
-- Source: [src/knowledge/evidence-graph.ts:19](../../../packages/materials/src/knowledge/evidence-graph.ts:19)
+- Source: [src/knowledge/evidence-graph.ts:20](../../../packages/materials/src/knowledge/evidence-graph.ts:20)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record coding evidence input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5814,7 +5814,7 @@
 ### RecordCodingEvidenceResult
 - Kind: `interface`
 - Signature: `RecordCodingEvidenceResult`
-- Source: [src/knowledge/evidence-graph.ts:28](../../../packages/materials/src/knowledge/evidence-graph.ts:28)
+- Source: [src/knowledge/evidence-graph.ts:29](../../../packages/materials/src/knowledge/evidence-graph.ts:29)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record coding evidence result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5822,7 +5822,7 @@
 ### RecordLeakResult
 - Kind: `interface`
 - Signature: `RecordLeakResult`
-- Source: [src/knowledge/evidence-graph.ts:38](../../../packages/materials/src/knowledge/evidence-graph.ts:38)
+- Source: [src/knowledge/evidence-graph.ts:39](../../../packages/materials/src/knowledge/evidence-graph.ts:39)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record leak result type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5830,7 +5830,7 @@
 ### UpdateReasoningTreeInput
 - Kind: `interface`
 - Signature: `UpdateReasoningTreeInput`
-- Source: [src/knowledge/evidence-graph.ts:55](../../../packages/materials/src/knowledge/evidence-graph.ts:55)
+- Source: [src/knowledge/evidence-graph.ts:60](../../../packages/materials/src/knowledge/evidence-graph.ts:60)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: update reasoning tree input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -8986,7 +8986,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
 
 ### CompetitionSandbox.close
 - Kind: `method`
@@ -9252,7 +9252,7 @@
 - Export: `@proofblade/materials`
 - Summary: Solver owns container teardown; cleaning this env must never remove it.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ContainerExecutionEnv.exec
 - Kind: `method`
@@ -9374,11 +9374,11 @@
 ### ContextCompiler.build
 - Kind: `method`
 - Signature: `(input: ContextBuildInput): ContextBuildOutput`
-- Source: [src/context/compiler.ts:22](../../../packages/materials/src/context/compiler.ts:22)
+- Source: [src/context/compiler.ts:23](../../../packages/materials/src/context/compiler.ts:23)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
 
 ### DurableCompactionCoordinator.provide
 - Kind: `method`
@@ -10141,7 +10141,7 @@
 ### CodingEvidenceGraph.annotateArtifact
 - Kind: `method`
 - Signature: `(input: { artifactId: string; name: string; summary: string; tags?: string[]; role?: ArtifactRole; relatedIds?: string[]; }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata; reused: boolean; durableProgress: boolean; progressKey: string; }>`
-- Source: [src/knowledge/evidence-graph.ts:79](../../../packages/materials/src/knowledge/evidence-graph.ts:79)
+- Source: [src/knowledge/evidence-graph.ts:84](../../../packages/materials/src/knowledge/evidence-graph.ts:84)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: annotate artifact operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10150,7 +10150,7 @@
 ### CodingEvidenceGraph.createTree
 - Kind: `method`
 - Signature: `(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:367](../../../packages/materials/src/knowledge/evidence-graph.ts:367)
+- Source: [src/knowledge/evidence-graph.ts:372](../../../packages/materials/src/knowledge/evidence-graph.ts:372)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10159,7 +10159,7 @@
 ### CodingEvidenceGraph.inspectForest
 - Kind: `method`
 - Signature: `(): Promise<ReasoningForestIndex>`
-- Source: [src/knowledge/evidence-graph.ts:418](../../../packages/materials/src/knowledge/evidence-graph.ts:418)
+- Source: [src/knowledge/evidence-graph.ts:423](../../../packages/materials/src/knowledge/evidence-graph.ts:423)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10168,7 +10168,7 @@
 ### CodingEvidenceGraph.inspectTree
 - Kind: `method`
 - Signature: `(treeId: string): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:422](../../../packages/materials/src/knowledge/evidence-graph.ts:422)
+- Source: [src/knowledge/evidence-graph.ts:427](../../../packages/materials/src/knowledge/evidence-graph.ts:427)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10177,7 +10177,7 @@
 ### CodingEvidenceGraph.linkNodes
 - Kind: `method`
 - Signature: `(input: LinkReasoningNodesInput): Promise<{ edge: ReasoningEdge; }>`
-- Source: [src/knowledge/evidence-graph.ts:317](../../../packages/materials/src/knowledge/evidence-graph.ts:317)
+- Source: [src/knowledge/evidence-graph.ts:322](../../../packages/materials/src/knowledge/evidence-graph.ts:322)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: link nodes operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10186,7 +10186,7 @@
 ### CodingEvidenceGraph.linkNodesBatch
 - Kind: `method`
 - Signature: `(inputs: LinkReasoningNodesInput[]): Promise<{ edges: ReasoningEdge[]; }>`
-- Source: [src/knowledge/evidence-graph.ts:336](../../../packages/materials/src/knowledge/evidence-graph.ts:336)
+- Source: [src/knowledge/evidence-graph.ts:341](../../../packages/materials/src/knowledge/evidence-graph.ts:341)
 - Export: `@proofblade/materials`
 - Summary: Commit a graph expansion in one ControlStore transaction.
 - Summary source: `tsdoc`
@@ -10194,7 +10194,7 @@
 ### CodingEvidenceGraph.readArtifact
 - Kind: `method`
 - Signature: `(artifactId: string, maxChars?: number): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:475](../../../packages/materials/src/knowledge/evidence-graph.ts:475)
+- Source: [src/knowledge/evidence-graph.ts:480](../../../packages/materials/src/knowledge/evidence-graph.ts:480)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read artifact operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10203,7 +10203,7 @@
 ### CodingEvidenceGraph.recordEvidence
 - Kind: `method`
 - Signature: `(input: RecordCodingEvidenceInput): Promise<RecordCodingEvidenceResult>`
-- Source: [src/knowledge/evidence-graph.ts:119](../../../packages/materials/src/knowledge/evidence-graph.ts:119)
+- Source: [src/knowledge/evidence-graph.ts:124](../../../packages/materials/src/knowledge/evidence-graph.ts:124)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record evidence operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10212,7 +10212,7 @@
 ### CodingEvidenceGraph.recordLeak
 - Kind: `method`
 - Signature: `(input: { leak: LeakRecord; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<RecordLeakResult>`
-- Source: [src/knowledge/evidence-graph.ts:263](../../../packages/materials/src/knowledge/evidence-graph.ts:263)
+- Source: [src/knowledge/evidence-graph.ts:268](../../../packages/materials/src/knowledge/evidence-graph.ts:268)
 - Export: `@proofblade/materials`
 - Summary: Persist a parsed pwn leak as a replayable reasoning node for later replans.
 - Summary source: `tsdoc`
@@ -10221,7 +10221,7 @@
 ### CodingEvidenceGraph.search
 - Kind: `method`
 - Signature: `(query?: string, tags?: string[]): Promise<Array<Record<string, unknown>>>`
-- Source: [src/knowledge/evidence-graph.ts:438](../../../packages/materials/src/knowledge/evidence-graph.ts:438)
+- Source: [src/knowledge/evidence-graph.ts:443](../../../packages/materials/src/knowledge/evidence-graph.ts:443)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10230,7 +10230,7 @@
 ### CodingEvidenceGraph.updateTree
 - Kind: `method`
 - Signature: `(input: UpdateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:391](../../../packages/materials/src/knowledge/evidence-graph.ts:391)
+- Source: [src/knowledge/evidence-graph.ts:396](../../../packages/materials/src/knowledge/evidence-graph.ts:396)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: update tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -11928,7 +11928,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/verification-recovery.test.ts`
 
 ### LocalFixtureSandbox.close
 - Kind: `method`
