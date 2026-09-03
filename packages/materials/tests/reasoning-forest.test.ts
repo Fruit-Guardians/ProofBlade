@@ -7,7 +7,7 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { buildReasoningForest, CodingEvidenceGraph, formatReasoningForestContext } from "../src/knowledge/evidence-graph.js";
 import { injectReasoningForestContext } from "../src/runtime/coding-lane.js";
-import { estimateTokens } from "../src/domain/utils.js";
+import { estimateTokens, sha256 } from "../src/domain/utils.js";
 
 test("reasoning forest reuses evidence across trees and rejects invalid graph edges", async () => {
   const root = resolve(import.meta.dirname, "../../..", "tmp");
@@ -91,6 +91,11 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
       };
     }
     assert.ok(estimateTokens(formatReasoningForestContext(oversizedForest)) <= 2_048, "forest context must stay within its model-facing bound");
+    const clipped = formatReasoningForestContext(oversizedForest);
+    const match = clipped.match(/^<reasoning-forest hash="[a-f0-9]{64}" visible-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/reasoning-forest>$/);
+    assert.ok(match, "forest envelope must expose a hash for the visible clipped body");
+    assert.equal(match?.[1], sha256(match?.[2] ?? ""), "visible-hash must match the clipped forest body");
+    assert.equal(formatReasoningForestContext(oversizedForest), clipped, "the clipped forest representation is deterministic");
 
     const longClaimArtifact = await services.artifacts.putText(runId, "long claim source", { filename: "long-claim.txt", mime: "text/plain", sensitivity: "public" });
     const longClaim = `完整权威主张：${"保持完整内容用于验证，展示标题应单独截断。".repeat(12)}`;

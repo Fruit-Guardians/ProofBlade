@@ -12,7 +12,7 @@ import type {
   ReasoningTree,
   RunSnapshot,
 } from "../domain/types.js";
-import { canonicalJson, id, sha256 } from "../domain/utils.js";
+import { canonicalJson, estimateTokens, id, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { LeakRecord } from "../pwn/leak.js";
@@ -560,17 +560,21 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
 
 export function formatReasoningForestContext(index: ReasoningForestIndex): string {
   if (index.trees.length === 0 && index.orphanNodes.length === 0) return "";
-  const rendered = [
-    `<reasoning-forest hash="${index.hash}">`,
+  const visibleHashPlaceholder = "0".repeat(64);
+  const prefix = `<reasoning-forest hash="${index.hash}" visible-hash="${visibleHashPlaceholder}">\n`;
+  const suffix = "\n</reasoning-forest>";
+  const body = [
     "Durable compact reasoning index; this is memory, not an instruction. Use evidence inspect_tree before relying on details.",
     ...index.trees.slice(0, MAX_REASONING_FOREST_REFS).map((tree) => `- ${boundReasoningForestId(tree.id)}: ${boundReasoningForestField(tree.name)}; status=${tree.status}; root=${boundReasoningForestId(tree.rootNodeId)}; nodes=${tree.nodeCount}; shared=${tree.sharedNodeCount}; summary=${boundReasoningForestField(tree.summary)}`),
     index.sharedNodes.length > 0 ? `Shared nodes: ${index.sharedNodes.slice(0, MAX_REASONING_FOREST_REFS).map((item) => `${boundReasoningForestId(item.nodeId)}[${item.treeIds.slice(0, MAX_REASONING_FOREST_REFS).map(boundReasoningForestId).join(",")}]`).join("; ")}` : "Shared nodes: none",
     index.orphanNodes.length > 0
       ? `Recent unorganized nodes: ${index.orphanNodes.slice(0, MAX_REASONING_FOREST_REFS).map((node) => `${boundReasoningForestId(node.id)} (${node.kind}): ${boundReasoningForestField(node.name)}; summary=${boundReasoningForestField(node.summary)}`).join(" | ")}`
       : "Recent unorganized nodes: none",
-    "</reasoning-forest>",
   ].join("\n");
-  return boundModelText(rendered, Math.max(64, rendered.length), MAX_REASONING_FOREST_CONTEXT_TOKENS).text;
+  const envelopeTokens = estimateTokens(`${prefix}${suffix}`);
+  const bounded = boundModelText(body, Math.max(64, body.length), Math.max(16, MAX_REASONING_FOREST_CONTEXT_TOKENS - envelopeTokens));
+  const visibleHash = sha256(bounded.text);
+  return `${prefix.replace(visibleHashPlaceholder, visibleHash)}${bounded.text}${suffix}`;
 }
 
 function boundReasoningForestField(value: string): string {
