@@ -13,6 +13,7 @@
 - Artifact 内容 hash 改变时旧索引立即失效；ControlStore generation 改变时清空整组索引，避免跨代污染。
 - ControlStore 与 ArtifactStore 仍是 canonical source；索引丢失可从原始 Artifact 重建，索引不会生成 Evidence 或 Fact。
 - `maxBytes` 按 UTF-8 字节计算，替换同一 artifact 会先扣除旧条目字节数再计入新内容，避免中文/emoji 或更新后的计数漂移。
+- `maxBytes` 按 UTF-8 字节计算，替换同一 artifact 会先扣除旧条目字节数再计入新内容，避免中文/emoji 或更新后的计数漂移。
 
 ## 行为比较
 
@@ -22,6 +23,7 @@
 
 - `deterministic-index.test.ts` 覆盖规范化、hash 失效、关键词命中和清空。
 - `evidence-search-index.test.ts` 用真实 ArtifactStore 统计同一 generation 的读取次数为一次，新 Artifact 只增加一次读取。
+- 回归覆盖中文、emoji 的 UTF-8 字节驱逐、总字节上限和同 artifact 替换计数。
 - 回归覆盖中文、emoji 的 UTF-8 字节驱逐、总字节上限和同 artifact 替换计数。
 - 现有 knowledge projection、Evidence Graph、materials build/typecheck 和 `check:components` 继续通过。
 
