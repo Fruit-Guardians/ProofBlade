@@ -66,7 +66,14 @@ test("context frame supports chat-completions messages and records omitted items
     createdAt: "2026-09-02T00:00:00.000Z",
   });
   assert.equal(noOmitted.frameHash, repeated.frameHash);
-  assert.equal(frame.frameHash, noOmitted.frameHash, "omitted metadata must not alter the provider-visible payload hash");
+  assert.notEqual(frame.frameHash, noOmitted.frameHash, "omitted metadata is part of the complete frame identity");
+  const sameOmittedDifferentRequest = buildModelContextFrame({
+    runId: "FRAME-OTHER", generation: 9, requestId: "PR-OTHER", provider: "local", model: "test", api: "openai-completions",
+    payload: { messages: [{ role: "user", content: "hello" }] },
+    omittedItems: [{ itemId: "another-request-item", role: "tool", source: "artifact", sourceIds: ["A-old"], contentHash: "b".repeat(64), visibleChars: 10, estimatedTokens: 3, included: true, artifactRefs: ["A-old"], evidenceRefs: [] }],
+    createdAt: "2027-01-01T00:00:00.000Z",
+  });
+  assert.equal(frame.frameHash, sameOmittedDifferentRequest.frameHash, "request identity and timestamp remain excluded from payload hash");
 });
 
 test("context frame bounds metadata arrays while retaining the final payload count", () => {
@@ -85,4 +92,5 @@ test("context frame bounds metadata arrays while retaining the final payload cou
   assert.equal(frame.omittedItems.length, 128);
   assert.ok(frame.finalMessages.every((item) => item.evidenceRefs.length <= 32));
   assert.ok(frame.omittedItems.every((item) => item.sourceIds.length <= 32));
+  assert.ok(JSON.stringify(frame).length < 200_000, "frame metadata must remain bounded");
 });

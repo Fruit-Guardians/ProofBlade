@@ -9,6 +9,7 @@
 - `model_context_frame_recorded` 事件写入最终 adapter payload 的 metadata-only frame。
 - `request_epoch_context` 同时保存 `modelContextFrameId` 和 `modelContextFrameHash`，可从事件重建请求与 frame 的关联。
 - omitted 项以 `included=false` 保存，后续可以显示预算裁剪原因和回取入口；原始正文不复制到 ControlStore。
+- `frameHash` 同时覆盖 `messageCount` 和有界后的 `omittedItems` 元数据；`requestId`、`runId` 和 `createdAt` 只用于关联与审计，不影响相同 payload 的可比较 hash。
 
 ## 首错与修复
 
@@ -19,6 +20,7 @@
 - frame 测试覆盖 Responses/input 和 Chat Completions/messages 两种 payload。
 - 测试断言敏感候选正文不出现在 frame JSON 中。
 - 测试断言 omitted 项保持 `included=false`，并且 frame hash 可用于稳定关联。
+- 测试覆盖不同 requestId/createdAt 的相同 payload hash 稳定性、不同 omitted 集合的 hash 差异，以及超大元数据数组的有界结果。
 - 现有 materials build/typecheck 和 context/observability 回归必须继续通过。
 
 ## 当前边界
