@@ -411,6 +411,20 @@ function matchesFirstActionTool(toolName: string, allowedToolNames: readonly str
   return allowedToolNames.some((allowed) => allowed === toolName || (allowed === "mcp__*" && toolName.startsWith("mcp__")));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stopSuggestionMessage(mode: string): string {
+  return mode === "verifier_driven"
+    ? "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
+    : "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
+}
+
+function matchesActionBundleTool(toolName: string, allowedToolNames: readonly string[]): boolean {
+  return matchesFirstActionTool(toolName, allowedToolNames);
+}
+
 export async function finalizeCodingTurn(options: {
   runId: string;
   controlStore: ControlStore;
