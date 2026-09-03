@@ -190,7 +190,9 @@
       "imports": [
         "node:crypto"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ],
       "structureHash": "b808d34e391aecf7d6f62674119573e3febc023308b6bd25bd3945ec1458ca60"
     },
     {

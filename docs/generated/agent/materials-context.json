@@ -74,7 +74,7 @@
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
-    "src/knowledge/evidence-graph.ts": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+    "src/knowledge/evidence-graph.ts": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
     "src/knowledge/observer.ts": "63cc7ab6bec68a56931e6c3068f961ed9aa075da0f9fec1bcd0de92e4822ccb8",
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "5e089cbde628eaa3cb15b85b917261798290376be1a04b26f9479e2d36088cab",
@@ -987,7 +987,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 77,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -4375,7 +4375,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 514,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -4391,7 +4391,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 561,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -10891,7 +10891,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 48,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -10905,7 +10905,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 66,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -10919,7 +10919,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 20,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -10933,7 +10933,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 29,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -10947,7 +10947,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 39,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -10961,7 +10961,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 60,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -22939,7 +22939,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 84,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/evidence-curation-gate.test.ts"
       ]
@@ -22955,7 +22955,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 372,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -22971,7 +22971,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 423,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -22987,7 +22987,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 427,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23003,7 +23003,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 322,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23019,7 +23019,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 341,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {
@@ -23033,7 +23033,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 480,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts"
       ]
@@ -23049,7 +23049,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 124,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -23069,7 +23069,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 268,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts"
       ]
@@ -23085,7 +23085,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 443,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
@@ -23112,7 +23112,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 396,
-      "moduleHash": "b447a7bc9b9e778250d05ef181c90f128cb4a7c7af812d53a1199dade7199a65",
+      "moduleHash": "bfae5215906011387d0cbdbd9c76c16688903bbe8234c82b7cf95a172cfd8acb",
       "testRefs": []
     },
     {

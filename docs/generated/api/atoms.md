@@ -80,6 +80,7 @@
 - Export: `@proofblade/atoms`
 - Summary: Return a conservative upper bound for UTF-8 tokenizer input.
 - Summary source: `tsdoc`
+- Tests: `packages/atoms/tests/atoms.test.ts`
 
 ### sha256
 - Kind: `function`

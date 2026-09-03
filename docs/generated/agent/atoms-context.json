@@ -156,7 +156,9 @@
       "module": "src/value.ts",
       "line": 49,
       "moduleHash": "efce5e1ad8adca2aea4268c9e02d8ae2d3ee8960be251b89c9f72842354fb8b5",
-      "testRefs": []
+      "testRefs": [
+        "packages/atoms/tests/atoms.test.ts"
+      ]
     },
     {
       "id": "@proofblade/atoms::function::sha256",
