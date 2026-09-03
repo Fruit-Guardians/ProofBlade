@@ -194,6 +194,7 @@ test("context bounds standing and phase layers before the final provider envelop
   const l2 = compiled.manifest.blocks?.find((block) => block.id === "context.l2")?.content ?? "";
   assert.ok(estimateTokens(l0) <= MAX_STANDING_LAYER_TOKENS);
   assert.ok(estimateTokens(l2) <= MAX_PHASE_LAYER_TOKENS);
+  assert.ok(estimateTokens(contextText(compiled)) <= 10_000, "default provider system context must stay below the 10K token hard cap");
   assert.ok(estimateTokens(contextText(compiled, 512)) <= 512);
 });
 

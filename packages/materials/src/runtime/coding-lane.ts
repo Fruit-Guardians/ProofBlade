@@ -974,8 +974,8 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
     compiled.messages.slice(1).map((message) => `[${message.role}]\n${message.content}`).join("\n\n"),
     turnGuidance ? `<proofblade-turn-guidance>\n${turnGuidance}\n</proofblade-turn-guidance>` : "",
   ].filter(Boolean).join("\n\n");
-  const dynamicHash = sha256(dynamicContent);
-  const prefix = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n`;
+  const hashPlaceholder = "0".repeat(64);
+  const prefix = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${hashPlaceholder}">\n`;
   const suffix = "\n</proofblade-context>";
   // ContextCompiler bounds individual blocks, but the provider receives this
   // projection as one message. Bound the final envelope as well.
@@ -983,7 +983,9 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
   const envelopeTokens = estimateTokens(JSON.stringify(emptyMessage));
   const dynamicBudget = Math.max(16, MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS - envelopeTokens);
   const bounded = boundModelText(dynamicContent, Math.max(64, dynamicContent.length), dynamicBudget);
-  const content = `${prefix}${bounded.text}${suffix}`;
+  const dynamicHash = sha256(bounded.text);
+  const prefixWithVisibleHash = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n`;
+  const content = `${prefixWithVisibleHash}${bounded.text}${suffix}`;
   return createCustomMessage(
     "proofblade_context_projection",
     content,
