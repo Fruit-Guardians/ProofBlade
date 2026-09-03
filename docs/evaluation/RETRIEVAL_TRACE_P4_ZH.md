@@ -12,6 +12,8 @@
 - Trace 记录 query/normalizedQuery、Run/generation、keyword 模式、候选 kind/score/reason、selectedRefs、injectedRefs、是否发生 Recall 和耗时。
 - `evidence` 工具的 `search` 返回 `{ results, trace }`；旧 `search()` API 保持兼容，仍只返回结果数组。
 - Trace 是派生观测，不改变 Artifact/Evidence/Fact 的权威性，也不会把正文或凭据写入日志。
+- Search/inspect 返回的 metadata、数组和深层对象使用统一有界投影；大 summary、tags、related IDs 通过截断标记保留显式 `readArtifact` 回取路径。
+- Search/inspect 返回的 metadata、数组和深层对象使用统一有界投影；大 summary、tags、related IDs 通过截断标记保留显式 `readArtifact` 回取路径。
 
 ## 行为与解释
 
@@ -20,6 +22,8 @@
 ## 验收
 
 - `evidence-search-index.test.ts` 验证真实 Artifact 命中、Run/generation、selected/injected refs、keyword 模式和耗时。
+- 大结果回归覆盖 JSON/UTF-8 正文、超长 summary、tags、related IDs、截断 marker 和显式 Artifact 读取。
+- 大结果回归覆盖 JSON/UTF-8 正文、超长 summary、tags、related IDs、截断 marker 和显式 Artifact 读取。
 - 确定性索引、knowledge projection、materials build/typecheck 与变更契约继续通过。
 
 ## 当前边界与下一步
