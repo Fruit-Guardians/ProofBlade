@@ -70,7 +70,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "cbdc79fd6218b6c6cda0266313e0be57095566fc62d40f254aef4e073b7f88e3",
+    "src/index.ts": "99c2ebd3eddaf118b93677db763612f8655a981ad8f4357b39adf8de0a68c38d",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
@@ -93,7 +93,7 @@
     "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+    "src/orchestration/single-agent-loop.ts": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -114,9 +114,9 @@
     "src/recovery/verification-recovery.ts": "289fc66f69229e149a1f292b0d3eed7d43bd81a46538bf236a4c6f76fda08224",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
-    "src/runtime/coding-lane.ts": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+    "src/runtime/coding-lane.ts": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
     "src/runtime/coding-resources.ts": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
-    "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
+    "src/runtime/coding-turn-projection.ts": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "7a20212a0c4051593022955c9dc1058d0794c18c7b616fa74ccc744872e9f0bb",
@@ -813,7 +813,8 @@
       "line": 45,
       "moduleHash": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
       "testRefs": [
-        "packages/materials/tests/ablation-policy.test.ts"
+        "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -1267,8 +1268,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 84,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 88,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -1559,7 +1560,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 81,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -2350,7 +2351,8 @@
       "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
-        "packages/materials/tests/ablation.test.ts"
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
     {
@@ -5276,8 +5278,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1138,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 1140,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5292,8 +5294,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1205,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 1207,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5308,8 +5310,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 859,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 861,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -5325,8 +5327,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 949,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 951,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -5341,8 +5343,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1030,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 1032,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5357,8 +5359,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 1025,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 1027,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5566,6 +5568,70 @@
       "line": 895,
       "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
       "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::function::attachCodingTurnGuards",
+      "name": "attachCodingTurnGuards",
+      "kind": "function",
+      "signature": "<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, progressBreaker: NoProgressToolBreaker | undefined, termination: CodingTurnTermination, resolveEffectPolicy?: ToolEffectPolicyResolver, failureStormBreaker?: ToolFailureStormBreaker, experimentBudgetBreaker?: ExperimentBudgetBreaker, toolBudget?: ToolCallBudget, firstActionBudget?: FirstActionBudget, ablationPolicy?: AblationPolicyBinding): () => void",
+      "summary": "Inferred summary: attach coding turn guards operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 66,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::attachRepeatedToolFailureBreaker",
+      "name": "attachRepeatedToolFailureBreaker",
+      "kind": "function",
+      "signature": "<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, termination: CodingTurnTermination): () => void",
+      "summary": "Inferred summary: attach repeated tool failure breaker operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 58,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::finalizeCodingTurn",
+      "name": "finalizeCodingTurn",
+      "kind": "function",
+      "signature": "(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<CodingClaimVerifier, \"project\">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>",
+      "summary": "Inferred summary: finalize coding turn operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 363,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::function::projectCodingAssistantText",
+      "name": "projectCodingAssistantText",
+      "kind": "function",
+      "signature": "(output: string, termination: CodingTurnTermination): string",
+      "summary": "Inferred summary: project coding assistant text operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 54,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::function::reconcileRuntimeConfig",
@@ -11572,8 +11638,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 27,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 28,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -11586,8 +11652,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 51,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 53,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -11600,8 +11666,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 74,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 78,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": []
     },
     {
@@ -12709,6 +12775,64 @@
       "module": "src/runtime/coding-resources.ts",
       "line": 131,
       "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPolicyBinding",
+      "name": "AblationPolicyBinding",
+      "kind": "interface",
+      "signature": "AblationPolicyBinding",
+      "summary": "Inferred summary: ablation policy binding type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 29,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::CodingTurnTermination",
+      "name": "CodingTurnTermination",
+      "kind": "interface",
+      "signature": "CodingTurnTermination",
+      "summary": "Inferred summary: coding turn termination type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 40,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": [
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::FirstActionBudget",
+      "name": "FirstActionBudget",
+      "kind": "interface",
+      "signature": "FirstActionBudget",
+      "summary": "Guard for the first challenge action. It is intentionally independent from",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 22,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ToolCallBudget",
+      "name": "ToolCallBudget",
+      "kind": "interface",
+      "signature": "ToolCallBudget",
+      "summary": "Inferred summary: tool call budget type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 12,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
       "testRefs": []
     },
     {
@@ -15970,6 +16094,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -17440,6 +17565,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -23737,6 +23863,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -25097,8 +25224,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 93,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 97,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -26385,6 +26512,7 @@
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/web-session.test.ts",
         "packages/materials/tests/web-tools.test.ts"
       ]
@@ -28747,8 +28875,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 786,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 788,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -28779,8 +28907,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 798,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 800,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28846,8 +28974,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 790,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 792,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -28864,14 +28992,14 @@
       "id": "@proofblade/materials::method::PiCodingLane.create",
       "name": "PiCodingLane.create",
       "kind": "method",
-      "signature": "(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>",
+      "signature": "(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => \"auto\" | \"assist\"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; ablationPolicy?: AblationPolicyBinding; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>",
       "summary": "Inferred summary: create operation used to perform a durable write.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
       "line": 118,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28961,8 +29089,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 794,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 796,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -28982,8 +29110,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-lane.ts",
-      "line": 708,
-      "moduleHash": "e17060e20e81f31f88521f9a4174a1bd1b765515fe496c8e599fa6dc2d0f9333",
+      "line": 710,
+      "moduleHash": "61594d13547086353dae66997893b5b074b08f7c29d554548ad710a73a23f2e9",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -32685,6 +32813,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -33097,6 +33226,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -33534,6 +33664,7 @@
         "packages/materials/tests/session-runtime-service.test.ts",
         "packages/materials/tests/session-runtime-wire.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
         "packages/materials/tests/update-proposals.test.ts",
         "packages/materials/tests/web-coding-tools.test.ts",
         "packages/materials/tests/web-session.test.ts",
@@ -36695,8 +36826,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 49,
-      "moduleHash": "313b0de93450da174ee786465319c68a80d3ca9c34b04acfcc67a75684b6d57c",
+      "line": 51,
+      "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
@@ -37108,6 +37239,20 @@
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 12,
       "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CodingTurnTerminationReason",
+      "name": "CodingTurnTerminationReason",
+      "kind": "type",
+      "signature": "CodingTurnTerminationReason",
+      "summary": "Inferred summary: coding turn termination reason type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/runtime/coding-turn-projection.ts",
+      "line": 10,
+      "moduleHash": "65fc1aaece1ad60892f9e241a7a30fc9d034a8073763c3137c1778d74c85203c",
       "testRefs": []
     },
     {
