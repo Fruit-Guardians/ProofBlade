@@ -18,7 +18,7 @@ import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { KNOWLEDGE_READ_MAX_TOKENS } from "../knowledge/projection.js";
 import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
-import type { CodingClaimVerifier } from "../verification/claim-verification.js";
+import type { TaskResultVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import type { Lane, RawEffectResult, TargetKind } from "../domain/types.js";
@@ -87,7 +87,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
   enabledMcpServers: Set<string>;
-  claimVerifier: CodingClaimVerifier;
+  /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
+  claimVerifier: TaskResultVerifier;
   /**
    * Stop the current Pi turn after result verification so the outer Run
    * coordinator can perform verifier-owned scoring before the model issues

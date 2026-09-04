@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
-  CodingClaimVerifier,
+  TaskResultVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
   ProofBladeToolRuntime,
@@ -522,7 +522,7 @@ export class DebugDataService {
           controlStore: this.services.control,
           artifactStore: this.services.artifacts,
           journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
+          claimVerifier: new TaskResultVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
           ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
           ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
@@ -543,7 +543,7 @@ export class DebugDataService {
           controlStore: this.services.control,
           artifactStore: this.services.artifacts,
           journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
+          claimVerifier: new TaskResultVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
           config: runConfig,
           browserVerifierFactory: this.browserVerifierFactory,
           ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),

@@ -68,7 +68,14 @@ interface ClaimReceipt {
   recordedAt: string;
 }
 
-export class CodingClaimVerifier {
+/**
+ * Domain-neutral verifier facade for task results.
+ *
+ * The implementation deliberately lives in the historical module for wire
+ * compatibility, but its public name no longer implies that every task has a
+ * claim or a CTF-style candidate.
+ */
+export class TaskResultVerifier {
   public constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
@@ -710,22 +717,8 @@ export class CodingClaimVerifier {
   }
 }
 
-/**
- * Domain-neutral verifier facade.  It inherits the durable implementation so
- * existing integrations can migrate without duplicating verifier state.
- */
-export class TaskResultVerifier extends CodingClaimVerifier {
-  public constructor(
-    runId: string,
-    controlStore: ControlStore,
-    artifactStore: ArtifactStore,
-    journal: EffectJournal,
-    verifierJournal: VerifierEffectJournal,
-    verifierControl: VerifierControlPort,
-  ) {
-    super(runId, controlStore, artifactStore, journal, verifierJournal, verifierControl);
-  }
-}
+/** @deprecated Use TaskResultVerifier for new generic security tasks. */
+export class CodingClaimVerifier extends TaskResultVerifier {}
 
 function parsePwnEndpoint(endpoint: string | undefined): { host: string; port: number } | undefined {
   if (!endpoint) return undefined;

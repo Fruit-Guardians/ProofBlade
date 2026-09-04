@@ -29,7 +29,7 @@ import type { EffectJournal } from "../effects/effect-journal.js";
 import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
-import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { TaskResultVerifier } from "../verification/claim-verification.js";
 import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingFlagSubmission, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
@@ -90,7 +90,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly closeTransport: () => Promise<void>,
     private readonly mcp: McpProjectRegistry,
     private readonly runtime: ProofBladeToolRuntime,
-    private readonly claimVerifier: CodingClaimVerifier,
+    private readonly claimVerifier: TaskResultVerifier,
     private readonly maintenance: { compactRequested: boolean; injectedObservationItems: import("../domain/types.js").ObservationQueueItem[] },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
     private readonly progressBreaker: NoProgressToolBreaker,
@@ -124,7 +124,7 @@ export class PiCodingLane implements AgentLanePort {
     artifactStore: ArtifactStore;
     journal: EffectJournal;
     /** Safe claim service; owns but does not expose the trusted verifier capabilities. */
-    claimVerifier: CodingClaimVerifier;
+    claimVerifier: TaskResultVerifier;
     /** Present only for platform-judged lanes; executes through the real Sandbox scorer. */
     platformVerifier?: IndependentVerifier;
     /**
