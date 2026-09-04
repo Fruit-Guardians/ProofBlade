@@ -926,11 +926,18 @@ export interface ArtifactRef extends ArtifactAtom {
     operation?: string;
     tags: string[];
   };
-  sensitivity: "public" | "secret" | "flag_candidate";
+  /**
+   * Controls whether model-facing projections may expose the Artifact body.
+   * `flag_candidate` is retained as a read-compatible legacy value for
+   * artifacts written by pre-security-agent releases.
+   */
+  sensitivity: ArtifactSensitivity;
   sourceEffectId?: string;
   truncated?: boolean;
   semantic?: ArtifactSemanticMetadata;
 }
+
+export type ArtifactSensitivity = "public" | "secret" | "result_candidate" | "flag_candidate";
 
 /** Verifier-owned effect operations that can produce a trusted verdict. */
 export type VerifierAttestationOperation =

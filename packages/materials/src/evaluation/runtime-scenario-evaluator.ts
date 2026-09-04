@@ -431,7 +431,7 @@ async function evaluateVerifierAuthority(context: RuntimeScenarioContext): Promi
   const services = createServices(context.root, context.config);
   const runId = `${context.runPrefix}-scenario-verifier-authority`;
   await services.control.createRun(runId, demoTask(runId, context.root, context.config));
-  const candidate = await services.artifacts.putText(runId, "candidate", { filename: "candidate.txt", sensitivity: "flag_candidate" });
+  const candidate = await services.artifacts.putText(runId, "candidate", { filename: "candidate.txt", sensitivity: "result_candidate" });
   await services.control.dispatch(runId, {
     type: "completion_proposed",
     completion: { id: "C-SCENARIO", purpose: "harness_verification", candidateHash: sha256("candidate"), artifactId: candidate.id },

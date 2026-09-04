@@ -687,7 +687,7 @@ async function main(): Promise<void> {
       const normalized = candidate.trim();
       const candidateArtifact = await services.artifacts.putText(runId, normalized, {
         filename: "cli-fixture-score-candidate.txt",
-        sensitivity: "flag_candidate",
+        sensitivity: "result_candidate",
       });
       const completionId = `C-CLI-${randomUUID()}`;
       await services.control.dispatch(runId, {

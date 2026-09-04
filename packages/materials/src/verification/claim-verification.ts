@@ -148,8 +148,8 @@ export class TaskResultVerifier {
       replayPolicy: "pure",
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `web-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `web-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -182,8 +182,8 @@ export class TaskResultVerifier {
       replayPolicy: "pure",
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `browser-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `browser-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -222,8 +222,8 @@ export class TaskResultVerifier {
       command: snapshot.task.verification.command,
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `pwn-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `pwn-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -334,7 +334,7 @@ export class TaskResultVerifier {
     const candidateArtifact = await this.artifactStore.putText(this.runId, candidate, {
       filename: `claim-candidate-${input.toolCallId}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: {
         name: "最终候选",
         summary: `等待受信复现的候选 sha256=${candidateHash}.`,
@@ -388,7 +388,7 @@ export class TaskResultVerifier {
         command,
         cwd: input.cwd,
         sessionId,
-        artifactSensitivity: "flag_candidate",
+        artifactSensitivity: "result_candidate",
       } as const;
       const execution = verifierDefinedCommand
         ? await this.verifierJournal.execute(this.runId, effectInput, signal)
@@ -425,7 +425,7 @@ export class TaskResultVerifier {
       const receiptArtifact = await this.artifactStore.putText(this.runId, canonicalJson(receipt), {
         filename: `claim-reproduction-${input.toolCallId}-${attemptIndex + 1}.json`,
         mime: "application/json",
-        sensitivity: "flag_candidate",
+        sensitivity: "result_candidate",
         semantic: {
           name: "最终候选复现收据",
           summary: `候选 ${candidateHash.slice(0, 12)}... 由 effect ${execution.effectId} 成功复现。`,
@@ -497,7 +497,7 @@ export class TaskResultVerifier {
     const outcomeArtifact = await this.artifactStore.putText(this.runId, outcomeEnvelope, {
       filename: `claim-outcome-${input.toolCallId}.json`,
       mime: "application/json",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: {
         name: "最终候选验证结果索引",
         summary: `Claim outcome envelope for candidate sha256=${candidateHash}.`,

@@ -455,7 +455,7 @@ export class EffectJournal {
         const staged = await this.artifactStore.stageText(runId, input.recoveryInput.content, {
           filename: input.recoveryInput.filename,
           mime: input.recoveryInput.mime ?? "application/json",
-          sensitivity: input.recoveryInput.sensitivity ?? "flag_candidate",
+          sensitivity: input.recoveryInput.sensitivity ?? "result_candidate",
           semantic: { name: "Verifier recovery input", summary: `Durable verifier input sha256=${recoveryArtifactSha256}.`, tags: ["verification", "recovery-input"], role: "supporting", relatedIds: [], annotatedBy: "harness" },
         });
         await this.#verifierControl.registerInputArtifact(runId, { type: "artifact", generation: staged.generation, artifact: staged });
@@ -583,7 +583,7 @@ export class EffectJournal {
       mime: "application/json",
       sourceEffectId: effectId,
       filename: `${operation}-${effectId}.json`,
-      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "flag_candidate" : "public"),
+      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "result_candidate" : "public"),
     } satisfies Parameters<ArtifactStore["putText"]>[2];
     let artifact: ArtifactRef;
     if (trustedVerifier) {

@@ -23,6 +23,34 @@ test("path-only and secret receipts never expose inline content", () => {
   assert.equal(secret.preview, undefined);
 });
 
+test("result candidate receipts keep candidate content restricted", () => {
+  const candidate = createModelReceipt({
+    runId: "R-1",
+    generation: 2,
+    operationId: "O-CANDIDATE",
+    title: "Security result",
+    content: "derived exploit result",
+    artifact: { ...artifact, sensitivity: "result_candidate" },
+    mode: "full",
+  });
+  assert.equal(candidate.preview, undefined);
+  const renderedCandidate = renderModelReceipt(candidate);
+  assert.match(renderedCandidate, /visible=restricted/);
+  assert.match(renderedCandidate, /summary=restricted artifact receipt/);
+  assert.doesNotMatch(renderedCandidate, /derived exploit result/);
+
+  const legacy = createModelReceipt({
+    runId: "R-1",
+    generation: 2,
+    operationId: "O-LEGACY",
+    title: "Legacy result",
+    content: "legacy candidate",
+    artifact: { ...artifact, sensitivity: "flag_candidate" },
+    mode: "full",
+  });
+  assert.equal(legacy.preview, undefined);
+});
+
 test("rendered receipts expose an explicit Artifact recall path", () => {
   const receipt = createModelReceipt({ runId: "R-1", generation: 2, operationId: "bash-1", title: "Large output", summary: "Large output archived", content: "x".repeat(5000), artifact, maxInlineChars: 64, maxPreviewChars: 20 });
   const rendered = renderModelReceipt(receipt);
