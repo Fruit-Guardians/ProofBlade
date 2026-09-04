@@ -1,7 +1,9 @@
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { buildAblationPairings, type AblationAttemptRecord, type AblationCaseRef, type AblationExperimentSnapshot } from "./ablation.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
+
+const STALE_LOCK_AFTER_MS = 15 * 60 * 1_000;
 
 export interface AblationLedgerDocument {
   schemaVersion: 1;
@@ -87,8 +89,18 @@ export class AblationRunLedger {
   private async withLock<T>(operation: () => Promise<T>): Promise<T> {
     await mkdir(dirname(this.path), { recursive: true });
     const lockPath = `${this.path}.lock`;
-    try { await writeFile(lockPath, `${process.pid}\n`, { flag: "wx" }); }
-    catch (error) { if ((error as { code?: string }).code === "EEXIST") throw new Error("Ablation ledger is locked by another process"); throw error; }
+    let acquired = false;
+    for (let attempt = 0; attempt < 2 && !acquired; attempt += 1) {
+      try {
+        await writeFile(lockPath, `${process.pid}\n${Date.now()}\n`, { flag: "wx" });
+        acquired = true;
+      } catch (error) {
+        if ((error as { code?: string }).code !== "EEXIST") throw error;
+        if (!(await isStaleLock(lockPath))) throw new Error("Ablation ledger is locked by another process");
+        await unlink(lockPath).catch(() => undefined);
+      }
+    }
+    if (!acquired) throw new Error("Ablation ledger is locked by another process");
     try { return await operation(); } finally { await unlink(lockPath).catch(() => undefined); }
   }
   private async persist(initial = false, clock: () => string = () => new Date().toISOString()): Promise<void> {
@@ -98,6 +110,26 @@ export class AblationRunLedger {
     await writeFile(temporary, `${JSON.stringify(this.document, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
     await rename(temporary, this.path);
   }
+}
+
+async function isStaleLock(lockPath: string): Promise<boolean> {
+  const [metadata, details] = await Promise.all([
+    readFile(lockPath, "utf8").catch(() => ""),
+    stat(lockPath).catch(() => undefined),
+  ]);
+  if (!details) return true;
+  const pid = Number.parseInt(metadata.split(/\s+/u, 1)[0] ?? "", 10);
+  if (Number.isSafeInteger(pid) && pid > 0) {
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "EPERM") return false;
+      if (code === "ESRCH") return true;
+    }
+  }
+  return Date.now() - details.mtimeMs >= STALE_LOCK_AFTER_MS;
 }
 
 function redactError(error: string): string { return error.replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,}]+/gi, "$1[REDACTED]").replace(/sk-[A-Za-z0-9_-]{12,}/g, "[REDACTED]").slice(0, 2_000); }

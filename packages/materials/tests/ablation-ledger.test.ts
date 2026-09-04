@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -22,5 +22,32 @@ test("ledger claims in deterministic order and never reclaims terminal attempts"
     assert.equal(second.caseId, "case-a");
     await ledger.markInterrupted();
     assert.equal((await AblationRunLedger.load(join(root, "ledger.json"))).summary().unknown, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("ledger recovers a lock left by an exited process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-stale-lock-"));
+  try {
+    const ledgerPath = join(root, "ledger.json");
+    const ledger = await AblationRunLedger.create(ledgerPath, experiment, [{ id: "case-a" }]);
+    await writeFile(`${ledgerPath}.lock`, "999999999\n0\n", { flag: "wx" });
+    const pairing = ledger.next();
+    assert.ok(pairing);
+    const claimed = await ledger.claim(pairing.pairingId, "run-recovered");
+    assert.equal(claimed.status, "running");
+    await assert.rejects(() => access(`${ledgerPath}.lock`), /ENOENT/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("ledger keeps a lock owned by a live process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-live-lock-"));
+  try {
+    const ledgerPath = join(root, "ledger.json");
+    const ledger = await AblationRunLedger.create(ledgerPath, experiment, [{ id: "case-a" }]);
+    await writeFile(`${ledgerPath}.lock`, `${process.pid}\n${Date.now()}\n`, { flag: "wx" });
+    const pairing = ledger.next();
+    assert.ok(pairing);
+    await assert.rejects(() => ledger.claim(pairing.pairingId, "run-blocked"), /locked by another process/);
+    await unlink(`${ledgerPath}.lock`);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
