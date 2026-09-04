@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 164
-- Symbols: 1742
+- Symbols: 1734
 
 ## Public Symbols
 
@@ -342,7 +342,7 @@
 - Export: `@proofblade/materials`
 - Summary: Applies only experiment-controlled cognitive policies. Resource, scope,
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation-policy.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/ablation-policy.test.ts`
 
 ### AblationExperimentStore
 - Kind: `class`
@@ -436,7 +436,7 @@
 ### CodingEvidenceGraph
 - Kind: `class`
 - Signature: `CodingEvidenceGraph`
-- Source: [src/knowledge/evidence-graph.ts:78](../../../packages/materials/src/knowledge/evidence-graph.ts:78)
+- Source: [src/knowledge/evidence-graph.ts:94](../../../packages/materials/src/knowledge/evidence-graph.ts:94)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding evidence graph class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -587,7 +587,7 @@
 ### SingleAgentCtfLoop
 - Kind: `class`
 - Signature: `SingleAgentCtfLoop`
-- Source: [src/orchestration/single-agent-loop.ts:88](../../../packages/materials/src/orchestration/single-agent-loop.ts:88)
+- Source: [src/orchestration/single-agent-loop.ts:84](../../../packages/materials/src/orchestration/single-agent-loop.ts:84)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent ctf loop class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1154,7 +1154,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: default harness policy constant used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation-policy.test.ts`, `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/ablation-policy.test.ts`, `packages/materials/tests/ablation.test.ts`
 
 ### FIXED_SAFETY_BOUNDARY
 - Kind: `constant`
@@ -1354,7 +1354,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1093](../../../packages/materials/src/runtime/coding-resources.ts:1093)
+- Source: [src/runtime/coding-resources.ts:1094](../../../packages/materials/src/runtime/coding-resources.ts:1094)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -1821,7 +1821,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create initial snapshot operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/skills.test.ts`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/skills.test.ts`
 
 ### projectionHash
 - Kind: `function`
@@ -1839,7 +1839,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reduce operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/update-proposals.test.ts`
+- Tests: `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/update-proposals.test.ts`
 
 ### containsCtfCandidate
 - Kind: `function`
@@ -2240,7 +2240,7 @@
 ### buildReasoningForest
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot): ReasoningForestIndex`
-- Source: [src/knowledge/evidence-graph.ts:524](../../../packages/materials/src/knowledge/evidence-graph.ts:524)
+- Source: [src/knowledge/evidence-graph.ts:603](../../../packages/materials/src/knowledge/evidence-graph.ts:603)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build reasoning forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2249,7 +2249,7 @@
 ### formatReasoningForestContext
 - Kind: `function`
 - Signature: `(index: ReasoningForestIndex): string`
-- Source: [src/knowledge/evidence-graph.ts:571](../../../packages/materials/src/knowledge/evidence-graph.ts:571)
+- Source: [src/knowledge/evidence-graph.ts:650](../../../packages/materials/src/knowledge/evidence-graph.ts:650)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: format reasoning forest context operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -2744,7 +2744,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1186](../../../packages/materials/src/runtime/coding-lane.ts:1186)
+- Source: [src/runtime/coding-lane.ts:1170](../../../packages/materials/src/runtime/coding-lane.ts:1170)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -2753,7 +2753,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1253](../../../packages/materials/src/runtime/coding-lane.ts:1253)
+- Source: [src/runtime/coding-lane.ts:1237](../../../packages/materials/src/runtime/coding-lane.ts:1237)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2762,7 +2762,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:882](../../../packages/materials/src/runtime/coding-lane.ts:882)
+- Source: [src/runtime/coding-lane.ts:866](../../../packages/materials/src/runtime/coding-lane.ts:866)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -2771,7 +2771,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:997](../../../packages/materials/src/runtime/coding-lane.ts:997)
+- Source: [src/runtime/coding-lane.ts:981](../../../packages/materials/src/runtime/coding-lane.ts:981)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2780,7 +2780,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:1078](../../../packages/materials/src/runtime/coding-lane.ts:1078)
+- Source: [src/runtime/coding-lane.ts:1062](../../../packages/materials/src/runtime/coding-lane.ts:1062)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -2789,7 +2789,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1073](../../../packages/materials/src/runtime/coding-lane.ts:1073)
+- Source: [src/runtime/coding-lane.ts:1057](../../../packages/materials/src/runtime/coding-lane.ts:1057)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -2798,7 +2798,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1196](../../../packages/materials/src/runtime/coding-resources.ts:1196)
+- Source: [src/runtime/coding-resources.ts:1197](../../../packages/materials/src/runtime/coding-resources.ts:1197)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2807,7 +2807,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1012](../../../packages/materials/src/runtime/coding-resources.ts:1012)
+- Source: [src/runtime/coding-resources.ts:1013](../../../packages/materials/src/runtime/coding-resources.ts:1013)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2816,7 +2816,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1029](../../../packages/materials/src/runtime/coding-resources.ts:1029)
+- Source: [src/runtime/coding-resources.ts:1030](../../../packages/materials/src/runtime/coding-resources.ts:1030)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2825,7 +2825,7 @@
 ### codingToolCatalog
 - Kind: `function`
 - Signature: `(): CodingToolCatalogEntry[]`
-- Source: [src/runtime/coding-resources.ts:137](../../../packages/materials/src/runtime/coding-resources.ts:137)
+- Source: [src/runtime/coding-resources.ts:138](../../../packages/materials/src/runtime/coding-resources.ts:138)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2833,7 +2833,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:262](../../../packages/materials/src/runtime/coding-resources.ts:262)
+- Source: [src/runtime/coding-resources.ts:263](../../../packages/materials/src/runtime/coding-resources.ts:263)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2842,7 +2842,7 @@
 ### createCodingTools
 - Kind: `function`
 - Signature: `(options?: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): AgentHarnessTool<CodingResourceContext>[]`
-- Source: [src/runtime/coding-resources.ts:145](../../../packages/materials/src/runtime/coding-resources.ts:145)
+- Source: [src/runtime/coding-resources.ts:146](../../../packages/materials/src/runtime/coding-resources.ts:146)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create coding tools operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2851,7 +2851,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:178](../../../packages/materials/src/runtime/coding-resources.ts:178)
+- Source: [src/runtime/coding-resources.ts:179](../../../packages/materials/src/runtime/coding-resources.ts:179)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2860,7 +2860,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1107](../../../packages/materials/src/runtime/coding-resources.ts:1107)
+- Source: [src/runtime/coding-resources.ts:1108](../../../packages/materials/src/runtime/coding-resources.ts:1108)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2869,7 +2869,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1180](../../../packages/materials/src/runtime/coding-resources.ts:1180)
+- Source: [src/runtime/coding-resources.ts:1181](../../../packages/materials/src/runtime/coding-resources.ts:1181)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -2878,7 +2878,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1170](../../../packages/materials/src/runtime/coding-resources.ts:1170)
+- Source: [src/runtime/coding-resources.ts:1171](../../../packages/materials/src/runtime/coding-resources.ts:1171)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -2887,7 +2887,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:165](../../../packages/materials/src/runtime/coding-resources.ts:165)
+- Source: [src/runtime/coding-resources.ts:166](../../../packages/materials/src/runtime/coding-resources.ts:166)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -2895,7 +2895,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:236](../../../packages/materials/src/runtime/coding-resources.ts:236)
+- Source: [src/runtime/coding-resources.ts:237](../../../packages/materials/src/runtime/coding-resources.ts:237)
 - Export: `@proofblade/materials`
 - Summary: Keep decompiler schemas out of unrelated challenge contexts. The generic
 - Summary source: `tsdoc`
@@ -2904,46 +2904,10 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:895](../../../packages/materials/src/runtime/coding-resources.ts:895)
+- Source: [src/runtime/coding-resources.ts:896](../../../packages/materials/src/runtime/coding-resources.ts:896)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
-
-### attachCodingTurnGuards
-- Kind: `function`
-- Signature: `<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, progressBreaker: NoProgressToolBreaker | undefined, termination: CodingTurnTermination, resolveEffectPolicy?: ToolEffectPolicyResolver, failureStormBreaker?: ToolFailureStormBreaker, experimentBudgetBreaker?: ExperimentBudgetBreaker, toolBudget?: ToolCallBudget, firstActionBudget?: FirstActionBudget, ablationPolicy?: AblationPolicyBinding, deferClaimAcceptance?: boolean): () => void`
-- Source: [src/runtime/coding-turn-projection.ts:73](../../../packages/materials/src/runtime/coding-turn-projection.ts:73)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: attach coding turn guards operation used to perform a durable write.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
-
-### attachRepeatedToolFailureBreaker
-- Kind: `function`
-- Signature: `<TContext extends object | undefined>(harness: AgentHarness<TContext>, repeatBreaker: RepeatedToolFailureBreaker, termination: CodingTurnTermination): () => void`
-- Source: [src/runtime/coding-turn-projection.ts:65](../../../packages/materials/src/runtime/coding-turn-projection.ts:65)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: attach repeated tool failure breaker operation used to provide a reusable operation.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
-
-### finalizeCodingTurn
-- Kind: `function`
-- Signature: `(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<CodingClaimVerifier, "project">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-turn-projection.ts:428](../../../packages/materials/src/runtime/coding-turn-projection.ts:428)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: finalize coding turn operation used to perform a durable write.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
-
-### projectCodingAssistantText
-- Kind: `function`
-- Signature: `(output: string, termination: CodingTurnTermination): string`
-- Source: [src/runtime/coding-turn-projection.ts:61](../../../packages/materials/src/runtime/coding-turn-projection.ts:61)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: project coding assistant text operation used to provide a reusable operation.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### reconcileRuntimeConfig
 - Kind: `function`
@@ -5023,7 +4987,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/competition-solver.test.ts`
+- Tests: `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`
 
 ### RuntimeResourceSnapshot
 - Kind: `interface`
@@ -5897,6 +5861,14 @@
 - Summary: Inferred summary: record leak result type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
+### RetrievalTrace
+- Kind: `interface`
+- Signature: `RetrievalTrace`
+- Source: [src/knowledge/evidence-graph.ts:78](../../../packages/materials/src/knowledge/evidence-graph.ts:78)
+- Export: `@proofblade/materials`
+- Summary: Inferred summary: retrieval trace type contract used to provide a reusable operation.
+- Summary source: `inferred`
+
 ### UpdateReasoningTreeInput
 - Kind: `interface`
 - Signature: `UpdateReasoningTreeInput`
@@ -6249,7 +6221,7 @@
 ### AgentLaneCreateInput
 - Kind: `interface`
 - Signature: `AgentLaneCreateInput`
-- Source: [src/orchestration/single-agent-loop.ts:28](../../../packages/materials/src/orchestration/single-agent-loop.ts:28)
+- Source: [src/orchestration/single-agent-loop.ts:27](../../../packages/materials/src/orchestration/single-agent-loop.ts:27)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: agent lane create input type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6257,7 +6229,7 @@
 ### SingleAgentRunOptions
 - Kind: `interface`
 - Signature: `SingleAgentRunOptions`
-- Source: [src/orchestration/single-agent-loop.ts:53](../../../packages/materials/src/orchestration/single-agent-loop.ts:53)
+- Source: [src/orchestration/single-agent-loop.ts:51](../../../packages/materials/src/orchestration/single-agent-loop.ts:51)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent run options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6265,7 +6237,7 @@
 ### SingleAgentRunOutcome
 - Kind: `interface`
 - Signature: `SingleAgentRunOutcome`
-- Source: [src/orchestration/single-agent-loop.ts:78](../../../packages/materials/src/orchestration/single-agent-loop.ts:78)
+- Source: [src/orchestration/single-agent-loop.ts:74](../../../packages/materials/src/orchestration/single-agent-loop.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: single agent run outcome type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6857,7 +6829,7 @@
 ### CodingFlagSubmission
 - Kind: `interface`
 - Signature: `CodingFlagSubmission`
-- Source: [src/runtime/coding-resources.ts:52](../../../packages/materials/src/runtime/coding-resources.ts:52)
+- Source: [src/runtime/coding-resources.ts:53](../../../packages/materials/src/runtime/coding-resources.ts:53)
 - Export: `@proofblade/materials`
 - Summary: Verdict returned by a real platform submission.
 - Summary source: `tsdoc`
@@ -6865,7 +6837,7 @@
 ### CodingResourceContext
 - Kind: `interface`
 - Signature: `CodingResourceContext`
-- Source: [src/runtime/coding-resources.ts:65](../../../packages/materials/src/runtime/coding-resources.ts:65)
+- Source: [src/runtime/coding-resources.ts:66](../../../packages/materials/src/runtime/coding-resources.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding resource context type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6874,50 +6846,9 @@
 ### CodingToolCatalogEntry
 - Kind: `interface`
 - Signature: `CodingToolCatalogEntry`
-- Source: [src/runtime/coding-resources.ts:131](../../../packages/materials/src/runtime/coding-resources.ts:131)
+- Source: [src/runtime/coding-resources.ts:132](../../../packages/materials/src/runtime/coding-resources.ts:132)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog entry type contract used to provide a reusable operation.
-- Summary source: `inferred`
-
-### AblationPolicyBinding
-- Kind: `interface`
-- Signature: `AblationPolicyBinding`
-- Source: [src/runtime/coding-turn-projection.ts:29](../../../packages/materials/src/runtime/coding-turn-projection.ts:29)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: ablation policy binding type contract used to provide a reusable operation.
-- Summary source: `inferred`
-
-### AblationRouteSnapshot
-- Kind: `interface`
-- Signature: `AblationRouteSnapshot`
-- Source: [src/runtime/coding-turn-projection.ts:42](../../../packages/materials/src/runtime/coding-turn-projection.ts:42)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: ablation route snapshot type contract used to provide a reusable operation.
-- Summary source: `inferred`
-
-### CodingTurnTermination
-- Kind: `interface`
-- Signature: `CodingTurnTermination`
-- Source: [src/runtime/coding-turn-projection.ts:47](../../../packages/materials/src/runtime/coding-turn-projection.ts:47)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: coding turn termination type contract used to provide a reusable operation.
-- Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
-
-### FirstActionBudget
-- Kind: `interface`
-- Signature: `FirstActionBudget`
-- Source: [src/runtime/coding-turn-projection.ts:22](../../../packages/materials/src/runtime/coding-turn-projection.ts:22)
-- Export: `@proofblade/materials`
-- Summary: Guard for the first challenge action. It is intentionally independent from
-- Summary source: `tsdoc`
-
-### ToolCallBudget
-- Kind: `interface`
-- Signature: `ToolCallBudget`
-- Source: [src/runtime/coding-turn-projection.ts:12](../../../packages/materials/src/runtime/coding-turn-projection.ts:12)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: tool call budget type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
 ### RuntimeConfigReconciliation
@@ -8428,7 +8359,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: bind operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityLifecycleRegistry.bindingsSnapshot
 - Kind: `method`
@@ -8490,7 +8421,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: register operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CapabilityLifecycleRegistry.registerConsumer
 - Kind: `method`
@@ -8570,7 +8501,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: find operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/firmware-core.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-retry.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CapabilityRegistry.list
 - Kind: `method`
@@ -8936,7 +8867,7 @@
 - Export: `@proofblade/materials`
 - Summary: Return all retained records, including stopped records for audit.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CompetitionEnvironmentJanitor.register
 - Kind: `method`
@@ -8945,7 +8876,7 @@
 - Export: `@proofblade/materials`
 - Summary: Convert a reservation into a durable live environment record. Static
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### CompetitionEnvironmentJanitor.release
 - Kind: `method`
@@ -8954,7 +8885,7 @@
 - Export: `@proofblade/materials`
 - Summary: Stop one managed environment. A failed stop stays ACTIVE with the error so
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CompetitionEnvironmentJanitor.releaseReservation
 - Kind: `method`
@@ -8999,7 +8930,7 @@
 - Export: `@proofblade/materials`
 - Summary: Release must be idempotent: an already absent resource counts as released.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ExperimentGate.assertAllowed
 - Kind: `method`
@@ -9043,7 +8974,7 @@
 - Export: `@proofblade/materials`
 - Summary: Pull the challenge list and seed per-challenge state. Idempotent.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### FleetScheduler.reprioritize
 - Kind: `method`
@@ -9088,7 +9019,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CompetitionSandbox.build
 - Kind: `method`
@@ -9212,7 +9143,7 @@
 - Export: `@proofblade/materials`
 - Summary: Release must be idempotent: an already absent resource counts as released.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DockerContainerRuntime.bindExternalResourceRegistry
 - Kind: `method`
@@ -9729,7 +9660,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ControlStore.waitForEvents
 - Kind: `method`
@@ -9780,7 +9711,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ArtifactStore.putText
 - Kind: `method`
@@ -9825,7 +9756,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verify operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`
 
 ### EffectJournal.#executeWithAuthority
 - Kind: `method`
@@ -9998,7 +9929,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: load operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### AblationExperimentStore.save
 - Kind: `method`
@@ -10252,7 +10183,7 @@
 ### CodingEvidenceGraph.annotateArtifact
 - Kind: `method`
 - Signature: `(input: { artifactId: string; name: string; summary: string; tags?: string[]; role?: ArtifactRole; relatedIds?: string[]; }): Promise<{ artifactId: string; semantic: ArtifactSemanticMetadata; reused: boolean; durableProgress: boolean; progressKey: string; }>`
-- Source: [src/knowledge/evidence-graph.ts:88](../../../packages/materials/src/knowledge/evidence-graph.ts:88)
+- Source: [src/knowledge/evidence-graph.ts:104](../../../packages/materials/src/knowledge/evidence-graph.ts:104)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: annotate artifact operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10261,7 +10192,7 @@
 ### CodingEvidenceGraph.createTree
 - Kind: `method`
 - Signature: `(input: CreateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:376](../../../packages/materials/src/knowledge/evidence-graph.ts:376)
+- Source: [src/knowledge/evidence-graph.ts:392](../../../packages/materials/src/knowledge/evidence-graph.ts:392)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10270,7 +10201,7 @@
 ### CodingEvidenceGraph.inspectForest
 - Kind: `method`
 - Signature: `(): Promise<ReasoningForestIndex>`
-- Source: [src/knowledge/evidence-graph.ts:427](../../../packages/materials/src/knowledge/evidence-graph.ts:427)
+- Source: [src/knowledge/evidence-graph.ts:443](../../../packages/materials/src/knowledge/evidence-graph.ts:443)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect forest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10279,7 +10210,7 @@
 ### CodingEvidenceGraph.inspectTree
 - Kind: `method`
 - Signature: `(treeId: string): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:431](../../../packages/materials/src/knowledge/evidence-graph.ts:431)
+- Source: [src/knowledge/evidence-graph.ts:447](../../../packages/materials/src/knowledge/evidence-graph.ts:447)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10288,7 +10219,7 @@
 ### CodingEvidenceGraph.linkNodes
 - Kind: `method`
 - Signature: `(input: LinkReasoningNodesInput): Promise<{ edge: ReasoningEdge; }>`
-- Source: [src/knowledge/evidence-graph.ts:326](../../../packages/materials/src/knowledge/evidence-graph.ts:326)
+- Source: [src/knowledge/evidence-graph.ts:342](../../../packages/materials/src/knowledge/evidence-graph.ts:342)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: link nodes operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10297,7 +10228,7 @@
 ### CodingEvidenceGraph.linkNodesBatch
 - Kind: `method`
 - Signature: `(inputs: LinkReasoningNodesInput[]): Promise<{ edges: ReasoningEdge[]; }>`
-- Source: [src/knowledge/evidence-graph.ts:345](../../../packages/materials/src/knowledge/evidence-graph.ts:345)
+- Source: [src/knowledge/evidence-graph.ts:361](../../../packages/materials/src/knowledge/evidence-graph.ts:361)
 - Export: `@proofblade/materials`
 - Summary: Commit a graph expansion in one ControlStore transaction.
 - Summary source: `tsdoc`
@@ -10305,16 +10236,16 @@
 ### CodingEvidenceGraph.readArtifact
 - Kind: `method`
 - Signature: `(artifactId: string, maxChars?: number): Promise<Record<string, unknown>>`
-- Source: [src/knowledge/evidence-graph.ts:490](../../../packages/materials/src/knowledge/evidence-graph.ts:490)
+- Source: [src/knowledge/evidence-graph.ts:550](../../../packages/materials/src/knowledge/evidence-graph.ts:550)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read artifact operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context-recovery.test.ts`
+- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`
 
 ### CodingEvidenceGraph.recordEvidence
 - Kind: `method`
 - Signature: `(input: RecordCodingEvidenceInput): Promise<RecordCodingEvidenceResult>`
-- Source: [src/knowledge/evidence-graph.ts:128](../../../packages/materials/src/knowledge/evidence-graph.ts:128)
+- Source: [src/knowledge/evidence-graph.ts:144](../../../packages/materials/src/knowledge/evidence-graph.ts:144)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: record evidence operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10323,7 +10254,7 @@
 ### CodingEvidenceGraph.recordLeak
 - Kind: `method`
 - Signature: `(input: { leak: LeakRecord; tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[]; }): Promise<RecordLeakResult>`
-- Source: [src/knowledge/evidence-graph.ts:272](../../../packages/materials/src/knowledge/evidence-graph.ts:272)
+- Source: [src/knowledge/evidence-graph.ts:288](../../../packages/materials/src/knowledge/evidence-graph.ts:288)
 - Export: `@proofblade/materials`
 - Summary: Persist a parsed pwn leak as a replayable reasoning node for later replans.
 - Summary source: `tsdoc`
@@ -10332,16 +10263,25 @@
 ### CodingEvidenceGraph.search
 - Kind: `method`
 - Signature: `(query?: string, tags?: string[]): Promise<Array<Record<string, unknown>>>`
-- Source: [src/knowledge/evidence-graph.ts:447](../../../packages/materials/src/knowledge/evidence-graph.ts:447)
+- Source: [src/knowledge/evidence-graph.ts:463](../../../packages/materials/src/knowledge/evidence-graph.ts:463)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search operation used to perform a durable write.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/workspace-search.test.ts`
 
+### CodingEvidenceGraph.searchWithTrace
+- Kind: `method`
+- Signature: `(query?: string, tags?: string[]): Promise<{ results: Array<Record<string, unknown>>; trace: RetrievalTrace; }>`
+- Source: [src/knowledge/evidence-graph.ts:507](../../../packages/materials/src/knowledge/evidence-graph.ts:507)
+- Export: `@proofblade/materials`
+- Summary: Return the same deterministic results plus a provenance-only retrieval trace.
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/evidence-search-index.test.ts`
+
 ### CodingEvidenceGraph.updateTree
 - Kind: `method`
 - Signature: `(input: UpdateReasoningTreeInput): Promise<{ tree: ReasoningTree; }>`
-- Source: [src/knowledge/evidence-graph.ts:400](../../../packages/materials/src/knowledge/evidence-graph.ts:400)
+- Source: [src/knowledge/evidence-graph.ts:416](../../../packages/materials/src/knowledge/evidence-graph.ts:416)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: update tree operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10443,7 +10383,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: load operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### McpProjectRegistry.persistedInput
 - Kind: `method`
@@ -10512,7 +10452,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: register operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### RunTelemetry.report
 - Kind: `method`
@@ -10539,7 +10479,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: records operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### MemoryTelemetryBackend.write
 - Kind: `method`
@@ -10986,7 +10926,7 @@
 ### SingleAgentCtfLoop.run
 - Kind: `method`
 - Signature: `(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome>`
-- Source: [src/orchestration/single-agent-loop.ts:97](../../../packages/materials/src/orchestration/single-agent-loop.ts:97)
+- Source: [src/orchestration/single-agent-loop.ts:93](../../../packages/materials/src/orchestration/single-agent-loop.ts:93)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -11338,7 +11278,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: records operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ExternalResourceRegistry.register
 - Kind: `method`
@@ -11347,7 +11287,7 @@
 - Export: `@proofblade/materials`
 - Summary: Register a resource before an external action starts. Repeating the exact binding is idempotent.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-receipt.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ExternalResourceRegistry.registerStarted
 - Kind: `method`
@@ -11365,7 +11305,7 @@
 - Export: `@proofblade/materials`
 - Summary: Release one resource through its backend; failures remain retryable UNKNOWN.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### PwnSessionRuntimeHost.adopt
 - Kind: `method`
@@ -11428,7 +11368,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to validate input or state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DurablePwnSessionSupervisor.adopt
 - Kind: `method`
@@ -11491,7 +11431,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### RunRecoveryService.recover
 - Kind: `method`
@@ -11527,7 +11467,7 @@
 - Export: `@proofblade/materials`
 - Summary: Release must be idempotent: an already absent resource counts as released.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### SessionResourceAdapter.takeBinding
 - Kind: `method`
@@ -11590,7 +11530,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DurableSessionRuntimeService.adopt
 - Kind: `method`
@@ -11653,7 +11593,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpSessionRuntimeBroker.action
 - Kind: `method`
@@ -11751,7 +11691,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### SandboxClaimRecoveryAdapter.reconcileStarted
 - Kind: `method`
@@ -11855,7 +11795,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:809](../../../packages/materials/src/runtime/coding-lane.ts:809)
+- Source: [src/runtime/coding-lane.ts:793](../../../packages/materials/src/runtime/coding-lane.ts:793)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11864,7 +11804,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:821](../../../packages/materials/src/runtime/coding-lane.ts:821)
+- Source: [src/runtime/coding-lane.ts:805](../../../packages/materials/src/runtime/coding-lane.ts:805)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11873,7 +11813,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:813](../../../packages/materials/src/runtime/coding-lane.ts:813)
+- Source: [src/runtime/coding-lane.ts:797](../../../packages/materials/src/runtime/coding-lane.ts:797)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11881,8 +11821,8 @@
 
 ### PiCodingLane.create
 - Kind: `method`
-- Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; ablationPolicy?: AblationPolicyBinding; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
-- Source: [src/runtime/coding-lane.ts:120](../../../packages/materials/src/runtime/coding-lane.ts:120)
+- Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; skillsLibraryPathForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
+- Source: [src/runtime/coding-lane.ts:119](../../../packages/materials/src/runtime/coding-lane.ts:119)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -11891,7 +11831,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:817](../../../packages/materials/src/runtime/coding-lane.ts:817)
+- Source: [src/runtime/coding-lane.ts:801](../../../packages/materials/src/runtime/coding-lane.ts:801)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -11900,7 +11840,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:730](../../../packages/materials/src/runtime/coding-lane.ts:730)
+- Source: [src/runtime/coding-lane.ts:715](../../../packages/materials/src/runtime/coding-lane.ts:715)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12199,7 +12139,7 @@
 - Export: `@proofblade/materials`
 - Summary: Load skills from one or more directories, in PRECEDENCE order. The default
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ProofBladeSkillRegistry.loadForModel
 - Kind: `method`
@@ -12351,7 +12291,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/claim-verification-recovery.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/demo.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/handoff.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/verification-recovery.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### JsonlControlStore.waitForEvents
 - Kind: `method`
@@ -12439,7 +12379,7 @@
 - Export: `@proofblade/materials`
 - Summary: Load `tool-catalog.json` from `root`. Missing/invalid manifests degrade to empty.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/competition-control-plane.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-fleet.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-concurrency.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation-replay.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/image-dedup.test.ts`, `packages/materials/tests/intent-scheduler-config.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/observability.test.ts`, `packages/materials/tests/output-rewrite.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-catalog.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-session.test.ts`
 
 ### ProofBladeToolCatalogRegistry.probe
 - Kind: `method`
@@ -12648,7 +12588,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read artifact operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context-recovery.test.ts`
+- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`
 
 ### ProofBladeToolRuntime.readJobOutput
 - Kind: `method`
@@ -12943,7 +12883,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: verify operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/skills.test.ts`
 
 ### WebReproducer.reproduce
 - Kind: `method`
@@ -12979,7 +12919,7 @@
 - Export: `@proofblade/materials`
 - Summary: Release must be idempotent: an already absent resource counts as released.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### BrowserContextResourceAdapter.takeBinding
 - Kind: `method`
@@ -13006,7 +12946,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in a remote runtime.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeContextPort.click
 - Kind: `method`
@@ -13105,7 +13045,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the remote broker.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeBroker.bindWireResource
 - Kind: `method`
@@ -13166,7 +13106,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### HttpBrowserRuntimeBroker.releaseWireResource
 - Kind: `method`
@@ -13210,7 +13150,7 @@
 - Export: `@proofblade/materials`
 - Summary: Persist the exact Control Store handoff marker in the service ledger.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/capability-backend.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/container-runtime.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/update-proposals.test.ts`, `packages/materials/tests/web-coding-tools.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### DurableBrowserRuntimeService.create
 - Kind: `method`
@@ -13264,7 +13204,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: release operation used to read or inspect state.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/competition-remote-query-matrix.test.ts`, `packages/materials/tests/competition-sandbox.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/docker-resource-adapter.test.ts`, `packages/materials/tests/durability.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/external-resource-registry.test.ts`, `packages/materials/tests/intent-scheduler.test.ts`, `packages/materials/tests/mcp.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-resource-adapter.test.ts`, `packages/materials/tests/session-runtime-combined-host.test.ts`, `packages/materials/tests/session-runtime-composition.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/session-runtime-wire.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### BrowserContextBackend.adoptExisting
 - Kind: `method`
@@ -13905,7 +13845,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: phase type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/app-server.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
 
 ### PrimaryFailureCategory
 - Kind: `type`
@@ -14466,7 +14406,7 @@
 ### AgentLaneFactory
 - Kind: `type`
 - Signature: `AgentLaneFactory`
-- Source: [src/orchestration/single-agent-loop.ts:51](../../../packages/materials/src/orchestration/single-agent-loop.ts:51)
+- Source: [src/orchestration/single-agent-loop.ts:49](../../../packages/materials/src/orchestration/single-agent-loop.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: agent lane factory type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -14703,14 +14643,6 @@
 - Export: `@proofblade/materials`
 - Summary: The stable challenge directions known to the solver.
 - Summary source: `tsdoc`
-
-### CodingTurnTerminationReason
-- Kind: `type`
-- Signature: `CodingTurnTerminationReason`
-- Source: [src/runtime/coding-turn-projection.ts:10](../../../packages/materials/src/runtime/coding-turn-projection.ts:10)
-- Export: `@proofblade/materials`
-- Summary: Inferred summary: coding turn termination reason type contract used to provide a reusable operation.
-- Summary source: `inferred`
 
 ### RuntimeConfigField
 - Kind: `type`

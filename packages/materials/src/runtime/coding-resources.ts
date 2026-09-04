@@ -9,7 +9,7 @@ import {
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
-import { boundedRequestedChars } from "../domain/text-bounds.js";
+import { boundModelText, boundedRequestedChars } from "../domain/text-bounds.js";
 import { createModelReceipt, renderModelReceipt } from "../context/model-receipt.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -37,6 +37,7 @@ export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
+const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
@@ -447,7 +448,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "search") {
       assertOnly(input, ["operation", "query", "tags"], "evidence search");
-      return toolResult({ results: await context.evidenceGraph.search(input.query, input.tags) });
+      return toolResult(await context.evidenceGraph.searchWithTrace(input.query, input.tags));
     }
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
@@ -1684,16 +1685,18 @@ function scalarOrJson(value: unknown): string {
 }
 
 function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const visible = boundModelText(renderMcpPayload(result), Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
   return {
-    content: [{ type: "text", text: renderMcpPayload(result) }],
-    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}) },
+    content: [{ type: "text", text: visible.text }],
+    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}) },
     isError: result.exitCode !== 0,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
   const serialized = JSON.stringify(details);
-  const visible = maxChars === undefined ? serialized : snipText(serialized, maxChars).text;
+  const requestedChars = maxChars === undefined ? Math.max(64, serialized.length) : Math.max(64, maxChars);
+  const visible = boundModelText(serialized, requestedChars, MODEL_TOOL_RESULT_MAX_TOKENS).text;
   return {
     content: [{ type: "text", text: visible }],
     details,
