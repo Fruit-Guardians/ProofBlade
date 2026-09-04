@@ -794,7 +794,7 @@ test("GUI CTF input stages attachments and completes through the shared reproduc
       async close() {},
     }));
     const runId = "GUI-CTF-WORKSPACE-001";
-    await data.startCtfSolve({ runId, objective: "从附件中恢复候选。", workspacePath: source, attachmentPaths: ["answer.txt"], targetKind: "misc", verificationCommand: command, mode: "auto", maxTurns: 1 });
+    await data.startTask({ runId, objective: "从附件中恢复候选。", workspacePath: source, attachmentPaths: ["answer.txt"], targetKind: "misc", verificationCommand: command, mode: "auto", maxTurns: 1 });
     let detail: RunDetail | undefined;
     for (let attempt = 0; attempt < 300; attempt += 1) {
       detail = await data.getRun(runId);
@@ -838,7 +838,7 @@ test("GUI CTF chat uses the same Coding Lane with the latest user instruction", 
     data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => makeLane(options.onEvent), async (options) => makeLane(options.onEvent));
     const runId = "GUI-CTF-CHAT-001";
     const command = process.platform === "win32" ? "type challenge.md" : "cat challenge.md";
-    await data.startCtfSolve({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
+    await data.startTask({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
     for (let attempt = 0; attempt < 100; attempt += 1) {
       if ((await data.getRun(runId)).snapshot.status === "PAUSED") break;
       await new Promise((resolve) => setTimeout(resolve, 50));

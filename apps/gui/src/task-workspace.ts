@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { copyFile, lstat, mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { classifyChallengePrompt, type TargetKind, type TaskContract } from "@proofblade/materials";
+import type { TargetKind, TaskContract } from "@proofblade/materials";
 
 const MAX_ATTACHMENT_BYTES = 128 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENT_BYTES = 512 * 1024 * 1024;
 const WORKSPACE_TARGET_PREFIX = "LOCAL_WORKSPACE:";
 
-export interface CtfWorkspaceInput {
+export interface TaskWorkspaceInput {
   runId: string;
   objective: string;
   workspacePath: string;
@@ -22,10 +22,10 @@ export interface CtfWorkspaceInput {
  * the verifier command to the resulting immutable TaskContract. The original
  * workspace is never used as the execution cwd, so a replay cannot mutate it.
  */
-export async function stageCtfWorkspace(input: CtfWorkspaceInput, runsRoot: string): Promise<TaskContract> {
+export async function stageTaskWorkspace(input: TaskWorkspaceInput, runsRoot: string): Promise<TaskContract> {
   const objective = input.objective.trim();
-  if (!objective) throw new Error("CTF objective is required");
-  if (objective.length > 32_000) throw new Error("CTF objective is too long (maximum 32,000 characters)");
+  if (!objective) throw new Error("Task objective is required");
+  if (objective.length > 32_000) throw new Error("Task objective is too long (maximum 32,000 characters)");
   const verificationCommand = input.verificationCommand.trim();
   if (!verificationCommand) throw new Error("A task-owned verification command is required");
   if (verificationCommand.length > 16_000) throw new Error("Verification command is too long (maximum 16,000 characters)");
@@ -60,12 +60,11 @@ export async function stageCtfWorkspace(input: CtfWorkspaceInput, runsRoot: stri
     inputs.push({ path: stagedPath, sha256: await sha256File(destination), read_only: true });
   }
 
-  const classification = classifyChallengePrompt(objective, inputs.map((item) => item.path).join("\n"));
   const targetKind = input.targetKind && input.targetKind !== "unknown" && input.targetKind !== "mixed"
     ? input.targetKind
-    : classification?.profile.targetKind ?? "misc";
+    : "unknown";
   await writeFile(join(stagingRoot, "challenge.md"), [
-    "# ProofBlade CTF workspace",
+    "# ProofBlade task workspace",
     "",
     objective,
     "",
@@ -78,7 +77,7 @@ export async function stageCtfWorkspace(input: CtfWorkspaceInput, runsRoot: stri
   return {
     schema_version: 1,
     task_id: input.runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: targetKind,
     target: `${WORKSPACE_TARGET_PREFIX}${targetKind}`,
     objective,
