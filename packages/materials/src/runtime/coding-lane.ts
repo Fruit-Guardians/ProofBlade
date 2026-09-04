@@ -103,6 +103,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly experimentBudgetBreaker: ExperimentBudgetBreaker,
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
+    private readonly refreshAblationRoute: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Teardown hook for durable shell jobs owned by this lane. */
     private readonly closeShellJobs: () => Promise<void>,
@@ -576,7 +577,14 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, options.ablationPolicy);
+    const ablationRoute = options.ablationPolicy ? {
+      domainPhase: snapshot.domainPhase,
+      actionBundles: preparation?.actionBundles ?? snapshot.toolPreparation?.actionBundles ?? [],
+    } : undefined;
+    const ablationBinding = options.ablationPolicy && ablationRoute
+      ? { ...options.ablationPolicy, route: () => ablationRoute }
+      : options.ablationPolicy;
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, ablationBinding, options.deferClaimAcceptance);
     const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -699,6 +707,11 @@ export class PiCodingLane implements AgentLanePort {
       experimentBudgetBreaker,
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
+      ablationRoute ? async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        ablationRoute.domainPhase = current.domainPhase;
+        ablationRoute.actionBundles = current.toolPreparation?.actionBundles ?? [];
+      } : async () => undefined,
       async () => {
         const branch = await session.getBranch();
         for (let index = branch.length - 1; index >= 0; index -= 1) {
@@ -731,6 +744,7 @@ export class PiCodingLane implements AgentLanePort {
     this.termination.ctfMode = ctfMode;
     this.turnContext.guidance = ctfMode ? this.ctfTurnGuidance : "";
     await this.refreshForestContext();
+    await this.refreshAblationRoute();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     const coordinator = new RunCoordinator(this.controlStore);
