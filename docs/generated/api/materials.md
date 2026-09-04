@@ -1731,7 +1731,7 @@
 ### buildModelContextFrame
 - Kind: `function`
 - Signature: `(input: ModelContextFrameInput): ModelContextFrame`
-- Source: [src/context/model-context-frame.ts:64](../../../packages/materials/src/context/model-context-frame.ts:64)
+- Source: [src/context/model-context-frame.ts:66](../../../packages/materials/src/context/model-context-frame.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build model context frame operation used to perform a durable write.
 - Summary source: `inferred`
@@ -4339,7 +4339,7 @@
 ### ModelContextFrameInput
 - Kind: `interface`
 - Signature: `ModelContextFrameInput`
-- Source: [src/context/model-context-frame.ts:47](../../../packages/materials/src/context/model-context-frame.ts:47)
+- Source: [src/context/model-context-frame.ts:49](../../../packages/materials/src/context/model-context-frame.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: model context frame input type contract used to provide a reusable operation.
 - Summary source: `inferred`
