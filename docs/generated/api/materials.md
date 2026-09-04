@@ -3047,7 +3047,7 @@
 ### finalizeCodingTurn
 - Kind: `function`
 - Signature: `(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<CodingClaimVerifier, "project">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-turn-projection.ts:428](../../../packages/materials/src/runtime/coding-turn-projection.ts:428)
+- Source: [src/runtime/coding-turn-projection.ts:461](../../../packages/materials/src/runtime/coding-turn-projection.ts:461)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: finalize coding turn operation used to perform a durable write.
 - Summary source: `inferred`
