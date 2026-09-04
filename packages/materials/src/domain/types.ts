@@ -1096,6 +1096,7 @@ export type EventType =
   | "provider_request_inter_event_idle"
   | "provider_request_stalled"
   | "provider_recovery_required"
+  | "resource_cleanup_recovery_required"
   | "provider_response_received"
   | "tool_call_recorded"
   | "tool_result_recorded"

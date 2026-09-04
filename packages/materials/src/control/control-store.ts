@@ -119,6 +119,7 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "provider_request_inter_event_idle",
   "provider_request_stalled",
   "provider_recovery_required",
+  "resource_cleanup_recovery_required",
   "provider_response_received",
   "request_epoch_context",
   "tool_call_recorded",

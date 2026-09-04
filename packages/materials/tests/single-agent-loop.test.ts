@@ -303,6 +303,41 @@ test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after
   }
 });
 
+test("[contract:deadline-cleanup] a stuck lane close cannot extend run completion indefinitely", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-stuck-lane-close-"));
+  const services = createServices(root, config);
+  let releaseClose!: () => void;
+  const lane: AgentLaneFactory = async () => ({
+    async prompt() { return { text: "bounded turn", stopReason: "stop", usage: zeroUsage() }; },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return false; },
+    async close() { await new Promise<void>((resolve) => { releaseClose = resolve; }); },
+  });
+  try {
+    const started = Date.now();
+    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+      runId: "STUCK-CLOSE-web-source-1",
+      task: fixtureTask("STUCK-CLOSE-web-source-1", "web-source-1", root, config),
+      mode: "auto",
+      maxTurns: 1,
+    });
+    assert.ok(Date.now() - started < 5_000);
+    assert.equal(result.status, "EXHAUSTED");
+    const cleanupEvent = (await services.control.events("STUCK-CLOSE-web-source-1")).find((event) => event.type === "resource_cleanup_recovery_required");
+    assert.deepEqual(cleanupEvent?.payload, {
+      status: "UNKNOWN",
+      recoveryRequired: true,
+      resources: ["coding_lane_close"],
+      reason: "Cleanup did not settle before the run deadline; reconcile resources before reuse.",
+    });
+    releaseClose();
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("[contract:abort-before-verification] aborting after Prompt leaves the candidate unverified", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-abort-before-verification-"));
   const services = createServices(root, config);

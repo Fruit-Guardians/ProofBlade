@@ -831,6 +831,11 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
     case "provider_recovery_required":
       updateEpochStatus(next, p, "FAILED", event.seq);
       break;
+    case "resource_cleanup_recovery_required":
+      // The event itself is the durable recovery queue entry. Resource handles
+      // are external to the Run projection and must be reconciled by their
+      // owning runtime before a subsequent lane reuses them.
+      break;
     case "provider_response_received":
       updateEpochStatus(next, p, Number(p.status) >= 400 ? "FAILED" : "RESPONSE_RECEIVED", event.seq);
       break;
