@@ -1067,6 +1067,12 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!["submission", "claim_reproduction", "harness_verification"].includes(command.completion.purpose)) {
       throw new Error(`Completion ${command.completion.id} requires an immutable purpose`);
     }
+    if (command.completion.submissionTarget !== undefined
+      && (typeof command.completion.submissionTarget !== "string"
+        || command.completion.submissionTarget.trim().length === 0
+        || command.completion.submissionTarget.length > 256)) {
+      throw new Error(`Completion ${command.completion.id} has an invalid submission target`);
+    }
     const artifact = snapshot.artifacts[command.completion.artifactId];
     if (!artifact) throw new Error(`Unknown completion artifact ${command.completion.artifactId}`);
     if (artifact.generation !== snapshot.generation) throw new Error(`Completion artifact is from generation ${artifact.generation}`);

@@ -49,19 +49,31 @@ const JADX_FIRST_CLASS_TOOLS = new Set([
   "search_method_by_name", "get_xrefs_to_class", "get_xrefs_to_method",
 ]);
 
-/** Verdict returned by a real platform submission. */
-export interface CodingFlagSubmission {
+/** Request sent through the run's externally configured submission capability. */
+export interface ExternalSubmissionRequest {
+  /** Stable logical destination, for example a competition, review queue, or deployment. */
+  target: string;
+  /** Payload is kept opaque to the generic harness and persisted as an Artifact. */
+  payload: string;
+}
+
+/** Verdict returned by a real external submission. */
+export interface ExternalSubmissionResult {
   accepted: boolean;
   completionId: string;
   candidateHash: string;
-  /** True when this exact flag was already submitted and the stored verdict was replayed. */
+  /** True when this exact payload was already submitted and the stored verdict was replayed. */
   replayed: boolean;
-  /** True in assist mode: recorded for operator approval, platform not contacted. */
+  /** True in assist mode: recorded for operator approval, destination not contacted. */
   heldForApproval?: boolean;
   message?: string;
   submissionsUsed: number;
   submissionsRemaining: number;
+  target?: string;
 }
+
+/** @deprecated Use ExternalSubmissionResult. Kept for old Competition callers. */
+export type CodingFlagSubmission = ExternalSubmissionResult;
 
 export interface CodingResourceContext extends ExecutionToolContext {
   /** Durable owner identity for lane-scoped shell process records. */
@@ -94,7 +106,9 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * runs, in which case those tools fail closed with a clear message.
    */
   webSession?: WebToolHandler;
-  /** Present only when the run is judged by a live competition platform. */
+  /** Present when a configured external destination accepts submissions. */
+  externalSubmit?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>;
+  /** @deprecated Compatibility alias for old competition integrations. */
   submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
@@ -143,7 +157,7 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
   }));
 }
 
-export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
+export function createCodingTools(options: { platformJudged?: boolean; externalSubmissionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyResultTool,
@@ -157,9 +171,10 @@ export function createCodingTools(options: { platformJudged?: boolean; webReprod
     ...createPwnCodingTools(),
     ...(options.webSessionEnabled ? createWebSessionTools() : []),
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
-    // Registered only for platform-judged runs: it spends a real submission, and
-    // a GUI chat run has no platform to submit to.
-    ...(options.platformJudged ? [submitFlagTool] : []),
+    // Registered only when a trusted destination is configured. The legacy
+    // alias remains available for existing Competition clients, but new runs
+    // should use external_submit and provide an explicit target.
+    ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool, submitFlagTool] : []),
   ];
 }
 
@@ -1020,18 +1035,35 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+const externalSubmitTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "external_submit",
+  label: "external_submit",
+  description: "Submit an opaque result payload to an explicitly configured external destination. The harness records the payload as an Artifact, applies approval and attempt limits, and returns the verifier's structured outcome; do not retry an unknown outcome blindly.",
+  parameters: Type.Object({
+    target: Type.String({ minLength: 1, maxLength: 256, description: "Logical destination declared by the task, such as a competition or review queue." }),
+    payload: Type.String({ minLength: 1, maxLength: 1_048_576, description: "Opaque submission payload. The destination adapter determines its format." }),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
+    const input = params as ExternalSubmissionRequest;
+    if (!context.externalSubmit) throw new Error("external_submit is unavailable: this run has no configured external destination");
+    return toolResult(await context.externalSubmit({ target: input.target.trim(), payload: input.payload }, signal));
+  },
+};
+
 const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
   name: "submit_flag",
   label: "submit_flag",
-  description: "Submit one complete flag to the competition platform and return its verdict. Each distinct flag costs one real submission from a limited budget, so submit only a flag you have derived; resubmitting the same value returns the stored verdict without a second API call.",
+  description: "Deprecated compatibility alias for external_submit targeting the configured competition destination. Prefer external_submit with an explicit target and opaque payload.",
   parameters: Type.Object({
     flag: Type.String({ minLength: 1, description: "One complete flag value, e.g. prefix{...}." }),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     const input = params as { flag: string };
-    if (!context.submitFlag) throw new Error("submit_flag is unavailable: this run is not judged by a competition platform");
-    return toolResult(await context.submitFlag(input.flag, signal));
+    if (context.externalSubmit) return toolResult(await context.externalSubmit({ target: "competition", payload: input.flag }, signal));
+    if (context.submitFlag) return toolResult(await context.submitFlag(input.flag, signal));
+    throw new Error("submit_flag is unavailable: this run has no configured external destination");
   },
 };
 
@@ -1079,7 +1111,7 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   // Interactive web session tools: only when the task has a resolvable web target.
   if (input.webSessionEnabled) active.push(...CODING_WEB_SESSION_TOOL_NAMES);
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
-  if (input.platformJudged) active.push(submitFlagTool.name);
+  if (input.platformJudged) active.push(externalSubmitTool.name, submitFlagTool.name);
   return active;
 }
 

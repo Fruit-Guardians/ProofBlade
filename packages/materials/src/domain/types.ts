@@ -706,6 +706,8 @@ export interface CompletionProposal {
   createdSeq: number;
   /** Stable request identity; random Completion IDs remain references only. */
   verificationKey?: string;
+  /** Logical external destination for submission completions. */
+  submissionTarget?: string;
 }
 
 export type VerificationRequestKind = "web" | "browser" | "pwn" | "claim";

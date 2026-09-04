@@ -30,7 +30,7 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { CodingClaimVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingFlagSubmission, type CodingResourceContext } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingFlagSubmission, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
@@ -442,7 +442,7 @@ export class PiCodingLane implements AgentLanePort {
         sessionRuntimeRequired: httpRuntimeRequired,
       })
       : undefined;
-    const tools = [...createCodingTools({ platformJudged, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled: platformJudged, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -457,8 +457,8 @@ export class PiCodingLane implements AgentLanePort {
       ...activeMcpTools.map((tool) => tool.name),
     ];
     if (platformJudged && !options.platformVerifier) throw new Error("Platform-judged lane requires a trusted platform verifier");
-    const submitFlag = platformJudged
-      ? createPlatformFlagSubmitter({
+    const externalSubmit = platformJudged
+      ? createPlatformExternalSubmitter({
         runId: options.runId,
         runtime,
         fixture,
@@ -502,7 +502,8 @@ export class PiCodingLane implements AgentLanePort {
       } : {}),
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
-      ...(submitFlag ? { submitFlag } : {}),
+      ...(externalSubmit ? { externalSubmit } : {}),
+      ...(externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),
@@ -836,7 +837,10 @@ async function latestExternalUserMessageFromSession(session: { getBranch(): Prom
 }
 
 /**
- * Build the platform submission path for a competition run.
+ * Build the generic external submission path for a task with a trusted
+ * destination. The current CompetitionSandbox is one adapter; the lane does
+ * not need to know whether the destination is a platform, review queue, or
+ * deployment service.
  *
  * `runtime.submitCandidate` enforces flag format, the submission budget, and
  * candidate-hash dedup, returning the existing completion for a repeat. The
@@ -847,7 +851,7 @@ async function latestExternalUserMessageFromSession(session: { getBranch(): Prom
  * submission stays on the event log — the two things the rules use as
  * tiebreakers (wrong-submission count, API-call efficiency).
  */
-export function createPlatformFlagSubmitter(deps: {
+export function createPlatformExternalSubmitter(deps: {
   runId: string;
   runtime: ProofBladeToolRuntime;
   fixture: FixtureRef;
@@ -860,11 +864,15 @@ export function createPlatformFlagSubmitter(deps: {
   approvalPolicy?: ApprovalPolicy;
   /** Called when the submission path pauses on a pending approval. */
   onApprovalRequired?: (approvalId: string) => void;
-}): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission> {
-  return async (flag, signal) => {
+}): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult> {
+  return async (request, signal) => {
+    const target = request.target.trim();
+    const payload = request.payload.trim();
+    if (!target) throw new Error("External submission target is required");
+    if (!payload) throw new Error("External submission payload is required");
     const before = await deps.controlStore.snapshot(deps.runId);
-    const { completionId, candidateHash } = await deps.runtime.submitCandidate(flag);
-    // Assist mode: the operator wants to see the flag before it costs a real
+    const { completionId, candidateHash } = await deps.runtime.submitExternal(payload, { target });
+    // Assist mode: the operator wants to inspect the payload before it costs a real
     // submission. The completion is recorded as PROPOSED so the loop can pause
     // and a later auto-mode turn can send it, but the platform is not called.
     if (deps.mode?.() === "assist") {
@@ -874,11 +882,12 @@ export function createPlatformFlagSubmitter(deps: {
         candidateHash,
         replayed: false,
         heldForApproval: true,
-        message: "Recorded for operator approval; the platform was NOT contacted and no submission was spent. Stop here and report your derivation.",
+        message: `Recorded for operator approval; destination ${target} was NOT contacted and no submission was spent. Stop here and report the derivation.`,
+        target,
         ...(await submissionCounters(deps.runtime, await deps.controlStore.snapshot(deps.runId))),
       };
     }
-    // submitCandidate returns an existing completion for a repeated flag. If it
+    // submitExternal returns an existing completion for a repeated payload. If it
     // was already judged, report the stored verdict without touching the API.
     const known = before.completions[completionId];
     if (known && known.status !== "PROPOSED") {
@@ -887,7 +896,8 @@ export function createPlatformFlagSubmitter(deps: {
         completionId,
         candidateHash,
         replayed: true,
-        message: `This flag was already submitted and ${known.status === "ACCEPTED" ? "accepted" : "rejected"}; no new submission was spent.`,
+        message: `This payload was already submitted to ${target} and ${known.status === "ACCEPTED" ? "accepted" : "rejected"}; no new submission was spent.`,
+        target,
         ...(await submissionCounters(deps.runtime, before)),
       };
     }
@@ -895,8 +905,8 @@ export function createPlatformFlagSubmitter(deps: {
       const approval = await deps.approvalPolicy.check({
         runId: deps.runId,
         operation: "platform.submit",
-        resource: flag,
-        reason: "A model-derived flag is ready for platform submission.",
+        resource: `${target}:${payload}`,
+        reason: `A model-derived result is ready for submission to ${target}.`,
       });
       if (!approval.allowed) {
         if (approval.approvalId) deps.onApprovalRequired?.(approval.approvalId);
@@ -907,6 +917,7 @@ export function createPlatformFlagSubmitter(deps: {
           replayed: false,
           heldForApproval: true,
           message: `${approval.reason ?? "Operator approval is required before submission."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}`,
+          target,
           ...(await submissionCounters(deps.runtime, await deps.controlStore.snapshot(deps.runId))),
         };
       }
@@ -918,9 +929,26 @@ export function createPlatformFlagSubmitter(deps: {
       completionId: outcome.completionId,
       candidateHash: outcome.candidateHash,
       replayed: false,
+      target,
       ...(await submissionCounters(deps.runtime, after)),
     };
   };
+}
+
+/** @deprecated Use createPlatformExternalSubmitter with an explicit target. */
+export function createPlatformFlagSubmitter(deps: {
+  runId: string;
+  runtime: ProofBladeToolRuntime;
+  fixture: FixtureRef;
+  controlStore: ControlStore;
+  verifier: Pick<IndependentVerifier, "verify">;
+  artifactStore: ArtifactStore;
+  mode?: () => "auto" | "assist";
+  approvalPolicy?: ApprovalPolicy;
+  onApprovalRequired?: (approvalId: string) => void;
+}): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission> {
+  const submit = createPlatformExternalSubmitter(deps);
+  return (flag, signal) => submit({ target: "competition", payload: flag }, signal);
 }
 
 /**

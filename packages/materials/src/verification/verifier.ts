@@ -65,6 +65,7 @@ export class IndependentVerifier {
           completionId: completion.id,
           candidateHash: completion.candidateHash,
           candidateArtifactId: artifact.id,
+          ...(completion.submissionTarget ? { submissionTarget: completion.submissionTarget } : {}),
           taskHash: sha256(canonicalJson(snapshot.task)),
           targetHash: sha256(snapshot.task.target),
           verificationRuleHash: sha256(canonicalJson(snapshot.task.verification)),
