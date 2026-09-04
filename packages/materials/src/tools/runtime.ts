@@ -346,8 +346,8 @@ export class ProofBladeToolRuntime {
     void target; // Reserved for destination-specific completion metadata in the next schema.
     // Only completions that are actually SUBMITTABLE count against the budget and
     // are eligible for dedup. `verify_claim` also proposes completions, but its
-    // artifact is a claim-reproduction JSON blob, not the bare flag. Counting those
-    // let a few verify_claim calls exhaust max_submissions with nothing ever sent,
+    // artifact is a verification record, not the bare submission payload. Counting those
+    // let a few verification calls exhaust max_submissions with nothing ever sent,
     // and deduping against one handed it back to IndependentVerifier, which
     // compared sha256(json blob) to candidateHash and threw "Candidate hash
     // mismatch" — losing an already-correct flag. The predicate below IS the

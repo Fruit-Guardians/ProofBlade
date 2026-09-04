@@ -157,11 +157,11 @@ export class SingleAgentCtfLoop {
       }
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
-    const acceptedAtStart = latestAcceptedClaim(await this.services.control.snapshot(options.runId), options.task);
+    const acceptedAtStart = latestAcceptedVerification(await this.services.control.snapshot(options.runId), options.task);
     if (acceptedAtStart) {
       const current = await this.services.control.snapshot(options.runId);
       const workItem = Object.values(current.workItems).find((item) => item.status === "RUNNING" && item.ownerLane === "executor");
-      const verified = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedAtStart.id, workItem?.id, options.signal);
+      const verified = await this.finalizeAcceptedVerification(options.runId, coordinator, intentScheduler, acceptedAtStart.id, workItem?.id, options.signal);
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
@@ -256,9 +256,9 @@ export class SingleAgentCtfLoop {
         }
         const after = await this.services.control.snapshot(options.runId);
         if (after.status === "PAUSED") break;
-        const acceptedClaim = latestAcceptedClaim(after, options.task);
+        const acceptedClaim = latestAcceptedVerification(after, options.task);
         if (acceptedClaim) {
-          verification = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedClaim.id, activeWorkItemId, options.signal);
+          verification = await this.finalizeAcceptedVerification(options.runId, coordinator, intentScheduler, acceptedClaim.id, activeWorkItemId, options.signal);
           activeWorkItemId = undefined;
           break;
         }
@@ -426,7 +426,7 @@ export class SingleAgentCtfLoop {
    * the hidden-scorer verifier (which would be a different authority); finish
    * the same durable report/submit edge from the accepted Completion instead.
    */
-  private async finalizeAcceptedClaim(
+  private async finalizeAcceptedVerification(
     runId: string,
     coordinator: RunCoordinator,
     scheduler: IntentScheduler,
@@ -437,12 +437,12 @@ export class SingleAgentCtfLoop {
     throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     const completion = snapshot.completions[completionId];
-    if (!completion || completion.status !== "ACCEPTED") throw new Error(`Task-owned completion is not accepted: ${completionId}`);
+    if (!completion || completion.status !== "ACCEPTED") throw new Error(`Task verification completion is not accepted: ${completionId}`);
     const artifact = snapshot.artifacts[completion.artifactId];
-    if (!artifact) throw new Error(`Task-owned completion candidate artifact is missing: ${completion.artifactId}`);
+    if (!artifact) throw new Error(`Task verification result artifact is missing: ${completion.artifactId}`);
     const candidate = (await this.services.artifacts.readText(runId, artifact)).trim();
     const evidenceIds = [...completion.evidenceIds];
-    if (evidenceIds.length === 0) throw new Error(`Task-owned completion has no reproduction Evidence: ${completionId}`);
+    if (evidenceIds.length === 0) throw new Error(`Task verification completion has no Evidence: ${completionId}`);
     if (snapshot.domainPhase !== "REPORT" && snapshot.domainPhase !== "SUBMIT") {
       await coordinator.setDomainPhase(runId, "REPRODUCE");
       await coordinator.moveToPhase(runId, "verification");
@@ -460,7 +460,7 @@ export class SingleAgentCtfLoop {
       `Evidence: ${evidenceIds.join(", ")}`,
       `Fact: ${fact?.id ?? "none"}`,
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
-      "Verification authority: task-owned reproduction command.",
+      "Verification authority: task-owned deterministic verifier.",
     ].join("\n");
     await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
     const current = await this.services.control.snapshot(runId);
@@ -472,7 +472,7 @@ export class SingleAgentCtfLoop {
       });
     }
     throwIfAborted(signal);
-    await coordinator.finishAccepted(runId, workItemId, completion.id, "Task-owned reproduction command accepted the candidate.");
+    await coordinator.finishAccepted(runId, workItemId, completion.id, "Task-owned deterministic verifier accepted the result.");
     return { completionId: completion.id, accepted: true, candidate, candidateHash: completion.candidateHash, evidenceIds, ...(fact ? { factId: fact.id } : {}) };
   }
 
@@ -565,10 +565,12 @@ function latestPending(snapshot: RunSnapshot) {
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
-function latestAcceptedClaim(snapshot: RunSnapshot, task: TaskContract) {
+function latestAcceptedVerification(snapshot: RunSnapshot, task: TaskContract) {
   if (task.verification.kind !== "reproduction") return undefined;
   return Object.values(snapshot.completions)
-    .filter((item) => item.status === "ACCEPTED" && item.purpose === "claim_reproduction" && item.generation === snapshot.generation)
+    .filter((item) => item.status === "ACCEPTED"
+      && (item.purpose === "claim_reproduction" || item.purpose === "harness_verification")
+      && item.generation === snapshot.generation)
     .sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 

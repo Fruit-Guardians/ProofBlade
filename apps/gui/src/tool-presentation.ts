@@ -33,10 +33,10 @@ export function toolPresentation(name: string, argumentsValue: unknown, result: 
     inputLabel = "加载 Skill";
     input = text(args.name) || display(argumentsValue);
     summary = input;
-  } else if (name === "verify_claim") {
-    inputLabel = "复现指令";
-    input = [command, labeled("最终候选", text(args.candidate))].filter(Boolean).join("\n\n");
-    summary = "复现最终结论";
+  } else if (name === "verify_claim" || name === "verify_result") {
+    inputLabel = "验证指令";
+    input = [command, labeled("待验证结果", text(args.result) || text(args.candidate))].filter(Boolean).join("\n\n");
+    summary = "验证最终结果";
   } else if (name === "evidence") {
     inputLabel = evidenceInputLabel(operation);
     summary = evidenceSummary(operation, args);
@@ -53,7 +53,7 @@ export function toolPresentation(name: string, argumentsValue: unknown, result: 
     summary: clip(summary, 220),
     inputLabel,
     input: bounded(input || "无参数"),
-    outputLabel: name === "verify_claim" ? "验证记录" : name === "evidence" ? "证据图更新" : "返回结果",
+    outputLabel: name === "verify_claim" || name === "verify_result" ? "验证记录" : name === "evidence" ? "证据图更新" : "返回结果",
     output: result === undefined ? "等待返回" : bounded(resultText(result) || "已完成（没有文本返回）"),
   };
 }

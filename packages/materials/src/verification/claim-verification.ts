@@ -230,6 +230,8 @@ export class CodingClaimVerifier {
     command: string;
     cwd: string;
     toolCallId: string;
+    /** Public callers may opt into the domain-neutral completion purpose. */
+    completionPurpose?: "claim_reproduction" | "harness_verification";
     supportingEvidenceIds?: string[];
     signal?: AbortSignal;
     /** Used only for non-task-bound observational commands. */
@@ -243,6 +245,7 @@ export class CodingClaimVerifier {
     const candidateHash = sha256(candidate);
     const commandHash = sha256(command);
     const supportingEvidenceIds = [...new Set(input.supportingEvidenceIds ?? [])];
+    const completionPurpose = input.completionPurpose ?? "claim_reproduction";
     const taskBoundCommand = snapshot.task.verification.kind === "reproduction"
       && typeof snapshot.task.verification.command === "string"
       ? snapshot.task.verification.command.trim()
@@ -311,7 +314,7 @@ export class CodingClaimVerifier {
     });
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "claim_reproduction", candidateHash, artifactId: candidateArtifact.id, verificationKey: request.request.key },
+      completion: { id: completionId, purpose: completionPurpose, candidateHash, artifactId: candidateArtifact.id, verificationKey: request.request.key },
       lane: "main",
     });
 
