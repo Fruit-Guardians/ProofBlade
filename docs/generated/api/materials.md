@@ -1714,7 +1714,7 @@
 ### contextText
 - Kind: `function`
 - Signature: `(output: ContextBuildOutput, maxTokens?: number): string`
-- Source: [src/context/compiler.ts:621](../../../packages/materials/src/context/compiler.ts:621)
+- Source: [src/context/compiler.ts:629](../../../packages/materials/src/context/compiler.ts:629)
 - Export: `@proofblade/materials`
 - Summary: Render the compiler output for providers that accept one system prompt.
 - Summary source: `tsdoc`
@@ -1723,7 +1723,7 @@
 ### snapshotContext
 - Kind: `function`
 - Signature: `(snapshot: RunSnapshot, runId: string): ContextBuildOutput`
-- Source: [src/context/compiler.ts:626](../../../packages/materials/src/context/compiler.ts:626)
+- Source: [src/context/compiler.ts:634](../../../packages/materials/src/context/compiler.ts:634)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot context operation used to read or inspect state.
 - Summary source: `inferred`

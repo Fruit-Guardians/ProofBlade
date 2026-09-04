@@ -233,21 +233,41 @@ function trimOldMessages(messages: AgentMessage[], maxTokens: number, dropped: A
 function enforceFinalTokenBudget(messages: AgentMessage[], maxTokens: number, dropped: AgentContextPruneResult["dropped"]): void {
   let guard = Math.max(16, messages.length * 4);
   while (messageTokens(messages) > maxTokens && guard-- > 0) {
-    const index = largestMessageIndex(messages);
+    const protectedIndexes = latestRecoveryIndexes(messages);
+    let index = largestMessageIndex(messages);
     if (index < 0) break;
     const before = messageTokens(messages);
     if (shrinkMessage(messages[index]!)) {
       dropped.push({ kind: "tool_result_snip", id: messageId(messages[index]!, index) });
       if (messageTokens(messages) < before) continue;
     }
+    if (protectedIndexes.has(index)) {
+      index = largestMessageIndex(messages, (candidate) => !protectedIndexes.has(candidate));
+      if (index < 0) break;
+    }
     if (!dropExchangeAt(messages, index, dropped)) break;
   }
 }
 
-function largestMessageIndex(messages: AgentMessage[]): number {
+function latestRecoveryIndexes(messages: AgentMessage[]): Set<number> {
+  const protectedIndexes = new Set<number>();
+  const latestUser = latestExternalUserMessage(messages);
+  const latestUserIndex = latestUser ? messages.indexOf(latestUser) : -1;
+  if (latestUserIndex >= 0) protectedIndexes.add(latestUserIndex);
+  const assistantIndex = [...messages].map((item, position) => ({ item, position }))
+    .reverse().find(({ item, position }) => item.role === "assistant" && assistantCalls(item).length > 0 && position + 1 < messages.length && messages[position + 1]?.role === "toolResult")?.position;
+  if (assistantIndex === undefined) return protectedIndexes;
+  let end = assistantIndex;
+  while (end + 1 < messages.length && messages[end + 1]?.role === "toolResult") end += 1;
+  for (let index = assistantIndex; index <= end; index += 1) protectedIndexes.add(index);
+  return protectedIndexes;
+}
+
+function largestMessageIndex(messages: AgentMessage[], include: (index: number) => boolean = () => true): number {
   let selected = -1;
   let largest = 0;
   for (let index = 0; index < messages.length; index += 1) {
+    if (!include(index)) continue;
     const size = estimateTokens(JSON.stringify(messages[index]));
     if (size > largest) { largest = size; selected = index; }
   }
@@ -304,5 +324,8 @@ function messageId(message: AgentMessage, index: number): string {
 }
 
 function messageTokens(messages: AgentMessage[]): number {
-  return estimateTokens(JSON.stringify(messages));
+  // Keep maintenance thresholds compatible with the provider's character
+  // approximation. UTF-8 byte limits are enforced separately by
+  // boundModelText for model-facing snippets.
+  return Math.ceil(JSON.stringify(messages).length / 4);
 }
