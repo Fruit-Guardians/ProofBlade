@@ -37,6 +37,8 @@ export interface ModelContextFrame {
   sourceMessages: ModelContextItem[];
   finalMessages: ModelContextItem[];
   omittedItems: ModelContextItem[];
+  /** Digest of messages omitted after the bounded visible prefix. */
+  omittedMessageHash?: string;
   totalVisibleChars: number;
   estimatedVisibleTokens: number;
   messageCount: number;
@@ -84,6 +86,9 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
   const omittedItems = [...(input.omittedItems ?? [])]
     .slice(0, MAX_FRAME_OMITTED_ITEMS)
     .map((item) => boundedFrameItem({ ...item, included: false }));
+  const omittedMessageHash = messages.length > MAX_FRAME_MESSAGES
+    ? sha256(canonicalJson(messages.slice(MAX_FRAME_MESSAGES).map((message) => ({ role: message.role, contentHash: sha256(message.content), visibleChars: message.content.length }))))
+    : undefined;
   const base = {
     schemaVersion: 1 as const,
     frameId: id("MCF"),
@@ -100,6 +105,7 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
     sourceMessages,
     finalMessages: sourceMessages,
     omittedItems,
+    ...(omittedMessageHash ? { omittedMessageHash } : {}),
     totalVisibleChars: sourceMessages.reduce((sum, item) => sum + item.visibleChars, 0),
     estimatedVisibleTokens: sourceMessages.reduce((sum, item) => sum + item.estimatedTokens, 0),
     messageCount: messages.length,
@@ -117,6 +123,7 @@ export function buildModelContextFrame(input: ModelContextFrameInput): ModelCont
     sourceMessages: base.sourceMessages.map(({ itemId: _itemId, ...item }) => item),
     finalMessages: base.finalMessages.map(({ itemId: _itemId, ...item }) => item),
     omittedItems: base.omittedItems.map(({ itemId: _itemId, ...item }) => item),
+    ...(base.omittedMessageHash ? { omittedMessageHash: base.omittedMessageHash } : {}),
     messageCount: base.messageCount,
   };
   return { ...base, frameHash: sha256(canonicalJson(hashInput)) };

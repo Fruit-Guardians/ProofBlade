@@ -94,3 +94,14 @@ test("context frame bounds metadata arrays while retaining the final payload cou
   assert.ok(frame.omittedItems.every((item) => item.sourceIds.length <= 32));
   assert.ok(JSON.stringify(frame).length < 200_000, "frame metadata must remain bounded");
 });
+
+test("context frame hashes messages omitted after the visible prefix", () => {
+  const messages = Array.from({ length: 129 }, (_, index) => ({ role: "user", content: `message-${index}` }));
+  const first = buildModelContextFrame({ runId: "FRAME-TAIL-1", generation: 0, requestId: "PR-1", provider: "local", model: "test", api: "openai-completions", payload: { messages } });
+  const changedTail = [...messages.slice(0, 128), { role: "user", content: "message-129-changed" }];
+  const second = buildModelContextFrame({ runId: "FRAME-TAIL-2", generation: 9, requestId: "PR-2", provider: "local", model: "test", api: "openai-completions", payload: { messages: changedTail } });
+  assert.equal(first.messageCount, 129);
+  assert.equal(first.finalMessages.length, 128);
+  assert.notEqual(first.omittedMessageHash, second.omittedMessageHash);
+  assert.notEqual(first.frameHash, second.frameHash);
+});
