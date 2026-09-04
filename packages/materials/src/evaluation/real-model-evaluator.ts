@@ -539,7 +539,7 @@ function realEvaluationTask(runId: string, corpusCase: LoadedRealEvaluationCase,
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: corpusCase.targetKind,
     target: `REAL_EVALUATION:${corpusCase.id}`,
     objective: corpusCase.objective,

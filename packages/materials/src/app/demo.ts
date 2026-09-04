@@ -117,7 +117,7 @@ export function demoTask(runId: string, root: string, config: ProofBladeConfig):
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "coding_assistant",
     target_kind: "misc",
     target: "LOCAL_FIXTURE",
     objective: "Locate the synthetic flag, preserve the observation, and verify it twice.",

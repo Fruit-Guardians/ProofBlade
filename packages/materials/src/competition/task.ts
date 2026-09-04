@@ -50,7 +50,7 @@ export function competitionTask(
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: targetKindForCategory(summary),
     target: connection ? `REMOTE:${connection}` : `CHALLENGE:${summary.challengeId}`,
     objective,

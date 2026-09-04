@@ -1083,10 +1083,13 @@ export function isLikelyCtfPrompt(text: string): boolean {
 }
 
 /** Durable task classification used when generated executor prompts omit CTF keywords. */
-export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind">): boolean {
-  // Target kind is a domain label for optional capabilities, not a mode
-  // switch. General coding tasks may legitimately analyze web or binary data.
-  return task.mode !== "coding_assistant";
+export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind"> & Partial<Pick<TaskContract, "verification">>): boolean {
+  // Domain tags and the legacy mode do not select a loop. Challenge-oriented
+  // preparation is needed only for tasks with a scorer or external platform;
+  // ordinary coding tasks may analyze the same web/binary domains directly.
+  return task.verification?.kind === "hidden_scorer"
+    || task.verification?.kind === "platform_submission"
+    || (!task.verification && task.mode === "ctf_solve");
 }
 
 const CTF_FAST_PATH_PROMPT = [
