@@ -1,4 +1,5 @@
 import type { ArtifactAtom, EffectAtom, MessageAtom, ReplayPolicyAtom, SequencedEventAtom } from "@proofblade/atoms";
+import type { CognitiveSnapshot, GeneralTaskContract, SafetySnapshot } from "./general-task-contract.js";
 
 export type Lane = "main" | "planner" | "executor" | "verifier";
 
@@ -1003,6 +1004,14 @@ export interface Lease {
 export interface RunSnapshot {
   runId: string;
   task: TaskContract;
+  /**
+   * Domain-neutral view of the task. This is materialized for newly-created
+   * Runs while the legacy `task` shape remains the replay compatibility anchor.
+   */
+  generalTask?: GeneralTaskContract;
+  /** Safety and cognitive policy are persisted independently of domain tags. */
+  safetySnapshot?: SafetySnapshot;
+  cognitiveSnapshot?: CognitiveSnapshot;
   taskHash: string;
   /** Hash of the in-memory control authority that created this Run. */
   authorityHash: string;

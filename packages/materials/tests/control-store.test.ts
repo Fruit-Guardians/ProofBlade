@@ -109,7 +109,7 @@ test("control events redact candidate-shaped annotation text at the replay bound
     const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
     const runId = "CTF-REDACTION-001";
     const candidate = "PB{control_event_secret}";
-    await control.createRun(runId, demoTask(runId, root, config));
+    await control.createRun(runId, { ...demoTask(runId, root, config), mode: "vulnerability_discovery" });
     const snapshot = await control.snapshot(runId);
     await control.dispatch(runId, {
       type: "artifact",

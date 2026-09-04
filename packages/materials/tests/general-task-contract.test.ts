@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { generalTaskFromLegacy, createCognitiveSnapshot, createSafetySnapshot, assertGeneralTaskContract, type GeneralTaskContract, type LegacyTaskContract } from "../src/domain/general-task-contract.js";
 import type { TaskContract } from "../src/domain/types.js";
+import { createInitialSnapshot } from "../src/control/reducer.js";
 
 function task(overrides: Partial<GeneralTaskContract> = {}): GeneralTaskContract {
   return {
@@ -69,6 +70,19 @@ test("legacy CTF tasks project to a generic contract without preserving a CTF mo
   assert.deepEqual(projected.verification, { kind: "rubric", required: true, successCriteria: legacy.success_criteria });
   assert.equal("mode" in projected, false);
   assert.doesNotThrow(() => assertGeneralTaskContract(projected));
+});
+
+test("new Run snapshots persist the generic task and independent policy planes", () => {
+  const snapshot = createInitialSnapshot(legacy.task_id, legacy as TaskContract);
+  const projected = generalTaskFromLegacy(legacy);
+  assert.deepEqual(snapshot.generalTask, projected);
+  assert.deepEqual(snapshot.safetySnapshot, createSafetySnapshot(projected));
+  assert.deepEqual(snapshot.cognitiveSnapshot, createCognitiveSnapshot(projected));
+
+  const retagged = createInitialSnapshot("LEGACY-002", { ...legacy, task_id: "LEGACY-002", target_kind: "pwn" } as TaskContract);
+  assert.notDeepEqual(retagged.generalTask?.domainTags, snapshot.generalTask?.domainTags);
+  assert.equal(retagged.safetySnapshot?.fingerprint, snapshot.safetySnapshot?.fingerprint);
+  assert.equal(retagged.cognitiveSnapshot?.fingerprint, snapshot.cognitiveSnapshot?.fingerprint);
 });
 
 test("generic contracts reject domain-dependent safety and invalid verification", () => {
