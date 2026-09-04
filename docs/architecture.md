@@ -56,14 +56,13 @@ RunCoordinator -> Pi coding lane -> ProofBlade tools -> Effect Journal -> Sandbo
                                                      -> Report -> SUBMIT -> verifier-gated finish
 ```
 
-Pi owns the provider turn and its JSONL Session. The coding lane can inspect the target, propose intents/hypotheses/facts and submit a candidate for verification. A proposed fact remains `PROPOSED`; a candidate is accepted only when its exact value occurs in a successful current-generation observation artifact. The candidate itself is kept in a sensitive artifact while the event log stores only its SHA-256 and artifact id.
+Pi owns the provider turn and its JSONL Session. The coding lane can inspect the target, propose intents/hypotheses/facts and submit a result for verification or an explicitly configured external destination. A proposed fact remains `PROPOSED`; a verifier accepts a result only under the task's declared verification policy. Result payloads stay in sensitive Artifacts while the event log stores only their SHA-256 and artifact id.
 
 `RunCoordinator` is the sole active phase and WorkItem coordinator shared by
 Competition, GUI and Fixture/Evaluation entrypoints. In Auto mode a proposed
-candidate enters the verifier-owned Effect Journal path; in Assist mode it
-pauses with a durable proposal and resumes through the same path. Dynamic flag
-shortcuts use the same verifier-owned effect rather than bypassing the state
-machine. The verifier executes the configured number of reproduction attempts
+result enters the verifier-owned Effect Journal path; in Assist mode it pauses
+with a durable proposal and resumes through the same path. External destinations
+use the same verifier-owned effect rather than bypassing the state machine. The verifier executes the configured number of reproduction attempts
 through the Effect Journal. Only the verifier lane can confirm a fact, verify a
 completion or commit `SUCCEEDED`; recovery also repairs a phase/WorkItem gap
 before the terminal event is appended.
