@@ -179,15 +179,14 @@ test("projects durable claim verification onto the matching assistant message", 
   assert.match(projected[1]?.text ?? "", /本轮候选未验证/);
 });
 
-test("marks a legacy challenge answer without reproduction metadata as unverified", () => {
+test("does not infer verification requirements from legacy prompt wording", () => {
   const legacy = conversationMessagesFromEntries([
     { type: "message", id: "legacy-user", message: { role: "user", content: [{ type: "text", text: "完成这道题，并得到flag" }] } },
     { type: "message", id: "legacy-tool-turn", message: { role: "assistant", stopReason: "toolUse", content: [{ type: "text", text: "正在检查文件" }] } },
     { type: "message", id: "legacy-answer", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "最终答案：LCTF2026EV-ARM-GW-042" }] } },
   ]);
   assert.equal(legacy[1]?.claimVerification, undefined);
-  assert.equal(legacy[2]?.claimVerification?.status, "unverified");
-  assert.equal(legacy[2]?.claimVerification?.reason, "历史消息没有候选复现记录。");
+  assert.equal(legacy[2]?.claimVerification, undefined);
 });
 
 test("rejects path-like run identifiers", () => {

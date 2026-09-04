@@ -19,7 +19,6 @@ import {
   RUN_ID_PATTERN,
   fixtureTask,
   listFixtureProfiles,
-  requiresClaimVerification,
   rewriteUnverifiedClaimText,
   type AppServices,
   type AgentLanePort,
@@ -913,22 +912,6 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
       if (claimVerification?.status === "unverified") {
         message.text = rewriteUnverifiedClaimText(message.text, claimVerification.reason);
       }
-    }
-  }
-  let latestUserPrompt = "";
-  for (const message of messages) {
-    if (message.role === "user") {
-      latestUserPrompt = message.text;
-      continue;
-    }
-    if (message.claimVerification || message.stopReason === "toolUse" || !message.text) continue;
-    if (requiresClaimVerification(latestUserPrompt, message.text)) {
-      message.claimVerification = {
-        required: true,
-        status: "unverified",
-        reason: "历史消息没有候选复现记录。",
-      };
-      message.text = rewriteUnverifiedClaimText(message.text, message.claimVerification.reason);
     }
   }
   return messages;
