@@ -1328,7 +1328,7 @@
 
 ### CODING_PROXY_TOOL_NAMES
 - Kind: `constant`
-- Signature: `readonly ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]`
+- Signature: `readonly ["verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]`
 - Source: [src/runtime/coding-resources.ts:35](../../../packages/materials/src/runtime/coding-resources.ts:35)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding proxy tool names constant used to provide a reusable operation.
@@ -1363,7 +1363,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1094](../../../packages/materials/src/runtime/coding-resources.ts:1094)
+- Source: [src/runtime/coding-resources.ts:1150](../../../packages/materials/src/runtime/coding-resources.ts:1150)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -2906,7 +2906,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1197](../../../packages/materials/src/runtime/coding-resources.ts:1197)
+- Source: [src/runtime/coding-resources.ts:1253](../../../packages/materials/src/runtime/coding-resources.ts:1253)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2915,7 +2915,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1013](../../../packages/materials/src/runtime/coding-resources.ts:1013)
+- Source: [src/runtime/coding-resources.ts:1069](../../../packages/materials/src/runtime/coding-resources.ts:1069)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2924,7 +2924,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1030](../../../packages/materials/src/runtime/coding-resources.ts:1030)
+- Source: [src/runtime/coding-resources.ts:1086](../../../packages/materials/src/runtime/coding-resources.ts:1086)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2941,7 +2941,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:263](../../../packages/materials/src/runtime/coding-resources.ts:263)
+- Source: [src/runtime/coding-resources.ts:265](../../../packages/materials/src/runtime/coding-resources.ts:265)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2959,7 +2959,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:179](../../../packages/materials/src/runtime/coding-resources.ts:179)
+- Source: [src/runtime/coding-resources.ts:180](../../../packages/materials/src/runtime/coding-resources.ts:180)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2968,7 +2968,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1108](../../../packages/materials/src/runtime/coding-resources.ts:1108)
+- Source: [src/runtime/coding-resources.ts:1164](../../../packages/materials/src/runtime/coding-resources.ts:1164)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2977,7 +2977,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1181](../../../packages/materials/src/runtime/coding-resources.ts:1181)
+- Source: [src/runtime/coding-resources.ts:1237](../../../packages/materials/src/runtime/coding-resources.ts:1237)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -2986,7 +2986,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1171](../../../packages/materials/src/runtime/coding-resources.ts:1171)
+- Source: [src/runtime/coding-resources.ts:1227](../../../packages/materials/src/runtime/coding-resources.ts:1227)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -2995,7 +2995,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:166](../../../packages/materials/src/runtime/coding-resources.ts:166)
+- Source: [src/runtime/coding-resources.ts:167](../../../packages/materials/src/runtime/coding-resources.ts:167)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -3003,7 +3003,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:237](../../../packages/materials/src/runtime/coding-resources.ts:237)
+- Source: [src/runtime/coding-resources.ts:238](../../../packages/materials/src/runtime/coding-resources.ts:238)
 - Export: `@proofblade/materials`
 - Summary: Keep decompiler schemas out of unrelated challenge contexts. The generic
 - Summary source: `tsdoc`
@@ -3012,7 +3012,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:896](../../../packages/materials/src/runtime/coding-resources.ts:896)
+- Source: [src/runtime/coding-resources.ts:952](../../../packages/materials/src/runtime/coding-resources.ts:952)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
