@@ -32,3 +32,9 @@ test("PMI, VOI and verified uplift preserve estimator identity and components", 
   assert.ok(uplift.confidenceInterval);
   assert.equal(uplift.online, false);
 });
+
+test("decision VOI rejects out-of-range probabilities and non-finite utilities", () => {
+  const base = { currentUtility: 0, outcomeUtilities: [1, 2], outcomeProbabilities: [0.5, 0.5], cost: 0 };
+  assert.throws(() => estimateDecisionVoi({ ...base, outcomeProbabilities: [1.2, -0.2] }), /between 0 and 1/);
+  assert.throws(() => estimateDecisionVoi({ ...base, outcomeUtilities: [Number.NaN, 2] }), /utilities must be finite/);
+});
