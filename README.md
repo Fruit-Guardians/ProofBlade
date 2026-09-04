@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型 CTF Agent 框架。它把 Pi 会话与 CTF 控制存储分离，用只追加事件记录每一次状态变化，并且只允许独立验证器作出任务完成判定。
+ProofBlade（证锋）是一个基于 Pi AgentHarness 的证据驱动型信息安全 Agent Harness。它把 Pi 会话与持久化控制存储分离，用只追加事件记录每一次状态变化，并且只允许独立验证器作出任务完成判定。Web、Pwn、Reverse、Forensics、移动端和外部平台任务共享同一套工具、证据、验证与恢复链；CTF/Competition 只是可选的平台适配和评测数据来源。
 
 ## 当前能力
 
@@ -160,7 +160,7 @@ RTK 只包装普通 Coding Agent 的 `bash`；`read/edit/write` 和 Solver 的 E
 - `Arguments`、`Result`、`Pi Entry`、`Telemetry` 和完整调试对象的树形/原文 JSON；
 - 同一 `toolCallId` 下 Pi Session 与 Control Store 事件的关联，以及 Artifact、Evidence、Effect 引用；
 - 浏览器 Web Worker Script Lab，内置调用摘要、证据提取和 Effect 摘要预设，输出可切换 JSON、表格和文本；
-- Chat、CTF 和 Fixture 共用 Coding Lane、上下文维护、Tool 调用、Evidence、Completion 和恢复路径；Fixture 仅额外提供恢复核对、机械 Checkpoint 和验证账本视图；
+- 普通安全对话、Competition 任务和 Fixture 共用 Coding Lane、上下文维护、Tool 调用、Evidence、Completion 和恢复路径；Fixture 仅额外提供恢复核对、机械 Checkpoint 和验证账本视图；
 - 多中转站 Profile、会话级模型切换、对话文件夹，以及 Tool/Skill/MCP 能力开关；
 - Provider Token、可见上下文和缓存字段的独立统计。
 
@@ -210,7 +210,7 @@ proofblade agent <run-id> [prompt]
 
 ```text
 apps/cli + apps/gui          用户意图、调试与交付入口
-   -> packages/materials     ProofBlade、CTF、Pi 和 Provider 知识
+   -> packages/materials     ProofBlade、信息安全、Pi 和 Provider 知识
       -> packages/molecules  通用的信息获取与处理组合
          -> packages/atoms   最小类型、值对象和存储原语
 ```
@@ -223,7 +223,7 @@ apps/cli + apps/gui          用户意图、调试与交付入口
 
 | 需求 | 扩展方式 | 放置位置 | 适合场景 |
 | --- | --- | --- | --- |
-| 最小类型、哈希、序列化或存储原语 | 原子 | `packages/atoms` | 完全不知道 Agent 和 CTF 业务 |
+| 最小类型、哈希、序列化或存储原语 | 原子 | `packages/atoms` | 完全不知道 Agent 和信息安全业务 |
 | 通用的信息获取、处理或传递流程 | 分子 | `packages/molecules` | 知道原子契约，不知道具体任务 |
 | 需要进入证据链的 ProofBlade 操作 | 内建 Tool / Capability | `packages/materials` | 读写 Run、制品、靶场或任务状态 |
 | 外部进程或独立服务提供的工具 | MCP Server | 项目根目录 `.mcp.json` | 希望延迟发现工具规范，并隔离服务生命周期 |

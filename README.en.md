@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness runtime. It keeps Pi sessions and the CTF control store separate, records every state transition as an append-only event, and makes completion a verifier-gated decision.
+ProofBlade is an evidence-driven information-security agent harness built on the Pi AgentHarness runtime. It separates Pi sessions from durable control state, records every transition as an append-only event, and makes completion a verifier-gated decision. Web, Pwn, Reverse, Forensics, mobile, and external-platform tasks share the same tool, evidence, verification, and recovery path; CTF/Competition is an optional platform adapter and evaluation source.
 
 ## Current scope
 
@@ -166,7 +166,7 @@ proofblade agent <run-id> [prompt]
 
 ```text
 apps/cli + apps/gui          user intent, debugging and delivery
-   -> packages/materials     ProofBlade, CTF, Pi and provider knowledge
+   -> packages/materials     ProofBlade, information security, Pi and provider knowledge
       -> packages/molecules  generic acquisition/processing composition
          -> packages/atoms   minimal types, values and storage primitives
 ```
