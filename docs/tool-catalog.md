@@ -40,14 +40,14 @@
 
 ## 注入与哈希
 
-- 注入：普通 Coding 对话渲染全量 `<tool-catalog catalog-hash="…">`；CTF 对话在 Lane 创建前选择 `ChallengeToolProfile`，只渲染该画像的 host 工具和 `multi`/`common` 工具，按 `kind` 分组后拼进稳定系统提示（L0/L1 前缀）。
+- 注入：普通 Coding 对话渲染全量 `<tool-catalog catalog-hash="…">`；安全任务在 Lane 创建前可选择 `SecurityToolProfile`，只渲染该画像的 host 工具和 `multi`/`common` 工具，按 `kind` 分组后拼进稳定系统提示（L0/L1 前缀）。
 - 哈希：`catalogHash()` 由全量清单的工具身份 + 描述 + 路径/文档计算；画像块使用筛选后的同一哈希算法。路径或文档变化会使稳定前缀与运行版本快照对应变化——这是有意为之，因为模型看到的新路径确属提示内容。`category`/`profiles` 只影响筛选，不改变全量清单 hash。
 - 版本快照：`toolCatalogHash` 与 `toolCatalog` 写入 `RunVersionSnapshot` 和 `RuntimeResourceSnapshot`（ContextManifest resources），与 `skillCatalogHash`/`mcpCatalogHash` 平行。
 - 失效处理：路径不存在只产生 `probe` 诊断（警告），**不阻断、不影响 hash**；manifest 缺失或非法降级为空目录。
 
 ## 方向预检与缓存
 
-`ChallengeToolProfile` 位于 `packages/materials/src/runtime/challenge-tool-profile.ts`，为 reverse/mobile/pwn/web/crypto/forensics/malware/osint/misc 维护固定的 Skill、host 工具、MCP 服务和 fallback 顺序。`proofblade tools init` 只解析固定候选清单并生成本机 manifest，不执行安装；`ToolPreflightService` 只对画像声明的 host 工具做一次 `stat` 检查，并将结果按 `profile + catalogHash + mcpCatalogHash` 写入安装根目录 `.proofblade/tool-health.json`，健康结果默认 10 分钟后刷新。不同画像共存，最多保留 32 个缓存项。结果区分 `missingRequiredTools` 与 `missingOptionalTools`：前者必须走画像 fallback，后者只影响增强路径。预检失败不会阻断 Lane，模型会收到缺失工具和可用 fallback，而不是在题目回合中反复发现/安装工具。
+`SecurityToolProfile` 位于 `packages/materials/src/runtime/security-tool-profile.ts`，为 reverse/mobile/pwn/web/crypto/forensics/malware/osint/misc 维护固定的 Skill、host 工具、MCP 服务和 fallback 顺序。`proofblade tools init` 只解析固定候选清单并生成本机 manifest，不执行安装；`ToolPreflightService` 只对画像声明的 host 工具做一次 `stat` 检查，并将结果按 `profile + catalogHash + mcpCatalogHash` 写入安装根目录 `.proofblade/tool-health.json`，健康结果默认 10 分钟后刷新。不同画像共存，最多保留 32 个缓存项。结果区分 `missingRequiredTools` 与 `missingOptionalTools`：前者必须走画像 fallback，后者只影响增强路径。预检失败不会阻断 Lane，模型会收到缺失工具和可用 fallback，而不是在题目回合中反复发现/安装工具。
 
 ## CLI
 
@@ -66,6 +66,6 @@ proofblade tools show <id>     # 显示单个条目
 ## 实现
 
 - `packages/materials/src/tools/catalog.ts`：`ProofBladeToolCatalogRegistry`（parse/validate/hash/profile selection/promptBlock/contextSnapshot/probe）。
-- `packages/materials/src/runtime/challenge-tool-profile.ts`：画像分类与本机工具/MCP 预检缓存。
+- `packages/materials/src/runtime/security-tool-profile.ts`：画像分类与本机工具/MCP 预检缓存。
 - 类型：`domain/types.ts` 的 `ToolKind`、`RuntimeResourceSnapshot.toolCatalog*`、`RunVersionSnapshot.toolCatalog*`。
 - 测试：`packages/materials/tests/tool-catalog.test.ts`。

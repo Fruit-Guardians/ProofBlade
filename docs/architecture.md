@@ -68,7 +68,7 @@ through the Effect Journal. Only the verifier lane can confirm a fact, verify a
 completion or commit `SUCCEEDED`; recovery also repairs a phase/WorkItem gap
 before the terminal event is appended.
 
-Before a model turn, an optional `ChallengeToolProfile` contributes durable tool-preparation metadata to `RunToolPreparation`. It describes available capabilities and fallback guidance without selecting a loop or imposing a domain-specific first action. The Coding lane keeps safety, approval, budget and verifier boundaries unconditional; a recovered lane treats the current-generation Observation ledger as the source of truth.
+Before a model turn, an optional `SecurityToolProfile` contributes durable tool-preparation metadata to `RunToolPreparation`. It describes available capabilities and fallback guidance without selecting a loop or imposing a domain-specific first action. The Coding lane keeps safety, approval, budget and verifier boundaries unconditional; a recovered lane treats the current-generation Observation ledger as the source of truth.
 
 For Competition and Fixture Runs, execution is derived from the durable `TaskContract` and optional verifier/capability bindings. No task mode or prompt keyword selects a separate challenge loop; all runs use the same generic orchestration and evidence/recovery boundaries.
 

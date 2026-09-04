@@ -641,7 +641,7 @@ test("ordinary GUI chat does not select a challenge profile from prompt wording"
   };
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
-      selectedProfile = options.challengeProfile?.id;
+      selectedProfile = options.securityProfile?.id;
       return lane;
     });
     const runId = "CHAT-PROFILE-001";
@@ -665,7 +665,7 @@ test("ordinary chat in a CTF-named workspace does not enable a challenge profile
   };
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
-      selectedProfile = options.challengeProfile?.id;
+      selectedProfile = options.securityProfile?.id;
       return lane;
     });
     const runId = "CHAT-ORDINARY-CTF-PATH-001";

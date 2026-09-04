@@ -6,7 +6,7 @@
 
 - `isChallengeTask()` 只把显式的非 `coding_assistant` 任务模式视为挑战流程；`target_kind=web/reverse/pwn/...` 只是能力与评估标签。
 - `PiCodingLane` 不再使用当前用户消息文本调用 `isLikelyCtfPrompt()` 改写本轮运行模式。普通请求里出现 `challenge`、`flag` 或 `reverse` 不会自动增加首步、Phase、Action Bundle 或 CTF fast path 文本。
-- 显式 `ctf_solve`、平台提交任务或调用方传入 `challengeProfile` 仍保持原有 verifier、scope、Effect、generation、预算和候选保护。
+- 显式 `ctf_solve`、平台提交任务或调用方传入 `securityProfile` 仍保持原有 verifier、scope、Effect、generation、预算和候选保护。
 
 ## 首错归因
 
