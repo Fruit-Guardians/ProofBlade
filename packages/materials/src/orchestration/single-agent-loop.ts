@@ -524,6 +524,13 @@ export class SingleAgentCtfLoop {
   }
 }
 
+/**
+ * Generic public name for the single-agent loop. The compatibility alias keeps
+ * historical Fixture/Competition imports replayable while the runtime is
+ * migrated away from CTF-specific terminology in later PRs.
+ */
+export const SingleAgentLoop = SingleAgentCtfLoop;
+
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
   return stopReason === "length" || (stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? ""));
 }

@@ -26,7 +26,7 @@ import {
   listBundledCapabilities,
   projectionHash,
   runDemo,
-  SingleAgentCtfLoop,
+  SingleAgentLoop,
   snapshotContext,
   FixtureEvaluationRunner,
   RealModelEvaluationRunner,
@@ -437,7 +437,7 @@ async function main(): Promise<void> {
       const maxTurnsValue = option(rest, "--max-turns") ?? positionals[2];
       const maxTurns = maxTurnsValue === undefined ? undefined : Number(maxTurnsValue);
       if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("--max-turns must be a positive integer");
-      const loop = new SingleAgentCtfLoop(root, config, services, undefined, browserVerifierFactory);
+      const loop = new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory);
       print(await loop.run({ runId, task: fixtureTask(runId, profileId, root, config), mode: modeValue, maxTurns }));
       break;
     }

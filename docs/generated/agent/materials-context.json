@@ -65,12 +65,12 @@
     "src/evaluation/ablation.ts": "e58828bff6ebacfb7bef193b6659fbf44ed2a28e6fc44eac739f4489703bf152",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
-    "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+    "src/evaluation/fixture-evaluator.ts": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
     "src/evaluation/information-value.ts": "f607d133f18f9d9f89f35695d6a63d88b17f5f68a429b5da80c94cf5b4191ab0",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+    "src/evaluation/real-model-evaluator.ts": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
@@ -99,7 +99,7 @@
     "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+    "src/orchestration/single-agent-loop.ts": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -866,7 +866,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 115,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -898,7 +898,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 280,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -1292,7 +1292,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 88,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -2404,7 +2404,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 19,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": [
         "packages/materials/tests/evaluation.test.ts"
       ]
@@ -2420,7 +2420,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 20,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -2434,7 +2434,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 21,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -2448,7 +2448,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 22,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -2476,7 +2476,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 15,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -2631,6 +2631,22 @@
       "moduleHash": "d7aa4a0bdfa4d9929ff7b8dd3dfcd0080dcb3d95dfe7d2452b22073e5f9230ba",
       "testRefs": [
         "packages/materials/tests/runtime-contracts.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::constant::SingleAgentLoop",
+      "name": "SingleAgentLoop",
+      "kind": "constant",
+      "signature": "typeof SingleAgentCtfLoop",
+      "summary": "Generic public name for the single-agent loop. The compatibility alias keeps",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/orchestration/single-agent-loop.ts",
+      "line": 532,
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
+      "testRefs": [
+        "packages/materials/tests/single-agent-loop.test.ts"
       ]
     },
     {
@@ -4408,7 +4424,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 732,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -4424,7 +4440,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 109,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -10667,7 +10683,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 26,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -10681,7 +10697,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 44,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -10695,7 +10711,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 37,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -10709,7 +10725,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 71,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -11021,7 +11037,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 19,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11035,7 +11051,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 213,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11049,7 +11065,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 159,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11063,7 +11079,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 58,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11077,7 +11093,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 26,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11091,7 +11107,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 67,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11105,7 +11121,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 81,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11119,7 +11135,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 260,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11133,7 +11149,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 205,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11147,7 +11163,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 196,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -11161,7 +11177,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 227,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -12215,7 +12231,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 28,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": []
     },
     {
@@ -12229,7 +12245,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 53,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": []
     },
     {
@@ -12243,7 +12259,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 78,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": []
     },
     {
@@ -22829,7 +22845,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 122,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -23063,7 +23079,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 283,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -25167,6 +25183,7 @@
         "packages/materials/tests/browser-runtime-service.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
         "packages/materials/tests/workspace-search.test.ts"
       ]
     },
@@ -26462,7 +26479,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 97,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -37971,7 +37988,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/fixture-evaluator.ts",
       "line": 24,
-      "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+      "moduleHash": "10ec40d645a3f50abafec05bcdca70e362571d1626526c098f036fc0d7efd369",
       "testRefs": []
     },
     {
@@ -38027,7 +38044,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 17,
-      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
+      "moduleHash": "7cef97f46b8381645694d05d5b84a38e1ee6b8eaff5db59bc8cb4f78573a226e",
       "testRefs": []
     },
     {
@@ -38325,7 +38342,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 51,
-      "moduleHash": "c553478bf746b798e150456d34f37c10176675f39fcaf383daefc6cceab200b9",
+      "moduleHash": "8189b8c1b8b5de20923f61ea56c4b0f2da4a90472a3d3f0b0d05f28e220a5e37",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",
