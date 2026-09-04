@@ -1257,6 +1257,42 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
   assert.equal((result.details as { artifactId: string }).artifactId, "A-1");
 });
 
+test("failed security MCP calls return an actionable fallback instead of a bare rejection", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "idalib-mcp",
+      configHash: "ida-hash",
+      tools: [{ name: "decompile", description: "Decompile", inputSchema: { type: "object" }, readOnlyHint: true }],
+    }),
+  } as unknown as McpProjectRegistry;
+  const context = {
+    mcp,
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set(["idalib-mcp"]),
+    runtime: {
+      async invokeCapability() {
+        throw new Error("idalib toolchain unavailable: IDA path is missing");
+      },
+    },
+  } as unknown as CodingResourceContext;
+  const tools = await createMcpFirstClassTools(mcp, ["idalib-mcp"]);
+  const decompile = tools.find((tool) => tool.name === "mcp__idalib-mcp__decompile");
+  assert.ok(decompile);
+  const result = await decompile.execute("call-failed", { path: "sample.bin" }, new AbortController().signal, () => undefined, context);
+  const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+  assert.equal(result.isError, true);
+  assert.match(text, /\[ProofBlade MCP failure\]/);
+  assert.match(text, /server=idalib-mcp tool=decompile/);
+  assert.match(text, /retryable=false/);
+  assert.match(text, /file, strings, readelf, or objdump/);
+  const feedback = (result.details as { failureFeedback: { status: string; server: string; tool: string; reason: string; retryable: boolean; nextActions: string[] } }).failureFeedback;
+  assert.deepEqual({ status: feedback.status, server: feedback.server, tool: feedback.tool, retryable: feedback.retryable }, { status: "failed", server: "idalib-mcp", tool: "decompile", retryable: false });
+});
+
 test("bash anchors an artifact only when output was actually withheld", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "proofblade-anchor-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });

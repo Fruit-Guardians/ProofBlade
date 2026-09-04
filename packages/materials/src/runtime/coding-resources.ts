@@ -290,28 +290,32 @@ export async function createMcpFirstClassToolSelection(
         parameters: schema as never,
         executionMode: "sequential",
         async execute(_toolCallId, params, sig, _onUpdate, context) {
-          assertMcpEnabled(context, server);
-          const capabilityId = context.mcp.summaries().find((item) => item.name === server)?.capabilityId;
-          if (!capabilityId) throw new Error(`Unknown MCP server: ${server}`);
-          // Production lanes route MCP calls through the journaled capability
-          // runtime so the raw response is archived and observed. Keep the
-          // direct registry fallback for small/fake tool contexts used by
-          // contract tests and offline callers.
-          if (context.runtime && typeof context.runtime.invokeCapability === "function") {
-            const invocation = await context.runtime.invokeCapability({
+          try {
+            assertMcpEnabled(context, server);
+            const capabilityId = context.mcp.summaries().find((item) => item.name === server)?.capabilityId;
+            if (!capabilityId) throw new Error(`Unknown MCP server: ${server}`);
+            // Production lanes route MCP calls through the journaled capability
+            // runtime so the raw response is archived and observed. Keep the
+            // direct registry fallback for small/fake tool contexts used by
+            // contract tests and offline callers.
+            if (context.runtime && typeof context.runtime.invokeCapability === "function") {
+              const invocation = await context.runtime.invokeCapability({
+                capabilityId,
+                operation: "call",
+                input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
+              }, sig);
+              return toolResult(invocation);
+            }
+            const result = await context.mcp.execute(
               capabilityId,
-              operation: "call",
-              input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
-            }, sig);
-            return toolResult(invocation);
+              "call",
+              { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
+              sig,
+            );
+            return mcpToolResult(result, { server, tool: tool.name });
+          } catch (error) {
+            return mcpFailureResult(server, tool.name, error);
           }
-          const result = await context.mcp.execute(
-            capabilityId,
-            "call",
-            { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
-            sig,
-          );
-          return mcpToolResult(result);
         },
       });
     }
@@ -1738,15 +1742,23 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
     if (!capabilityId) throw new Error(`Unknown MCP server: ${input.server}`);
     if (context.runtime && typeof context.runtime.invokeCapability === "function") {
-      const invocation = await context.runtime.invokeCapability({
-        capabilityId,
-        operation: "call",
-        input: { tool: input.tool, arguments: input.arguments },
-      }, signal);
-      return toolResult(invocation);
+      try {
+        const invocation = await context.runtime.invokeCapability({
+          capabilityId,
+          operation: "call",
+          input: { tool: input.tool, arguments: input.arguments },
+        }, signal);
+        return toolResult(invocation);
+      } catch (error) {
+        return mcpFailureResult(input.server, input.tool, error);
+      }
     }
-    const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
-    return mcpToolResult(result);
+    try {
+      const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
+      return mcpToolResult(result, { server: input.server, tool: input.tool });
+    } catch (error) {
+      return mcpFailureResult(input.server, input.tool, error);
+    }
   },
 };
 
@@ -1867,13 +1879,70 @@ function scalarOrJson(value: unknown): string {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : JSON.stringify(value);
 }
 
-function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+function mcpToolResult(result: RawEffectResult, identity?: { server: string; tool: string }): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
   const visible = boundModelText(renderMcpPayload(result), Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
+  const failed = result.exitCode !== 0;
+  const feedback = failed && identity ? mcpFailureFeedback(identity.server, identity.tool, result.stderr || visible.text) : undefined;
+  const bounded = boundModelText(feedback ? `${visible.text}\n\n${renderMcpFailureFeedback(feedback)}` : visible.text, Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
   return {
-    content: [{ type: "text", text: visible.text }],
-    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}) },
-    isError: result.exitCode !== 0,
+    content: [{ type: "text", text: bounded.text }],
+    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated || bounded.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}), ...(feedback ? { failureFeedback: feedback } : {}) },
+    isError: failed,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+interface McpFailureFeedback {
+  status: "failed";
+  server: string;
+  tool: string;
+  reason: string;
+  retryable: boolean;
+  nextActions: string[];
+}
+
+function mcpFailureResult(server: string, tool: string, error: unknown): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const feedback = mcpFailureFeedback(server, tool, error);
+  return {
+    content: [{ type: "text", text: renderMcpFailureFeedback(feedback) }],
+    details: { failureFeedback: feedback },
+    isError: true,
+  } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+function mcpFailureFeedback(server: string, tool: string, error: unknown): McpFailureFeedback {
+  const reason = boundedFailureReason(error);
+  const inputFailure = /(?:argument|input|schema|required|unsupported|invalid|unknown .*tool|tool .*not allowed)/i.test(reason)
+    || (/(?:missing|required)/i.test(reason) && !/(?:path|toolchain|executable|binary) .*missing/i.test(reason));
+  const unavailable = !inputFailure && /(?:permission|disabled|unavailable|missing toolchain|toolchain unavailable|path is missing|stale generation|connection refused|timed out)/i.test(reason);
+  const retryable = !unavailable;
+  const nextActions = inputFailure
+    ? [
+      "Read the exact MCP tool schema and correct the arguments; do not repeat the unchanged call.",
+      "If the operation is unavailable, use mcp_call operation=describe for the same server and tool before retrying.",
+    ]
+    : [
+      "Confirm the MCP server is enabled, reachable, and its declared toolchain is ready before retrying.",
+      "For binary or firmware analysis, fall back to bounded read/bash probes such as file, strings, readelf, or objdump and preserve their output as Evidence.",
+    ];
+  if (/idalib/i.test(server)) nextActions.push("If IDA/idalib remains unavailable, use the local static fallback; do not treat the MCP failure as evidence about the target.");
+  if (/jadx/i.test(server)) nextActions.push("If JADX remains unavailable, inspect the APK with bounded unzip/apktool/read probes and preserve the manifest or source artifact.");
+  return { status: "failed", server, tool, reason, retryable, nextActions };
+}
+
+function renderMcpFailureFeedback(feedback: McpFailureFeedback): string {
+  return [
+    "[ProofBlade MCP failure]",
+    `server=${feedback.server} tool=${feedback.tool}`,
+    `reason=${feedback.reason}`,
+    `retryable=${feedback.retryable}`,
+    `next=${feedback.nextActions.join(" | ")}`,
+  ].join("\n");
+}
+
+function boundedFailureReason(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const normalized = raw.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+  return normalized.length > 1_000 ? `${normalized.slice(0, 997)}...` : normalized || "MCP call failed without a diagnostic.";
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
