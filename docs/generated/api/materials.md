@@ -1784,7 +1784,7 @@
 ### selectContextCandidates
 - Kind: `function`
 - Signature: `(candidates: readonly ContextCandidate[], maxTokens: number): BrokerSelection`
-- Source: [src/context/model-receipt.ts:176](../../../packages/materials/src/context/model-receipt.ts:176)
+- Source: [src/context/model-receipt.ts:177](../../../packages/materials/src/context/model-receipt.ts:177)
 - Export: `@proofblade/materials`
 - Summary: Deterministic, provenance-aware selection; scores are ranking signals, not trust.
 - Summary source: `tsdoc`
@@ -2029,7 +2029,7 @@
 ### buildAblationPairings
 - Kind: `function`
 - Signature: `(experiment: Pick<AblationExperimentSnapshot, "experimentId" | "variants" | "runOrder" | "budget">, cases: readonly AblationCaseRef[]): AblationPairing[]`
-- Source: [src/evaluation/ablation.ts:370](../../../packages/materials/src/evaluation/ablation.ts:370)
+- Source: [src/evaluation/ablation.ts:376](../../../packages/materials/src/evaluation/ablation.ts:376)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build ablation pairings operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4463,7 +4463,7 @@
 ### BrokerSelection
 - Kind: `interface`
 - Signature: `BrokerSelection`
-- Source: [src/context/model-receipt.ts:173](../../../packages/materials/src/context/model-receipt.ts:173)
+- Source: [src/context/model-receipt.ts:174](../../../packages/materials/src/context/model-receipt.ts:174)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: broker selection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4471,7 +4471,7 @@
 ### ContextCandidate
 - Kind: `interface`
 - Signature: `ContextCandidate`
-- Source: [src/context/model-receipt.ts:158](../../../packages/materials/src/context/model-receipt.ts:158)
+- Source: [src/context/model-receipt.ts:159](../../../packages/materials/src/context/model-receipt.ts:159)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: context candidate type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10218,7 +10218,7 @@
 ### AblationExperimentStore.list
 - Kind: `method`
 - Signature: `(): Promise<Array<Pick<AblationExperimentSnapshot, "experimentId" | "name" | "experimentFingerprint">>>`
-- Source: [src/evaluation/ablation.ts:327](../../../packages/materials/src/evaluation/ablation.ts:327)
+- Source: [src/evaluation/ablation.ts:333](../../../packages/materials/src/evaluation/ablation.ts:333)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10227,7 +10227,7 @@
 ### AblationExperimentStore.load
 - Kind: `method`
 - Signature: `(experimentId: string): Promise<AblationExperimentSnapshot>`
-- Source: [src/evaluation/ablation.ts:321](../../../packages/materials/src/evaluation/ablation.ts:321)
+- Source: [src/evaluation/ablation.ts:327](../../../packages/materials/src/evaluation/ablation.ts:327)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: load operation used to read or inspect state.
 - Summary source: `inferred`
