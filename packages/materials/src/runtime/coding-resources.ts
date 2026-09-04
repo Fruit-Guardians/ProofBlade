@@ -32,10 +32,8 @@ import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSear
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
-/** Provider-facing proxy tools for new generic security tasks. */
+/** Provider-facing proxy tools for generic security tasks. */
 export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
-/** Historical alias retained for old sessions and competition integrations. */
-const CODING_LEGACY_PROXY_TOOL_NAMES = ["verify_claim"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -75,9 +73,6 @@ export interface ExternalSubmissionResult {
   target?: string;
 }
 
-/** @deprecated Use ExternalSubmissionResult. Kept for old Competition callers. */
-export type CodingFlagSubmission = ExternalSubmissionResult;
-
 export interface CodingResourceContext extends ExecutionToolContext {
   /** Durable owner identity for lane-scoped shell process records. */
   ownerLane?: Lane;
@@ -92,8 +87,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /**
    * Stop the current Pi turn after result verification so the outer Run
    * coordinator can perform verifier-owned scoring before the model issues
-   * another tool call. Competition lanes leave this unset so submit_flag may
-   * follow a preliminary observation in the same turn.
+   * another tool call. Platform-judged lanes leave this unset so external_submit
+   * may follow a preliminary observation in the same turn.
    */
   deferClaimAcceptance?: boolean;
   /** Keep claim verification in the same continuous maintenance loop. */
@@ -112,8 +107,6 @@ export interface CodingResourceContext extends ExecutionToolContext {
   webSession?: WebToolHandler;
   /** Present when a configured external destination accepts submissions. */
   externalSubmit?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>;
-  /** @deprecated Compatibility alias for old competition integrations. */
-  submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
   /**
@@ -166,17 +159,12 @@ export interface CodingToolOptions {
   externalSubmissionEnabled?: boolean;
   webReproductionEnabled?: boolean;
   webSessionEnabled?: boolean;
-  /** Expose the pre-generic verify_claim alias for historical callers only. */
-  legacyClaimVerification?: boolean;
-  /** Expose the pre-generic submit_flag alias for historical callers only. */
-  legacySubmissionAlias?: boolean;
 }
 
 export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyResultTool,
-    ...(options.legacyClaimVerification ? [verifyClaimTool] : []),
     evidenceTool,
     loadSkillTool,
     capabilityTool,
@@ -186,10 +174,8 @@ export function createCodingTools(options: CodingToolOptions = {}): AgentHarness
     ...createPwnCodingTools(),
     ...(options.webSessionEnabled ? createWebSessionTools() : []),
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
-    // Registered only when a trusted destination is configured. New runs use
-    // external_submit with an explicit target; submit_flag is legacy-only.
+    // Registered only when a trusted destination is configured.
     ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool] : []),
-    ...((options.externalSubmissionEnabled || options.platformJudged) && options.legacySubmissionAlias ? [submitFlagTool] : []),
   ];
 }
 
@@ -281,7 +267,6 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   bash: PROCESS_EFFECT,
   edit: WORKSPACE_EFFECT,
   write: WORKSPACE_EFFECT,
-  verify_claim: WORKSPACE_EFFECT,
   verify_result: WORKSPACE_EFFECT,
   load_skill: READ_ONLY_EFFECT,
   // Starting and killing processes is a process side effect; polling a log is not,
@@ -343,59 +328,10 @@ export function createCodingToolEffectPolicyResolver(
   };
 }
 
-const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "verify_claim",
-  label: "verify_claim",
-  description: "Run the task's deterministic workspace verifier and journal its exact candidate output. A task-bound command creates trusted reproduction Evidence and accepts a Completion; when a task has no verifier policy, the same call is retained as an explicitly unverified observation.",
-  parameters: Type.Object({
-    candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
-    command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
-    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the reproduction." })),
-    timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
-  }, { additionalProperties: false }),
-  executionMode: "sequential",
-  async execute(toolCallId, params, signal, onUpdate, context) {
-    const input = params as { candidate: string; command: string; evidenceIds?: string[]; timeout?: number };
-    const candidate = input.candidate.trim();
-    const command = input.command.trim();
-    if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
-    if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
-    const executor = createBashTool<CodingResourceContext>();
-    let output = "";
-    const reproduction = await context.claimVerifier.record({
-      candidate,
-      command,
-      cwd: context.env.cwd,
-      toolCallId,
-      completionPurpose: "claim_reproduction",
-      supportingEvidenceIds: input.evidenceIds,
-      signal,
-      execute: async (innerSignal) => {
-        const started = Date.now();
-        const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
-        output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-        return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
-      },
-    });
-    const result = toolResult({
-      verified: reproduction.verified,
-      candidateHash: reproduction.candidateHash,
-      commandHash: reproduction.commandHash,
-      artifactId: reproduction.artifactId,
-      evidenceId: reproduction.evidenceId,
-      completionId: reproduction.completionId,
-      supportingEvidenceIds: reproduction.supportingEvidenceIds,
-      output,
-    });
-    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
-  },
-};
-
 /**
- * Domain-neutral verification entry point. `verify_claim` remains registered
- * as a compatibility alias for existing sessions and competition fixtures;
- * this name makes it clear that the result can be a file, test output, state,
- * or protocol value rather than a CTF flag.
+ * Domain-neutral verification entry point. The provider-facing contract uses
+ * `verify_result`; historical claim events are handled by replay/migration
+ * code and are never exposed as a new model tool.
  */
 const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
   name: "verify_result",
@@ -1086,22 +1022,6 @@ const externalSubmitTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "submit_flag",
-  label: "submit_flag",
-  description: "Deprecated compatibility alias for external_submit targeting the configured competition destination. Prefer external_submit with an explicit target and opaque payload.",
-  parameters: Type.Object({
-    flag: Type.String({ minLength: 1, description: "One complete flag value, e.g. prefix{...}." }),
-  }, { additionalProperties: false }),
-  executionMode: "sequential",
-  async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const input = params as { flag: string };
-    if (context.externalSubmit) return toolResult(await context.externalSubmit({ target: "competition", payload: input.flag }, signal));
-    if (context.submitFlag) return toolResult(await context.submitFlag(input.flag, signal));
-    throw new Error("submit_flag is unavailable: this run has no configured external destination");
-  },
-};
-
 const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "web_reproduce",
   label: "web_reproduce",
@@ -1133,12 +1053,10 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; legacyClaimVerification?: boolean; legacySubmissionAlias?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
-  const builtinCount = active.length;
   active.push(...CODING_PROXY_TOOL_NAMES);
-  if (input.legacyClaimVerification) active.splice(builtinCount + 1, 0, ...CODING_LEGACY_PROXY_TOOL_NAMES);
   // Only expose the tube tools when a Docker-backed pwn container or durable
   // session-runtime broker is attached, so a GUI chat run does not advertise
   // seven tools that would fail closed.
@@ -1150,15 +1068,13 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
   if (input.platformJudged) {
     active.push(externalSubmitTool.name);
-    if (input.legacySubmissionAlias) active.push(submitFlagTool.name);
   } else if (input.externalSubmissionEnabled) {
     active.push(externalSubmitTool.name);
-    if (input.legacySubmissionAlias) active.push(submitFlagTool.name);
   }
   return active;
 }
 
-export function codingProviderToolContractSnapshot(options: Pick<CodingToolOptions, "legacyClaimVerification" | "legacySubmissionAlias"> = {}): Array<{ name: string; description: string; parameters: unknown }> {
+export function codingProviderToolContractSnapshot(options: CodingToolOptions = {}): Array<{ name: string; description: string; parameters: unknown }> {
   return createCodingTools(options).map((tool) => ({
     name: tool.name,
     description: tool.description,

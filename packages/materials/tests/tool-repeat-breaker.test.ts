@@ -1146,21 +1146,21 @@ test("[contract:ablation-route-abort] a real Harness abort remains observable af
   }
 });
 
-test("[contract:stop-suggestion] verified claims emit an advisory result without blocking the outer verifier", async () => {
+test("[contract:stop-suggestion] verified results emit an advisory result without blocking the outer verifier", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-stop-suggestion-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
     const faux = fauxProvider({ provider: "faux-stop-suggestion" });
     const models = createModels();
     models.setProvider(faux.provider);
-    faux.setResponses([fauxAssistantMessage(fauxToolCall("verify_claim", { candidate: "PB{ok}", command: "cat answer.txt" }, { id: "verified-claim" }), { stopReason: "toolUse" })]);
+    faux.setResponses([fauxAssistantMessage(fauxToolCall("verify_result", { result: "PB{ok}", command: "cat answer.txt" }, { id: "verified-result" }), { stopReason: "toolUse" })]);
     const verify: AgentHarnessTool<undefined> = {
-      name: "verify_claim", label: "verify_claim", description: "verify", parameters: Type.Object({ candidate: Type.String(), command: Type.String() }),
+      name: "verify_result", label: "verify_result", description: "verify", parameters: Type.Object({ result: Type.String(), command: Type.String() }),
       async execute() { return { content: [{ type: "text" as const, text: "verified" }], details: { verified: true, completionId: "C-1" }, terminate: true }; },
     };
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
     const session = await repo.create({ id: "stop-suggestion", cwd: root });
-    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [verify], activeToolNames: ["verify_claim"], systemPrompt: "test" });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [verify], activeToolNames: ["verify_result"], systemPrompt: "test" });
     const events: string[] = [];
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, {}, undefined, undefined, undefined, undefined, undefined, {
       controller: new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, stopSuggestion: "verifier_driven" }),

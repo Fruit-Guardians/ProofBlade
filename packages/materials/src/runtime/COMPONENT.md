@@ -27,7 +27,7 @@
 - `coding-lane.ts` 是唯一生产 Agent lane：交互任务、Fixture 和 Competition 都由它驱动；差异只来自不可变 `TaskContract` 能力和外层是否需要多轮 Coordinator，不再分叉 Tool、上下文、Evidence 或 Completion 系统。确定性 lane 仅由评测和单元测试注入。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
-- `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_result` 是通用结果复现门，`verify_claim` 仅作为旧 Session/Fixture 的兼容别名。
+- `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_result` 是通用结果复现门。历史 `verify_claim` 事件只由回放/迁移逻辑读取，不再作为模型工具暴露。
 - `CodingClaimVerifier` 是唯一候选验证路径。任务绑定的 reproduction command 对所有模式都走同一 verifier journal；没有绑定命令的普通探索仍可继续，但只能写入明确标记的 observation，不能接受 Completion，最终文本也会统一标记为未验证。`deferClaimAcceptance` 只控制外层编排时机，不改变验证规则。
 - `SecurityToolProfile.firstActionPlan` 将首个安全任务动作结构化为建议的 Tool 集和有界调用次数；Preflight 结果与该计划一起写入 Run。Coding lane 在 `tool_call` 结果中给出可操作的 advisory，但不会因为模型选择了其他工具而阻断；首个成功 Observation 仍会记录为已完成，恢复时从当前代 Observation 推导状态。
 - `SecurityToolProfile.actionBundles` 将 RECON、TARGET_MODEL、HYPOTHESIS、EXPERIMENT、REPRODUCE 各阶段的工具、能力、前置条件、成功/失败判据和调用上限一次性预计算；Preflight 与 Run replay 携带同一份契约，回合提示只推荐当前 durable phase，不再让模型临场请求或安装缺失工具。阶段路线和动作包默认只产生带原因与下一步的 advisory；只有显式消融 Variant 的 `hard_gate` 才允许认知阻断。
@@ -37,8 +37,8 @@
 - Web verifier 的 transport 可冻结为 HTTP 或 Browser；Browser 模式只在 Coding Lane 收到应用拥有的 `BrowserVerifierFactory` 时暴露同一个 `web_reproduce` 工具，否则不注册该工具。Factory 只产生 verifier-owned 的全新 context，输入绑定 run/generation/target/policy/recipe hash/scope/响应上限；若提供 `BrowserRuntimeBroker`，opaque handle 与稳定 `verificationKey` 会进入 `ExternalResourceRegistry` 并由 CLI/GUI/Competition recovery composition 参与 inspect/adopt/release；配置了 broker 但 factory/凭据不可用时，Browser 题目在 lane 创建前直接 fail-closed，不静默退回本地 Playwright。没有 broker 的 context 仍只在进程内有效，重启后 fail-closed。Broker 接管后，`BrowserReproducer` 复用原 replay Effect、原 session id 和已持久化 interaction count，从中断的 recipe step 继续，不创建第二个 context；顺序多 attempt 恢复会复用已完成 attempt 的 replay Artifact，并只接管唯一的 STARTED attempt；多个同时 in-flight 或结果不明确时仍保持人工恢复，避免猜测前序结果。MCP/browser 工具不属于该边界。每次全新 browser replay 都创建空 storage 的 verifier context，保持单一 Web 解题路径而不把浏览器驱动暴露给模型。当前 policy 已约束步骤数、总时限、响应上限和 click/fill/submit/wait allowlist；`evaluate` 默认禁止。材料层提供 `tryCreatePlaywrightBrowserVerifierFactory` 的可选动态 adapter，CLI/GUI/Competition 负责注入；缺少 Playwright 或浏览器二进制时保持 fail-closed，CI 不需要安装浏览器。真实 host 通过 `scripts/browser-runtime-playwright-host.ts` 自动探测 `launchPersistentContext`：有该能力时使用受控 profile root + 脱敏 host ledger，支持新进程 `inspect/adopt/resolve`；没有该能力时明确降级为 process-local 且 `stableAcrossRestart=false`。
 - 发布前 smoke 使用根目录 `npm run browser:smoke:required`，它只启动本地表单靶场并验证真实 BrowserReproducer → Effect → Evidence → Completion 链；Playwright 可以通过 `PROOFBLADE_PLAYWRIGHT_MODULE` 从外置安装加载，不进入 ProofBlade 的硬依赖。
 - `bash` 是分析逃生通道而不是第二个控制面：其输出只能进入不受信任的 Artifact/Observation；运行时会拦截常见的脚本/重定向写入 `domain_record` 或 Control Store 的尝试。真正的 Web/Pwn 领域记录必须由结构化 Tool 或受信 verifier 通过 ControlStore 写入，静态 guard 不是 verifier 权限的替代品。
-- CTF 硬约束由持久化 `TaskContract` 的 `mode/target_kind` 判定，不能依赖 executor prompt 是否包含 “CTF/flag” 关键词；这样 Competition/Fixture 的实验预算和 evidence-first replan 不会因提示词投影变化而失效。
-- 普通 `coding_assistant` 任务不因 `target_kind` 标签或用户消息中的 `challenge/flag` 字样自动进入 CTF 工作流；CTF 认知引导只由显式任务模式或调用方提供的挑战 Profile 启用。领域标签仍可用于推荐能力，但不能改变通用 Agent Loop 的基本语义。
+- 安全约束由持久化 `TaskContract` 的权限、范围和验证策略判定，不能依赖 executor prompt 是否包含安全领域关键词；这样安全评估和 evidence-first replan 不会因提示词投影变化而失效。
+- 普通 `coding_assistant` 任务不因 `target_kind` 标签或用户消息中的领域词语自动进入专用工作流；安全画像只用于按需推荐能力，不能改变通用 Agent Loop 的基本语义。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
@@ -51,7 +51,7 @@
 
 ## 开发规则与验证
 
-模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。顶层 Tool schema 只能由不可变 `TaskContract.target_kind` 决定；每轮 CTF 分类、Challenge Profile、Preflight 和准备后的工作流必须进入最后一条 `proofblade-context` 动态消息，不能拼接用户原文或回写 System/Developer 消息。Pi 升级必须更新锁定快照与适配测试。
+模型、URL、思考等级、缓存策略、Provider 重试预算和 `maxConcurrentRequests` 只能来自配置。调度器在真实 Provider 请求前取得按 Provider/model 共享的并发槽，默认上限为 1；排队请求可被 AbortSignal 取消且不会占用成本 reservation，槽位按 FIFO 释放。OpenAI-compatible 429/408/409/5xx 由 Pi 的可中止退避处理；`maxRetries` 控制重试次数，`maxRetryDelayMs` 限制中转站 `Retry-After`，暂停时 AbortSignal 会打断等待。保持 System/Tool 前缀稳定，Provider 切换不进入底层组件。顶层 Tool schema 只能由不可变 `TaskContract` 能力声明决定；每轮安全画像、Preflight 和准备后的工作流必须进入最后一条 `proofblade-context` 动态消息，不能拼接用户原文或回写 System/Developer 消息。Pi 升级必须更新锁定快照与适配测试。
 
 Provider Native 发现只依据明确选择的 wire protocol，不发送会产生费用或远端副作用的探针。`openai-responses`/`anthropic-messages` 的服务器搜索、代码执行等能力在没有能记录策略、输入、输出、Artifact 与 Evidence 的适配器前只能标记为 protocol candidate；与 `read`、`bash`、`edit`、`write` 重合的 workspace 语义必须由 ProofBlade 受控工具接管，不能作为第二套模型可见工具注册。
 
@@ -67,11 +67,11 @@ Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外
 
 MCP 调用结果必须解包后再交给模型，不得逐层重新序列化。线缆形状是四层嵌套：Tool 自己的 JSON 是 `result.content[].text` 里的字符串，外面套 `{server, tool, result}` 信封，信封又是 `RawEffectResult.stdout` 里的字符串。直接再 `JSON.stringify` 一次会让模型收到没有真实换行的 `\\\"instruction\\\"` 转义串，从而判断输出被截断并重复发起同一次调用；实测一次 idalib `disasm` 因此从 835 字符膨胀到 10778 字符（12.9 倍）。指令清单（`asm.lines`）扁平化为 `addr  instruction` 行并内联 label 与 ref，`decompiled`/`pseudocode`/`code`/`source` 按原文输出，`null` 与空容器字段丢弃。
 
-`submit_flag` 只在 `verification.kind = "platform_submission"` 时注册，因为它会花掉一次真实提交，GUI 聊天运行没有可提交的对象。它先走 `runtime.submitCandidate`（格式校验、提交预算、候选哈希去重），再由 `IndependentVerifier` 触发 Journal 的 `fixture_score`，那才是真正到达平台的一步。禁止在 lane 里直接调用平台 API：Journal 的 idempotency key 会把重复提交折叠成回放而非第二次调用，事件日志同时是「错误提交次数」和「API 调用效率」两个计分项的账本。assist 模式下候选只记录为 PROPOSED completion 并立即返回，绝不联系平台，由操作者决定是否放行。
+`external_submit` 只在 `verification.kind = "platform_submission"` 时注册，因为它会花掉一次真实提交，GUI 聊天运行没有可提交的对象。它先走 `runtime.submitCandidate`（格式校验、提交预算、候选哈希去重），再由 `IndependentVerifier` 触发 Journal 的 `fixture_score`，那才是真正到达平台的一步。禁止在 lane 里直接调用平台 API：Journal 的 idempotency key 会把重复提交折叠成回放而非第二次调用，事件日志同时是「错误提交次数」和「API 调用效率」两个计分项的账本。assist 模式下候选只记录为 PROPOSED completion 并立即返回，绝不联系平台，由操作者决定是否放行。
 
 Artifact 锚点只在可见输出确实少于原始输出时追加，并写明被截留的字节数。对完整输出宣告 Artifact 会教会模型「有内容被藏起来了」，使它把回合花在取回已经拿到的文本上；`read` 的归档内容等于其可见内容，因此永不追加锚点，Artifact ID 只留在 `details` 里供 GUI 与 Evidence Graph 使用。`evidence search` 在元数据未命中时检索归档正文（单个 Artifact 上限 512 KB），否则内容查询永远落空而模型只能重跑命令。
 
-CTF flag、挑战答案或恢复密钥等确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现候选不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
+安全任务中的确定性结论必须由不含候选明文的命令从工作区输入复现。最终回答和复现结果不一致时，Runtime 把本轮投影为 `unverified`，不把字符串扫描结果当作确认。
 
 输出改写不得改变 `bash` 的名称、描述、Schema 或 Tool 顺序。统一 Coding lane 的业务工具继续使用 Effect Journal/Capability Router，不叠加第二条 RTK 裁剪链。
 

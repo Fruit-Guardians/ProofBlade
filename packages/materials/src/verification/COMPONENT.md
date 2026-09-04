@@ -4,9 +4,9 @@
 {
   "id": "materials-verification",
   "name": "Independent Verifier",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-04T21:30:03.000Z",
   "qualityAudit": {
     "bugAuditCount": 3,
     "securityAuditCount": 3,
@@ -40,7 +40,7 @@
 
 验证失败保持显式、可重放且不泄漏 scorer 细节。修改接受条件时同步 Task Contract、评测协议和 Auto/Assist 测试。
 
-Coding 复现命令不得包含候选明文，任务绑定命令的 stdout 必须有一行与最终候选完全相等；宽松子串扫描或模型自选命令只能作为观察，不能单独形成 reproduction Evidence。每个 verifier Effect 产出结构化 verdict，绑定 Task hash、Generation、Completion、Candidate Artifact、session、attempt 与 transcript Artifact；ControlStore 会再次核验 verdict 方向和语义绑定。`verify_claim` 必须校验传入的支撑 Evidence ID，并将其挂到执行记录、Evidence、Fact 和结果 Artifact 上；最终投影按 `completionId + candidateHash` 从 durable state 重建每一条独立复现，不得依赖进程内数组或 `assistantText.includes()`。
+Coding 复现命令不得包含候选明文，任务绑定命令的 stdout 必须有一行与最终候选完全相等；宽松子串扫描或模型自选命令只能作为观察，不能单独形成 reproduction Evidence。每个 verifier Effect 产出结构化 verdict，绑定 Task hash、Generation、Completion、Candidate Artifact、session、attempt 与 transcript Artifact；ControlStore 会再次核验 verdict 方向和语义绑定。`verify_result` 必须校验传入的支撑 Evidence ID，并将其挂到执行记录、Evidence、Fact 和结果 Artifact 上；历史 `verify_claim` 事件仅在回放/迁移时读取。最终投影按 `completionId + candidateHash` 从 durable state 重建每一条独立复现，不得依赖进程内数组或 `assistantText.includes()`。
 
 成功复现还必须生成以 accepted Completion 为根的结果树，并通过 `reproduces/supports/depends_on/derived_from` 边连接上游 Evidence 与复现 Artifact，供主 Agent 和 GUI 回溯完整依据。
 

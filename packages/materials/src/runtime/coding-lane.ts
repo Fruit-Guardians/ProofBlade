@@ -30,7 +30,7 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { TaskResultVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingFlagSubmission, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
@@ -175,10 +175,6 @@ export class PiCodingLane implements AgentLanePort {
     onApprovalRequired?: (approvalId: string) => void;
     /** Optional strict-ablation policy binding; safety checks remain unconditional. */
     ablationPolicy?: AblationPolicyBinding;
-    /** Expose the pre-generic verify_claim alias for historical callers only. */
-    legacyClaimVerification?: boolean;
-    /** Expose the pre-generic submit_flag alias for historical callers only. */
-    legacySubmissionAlias?: boolean;
     /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
@@ -287,8 +283,8 @@ export class PiCodingLane implements AgentLanePort {
     const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
     const forestContext = { value: formatReasoningForestContext(await evidenceGraph.inspectForest()) };
     const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
-    // A live platform is the judge only for competition runs; a GUI chat run has
-    // nothing to submit to and must not be given submit_flag.
+    // A live platform is the judge only for platform-submission runs; a GUI chat
+    // run has nothing to submit to and must not be given external_submit.
     const platformJudged = snapshot.task.verification.kind === "platform_submission";
     const fixture = {
       fixtureId: options.runId,
@@ -476,11 +472,7 @@ export class PiCodingLane implements AgentLanePort {
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
-    // Legacy aliases are opt-in at the caller boundary. Do not infer them from
-    // a historical task mode: execution is driven by the generic task contract.
-    const legacyClaimVerification = options.legacyClaimVerification === true;
-    const legacySubmissionAlias = options.legacySubmissionAlias === true;
-    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession), legacyClaimVerification, legacySubmissionAlias }), ...mcpFirstClassTools];
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -488,8 +480,6 @@ export class PiCodingLane implements AgentLanePort {
         mcpServers: [...enabledMcpServers],
         platformJudged,
         externalSubmissionEnabled,
-        legacyClaimVerification,
-        legacySubmissionAlias,
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
         webReproductionEnabled: Boolean(webReproducer || browserReproducer),
@@ -530,7 +520,6 @@ export class PiCodingLane implements AgentLanePort {
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
       ...(externalSubmit ? { externalSubmit } : {}),
-      ...(platformJudged && legacySubmissionAlias && externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),
@@ -986,26 +975,10 @@ export function createDeclaredExternalSubmitter(deps: {
   };
 }
 
-/** @deprecated Use createPlatformExternalSubmitter with an explicit target. */
-export function createPlatformFlagSubmitter(deps: {
-  runId: string;
-  runtime: ProofBladeToolRuntime;
-  fixture: FixtureRef;
-  controlStore: ControlStore;
-  verifier: Pick<IndependentVerifier, "verify">;
-  artifactStore: ArtifactStore;
-  mode?: () => "auto" | "assist";
-  approvalPolicy?: ApprovalPolicy;
-  onApprovalRequired?: (approvalId: string) => void;
-}): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission> {
-  const submit = createPlatformExternalSubmitter(deps);
-  return (flag, signal) => submit({ target: "competition", payload: flag }, signal);
-}
-
 /**
  * Count only submittable completions, matching the budget rule in
  * `submitCandidate`. Counting every completion inflated the number reported to the
- * model and the fleet, because `verify_claim` proposes completions that are never
+ * model and the fleet, because local verification proposes completions that are never
  * sent to the platform.
  */
 async function submissionCounters(
