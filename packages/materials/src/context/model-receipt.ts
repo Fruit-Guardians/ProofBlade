@@ -147,6 +147,7 @@ export async function recallArtifact(options: { artifactStore: ArtifactStore; ar
     }
     const range = await options.artifactStore.readTextRange(options.runId, options.artifact, limit, offset);
     const content = range.content;
+    if (!range.truncated && offset === 0 && sha256(content) !== options.artifact.sha256) return failedRecall(base, "HASH_MISMATCH", "complete recalled content does not match the Artifact hash");
     const record: RecallRecord = { ...base, returnedBytes: range.bytesRead, returnedChars: content.length, contentHash: options.artifact.sha256, projectionHash: sha256(content), truncated: range.truncated, status: "SUCCEEDED" };
     return { record, content, marker: recallMarker(record, options.artifact.sensitivity) };
   } catch (error) {

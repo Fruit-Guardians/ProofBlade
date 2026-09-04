@@ -136,6 +136,33 @@ test("real model evaluator stages a hash-bound local corpus and compares variant
   }
 });
 
+test("resumable evaluator runs only selected pairings and records durable callbacks", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-eval-resume-"));
+  const source = "resume fixture";
+  const expected = "flag{resume}";
+  try {
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({ schemaVersion: 1, id: "resume-corpus", cases: [corpusCase("sample", "target.bin", expected, source)] }), "utf8");
+    const events: string[] = [];
+    const summary = await new RealModelEvaluationRunner(root, solver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [{ id: "alpha", config: config("alpha") }, { id: "beta", config: config("beta") }],
+      allowLive: true,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-RESUME",
+      pairingFilter: [{ variantId: "beta", corpusCaseId: "sample", attempt: 1 }],
+      onCaseStart: ({ variantId, corpusCaseId, attempt, runId }) => events.push(`start:${variantId}:${corpusCaseId}:${attempt}:${runId}`),
+      onCaseComplete: (result) => events.push(`complete:${result.variantId}:${result.corpusCaseId}:${result.attempt}`),
+    });
+    assert.deepEqual(summary.variants.map((variant) => variant.cases.length), [0, 1]);
+    assert.deepEqual(events.map((event) => event.split(":").slice(0, 4).join(":")), ["start:beta:sample:1", "complete:beta:sample:1"]);
+    assert.equal(summary.gate.checks.some((item) => item.id === "full_corpus_coverage"), false);
+    assert.equal(summary.gate.checks.find((item) => item.id === "selected_pairing_coverage")?.passed, true);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("real evaluation preflight validates Web/Pwn coverage and never contacts a Provider", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-real-preflight-"));
   try {
@@ -222,6 +249,33 @@ test("real evaluation preflight reports missing credentials and direction covera
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("strict ablation mode allows shared Provider profiles when strategy fingerprints differ", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-real-shared-profile-"));
+  try {
+    const source = "shared profile marker";
+    const expected = "flag{shared_profile}";
+    await writeFile(join(root, "target.bin"), source, "utf8");
+    await writeFile(join(root, "corpus.json"), JSON.stringify({ schemaVersion: 1, id: "shared-profile", cases: [corpusCase("sample", "target.bin", expected, source)] }), "utf8");
+    const shared = config("alpha");
+    const summary = await new RealModelEvaluationRunner(root, solver).run({
+      corpusPath: join(root, "corpus.json"),
+      variants: [
+        { id: "baseline", config: shared, strategyFingerprint: "policy-base" },
+        { id: "candidate", config: shared, strategyFingerprint: "policy-recall" },
+      ],
+      allowLive: true,
+      allowSharedProviderProfile: true,
+      requireProviderTraffic: false,
+      attempts: 1,
+      maxTurns: 1,
+      maxCostUsd: 1,
+      runPrefix: "REAL-SHARED-PROFILE",
+    });
+    assert.equal(summary.gate.checks.find((item) => item.id === "distinct_profile_variants")?.passed, true);
+    assert.deepEqual(summary.variants.map((item) => item.strategyFingerprint), ["policy-base", "policy-recall"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("real evaluation rejects two ids that point to the same provider profile", async () => {

@@ -202,6 +202,8 @@ export interface AblationAttemptRecord extends AblationPairing {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+  /** Bounded, prompt/candidate-free result snapshot for crash recovery. */
+  result?: Record<string, unknown>;
 }
 
 export interface AblationCaseRef {
@@ -311,6 +313,12 @@ export class AblationExperimentStore {
     const root = resolve(this.directory);
     await mkdir(root, { recursive: true });
     const path = join(root, `${experiment.experimentId}.json`);
+    try {
+      await readFile(path, "utf8");
+      throw new Error(`Ablation experiment ${experiment.experimentId} already exists; create a new experiment version instead`);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+    }
     const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
     await writeFile(temporary, `${JSON.stringify(experiment, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
     await rename(temporary, path);

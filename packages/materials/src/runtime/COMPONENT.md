@@ -4,9 +4,9 @@
 {
   "id": "materials-runtime",
   "name": "Pi and Provider Runtime",
-  "version": "0.10.25",
+  "version": "0.10.26",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-29T10:23:08.975Z",
+  "updatedAt": "2026-09-02T13:56:20.488+08:00",
   "qualityAudit": {
     "bugAuditCount": 23,
     "securityAuditCount": 23,
@@ -38,6 +38,7 @@
 - 发布前 smoke 使用根目录 `npm run browser:smoke:required`，它只启动本地表单靶场并验证真实 BrowserReproducer → Effect → Evidence → Completion 链；Playwright 可以通过 `PROOFBLADE_PLAYWRIGHT_MODULE` 从外置安装加载，不进入 ProofBlade 的硬依赖。
 - `bash` 是分析逃生通道而不是第二个控制面：其输出只能进入不受信任的 Artifact/Observation；运行时会拦截常见的脚本/重定向写入 `domain_record` 或 Control Store 的尝试。真正的 Web/Pwn 领域记录必须由结构化 Tool 或受信 verifier 通过 ControlStore 写入，静态 guard 不是 verifier 权限的替代品。
 - CTF 硬约束由持久化 `TaskContract` 的 `mode/target_kind` 判定，不能依赖 executor prompt 是否包含 “CTF/flag” 关键词；这样 Competition/Fixture 的实验预算和 evidence-first replan 不会因提示词投影变化而失效。
+- 普通 `coding_assistant` 任务不因 `target_kind` 标签或用户消息中的 `challenge/flag` 字样自动进入 CTF 工作流；CTF 认知引导只由显式任务模式或调用方提供的挑战 Profile 启用。领域标签仍可用于推荐能力，但不能改变通用 Agent Loop 的基本语义。
 - Coding Provider 始终看到固定 `evidence`、`load_skill`、`capability` 和 `mcp_call`；`capability` 通过 search/describe/invoke 渐进暴露逻辑能力，启用的 Skill/MCP 只改变运行时允许集合与短摘要，不展开动态 Tool Schema。
 - Coding Lane 把已校验的工作目录作为 Capability 可见根，并复用共享 Control Store、Artifact Store 和 Effect Journal；`.proofblade`、路径越界、硬链接和 Backend 绑定保护与 Fixture Solver 一致。当前 Coding Capability Runtime 不隐式导入未启用 MCP，MCP 仍由会话级 `mcp_call` 集合控制。
 - 无进展守卫分别累计纯只读观察和显式 `durableProgress=false` 观察；普通 Bash/process 和未解析策略只清除 read-window，只有显式持久进展或 workspace/network/platform 副作用可清除 declared-no-progress-window。
