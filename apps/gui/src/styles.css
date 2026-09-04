@@ -44,8 +44,8 @@ code, pre, textarea { font-family: "Cascadia Code", "SFMono-Regular", Consolas, 
 .new-run-button, .primary-button, .run-script { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border: 1px solid #3da878; border-radius: var(--radius); color: #07150e; background: var(--green); font-weight: 700; cursor: pointer; }
 .new-run-actions { display: grid; gap: 6px; padding: 14px 14px 10px; }
 .new-run-button { width: 100%; }
-.fixture-test-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 31px; border: 1px solid #3d4a43; border-radius: var(--radius); color: #aeb9b3; background: #171d19; cursor: pointer; font-size: 10px; }
-.fixture-test-button:hover { border-color: #59685f; color: var(--text); background: #1d2520; }
+.task-template-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 31px; border: 1px solid #3d4a43; border-radius: var(--radius); color: #aeb9b3; background: #171d19; cursor: pointer; font-size: 10px; }
+.task-template-button:hover { border-color: #59685f; color: var(--text); background: #1d2520; }
 .new-run-button:hover, .primary-button:hover, .run-script:hover { background: #56d49a; }
 .run-search { display: flex; align-items: center; gap: 7px; min-width: 0; height: 32px; margin: 0 14px 9px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; color: var(--faint); background: #0d110f; }
 .run-search:focus-within { border-color: #438065; }

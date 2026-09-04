@@ -93,16 +93,16 @@ export async function getArtifact(runId: string, artifactId: string): Promise<Ar
   return await request(`/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`);
 }
 
-export async function startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns: number }): Promise<unknown> {
-  return await request("/api/solve", { method: "POST", body: JSON.stringify(input) });
+export async function startTaskFromTemplate(input: { runId: string; templateId: string; mode: "auto" | "assist"; maxTurns: number }): Promise<unknown> {
+  return await request("/api/tasks/templates/run", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string; verificationCommand?: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<{ runId: string }> {
-  return await request("/api/fixture-conversations", { method: "POST", body: JSON.stringify(input) });
+export async function createTaskFromTemplate(input: { runId: string; templateId: string; objective: string }): Promise<{ runId: string }> {
+  return await request("/api/tasks/templates", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function streamChat(runId: string, prompt: string, onEvent: (event: ChatStreamEvent) => void, signal?: AbortSignal): Promise<void> {

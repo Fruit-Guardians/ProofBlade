@@ -101,7 +101,7 @@ export class DebugDataService {
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
   private readonly chatTasks = new Set<Promise<void>>();
-  private readonly solveTasks = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
+  private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
@@ -155,13 +155,13 @@ export class DebugDataService {
     this.runDetailLoads.clear();
     const aborts: Promise<unknown>[] = [];
     for (const [runId, lane] of this.activeLanes) {
-      if (!this.solveTasks.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
+      if (!this.taskRuns.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
     }
-    for (const task of this.solveTasks.values()) task.controller.abort("GUI shutting down");
+    for (const task of this.taskRuns.values()) task.controller.abort("GUI shutting down");
     const abortResults = await Promise.allSettled(aborts);
     const taskResults = await Promise.allSettled([
       ...this.chatTasks,
-      ...[...this.solveTasks.values()].map((task) => task.promise),
+      ...[...this.taskRuns.values()].map((task) => task.promise),
     ]);
     const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
@@ -319,10 +319,10 @@ export class DebugDataService {
     return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
   }
 
-  public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
+  public async startTaskFromTemplate(input: { runId: string; templateId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
     assertRunId(input.runId);
-    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    const task = fixtureTask(input.runId, input.templateId, this.root, this.config);
     await this.ensureRunCreated(input.runId, task);
     return await this.startTaskRun(task, input.mode, input.maxTurns);
   }
@@ -371,9 +371,9 @@ export class DebugDataService {
     }).finally(() => {
       this.activeLanes.delete(task.task_id);
       this.pauseRequests.delete(task.task_id);
-      if (this.solveTasks.get(task.task_id)?.promise === runPromise) this.solveTasks.delete(task.task_id);
+      if (this.taskRuns.get(task.task_id)?.promise === runPromise) this.taskRuns.delete(task.task_id);
     });
-    this.solveTasks.set(task.task_id, { controller, promise: runPromise });
+    this.taskRuns.set(task.task_id, { controller, promise: runPromise });
     void runPromise.catch(() => undefined);
     return info;
   }
@@ -404,11 +404,11 @@ export class DebugDataService {
     this.runDetailCache.delete(runId);
   }
 
-  public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+  public async createTaskFromTemplate(input: { runId: string; templateId: string; objective: string }): Promise<RunSnapshot> {
     this.assertOpen();
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
-    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    const task = fixtureTask(input.runId, input.templateId, this.root, this.config);
     task.objective = input.objective.trim() || task.objective;
     await this.services.control.createRun(input.runId, task);
     const fixture = await this.services.sandbox.build(task);
@@ -461,9 +461,9 @@ export class DebugDataService {
     if (!text) throw new Error("Prompt is required");
     const active = this.active.get(runId);
     if (active) {
-      const solveTask = this.solveTasks.get(runId);
-      const pausedSnapshot = solveTask ? await this.services.control.snapshot(runId) : undefined;
-      if (solveTask && pausedSnapshot?.status === "PAUSED") await solveTask.promise.catch(() => undefined);
+      const taskRun = this.taskRuns.get(runId);
+      const pausedSnapshot = taskRun ? await this.services.control.snapshot(runId) : undefined;
+      if (taskRun && pausedSnapshot?.status === "PAUSED") await taskRun.promise.catch(() => undefined);
       if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
     }
     const snapshot = await this.services.control.snapshot(runId);
@@ -635,8 +635,8 @@ export class DebugDataService {
     await this.ensurePaused(runId, reason);
     const paused: ActiveRunInfo = { ...current, state: "paused" };
     this.active.set(runId, paused);
-    const solveTask = this.solveTasks.get(runId);
-    if (solveTask) solveTask.controller.abort(reason);
+    const taskRun = this.taskRuns.get(runId);
+    if (taskRun) taskRun.controller.abort(reason);
     else await this.activeLanes.get(runId)?.abort(reason);
     return paused;
   }
