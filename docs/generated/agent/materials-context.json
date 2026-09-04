@@ -150,7 +150,7 @@
     "src/tools/contracts.ts": "809bb08337ad6b77cc4950cf336b680db418c97a3ba85d6deb2e88a52bf0ead1",
     "src/tools/errors.ts": "97ec5b71ec31248d5a7ec6e5f17fee57b579abf5a6c8135ff4e06e2c9ae5c225",
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
-    "src/tools/runtime.ts": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+    "src/tools/runtime.ts": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
     "src/verification/browser-reproducer.ts": "a301b521c533914d1447064d8a3319e8ac2a3e1da7482d80ec0b6ffbeb66bb06",
     "src/verification/claim-verification.ts": "87d1b1f3b67dc9ed0acac26aadf68f462626558985d6255534c2f95f57a13398",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
@@ -1864,8 +1864,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 30,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 36,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -14256,7 +14256,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
       "line": 22,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::ResultValidationPolicy",
+      "name": "ResultValidationPolicy",
+      "kind": "interface",
+      "signature": "ResultValidationPolicy",
+      "summary": "Optional domain-owned check for a result before it becomes a Completion.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/tools/runtime.ts",
+      "line": 31,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -32896,8 +32910,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 475,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 488,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -32910,8 +32924,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 212,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 218,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -32977,8 +32991,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 451,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 464,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -32991,8 +33005,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 68,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 74,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -33007,8 +33021,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 424,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 437,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -33021,8 +33035,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 217,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 223,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
@@ -33039,8 +33053,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 84,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 90,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -33058,8 +33072,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 190,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 196,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -33075,8 +33089,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 64,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 70,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -33092,8 +33106,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 202,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 208,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -33106,8 +33120,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 198,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 204,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -33122,8 +33136,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 157,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 163,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts"
       ]
@@ -33138,8 +33152,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 269,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 275,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -33152,8 +33166,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 256,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 262,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
@@ -33169,8 +33183,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 243,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 249,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -33183,8 +33197,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 403,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 416,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts"
@@ -33200,8 +33214,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 181,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 187,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -33216,8 +33230,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 207,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 213,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -33232,8 +33246,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 72,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 78,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -33248,8 +33262,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 76,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 82,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/mcp.test.ts"
       ]
@@ -33264,8 +33278,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 176,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 182,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"
@@ -33281,8 +33295,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 455,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 468,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts"
       ]
@@ -33297,8 +33311,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 430,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 443,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/knowledge-projection.test.ts"
       ]
@@ -33313,8 +33327,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 386,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 399,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -33408,8 +33422,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 185,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 191,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts"
       ]
@@ -33424,8 +33438,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 302,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 315,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
@@ -33437,15 +33451,31 @@
       "id": "@proofblade/materials::method::ProofBladeToolRuntime.submitExternal",
       "name": "ProofBladeToolRuntime.submitExternal",
       "kind": "method",
-      "signature": "(payload: string, options?: { target?: string; sensitivity?: \"public\" | \"secret\" | \"flag_candidate\"; }): Promise<{ completionId: string; candidateHash: string; }>",
+      "signature": "(payload: string, options?: { target?: string; sensitivity?: \"public\" | \"secret\" | \"flag_candidate\"; validator?: ResultValidationPolicy; }): Promise<{ completionId: string; candidateHash: string; }>",
+      "summary": "Alias used by external destination adapters.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/tools/runtime.ts",
+      "line": 306,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::method::ProofBladeToolRuntime.submitResult",
+      "name": "ProofBladeToolRuntime.submitResult",
+      "kind": "method",
+      "signature": "(payload: string, options?: { target?: string; sensitivity?: \"public\" | \"secret\" | \"flag_candidate\"; validator?: ResultValidationPolicy; }): Promise<{ completionId: string; candidateHash: string; }>",
       "summary": "Propose an opaque result for a configured external destination. The",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 288,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
-      "testRefs": []
+      "line": 294,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
+      "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts"
+      ]
     },
     {
       "id": "@proofblade/materials::method::ProofBladeToolRuntime.submittableCompletions",
@@ -33457,8 +33487,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 370,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 383,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": []
     },
     {
@@ -33471,8 +33501,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/tools/runtime.ts",
-      "line": 194,
-      "moduleHash": "2fd42249c1fc9d42e3e488cd5397c101eb751f4525f9cf82339a2718be1460c5",
+      "line": 200,
+      "moduleHash": "d4dde62256750d4cadc7762f89390c256049040c1142edab1706045fd0bc24c8",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/mcp.test.ts"

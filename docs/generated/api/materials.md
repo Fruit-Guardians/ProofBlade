@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 168
-- Symbols: 1797
+- Symbols: 1799
 
 ## Public Symbols
 
@@ -889,7 +889,7 @@
 ### ProofBladeToolRuntime
 - Kind: `class`
 - Signature: `ProofBladeToolRuntime`
-- Source: [src/tools/runtime.ts:30](../../../packages/materials/src/tools/runtime.ts:30)
+- Source: [src/tools/runtime.ts:36](../../../packages/materials/src/tools/runtime.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: proof blade tool runtime class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7672,6 +7672,14 @@
 - Summary: Inferred summary: inspect target result type contract used to provide a reusable operation.
 - Summary source: `inferred`
 
+### ResultValidationPolicy
+- Kind: `interface`
+- Signature: `ResultValidationPolicy`
+- Source: [src/tools/runtime.ts:31](../../../packages/materials/src/tools/runtime.ts:31)
+- Export: `@proofblade/materials`
+- Summary: Optional domain-owned check for a result before it becomes a Completion.
+- Summary source: `tsdoc`
+
 ### BrowserReproducerRecoveryOptions
 - Kind: `interface`
 - Signature: `BrowserReproducerRecoveryOptions`
@@ -12911,7 +12919,7 @@
 ### ProofBladeToolRuntime.candidateArtifactPath
 - Kind: `method`
 - Signature: `(path: string): string`
-- Source: [src/tools/runtime.ts:475](../../../packages/materials/src/tools/runtime.ts:475)
+- Source: [src/tools/runtime.ts:488](../../../packages/materials/src/tools/runtime.ts:488)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: candidate artifact path operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12919,7 +12927,7 @@
 ### ProofBladeToolRuntime.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/tools/runtime.ts:212](../../../packages/materials/src/tools/runtime.ts:212)
+- Source: [src/tools/runtime.ts:218](../../../packages/materials/src/tools/runtime.ts:218)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12928,7 +12936,7 @@
 ### ProofBladeToolRuntime.consolidateKnowledge
 - Kind: `method`
 - Signature: `(input?: ConsolidateInput): Promise<ConsolidateResult>`
-- Source: [src/tools/runtime.ts:451](../../../packages/materials/src/tools/runtime.ts:451)
+- Source: [src/tools/runtime.ts:464](../../../packages/materials/src/tools/runtime.ts:464)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: consolidate knowledge operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12936,7 +12944,7 @@
 ### ProofBladeToolRuntime.discoverCapabilities
 - Kind: `method`
 - Signature: `(input?: CapabilityDiscoveryInput): ReturnType<ProofBladeCapabilityRouter["discover"]>`
-- Source: [src/tools/runtime.ts:68](../../../packages/materials/src/tools/runtime.ts:68)
+- Source: [src/tools/runtime.ts:74](../../../packages/materials/src/tools/runtime.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: discover capabilities operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12945,7 +12953,7 @@
 ### ProofBladeToolRuntime.inspectKnowledge
 - Kind: `method`
 - Signature: `(uri: string, level?: KnowledgeLevel, maxChars?: number): Promise<KnowledgeReadResult>`
-- Source: [src/tools/runtime.ts:424](../../../packages/materials/src/tools/runtime.ts:424)
+- Source: [src/tools/runtime.ts:437](../../../packages/materials/src/tools/runtime.ts:437)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect knowledge operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12953,7 +12961,7 @@
 ### ProofBladeToolRuntime.inspectTarget
 - Kind: `method`
 - Signature: `(path?: string): Promise<InspectTargetResult>`
-- Source: [src/tools/runtime.ts:217](../../../packages/materials/src/tools/runtime.ts:217)
+- Source: [src/tools/runtime.ts:223](../../../packages/materials/src/tools/runtime.ts:223)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inspect target operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12962,7 +12970,7 @@
 ### ProofBladeToolRuntime.invokeCapability
 - Kind: `method`
 - Signature: `(input: { capabilityId: string; operation: string; input: Record<string, unknown>; }, signal?: AbortSignal): Promise<CapabilityInvocationResult>`
-- Source: [src/tools/runtime.ts:84](../../../packages/materials/src/tools/runtime.ts:84)
+- Source: [src/tools/runtime.ts:90](../../../packages/materials/src/tools/runtime.ts:90)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: invoke capability operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12971,7 +12979,7 @@
 ### ProofBladeToolRuntime.jobStatus
 - Kind: `method`
 - Signature: `(jobId: string): Promise<JobRecord>`
-- Source: [src/tools/runtime.ts:190](../../../packages/materials/src/tools/runtime.ts:190)
+- Source: [src/tools/runtime.ts:196](../../../packages/materials/src/tools/runtime.ts:196)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: job status operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12980,7 +12988,7 @@
 ### ProofBladeToolRuntime.listCapabilities
 - Kind: `method`
 - Signature: `(): ReturnType<ProofBladeCapabilityRouter["listCapabilities"]>`
-- Source: [src/tools/runtime.ts:64](../../../packages/materials/src/tools/runtime.ts:64)
+- Source: [src/tools/runtime.ts:70](../../../packages/materials/src/tools/runtime.ts:70)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list capabilities operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12989,7 +12997,7 @@
 ### ProofBladeToolRuntime.listJobs
 - Kind: `method`
 - Signature: `(): Promise<JobRecord[]>`
-- Source: [src/tools/runtime.ts:202](../../../packages/materials/src/tools/runtime.ts:202)
+- Source: [src/tools/runtime.ts:208](../../../packages/materials/src/tools/runtime.ts:208)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: list jobs operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12997,7 +13005,7 @@
 ### ProofBladeToolRuntime.monitorJob
 - Kind: `method`
 - Signature: `(jobId: string, input?: JobMonitorInput): Promise<JobMonitorResult>`
-- Source: [src/tools/runtime.ts:198](../../../packages/materials/src/tools/runtime.ts:198)
+- Source: [src/tools/runtime.ts:204](../../../packages/materials/src/tools/runtime.ts:204)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: monitor job operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13006,7 +13014,7 @@
 ### ProofBladeToolRuntime.observeArtifact
 - Kind: `method`
 - Signature: `(input: { operation: string; artifactId: string; exitCode?: number | null; }): Promise<ObservationOutcome & { progressKey: string; }>`
-- Source: [src/tools/runtime.ts:157](../../../packages/materials/src/tools/runtime.ts:157)
+- Source: [src/tools/runtime.ts:163](../../../packages/materials/src/tools/runtime.ts:163)
 - Export: `@proofblade/materials`
 - Summary: Observe an artifact produced by a coding-lane tool that did not originate
 - Summary source: `tsdoc`
@@ -13015,7 +13023,7 @@
 ### ProofBladeToolRuntime.proposeFact
 - Kind: `method`
 - Signature: `(input: { statement: string; evidenceIds: string[]; }): Promise<{ factId: string; }>`
-- Source: [src/tools/runtime.ts:269](../../../packages/materials/src/tools/runtime.ts:269)
+- Source: [src/tools/runtime.ts:275](../../../packages/materials/src/tools/runtime.ts:275)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: propose fact operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13023,7 +13031,7 @@
 ### ProofBladeToolRuntime.proposeHypothesis
 - Kind: `method`
 - Signature: `(input: { statement: string; evidenceIds?: string[]; }): Promise<{ hypothesisId: string; }>`
-- Source: [src/tools/runtime.ts:256](../../../packages/materials/src/tools/runtime.ts:256)
+- Source: [src/tools/runtime.ts:262](../../../packages/materials/src/tools/runtime.ts:262)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: propose hypothesis operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13032,7 +13040,7 @@
 ### ProofBladeToolRuntime.proposeIntent
 - Kind: `method`
 - Signature: `(input: { title: string; description: string; priority?: number; }): Promise<{ intentId: string; }>`
-- Source: [src/tools/runtime.ts:243](../../../packages/materials/src/tools/runtime.ts:243)
+- Source: [src/tools/runtime.ts:249](../../../packages/materials/src/tools/runtime.ts:249)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: propose intent operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13040,7 +13048,7 @@
 ### ProofBladeToolRuntime.readArtifact
 - Kind: `method`
 - Signature: `(artifactId: string, maxChars?: number): Promise<Record<string, unknown>>`
-- Source: [src/tools/runtime.ts:403](../../../packages/materials/src/tools/runtime.ts:403)
+- Source: [src/tools/runtime.ts:416](../../../packages/materials/src/tools/runtime.ts:416)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read artifact operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13049,7 +13057,7 @@
 ### ProofBladeToolRuntime.readJobOutput
 - Kind: `method`
 - Signature: `(jobId: string, maxChars?: number): Promise<JobOutput>`
-- Source: [src/tools/runtime.ts:181](../../../packages/materials/src/tools/runtime.ts:181)
+- Source: [src/tools/runtime.ts:187](../../../packages/materials/src/tools/runtime.ts:187)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: read job output operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13058,7 +13066,7 @@
 ### ProofBladeToolRuntime.recoverJobs
 - Kind: `method`
 - Signature: `(): Promise<JobOutput[]>`
-- Source: [src/tools/runtime.ts:207](../../../packages/materials/src/tools/runtime.ts:207)
+- Source: [src/tools/runtime.ts:213](../../../packages/materials/src/tools/runtime.ts:213)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: recover jobs operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13067,7 +13075,7 @@
 ### ProofBladeToolRuntime.resolveCapabilityPolicy
 - Kind: `method`
 - Signature: `(input: { capabilityId: string; operation: string; input: Record<string, unknown>; }): ReturnType<ProofBladeCapabilityRouter["resolveInvocationPolicy"]>`
-- Source: [src/tools/runtime.ts:72](../../../packages/materials/src/tools/runtime.ts:72)
+- Source: [src/tools/runtime.ts:78](../../../packages/materials/src/tools/runtime.ts:78)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resolve capability policy operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13076,7 +13084,7 @@
 ### ProofBladeToolRuntime.resourceSnapshot
 - Kind: `method`
 - Signature: `(base: RuntimeResourceSnapshot): RuntimeResourceSnapshot`
-- Source: [src/tools/runtime.ts:76](../../../packages/materials/src/tools/runtime.ts:76)
+- Source: [src/tools/runtime.ts:82](../../../packages/materials/src/tools/runtime.ts:82)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: resource snapshot operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -13085,7 +13093,7 @@
 ### ProofBladeToolRuntime.runBackground
 - Kind: `method`
 - Signature: `(input: BackgroundJobStartInput): Promise<Record<string, unknown>>`
-- Source: [src/tools/runtime.ts:176](../../../packages/materials/src/tools/runtime.ts:176)
+- Source: [src/tools/runtime.ts:182](../../../packages/materials/src/tools/runtime.ts:182)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run background operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13094,7 +13102,7 @@
 ### ProofBladeToolRuntime.searchHistory
 - Kind: `method`
 - Signature: `(query: string): Promise<Array<Record<string, unknown>>>`
-- Source: [src/tools/runtime.ts:455](../../../packages/materials/src/tools/runtime.ts:455)
+- Source: [src/tools/runtime.ts:468](../../../packages/materials/src/tools/runtime.ts:468)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search history operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13103,7 +13111,7 @@
 ### ProofBladeToolRuntime.searchKnowledge
 - Kind: `method`
 - Signature: `(query?: string, maxResults?: number, maxChars?: number, includeStale?: boolean): Promise<KnowledgeProjection[]>`
-- Source: [src/tools/runtime.ts:430](../../../packages/materials/src/tools/runtime.ts:430)
+- Source: [src/tools/runtime.ts:443](../../../packages/materials/src/tools/runtime.ts:443)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search knowledge operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13112,7 +13120,7 @@
 ### ProofBladeToolRuntime.status
 - Kind: `method`
 - Signature: `(): Promise<Record<string, unknown>>`
-- Source: [src/tools/runtime.ts:386](../../../packages/materials/src/tools/runtime.ts:386)
+- Source: [src/tools/runtime.ts:399](../../../packages/materials/src/tools/runtime.ts:399)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: status operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13121,7 +13129,7 @@
 ### ProofBladeToolRuntime.stopJob
 - Kind: `method`
 - Signature: `(jobId: string, reason?: string): Promise<Record<string, unknown>>`
-- Source: [src/tools/runtime.ts:185](../../../packages/materials/src/tools/runtime.ts:185)
+- Source: [src/tools/runtime.ts:191](../../../packages/materials/src/tools/runtime.ts:191)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: stop job operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13130,7 +13138,7 @@
 ### ProofBladeToolRuntime.submitCandidate
 - Kind: `method`
 - Signature: `(candidate: string): Promise<{ completionId: string; candidateHash: string; }>`
-- Source: [src/tools/runtime.ts:302](../../../packages/materials/src/tools/runtime.ts:302)
+- Source: [src/tools/runtime.ts:315](../../../packages/materials/src/tools/runtime.ts:315)
 - Export: `@proofblade/materials`
 - Summary: Legacy flag-shaped submission entry point. New code should use
 - Summary source: `tsdoc`
@@ -13138,16 +13146,25 @@
 
 ### ProofBladeToolRuntime.submitExternal
 - Kind: `method`
-- Signature: `(payload: string, options?: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; }): Promise<{ completionId: string; candidateHash: string; }>`
-- Source: [src/tools/runtime.ts:288](../../../packages/materials/src/tools/runtime.ts:288)
+- Signature: `(payload: string, options?: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy; }): Promise<{ completionId: string; candidateHash: string; }>`
+- Source: [src/tools/runtime.ts:306](../../../packages/materials/src/tools/runtime.ts:306)
+- Export: `@proofblade/materials`
+- Summary: Alias used by external destination adapters.
+- Summary source: `tsdoc`
+
+### ProofBladeToolRuntime.submitResult
+- Kind: `method`
+- Signature: `(payload: string, options?: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy; }): Promise<{ completionId: string; candidateHash: string; }>`
+- Source: [src/tools/runtime.ts:294](../../../packages/materials/src/tools/runtime.ts:294)
 - Export: `@proofblade/materials`
 - Summary: Propose an opaque result for a configured external destination. The
 - Summary source: `tsdoc`
+- Tests: `packages/materials/tests/coding-resources.test.ts`
 
 ### ProofBladeToolRuntime.submittableCompletions
 - Kind: `method`
 - Signature: `(snapshot: RunSnapshot): Promise<CompletionProposal[]>`
-- Source: [src/tools/runtime.ts:370](../../../packages/materials/src/tools/runtime.ts:370)
+- Source: [src/tools/runtime.ts:383](../../../packages/materials/src/tools/runtime.ts:383)
 - Export: `@proofblade/materials`
 - Summary: Completions explicitly proposed for submission whose Artifact is still the exact candidate.
 - Summary source: `tsdoc`
@@ -13155,7 +13172,7 @@
 ### ProofBladeToolRuntime.waitJob
 - Kind: `method`
 - Signature: `(jobId: string, timeoutMs?: number): Promise<JobRecord>`
-- Source: [src/tools/runtime.ts:194](../../../packages/materials/src/tools/runtime.ts:194)
+- Source: [src/tools/runtime.ts:200](../../../packages/materials/src/tools/runtime.ts:200)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: wait job operation used to provide a reusable operation.
 - Summary source: `inferred`

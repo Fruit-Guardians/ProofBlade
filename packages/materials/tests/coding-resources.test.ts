@@ -88,6 +88,41 @@ test("declared external submission rejects destinations outside the immutable ta
   assert.deepEqual(calls, [{ target: "review", payload: "opaque result" }]);
 });
 
+test("generic result proposals accept ordinary text without CTF formatting", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-generic-result-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "GENERIC-RESULT-TEST";
+  await services.control.createRun(runId, demoTask(runId, root, config));
+  const runtime = new ProofBladeToolRuntime(
+    runId,
+    { fixtureId: runId, generation: 0, path: root, privatePath: join(root, ".proofblade") },
+    services.runsRoot,
+    services.control,
+    services.artifacts,
+    services.journal,
+    root,
+    { includeMcp: false },
+  );
+  try {
+    const proposed = await runtime.submitResult("ordinary report result", { target: "review" });
+    const snapshot = await services.control.snapshot(runId);
+    const completion = snapshot.completions[proposed.completionId];
+    assert.ok(completion);
+    assert.equal(completion.purpose, "submission");
+    assert.equal(completion.submissionTarget, "review");
+    assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[completion.artifactId]!), "ordinary report result");
+  } finally {
+    await runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
   const tools = [
     { name: "mcp__idalib-mcp__idalib_open" },
