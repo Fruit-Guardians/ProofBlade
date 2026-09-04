@@ -92,10 +92,8 @@ test("coding prompt carries strict interactive Pwn synchronization guidance", ()
   assert.match(source, /generic suffix/);
   assert.match(source, /PB_READY/);
   assert.match(source, /PYTHONIOENCODING=utf-8/);
-  assert.match(source, /First action contract/);
-  assert.match(source, /PREPARED_CTF_WORKFLOW_PROMPT/);
-  assert.match(source, /first assistant action MUST be one allowed tool call/);
-  assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
+  assert.doesNotMatch(source, /CTF_FAST_PATH_PROMPT|PREPARED_CTF_WORKFLOW_PROMPT|PREPARED_CTF_FAST_PATH_PROMPT/);
+  assert.doesNotMatch(source, /first assistant action MUST be one allowed tool call/);
   assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
   assert.match(source, /<proofblade-turn-guidance>/);
 });

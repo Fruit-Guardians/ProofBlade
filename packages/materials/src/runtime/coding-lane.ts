@@ -75,8 +75,6 @@ Anything that will take more than about a minute — a brute force, a wide sweep
 
 If the same tool call keeps looking wrong or incomplete, do not re-issue it a third time. Either the output is telling you something you have not accepted yet, or the approach is wrong: change the question, change the tool, or move on with what you already have.
 
-When the user asks for a CTF flag, challenge answer, recovered secret, or another deterministic result from workspace evidence, inspect the real inputs and test decoy hypotheses against file structures and control flow. Before reporting a final candidate as confirmed, call verify_claim with the exact candidate and a deterministic command that derives and prints it without embedding the candidate literal. Link the supporting evidence ids used by the reproduction. Treat strings output alone as an observation, not verification. If reproduction is still missing, state that the conclusion is unverified and name the missing check.
-
 Use the capability proxy as an optional analysis instrument, not a mandatory workflow. Search it when stable binary or firmware structure would help, describe only the chosen operation to load its schema, and invoke it with workspace-relative paths. Keep planning autonomous; do not call capabilities mechanically when read or bash is more appropriate.`;
 
 export class PiCodingLane implements AgentLanePort {
@@ -86,8 +84,6 @@ export class PiCodingLane implements AgentLanePort {
   private constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
-    private readonly challengeMode: boolean,
-    private readonly ctfTurnGuidance: string,
     private readonly turnContext: { guidance: string },
     private readonly harness: AgentHarness<CodingResourceContext>,
     private readonly env: ExecutionEnv,
@@ -153,8 +149,6 @@ export class PiCodingLane implements AgentLanePort {
     browserHandoffs?: readonly BrowserRuntimeHandoff[];
     /** Path visible to commands inside the execution backend (normally /workspace). */
     workspaceRootForPrompt?: string;
-    /** Skill library path visible to commands inside the execution backend. */
-    skillsLibraryPathForPrompt?: string;
     /** Platform syntax visible to the execution backend (Docker is Linux on every host). */
     executionPlatform?: NodeJS.Platform;
     /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
@@ -222,9 +216,8 @@ export class PiCodingLane implements AgentLanePort {
     if (options.browserRuntimeRequired && snapshot.task.verification.web?.transport === "browser" && !options.browserVerifierFactory) {
       throw new Error("Browser runtime broker is configured but unavailable for browser verification");
     }
-    // Domain labels may recommend optional tools, but they do not turn a
-    // general coding task into a CTF workflow. Only an explicit challenge task
-    // or caller-supplied profile enables challenge preparation and guidance.
+    // Domain labels may select optional capability preparation, but never
+    // change the Agent Loop or inject a domain-specific workflow prompt.
     const challengeMode = isChallengeTask(snapshot.task) || Boolean(options.challengeProfile);
     const challengeProfile = options.challengeProfile ?? (challengeMode ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
@@ -266,7 +259,6 @@ export class PiCodingLane implements AgentLanePort {
     // Expose each enabled MCP server's tools as FIRST-CLASS provider tools
     // (mcp__<server>__<tool>) so the model uses them natively, like Claude Code —
     // instead of the mcp_call proxy it will not drive. mcp_call stays as a fallback.
-    const dynamicTargetKind = challengeProfile?.targetKind ?? snapshot.task.target_kind;
     // Provider-native tool schemas belong to the stable prefix. A per-turn chat
     // classification may steer the dynamic suffix, but only the immutable task
     // contract may alter the top-level tool surface.
@@ -516,39 +508,16 @@ export class PiCodingLane implements AgentLanePort {
       artifactOutputRefs: new Map(),
       imagesSeen: new Map<string, number>(),
     };
-    const skillsLibraryPath = join(installRoot, "skills-library", "ctf-skills");
-    const skillsLibraryPathForPrompt = options.skillsLibraryPathForPrompt ?? skillsLibraryPath;
     const stableSystemPrompt = codingSystemPrompt(
       resources,
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
       options.workspaceRootForPrompt ?? options.projectRoot,
       toolCatalog.promptBlock(),
       {
-        platformJudged,
-        maxSubmissions: snapshot.task.constraints.max_submissions,
-        ...(snapshot.task.verification.kind === "reproduction" && snapshot.task.verification.command
-          ? { verificationCommand: snapshot.task.verification.command }
-          : {}),
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
     );
-    const categoryGuidance = codingCtfCategoryGuidance(dynamicTargetKind, snapshot.task.target, Boolean(pwnTools), Boolean(pwnTools && pwnReproductionPolicy), Boolean(webSession));
-    const ctfTurnGuidance = !challengeMode
-      ? ""
-      : challengeProfile
-      ? [
-          PREPARED_CTF_FAST_PATH_PROMPT,
-          PREPARED_CTF_WORKFLOW_PROMPT,
-          preparedChallengeProfileBlock(challengeProfile, preflight),
-          categoryGuidance,
-          toolCatalog.promptBlock(challengeProfile.id, challengeProfile.hostToolIds),
-        ].filter(Boolean).join("\n\n")
-      : [
-          CTF_FAST_PATH_PROMPT,
-          codingCtfWorkflowGuidance(skillsLibraryPathForPrompt),
-          categoryGuidance,
-        ].filter(Boolean).join("\n\n");
     const turnContext = { guidance: "" };
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
@@ -695,8 +664,6 @@ export class PiCodingLane implements AgentLanePort {
     return new PiCodingLane(
       options.runId,
       options.controlStore,
-      challengeMode,
-      ctfTurnGuidance,
       turnContext,
       harness,
       env,
@@ -740,7 +707,6 @@ export class PiCodingLane implements AgentLanePort {
     // Prompt wording is not a runtime mode switch. This prevents a normal
     // coding conversation mentioning "challenge" or "flag" from receiving
     // CTF workflow constraints or hard experiment semantics.
-    const ctfMode = this.challengeMode;
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();
@@ -749,8 +715,7 @@ export class PiCodingLane implements AgentLanePort {
     delete this.termination.reason;
     this.termination.requested = false;
     this.termination.confirmed = false;
-    this.termination.ctfMode = ctfMode;
-    this.turnContext.guidance = ctfMode ? this.ctfTurnGuidance : "";
+    this.turnContext.guidance = "";
     await this.refreshForestContext();
     await this.refreshAblationRoute();
     this.busy = true;
@@ -1092,33 +1057,6 @@ export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind">
     || (!task.verification && task.mode === "ctf_solve");
 }
 
-const CTF_FAST_PATH_PROMPT = [
-  "[ProofBlade CTF fast path]",
-  "Treat this as one bounded challenge-solving turn, not an open-ended coding session.",
-  "First classify the dominant category and read exactly one matching ctf-* playbook from the skills library.",
-  "After the first useful structure/constraint is extracted, write a small solver or reproducer immediately; do not keep dumping AST/disassembly or rewriting equivalent probes.",
-  "Every exploratory command must either produce a new fact, update the solver, or verify a candidate. If the same approach has not advanced after a few probes, stop and change the hypothesis.",
-  "Use verify_claim before reporting a flag.",
-].join("\n");
-
-const PREPARED_CTF_FAST_PATH_PROMPT = [
-  "[ProofBlade prepared CTF path]",
-  "Treat this as one bounded challenge-solving turn using the already selected and preflighted direction.",
-  "Execute the prepared first-action contract with the listed tools, persist its observation, and do not reclassify the challenge, scan unrelated playbooks, discover tools, install packages, or retry missing binaries.",
-  "After the first useful structure or constraint is extracted, write a small solver or reproducer and validate a candidate through the verifier before reporting it.",
-].join("\n");
-
-const PREPARED_CTF_WORKFLOW_PROMPT = [
-  "## CTF solving workflow (prepared direction)",
-  "When the task is to solve this prepared CTF challenge:",
-  "1. Use the durable profile and first-action contract below; do not reclassify the challenge, read unrelated playbooks, discover tools, install packages, or retry missing binaries.",
-  "2. The first assistant action MUST be one allowed tool call, not a prose plan or another classification. Persist its observation before choosing a second action.",
-  "3. Once the first useful structure or constraint is observed, write the smallest solver or reproducer that can test it. Change the hypothesis when a probe does not add a fact.",
-  "4. Validate the candidate through the verifier and only then report or submit it.",
-  "## Interactive native/Pwn protocol discipline",
-  "Use complete state-specific prompt anchors for interactive targets, log timeout and received bytes, and treat EOF or a timeout as protocol failure. Use a fresh connection for retries and confirm a shell with a unique PB_READY marker.",
-].join("\n");
-
 function codingCtfWorkflowGuidance(skillsLibraryPath: string): string {
   const lib = skillsLibraryPath.replace(/\\/g, "/");
   return `## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
@@ -1129,7 +1067,7 @@ function codingSystemPrompt(
   mcpServers: Array<{ name: string; description: string }>,
   workspaceRoot: string,
   toolCatalogBlock: string,
-  options: { platformJudged?: boolean; maxSubmissions?: number; verificationCommand?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
+  options: { executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string } = {},
 ): string {
   // State the workspace explicitly. Without it the model guesses, wanders into a
   // parent directory, and then resolves a name that means something different
@@ -1145,16 +1083,7 @@ function codingSystemPrompt(
   const mcpPathBlock = options.hostWorkspaceRootForMcp
     ? `\n\nMCP path boundary: shell/read/edit/write operate on the container workspace at \`${workspaceRoot}\`. Host-side MCP tools (for example IDA/JADX) cannot see that virtual path; when an MCP tool asks for a file path, pass the host workspace path \`${options.hostWorkspaceRootForMcp}\` plus the workspace-relative suffix. Never use that host path in bash.`
     : "";
-  // Competition runs only. A wrong submission is scored against us (it is an
-  // explicit tiebreaker), so the budget and the cost of guessing must be stated
-  // where the model cannot miss them.
-  const submissionBlock = options.platformJudged
-    ? `\n\n## Submitting the flag\nThis challenge is judged by the live competition platform. Call \`submit_flag\` with the complete flag to submit it and get the verdict; that is the only way to score, and finishing your turn without calling it means the challenge is not solved.\nYou have at most ${options.maxSubmissions ?? 5} submissions for this challenge, and wrong submissions count against the team's ranking — do not guess or spray variants. Submit when you have derived the flag, not when you are hoping. Resubmitting a value you already submitted is free (the stored verdict is replayed) but tells you nothing new. If a submission is rejected, treat it as evidence your derivation is wrong and go back to the analysis rather than mutating the string.`
-    : "";
-  const verificationBlock = options.verificationCommand
-    ? `\n\n## Task-bound candidate verification\nThis run has one immutable verifier command. When reporting a deterministic candidate, call \`verify_claim\` with the exact command below; do not substitute a model-invented command:\n\n\`${options.verificationCommand}\``
-    : "\n\n## Candidate verification\nThis run has no immutable verifier command. You may continue investigating and record observations, but any candidate conclusion remains unverified until the task is created with a verifier policy.";
-  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${toolCatalogBlock}${submissionBlock}${verificationBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
+  return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${toolCatalogBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
 function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {
