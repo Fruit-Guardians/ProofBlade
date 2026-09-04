@@ -20,7 +20,7 @@
     "src/competition/experiment-gate.ts": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
     "src/competition/fleet.ts": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
-    "src/competition/loop.ts": "addf2d488fe0758c48084ad3c73b2c6ac1f147b8fbf762adce4d73dd8f576c46",
+    "src/competition/loop.ts": "75c2bda9293038705a0f7006368efdd61e71468a2bc6eb1a67d08c643e04b512",
     "src/competition/sandbox.ts": "71da3ade3bf1e5b2a8b73638e5ebf04c1238126e6b1e9364852049fb75311af5",
     "src/competition/solver.ts": "54806d902d8e7fb341d7bf34f953d108e227cea22360cfdb0f5cb6bbcbc24c5f",
     "src/competition/task.ts": "aa595530853625ca3b41aba5d8e453b8f35ca38fb1dc3366eec4284d05c03dfc",
@@ -96,7 +96,7 @@
     "src/orchestration/observation-queue.ts": "dc6fd08d113f836a34f7519f3f93774a5946394c2a76826c497d09e14e4ff305",
     "src/orchestration/planner.ts": "1af2274f0cd0d164fdc6754ff675133d6d55213862a19b31e1b2384671c771b1",
     "src/orchestration/refiner.ts": "38858c61f8bc343c11ddef52a1b602c0f788af49209752add8a80e9ed31c8229",
-    "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+    "src/orchestration/run-coordinator.ts": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
     "src/orchestration/single-agent-loop.ts": "9c0c57bf87b4cb09e8b0c16f02a0c0000779459813211bb2c0bad03c756ee81a",
@@ -1257,7 +1257,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 34,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -12209,7 +12209,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 21,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {
@@ -16812,6 +16812,7 @@
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-remote-query-matrix.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/container-runtime.test.ts",
@@ -19182,6 +19183,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -25941,8 +25943,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 151,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 143,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -25977,8 +25979,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 155,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 147,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/run-work-scheduler.test.ts"
       ]
@@ -25993,8 +25995,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 139,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 131,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -26036,21 +26038,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 94,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
-      "testRefs": []
-    },
-    {
-      "id": "@proofblade/materials::method::RunCoordinator.domainPhaseForTurn",
-      "name": "RunCoordinator.domainPhaseForTurn",
-      "kind": "method",
-      "signature": "(turn: number): DomainPhase",
-      "summary": "Select the durable investigation phase for a bounded model turn.",
-      "summarySource": "tsdoc",
-      "tags": [],
-      "exportPath": "@proofblade/materials",
-      "module": "src/orchestration/run-coordinator.ts",
-      "line": 124,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {
@@ -26064,7 +26052,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 60,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/event-ingress-scope.test.ts"
       ]
@@ -26080,7 +26068,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 84,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/event-ingress-scope.test.ts"
       ]
@@ -26096,7 +26084,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 51,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/event-ingress-scope.test.ts"
       ]
@@ -26111,8 +26099,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 147,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 139,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -26180,8 +26168,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 180,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 172,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -26197,7 +26185,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 116,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {
@@ -26210,8 +26198,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 132,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 124,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {
@@ -26225,7 +26213,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 99,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/competition-convergence.test.ts"
       ]
@@ -26240,8 +26228,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 143,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 135,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": [
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
         "packages/materials/tests/provider-budget.test.ts",
@@ -26259,8 +26247,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
-      "line": 163,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "line": 155,
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {
@@ -30177,6 +30165,7 @@
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -30274,6 +30263,7 @@
       "line": 803,
       "moduleHash": "517b02c1720839b5b04e2148bca9afcf4887797bed304e1da2111efa9c4ee47e",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -30393,6 +30383,7 @@
       "line": 807,
       "moduleHash": "517b02c1720839b5b04e2148bca9afcf4887797bed304e1da2111efa9c4ee47e",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -30446,6 +30437,7 @@
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -30543,6 +30535,7 @@
       "line": 143,
       "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -30662,6 +30655,7 @@
       "line": 147,
       "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
@@ -31338,6 +31332,7 @@
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
         "packages/materials/tests/competition-sandbox.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/control-store-evidence-invariants.test.ts",
@@ -38420,7 +38415,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/run-coordinator.ts",
       "line": 19,
-      "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
+      "moduleHash": "62f089cb52147c07ee85d2181a64ba321fb9e13134748740c4c1cb75517315d1",
       "testRefs": []
     },
     {

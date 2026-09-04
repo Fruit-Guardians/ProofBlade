@@ -183,7 +183,11 @@ export async function runCompetitionLoop(
         break;
       }
       turns += 1;
-      await coordinator.setDomainPhase(options.runId, coordinator.domainPhaseForTurn(turns));
+      // Domain phases are durable status observations, not a turn-based route.
+      // The model may need to inspect, model, experiment, or report in a
+      // different order for a particular security target.  Only verifier and
+      // recovery paths below publish a phase transition; this loop must not
+      // turn a platform adapter into a CTF-specific state machine.
       workItemId = (await coordinator.claim(options.runId, options.task, turns)).id;
       const preTurnSnapshot = await services.control.snapshot(options.runId);
       const submissionsSoFar = countSubmissions(preTurnSnapshot);

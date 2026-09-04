@@ -276,7 +276,9 @@ test("real solver drives a security target to SOLVED on the coding lane via exte
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string; status?: string } });
     assert.equal(events.filter((event) => event.type === "work_item_claimed").length, 1);
     assert.equal(events.filter((event) => event.type === "work_item_completed").length, 1);
-    assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["RECON", "REPORT", "SUBMIT"]);
+    // The platform adapter no longer infers RECON from turn 1.  Only the
+    // verifier-owned terminal path publishes REPORT -> SUBMIT.
+    assert.deepEqual(events.filter((event) => event.type === "domain_phase_changed").map((event) => event.payload?.domainPhase), ["REPORT", "SUBMIT"]);
     const runId = (await readdir(join(root, "runs")))[0]!;
     const projection = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"), "utf8")) as RunSnapshot;
     assert.equal(hasAcceptedPlatformSubmission(projection), true);
