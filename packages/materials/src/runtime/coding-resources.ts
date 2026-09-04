@@ -540,16 +540,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
 };
 
 /**
- * Submit a flag candidate to the live competition platform.
+ * Submit a model-derived result to a configured external destination.
  *
- * Only registered when the run's `verification.kind` is `platform_submission`,
- * because it is the one path that spends a real submission against the
- * platform. Routes through `runtime.submitCandidate` (format check, submission
- * budget, candidate-hash dedup) and then the effect journal's `fixture_score`,
- * whose idempotency key collapses a repeated identical submission into the
- * stored result instead of a second API call. Both tiebreakers the rules score
- * — wrong-submission count and API-call efficiency — are therefore accounted
- * for in the journal rather than tracked separately.
+ * Only registered when the run has an external destination. The destination
+ * adapter owns payload semantics; this resource remains generic and routes
+ * through the durable completion, verification, approval, and replay path.
  */
 /**
  * Start a long command WITHOUT blocking the turn.

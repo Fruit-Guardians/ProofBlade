@@ -67,7 +67,7 @@ Coding `mcp_call describe` 使用 MCP Registry 的统一服务器描述，除外
 
 MCP 调用结果必须解包后再交给模型，不得逐层重新序列化。线缆形状是四层嵌套：Tool 自己的 JSON 是 `result.content[].text` 里的字符串，外面套 `{server, tool, result}` 信封，信封又是 `RawEffectResult.stdout` 里的字符串。直接再 `JSON.stringify` 一次会让模型收到没有真实换行的 `\\\"instruction\\\"` 转义串，从而判断输出被截断并重复发起同一次调用；实测一次 idalib `disasm` 因此从 835 字符膨胀到 10778 字符（12.9 倍）。指令清单（`asm.lines`）扁平化为 `addr  instruction` 行并内联 label 与 ref，`decompiled`/`pseudocode`/`code`/`source` 按原文输出，`null` 与空容器字段丢弃。
 
-`external_submit` 只在 `verification.kind = "platform_submission"` 时注册，因为它会花掉一次真实提交，GUI 聊天运行没有可提交的对象。它先走 `runtime.submitCandidate`（格式校验、提交预算、候选哈希去重），再由 `IndependentVerifier` 触发 Journal 的 `fixture_score`，那才是真正到达平台的一步。禁止在 lane 里直接调用平台 API：Journal 的 idempotency key 会把重复提交折叠成回放而非第二次调用，事件日志同时是「错误提交次数」和「API 调用效率」两个计分项的账本。assist 模式下候选只记录为 PROPOSED completion 并立即返回，绝不联系平台，由操作者决定是否放行。
+`external_submit` 只在配置了外部目标时注册；普通 GUI 聊天没有目标，因此不会看到该工具。它把不透明的安全结果交给目标适配器，再由 Completion、Verifier、Approval 和 Journal 共同处理持久化、幂等回放与审计。Competition 适配器可以在内部把结果映射到平台协议，但模型工具目录不再暴露 CTF 专用的 `submit_candidate`。
 
 Artifact 锚点只在可见输出确实少于原始输出时追加，并写明被截留的字节数。对完整输出宣告 Artifact 会教会模型「有内容被藏起来了」，使它把回合花在取回已经拿到的文本上；`read` 的归档内容等于其可见内容，因此永不追加锚点，Artifact ID 只留在 `details` 里供 GUI 与 Evidence Graph 使用。`evidence search` 在元数据未命中时检索归档正文（单个 Artifact 上限 512 KB），否则内容查询永远落空而模型只能重跑命令。
 

@@ -863,14 +863,9 @@ async function latestExternalUserMessageFromSession(session: { getBranch(): Prom
  * not need to know whether the destination is a platform, review queue, or
  * deployment service.
  *
- * `runtime.submitExternal` enforces the submission budget and candidate-hash
- * dedup, returning the existing completion for a repeat. The
- * `IndependentVerifier` then drives the journal's `fixture_score` effect, which
- * is what actually reaches `CompetitionApi.submitFlag`. Going through the
- * journal (rather than calling the API directly) is deliberate: its idempotency
- * key replays a stored verdict instead of spending a second API call, and every
- * submission stays on the event log — the two things the rules use as
- * tiebreakers (wrong-submission count, API-call efficiency).
+ * `runtime.submitExternal` stores the opaque result with a durable completion
+ * and candidate hash. The destination adapter and verifier decide payload
+ * semantics; the lane only coordinates approval, replay, and accounting.
  */
 export function createPlatformExternalSubmitter(deps: {
   runId: string;
@@ -977,7 +972,7 @@ export function createDeclaredExternalSubmitter(deps: {
 
 /**
  * Count only submittable completions, matching the budget rule in
- * `submitCandidate`. Counting every completion inflated the number reported to the
+ * submittable completions. Counting every completion inflated the number reported to the
  * model and the fleet, because local verification proposes completions that are never
  * sent to the platform.
  */
