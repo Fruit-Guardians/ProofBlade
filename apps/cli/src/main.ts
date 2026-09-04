@@ -238,7 +238,7 @@ async function main(): Promise<void> {
         if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("Ablation corpus snapshot changed; create a new immutable experiment version before running");
         const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
         let ledger: AblationRunLedger;
-        try { ledger = await AblationRunLedger.load(ledgerPath); }
+        try { ledger = await AblationRunLedger.load(ledgerPath, experiment); }
         catch (error) {
           if ((error as { code?: string }).code !== "ENOENT") throw error;
           ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
@@ -289,6 +289,12 @@ async function main(): Promise<void> {
       if (action === "init") {
         const corpus = await loadRealEvaluationCorpus(resolve(root, experiment.corpus.path));
         const ledgerPath = join(root, ".proofblade", "ablation", `${experiment.experimentId}.ledger.json`);
+        try {
+          await access(ledgerPath);
+          throw new Error(`Ablation ledger already exists at ${ledgerPath}; use status/resume or create a new experiment snapshot.`);
+        } catch (error) {
+          if ((error as { code?: string }).code !== "ENOENT") throw error;
+        }
         const ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
         print({ experimentId: experiment.experimentId, ledgerPath, summary: ledger.summary() });
         break;

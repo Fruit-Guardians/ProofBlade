@@ -383,7 +383,7 @@
 ### RealModelEvaluationRunner
 - Kind: `class`
 - Signature: `RealModelEvaluationRunner`
-- Source: [src/evaluation/real-model-evaluator.ts:270](../../../packages/materials/src/evaluation/real-model-evaluator.ts:270)
+- Source: [src/evaluation/real-model-evaluator.ts:280](../../../packages/materials/src/evaluation/real-model-evaluator.ts:280)
 - Export: `@proofblade/materials`
 - Summary: Runs real provider-backed Coding lanes only after an explicit caller opt-in.
 - Summary source: `tsdoc`
@@ -2205,7 +2205,7 @@
 ### deriveProviderDiagnostics
 - Kind: `function`
 - Signature: `(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:705](../../../packages/materials/src/evaluation/real-model-evaluator.ts:705)
+- Source: [src/evaluation/real-model-evaluator.ts:732](../../../packages/materials/src/evaluation/real-model-evaluator.ts:732)
 - Export: `@proofblade/materials`
 - Summary: Projects provider traffic onto durable executor turns without relying on
 - Summary source: `tsdoc`
@@ -2214,7 +2214,7 @@
 ### preflightRealModelEvaluation
 - Kind: `function`
 - Signature: `(options: RealModelEvaluationPreflightOptions): Promise<RealModelEvaluationPreflightSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:100](../../../packages/materials/src/evaluation/real-model-evaluator.ts:100)
+- Source: [src/evaluation/real-model-evaluator.ts:109](../../../packages/materials/src/evaluation/real-model-evaluator.ts:109)
 - Export: `@proofblade/materials`
 - Summary: Validate a live evaluation setup without creating a Run or contacting a
 - Summary source: `tsdoc`
@@ -5753,7 +5753,7 @@
 ### RealModelCategorySummary
 - Kind: `interface`
 - Signature: `RealModelCategorySummary`
-- Source: [src/evaluation/real-model-evaluator.ts:204](../../../packages/materials/src/evaluation/real-model-evaluator.ts:204)
+- Source: [src/evaluation/real-model-evaluator.ts:213](../../../packages/materials/src/evaluation/real-model-evaluator.ts:213)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model category summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5761,7 +5761,7 @@
 ### RealModelEvaluationCase
 - Kind: `interface`
 - Signature: `RealModelEvaluationCase`
-- Source: [src/evaluation/real-model-evaluator.ts:150](../../../packages/materials/src/evaluation/real-model-evaluator.ts:150)
+- Source: [src/evaluation/real-model-evaluator.ts:159](../../../packages/materials/src/evaluation/real-model-evaluator.ts:159)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation case type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5769,7 +5769,7 @@
 ### RealModelEvaluationGatePolicy
 - Kind: `interface`
 - Signature: `RealModelEvaluationGatePolicy`
-- Source: [src/evaluation/real-model-evaluator.ts:49](../../../packages/materials/src/evaluation/real-model-evaluator.ts:49)
+- Source: [src/evaluation/real-model-evaluator.ts:58](../../../packages/materials/src/evaluation/real-model-evaluator.ts:58)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation gate policy type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5777,7 +5777,7 @@
 ### RealModelEvaluationOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:24](../../../packages/materials/src/evaluation/real-model-evaluator.ts:24)
+- Source: [src/evaluation/real-model-evaluator.ts:26](../../../packages/materials/src/evaluation/real-model-evaluator.ts:26)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5785,7 +5785,7 @@
 ### RealModelEvaluationPreflightOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:58](../../../packages/materials/src/evaluation/real-model-evaluator.ts:58)
+- Source: [src/evaluation/real-model-evaluator.ts:67](../../../packages/materials/src/evaluation/real-model-evaluator.ts:67)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5793,7 +5793,7 @@
 ### RealModelEvaluationPreflightSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:72](../../../packages/materials/src/evaluation/real-model-evaluator.ts:72)
+- Source: [src/evaluation/real-model-evaluator.ts:81](../../../packages/materials/src/evaluation/real-model-evaluator.ts:81)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5801,7 +5801,7 @@
 ### RealModelEvaluationSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:250](../../../packages/materials/src/evaluation/real-model-evaluator.ts:250)
+- Source: [src/evaluation/real-model-evaluator.ts:260](../../../packages/materials/src/evaluation/real-model-evaluator.ts:260)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5809,7 +5809,7 @@
 ### RealModelProviderDiagnostics
 - Kind: `interface`
 - Signature: `RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:196](../../../packages/materials/src/evaluation/real-model-evaluator.ts:196)
+- Source: [src/evaluation/real-model-evaluator.ts:205](../../../packages/materials/src/evaluation/real-model-evaluator.ts:205)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model provider diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5817,7 +5817,7 @@
 ### RealModelTurnDiagnostics
 - Kind: `interface`
 - Signature: `RealModelTurnDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:187](../../../packages/materials/src/evaluation/real-model-evaluator.ts:187)
+- Source: [src/evaluation/real-model-evaluator.ts:196](../../../packages/materials/src/evaluation/real-model-evaluator.ts:196)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model turn diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5825,7 +5825,7 @@
 ### RealModelVariantSummary
 - Kind: `interface`
 - Signature: `RealModelVariantSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:218](../../../packages/materials/src/evaluation/real-model-evaluator.ts:218)
+- Source: [src/evaluation/real-model-evaluator.ts:227](../../../packages/materials/src/evaluation/real-model-evaluator.ts:227)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model variant summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9097,7 +9097,7 @@
 - Export: `@proofblade/materials`
 - Summary: Return all retained records, including stopped records for audit.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### CompetitionEnvironmentJanitor.register
 - Kind: `method`
@@ -10263,7 +10263,7 @@
 ### RealModelEvaluationRunner.run
 - Kind: `method`
 - Signature: `(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:273](../../../packages/materials/src/evaluation/real-model-evaluator.ts:273)
+- Source: [src/evaluation/real-model-evaluator.ts:283](../../../packages/materials/src/evaluation/real-model-evaluator.ts:283)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10772,7 +10772,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: records operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### MemoryTelemetryBackend.write
 - Kind: `method`
@@ -11571,7 +11571,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: records operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation-report.test.ts`, `packages/materials/tests/binding-transaction.test.ts`, `packages/materials/tests/browser-resource-adapter.test.ts`, `packages/materials/tests/browser-runtime-broker.test.ts`, `packages/materials/tests/browser-runtime-playwright-host.test.ts`, `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-lifecycle-replay.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/environment-janitor.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/provider-pi-http-smoke.test.ts`, `packages/materials/tests/provider-scheduler.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/session-registry.test.ts`, `packages/materials/tests/session-runtime-service.test.ts`, `packages/materials/tests/skills.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/web-session.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ExternalResourceRegistry.register
 - Kind: `method`

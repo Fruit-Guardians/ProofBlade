@@ -69,7 +69,7 @@
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
-    "src/evaluation/real-model-evaluator.ts": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+    "src/evaluation/real-model-evaluator.ts": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
     "src/evaluation/replay.ts": "e988de6d6072220cc0ce0ced8c81f8f256b4189c8a67a5ff6d3f5880c2dec6d1",
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
@@ -896,8 +896,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 270,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 280,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -2474,7 +2474,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 15,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -4339,8 +4339,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 705,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 732,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -4355,8 +4355,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 100,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 109,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": [
         "packages/materials/tests/real-model-evaluator.test.ts"
       ]
@@ -10833,7 +10833,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 19,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10846,8 +10846,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 204,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 213,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10860,8 +10860,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 150,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 159,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10874,8 +10874,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 49,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 58,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10888,8 +10888,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 24,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 26,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10902,8 +10902,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 58,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 67,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10916,8 +10916,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 72,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 81,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10930,8 +10930,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 250,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 260,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10944,8 +10944,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 196,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 205,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10958,8 +10958,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 187,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 196,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -10972,8 +10972,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 218,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 227,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
@@ -17955,6 +17955,7 @@
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
@@ -22798,8 +22799,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
-      "line": 273,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "line": 283,
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -24780,6 +24781,7 @@
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
@@ -27464,6 +27466,7 @@
         "packages/materials/tests/pwn-session-runtime-host.test.ts",
         "packages/materials/tests/pwn-session-supervisor.test.ts",
         "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/runtime-contracts.test.ts",
         "packages/materials/tests/session-registry.test.ts",
         "packages/materials/tests/session-runtime-service.test.ts",
@@ -37612,7 +37615,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/real-model-evaluator.ts",
       "line": 17,
-      "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
+      "moduleHash": "57889cc8fc89c3bad43cd5549532f7ea838e5f645155cd54e0e6de67687ba6a6",
       "testRefs": []
     },
     {
