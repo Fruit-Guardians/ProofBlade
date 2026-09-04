@@ -1,7 +1,7 @@
 import { AgentHarness } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
-import { rewriteUnverifiedClaimText, type TaskResultVerifier } from "../verification/claim-verification.js";
+import { rewriteUnverifiedResultText, type TaskResultVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
@@ -472,11 +472,11 @@ export async function finalizeCodingTurn(options: {
     : options.recoveryExhausted
       ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
       : options.response.errorMessage;
-  const initialClaimVerification = await options.claimVerifier.project(options.userPrompt, projectedOutput);
-  const output = initialClaimVerification.status === "unverified"
-    ? rewriteUnverifiedClaimText(projectedOutput, initialClaimVerification.reason)
+  const resultVerification = await options.claimVerifier.project(options.userPrompt, projectedOutput);
+  const output = resultVerification.status === "unverified"
+    ? rewriteUnverifiedResultText(projectedOutput, resultVerification.reason)
     : projectedOutput;
-  const claimVerification = initialClaimVerification;
+  const claimVerification = resultVerification;
   const task = await options.controlStore.snapshot(options.runId);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
@@ -487,6 +487,7 @@ export async function finalizeCodingTurn(options: {
     payload: {
       ...persistedAssistantText(task.task.mode, output),
       stopReason,
+      resultVerification,
       claimVerification,
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
@@ -501,6 +502,7 @@ export async function finalizeCodingTurn(options: {
     stopReason,
     usage: options.response.usage,
     errorMessage,
+    resultVerification,
     claimVerification,
     termination: confirmed ? options.termination.reason : undefined,
   };

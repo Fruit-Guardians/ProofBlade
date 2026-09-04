@@ -19,7 +19,7 @@ import {
   RUN_ID_PATTERN,
   fixtureTask,
   listFixtureProfiles,
-  rewriteUnverifiedClaimText,
+  rewriteUnverifiedResultText,
   type AppServices,
   type AgentLanePort,
   type AgentOutcome,
@@ -508,6 +508,7 @@ export class DebugDataService {
           text: taskOutcome?.text ?? `Task turn finished with ${result.status}.`,
           stopReason: taskOutcome?.stopReason ?? result.status.toLowerCase(),
           usage: normalizeUsage(taskOutcome?.usage) ?? emptyUsage(),
+          resultVerification: taskOutcome?.resultVerification ?? taskOutcome?.claimVerification,
           claimVerification: taskOutcome?.claimVerification,
         });
         return;
@@ -602,7 +603,7 @@ export class DebugDataService {
       if (accepted && afterTurn.status !== "SUCCEEDED") {
         await coordinator.finishAccepted(runId, workItem.id, accepted.id, "The task verifier accepted the result.");
       }
-      emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
+      emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), resultVerification: outcome.resultVerification ?? outcome.claimVerification, claimVerification: outcome.claimVerification });
     } catch (error) {
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
@@ -931,15 +932,20 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
         interrupted.error = undefined;
       }
     }
-    if (!isRecord(event.payload?.claimVerification)) continue;
-    const claimVerification = event.payload?.claimVerification as unknown as ChatMessageDebug["claimVerification"];
+    const verificationPayload = isRecord(event.payload?.resultVerification)
+      ? event.payload?.resultVerification
+      : event.payload?.claimVerification;
+    if (!isRecord(verificationPayload)) continue;
+    const resultVerification = verificationPayload as unknown as ChatMessageDebug["resultVerification"];
     const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
     const message = (piEntryId ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId) : undefined)
-      ?? [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
+      ?? [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.resultVerification === undefined && item.claimVerification === undefined);
     if (message) {
-      message.claimVerification = claimVerification;
-      if (claimVerification?.status === "unverified") {
-        message.text = rewriteUnverifiedClaimText(message.text, claimVerification.reason);
+      message.resultVerification = resultVerification;
+      // Keep the old field populated while clients migrate to the generic name.
+      message.claimVerification = resultVerification;
+      if (resultVerification?.status === "unverified") {
+        message.text = rewriteUnverifiedResultText(message.text, resultVerification.reason);
       }
     }
   }
