@@ -19,6 +19,7 @@ import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
 import { boundModelText } from "../domain/text-bounds.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import type { ModelContextItem } from "../context/model-context-frame.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
@@ -586,6 +587,7 @@ export class PiCodingLane implements AgentLanePort {
     // actual compact trigger relative to the provider input budget.
     const proactiveMaintenanceLimit = Math.min(contextBudget, Math.max(8_192, Math.floor(contextBudget * threshold / 0.8)));
     let currentContextTokens = 0;
+    let lastOmittedItems: ModelContextItem[] = [];
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
     harness.on("context", async ({ messages }) => {
@@ -619,6 +621,7 @@ export class PiCodingLane implements AgentLanePort {
         messageBudget: targetMessageBudget,
         baseTokens: estimateTokens(JSON.stringify(dynamicProjection)),
       });
+      lastOmittedItems = contextPruneOmissions(prepared.dropped);
       currentContextTokens = prepared.estimatedTokens + estimateTokens(JSON.stringify(dynamicProjection));
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
@@ -665,7 +668,11 @@ export class PiCodingLane implements AgentLanePort {
         });
         previousContextBlocks = compiled.manifest.blocks;
         const summary = contextSnapshot(compiled.manifest);
-        return { ...summary, estimatedTokens: currentContextTokens > 0 ? currentContextTokens : summary.estimatedTokens };
+        return {
+          ...summary,
+          estimatedTokens: currentContextTokens > 0 ? currentContextTokens : summary.estimatedTokens,
+          omittedItems: lastOmittedItems,
+        };
       },
       scheduling,
     });
@@ -944,6 +951,31 @@ async function submissionCounters(
 ): Promise<{ submissionsUsed: number; submissionsRemaining: number }> {
   const used = (await runtime.submittableCompletions(snapshot)).length;
   return { submissionsUsed: used, submissionsRemaining: Math.max(0, snapshot.task.constraints.max_submissions - used) };
+}
+
+function contextPruneOmissions(dropped: readonly { kind: string; id?: string }[]): ModelContextItem[] {
+  const omissions = new Map<string, ModelContextItem>();
+  for (const item of dropped) {
+    const sourceId = item.id?.slice(0, 128);
+    const identity = canonicalJson({ kind: item.kind, ...(sourceId ? { sourceId } : {}) });
+    const contentHash = sha256(identity);
+    omissions.set(identity, {
+      itemId: `pruned:${item.kind.slice(0, 64)}:${contentHash.slice(0, 16)}`,
+      role: "unknown",
+      source: "context",
+      sourceIds: sourceId ? [sourceId] : [],
+      // The pruner reports identities rather than discarded bodies. Recording
+      // a hash of that metadata keeps telemetry informative without retaining
+      // model-visible text that the final request did not contain.
+      contentHash,
+      visibleChars: 0,
+      estimatedTokens: 0,
+      included: false,
+      artifactRefs: [],
+      evidenceRefs: [],
+    });
+  }
+  return [...omissions.values()];
 }
 
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {

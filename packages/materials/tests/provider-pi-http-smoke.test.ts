@@ -150,7 +150,26 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
     const configured = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     closeTransport = configured.closeTransport;
     const harness = new AgentHarness({ session, models: configured.models, model: configured.model, systemPrompt: "Reply with one short word." });
-    const detach = attachPiObservability(harness, { runId, lane: "main", controlStore: services.control, scheduling });
+    const detach = attachPiObservability(harness, {
+      runId,
+      lane: "main",
+      controlStore: services.control,
+      scheduling,
+      getContextSnapshot: async () => ({
+        omittedItems: [{
+          itemId: "pruned:tool_exchange:123",
+          role: "unknown",
+          source: "context" as const,
+          sourceIds: ["call-123"],
+          contentHash: "a".repeat(64),
+          visibleChars: 0,
+          estimatedTokens: 0,
+          included: false,
+          artifactRefs: [],
+          evidenceRefs: [],
+        }],
+      }),
+    });
     try {
       const response = await harness.prompt("Say ok.");
       assert.equal(response.stopReason, "stop");
@@ -173,6 +192,14 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
     assert.equal(telemetry.provider.byModel[0]?.provider, "mock-http");
     assert.equal(telemetry.provider.byModel[0]?.model, "mock-model");
     assert.equal(telemetry.provider.tokens.total, 4);
+    const frameEvents = (await services.control.events(runId)).filter((event) => event.type === "model_context_frame_recorded");
+    assert.equal(frameEvents.length, 1);
+    const frame = (frameEvents[0]?.payload as { frame?: { messageCount?: number; frameHash?: string; omittedItems?: Array<{ itemId?: string; included?: boolean }> } }).frame;
+    assert.ok((frame?.messageCount ?? 0) > 0);
+    assert.equal(frame?.frameHash?.length, 64);
+    assert.equal(frame?.omittedItems?.[0]?.itemId, "pruned:tool_exchange:123");
+    assert.equal(frame?.omittedItems?.[0]?.included, false);
+    assert.doesNotMatch(JSON.stringify(frameEvents[0]?.payload), /Say ok\.|Reply with one short word/);
   } finally {
     await closeTransport?.();
     delete process.env[apiKeyEnv];
