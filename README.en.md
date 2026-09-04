@@ -39,7 +39,8 @@ npm ci
 npm run build
 npm run cli -- run demo DEMO-001
 npm run cli -- fixtures
-npm run cli -- solve web-source-1 WEB-001 auto 2
+npm run cli -- task create WEB-001 --template web-source-1
+npm run cli -- task run WEB-001 --mode auto --max-turns 2
 npm run cli -- show DEMO-001
 npm run cli -- timeline DEMO-001
 npm run cli -- cost DEMO-001
@@ -139,7 +140,9 @@ proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
 proofblade skill <run-id> <skill-name> [additional instructions]
-proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
+proofblade task templates
+proofblade task create <task-id> --template <template-id> [--objective TEXT]
+proofblade task run <task-id> [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>
 proofblade timeline <run-id>
 proofblade ledger <run-id>
