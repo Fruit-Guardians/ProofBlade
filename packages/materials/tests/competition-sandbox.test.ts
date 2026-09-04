@@ -97,6 +97,12 @@ test("competitionTask uses platform_submission with a single reproduction", () =
   ]);
 });
 
+test("competitionTask binds a platform-provided result as a read-only task input", () => {
+  const provided = "flag{provided}";
+  const task = competitionTask("RUN-PROVIDED", summary(), { connectionInfo: "nc host 1337", teamFlag: provided }, "/root", CONFIG, [], provided);
+  assert.deepEqual(task.inputs.at(-1), { path: "platform-provided-result.txt", sha256: sha256(`${provided}\n`), read_only: true });
+});
+
 test("competitionTask binds exact endpoint tuples without allowing host-port cross products", () => {
   const task = competitionTask(
     "RUN-ENDPOINTS",
@@ -116,7 +122,7 @@ test("competitionTask binds exact endpoint tuples without allowing host-port cro
   assert.equal(task.scope.allowed_workspace, join("/root", "fixtures/runtime", "RUN-ENDPOINTS"));
 });
 
-test("CompetitionSandbox unpacks attachments and writes connection info", async () => {
+test("CompetitionSandbox unpacks attachments and writes connection info and provided result", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-comp-"));
   try {
     const api = new FakeCompetitionApi("flag{ok}");
@@ -125,11 +131,12 @@ test("CompetitionSandbox unpacks attachments and writes connection info", async 
       challengeId: "CH-1",
       workspaceRoot: root,
       attachments: [{ name: "notes.txt", base64: Buffer.from("hello").toString("base64") }],
-      environment: { instanceId: "inst-1", connectionInfo: "nc host 1337" },
+      environment: { instanceId: "inst-1", connectionInfo: "nc host 1337", teamFlag: "flag{provided}" },
     });
     const ref = await sandbox.build({ task_id: "RUN-1" } as never);
     assert.equal(await readFile(join(ref.path, "notes.txt"), "utf8"), "hello");
     assert.equal((await readFile(join(ref.path, "connection-info.txt"), "utf8")).trim(), "nc host 1337");
+    assert.equal((await readFile(join(ref.path, "platform-provided-result.txt"), "utf8")).trim(), "flag{provided}");
     await sandbox.close();
     assert.equal(api.stopped, 1);
   } finally {

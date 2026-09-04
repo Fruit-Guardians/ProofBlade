@@ -34,7 +34,7 @@
 - `CompetitionEnvironmentJanitor` 可把平台环境同步到共享 `ExternalResourceRegistry`；`CompetitionEnvironmentResourceAdapter` 只把 janitor 已确认的同 owner/instance/key 记录标为 `MATCH`，恢复时可 adopt，跨 Run 或 instance/key 不匹配时保留 `UNKNOWN`。平台提供 `inspectEnvironment` 时必须再通过集中式 `CompetitionEnvironmentIdentityCapabilities` 检查：只有声明为跨重启稳定且精确匹配的 `instance-id`/`idempotency-key` 才能 adopt 或 release，缺字段是 `UNKNOWN`；没有远程查询默认也保持 `UNKNOWN`，只有显式 `allowLedgerOnlyRecovery` 才允许兼容旧的本地账本模式。通用 HTTP 适配器支持 `Idempotency-Key` header，并允许查询 endpoint 使用 `{challengeId}`、`{instanceId}` 或 `{idempotencyKey}` 路径占位符；DASCTF 明确是 `challenge-only` 且不回显稳定 key，因此只能观察，不能跨重启自动 adopt。
 - Coding lane 可接收 `ApprovalPolicy`；当外部提交或平台提供的动态结果需要批准时，只记录 pending approval 并停止在提交前，不触碰平台 API。
 - `solver.ts` 把上面几件组装成一次完整运行；平台提供的动态结果可以走无模型的受控提交路径，但仍创建 Run、候选 Artifact、`fixture_score` Effect 和 verifier 终态。生产 GUI 的 live backend 为每个 API/solver pair 共享一份 janitor，避免 Fleet 并发超过平台环境上限。
-- `solver.ts` 在平台环境返回后按题目 `target_kind` 预检必需的 session broker，并把同一份只读 `SessionRuntimePreflight` 传入 coding lane；lane 不重复请求 health。无关 kind 不扩大故障域，动态 flag 仍完全跳过 session runtime。
+- `solver.ts` 在平台环境返回后按题目 `target_kind` 预检必需的 session broker，并把同一份只读 `SessionRuntimePreflight` 传入 coding lane；lane 不重复请求 health。无关 kind 不扩大故障域；平台提供的结果作为只读任务输入处理，不绕过 session runtime。
 - 通用 `HttpCompetitionApi` 与 DASCTF adapter 的 JSON envelope 通过共享有界流读取器分块消费；超过 `maxResponseBytes`（默认 8 MiB）会取消底层 reader，避免 `response.text()` 在异常大响应上先分配完整正文。
 
 Provider 已在单次 Prompt 内执行配置的重试策略；若最终仍返回 `stopReason=error`，竞赛循环必须立即以 `PROVIDER_ERROR` 结束该题并保留 `errorMessage`。Fleet 收到该状态后触发本次运行的 Provider 断路器，不再领取新的 pending 题；修复余额、凭据或上游故障后再次 Start 可继续 pending 队列，已经失败的诊断题不会被静默重试。
