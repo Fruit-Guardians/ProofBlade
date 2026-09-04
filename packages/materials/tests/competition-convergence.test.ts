@@ -22,8 +22,10 @@ test("deadline budget is bounded and visible in the competition turn prompt", ()
   assert.equal(remainingRunDeadlineMs("not-a-date", 5_000, Date.parse(startedAt) + 1_500), 5_000);
   const prompt = turnPrompt(task, 1, "/workspace", { submissionsSoFar: 0, remainingDeadlineMs: 1_501 });
   assert.match(prompt, /Remaining deadline: 2 seconds/);
-  assert.match(prompt, /Task inputs \(read-only, relative to this challenge workspace\)/);
+  assert.match(prompt, /Task inputs \(read-only, relative to this task workspace\)/);
   assert.match(prompt, /Do not search the ProofBlade install root/);
+  assert.match(prompt, /external_submit/);
+  assert.doesNotMatch(prompt, /submit_flag/);
   assert.match(turnPrompt(task, 1, "/workspace", {
     submissionsSoFar: 0,
     domainPhase: "RECON",
@@ -39,6 +41,14 @@ test("deadline budget is bounded and visible in the competition turn prompt", ()
       maxCalls: 2,
     },
   }), /Action bundle web-recon: Capture one baseline/);
+});
+
+test("later competition turns keep the submission contract generic", () => {
+  const task = fixtureTask("PROMPT-GENERIC", "web-source-1", "/workspace", config);
+  const prompt = turnPrompt(task, 2, "/workspace", { submissionsSoFar: 0, domainPhase: "EXPERIMENT" });
+  assert.match(prompt, /external_submit/);
+  assert.match(prompt, /verified/);
+  assert.doesNotMatch(prompt, /submit_flag|submit the flag|challenge files/i);
 });
 
 test("domainPhase and ExperimentRecord replay durably and block a third failed repeat", async () => {

@@ -9,7 +9,7 @@ import type { RunSnapshot } from "../src/domain/types.js";
 import { readdir, readFile } from "node:fs/promises";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
-import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
+import { createPlatformExternalSubmitter } from "../src/runtime/coding-lane.js";
 import { hasAcceptedPlatformSubmission, type CompetitionLaneFactory } from "../src/competition/loop.js";
 import type { ContainerRuntimePort } from "../src/container/contracts.js";
 import {
@@ -53,8 +53,8 @@ const CONFIG: ProofBladeConfig = {
 
 /**
  * A deterministic coding lane: read the attachment from the real workspace, lift
- * a flag-shaped value, and submit it through the SAME submitter the production
- * lane installs as `submit_flag` — so this exercises the real
+ * a result value, and submit it through the SAME submitter the production
+ * lane installs as `external_submit` — so this exercises the real
  * submitCandidate -> IndependentVerifier -> journal fixture_score -> API path
  * rather than a mock of it.
  */
@@ -71,7 +71,7 @@ const flagLane: CompetitionLaneFactory = async (options) => {
     options.installRoot ?? options.projectRoot,
     { includeMcp: false },
   );
-  const submitFlag = createPlatformFlagSubmitter({
+  const submitResult = createPlatformExternalSubmitter({
     runId: options.runId,
     runtime,
     fixture,
@@ -85,7 +85,7 @@ const flagLane: CompetitionLaneFactory = async (options) => {
       const text = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
       const candidate = text.match(/[A-Za-z][A-Za-z0-9_-]{0,31}\{[^{}\r\n]{1,512}\}/)?.[0];
       if (!candidate) throw new Error("no candidate in workspace");
-      const verdict = await submitFlag(candidate);
+      const verdict = await submitResult({ target: "competition", payload: candidate });
       return { text: `submitted accepted=${verdict.accepted}`, stopReason: "stop", usage: zeroUsage() };
     },
     async compact() {},
@@ -249,13 +249,20 @@ class FakeApi implements CompetitionApi {
   }
 }
 
-test("real solver drives a challenge to SOLVED on the coding lane via submit_flag", async () => {
+test("real solver drives a security target to SOLVED on the coding lane via external_submit", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-"));
   try {
     const api = new FakeApi([{ id: "CH1", value: 100, flag: "flag{solver_ok}" }]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 1, createLane: flagLane });
+    let legacyOptions: { legacyClaimVerification?: boolean; legacySubmissionAlias?: boolean } | undefined;
+    const genericLane: CompetitionLaneFactory = async (options) => {
+      legacyOptions = { legacyClaimVerification: options.legacyClaimVerification, legacySubmissionAlias: options.legacySubmissionAlias };
+      return await flagLane(options);
+    };
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 1, createLane: genericLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
     assert.equal(result.solved, true, result.status);
+    assert.equal(legacyOptions?.legacyClaimVerification, undefined, "competition lanes do not force the legacy verification alias");
+    assert.equal(legacyOptions?.legacySubmissionAlias, undefined, "competition lanes do not force the legacy submission alias");
     assert.equal(result.status, "SOLVED");
     assert.equal(result.submissions, 1, "exactly one submission may be spent on a first-try solve");
     assert.match(api.startKeys[0]?.key ?? "", /^proofblade-env-/);

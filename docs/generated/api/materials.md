@@ -2883,6 +2883,7 @@
 - Export: `@proofblade/materials`
 - Summary: Build the generic external submission path for a task with a trusted
 - Summary source: `tsdoc`
+- Tests: `packages/materials/tests/competition-solver.test.ts`
 
 ### createPlatformFlagSubmitter
 - Kind: `function`
@@ -2892,7 +2893,7 @@
 - Summary: Inferred summary: create platform flag submitter operation used to perform a durable write.
 - Summary source: `inferred`
 - Tags: `deprecated`
-- Tests: `packages/materials/tests/competition-pwn-e2e.test.ts`, `packages/materials/tests/competition-solver.test.ts`
+- Tests: `packages/materials/tests/competition-pwn-e2e.test.ts`
 
 ### injectReasoningForestContext
 - Kind: `function`
@@ -13132,7 +13133,7 @@
 - Export: `@proofblade/materials`
 - Summary: Propose an opaque result for a configured external destination. The
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/coding-resources.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`
 
 ### ProofBladeToolRuntime.submittableCompletions
 - Kind: `method`

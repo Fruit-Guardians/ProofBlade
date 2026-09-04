@@ -147,12 +147,6 @@ export async function runCompetitionLoop(
       // minutes, which in a fleet idles a worker slot for the whole time; long work
       // belongs in shell_background instead.
       bashTimeoutSecondsMax: options.bashTimeoutSecondsMax ?? 180,
-      // Competition replay still speaks the historical verify_claim protocol;
-      // generic security tasks leave this compatibility alias disabled.
-      legacyClaimVerification: true,
-      // Keep the old flag-shaped submission alias only for the competition
-      // adapter. New platform tasks use external_submit with an explicit target.
-      legacySubmissionAlias: true,
       ...(options.executionEnv ? { executionEnv: options.executionEnv } : {}),
       ...(options.workspaceRootForPrompt ? { workspaceRootForPrompt: options.workspaceRootForPrompt } : {}),
       ...(options.skillsLibraryPathForPrompt ? { skillsLibraryPathForPrompt: options.skillsLibraryPathForPrompt } : {}),
@@ -378,12 +372,11 @@ export function countSubmissions(snapshot: RunSnapshot): number {
 }
 
 /**
- * Number of turns without a single submission after which the loop injects a
- * hard replan directive. In the failed CH-10662 run the model spent dozens of
- * tool calls inside one provider turn rewriting the same broken parser without
- * ever calling submit_flag or reconsidering its hypothesis. A single mid-run
- * kick that the model cannot miss is much cheaper than waiting for every outer
- * turn-level stall breaker.
+ * Number of turns without an external submission after which the loop injects a
+ * hard replan directive. A model can spend dozens of tool calls rewriting the
+ * same broken parser without producing a verifiable result or reconsidering its
+ * hypothesis. A single mid-run kick keeps the security workflow moving without
+ * imposing a domain-specific exploit strategy.
  */
 const REPLAN_NUDGE_AFTER_TURNS = 12;
 const MAX_GUARD_REPLANS = 2;
@@ -396,9 +389,9 @@ const MAX_GUARD_REPLANS = 2;
  *
  * After REPLAN_NUDGE_AFTER_TURNS turns without any submission attempt, the
  * regular continue-nudge is replaced by an explicit stop-and-replan directive.
- * That is the ONE place we override the caching-friendly short nudge, because
- * a model that has run twelve turns of the same failing approach won't
- * self-correct from a generic "continue".
+ * That is the one place we override the caching-friendly short nudge, because
+ * a model that has run twelve turns of the same failing approach will not
+ * reliably self-correct from a generic "continue".
  */
 export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: string, progress: { submissionsSoFar: number; forceReplan?: boolean; previousTermination?: string; domainPhase?: string; remainingToolCalls?: number; remainingDeadlineMs?: number; actionBundle?: ActionBundle } = { submissionsSoFar: 0 }): string {
   const phaseLine = progress.domainPhase
@@ -417,21 +410,21 @@ export function turnPrompt(task: TaskContract, turn: number, workspaceRoot: stri
     if (progress.forceReplan || (progress.submissionsSoFar === 0 && turn > REPLAN_NUDGE_AFTER_TURNS)) {
       return [phaseLine, actionBundleLine, deadlineLine, budgetLine, replanNudge(task.target_kind, turn, progress.previousTermination)].filter((line): line is string => Boolean(line)).join("\n");
     }
-    return [phaseLine, actionBundleLine, deadlineLine, budgetLine, "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step, and call submit_flag once you have derived the flag."].filter((line): line is string => Boolean(line)).join("\n");
+    return [phaseLine, actionBundleLine, deadlineLine, budgetLine, "Continue from where you left off. Do not restart the analysis or re-read what you already have; take the next concrete step. When a result is verified, submit it with external_submit to the configured destination; do not submit an unverified guess."].filter((line): line is string => Boolean(line)).join("\n");
   }
   const lines = [phaseLine, actionBundleLine, deadlineLine, budgetLine, task.objective.trim()].filter((line): line is string => Boolean(line));
   if (task.target.startsWith("REMOTE:")) {
     lines.push(`\nLive target: ${task.target.slice("REMOTE:".length)} (also in connection-info.txt).`);
   }
-  lines.push(`\nChallenge files are in ${workspaceRoot.replace(/\\/g, "/")}. Solve it and submit the flag with submit_flag.`);
-  lines.push(`Task inputs (read-only, relative to this challenge workspace): ${task.inputs.map((input) => input.path).join(", ") || "none listed; inspect only the current workspace"}.`);
-  lines.push("Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.");
+  lines.push(`\nThe scoped security target and task files are in ${workspaceRoot.replace(/\\/g, "/")}. Analyze them and, once the result is independently verified, submit the opaque result with external_submit to the configured destination.`);
+  lines.push(`Task inputs (read-only, relative to this task workspace): ${task.inputs.map((input) => input.path).join(", ") || "none listed; inspect only the current workspace"}.`);
+  lines.push("Do not search the ProofBlade install root, skills library, runs/, or parent directories for target answers; those are framework resources, not task data.");
   return lines.join("\n");
 }
 function replanNudge(kind: TargetKind, turn: number, previousTermination?: string): string {
   const lines = [
-    `[ProofBlade replan checkpoint — turn ${turn}${previousTermination ? ` after ${previousTermination}` : " without a submit_flag call"}]`,
-    "The current strategy has consumed many turns without producing a flag. Stop iterating on the same exploit or parser: it is either wrong or blocked on a hypothesis you have not questioned.",
+    `[ProofBlade replan checkpoint — turn ${turn}${previousTermination ? ` after ${previousTermination}` : " without an external submission attempt"}]`,
+    "The current strategy has consumed many turns without producing a verifiable result. Stop iterating on the same exploit or parser: it is either wrong or blocked on a hypothesis you have not questioned.",
     "In THIS turn:",
     "1. Write ONE short paragraph naming the strongest evidence you have and the assumption your current approach depends on.",
     "2. State the alternative hypothesis you have been avoiding.",
