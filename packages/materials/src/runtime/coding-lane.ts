@@ -54,7 +54,7 @@ import { adoptVerifierBrowserSession, openVerifierBrowserSession, type BrowserVe
 import type { BrowserRuntimeHandoff } from "../web/browser-resource-adapter.js";
 import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, withFirstClassMcpToolExposure, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
+import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, runToolPreparationFromPreflight, securityProfileForTask, withFirstClassMcpToolExposure, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
@@ -222,10 +222,11 @@ export class PiCodingLane implements AgentLanePort {
     }
     // A task profile only prepares optional tools. It never selects a loop or
     // injects a domain workflow prompt; ordinary tasks can use the same tools.
-    const profileRequested = Boolean(options.securityProfile)
-      || snapshot.task.verification.kind === "hidden_scorer"
-      || snapshot.task.verification.kind === "platform_submission";
-    const taskProfile = options.securityProfile ?? (profileRequested ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
+    // Security tooling is selected by the durable task label (or an explicit
+    // caller binding), never by prompt wording. This makes ordinary security
+    // analysis tasks receive the same preflight/MCP visibility as fixtures and
+    // platform runs without restoring a CTF-specific execution path.
+    const taskProfile = securityProfileForTask(snapshot.task, options.securityProfile);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
     let preflight: SecurityToolPreflight | undefined;
     let preparation: RunToolPreparation | undefined;
