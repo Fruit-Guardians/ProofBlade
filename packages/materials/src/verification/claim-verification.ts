@@ -36,6 +36,9 @@ export interface ClaimVerificationProjection {
   reason?: string;
 }
 
+/** Domain-neutral name for the same durable verification projection. */
+export type ResultVerificationProjection = ClaimVerificationProjection;
+
 /** Keep candidate-shaped output visibly non-authoritative until projection verifies it. */
 export function rewriteUnverifiedClaimText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
   const rewritten = assistantText.replace(/\bflag\s*[:：]/gi, "候选（未验证）：");
@@ -225,6 +228,19 @@ export class CodingClaimVerifier {
   }
 
   /** Execute and attest a claim through a journaled verifier Effect. */
+  public async recordResult(input: {
+    result: string;
+    command: string;
+    cwd: string;
+    toolCallId: string;
+    supportingEvidenceIds?: string[];
+    signal?: AbortSignal;
+    execute?: (signal: AbortSignal) => Promise<RawEffectResult>;
+  }): Promise<ClaimReproduction> {
+    return await this.record({ ...input, candidate: input.result, completionPurpose: "harness_verification" });
+  }
+
+  /** Execute and attest a legacy claim through a journaled verifier Effect. */
   public async record(input: {
     candidate: string;
     command: string;
@@ -691,6 +707,23 @@ export class CodingClaimVerifier {
       }
     }
     return undefined;
+  }
+}
+
+/**
+ * Domain-neutral verifier facade.  It inherits the durable implementation so
+ * existing integrations can migrate without duplicating verifier state.
+ */
+export class TaskResultVerifier extends CodingClaimVerifier {
+  public constructor(
+    runId: string,
+    controlStore: ControlStore,
+    artifactStore: ArtifactStore,
+    journal: EffectJournal,
+    verifierJournal: VerifierEffectJournal,
+    verifierControl: VerifierControlPort,
+  ) {
+    super(runId, controlStore, artifactStore, journal, verifierJournal, verifierControl);
   }
 }
 

@@ -403,12 +403,11 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
     if (command.includes(result)) throw new Error("Verification command embeds the result literal; derive it from workspace inputs instead");
     const executor = createBashTool<CodingResourceContext>();
     let output = "";
-    const reproduction = await context.claimVerifier.record({
-      candidate: result,
+    const reproduction = await context.claimVerifier.recordResult({
+      result,
       command,
       cwd: context.env.cwd,
       toolCallId,
-      completionPurpose: "harness_verification",
       supportingEvidenceIds: input.evidenceIds,
       signal,
       execute: async (innerSignal) => {
