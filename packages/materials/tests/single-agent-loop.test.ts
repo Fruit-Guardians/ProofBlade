@@ -90,7 +90,7 @@ test("local Run prompt carries the remaining deadline into the single coding lan
     assert.equal(result.status, "EXHAUSTED");
     assert.deepEqual(phaseAtLaneCreation, { domainPhase: "RECON", phase: "reconnaissance" });
     assert.match(promptText, /Remaining deadline: \d+ seconds/);
-    assert.match(promptText, /Task inputs \(read-only, relative to the current challenge workspace\):/);
+    assert.match(promptText, /Task inputs \(read-only, relative to the current workspace\):/);
     assert.match(promptText, /Do not search the ProofBlade install root/);
   } finally {
     await services.sandbox.close();
