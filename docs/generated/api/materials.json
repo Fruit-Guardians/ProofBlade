@@ -61,6 +61,7 @@
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
     "src/evaluation/ablation-ledger.ts": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
     "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
+    "src/evaluation/ablation-report.ts": "0cebf258152d05a961d3c9a8392a866d165778fb5ac950964a396bbff777d2fc",
     "src/evaluation/ablation.ts": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
@@ -74,7 +75,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "37ca9f7228757581cc0a49681ba0ab2ccb17436fb601954951a4887955545c7b",
+    "src/index.ts": "555a940ddb75c18664ca8b4db291bfbdf9642e856ee7f5497712701633b7dda6",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
@@ -5993,6 +5994,48 @@
       "structureHash": "7b4133bf36e9aec7c0f47f4cec88282216caffbe10bbbd44b532d87b724c076e"
     },
     {
+      "id": "@proofblade/materials::function::buildAblationReport",
+      "name": "buildAblationReport",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 81,
+      "signature": "(experiment: AblationExperimentSnapshot, records: readonly AblationResultRecord[]): AblationReport",
+      "summary": "Inferred summary: build ablation report operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ],
+      "structureHash": "e70121ec76289ebdc4545a577fc4087bf767dd5c3e5dab0c4540a0463f4927b5"
+    },
+    {
+      "id": "@proofblade/materials::function::renderAblationReportZh",
+      "name": "renderAblationReportZh",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 147,
+      "signature": "(report: AblationReport): string",
+      "summary": "Inferred summary: render ablation report zh operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ],
+      "structureHash": "19386ad36cf1c33e00accf750a40ad441002d20604d3d96b7ce6ed367cfeda6c"
+    },
+    {
       "id": "@proofblade/materials::function::buildAblationPairings",
       "name": "buildAblationPairings",
       "kind": "function",
@@ -6110,6 +6153,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts"
       ],
       "structureHash": "c39d2a6d95ef885ef6afa6e03f30fc15e1807632d43ed92bf3673fcd5685cc88"
@@ -13995,6 +14039,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -14060,6 +14105,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -15172,6 +15218,80 @@
       "line": 6,
       "signature": "AblationPolicyDecisionInput",
       "summary": "Inferred summary: ablation policy decision input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationClosureSummary",
+      "name": "AblationClosureSummary",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 72,
+      "signature": "AblationClosureSummary",
+      "summary": "Inferred summary: ablation closure summary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationReport",
+      "name": "AblationReport",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 53,
+      "signature": "AblationReport",
+      "summary": "Inferred summary: ablation report type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationResultRecord",
+      "name": "AblationResultRecord",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 4,
+      "signature": "AblationResultRecord",
+      "summary": "Inferred summary: ablation result record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantReport",
+      "name": "AblationVariantReport",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "AblationVariantReport",
+      "summary": "Inferred summary: ablation variant report type contract used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "imports": [
@@ -23164,6 +23284,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -23419,6 +23540,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -23801,6 +23923,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24056,6 +24179,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24311,6 +24435,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -24566,6 +24691,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -25696,6 +25822,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26621,6 +26748,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27015,6 +27143,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27220,6 +27349,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -27460,6 +27590,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -28843,6 +28974,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -29398,6 +29530,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -29786,6 +29919,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -29838,6 +29972,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -31557,6 +31692,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -32107,6 +32243,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -32156,6 +32293,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -32843,6 +32981,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -32967,6 +33106,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33099,6 +33239,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33243,6 +33384,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33627,6 +33769,7 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33725,6 +33868,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -35565,6 +35709,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -35698,6 +35843,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -35853,6 +35999,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -36856,6 +37003,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -37056,6 +37204,7 @@
         "./run-work-scheduler.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37380,6 +37529,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -37430,6 +37580,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -37510,6 +37661,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -37637,6 +37789,7 @@
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -38732,6 +38885,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -39032,6 +39186,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -39371,6 +39526,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -41943,6 +42099,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -43647,6 +43804,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
@@ -45339,6 +45497,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -45500,6 +45659,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -46994,6 +47154,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47593,6 +47754,7 @@
       ],
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -47964,6 +48126,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation-report.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -52661,6 +52824,24 @@
       "line": 4,
       "signature": "AblationDecision",
       "summary": "Inferred summary: ablation decision type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js",
+        "./ablation.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationEvaluationStage",
+      "name": "AblationEvaluationStage",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation-report.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 30,
+      "signature": "AblationEvaluationStage",
+      "summary": "Inferred summary: ablation evaluation stage type contract used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "imports": [
