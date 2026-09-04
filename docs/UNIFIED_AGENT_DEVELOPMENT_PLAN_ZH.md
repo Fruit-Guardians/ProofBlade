@@ -591,7 +591,7 @@ Provider attempt 因 watchdog 结束不等于 Run 结束。重试上限耗尽后
 
 #### 实现内容
 
-1. 在 `RunCoordinator`/`SingleAgentCtfLoop` 增加统一 event ingress 和 bounded drain。
+1. 在 `RunCoordinator`/`SingleAgentLoop` 增加统一 event ingress 和 bounded drain。
 2. 所有用户消息、后台 Job 变化、Provider terminal、Tool end、外部回调和维护信号先 append，再在安全点消费。
 3. 在现有 `run_background`、`read_job_output`、`stop_job` 基础上增加 `monitor_job` 语义：
 

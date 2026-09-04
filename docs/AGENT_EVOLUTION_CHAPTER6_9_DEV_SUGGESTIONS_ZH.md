@@ -174,7 +174,7 @@ verifier.result              结果/过程/质量验证
 
 ### 4.2 一个事件循环，而不是多套 Agent
 
-建议扩展现有 `RunCoordinator`、`SingleAgentCtfLoop` 和 Coding Lane，而不是新增普通 Chat Agent、CTF Agent、后台 Curator Agent 三个执行系统。维护任务可以作为同一个 Run 的低优先级 WorkItem 和事件批次执行。
+建议扩展现有 `RunCoordinator`、`SingleAgentLoop` 和 Coding Lane，而不是新增普通 Chat Agent、领域 Agent、后台 Curator Agent 三个执行系统。维护任务可以作为同一个 Run 的低优先级 WorkItem 和事件批次执行。
 
 安全点事件循环的逻辑如下：
 
@@ -529,7 +529,7 @@ safety delta            越权、注入、虚假完成和重复副作用变化
 
 **建议改动**：
 
-- 扩展现有 `RunCoordinator`/`SingleAgentCtfLoop` 的输入入口，所有输入先 append event；
+- 扩展现有 `RunCoordinator`/`SingleAgentLoop` 的输入入口，所有输入先 append event；
 - 在 Provider 完成、Tool 返回、Job 进度和用户消息边界统一 drain 事件；
 - 增加 urgent/normal/background 三种优先级和 generation fencing；
 - 让可恢复压力进入 `maintenance` 或 `replan` WorkItem，不再调用终止型 guard；

@@ -521,12 +521,6 @@ export class SingleAgentLoop {
   }
 }
 
-/**
- * Historical export retained for replay and downstream compatibility. New
- * callers must use the domain-neutral SingleAgentLoop implementation above.
- */
-export const SingleAgentCtfLoop = SingleAgentLoop;
-
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
   return stopReason === "length" || (stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? ""));
 }

@@ -194,7 +194,7 @@ export class PiCodingLane implements AgentLanePort {
       : await repo.create({
         id: sessionId,
         cwd: options.projectRoot,
-        metadata: { runId: options.runId, lane: "main", purpose: sessionId === `${options.runId}-chat` ? "chat" : "ctf" },
+        metadata: { runId: options.runId, lane: "main", purpose: sessionId === `${options.runId}-chat` ? "chat" : "task" },
       });
     const profile = await resolveModelProfile(options.config.modelProfiles.executor);
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane: "main", controlStore: options.controlStore });
@@ -476,12 +476,10 @@ export class PiCodingLane implements AgentLanePort {
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
-    // New generic security tasks use verify_result. Historical ctf_solve
-    // snapshots and explicitly opted-in callers retain verify_claim so their
-    // recorded sessions remain replayable.
-    const historicalClaimTask = (snapshot.task as { mode?: string }).mode === "ctf_solve";
-    const legacyClaimVerification = options.legacyClaimVerification === true || historicalClaimTask;
-    const legacySubmissionAlias = options.legacySubmissionAlias === true || historicalClaimTask;
+    // Legacy aliases are opt-in at the caller boundary. Do not infer them from
+    // a historical task mode: execution is driven by the generic task contract.
+    const legacyClaimVerification = options.legacyClaimVerification === true;
+    const legacySubmissionAlias = options.legacySubmissionAlias === true;
     const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession), legacyClaimVerification, legacySubmissionAlias }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({

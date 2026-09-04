@@ -64,7 +64,7 @@ Provider 请求事件还记录 `cacheRetention`（`short`、`long` 或 `none`）
 
 ## 真实模型对话
 
-“新建对话”创建 Coding Agent 会话，不选择或初始化 Fixture；普通 Chat、CTF Chat 和 Fixture 都调用同一个 Coding Lane。对话 composer 调用：
+“新建对话”创建 Coding Agent 会话，不选择或初始化 Fixture；交互任务和 Fixture 都调用同一个 Coding Lane。对话 composer 调用：
 
 ```text
 Browser -> POST /api/runs/:id/chat
@@ -76,7 +76,7 @@ Browser -> POST /api/runs/:id/chat
         -> Pi Session + Control Store
 ```
 
-侧栏“Fixture 测试”是独立入口，但交互 Chat、CTF Chat 和 Fixture 自动执行共用同一个 `PiCodingLane`、`CodingClaimVerifier`、上下文维护和恢复路径。自动执行只由 `SingleAgentCtfLoop` 在外层编排多轮；它不拥有第二套 Tool、Completion 或验证判定逻辑。Fixture 额外构建靶场、显示阶段条并提供 Evidence、Artifact、Checkpoint 和恢复核对。
+侧栏“Fixture 测试”是独立入口，但交互任务和 Fixture 自动执行共用同一个 `PiCodingLane`、`CodingClaimVerifier`、上下文维护和恢复路径。自动执行只由 `SingleAgentLoop` 在外层编排多轮；它不拥有第二套 Tool、Completion 或验证判定逻辑。Fixture 额外构建靶场、显示阶段条并提供 Evidence、Artifact、Checkpoint 和恢复核对。
 
 响应使用 `text/event-stream`。服务端把 AgentHarness 事件规范化为：
 
@@ -208,7 +208,7 @@ return {
 | `POST` | `/api/conversations` | 校验工作目录和可选验证命令，并创建不绑定 Fixture 的 Coding Agent 会话 |
 | `POST` | `/api/fixture-conversations` | 创建绑定 Fixture 的交互调试会话 |
 | `POST` | `/api/runs/:id/chat` | 通过 SSE 执行一个真实模型 turn |
-| `POST` | `/api/solve` | 使用生产 `SingleAgentCtfLoop` 创建并执行 Run |
+| `POST` | `/api/solve` | 使用生产 `SingleAgentLoop` 创建并执行 Run |
 | `POST` | `/api/runs/:id/reconcile` | 使用 `RunRecoveryService` 核对恢复 |
 | `POST` | `/api/runs/:id/checkpoint` | 使用 `CheckpointService` 创建机械检查点 |
 

@@ -9,7 +9,7 @@ import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, SingleAgentLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
@@ -56,10 +56,6 @@ const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async close() {},
 });
 
-test("exports a generic single-agent loop name while preserving the legacy alias", () => {
-  assert.equal(SingleAgentLoop, SingleAgentCtfLoop);
-});
-
 test("local Run prompt carries the remaining deadline into the single coding lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-deadline-prompt-"));
   let promptText = "";
@@ -81,7 +77,7 @@ test("local Run prompt carries the remaining deadline into the single coding lan
   };
   try {
     const runId = "DEADLINE-PROMPT-web-source-1";
-    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+    const result = await new SingleAgentLoop(root, config, services, lane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",
@@ -98,7 +94,7 @@ test("local Run prompt carries the remaining deadline into the single coding lan
   }
 });
 
-test("single-agent CTF loop forwards configured session runtime brokers to its lane", async () => {
+test("single-agent loop forwards configured session runtime brokers to its lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-loop-session-runtime-"));
   const services = createServices(root, config, { sessionRuntimeBrokers: [sessionRuntimeBroker()], sessionRuntimeRequired: true, browserRuntimeRequired: true });
   let received: unknown;
@@ -114,7 +110,7 @@ test("single-agent CTF loop forwards configured session runtime brokers to its l
   };
   try {
     const runId = "SESSION-RUNTIME-FORWARD-web-source-1";
-    await new SingleAgentCtfLoop(root, config, services, lane).run({
+    await new SingleAgentLoop(root, config, services, lane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",
@@ -169,7 +165,7 @@ test("auto mode solves all three web and three reverse fixtures through the veri
     const services = createServices(root, config);
     for (const profile of listFixtureProfiles()) {
       const runId = `AUTO-${profile.id}`;
-      const loop = new SingleAgentCtfLoop(root, config, services, deterministicLane);
+      const loop = new SingleAgentLoop(root, config, services, deterministicLane);
       const result = await loop.run({ runId, task: fixtureTask(runId, profile.id, root, config), mode: "auto", maxTurns: 1 });
       assert.equal(result.status, "SUCCEEDED", profile.id);
       assert.equal(result.phase, "report", profile.id);
@@ -198,7 +194,7 @@ test("assist mode pauses before verification and resumes from the durable propos
   try {
     const services = createServices(root, config);
     const runId = "ASSIST-web-source-1";
-    const loop = new SingleAgentCtfLoop(root, config, services, deterministicLane);
+    const loop = new SingleAgentLoop(root, config, services, deterministicLane);
     const task = fixtureTask(runId, "web-source-1", root, config);
     const first = await loop.run({ runId, task, mode: "assist", maxTurns: 1 });
     assert.equal(first.status, "PAUSED");
@@ -234,7 +230,7 @@ test("auto mode preserves a pause raised during a turn instead of exhausting the
       async isIdle() { return true; },
       async close() {},
     });
-    const result = await new SingleAgentCtfLoop(root, config, services, pausingLane).run({ runId, task, mode: "auto", maxTurns: 1 });
+    const result = await new SingleAgentLoop(root, config, services, pausingLane).run({ runId, task, mode: "auto", maxTurns: 1 });
     assert.equal(result.status, "PAUSED");
     assert.equal(result.turns, 1);
   } finally {
@@ -258,7 +254,7 @@ test("[contract:provider-budget-exhaustion] a Provider budget termination ends t
       async close() {},
     });
     const runId = "PROVIDER-BUDGET-web-source-1";
-    const result = await new SingleAgentCtfLoop(root, config, services, budgetLane).run({
+    const result = await new SingleAgentLoop(root, config, services, budgetLane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",
@@ -295,7 +291,7 @@ test("[contract:abort-after-planner-before-prompt] [contract:sandbox-close-after
     const runId = "ABORT-PLANNER-web-source-1";
     const task = fixtureTask(runId, "web-source-1", root, config);
     await assert.rejects(
-      new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
+      new SingleAgentLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
       /aborted/i,
     );
     assert.equal(prompts, 0);
@@ -320,7 +316,7 @@ test("[contract:deadline-cleanup] a stuck lane close cannot extend run completio
   });
   try {
     const started = Date.now();
-    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+    const result = await new SingleAgentLoop(root, config, services, lane).run({
       runId: "STUCK-CLOSE-web-source-1",
       task: fixtureTask("STUCK-CLOSE-web-source-1", "web-source-1", root, config),
       mode: "auto",
@@ -366,7 +362,7 @@ test("[contract:abort-before-verification] aborting after Prompt leaves the cand
     const runId = "ABORT-VERIFY-web-source-1";
     const task = fixtureTask(runId, "web-source-1", root, config);
     await assert.rejects(
-      new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
+      new SingleAgentLoop(root, config, services, lane).run({ runId, task, mode: "auto", maxTurns: 1, signal: controller.signal }),
       /aborted/i,
     );
     const snapshot = await services.control.snapshot(runId);
@@ -414,7 +410,7 @@ test("attachment-backed reproduction completion finishes through RunCoordinator 
       async isIdle() { return true; },
       async close() {},
     });
-    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({ runId: task.task_id, task, mode: "auto", maxTurns: 1 });
+    const result = await new SingleAgentLoop(root, config, services, lane).run({ runId: task.task_id, task, mode: "auto", maxTurns: 1 });
     const snapshot = await services.control.snapshot(task.task_id);
     assert.equal(result.status, "SUCCEEDED");
     assert.equal(snapshot.domainPhase, "SUBMIT");
@@ -442,7 +438,7 @@ test("an unexpected coding lane failure terminalizes the Run for replay", async 
   try {
     const runId = "LANE-FAILURE-web-source-1";
     await assert.rejects(
-      new SingleAgentCtfLoop(root, config, services, failingLane).run({
+      new SingleAgentLoop(root, config, services, failingLane).run({
         runId,
         task: fixtureTask(runId, "web-source-1", root, config),
         mode: "auto",
@@ -488,7 +484,7 @@ test("[contract:pause-during-verifier] pause during verifier remains PAUSED inst
   });
   try {
     const runId = "PAUSE-VERIFIER-web-source-1";
-    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({ runId, task: fixtureTask(runId, "web-source-1", root, config), mode: "auto", maxTurns: 1 });
+    const result = await new SingleAgentLoop(root, config, services, lane).run({ runId, task: fixtureTask(runId, "web-source-1", root, config), mode: "auto", maxTurns: 1 });
     assert.equal(result.status, "PAUSED");
     assert.equal((await services.control.snapshot(runId)).status, "PAUSED");
   } finally {
@@ -512,7 +508,7 @@ test("[contract:pause-before-finish] an atomically persisted pause wins the race
   };
   try {
     const runId = "PAUSE-FINISH-web-source-1";
-    const result = await new SingleAgentCtfLoop(root, config, services, deterministicLane).run({
+    const result = await new SingleAgentLoop(root, config, services, deterministicLane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",
@@ -550,7 +546,7 @@ test("[contract:pause-before-exhaust] an atomically persisted pause wins the rac
   });
   try {
     const runId = "PAUSE-EXHAUST-web-source-1";
-    const result = await new SingleAgentCtfLoop(root, config, services, idleLane).run({
+    const result = await new SingleAgentLoop(root, config, services, idleLane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",
@@ -617,7 +613,7 @@ test("terminal reopen projects the exact finalResult completion instead of a new
     await services.verifier.finish(runId, { completionId: "C-FINAL", reason: "terminal reopen projection regression" });
 
     const neverCreateLane: AgentLaneFactory = async () => { throw new Error("terminal reopen must not create a lane"); };
-    const reopened = await new SingleAgentCtfLoop(root, config, services, neverCreateLane).run({ runId, task, mode: "auto" });
+    const reopened = await new SingleAgentLoop(root, config, services, neverCreateLane).run({ runId, task, mode: "auto" });
     const snapshot = await services.control.snapshot(runId);
     assert.equal(reopened.status, "SUCCEEDED");
     assert.equal(reopened.completionId, "C-FINAL");
