@@ -413,23 +413,42 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
     const result = input.result.trim();
     const command = input.command.trim();
     if (!result || !command) throw new Error("verify_result requires a result and verification command");
-    if (command.includes(result)) throw new Error("Verification command embeds the result literal; derive it from workspace inputs instead");
+    if (command.includes(result)) {
+      return toolResult({
+        verified: false,
+        result,
+        resultHash: sha256(result),
+        commandHash: sha256(command),
+        verifierFeedback: verifierFailureFeedback(new Error("Verification command embeds the result literal; derive it from workspace inputs instead")),
+      }, true);
+    }
     const executor = createBashTool<CodingResourceContext>();
     let output = "";
-    const reproduction = await context.claimVerifier.recordResult({
-      result,
-      command,
-      cwd: context.env.cwd,
-      toolCallId,
-      supportingEvidenceIds: input.evidenceIds,
-      signal,
-      execute: async (innerSignal) => {
-        const started = Date.now();
-        const executed = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
-        output = executed.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-        return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
-      },
-    });
+    let reproduction: Awaited<ReturnType<CodingResourceContext["claimVerifier"]["recordResult"]>>;
+    try {
+      reproduction = await context.claimVerifier.recordResult({
+        result,
+        command,
+        cwd: context.env.cwd,
+        toolCallId,
+        supportingEvidenceIds: input.evidenceIds,
+        signal,
+        execute: async (innerSignal) => {
+          const started = Date.now();
+          const executed = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
+          output = executed.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+          return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
+        },
+      });
+    } catch (error) {
+      return toolResult({
+        verified: false,
+        result,
+        resultHash: sha256(result),
+        commandHash: sha256(command),
+        verifierFeedback: verifierFailureFeedback(error),
+      }, true);
+    }
     const response = toolResult({
       verified: reproduction.verified,
       result: reproduction.candidate,
@@ -1814,4 +1833,23 @@ function toolResult(details: unknown, isError = false, maxChars?: number): Retur
     details,
     isError,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+function verifierFailureFeedback(error: unknown): {
+  stage: "input" | "policy" | "execution" | "recovery";
+  reason: string;
+  retryable: boolean;
+  nextAction: string;
+} {
+  const reason = error instanceof Error ? error.message : String(error);
+  if (/embeds the (?:candidate|result) literal/i.test(reason)) {
+    return { stage: "input", reason, retryable: true, nextAction: "Derive the result from workspace inputs; do not place the literal result in the verification command." };
+  }
+  if (/exact immutable task-bound verification command/i.test(reason)) {
+    return { stage: "policy", reason, retryable: true, nextAction: "Use the command declared by the task verifier, or ask the user to update the task contract." };
+  }
+  if (/requires durable recovery|durable .* (?:missing|incomplete|no valid)/i.test(reason)) {
+    return { stage: "recovery", reason, retryable: false, nextAction: "Reconcile or resume the run before issuing another verification request; do not blindly rerun the command." };
+  }
+  return { stage: "execution", reason, retryable: true, nextAction: "Inspect the verifier output and supporting Evidence, then change the command or result before retrying." };
 }
