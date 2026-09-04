@@ -15,7 +15,7 @@ import {
   bashEscapeHatchViolation,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
-import { codingCtfCategoryGuidance, createDeclaredExternalSubmitter, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
+import { codingHostGuidance, createDeclaredExternalSubmitter } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -28,7 +28,6 @@ import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
 /**
  * Pinned so an accidental schema/description/order change is caught. Update it
@@ -154,38 +153,6 @@ test("coding host guidance uses Windows-compatible Python and workspace paths", 
   assert.match(guidance, /workspace-relative/);
   assert.match(guidance, /\/tmp/);
   assert.doesNotMatch(codingHostGuidance("linux"), /never python3/);
-});
-
-test("coding prompt carries strict interactive Pwn synchronization guidance", () => {
-  const source = readFileSync(resolve(import.meta.dirname, "../src/runtime/coding-lane.ts"), "utf8");
-  assert.match(source, /generic suffix/);
-  assert.match(source, /PB_READY/);
-  assert.match(source, /PYTHONIOENCODING=utf-8/);
-  assert.doesNotMatch(source, /CTF_FAST_PATH_PROMPT|PREPARED_CTF_WORKFLOW_PROMPT|PREPARED_CTF_FAST_PATH_PROMPT/);
-  assert.doesNotMatch(source, /first assistant action MUST be one allowed tool call/);
-  assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
-  assert.match(source, /<proofblade-turn-guidance>/);
-});
-
-test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
-  const withTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true);
-  // Tube path: point at pwn_open/send/recv/reproduce, not a blocking bash script.
-  assert.match(withTube, /pwn_open/);
-  assert.match(withTube, /pwn_recv/);
-  assert.match(withTube, /pwn_reproduce/);
-  // The old "Use `from pwn import *` directly" nudge that produced monolithic
-  // blocking scripts must be gone.
-  assert.doesNotMatch(withTube, /Use `from pwn import \*` directly/);
-
-  const noTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", false);
-  // No-tube path: forbid blocking a foreground bash; use shell_background.
-  assert.match(noTube, /shell_background/);
-  assert.match(noTube, /shell_job/);
-  assert.doesNotMatch(noTube, /pwn_open/);
-
-  const noVerifier = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true, false);
-  assert.match(noVerifier, /immutable task verifier is not configured/);
-  assert.doesNotMatch(noVerifier, /Confirm a solve with `pwn_reproduce`/);
 });
 
 test("a timed-out interactive bash command yields a targeted remediation hint", () => {
@@ -685,25 +652,11 @@ test("coding read creates a searchable source artifact for the evidence graph", 
   }
 });
 
-test("legacy CTF prompt detection remains descriptive and does not redefine general task mode", () => {
-  assert.equal(isLikelyCtfPrompt("题目描述：求解flag"), true);
-  assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
-  assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
-  assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
-});
-
 test("bash remains an untrusted escape hatch and cannot write the control ledger", () => {
   assert.match(bashEscapeHatchViolation("node -e 'controlStore.dispatchTransaction(run, { type: \\\"domain_record\\\" })'") ?? "", /cannot write ProofBlade control records/);
   assert.match(bashEscapeHatchViolation("python -c 'open(\\\"runs/CONTROL/events.jsonl\\\", \\\"a\\\").write(\\\"fake\\\")'") ?? "", /cannot write ProofBlade control records/);
   assert.equal(bashEscapeHatchViolation("rg -n domain_record packages/materials/src"), undefined);
   assert.equal(bashEscapeHatchViolation("python -c 'print(2 + 2)'"), undefined);
-});
-
-test("durable CTF task classification enables challenge guards without prompt keywords", () => {
-  assert.equal(isChallengeTask({ mode: "ctf_solve", target_kind: "unknown" }), true);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
 test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
