@@ -574,6 +574,30 @@ test("[contract:no-progress-chat-done] streams a convergence stop as a normal as
   }
 });
 
+test("ordinary GUI chat records a durable executor work item for each turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-chat-work-item-"));
+  const lane: AgentLanePort = {
+    async prompt() { return { text: "已完成检查", stopReason: "stop", usage: zeroUsage() }; },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-WORK-ITEM-001";
+    await data.createConversation({ runId, title: "持久化对话", workspacePath: root });
+    await data.chat(runId, "检查当前目录", () => undefined, undefined, undefined, root);
+    const detail = await data.getRun(runId);
+    const workItems = Object.values(detail.snapshot.workItems);
+    assert.equal(workItems.length, 1);
+    assert.equal(workItems[0]?.ownerLane, "executor");
+    assert.equal(workItems[0]?.status, "SUCCEEDED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CTF-shaped chat uses the same continuous coding lane without a mode-specific replan", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-replan-"));
   const prompts: string[] = [];
