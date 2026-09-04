@@ -593,6 +593,9 @@ test("ordinary GUI chat records a durable executor work item for each turn", asy
     assert.equal(workItems.length, 1);
     assert.equal(workItems[0]?.ownerLane, "executor");
     assert.equal(workItems[0]?.status, "SUCCEEDED");
+    const intents = Object.values(detail.snapshot.schedulerIntents ?? {});
+    assert.equal(intents.length, 1);
+    assert.equal(intents[0]?.status, "COMPLETED");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

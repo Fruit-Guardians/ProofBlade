@@ -7,7 +7,6 @@ import {
   TaskResultVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
-  ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
   RunCoordinator,
@@ -476,134 +475,65 @@ export class DebugDataService {
     this.active.set(runId, info);
     this.streamEmitters.set(runId, emit);
     emit({ type: "started", runId });
-    let runtime: ProofBladeToolRuntime | undefined;
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
-      if (runKind(snapshot.task) === "fixture") {
-        let taskOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentLoop(this.root, runConfig, this.services, this.createLane, this.browserVerifierFactory);
-        const result = await loop.run({
-          runId,
-          task: snapshot.task,
-          mode: "assist",
-          maxTurns: 1,
-          userPrompt: text,
-          onTurn: (outcome) => { taskOutcome = outcome; },
-          onEvent: (event) => emitAgentEvent(event, emit),
-          onLaneReady: async (activeLane) => {
-            this.activeLanes.set(runId, activeLane);
-            if (this.pauseRequests.has(runId)) {
-              await this.ensurePaused(runId, "Paused by user");
-              await activeLane.abort("Paused by user");
-            }
-          },
-        });
-        if (this.pauseRequests.has(runId)) {
-          emit({ type: "paused", runId });
-          return;
-        }
-        emit({
-          type: "done",
-          text: taskOutcome?.text ?? `Task turn finished with ${result.status}.`,
-          stopReason: taskOutcome?.stopReason ?? result.status.toLowerCase(),
-          usage: normalizeUsage(taskOutcome?.usage) ?? emptyUsage(),
-          resultVerification: taskOutcome?.resultVerification ?? taskOutcome?.claimVerification,
-          claimVerification: taskOutcome?.claimVerification,
-        });
-        return;
-      }
-      if (runKind(snapshot.task) === "chat") {
-        const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
-        lane = await this.createCodingLane({
-          projectRoot,
+      let taskOutcome: AgentOutcome | undefined;
+      const laneFactory: AgentLaneFactory | undefined = runKind(snapshot.task) === "chat"
+        ? async (input) => await this.createCodingLane({
+          projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
           installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new TaskResultVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
+          runId: input.runId,
+          runDir: input.runDir,
+          controlStore: input.services.control,
+          artifactStore: input.services.artifacts,
+          journal: input.services.journal,
+          claimVerifier: input.claimVerifier,
           config: runConfig,
-          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
-          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
-          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
+          ...(input.browserVerifierFactory ? { browserVerifierFactory: input.browserVerifierFactory } : {}),
+          ...(input.externalResources ? { externalResources: input.externalResources } : {}),
+          ...(input.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: input.services.sessionRuntimeBrokers } : {}),
+          ...(input.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: input.services.sessionRuntimeRequired }),
+          ...(input.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: input.services.browserRuntimeRequired }),
           capabilities,
           contextCompactionThreshold,
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      } else {
-        this.assertOpen();
-        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
-        runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-        lane = await PiCodingLane.create({
-          projectRoot: recovery.fixture.path,
-          installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new TaskResultVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
-          config: runConfig,
-          browserVerifierFactory: this.browserVerifierFactory,
-          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
-          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
-          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
           deferClaimAcceptance: true,
-          sessionId: `${runId}-coding`,
-          sessionHandoffs: recovery.sessionHandoffs,
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      }
-      this.assertOpen();
-      this.activeLanes.set(runId, lane);
+          sessionId: `${runId}-chat`,
+          sessionHandoffs: input.sessionHandoffs,
+          browserHandoffs: input.browserHandoffs,
+          onEvent: input.onEvent,
+        })
+        : this.createLane;
+      const loop = new SingleAgentLoop(this.root, runConfig, this.services, laneFactory, this.browserVerifierFactory);
+      const result = await loop.run({
+        runId,
+        task: snapshot.task,
+        mode: "assist",
+        maxTurns: 1,
+        userPrompt: text,
+        onTurn: (outcome) => { taskOutcome = outcome; },
+        onEvent: (event) => emitAgentEvent(event, emit),
+        onLaneReady: async (activeLane) => {
+          lane = activeLane;
+          this.activeLanes.set(runId, activeLane);
+          if (this.pauseRequests.has(runId)) {
+            await this.ensurePaused(runId, "Paused by user");
+            await activeLane.abort("Paused by user");
+          }
+        },
+      });
       if (this.pauseRequests.has(runId)) {
-        await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
         return;
       }
-      const coordinator = new RunCoordinator(this.services.control, this.services.verifier);
-      const turnBefore = await this.services.control.snapshot(runId);
-      const workItem = await coordinator.claim(runId, snapshot.task, 1);
-      let outcome: AgentOutcome;
-      try {
-        outcome = await lane.prompt(text);
-      } catch (error) {
-        await coordinator.fail(runId, workItem.id, error instanceof Error ? error.message : String(error)).catch(() => undefined);
-        throw error;
-      }
-      if (this.pauseRequests.has(runId)) {
-        await coordinator.block(runId, workItem.id, "Paused by user during the coding turn").catch(() => undefined);
-        await this.ensurePaused(runId, "Paused by user");
-        emit({ type: "paused", runId });
-        return;
-      }
-      const recoverableTermination = isRecoverableTermination(outcome.termination);
-      if (!recoverableTermination && (outcome.errorMessage || outcome.stopReason === "error")) {
-        await coordinator.fail(runId, workItem.id, outcome.errorMessage || "Provider request failed").catch(() => undefined);
-        emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
-        return;
-      }
-      const afterTurn = await this.services.control.snapshot(runId);
-      const progress = outcome.text.trim().length > 0
-        || newIds(turnBefore.observations, afterTurn.observations).length > 0
-        || newIds(turnBefore.artifacts, afterTurn.artifacts).length > 0
-        || newIds(turnBefore.evidence, afterTurn.evidence).length > 0
-        || newIds(turnBefore.facts, afterTurn.facts).length > 0
-        || newIds(turnBefore.hypotheses, afterTurn.hypotheses).length > 0;
-      await coordinator.settle(runId, workItem.id, progress,
-        newIds(turnBefore.evidence, afterTurn.evidence),
-        newIds(turnBefore.artifacts, afterTurn.artifacts));
-      const accepted = Object.values(afterTurn.completions).find((completion) =>
-        completion.status === "ACCEPTED"
-          && completion.runId === runId
-          && completion.generation === afterTurn.generation
-          && (completion.purpose === "harness_verification" || completion.purpose === "claim_reproduction"));
-      if (accepted && afterTurn.status !== "SUCCEEDED") {
-        await coordinator.finishAccepted(runId, workItem.id, accepted.id, "The task verifier accepted the result.");
-      }
-      emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), resultVerification: outcome.resultVerification ?? outcome.claimVerification, claimVerification: outcome.claimVerification });
+      emit({
+        type: "done",
+        text: taskOutcome?.text ?? `Task turn finished with ${result.status}.`,
+        stopReason: taskOutcome?.termination && isRecoverableTermination(taskOutcome.termination) ? "stop" : taskOutcome?.stopReason ?? result.status.toLowerCase(),
+        usage: normalizeUsage(taskOutcome?.usage) ?? emptyUsage(),
+        resultVerification: taskOutcome?.resultVerification ?? taskOutcome?.claimVerification,
+        claimVerification: taskOutcome?.claimVerification,
+      });
     } catch (error) {
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
@@ -1013,10 +943,6 @@ export function correlateToolCalls(
 export function codingWorkspace(task: Pick<TaskContract, "mode" | "target" | "scope">, preferred: string | undefined, fallback: string): string {
   if (task.mode !== "coding_assistant") return fallback;
   return preferred || task.scope.allowed_workspace || task.target || fallback;
-}
-
-function newIds(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
-  return Object.keys(after).filter((key) => !(key in before));
 }
 
 function collectReferencedIds(values: unknown[], snapshot: RunSnapshot): Set<string> {
