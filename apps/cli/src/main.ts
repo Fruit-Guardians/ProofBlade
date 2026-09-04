@@ -47,6 +47,7 @@ import {
   replayStats,
   compareReplayStats,
   shadowReplay,
+  fixtureTask,
   CompetitionApiJournal,
   replayCompetitionApiScript,
   RunTelemetry,
@@ -62,7 +63,7 @@ import {
   preflightConfiguredRuntimes,
   withSessionResourceAdapters,
 } from "@proofblade/materials";
-import type { CompetitionApiReplayStep } from "@proofblade/materials";
+import type { CompetitionApiReplayStep, RunSnapshot } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
 
@@ -113,6 +114,52 @@ async function main(): Promise<void> {
       const snapshot = await services.control.createRun(runId, demoTask(runId, root, config));
       print({ runId, status: snapshot.status, phase: snapshot.phase });
       break;
+    }
+    case "task": {
+      const action = arg ?? "help";
+      if (action === "templates") {
+        print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+        break;
+      }
+      if (action === "create") {
+        const runId = required(rest[0], "task id");
+        const templateId = option(rest, "--template") ?? (rest[1] && !rest[1].startsWith("--") ? rest[1] : undefined);
+        const template = required(templateId, "task template id");
+        const task = fixtureTask(runId, template, root, config);
+        const objective = option(rest, "--objective");
+        if (objective?.trim()) task.objective = objective.trim();
+        const snapshot = await services.control.createRun(runId, task);
+        print({ runId, templateId: template, status: snapshot.status, phase: snapshot.phase });
+        break;
+      }
+      const runId = required(rest[0], "run id");
+      if (action === "status") {
+        const snapshot = await services.control.snapshot(runId);
+        print(taskStatus(snapshot));
+        break;
+      }
+      if (action === "cancel") {
+        const snapshot = await services.control.snapshot(runId);
+        if (!["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
+          await services.control.dispatch(runId, { type: "cancel", reason: rest.slice(1).join(" ").trim() || "Cancelled by user", lane: "main" });
+        }
+        print(taskStatus(await services.control.snapshot(runId)));
+        break;
+      }
+      if (action === "run") {
+        const modeValue = option(rest, "--mode") ?? "assist";
+        if (modeValue !== "auto" && modeValue !== "assist") throw new Error("task run --mode must be auto or assist");
+        const taskSnapshot = await services.control.snapshot(runId);
+        const result = await new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory).run({
+          runId,
+          task: taskSnapshot.task,
+          mode: modeValue,
+          maxTurns: parsePositiveOption(rest, "--max-turns"),
+        });
+        print(result);
+        break;
+      }
+      throw new Error("task action must be templates, create, run, status, or cancel");
     }
     case "run": {
       if (arg !== "demo") throw new Error("The first fixture profile is named 'demo'");
@@ -759,6 +806,27 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
+function taskStatus(snapshot: RunSnapshot): Record<string, unknown> {
+  return {
+    runId: snapshot.runId,
+    status: snapshot.status,
+    phase: snapshot.phase,
+    targetKind: snapshot.task.target_kind,
+    generation: snapshot.generation,
+    lastSeq: snapshot.lastSeq,
+    counts: {
+      facts: Object.keys(snapshot.facts).length,
+      observations: Object.keys(snapshot.observations).length,
+      evidence: Object.keys(snapshot.evidence).length,
+      artifacts: Object.keys(snapshot.artifacts).length,
+      effects: Object.keys(snapshot.effects).length,
+      completions: Object.keys(snapshot.completions).length,
+    },
+    finalResult: snapshot.finalResult,
+    failureCategory: snapshot.failureCategory,
+  };
+}
+
 function parseObject(value: string, label: string): Record<string, unknown> {
   const parsed = JSON.parse(value) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${label} must be a JSON object`);
@@ -797,6 +865,11 @@ function helpText(): string {
     "Commands:",
     "  init <run-id>",
     "  run demo [--run-id ID]",
+    "  task templates",
+    "  task create <task-id> --template <template-id> [--objective TEXT]",
+    "  task run <task-id> [--mode auto|assist] [--max-turns N]",
+    "  task status <task-id>",
+    "  task cancel <task-id> [reason]",
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
