@@ -11,7 +11,6 @@ import {
   JsonlControlStore,
   loadConfig,
   listFixtureProfiles,
-  PiAgentLane,
   PiCodingLane,
   PlannerCoordinator,
   ProofBladeToolRuntime,
@@ -63,7 +62,7 @@ import {
   preflightConfiguredRuntimes,
   withSessionResourceAdapters,
 } from "@proofblade/materials";
-import type { CompetitionApiReplayStep, RunSnapshot } from "@proofblade/materials";
+import type { AgentOutcome, CompetitionApiReplayStep, RunSnapshot } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
 
@@ -717,15 +716,17 @@ async function main(): Promise<void> {
     case "agent": {
       const runId = required(arg, "run id");
       const prompt = rest.join(" ").trim() || "Summarize the current verified facts and evidence ids in JSON.";
-      const runDir = join(services.runsRoot, runId);
-      await access(runDir);
-      const lane = await PiAgentLane.create({ runId, runDir, controlStore: services.control, config });
-      try {
-        const outcome = await lane.prompt(prompt);
-        print(outcome);
-      } finally {
-        await lane.close();
-      }
+      const taskSnapshot = await services.control.snapshot(runId);
+      let response: AgentOutcome | undefined;
+      const result = await new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory).run({
+        runId,
+        task: taskSnapshot.task,
+        mode: "assist",
+        maxTurns: 1,
+        userPrompt: prompt,
+        onTurn: (outcome) => { response = outcome; },
+      });
+      print(response ?? result);
       break;
     }
     case "help":
