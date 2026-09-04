@@ -8,7 +8,7 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { RunRecoveryService } from "../src/recovery/run-recovery.js";
 import { VerificationRecoveryAdapterRegistry, VerificationRecoveryService } from "../src/recovery/verification-recovery.js";
 import { beginVerificationRequest } from "../src/verification/verification-key.js";
-import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
+import { CodingClaimVerifier, TaskResultVerifier } from "../src/verification/claim-verification.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
 import { serializeVerifierOutcomeEnvelope } from "../src/verification/outcome-envelope.js";
 
@@ -64,6 +64,40 @@ test("RunRecoveryService resumes a proposed pure claim command through the sandb
     const second = await new RunRecoveryService(services.control, services.journal, services.sandbox, services.fixtureControl, undefined, services.verificationRecovery).recover(runId, task);
     assert.equal(second.verification.items[0]?.status, "AMBIGUOUS");
     assert.equal((await services.control.snapshot(runId)).lastSeq, seq);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("TaskResultVerifier records generic result verification with a domain-neutral operation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-result-verification-operation-"));
+  const runId = "RESULT-VERIFICATION-OPERATION";
+  const candidate = "analysis-result-verified";
+  try {
+    const services = createServices(root, config);
+    const task = demoTask(runId, root, config);
+    task.target = `LOCAL_WORKSPACE:${root}`;
+    task.scope.allowed_workspace = root;
+    task.verification.command = "node verify.mjs";
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    await writeFile(join(root, "verify.mjs"), `process.stdout.write(${JSON.stringify(candidate)});\n`, "utf8");
+
+    const verifier = new TaskResultVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const reproduction = await verifier.recordResult({
+      result: candidate,
+      command: task.verification.command,
+      cwd: root,
+      toolCallId: "result-verification-call",
+    });
+    const snapshot = await services.control.snapshot(runId);
+    const effect = Object.values(snapshot.effects).find((item) => item.operation === "result_verification");
+    assert.equal(effect?.operation, "result_verification");
+    assert.equal(effect?.verification?.operation, "result_verification");
+    const receipt = JSON.parse(await services.artifacts.readText(runId, snapshot.artifacts[reproduction.artifactId]!)) as { kind?: string };
+    assert.equal(receipt.kind, "result_verification");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

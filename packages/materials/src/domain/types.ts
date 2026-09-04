@@ -932,11 +932,20 @@ export interface ArtifactRef extends ArtifactAtom {
   semantic?: ArtifactSemanticMetadata;
 }
 
+/** Verifier-owned effect operations that can produce a trusted verdict. */
+export type VerifierAttestationOperation =
+  | "fixture_score"
+  | "result_verification"
+  | "claim_reproduction"
+  | "pwn_reproduce"
+  | "web_reproduce"
+  | "browser_reproduce";
+
 export interface VerificationVerdict {
   schemaVersion: 1;
   valid: boolean;
   accepted: boolean;
-  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce" | "web_reproduce" | "browser_reproduce";
+  operation: VerifierAttestationOperation;
   runId: string;
   taskId: string;
   taskHash: string;

@@ -501,7 +501,7 @@ export class EffectJournal {
 
   private async readVerifierRecoveryInput(runId: string, effect: RunSnapshot["effects"][string]): Promise<RawEffectResult | undefined> {
     const hash = typeof effect.args.recoveryArtifactSha256 === "string" ? effect.args.recoveryArtifactSha256 : undefined;
-    if (!hash || !["claim_reproduction", "web_reproduce", "browser_reproduce", "pwn_reproduce"].includes(effect.operation)) return undefined;
+    if (!hash || !["result_verification", "claim_reproduction", "web_reproduce", "browser_reproduce", "pwn_reproduce"].includes(effect.operation)) return undefined;
     const snapshot = await this.controlStore.snapshot(runId);
     const artifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.origin.registeredBy === "verifier"
       && artifact.generation === snapshot.generation
@@ -630,7 +630,7 @@ export class EffectJournal {
       } catch {
         valid = false;
       }
-    } else if (operation === "claim_reproduction" && result.exitCode === 0) {
+    } else if ((operation === "result_verification" || operation === "claim_reproduction") && result.exitCode === 0) {
       const candidateArtifact = snapshot.artifacts[completion.artifactId];
       if (candidateArtifact) {
         try {
