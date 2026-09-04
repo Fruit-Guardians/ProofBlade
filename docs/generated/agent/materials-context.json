@@ -76,7 +76,7 @@
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
-    "src/knowledge/evidence-graph.ts": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+    "src/knowledge/evidence-graph.ts": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
     "src/knowledge/observer.ts": "63cc7ab6bec68a56931e6c3068f961ed9aa075da0f9fec1bcd0de92e4822ccb8",
     "src/knowledge/projection.ts": "ecd4a9ab8a1552439ba659d3ed8c90cc788d43b7df19780df3d9612b8dccc5be",
     "src/mcp/registry.ts": "5e089cbde628eaa3cb15b85b917261798290376be1a04b26f9479e2d36088cab",
@@ -117,7 +117,7 @@
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
     "src/runtime/coding-lane.ts": "976457a5215d665c56b7d96f38d3321a61fddd87321ec7373a9d045a4eea3f72",
-    "src/runtime/coding-resources.ts": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+    "src/runtime/coding-resources.ts": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
     "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -988,8 +988,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 78,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 94,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -2637,7 +2637,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 34,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -2651,7 +2651,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 35,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -2665,7 +2665,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 39,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -2681,7 +2681,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 38,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/web-coding-tools.test.ts"
       ]
@@ -2697,7 +2697,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
       "line": 36,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -2710,8 +2710,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1093,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1094,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -3625,6 +3625,7 @@
       "moduleHash": "6d8ccfa1fcfaff41451799fec0ad1eff53833525d92f3b0a7c9e60c18dfcef6e",
       "testRefs": [
         "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/provider-pi-http-smoke.test.ts",
@@ -3671,6 +3672,7 @@
         "packages/materials/tests/control-store.test.ts",
         "packages/materials/tests/demo.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/local-holdout.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -4395,8 +4397,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 524,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 603,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -4411,8 +4413,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 571,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 650,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -5394,8 +5396,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1196,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1197,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5410,8 +5412,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1012,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1013,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -5428,8 +5430,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1029,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1030,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5444,8 +5446,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 137,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 138,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -5458,8 +5460,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 262,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 263,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5474,8 +5476,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 145,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 146,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5490,8 +5492,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 178,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 179,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5506,8 +5508,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1107,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1108,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/image-dedup.test.ts"
       ]
@@ -5522,8 +5524,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1180,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1181,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5538,8 +5540,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 1170,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 1171,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5554,8 +5556,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 165,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 166,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -5568,8 +5570,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 236,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 237,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5584,8 +5586,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 895,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 896,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -9468,7 +9470,8 @@
       "line": 973,
       "moduleHash": "29b7d43e104b0539c068231f77970aa24310622534653b7db1c6dac9f9578c8e",
       "testRefs": [
-        "packages/materials/tests/competition-solver.test.ts"
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts"
       ]
     },
     {
@@ -10958,7 +10961,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 49,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -10972,7 +10975,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 67,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -10986,7 +10989,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 21,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -11000,7 +11003,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 30,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -11014,7 +11017,21 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 40,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::RetrievalTrace",
+      "name": "RetrievalTrace",
+      "kind": "interface",
+      "signature": "RetrievalTrace",
+      "summary": "Inferred summary: retrieval trace type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/knowledge/evidence-graph.ts",
+      "line": 78,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -11028,7 +11045,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
       "line": 61,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -12741,8 +12758,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 52,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 53,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -12755,8 +12772,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 65,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 66,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -12774,8 +12791,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-resources.ts",
-      "line": 131,
-      "moduleHash": "80d16a572e710e495d51e9c0326dc934899791bed6bc7e4c080f51ec9270037a",
+      "line": 132,
+      "moduleHash": "9cceb6071b292b431bdb4fac26a286f51a1c9938c83683e02509ca1deaf75bb8",
       "testRefs": []
     },
     {
@@ -16216,6 +16233,7 @@
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -16430,6 +16448,7 @@
         "packages/materials/tests/evaluation.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -17538,6 +17557,7 @@
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -17916,6 +17936,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -18144,6 +18165,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -20844,6 +20866,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -21608,6 +21631,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -23059,8 +23083,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 88,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 104,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/evidence-curation-gate.test.ts"
       ]
@@ -23075,8 +23099,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 376,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 392,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23091,8 +23115,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 427,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 443,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23107,8 +23131,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 431,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 447,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23123,8 +23147,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 326,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 342,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/reasoning-forest.test.ts"
       ]
@@ -23139,8 +23163,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 345,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 361,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -23153,10 +23177,11 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 490,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 550,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
-        "packages/materials/tests/context-recovery.test.ts"
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts"
       ]
     },
     {
@@ -23169,8 +23194,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 128,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 144,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
@@ -23189,8 +23214,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 272,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 288,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/pwn-layer.test.ts"
       ]
@@ -23205,8 +23230,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 447,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 463,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": [
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
@@ -23225,6 +23250,22 @@
       ]
     },
     {
+      "id": "@proofblade/materials::method::CodingEvidenceGraph.searchWithTrace",
+      "name": "CodingEvidenceGraph.searchWithTrace",
+      "kind": "method",
+      "signature": "(query?: string, tags?: string[]): Promise<{ results: Array<Record<string, unknown>>; trace: RetrievalTrace; }>",
+      "summary": "Return the same deterministic results plus a provenance-only retrieval trace.",
+      "summarySource": "tsdoc",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/knowledge/evidence-graph.ts",
+      "line": 507,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
+      "testRefs": [
+        "packages/materials/tests/evidence-search-index.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::method::CodingEvidenceGraph.updateTree",
       "name": "CodingEvidenceGraph.updateTree",
       "kind": "method",
@@ -23234,8 +23275,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/knowledge/evidence-graph.ts",
-      "line": 400,
-      "moduleHash": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
+      "line": 416,
+      "moduleHash": "10b0016a57fe041d5d1da7a851238c53c389a0e4dd1f38c945c72ee6135926c1",
       "testRefs": []
     },
     {
@@ -23545,6 +23586,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -23704,6 +23746,7 @@
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -26548,6 +26591,7 @@
         "packages/materials/tests/docker-resource-adapter.test.ts",
         "packages/materials/tests/environment-janitor.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/knowledge-read-bounds.test.ts",
         "packages/materials/tests/model-receipt.test.ts",
@@ -30384,6 +30428,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -30876,6 +30921,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/handoff.test.ts",
         "packages/materials/tests/intent-scheduler.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
@@ -31297,6 +31343,7 @@
         "packages/materials/tests/event-ingress-scope.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/image-dedup.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -31816,7 +31863,8 @@
       "line": 377,
       "moduleHash": "3e9941f693342aed2597c66f576bf6eb7a2ca05f6b11b11d4b7742c74b80edbd",
       "testRefs": [
-        "packages/materials/tests/context-recovery.test.ts"
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts"
       ]
     },
     {
