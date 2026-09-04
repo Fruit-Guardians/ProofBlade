@@ -26,10 +26,10 @@ test("classifies challenge directions before a lane is created", () => {
   assert.equal(classifyChallengePrompt("ordinary TypeScript feature") , undefined);
   assert.equal(classifyChallengePrompt("implement a binary search") , undefined);
   assert.equal(profileForTargetKind("reverse", "packed UPX ELF")?.id, "reverse");
-  assert.equal(profileForTargetKind("misc", "REAL_EVALUATION:forensics-pcap")?.id, "forensics");
-  assert.equal(profileForTargetKind("misc", "REAL_EVALUATION:malware-yara")?.id, "malware");
-  assert.equal(profileForTargetKind("unknown", "remote nc service with a format string")?.id, "pwn");
-  assert.equal(profileForTargetKind("mixed", "HTTP endpoint with JWT and SSRF")?.id, "web");
+  assert.equal(profileForTargetKind("misc", "REAL_EVALUATION:forensics-pcap")?.id, "misc");
+  assert.equal(profileForTargetKind("misc", "REAL_EVALUATION:malware-yara")?.id, "misc");
+  assert.equal(profileForTargetKind("unknown", "remote nc service with a format string"), undefined);
+  assert.equal(profileForTargetKind("mixed", "HTTP endpoint with JWT and SSRF"), undefined);
   assert.equal(profileForTargetKind("unknown", "ordinary project refactor"), undefined);
 });
 

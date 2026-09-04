@@ -737,7 +737,7 @@
 ### ToolPreflightService
 - Kind: `class`
 - Signature: `ToolPreflightService`
-- Source: [src/runtime/challenge-tool-profile.ts:536](../../../packages/materials/src/runtime/challenge-tool-profile.ts:536)
+- Source: [src/runtime/challenge-tool-profile.ts:529](../../../packages/materials/src/runtime/challenge-tool-profile.ts:529)
 - Export: `@proofblade/materials`
 - Summary: Performs one bounded local readiness check and persists the result by catalog
 - Summary source: `tsdoc`
@@ -2780,7 +2780,7 @@
 ### actionBundleForPhase
 - Kind: `function`
 - Signature: `(profile: ChallengeToolProfile, domainPhase: string): ActionBundle | undefined`
-- Source: [src/runtime/challenge-tool-profile.ts:447](../../../packages/materials/src/runtime/challenge-tool-profile.ts:447)
+- Source: [src/runtime/challenge-tool-profile.ts:440](../../../packages/materials/src/runtime/challenge-tool-profile.ts:440)
 - Export: `@proofblade/materials`
 - Summary: Return the phase-scoped action contract selected by a prepared profile.
 - Summary source: `tsdoc`
@@ -2789,7 +2789,7 @@
 ### assertToolPreparationPublished
 - Kind: `function`
 - Signature: `(snapshot: Pick<RunSnapshot, "generation" | "toolPreparation">, preparation: RunToolPreparation): void`
-- Source: [src/runtime/challenge-tool-profile.ts:692](../../../packages/materials/src/runtime/challenge-tool-profile.ts:692)
+- Source: [src/runtime/challenge-tool-profile.ts:685](../../../packages/materials/src/runtime/challenge-tool-profile.ts:685)
 - Export: `@proofblade/materials`
 - Summary: Assert that a preflight result was durably published before a Provider turn.
 - Summary source: `tsdoc`
@@ -2825,16 +2825,16 @@
 ### classifyChallengePrompt
 - Kind: `function`
 - Signature: `(text: string, workspaceHint?: string): ChallengeClassification | undefined`
-- Source: [src/runtime/challenge-tool-profile.ts:456](../../../packages/materials/src/runtime/challenge-tool-profile.ts:456)
+- Source: [src/runtime/challenge-tool-profile.ts:449](../../../packages/materials/src/runtime/challenge-tool-profile.ts:449)
 - Export: `@proofblade/materials`
-- Summary: Conservative prompt/workspace classifier used before a GUI lane is created.
+- Summary: Explicit opt-in prompt/workspace classifier for legacy integrations. The
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/challenge-tool-profile.test.ts`
 
 ### preflightFromRunToolPreparation
 - Kind: `function`
 - Signature: `(preparation: RunToolPreparation): ChallengeToolPreflight`
-- Source: [src/runtime/challenge-tool-profile.ts:703](../../../packages/materials/src/runtime/challenge-tool-profile.ts:703)
+- Source: [src/runtime/challenge-tool-profile.ts:696](../../../packages/materials/src/runtime/challenge-tool-profile.ts:696)
 - Export: `@proofblade/materials`
 - Summary: Rehydrate the prompt-facing preflight view from a persisted Run state.
 - Summary source: `tsdoc`
@@ -2842,7 +2842,7 @@
 
 ### profileForTargetKind
 - Kind: `function`
-- Signature: `(targetKind: TargetKind, target?: string): ChallengeToolProfile | undefined`
+- Signature: `(targetKind: TargetKind, _target?: string): ChallengeToolProfile | undefined`
 - Source: [src/runtime/challenge-tool-profile.ts:427](../../../packages/materials/src/runtime/challenge-tool-profile.ts:427)
 - Export: `@proofblade/materials`
 - Summary: Map a durable task target kind to the default prepared profile.
@@ -2852,7 +2852,7 @@
 ### runToolPreparationFromPreflight
 - Kind: `function`
 - Signature: `(preflight: ChallengeToolPreflight, profile: ChallengeToolProfile, generation: number): RunToolPreparation`
-- Source: [src/runtime/challenge-tool-profile.ts:663](../../../packages/materials/src/runtime/challenge-tool-profile.ts:663)
+- Source: [src/runtime/challenge-tool-profile.ts:656](../../../packages/materials/src/runtime/challenge-tool-profile.ts:656)
 - Export: `@proofblade/materials`
 - Summary: Convert the transient preflight result into the bounded durable Run state.
 - Summary source: `tsdoc`
@@ -7105,7 +7105,7 @@
 ### ChallengeToolPreflight
 - Kind: `interface`
 - Signature: `ChallengeToolPreflight`
-- Source: [src/runtime/challenge-tool-profile.ts:488](../../../packages/materials/src/runtime/challenge-tool-profile.ts:488)
+- Source: [src/runtime/challenge-tool-profile.ts:481](../../../packages/materials/src/runtime/challenge-tool-profile.ts:481)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: challenge tool preflight type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7121,7 +7121,7 @@
 ### McpHealthRecord
 - Kind: `interface`
 - Signature: `McpHealthRecord`
-- Source: [src/runtime/challenge-tool-profile.ts:482](../../../packages/materials/src/runtime/challenge-tool-profile.ts:482)
+- Source: [src/runtime/challenge-tool-profile.ts:475](../../../packages/materials/src/runtime/challenge-tool-profile.ts:475)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp health record type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7129,7 +7129,7 @@
 ### ToolHealthRecord
 - Kind: `interface`
 - Signature: `ToolHealthRecord`
-- Source: [src/runtime/challenge-tool-profile.ts:475](../../../packages/materials/src/runtime/challenge-tool-profile.ts:475)
+- Source: [src/runtime/challenge-tool-profile.ts:468](../../../packages/materials/src/runtime/challenge-tool-profile.ts:468)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: tool health record type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12205,7 +12205,7 @@
 ### ToolPreflightService.prepare
 - Kind: `method`
 - Signature: `(profile: ChallengeToolProfile, catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight>`
-- Source: [src/runtime/challenge-tool-profile.ts:539](../../../packages/materials/src/runtime/challenge-tool-profile.ts:539)
+- Source: [src/runtime/challenge-tool-profile.ts:532](../../../packages/materials/src/runtime/challenge-tool-profile.ts:532)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prepare operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12214,7 +12214,7 @@
 ### ToolPreflightService.prepareAll
 - Kind: `method`
 - Signature: `(profiles: readonly ChallengeToolProfile[], catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight[]>`
-- Source: [src/runtime/challenge-tool-profile.ts:606](../../../packages/materials/src/runtime/challenge-tool-profile.ts:606)
+- Source: [src/runtime/challenge-tool-profile.ts:599](../../../packages/materials/src/runtime/challenge-tool-profile.ts:599)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prepare all operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12223,7 +12223,7 @@
 ### ToolPreflightService.prepareInExecution
 - Kind: `method`
 - Signature: `(profile: ChallengeToolProfile, env: ExecutionEnv, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">, options?: { runtimeKey: string; force?: boolean; }): Promise<ChallengeToolPreflight>`
-- Source: [src/runtime/challenge-tool-profile.ts:579](../../../packages/materials/src/runtime/challenge-tool-profile.ts:579)
+- Source: [src/runtime/challenge-tool-profile.ts:572](../../../packages/materials/src/runtime/challenge-tool-profile.ts:572)
 - Export: `@proofblade/materials`
 - Summary: Probe the actual execution backend used by the lane. Host catalog paths are
 - Summary source: `tsdoc`

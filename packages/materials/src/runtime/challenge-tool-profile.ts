@@ -424,22 +424,15 @@ export function challengeToolCatalogSpecs(): ToolCatalogBootstrapSpec[] {
 }
 
 /** Map a durable task target kind to the default prepared profile. */
-export function profileForTargetKind(targetKind: TargetKind, target = ""): ChallengeToolProfile | undefined {
-  if (targetKind === "reverse") return classifyChallengePrompt(target)?.profile ?? challengeToolProfile("reverse");
+export function profileForTargetKind(targetKind: TargetKind, _target = ""): ChallengeToolProfile | undefined {
+  // Capability preparation is selected by the durable task contract only. Do
+  // not inspect target/objective text here: words such as "flag" or
+  // "challenge" are ordinary project vocabulary and must never reroute a run.
+  if (targetKind === "reverse") return challengeToolProfile("reverse");
   if (targetKind === "pwn" || targetKind === "web" || targetKind === "crypto") return challengeToolProfile(targetKind);
-  if (targetKind === "misc") {
-    // Platforms often collapse forensics, malware, OSINT and misc into one
-    // bucket. Keep the durable TargetKind compatible with that wire value, but
-    // still select the specialized prepared tool profile when the target text
-    // carries a stronger direction marker.
-    return classifyChallengePrompt(`CTF ${target}`)?.profile ?? challengeToolProfile("misc");
-  }
-  // GUI/chat tasks can legitimately arrive with an unknown or mixed wire kind.
-  // Do the same deterministic text classification before the first Pi turn so
-  // they receive a bounded profile instead of falling through to an unprepared
-  // generic tool set. Ordinary non-challenge conversations still return none.
-  if (targetKind === "mixed") return classifyChallengePrompt(`CTF ${target}`)?.profile;
-  if (targetKind === "unknown") return classifyChallengePrompt(target)?.profile;
+  if (targetKind === "misc") return challengeToolProfile("misc");
+  // Unknown and mixed tasks keep the generic capability surface. Callers that
+  // explicitly ask for a domain classifier may still use classifyChallengePrompt.
   return undefined;
 }
 
@@ -449,9 +442,9 @@ export function actionBundleForPhase(profile: ChallengeToolProfile, domainPhase:
 }
 
 /**
- * Conservative prompt/workspace classifier used before a GUI lane is created.
- * Ordinary coding requests return undefined; challenge-shaped requests receive
- * one deterministic profile and a small confidence explanation.
+ * Explicit opt-in prompt/workspace classifier for legacy integrations. The
+ * runtime does not call this function while creating a lane; target text never
+ * changes a task's default capability route.
  */
 export function classifyChallengePrompt(text: string, workspaceHint = ""): ChallengeClassification | undefined {
   const haystack = `${text}\n${workspaceHint}`.toLowerCase();
