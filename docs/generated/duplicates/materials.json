@@ -216,7 +216,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 487,
+          "line": 488,
           "summary": "Commit the final Control Store fence for a broker-owned session binding."
         },
         {
@@ -226,7 +226,7 @@
           "kind": "method",
           "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
           "module": "src/control/control-store.ts",
-          "line": 470,
+          "line": 471,
           "summary": "Inferred summary: dispatch transaction operation used to perform a durable write."
         }
       ],
@@ -245,7 +245,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 273,
+          "line": 274,
           "summary": "Inferred summary: replay operation used to read or inspect state."
         },
         {
@@ -255,7 +255,7 @@
           "kind": "method",
           "signature": "(runId: string): Promise<RunSnapshot>",
           "module": "src/control/control-store.ts",
-          "line": 268,
+          "line": 269,
           "summary": "Inferred summary: snapshot operation used to read or inspect state."
         }
       ],
@@ -449,7 +449,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 809,
+          "line": 817,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -478,7 +478,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 813,
+          "line": 821,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
