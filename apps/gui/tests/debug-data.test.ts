@@ -630,6 +630,34 @@ test("GUI selects a prepared challenge profile before creating the coding lane",
   }
 });
 
+test("ordinary chat in a CTF-named workspace does not enable a challenge profile", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ordinary-ctf-path-"));
+  let selectedProfile: string | undefined;
+  const lane: AgentLanePort = {
+    async prompt() { return { text: "hello", stopReason: "stop", usage: zeroUsage() }; },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
+      selectedProfile = options.challengeProfile?.id;
+      return lane;
+    });
+    const runId = "CHAT-ORDINARY-CTF-PATH-001";
+    const workspacePath = join(root, "CTF", "mosaic_0rtt");
+    await mkdir(workspacePath, { recursive: true });
+    await data.createConversation({ runId, title: "测试题", workspacePath });
+
+    await data.chat(runId, "你好", () => undefined, undefined, undefined, workspacePath);
+
+    assert.equal(selectedProfile, undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("GUI fixture conversations enter RECON through RunCoordinator", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-conversation-phase-"));
   try {
