@@ -7,6 +7,8 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { WebToolHandler, type WebScope } from "../src/web/web-tools.js";
+import { createWebSessionTools } from "../src/runtime/web-coding-tools.js";
+import type { CodingResourceContext } from "../src/runtime/coding-resources.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 import type { ExternalResourceRecord } from "../src/recovery/external-resource-registry.js";
 
@@ -196,10 +198,63 @@ test("url outside task scope is rejected before connecting (host, port, scheme)"
   try {
     const handler = await makeHandler(root, "WEB-TOOL-SCOPE", { allowedHosts: ["1.14.76.59"], allowedPorts: [80] });
     // In-scope host+port passes the app-layer check (connection may fail later, but scope is fine).
-    await assert.rejects(handler.open({ baseUrl: "http://8.8.8.8:80/" }), /outside the task scope/);
-    await assert.rejects(handler.open({ baseUrl: "http://1.14.76.59:9999/" }), /outside the task scope/);
-    await assert.rejects(handler.open({ baseUrl: "file:///etc/passwd" }), /scheme .* is not allowed|not a valid URL/);
+    for (const input of ["http://8.8.8.8:80/", "http://1.14.76.59:9999/", "file:///etc/passwd"]) {
+      await assert.rejects(handler.open({ baseUrl: input }), (error: unknown) => {
+        const text = error instanceof Error ? error.message : String(error);
+        assert.match(text, /outside the task scope|scheme .* is not allowed|not a valid URL/);
+        assert.match(text, /not executed/);
+        assert.match(text, /Next:/);
+        return true;
+      });
+    }
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("unknown Web sessions explain recovery instead of returning a bare error", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-tool-unknown-session-"));
+  try {
+    const handler = await makeHandler(root, "WEB-TOOL-UNKNOWN");
+    await assert.rejects(() => handler.request({ sessionId: "missing-session", path: "/" }), (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /Unknown web session/);
+      assert.match(text, /not executed/);
+      assert.match(text, /Next:.*web_list/);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("web_request reports sent-but-unrecorded requests without encouraging blind retry", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-web-tool-sent-unknown-"));
+  let received = 0;
+  const server = createServer((_request, response) => { received += 1; response.end("accepted"); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("server did not bind");
+  try {
+    const runId = "WEB-TOOL-SENT-UNKNOWN";
+    const services = createServices(root, config);
+    await services.control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "web" });
+    const originalPutText = services.artifacts.putText.bind(services.artifacts);
+    services.artifacts.putText = async (...args: Parameters<typeof services.artifacts.putText>) => {
+      if (String(args[1]).includes("http_exchange")) throw new Error("artifact disk unavailable");
+      return await originalPutText(...args);
+    };
+    const handler = new WebToolHandler({ runId, controlStore: services.control, artifactStore: services.artifacts, ownerLane: "main" });
+    const opened = await handler.open({ baseUrl: `http://127.0.0.1:${address.port}/` });
+    const tool = createWebSessionTools().find((item) => item.name === "web_request")!;
+    const result = await tool.execute!("sent-unknown", { sessionId: opened.sessionId, path: "/submit", method: "POST", body: "value=1" }, new AbortController().signal, () => {}, { webSession: handler } as unknown as CodingResourceContext);
+    assert.equal(received, 1);
+    assert.equal(result.isError, true);
+    const text = result.content.filter((item): item is { type: "text"; text: string } => item.type === "text").map((item) => item.text).join("\n");
+    assert.match(text, /request_sent_result_unknown/);
+    assert.match(text, /do not blindly retry/i);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(root, { recursive: true, force: true });
   }
 });

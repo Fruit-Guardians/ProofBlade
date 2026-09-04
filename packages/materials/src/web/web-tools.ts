@@ -102,11 +102,12 @@ export class WebToolHandler {
 }
 
   public async open(input: WebOpenInput): Promise<{ sessionId: string; baseUrl: string }> {
-    this.assertUrlAllowed(input.baseUrl);
-    if (this.deps.sessionRuntimeRequired && !this.deps.sessionBroker) throw new Error("Session runtime broker is configured but unavailable");
-    const backend = this.deps.sessionBroker
-      ? await this.openBrokerSession(input)
-      : await HttpSessionBackend.open({
+    try {
+      this.assertUrlAllowed(input.baseUrl);
+      if (this.deps.sessionRuntimeRequired && !this.deps.sessionBroker) throw webError("Session runtime broker is configured but unavailable", "use the configured session broker or run with a local HTTP session profile");
+      const backend = this.deps.sessionBroker
+        ? await this.openBrokerSession(input)
+        : await HttpSessionBackend.open({
         runId: this.deps.runId,
         baseUrl: input.baseUrl,
         ownerLane: this.ownerLane,
@@ -118,10 +119,13 @@ export class WebToolHandler {
         ...(this.deps.fetchImpl ? { fetchImpl: this.deps.fetchImpl } : {}),
         ...(this.deps.externalResources ? { externalResources: this.deps.externalResources } : {}),
         ...(this.deps.externalRelease ? { externalRelease: this.deps.externalRelease } : {}),
-      });
-    this.sessions.set(backend.sessionId, { backend, baseUrl: input.baseUrl });
-    this.closed.delete(backend.sessionId);
-    return { sessionId: backend.sessionId, baseUrl: input.baseUrl };
+        });
+      this.sessions.set(backend.sessionId, { backend, baseUrl: input.baseUrl });
+      this.closed.delete(backend.sessionId);
+      return { sessionId: backend.sessionId, baseUrl: input.baseUrl };
+    } catch (error) {
+      throw asWebActionableError(error, "provide an in-scope http(s) target or repair the configured Web session runtime");
+    }
   }
 
   private async openBrokerSession(input: WebOpenInput): Promise<HttpSessionBackend> {
@@ -138,10 +142,10 @@ export class WebToolHandler {
     };
     const idempotencyKey = sha256(canonicalJson(request));
     const created = await this.deps.sessionBroker!.create(request, idempotencyKey);
-    if (created.state === "UNKNOWN" || !created.sessionId || !created.externalId) throw new Error(created.summary ?? "HTTP session broker did not create a durable session");
+    if (created.state === "UNKNOWN" || !created.sessionId || !created.externalId) throw webError(created.summary ?? "HTTP session broker did not create a durable session", "check the broker health and retry the same scoped target");
     const resource = brokerHttpResource(this.deps.runId, snapshot.generation, this.ownerLane, created.sessionId, created.externalId, request);
     const binding = await this.deps.sessionBroker!.createBinding(resource);
-    if (binding.kind !== "http-session") throw new Error("HTTP session broker returned a Pwn binding");
+    if (binding.kind !== "http-session") throw webError("HTTP session broker returned a Pwn binding", "use the HTTP session broker binding for this Web tool");
     const options = {
       runId: this.deps.runId,
       baseUrl: input.baseUrl,
@@ -166,14 +170,22 @@ export class WebToolHandler {
   }
 
   public async request(input: WebRequestInput, signal?: AbortSignal): Promise<WebRequestView> {
-    const { backend } = this.require(input.sessionId);
-    const resp = await backend.request(input.path, {
-      ...(input.method ? { method: input.method } : {}),
-      ...(input.headers ? { headers: input.headers } : {}),
-      ...(input.body !== undefined ? { body: input.body } : {}),
-    }, signal);
-    await this.recordExchange(input, resp, this.sessions.get(input.sessionId)?.baseUrl);
-    return this.view(input.sessionId, resp);
+    try {
+      const { backend } = this.require(input.sessionId);
+      const resp = await backend.request(input.path, {
+        ...(input.method ? { method: input.method } : {}),
+        ...(input.headers ? { headers: input.headers } : {}),
+        ...(input.body !== undefined ? { body: input.body } : {}),
+      }, signal);
+      await this.recordExchange(input, resp, this.sessions.get(input.sessionId)?.baseUrl);
+      return this.view(input.sessionId, resp);
+    } catch (error) {
+      throw asWebActionableError(error, "call web_list to recover a live session, then retry with an in-scope path and supported method");
+    }
+  }
+
+  public static requestPersistenceError(error: unknown): error is Error & { requestSent: true } {
+    return typeof error === "object" && error !== null && (error as { requestSent?: unknown }).requestSent === true;
   }
 
   /**
@@ -184,9 +196,10 @@ export class WebToolHandler {
    * we reopen against the same origin and issue the single request there.
    */
   public async replay(input: WebRequestInput, signal?: AbortSignal): Promise<WebRequestView> {
-    const { baseUrl } = this.require(input.sessionId);
-    this.assertUrlAllowed(baseUrl);
-    const clean = await HttpSessionBackend.open({
+    try {
+      const { baseUrl } = this.require(input.sessionId);
+      this.assertUrlAllowed(baseUrl);
+      const clean = await HttpSessionBackend.open({
       runId: this.deps.runId,
       baseUrl,
       ownerLane: this.ownerLane,
@@ -198,26 +211,33 @@ export class WebToolHandler {
       ...(this.deps.fetchImpl ? { fetchImpl: this.deps.fetchImpl } : {}),
       ...(this.deps.externalResources ? { externalResources: this.deps.externalResources } : {}),
       ...(this.deps.externalRelease ? { externalRelease: this.deps.externalRelease } : {}),
-    });
-    try {
-      const resp = await clean.request(input.path, {
-        ...(input.method ? { method: input.method } : {}),
-        ...(input.headers ? { headers: input.headers } : {}),
-        ...(input.body !== undefined ? { body: input.body } : {}),
-      }, signal);
-      await this.recordExchange(input, resp, baseUrl, clean.sessionId);
-      return this.view(clean.sessionId, resp);
-    } finally {
-      await clean.close("replay-complete").catch(() => undefined);
+      });
+      try {
+        const resp = await clean.request(input.path, {
+          ...(input.method ? { method: input.method } : {}),
+          ...(input.headers ? { headers: input.headers } : {}),
+          ...(input.body !== undefined ? { body: input.body } : {}),
+        }, signal);
+        await this.recordExchange(input, resp, baseUrl, clean.sessionId);
+        return this.view(clean.sessionId, resp);
+      } finally {
+        await clean.close("replay-complete").catch(() => undefined);
+      }
+    } catch (error) {
+      throw asWebActionableError(error, "call web_list to recover a live session, then retry replay with a bounded request");
     }
   }
 
   public async close(sessionId: string): Promise<void> {
-    if (this.closed.has(sessionId)) return;
-    const { backend } = this.require(sessionId);
-    await backend.close("closed by model");
-    this.sessions.delete(sessionId);
-    this.closed.add(sessionId);
+    try {
+      if (this.closed.has(sessionId)) return;
+      const { backend } = this.require(sessionId);
+      await backend.close("closed by model");
+      this.sessions.delete(sessionId);
+      this.closed.add(sessionId);
+    } catch (error) {
+      throw asWebActionableError(error, "call web_list and close a session id owned by this Run");
+    }
   }
 
   public list(): Array<{ sessionId: string; baseUrl: string }> {
@@ -241,18 +261,18 @@ export class WebToolHandler {
    */
   private assertUrlAllowed(url: string): void {
     let parsed: URL;
-    try { parsed = new URL(url); } catch { throw new Error(`web url is not a valid URL: ${url}`); }
+    try { parsed = new URL(url); } catch { throw webError(`web url is not a valid URL: ${url}`, "provide an absolute http(s) URL for the scoped target"); }
     const scheme = parsed.protocol.replace(/:$/, "").toLowerCase();
-    if (scheme !== "http" && scheme !== "https") throw new Error(`web url scheme ${scheme} is not allowed (http/https only)`);
+    if (scheme !== "http" && scheme !== "https") throw webError(`web url scheme ${scheme} is not allowed (http/https only)`, "use an http:// or https:// target");
     if (!this.deps.scope) return;
     const host = parsed.hostname.toLowerCase();
     const port = parsed.port ? Number(parsed.port) : scheme === "https" ? 443 : 80;
     const { allowedHosts, allowedPorts } = this.deps.scope;
     if (allowedHosts.length > 0 && !allowedHosts.some((pattern) => hostMatches(host, pattern))) {
-      throw new Error(`web url host ${host} is outside the task scope`);
+      throw webError(`web url host ${host} is outside the task scope`, "choose a host from the task scope or use a local target");
     }
     if (allowedPorts.length > 0 && !allowedPorts.includes(port)) {
-      throw new Error(`web url port ${port} is outside the task scope`);
+      throw webError(`web url port ${port} is outside the task scope`, "choose a port from the task scope or use a local target");
     }
   }
 
@@ -349,9 +369,25 @@ export class WebToolHandler {
 
   private require(sessionId: string): LiveWebSession {
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error(`Unknown web session: ${sessionId}`);
+    if (!session) throw webError(`Unknown web session: ${sessionId}`, "call web_list and use a session id from this Run, or call web_open to start one");
     return session;
   }
+}
+
+function webError(reason: string, next: string): Error {
+  return new Error(`[ProofBlade tool request rejected: web]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`);
+}
+
+function asWebActionableError(error: unknown, fallbackNext: string): Error {
+  if (WebToolHandler.requestPersistenceError(error)) return error;
+  if (error instanceof Error && error.message.startsWith("[ProofBlade")) return error;
+  const reason = error instanceof Error ? error.message : String(error);
+  const next = /generation drift|not OPEN|closed/i.test(reason)
+    ? "call web_list, close the stale session if needed, and open a fresh session in the current Run generation"
+    : /origin|outside the task scope|scheme|port|method|body exceeds/i.test(reason)
+      ? "use an in-scope http(s) origin, a supported HTTP method, and a body no larger than 1 MiB"
+      : fallbackNext;
+  return webError(reason, next);
 }
 
 function brokerHttpResource(

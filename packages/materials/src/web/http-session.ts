@@ -18,6 +18,16 @@ export interface HttpSessionResponse {
   candidateKinds: string[];
 }
 
+/** The remote request completed, but durable local recording failed. */
+class HttpRequestPersistenceError extends Error {
+  public readonly requestSent = true;
+
+  public constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = "HttpRequestPersistenceError";
+  }
+}
+
 /** Bounded, replay-friendly record persisted for every HTTP exchange. */
 export interface HttpExchangeArtifact {
   schemaVersion: 1;
@@ -226,39 +236,43 @@ export class HttpSessionBackend {
       await this.options.experimentGate?.record({ runId: this.options.runId, action, input: gateInput, outcome: /timed out|timeout/i.test(String(error)) ? "timeout" : "failure", summary: String(error).slice(0, 1_000) });
       throw error;
     }
-    this.captureCookies(response.headers);
-    const body = await readBoundedResponseBody(response);
-    this.csrfToken = extractCsrfToken(response.headers, body) ?? this.csrfToken;
-    const stateHash = this.stateHash();
-    const responseHeaders = sanitizeHeaders(Object.fromEntries(response.headers.entries()));
-    const exchange: HttpExchangeArtifact = {
-      schemaVersion: 1,
-      kind: "http_exchange",
-      request: {
-        method,
-        url: url.toString(),
-        headers: requestHeaders,
-        ...(init.body === undefined ? {} : { body: init.body }),
-      },
-      response: { status: response.status, headers: responseHeaders, body },
-      stateHash,
-    };
-    this.exchangeCount += 1;
-    const exchangeArtifact = await this.options.artifactStore.putText(this.options.runId, JSON.stringify(exchange), {
-      filename: `http-${this.sessionId}-${String(this.exchangeCount).padStart(4, "0")}.exchange.json`,
-      mime: "application/json",
-      sensitivity: "public",
-      semantic: { name: `HTTP ${method} ${url.pathname} exchange`, summary: `Replayable HTTP exchange for ${url.pathname}.`, tags: ["web", "http", "exchange", String(response.status)], role: "supporting", relatedIds: [], annotatedBy: "harness" },
-    });
-    const observed = await this.observer.observe(this.options.runId, {
-      operation: action,
-      artifactId: exchangeArtifact.id,
-      generation: snapshot.generation,
-      result: { stdout: body, stderr: "", exitCode: response.status >= 400 ? response.status : 0, durationMs: 0 },
-    });
-    await this.options.controlStore.dispatch(this.options.runId, { type: "session_interacted", sessionId: this.sessionId, transcriptArtifactId: exchangeArtifact.id, stateHash, waitReason: "idle", lane: this.options.ownerLane });
-    await this.options.experimentGate?.record({ runId: this.options.runId, action, input: gateInput, outcome: response.status >= 500 ? "failure" : "success", summary: `HTTP ${response.status} response.` });
-    return { status: response.status, headers: responseHeaders, body, artifactId: exchangeArtifact.id, stateHash, observationId: observed.observationId, evidenceId: observed.evidenceId, candidateKinds: observed.candidateKinds };
+    try {
+      this.captureCookies(response.headers);
+      const body = await readBoundedResponseBody(response);
+      this.csrfToken = extractCsrfToken(response.headers, body) ?? this.csrfToken;
+      const stateHash = this.stateHash();
+      const responseHeaders = sanitizeHeaders(Object.fromEntries(response.headers.entries()));
+      const exchange: HttpExchangeArtifact = {
+        schemaVersion: 1,
+        kind: "http_exchange",
+        request: {
+          method,
+          url: url.toString(),
+          headers: requestHeaders,
+          ...(init.body === undefined ? {} : { body: init.body }),
+        },
+        response: { status: response.status, headers: responseHeaders, body },
+        stateHash,
+      };
+      this.exchangeCount += 1;
+      const exchangeArtifact = await this.options.artifactStore.putText(this.options.runId, JSON.stringify(exchange), {
+        filename: `http-${this.sessionId}-${String(this.exchangeCount).padStart(4, "0")}.exchange.json`,
+        mime: "application/json",
+        sensitivity: "public",
+        semantic: { name: `HTTP ${method} ${url.pathname} exchange`, summary: `Replayable HTTP exchange for ${url.pathname}.`, tags: ["web", "http", "exchange", String(response.status)], role: "supporting", relatedIds: [], annotatedBy: "harness" },
+      });
+      const observed = await this.observer.observe(this.options.runId, {
+        operation: action,
+        artifactId: exchangeArtifact.id,
+        generation: snapshot.generation,
+        result: { stdout: body, stderr: "", exitCode: response.status >= 400 ? response.status : 0, durationMs: 0 },
+      });
+      await this.options.controlStore.dispatch(this.options.runId, { type: "session_interacted", sessionId: this.sessionId, transcriptArtifactId: exchangeArtifact.id, stateHash, waitReason: "idle", lane: this.options.ownerLane });
+      await this.options.experimentGate?.record({ runId: this.options.runId, action, input: gateInput, outcome: response.status >= 500 ? "failure" : "success", summary: `HTTP ${response.status} response.` });
+      return { status: response.status, headers: responseHeaders, body, artifactId: exchangeArtifact.id, stateHash, observationId: observed.observationId, evidenceId: observed.evidenceId, candidateKinds: observed.candidateKinds };
+    } catch (error) {
+      throw new HttpRequestPersistenceError(`HTTP ${method} request was sent, but durable recording failed; remote outcome is unknown.`, error);
+    }
   }
 
   public async close(reason = "closed"): Promise<void> {
