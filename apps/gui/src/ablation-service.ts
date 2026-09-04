@@ -71,7 +71,7 @@ export class AblationService {
   public async detail(experimentId: string): Promise<AblationUiDetail> {
     const experiment = await this.store.load(experimentId);
     const status = await this.readStatus(experimentId);
-    const ledger = await this.tryLedger(experimentId);
+    const ledger = await this.tryLedger(experiment);
     const report = await this.tryReport(experimentId);
     return {
       experiment,
@@ -118,7 +118,7 @@ export class AblationService {
     if (corpus.snapshot.hash !== experiment.corpus.hash) throw new Error("消融语料快照已变化；请创建新的实验版本");
     const ledgerPath = join(this.directory, `${experiment.experimentId}.ledger.json`);
     let ledger: AblationRunLedger;
-    try { ledger = await AblationRunLedger.load(ledgerPath); }
+    try { ledger = await AblationRunLedger.load(ledgerPath, experiment); }
     catch (error) {
       if ((error as { code?: string }).code !== "ENOENT") throw error;
       ledger = await AblationRunLedger.create(ledgerPath, experiment, corpus.cases.map((item) => ({ id: item.id, targetKind: item.targetKind })));
@@ -175,8 +175,8 @@ export class AblationService {
     try { return await this.preflightFor(experiment, false); } catch { return undefined; }
   }
 
-  private async tryLedger(experimentId: string): Promise<ReturnType<AblationRunLedger["summary"]> | undefined> {
-    try { return (await AblationRunLedger.load(join(this.directory, `${experimentId}.ledger.json`))).summary(); } catch { return undefined; }
+  private async tryLedger(experiment: AblationExperimentSnapshot): Promise<ReturnType<AblationRunLedger["summary"]> | undefined> {
+    try { return (await AblationRunLedger.load(join(this.directory, `${experiment.experimentId}.ledger.json`), experiment)).summary(); } catch { return undefined; }
   }
 
   private async tryReport(experimentId: string): Promise<{ report: ReturnType<typeof buildAblationReport>; markdown: string } | undefined> {
