@@ -56,7 +56,13 @@ test("domainPhase and ExperimentRecord replay durably and block a third failed r
     const third = await gate.record(input);
     assert.equal(third.allowed, false);
     assert.equal(third.previousFailures, 2);
-    await assert.rejects(gate.assertAllowed({ runId, action: input.action, input: input.input }), /blocked action/);
+    await assert.rejects(gate.assertAllowed({ runId, action: input.action, input: input.input }), (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      assert.match(text, /Reason:.*already failed 2 times[\s\S]*not executed/);
+      assert.match(text, /Next:.*change the hypothesis or material input/);
+      assert.match(text, /new authorized run with an explicitly larger repeat budget/);
+      return true;
+    });
     const replayed = await services.control.replay(runId);
     assert.equal(replayed.domainPhase, "EXPERIMENT");
     assert.equal(Object.keys(replayed.experiments).length, 2);
