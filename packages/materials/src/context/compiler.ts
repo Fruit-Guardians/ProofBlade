@@ -432,14 +432,16 @@ function buildActiveControls(input: {
   observationQueue: ObservationQueueItem[];
   tokenBudget: number;
 }): string {
-  return boundLedger([
+  const handoffs = [
+    "Handoffs:",
+    ...input.handoffs.map((item) => `- ${item.id}: phase=${item.phase}; status=${item.status}; knowledge=${item.knowledgeVersion}`),
+    ...(input.handoffs.length === 0 ? ["- none"] : []),
+  ].join("\n");
+  const body = [
     "Active controls change frequently and must not rewrite the durable ledger.",
     "Pending observations (read the corresponding Job, Artifact, or verifier state to acknowledge):",
     ...input.observationQueue.map((item) => `- ${item.id}: ${item.kind} priority=${item.priority} summary=${safeLedgerText(item.summary)} refs=${item.relatedIds.join(",") || "none"} artifacts=${item.artifactIds.join(",") || "none"}`),
     ...(input.observationQueue.length === 0 ? ["- none"] : []),
-    "Handoffs:",
-    ...input.handoffs.map((item) => `- ${item.id}: phase=${item.phase}; status=${item.status}; knowledge=${item.knowledgeVersion}`),
-    ...(input.handoffs.length === 0 ? ["- none"] : []),
     "Jobs:",
     ...input.jobs.map((item) => `- ${item.id}: ${item.capabilityId}.${item.operation} status=${item.status} replay=${item.replayPolicy} artifact=${item.artifactId ?? "none"}`),
     ...(input.jobs.length === 0 ? ["- none"] : []),
@@ -449,7 +451,13 @@ function buildActiveControls(input: {
     "Leases:",
     ...input.leases.map((item) => `- ${item.resourceKey}: owner=${item.ownerLane} generation=${item.generation} expires=${item.expiresAt}`),
     ...(input.leases.length === 0 ? ["- none"] : []),
-  ].join("\n"), Math.min(input.tokenBudget, MAX_LEDGER_BLOCK_TOKENS));
+  ].join("\n");
+  const budget = Math.min(input.tokenBudget, MAX_LEDGER_BLOCK_TOKENS);
+  const boundedBody = boundLedger(body, Math.max(64, budget - estimateTokens(handoffs)));
+  // The handoff line is an active route, not expendable middle context. The
+  // body budget leaves room for it; retain it verbatim if the snip marker's
+  // fixed overhead makes the conservative estimate slightly exceed budget.
+  return `${boundedBody}\n${handoffs}`;
 }
 
 function boundLedger(value: string, tokenBudget: number): string {
