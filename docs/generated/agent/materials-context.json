@@ -74,7 +74,7 @@
     "src/index.ts": "bb28562130a426c2b0b86b335998ff44b6b120c263620cf7c796c66c0cf266dd",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
-    "src/knowledge/deterministic-index.ts": "0573d7f76213bd66e9b1e47dbd8fdd02b8739c41dd92b45a496e9c32790ea68a",
+    "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
     "src/knowledge/evidence-graph.ts": "3e2b3a3a7bcd9682200d0e01287a5f8975c6d751de178956acc533ece091cd4c",
     "src/knowledge/observer.ts": "63cc7ab6bec68a56931e6c3068f961ed9aa075da0f9fec1bcd0de92e4822ccb8",
