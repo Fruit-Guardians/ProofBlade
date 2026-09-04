@@ -5,6 +5,7 @@ import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verific
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import type { AblationDecisionEvent, AblationPolicyController } from "../evaluation/ablation-policy.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
 
@@ -23,6 +24,24 @@ export interface FirstActionBudget {
   maxCalls: number;
   count: number;
   completed: boolean;
+}
+
+export interface AblationPolicyBinding {
+  controller: AblationPolicyController;
+  experimentId: string;
+  variantId: string;
+  caseId: string;
+  runId: string;
+  attempt: number;
+  /** Current durable route, refreshed before each provider turn. */
+  route?: () => AblationRouteSnapshot | undefined;
+  turn?: () => number;
+  onDecision?: (event: AblationDecisionEvent) => void | Promise<void>;
+}
+
+export interface AblationRouteSnapshot {
+  domainPhase: string;
+  actionBundles: Array<{ domainPhase: string; toolNames: readonly string[] }>;
 }
 
 export interface CodingTurnTermination {
@@ -61,6 +80,8 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
   experimentBudgetBreaker?: ExperimentBudgetBreaker,
   toolBudget?: ToolCallBudget,
   firstActionBudget?: FirstActionBudget,
+  ablationPolicy?: AblationPolicyBinding,
+  deferClaimAcceptance = false,
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
@@ -96,6 +117,31 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         details: event.details,
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
+      const details = isRecord(event.details) ? event.details : {};
+      const verifierReady = event.toolName === "verify_claim" && details.verified === true;
+      if (verifierReady && ablationPolicy) {
+        const policyEvent = ablationPolicy.controller.decide({
+          experimentId: ablationPolicy.experimentId,
+          variantId: ablationPolicy.variantId,
+          caseId: ablationPolicy.caseId,
+          attempt: ablationPolicy.attempt,
+          runId: ablationPolicy.runId,
+          turn: ablationPolicy.turn?.() ?? 1,
+          requestedAction: "tool_result",
+          requestedTool: event.toolName,
+          stopSuggested: true,
+          reasonInputs: { toolName: event.toolName, verified: true, completionId: typeof details.completionId === "string" ? details.completionId : "" },
+        });
+        void ablationPolicy.onDecision?.(policyEvent);
+        if (policyEvent.decision === "advise") {
+          return {
+            content: [...event.content, { type: "text" as const, text: stopSuggestionMessage(policyEvent.policyMode) }],
+            details: { ...details, stopSuggestion: true, stopSuggestionMode: policyEvent.policyMode },
+            isError: false,
+            ...(deferClaimAcceptance ? { terminate: true } : {}),
+          };
+        }
+      }
       const experiment = experimentBudgetBreaker?.observe(observation);
       if (experiment?.terminate) {
         if (termination.continuousRecovery) {
@@ -205,6 +251,37 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
     const storm = failureStormBreaker?.observe(observation);
     const decision = repeatBreaker.observe(observation);
+    const policyEvent = ablationPolicy && ablationPolicy.controller.decide({
+      experimentId: ablationPolicy.experimentId,
+      variantId: ablationPolicy.variantId,
+      caseId: ablationPolicy.caseId,
+      attempt: ablationPolicy.attempt,
+      runId: ablationPolicy.runId,
+      turn: ablationPolicy.turn?.() ?? 1,
+      requestedAction: "tool_result",
+      requestedTool: event.toolName,
+      ...(decision.terminate ? { duplicateFailure: true } : {}),
+      ...(storm?.terminate ? { circuitBreakerTriggered: true } : {}),
+      reasonInputs: { toolName: event.toolName, duplicateFailure: decision.terminate, circuitBreakerTriggered: Boolean(storm?.terminate) },
+    });
+    if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
+    const ablationRelaxesFailureGuard = policyEvent?.decision === "allow" || policyEvent?.decision === "advise";
+    if (ablationRelaxesFailureGuard && storm?.terminate) {
+      failureStormBreaker?.reset();
+      return {
+        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: toolFailureStormMessage(storm.count) }],
+        details: { failureStorm: true, advisory: true, count: storm.count, key: storm.key },
+        isError: true,
+      };
+    }
+    if (ablationRelaxesFailureGuard && decision.terminate) {
+      repeatBreaker.reset();
+      return {
+        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: repeatedToolFailureMessage(event.toolName, decision.count) }],
+        details: { repeatedFailure: true, advisory: true, toolName: event.toolName, count: decision.count, key: decision.key },
+        isError: true,
+      };
+    }
     if (storm?.terminate && !decision.terminate) {
       if (termination.continuousRecovery) {
         failureStormBreaker?.reset();
@@ -244,7 +321,40 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
   });
   const unsubscribeToolCall = harness.on("tool_call", (event) => {
-    if (firstActionBudget && !firstActionBudget.completed) {
+    const firstActionViolation = firstActionBudget && !firstActionBudget.completed
+      && !isFirstActionCompletionTool(event.toolName)
+      && !matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames);
+    const route = ablationPolicy?.route?.();
+    const completionTool = isCompletionTool(event.toolName);
+    const activeBundle = route?.actionBundles.find((bundle) => bundle.domainPhase === route.domainPhase);
+    const matchesActiveBundle = activeBundle ? matchesActionBundleTool(event.toolName, activeBundle.toolNames) : true;
+    const appearsInAnotherPhase = route?.actionBundles.some((bundle) => bundle.domainPhase !== route.domainPhase && matchesActionBundleTool(event.toolName, bundle.toolNames)) ?? false;
+    const policyEvent = ablationPolicy && ablationPolicy.controller.decide({
+      experimentId: ablationPolicy.experimentId,
+      variantId: ablationPolicy.variantId,
+      caseId: ablationPolicy.caseId,
+      attempt: ablationPolicy.attempt,
+      runId: ablationPolicy.runId,
+      turn: ablationPolicy.turn?.() ?? 1,
+      requestedAction: "tool_call",
+      requestedTool: event.toolName,
+      ...(firstActionViolation ? { firstActionViolation: true } : {}),
+      ...(activeBundle && !completionTool && !matchesActiveBundle ? { actionBundleViolation: true } : {}),
+      ...(activeBundle && !completionTool && !matchesActiveBundle && appearsInAnotherPhase ? { phaseRouteViolation: true } : {}),
+      reasonInputs: {
+        toolName: event.toolName,
+        firstActionViolation: Boolean(firstActionViolation),
+        domainPhase: route?.domainPhase ?? "",
+        activeBundleId: activeBundle?.domainPhase ?? "",
+        actionBundleViolation: Boolean(activeBundle && !completionTool && !matchesActiveBundle),
+        phaseRouteViolation: Boolean(activeBundle && !completionTool && !matchesActiveBundle && appearsInAnotherPhase),
+      },
+    });
+    if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
+    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") return { block: true, reason: `[ProofBlade ablation] ${policyEvent.reasonCode}` };
+    const ablationRelaxesFirstAction = policyEvent?.policyName === "first_action"
+      && (policyEvent.decision === "allow" || policyEvent.decision === "advise");
+    if (firstActionBudget && !firstActionBudget.completed && !ablationRelaxesFirstAction) {
       if (isFirstActionCompletionTool(event.toolName)) {
         firstActionBudget.completed = true;
       } else if (!matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
@@ -290,11 +400,29 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
 }
 
 function isFirstActionCompletionTool(toolName: string): boolean {
+  return isCompletionTool(toolName);
+}
+
+function isCompletionTool(toolName: string): boolean {
   return toolName === "verify_claim" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
 }
 
 function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {
   return allowedToolNames.some((allowed) => allowed === toolName || (allowed === "mcp__*" && toolName.startsWith("mcp__")));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stopSuggestionMessage(mode: string): string {
+  return mode === "verifier_driven"
+    ? "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
+    : "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
+}
+
+function matchesActionBundleTool(toolName: string, allowedToolNames: readonly string[]): boolean {
+  return matchesFirstActionTool(toolName, allowedToolNames);
 }
 
 export async function finalizeCodingTurn(options: {

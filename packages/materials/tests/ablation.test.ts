@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAblationPairings, DEFAULT_HARNESS_POLICY, validateAblationExperiment } from "../src/index.js";
+import { buildAblationPairings, DEFAULT_HARNESS_POLICY, preflightAblationExperiment, AblationExperimentStore, validateAblationExperiment } from "../src/index.js";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { canonicalJson, sha256 } from "../src/domain/utils.js";
 
 const profile = {
   provider: "relay",
@@ -14,6 +18,7 @@ const profile = {
   requestTimeoutMs: 120000,
   maxRetries: 2,
   input: ["text"] as Array<"text">,
+  pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2, cacheReadUsdPerMillion: 0, cacheWriteUsdPerMillion: 0 },
 };
 
 function input(overrides: Record<string, unknown> = {}) {
@@ -43,6 +48,38 @@ test("validates a strict same-model ablation and produces stable fingerprints", 
   assert.equal(first.safety.secretIsolation, "enforced");
 });
 
+test("provider proxy transport is included in the immutable model snapshot", () => {
+  const proxied = validateAblationExperiment(input(), { ...profile, proxyUrl: "http://127.0.0.1:7897" });
+  assert.equal(proxied.model.proxyUrl, "http://127.0.0.1:7897");
+  assert.notEqual(proxied.model.profileFingerprint, validateAblationExperiment(input(), profile).model.profileFingerprint);
+});
+
+test("preflight compares every immutable provider snapshot field", async () => {
+  process.env.TEST_KEY = "test-key";
+  const experiment = validateAblationExperiment(input(), profile);
+  for (const changedProfile of [
+    { ...profile, proxyUrl: "http://127.0.0.1:7897" },
+    { ...profile, apiKeyEnv: "OTHER_KEY" },
+    { ...profile, endpointMode: "exact" as const },
+    { ...profile, contextWindow: profile.contextWindow + 1 },
+    { ...profile, maxTokens: profile.maxTokens + 1 },
+  ]) {
+    const result = await preflightAblationExperiment(experiment, changedProfile);
+    assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, false);
+  }
+  delete process.env.TEST_KEY;
+});
+
+test("canonicalizes Provider baseUrl consistently across snapshots and preflight", async () => {
+  process.env.TEST_KEY = "secret";
+  const profileWithSlash = { ...profile, baseUrl: `${profile.baseUrl}/` };
+  const experiment = validateAblationExperiment(input(), profileWithSlash);
+  assert.equal(experiment.model.baseUrl, profile.baseUrl);
+  const result = await preflightAblationExperiment(experiment, profileWithSlash);
+  assert.equal(result.checks.find((check) => check.id === "provider_match")?.passed, true);
+  delete process.env.TEST_KEY;
+});
+
 test("rejects auto model, duplicate baselines, policy mismatch and disabled safety", () => {
   assert.throws(() => validateAblationExperiment(input({ model: { profileId: "relay-a", model: "auto" } }), profile), /concrete model/);
   assert.throws(() => validateAblationExperiment(input({ variants: [input().variants[0], { ...input().variants[1], baseline: true }] }), profile), /exactly one baseline/);
@@ -69,4 +106,81 @@ test("builds deterministic interleaved and seeded stratified pairings", () => {
   const stratified = buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases);
   assert.deepEqual(stratified, buildAblationPairings({ ...experiment, runOrder: { mode: "stratified", seed: 9 } }, cases));
   assert.deepEqual(stratified.map((item) => item.ordinal), stratified.map((_, index) => index));
+});
+
+test("preflight exposes credential presence without exposing its value and probes only model metadata", async () => {
+  process.env.TEST_KEY = "secret-value-that-must-not-be-returned";
+  const experiment = validateAblationExperiment(input(), profile);
+  const result = await preflightAblationExperiment(experiment, profile, {
+    probe: true,
+    fetch: async (url, init) => {
+      assert.match(String(url), /models$/);
+      assert.match(String((init?.headers as Record<string, string>).authorization), /^Bearer secret-value/);
+      return new Response(JSON.stringify({ data: [{ id: "luna-1" }] }), { status: 200 });
+    },
+  });
+  assert.equal(result.ready, true);
+  assert.equal(result.provider.credentialPresent, true);
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
+  delete process.env.TEST_KEY;
+});
+
+test("provider probe rejects a discovery response that omits the requested model", async () => {
+  process.env.TEST_KEY = "probe-key";
+  const result = await preflightAblationExperiment(validateAblationExperiment(input(), profile), profile, {
+    probe: true,
+    fetch: async () => new Response(JSON.stringify({ data: [{ id: "other-chat-model" }] }), { status: 200 }),
+  });
+  assert.equal(result.checks.find((check) => check.id === "provider_probe")?.passed, false);
+  assert.equal(result.ready, false);
+  delete process.env.TEST_KEY;
+});
+
+test("experiment store persists immutable snapshots and rejects tampering", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-store-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const experiment = validateAblationExperiment(input(), profile);
+    const path = await store.save(experiment);
+    assert.match(path, /AB-20260831-001\.json$/);
+    assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
+    assert.equal((await store.load(experiment.experimentId)).experimentFingerprint, experiment.experimentFingerprint);
+    await assert.rejects(() => store.save(experiment), /already exists/);
+    const original = await readFile(path, "utf8");
+    await (await import("node:fs/promises")).writeFile(path, original.replace("Receipt comparison", "tampered"));
+    await assert.rejects(() => store.load(experiment.experimentId), /fingerprint mismatch/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("v1 snapshots missing expanded policy fields retain historical hard-policy defaults", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-v1-policy-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const current = validateAblationExperiment(input(), profile);
+    const legacy = {
+      ...current,
+      protocolVersion: "ablation-v1" as const,
+      variants: current.variants.map(({ policy: _policy, policySnapshot: _policySnapshot, ...variant }) => variant),
+    };
+    const { experimentFingerprint: _fingerprint, ...content } = legacy;
+    const persisted = { ...content, experimentFingerprint: sha256(canonicalJson(content)) };
+    await (await import("node:fs/promises")).writeFile(join(root, `${current.experimentId}.json`), JSON.stringify(persisted), "utf8");
+    const loaded = await store.load(current.experimentId);
+    assert.equal(loaded.protocolVersion, "ablation-v1");
+    assert.equal(loaded.variants[0]?.policy.firstAction, "hard_gate");
+    assert.equal(loaded.variants[0]?.policy.circuitBreaker, "hard_stop");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("experiment store ignores mutable ledger, results, and status projections", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-ablation-store-list-"));
+  try {
+    const store = new AblationExperimentStore(root);
+    const experiment = validateAblationExperiment(input(), profile);
+    await store.save(experiment);
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.ledger.json`), JSON.stringify({ schemaVersion: 1, attempts: {} }));
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.results.json`), JSON.stringify({ variants: [] }));
+    await (await import("node:fs/promises")).writeFile(join(root, `${experiment.experimentId}.status.json`), JSON.stringify({ status: "running" }));
+    assert.deepEqual((await store.list()).map((item) => item.experimentId), [experiment.experimentId]);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

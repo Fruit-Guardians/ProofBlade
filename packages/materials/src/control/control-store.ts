@@ -122,6 +122,7 @@ const TELEMETRY_EVENT_TYPES = new Set<HarnessEvent["type"]>([
   "resource_cleanup_recovery_required",
   "provider_response_received",
   "request_epoch_context",
+  "model_context_frame_recorded",
   "tool_call_recorded",
   "tool_result_recorded",
   "consolidate_started",

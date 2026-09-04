@@ -386,7 +386,7 @@ export function makeEvent(
 }
 
 function sourceForEvent(type: HarnessEvent["type"], actor: HarnessEvent["actor"]): RunEventEnvelope["source"] {
-  if (type.startsWith("provider_") || type === "model_usage" || type === "request_epoch_started" || type === "request_epoch_context") return "provider";
+  if (type.startsWith("provider_") || type === "model_usage" || type === "request_epoch_started" || type === "request_epoch_context" || type === "model_context_frame_recorded") return "provider";
   if (type.startsWith("job_")) return "job";
   if (type.startsWith("tool_") || type.startsWith("effect_") || actor === "tool") return "tool";
   if (type.startsWith("consolidate") || type === "compaction_recorded") return "maintenance";
@@ -402,6 +402,6 @@ function priorityForEvent(type: HarnessEvent["type"]): RunEventEnvelope["priorit
 
 function replayPolicyForEvent(type: HarnessEvent["type"]): RunEventEnvelope["replayPolicy"] {
   if (type.startsWith("event_ingress_")) return "idempotent";
-  if (type.startsWith("provider_") || type === "model_usage" || type.startsWith("tool_") || type.startsWith("consolidate")) return "pure";
+  if (type.startsWith("provider_") || type === "model_usage" || type === "model_context_frame_recorded" || type.startsWith("tool_") || type.startsWith("consolidate")) return "pure";
   return "unknown";
 }

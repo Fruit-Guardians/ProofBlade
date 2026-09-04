@@ -238,6 +238,62 @@ button.message-tool:hover, button.message-tool.selected { border-color: #3e6f57;
 .send-button { display: grid; width: 28px; height: 28px; margin-left: auto; place-items: center; border: 1px solid #3aaa78; border-radius: 5px; color: #07140d; background: var(--green); cursor: pointer; }
 .send-button:disabled { border-color: #334139; color: #617069; background: #202923; cursor: default; }
 .send-button.stop-button { border-color: #d56b6b; color: #fff; background: #b94343; }
+
+.ablation-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100%; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.ablation-list-panel { display: flex; min-width: 0; flex-direction: column; border-right: 1px solid var(--line); background: #101512; }
+.ablation-list-panel > header, .ablation-detail-head, .ablation-section > header, .ablation-form > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 0 12px; border-bottom: 1px solid var(--line-soft); }
+.ablation-list-panel > header > div, .ablation-form > header > div { display: flex; align-items: center; gap: 7px; color: var(--green); }
+.ablation-list-panel > header strong, .ablation-form > header strong { color: var(--text); font-size: 11px; }
+.ablation-new { margin: 10px; min-height: 31px; font-size: 10px; }
+.ablation-list { min-height: 0; overflow: auto; padding: 5px; }
+.ablation-list-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 7px; width: 100%; margin-bottom: 3px; padding: 9px; border: 1px solid transparent; border-radius: 4px; text-align: left; background: transparent; cursor: pointer; }
+.ablation-list-item:hover, .ablation-list-item.active { border-color: #315d49; background: #18231d; }
+.ablation-list-item strong { overflow: hidden; color: var(--text); font: 600 9px/1.2 "Cascadia Code", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.ablation-list-item span { grid-column: 1 / -1; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.ablation-list-item em { color: var(--faint); font-size: 8px; font-style: normal; }
+.ablation-status { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-height: 18px; padding: 0 5px; border: 1px solid #3d4b43; border-radius: 3px; color: var(--muted); font-size: 8px; font-style: normal; white-space: nowrap; }
+.ablation-status.ready, .ablation-status.completed { border-color: #2c694c; color: #70d6a4; background: #14251c; }
+.ablation-status.running { border-color: #306678; color: #7dccdf; background: #14232a; }
+.ablation-status.failed { border-color: #78403e; color: #ee8b87; background: #291817; }
+.ablation-status.large { margin-right: 12px; min-height: 23px; padding: 0 8px; font-size: 9px; }
+.ablation-main { min-width: 0; overflow: auto; }
+.ablation-empty { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; min-height: 55vh; color: var(--faint); text-align: center; }
+.ablation-empty svg { color: var(--green); }
+.ablation-empty strong { color: #b8c3bd; font-size: 12px; }
+.ablation-empty span { font-size: 10px; }
+.ablation-form { min-height: 100%; background: var(--panel); }
+.ablation-form > header { justify-content: flex-start; min-height: 52px; }
+.ablation-form > header span { color: var(--faint); font-size: 9px; }
+.ablation-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; }
+.ablation-form-grid label { display: grid; gap: 5px; min-width: 0; }
+.ablation-form-grid label.wide { grid-column: 1 / -1; }
+.ablation-form-grid label > span { color: var(--muted); font-size: 10px; }
+.ablation-form-grid input, .ablation-form-grid select, .ablation-form-grid textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; color: var(--text); background: #0d110f; font-size: 10px; }
+.ablation-form-grid textarea { resize: vertical; line-height: 15px; }
+.ablation-form > footer { display: flex; justify-content: flex-end; gap: 7px; padding: 0 14px 14px; }
+.ablation-detail { min-width: 0; padding-bottom: 20px; }
+.ablation-detail-head { align-items: flex-start; min-height: 75px; padding: 14px; }
+.ablation-detail-head > div { min-width: 0; }
+.ablation-detail-head h2 { margin: 3px 0 0; color: var(--text); font-size: 16px; }
+.ablation-detail-head p { overflow: hidden; margin: 5px 0 0; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.eyebrow { color: var(--green); font: 9px/1 "Cascadia Code", monospace; }
+.ablation-actions { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+.ablation-actions .primary-button { min-height: 31px; margin-left: auto; font-size: 10px; }
+.inline-check { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }
+.ablation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+.ablation-section { min-width: 0; border: 1px solid var(--line); border-radius: 5px; background: #121714; }
+.ablation-section > header { min-height: 36px; }
+.ablation-section > header strong { color: #c3cec7; font-size: 10px; }
+.ablation-section > header .ok { color: var(--green); }.ablation-section > header .bad { color: var(--red); }
+.ablation-facts { display: grid; gap: 7px; margin: 0; padding: 11px; }
+.ablation-facts div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; }
+.ablation-facts dt { color: var(--faint); font-size: 9px; }.ablation-facts dd { overflow: hidden; margin: 0; color: #b6c2ba; font: 9px/14px "Cascadia Code", monospace; text-overflow: ellipsis; white-space: nowrap; }.ablation-facts code { color: var(--cyan); }
+.muted { margin: 0; padding: 14px 11px; color: var(--faint); font-size: 10px; }
+.check-list { display: grid; gap: 6px; padding: 11px; }.check-list > div { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 6px; align-items: center; font: 9px/1.2 "Cascadia Code", monospace; }.check-pass svg { color: var(--green); }.check-fail svg { color: var(--red); }.check-list em { color: var(--faint); font-style: normal; }.warning { display: flex; align-items: center; gap: 5px; margin: 5px 0 0; color: var(--amber); font-size: 9px; }
+.progress-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 11px; }.progress-facts div { display: grid; gap: 4px; padding: 8px 5px; text-align: center; background: #171d19; }.progress-facts strong { color: var(--text); font: 600 16px/1 "Cascadia Code", monospace; }.progress-facts span { color: var(--faint); font-size: 8px; }
+.wide-section { grid-column: 1 / -1; }.ablation-table-wrap { overflow-x: auto; padding: 0 11px 11px; }.ablation-section table { width: 100%; border-collapse: collapse; font-size: 9px; }.ablation-section th, .ablation-section td { padding: 8px 6px; border-bottom: 1px solid var(--line-soft); text-align: left; white-space: nowrap; }.ablation-section th { color: var(--faint); font-weight: 500; }.ablation-section td { color: #b9c5bd; }.ablation-report { margin: 0 11px 11px; border-top: 1px solid var(--line-soft); }.ablation-report summary { padding: 8px 0; color: var(--cyan); cursor: pointer; font-size: 9px; }.ablation-report pre { max-height: 300px; overflow: auto; margin: 0; padding: 9px; color: #b8c6bd; background: #0b0f0c; font-size: 9px; line-height: 15px; white-space: pre-wrap; }
+@media (max-width: 900px) { .ablation-shell { grid-template-columns: 180px minmax(0, 1fr); }.ablation-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.ablation-grid { grid-template-columns: minmax(0, 1fr); }.wide-section { grid-column: auto; } }
+@media (max-width: 620px) { .ablation-shell { display: block; overflow: visible; }.ablation-list-panel { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--line); }.ablation-form-grid { grid-template-columns: minmax(0, 1fr); }.ablation-form-grid label.wide { grid-column: auto; }.ablation-detail-head { display: block; }.ablation-detail-head .large { margin-top: 8px; }.ablation-actions { flex-wrap: wrap; }.ablation-actions .primary-button { margin-left: 0; }.ablation-grid { padding: 8px; } }
 .send-button.stop-button:hover:not(:disabled) { background: #ca5050; }
 .terminal-chat-bar { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; color: #c5a76e; font-size: 9px; }
 .terminal-chat-bar span { flex: 1; }

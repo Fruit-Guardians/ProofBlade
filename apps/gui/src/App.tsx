@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startCtfSolve, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
+import { AblationWorkspace } from "./ablation-workspace.js";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -64,6 +65,7 @@ export function App() {
   const [detail, setDetail] = useState<RunDetail>();
   const [tab, setTab] = useState<MainTab>("chat");
   const [fleetView, setFleetView] = useState(false);
+  const [ablationView, setAblationView] = useState(false);
   const [search, setSearch] = useState("");
   const [runKindFilter, setRunKindFilter] = useState<"chat" | "fixture">("chat");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -73,7 +75,6 @@ export function App() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
-  const [ctfOpen, setCtfOpen] = useState(false);
   const [fixtureOpen, setFixtureOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [capabilityOpen, setCapabilityOpen] = useState(false);
@@ -134,6 +135,7 @@ export function App() {
     if (!runId) return;
     localStorage.setItem("proofblade.runId", runId);
     setFleetView(false);
+    setAblationView(false);
     setTab("chat");
     setDetail(undefined);
     setRefreshing(true);
@@ -193,8 +195,9 @@ export function App() {
     <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button><button className="fixture-test-button" onClick={() => setCtfOpen(true)}><Zap size={15} />CTF 解题</button></div>
-      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
+      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button></div>
+      <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setAblationView(false); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
+      <button className={`fleet-entry ${ablationView ? "active" : ""}`} onClick={() => { setAblationView(true); setFleetView(false); setDetail(undefined); setLeftOpen(false); }}><FlaskConical size={15} />消融实验</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
       <div className="run-kind-switch segmented"><button className={runKindFilter === "chat" ? "active" : ""} onClick={() => setRunKindFilter("chat")}><MessageSquare size={12} />对话</button><button className={runKindFilter === "fixture" ? "active" : ""} onClick={() => setRunKindFilter("fixture")}><FlaskConical size={12} />Fixture</button></div>
       {runKindFilter === "fixture" && <div className="filter-row">
@@ -222,7 +225,7 @@ export function App() {
         <button className="icon-button mobile-only" title="Run 列表" onClick={() => setLeftOpen(true)}><Menu size={19} /></button>
         <div className="run-heading">
           <div><h1>{fleetView ? "并行解题 (Fleet)" : (detail?.snapshot.runId ?? (loading ? "正在加载" : "选择 Run"))}</h1>{!fleetView && detail && (detail.kind === "chat" ? <ConversationBadge /> : <StatusBadge status={detail.snapshot.status} />)}</div>
-          <p>{fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
+          <p>{ablationView ? "Provider、策略 Variant、预检与结果比较" : fleetView ? "批量并行解题 · 实时监督与优先级/模式/并发控制" : (detail?.kind === "chat" ? (workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective) : (detail?.snapshot.task.objective ?? ""))}</p>
         </div>
         <div className="header-actions">
           {detail?.kind === "fixture" && <button className="command-button" title="核对 Fixture、Effect、Job 和 Lease" disabled={refreshing} onClick={() => void action("recover")}><RotateCcw size={15} /><span className="hide-mobile">恢复核对</span></button>}
@@ -236,14 +239,15 @@ export function App() {
         </div>
       </header>
 
-      {!fleetView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
-      {!fleetView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
+      {!fleetView && !ablationView && detail?.kind === "fixture" && <PhaseStrip current={detail.snapshot.phase} />}
+      {!fleetView && !ablationView && <nav className="main-tabs">{visibleTabs.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon size={15} />{detail?.kind === "chat" ? chatTabLabel(item.id, item.label) : item.label}{item.id === "debugger" && detail && <span>{detail.sessions.reduce((sum, session) => sum + session.toolCalls.length, 0)}</span>}</button>)}</nav>}
 
       <div className="content-area">
         {error && <AlertBar kind="error" onClose={() => setError(undefined)}>{error}</AlertBar>}
         {notice && <AlertBar kind="success" onClose={() => setNotice(undefined)}>{notice}</AlertBar>}
+        {ablationView && <AblationWorkspace providers={providers} onError={setError} onNotice={setNotice} />}
         {fleetView && <FleetView onError={setError} />}
-        {!fleetView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
+        {!fleetView && !ablationView && !detail && <LoadingState loading={loading || refreshing} hasRuns={runs.length > 0} />}
         {!fleetView && detail && tab === "chat" && <Conversation detail={detail} providers={providers} workspace={workspaceSettings} onWorkspaceChange={setWorkspaceSettings} onRefresh={async () => { await refreshPoller.poll(); }} onError={setError} onNew={() => setNewRunOpen(true)} onCapabilities={() => setCapabilityOpen(true)} />}
         {!fleetView && detail && tab === "overview" && <Overview detail={detail} />}
         {!fleetView && detail && tab === "debugger" && <ToolDebugger detail={detail} />}
@@ -259,7 +263,6 @@ export function App() {
       {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
-    {ctfOpen && <CtfSolveModal defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setCtfOpen(false)} onCreated={(id) => { setCtfOpen(false); setRunKindFilter("fixture"); setStatusFilter("ALL"); setRunId(id); }} />}
     {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
@@ -1111,37 +1114,6 @@ function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }:
     try { await createConversation({ runId, title, folderId: folderId || undefined, workspacePath, ...(verificationCommand.trim() ? { verificationCommand: verificationCommand.trim() } : {}) }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><label><span>任务验证命令（可选；填写后与 CTF 使用同一受信复现链）</span><textarea rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：node solve.mjs" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
-}
-
-function CtfSolveModal({ defaultWorkspace, onClose, onCreated }: { defaultWorkspace: string; onClose(): void; onCreated(id: string): void }) {
-  const [runId, setRunId] = useState(`CTF-${Date.now()}`);
-  const [objective, setObjective] = useState("");
-  const [workspacePath, setWorkspacePath] = useState(defaultWorkspace);
-  const [attachments, setAttachments] = useState("");
-  const [targetKind, setTargetKind] = useState("unknown");
-  const [verificationCommand, setVerificationCommand] = useState("");
-  const [mode, setMode] = useState<"assist" | "auto">("assist");
-  const [maxTurns, setMaxTurns] = useState(6);
-  const [directoryOpen, setDirectoryOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError(undefined);
-    try {
-      await startCtfSolve({
-        runId,
-        objective,
-        workspacePath,
-        attachmentPaths: attachments.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
-        targetKind,
-        verificationCommand,
-        mode,
-        maxTurns,
-      });
-      onCreated(runId);
-    } catch (caught) { setError(message(caught)); setBusy(false); }
-  };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><Zap size={17} /><strong>CTF 解题 Run</strong><span className="modal-subtitle">题目、附件和验证命令一次绑定</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>Run ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>题目描述</span><textarea required rows={5} value={objective} onChange={(event) => setObjective(event.target.value)} placeholder="粘贴完整题目描述、目标和约束" autoFocus /></label><label><span>原始工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>附件位置</span><textarea rows={3} value={attachments} onChange={(event) => setAttachments(event.target.value)} placeholder="每行一个路径（相对或绝对，但必须位于工作目录内）" /></label><div className="modal-row"><label><span>方向</span><select value={targetKind} onChange={(event) => setTargetKind(event.target.value)}>{[["unknown", "自动识别"], ["web", "Web"], ["pwn", "Pwn"], ["reverse", "Reverse"], ["crypto", "Crypto"], ["misc", "Misc"]].map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div><label><span>任务验证命令（必须从附件推导并逐行输出候选）</span><textarea required rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：python solve.py | tail -n 1" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !objective.trim() || !workspacePath.trim() || !verificationCommand.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}启动 verifier-first Run</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
 }
 
 function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath: string; onClose(): void; onSelect(path: string): void | Promise<void> }) {

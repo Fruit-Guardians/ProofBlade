@@ -4,9 +4,9 @@
 {
   "id": "materials-knowledge",
   "name": "Knowledge Observer",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-28T16:00:00.000Z",
+  "updatedAt": "2026-09-02T14:08:00.000+08:00",
   "qualityAudit": {
     "bugAuditCount": 5,
     "securityAuditCount": 5,
@@ -29,10 +29,13 @@
 - `evidence-curation-gate.ts` 追踪未审阅的 `read/bash` 产物；软检查点提示整理，硬检查点阻止继续侦察，直至 Agent 将产物提升为 Evidence，或受信 user/harness 显式审阅普通/调试输出。
 - 模型只能提出知识命令；Reducer 决定知识状态。
 - 原始大输出留在 Artifact，Knowledge 只保存可检索索引与引用。
+- `deterministic-index.ts` 为当前 Run/generation 提供可重建的文本索引；Artifact 内容 hash 变化会失效旧条目，generation 切换会清空索引。它是性能缓存，不是第二个事实库。
 
 ## 开发规则与验证
 
 所有目标内容保持不可信标签和来源。Routine Tool 输出默认只是 intermediate/debug Artifact；只有具备名称、摘要、标签和来源引用的发现才提升为 Evidence。Evidence Curator 通过固定代理命名、解释、连边和组织树；主 Agent 默认读取 Forest 摘要，需要溯源时才展开局部树。底层图允许节点被多树采用，GUI 的树形结构只是投影。
+
+`evidence.search` 优先查询当前 generation 的确定性 Artifact 索引；首次遇到新内容时才从 ArtifactStore 读取一次。索引命中、L2 读取、进入 ModelContextFrame 和后续模型使用仍是四个独立状态，不能因为缓存命中就声称模型已经读取或验证内容。
 
 证据整理门按唯一内容哈希投影互斥状态 `promoted > reviewed > viewed > unviewed`。普通 Agent annotation 只能把产物标为 `viewed`，仍属于 pending，不能解除门禁；只有来源明确的 Evidence promotion，或通过受信 capability 产生的 user/harness `artifact_annotated` 事件，才能移出 pending。Artifact 注册时自带的 harness semantic metadata 不算审阅。重复输出不重复占用预算，同哈希副本共享最高可信状态；测试必须覆盖软提示、硬阻断、去重、promotion、trusted review，以及批量 Agent annotation 仍无法清账。
 

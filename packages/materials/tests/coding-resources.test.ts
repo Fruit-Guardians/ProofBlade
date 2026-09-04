@@ -536,6 +536,8 @@ test("coding bash archives raw output before returning RTK-compressed content", 
     assert.ok(Number(rewrite.savingsRate) > 0.9);
     const artifactId = String(rewrite.artifactId);
     assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`ProofBlade artifact ${artifactId}`));
+    assert.match(result.content.map((item) => item.text ?? "").join("\n"), /\[ProofBlade receipt\][\s\S]*visible=bounded[\s\S]*next=recall/);
+    assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`artifact=pb://run/${runId}/artifact/${artifactId}/content`));
     const snapshot = await services.control.snapshot(runId);
     assert.ok(snapshot.artifacts[artifactId]);
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
@@ -613,11 +615,12 @@ test("coding read creates a searchable source artifact for the evidence graph", 
   }
 });
 
-test("CTF-shaped prompts opt into the bounded challenge path without matching ordinary coding", () => {
+test("legacy CTF prompt detection remains descriptive and does not redefine general task mode", () => {
   assert.equal(isLikelyCtfPrompt("题目描述：求解flag"), true);
   assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
   assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
   assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
 });
 
 test("bash remains an untrusted escape hatch and cannot write the control ledger", () => {
@@ -629,7 +632,7 @@ test("bash remains an untrusted escape hatch and cannot write the control ledger
 
 test("durable CTF task classification enables challenge guards without prompt keywords", () => {
   assert.equal(isChallengeTask({ mode: "ctf_solve", target_kind: "unknown" }), true);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), true);
+  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
   assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
@@ -1109,6 +1112,8 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     const withheldText = withheld.content.map((part) => part.text ?? "").join("\n");
     assert.match(withheldText, /ProofBlade artifact A-2: 4096 bytes withheld/);
     assert.match(withheldText, /do not re-run the command/);
+    assert.match(withheldText, /\[ProofBlade receipt\][\s\S]*visible=bounded[\s\S]*next=recall/);
+    assert.match(withheldText, /artifact=pb:\/\/run\/RUN-anchor\/artifact\/A-2\/content/);
     assert.equal(archived.length, 2);
   } finally {
     try {

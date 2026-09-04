@@ -1,4 +1,4 @@
-import type { ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetSnapshot, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
+import type { AblationDetail, AblationListItem, ActiveRunInfo, ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetSnapshot, ModelDiscoveryResult, ProviderSettings, ProviderSettingsInput, RunDetail, RunListItem, WorkspaceSettings } from "./shared.js";
 import type { ProviderApi } from "@proofblade/materials";
 
 export async function getBootstrap(): Promise<BootstrapData> {
@@ -7,6 +7,26 @@ export async function getBootstrap(): Promise<BootstrapData> {
 
 export async function getRuns(): Promise<RunListItem[]> {
   return await request("/api/runs");
+}
+
+export async function getAblationExperiments(): Promise<AblationListItem[]> {
+  return await request("/api/ablation");
+}
+
+export async function getAblationExperiment(experimentId: string): Promise<AblationDetail> {
+  return await request(`/api/ablation/${encodeURIComponent(experimentId)}`);
+}
+
+export async function createAblationExperiment(input: unknown): Promise<{ experimentId: string; experimentFingerprint: string }> {
+  return await request("/api/ablation", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function preflightAblationExperiment(experimentId: string, probe = false): Promise<NonNullable<AblationDetail["preflight"]>> {
+  return await request(`/api/ablation/${encodeURIComponent(experimentId)}/preflight`, { method: "POST", body: JSON.stringify({ probe }) });
+}
+
+export async function runAblationExperiment(experimentId: string, allowLive: boolean, probe = false): Promise<{ experimentId: string; status: string }> {
+  return await request(`/api/ablation/${encodeURIComponent(experimentId)}/run`, { method: "POST", body: JSON.stringify({ allowLive, probe }) });
 }
 
 export async function getProviderSettings(): Promise<ProviderSettings> {

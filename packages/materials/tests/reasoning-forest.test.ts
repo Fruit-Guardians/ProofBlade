@@ -5,8 +5,9 @@ import test from "node:test";
 import type { AgentMessage } from "@earendil-works/pi-agent-core/node";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { CodingEvidenceGraph, formatReasoningForestContext } from "../src/knowledge/evidence-graph.js";
+import { buildReasoningForest, CodingEvidenceGraph, formatReasoningForestContext } from "../src/knowledge/evidence-graph.js";
 import { injectReasoningForestContext } from "../src/runtime/coding-lane.js";
+import { estimateTokens, sha256 } from "../src/domain/utils.js";
 
 test("reasoning forest reuses evidence across trees and rejects invalid graph edges", async () => {
   const root = resolve(import.meta.dirname, "../../..", "tmp");
@@ -76,6 +77,25 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     const firstHash = (await services.control.replay(runId)).projectionHash;
     const secondHash = (await services.control.replay(runId)).projectionHash;
     assert.equal(firstHash, secondHash);
+    const currentSnapshot = await services.control.snapshot(runId);
+    assert.equal(buildReasoningForest(currentSnapshot).hash, buildReasoningForest({ ...currentSnapshot, lastSeq: currentSnapshot.lastSeq + 1 }).hash);
+    assert.equal(formatReasoningForestContext(buildReasoningForest(currentSnapshot)), formatReasoningForestContext(buildReasoningForest({ ...currentSnapshot, lastSeq: currentSnapshot.lastSeq + 100 })), "unrelated event sequence must not change visible forest context");
+    const oversizedForest = buildReasoningForest(currentSnapshot);
+    if (oversizedForest.trees[0]) {
+      oversizedForest.trees[0] = {
+        ...oversizedForest.trees[0],
+        name: "N".repeat(2_000),
+        summary: "S".repeat(2_000),
+        tags: ["T".repeat(2_000)],
+        relatedTreeIds: Array.from({ length: 100 }, (_, index) => `TREE-${index}-${"R".repeat(100)}`),
+      };
+    }
+    assert.ok(estimateTokens(formatReasoningForestContext(oversizedForest)) <= 2_048, "forest context must stay within its model-facing bound");
+    const clipped = formatReasoningForestContext(oversizedForest);
+    const match = clipped.match(/^<reasoning-forest hash="[a-f0-9]{64}" visible-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/reasoning-forest>$/);
+    assert.ok(match, "forest envelope must expose a hash for the visible clipped body");
+    assert.equal(match?.[1], sha256(match?.[2] ?? ""), "visible-hash must match the clipped forest body");
+    assert.equal(formatReasoningForestContext(oversizedForest), clipped, "the clipped forest representation is deterministic");
 
     const longClaimArtifact = await services.artifacts.putText(runId, "long claim source", { filename: "long-claim.txt", mime: "text/plain", sensitivity: "public" });
     const longClaim = `完整权威主张：${"保持完整内容用于验证，展示标题应单独截断。".repeat(12)}`;

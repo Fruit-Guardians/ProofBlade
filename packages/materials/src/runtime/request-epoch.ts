@@ -162,7 +162,7 @@ function statusForEvent(event: HarnessEvent): RequestEpochStatus | undefined {
 }
 
 function selectEpochFields(fields: Record<string, unknown>): Record<string, string> {
-  const allowed = ["requestBodyHash", "requestHeadersHash", "requestContextHash", "providerBindingId", "scopePolicyHash", "stablePrefixHash", "dynamicSuffixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash"];
+  const allowed = ["requestBodyHash", "requestHeadersHash", "requestContextHash", "providerBindingId", "scopePolicyHash", "stablePrefixHash", "dynamicSuffixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash", "modelContextFrameId", "modelContextFrameHash"];
   return Object.fromEntries(allowed.filter((key) => typeof fields[key] === "string").map((key) => [key, fields[key] as string]));
 }
 

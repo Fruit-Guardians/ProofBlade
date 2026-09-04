@@ -9,7 +9,8 @@ import {
 import { snipText, type OutputRewritePort, type OutputRewriteTicket } from "@proofblade/molecules";
 import { Type } from "typebox";
 import { sha256 } from "../domain/utils.js";
-import { boundedRequestedChars } from "../domain/text-bounds.js";
+import { boundModelText, boundedRequestedChars } from "../domain/text-bounds.js";
+import { createModelReceipt, renderModelReceipt } from "../context/model-receipt.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { McpProjectRegistry } from "../mcp/registry.js";
@@ -36,6 +37,7 @@ export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
+const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
@@ -446,7 +448,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     if (input.operation === "search") {
       assertOnly(input, ["operation", "query", "tags"], "evidence search");
-      return toolResult({ results: await context.evidenceGraph.search(input.query, input.tags) });
+      return toolResult(await context.evidenceGraph.searchWithTrace(input.query, input.tags));
     }
     if (input.operation === "read") {
       assertOnly(input, ["operation", "artifactId", "maxChars"], "evidence read");
@@ -1149,9 +1151,10 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
+      const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content)],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
       };
     },
@@ -1242,19 +1245,21 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
+        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
+        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
       const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
+      const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0))],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
@@ -1263,6 +1268,47 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       };
     },
   };
+}
+
+function isBoundedReadResult(result: { details?: unknown }): boolean {
+  return Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true);
+}
+
+async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0): Promise<string | undefined> {
+  try {
+    const runId = context.runtime?.runId ?? context.outputRewrite?.runId;
+    if (!runId) return undefined;
+    const snapshot = context.controlStore
+      ? await context.controlStore.snapshot(runId).catch(() => undefined)
+      : undefined;
+    const artifact = snapshot?.artifacts[artifactId] ?? ({
+      id: artifactId,
+      runId,
+      generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
+      path: `artifacts/${artifactId}`,
+      sha256: artifactHash || "0".repeat(64),
+      bytes: artifactBytes,
+      mime: "text/plain",
+      sensitivity: "public",
+      origin: { schemaVersion: 1, registeredBy: "agent", tags: [] },
+    } as never);
+    return renderModelReceipt(createModelReceipt({
+      runId,
+      generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
+      operationId,
+      title,
+      content,
+      artifact,
+      summary: `${title} 已归档；完整内容请沿 Artifact URI 使用 evidence.read/Recall。`,
+      mode: bounded ? "receipt" : "full",
+      ...(bounded ? { omittedChars: Math.max(omittedChars, artifactBytes - content.length) } : {}),
+      maxInlineChars: 2_048,
+      maxPreviewChars: 512,
+      nextActions: bounded ? ["recall"] : ["none"],
+    }));
+  } catch {
+    return undefined;
+  }
 }
 
 interface AutomaticArtifactDetails {
@@ -1639,16 +1685,18 @@ function scalarOrJson(value: unknown): string {
 }
 
 function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const visible = boundModelText(renderMcpPayload(result), Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
   return {
-    content: [{ type: "text", text: renderMcpPayload(result) }],
-    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}) },
+    content: [{ type: "text", text: visible.text }],
+    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}) },
     isError: result.exitCode !== 0,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
   const serialized = JSON.stringify(details);
-  const visible = maxChars === undefined ? serialized : snipText(serialized, maxChars).text;
+  const requestedChars = maxChars === undefined ? Math.max(64, serialized.length) : Math.max(64, maxChars);
+  const visible = boundModelText(serialized, requestedChars, MODEL_TOOL_RESULT_MAX_TOKENS).text;
   return {
     content: [{ type: "text", text: visible }],
     details,

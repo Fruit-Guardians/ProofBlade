@@ -64,6 +64,6 @@ export function prepareContextMaintenance(input: ContextMaintenanceInput): Conte
     plan,
     postPlan,
     nextAction: plan.shouldCompact || postPlan.shouldCompact ? "compact" : "none",
-    checkpointRecommended: repaired.dropped.length > 0 || mustEmergencyPrune,
+    checkpointRecommended: repaired.dropped.length > 0 || pruned.dropped.length > 0 || mustEmergencyPrune,
   };
 }

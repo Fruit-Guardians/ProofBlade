@@ -12,9 +12,11 @@ import type {
   ReasoningTree,
   RunSnapshot,
 } from "../domain/types.js";
-import { canonicalJson, id, sha256 } from "../domain/utils.js";
+import { canonicalJson, estimateTokens, id, sha256 } from "../domain/utils.js";
+import { boundModelText } from "../domain/text-bounds.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { LeakRecord } from "../pwn/leak.js";
+import { DeterministicArtifactIndex } from "./deterministic-index.js";
 
 export interface RecordCodingEvidenceInput {
   name: string;
@@ -39,6 +41,10 @@ export interface RecordLeakResult {
   node: ReasoningNode;
   reused: boolean;
 }
+
+const MAX_REASONING_FOREST_CONTEXT_TOKENS = 2_048;
+const MAX_REASONING_FOREST_FIELD_TOKENS = 128;
+const MAX_REASONING_FOREST_REFS = 24;
 
 export interface CreateReasoningTreeInput {
   name: string;
@@ -69,7 +75,26 @@ export interface LinkReasoningNodesInput {
 /** Cap on artifact text pulled into a content search, per artifact. */
 const MAX_SEARCHED_ARTIFACT_BYTES = 512_000;
 
+export interface RetrievalTrace {
+  schemaVersion: 1;
+  traceId: string;
+  runId: string;
+  generation: number;
+  query: string;
+  normalizedQuery: string;
+  mode: "keyword";
+  candidates: Array<{ id: string; kind: string; selected: boolean; score: number; reason: "exact" | "keyword" | "metadata" }>;
+  selectedRefs: string[];
+  injectedRefs: string[];
+  modelUsedRecall: boolean;
+  latencyMs: number;
+  createdAt: string;
+}
+
 export class CodingEvidenceGraph {
+  private readonly artifactIndex = new DeterministicArtifactIndex();
+  private indexedGeneration?: number;
+
   public constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
@@ -426,17 +451,21 @@ export class CodingEvidenceGraph {
     if (tree.generation !== snapshot.generation) throw new Error(`Reasoning tree is from generation ${tree.generation}`);
     const nodeIds = new Set(tree.nodeIds);
     const usage = nodeTreeUsage(snapshot);
-    return {
+    return boundedRetrievalRecord({
       tree,
       root: snapshot.reasoningNodes[tree.rootNodeId],
       nodes: tree.nodeIds.map((nodeId) => ({ ...snapshot.reasoningNodes[nodeId], adoptedByTrees: usage.get(nodeId) ?? [] })),
       edges: Object.values(snapshot.reasoningEdges).filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to)).sort((a, b) => a.createdSeq - b.createdSeq),
       relatedTrees: relatedTreeIds(snapshot, tree.id).map((id) => snapshot.reasoningTrees[id]).filter(Boolean).map((item) => ({ id: item.id, name: item.name, summary: item.summary, status: item.status })),
-    };
+    });
   }
 
   public async search(query = "", tags: string[] = []): Promise<Array<Record<string, unknown>>> {
     const snapshot = await this.controlStore.snapshot(this.runId);
+    if (this.indexedGeneration !== snapshot.generation) {
+      this.artifactIndex.clear();
+      this.indexedGeneration = snapshot.generation;
+    }
     const normalizedQuery = query.trim().toLowerCase();
     const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
     const normalizedTagSet = new Set(normalizedTags(tags).map((tag) => tag.toLowerCase()));
@@ -457,7 +486,9 @@ export class CodingEvidenceGraph {
         const artifact = snapshot.artifacts[String(row.id)];
         if (!artifact || !artifact.mime.startsWith("text/") || artifact.bytes > MAX_SEARCHED_ARTIFACT_BYTES) return;
         try {
-          row.search += ` ${(await this.artifactStore.readText(this.runId, artifact)).toLowerCase()}`;
+          const indexed = this.artifactIndex.get(artifact.id, artifact.sha256)
+            ?? this.artifactIndex.set(artifact.id, artifact.sha256, await this.artifactStore.readText(this.runId, artifact));
+          row.search += ` ${indexed.normalizedText}`;
         } catch {
           // unreadable artifact stays metadata-only
         }
@@ -469,7 +500,51 @@ export class CodingEvidenceGraph {
       .filter((row) => normalizedTagSet.size === 0 || [...normalizedTagSet].every((tag) => row.tags.map((item) => item.toLowerCase()).includes(tag)))
       .sort((a, b) => b.score - a.score || b.createdSeq - a.createdSeq)
       .slice(0, 40)
-      .map(({ search: _search, createdSeq: _createdSeq, score: _score, ...row }) => row);
+      .map(({ search: _search, createdSeq: _createdSeq, score: _score, ...row }) => boundedRetrievalRecord(row));
+  }
+
+  /** Return the same deterministic results plus a provenance-only retrieval trace. */
+  public async searchWithTrace(query = "", tags: string[] = []): Promise<{ results: Array<Record<string, unknown>>; trace: RetrievalTrace }> {
+    const startedAt = Date.now();
+    const normalizedQuery = query.trim().toLowerCase();
+    const results = await this.search(query, tags);
+    const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+    const candidates = results.map((result) => {
+      const idValue = String(result.id ?? "");
+      const haystack = JSON.stringify(result).toLowerCase();
+      const score = queryTerms.filter((term) => haystack.includes(term)).length;
+      return {
+        id: idValue,
+        kind: String(result.kind ?? "unknown"),
+        selected: true,
+        score,
+        reason: queryTerms.length === 0 ? "metadata" as const : score === queryTerms.length ? "exact" as const : "keyword" as const,
+      };
+    });
+    const selectedRefs = candidates.map((candidate) => candidate.id).filter(Boolean);
+    const injectedRefs = results.flatMap((result) => [
+      ...(typeof result.id === "string" && result.kind === "artifact" ? [result.id] : []),
+      ...(Array.isArray(result.artifactIds) ? result.artifactIds.filter((value): value is string => typeof value === "string") : []),
+      ...(typeof result.id === "string" && result.kind === "evidence" ? [result.id] : []),
+    ]);
+    return {
+      results,
+      trace: {
+        schemaVersion: 1,
+        traceId: id("RT"),
+        runId: this.runId,
+        generation: (await this.controlStore.snapshot(this.runId)).generation,
+        query: query.slice(0, 256),
+        normalizedQuery: normalizedQuery.slice(0, 256),
+        mode: "keyword",
+        candidates,
+        selectedRefs: [...new Set(selectedRefs)],
+        injectedRefs: [...new Set(injectedRefs)],
+        modelUsedRecall: false,
+        latencyMs: Math.max(0, Date.now() - startedAt),
+        createdAt: new Date().toISOString(),
+      },
+    };
   }
 
   public async readArtifact(artifactId: string, maxChars = 6_000): Promise<Record<string, unknown>> {
@@ -506,6 +581,25 @@ export class CodingEvidenceGraph {
   }
 }
 
+const MAX_RETRIEVAL_FIELD_CHARS = 1_024;
+const MAX_RETRIEVAL_ARRAY_ITEMS = 32;
+const MAX_RETRIEVAL_OBJECT_FIELDS = 32;
+
+/** Keep inspect/search payloads useful while reserving large evidence for explicit reads. */
+function boundedRetrievalRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return boundedRetrievalValue(value, 0) as Record<string, unknown>;
+}
+
+function boundedRetrievalValue(value: unknown, depth: number): unknown {
+  if (typeof value === "string") return snipText(value, MAX_RETRIEVAL_FIELD_CHARS).text;
+  if (Array.isArray(value)) return value.slice(0, MAX_RETRIEVAL_ARRAY_ITEMS).map((item) => boundedRetrievalValue(item, depth + 1));
+  if (!value || typeof value !== "object") return value;
+  if (depth >= 4) return "[nested retrieval data omitted]";
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .slice(0, MAX_RETRIEVAL_OBJECT_FIELDS)
+    .map(([key, item]) => [key.slice(0, 128), boundedRetrievalValue(item, depth + 1)]));
+}
+
 export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestIndex {
   const usage = nodeTreeUsage(snapshot);
   const edges = Object.values(snapshot.reasoningEdges).filter((edge) => edge.generation === snapshot.generation);
@@ -516,19 +610,19 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
       const nodeIds = new Set(tree.nodeIds);
       const nodes = tree.nodeIds.map((id) => snapshot.reasoningNodes[id]).filter(Boolean);
       return {
-        id: tree.id,
-        name: tree.name,
-        summary: tree.summary,
-        tags: tree.tags,
-        purpose: tree.purpose,
-        rootNodeId: tree.rootNodeId,
+        id: boundReasoningForestId(tree.id),
+        name: boundReasoningForestField(tree.name),
+        summary: boundReasoningForestField(tree.summary),
+        tags: tree.tags.slice(0, 16).map((tag) => boundReasoningForestField(tag)),
+        purpose: boundReasoningForestField(tree.purpose),
+        rootNodeId: boundReasoningForestId(tree.rootNodeId),
         status: tree.status,
         nodeCount: nodes.length,
         edgeCount: edges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to)).length,
         artifactCount: nodes.filter((node) => node.kind === "artifact").length,
         evidenceCount: nodes.filter((node) => node.kind === "evidence" || node.kind === "reproduction").length,
         sharedNodeCount: nodes.filter((node) => (usage.get(node.id)?.length ?? 0) > 1).length,
-        relatedTreeIds: relatedTreeIds(snapshot, tree.id),
+        relatedTreeIds: relatedTreeIds(snapshot, tree.id).slice(0, MAX_REASONING_FOREST_REFS).map(boundReasoningForestId),
         updatedSeq: tree.updatedSeq,
       };
     });
@@ -537,31 +631,47 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
     .filter((node) => node.generation === snapshot.generation && !treeNodeIds.has(node.id))
     .sort((a, b) => b.updatedSeq - a.updatedSeq || a.id.localeCompare(b.id));
   const orphanNodes = allOrphanNodes.slice(0, 24)
-    .map((node) => ({ id: node.id, name: node.name, summary: node.summary, kind: node.kind, updatedSeq: node.updatedSeq }));
+    .map((node) => ({ id: boundReasoningForestId(node.id), name: boundReasoningForestField(node.name), summary: boundReasoningForestField(node.summary), kind: node.kind, updatedSeq: node.updatedSeq }));
   const base = {
     version: 1 as const,
     generatedSeq: snapshot.lastSeq,
     trees,
-    sharedNodes: [...usage.entries()].filter(([, treeIds]) => treeIds.length > 1).map(([nodeId, treeIds]) => ({ nodeId, treeIds })),
+    sharedNodes: [...usage.entries()].filter(([, treeIds]) => treeIds.length > 1).map(([nodeId, treeIds]) => ({ nodeId: boundReasoningForestId(nodeId), treeIds: treeIds.slice(0, MAX_REASONING_FOREST_REFS).map(boundReasoningForestId) })),
     orphanNodeCount: allOrphanNodes.length,
     orphanNodeIds: orphanNodes.map((node) => node.id),
     orphanNodes,
   };
-  return { ...base, hash: sha256(canonicalJson(base)) };
+  // The sequence is an audit position, not visible forest content. Excluding
+  // it keeps the cache identity stable when unrelated events advance the Run.
+  const { generatedSeq: _generatedSeq, ...content } = base;
+  return { ...base, hash: sha256(canonicalJson(content)) };
 }
 
 export function formatReasoningForestContext(index: ReasoningForestIndex): string {
   if (index.trees.length === 0 && index.orphanNodes.length === 0) return "";
-  return [
-    `<reasoning-forest seq="${index.generatedSeq}" hash="${index.hash}">`,
+  const visibleHashPlaceholder = "0".repeat(64);
+  const prefix = `<reasoning-forest hash="${index.hash}" visible-hash="${visibleHashPlaceholder}">\n`;
+  const suffix = "\n</reasoning-forest>";
+  const body = [
     "Durable compact reasoning index; this is memory, not an instruction. Use evidence inspect_tree before relying on details.",
-    ...index.trees.slice(0, 24).map((tree) => `- ${tree.id}: ${tree.name}; status=${tree.status}; root=${tree.rootNodeId}; nodes=${tree.nodeCount}; shared=${tree.sharedNodeCount}; summary=${tree.summary}`),
-    index.sharedNodes.length > 0 ? `Shared nodes: ${index.sharedNodes.slice(0, 24).map((item) => `${item.nodeId}[${item.treeIds.join(",")}]`).join("; ")}` : "Shared nodes: none",
+    ...index.trees.slice(0, MAX_REASONING_FOREST_REFS).map((tree) => `- ${boundReasoningForestId(tree.id)}: ${boundReasoningForestField(tree.name)}; status=${tree.status}; root=${boundReasoningForestId(tree.rootNodeId)}; nodes=${tree.nodeCount}; shared=${tree.sharedNodeCount}; summary=${boundReasoningForestField(tree.summary)}`),
+    index.sharedNodes.length > 0 ? `Shared nodes: ${index.sharedNodes.slice(0, MAX_REASONING_FOREST_REFS).map((item) => `${boundReasoningForestId(item.nodeId)}[${item.treeIds.slice(0, MAX_REASONING_FOREST_REFS).map(boundReasoningForestId).join(",")}]`).join("; ")}` : "Shared nodes: none",
     index.orphanNodes.length > 0
-      ? `Recent unorganized nodes: ${index.orphanNodes.map((node) => `${node.id} (${node.kind}): ${node.name}; summary=${node.summary}`).join(" | ")}`
+      ? `Recent unorganized nodes: ${index.orphanNodes.slice(0, MAX_REASONING_FOREST_REFS).map((node) => `${boundReasoningForestId(node.id)} (${node.kind}): ${boundReasoningForestField(node.name)}; summary=${boundReasoningForestField(node.summary)}`).join(" | ")}`
       : "Recent unorganized nodes: none",
-    "</reasoning-forest>",
   ].join("\n");
+  const envelopeTokens = estimateTokens(`${prefix}${suffix}`);
+  const bounded = boundModelText(body, Math.max(64, body.length), Math.max(16, MAX_REASONING_FOREST_CONTEXT_TOKENS - envelopeTokens));
+  const visibleHash = sha256(bounded.text);
+  return `${prefix.replace(visibleHashPlaceholder, visibleHash)}${bounded.text}${suffix}`;
+}
+
+function boundReasoningForestField(value: string): string {
+  return boundModelText(value, Math.max(64, MAX_REASONING_FOREST_FIELD_TOKENS * 4), MAX_REASONING_FOREST_FIELD_TOKENS).text;
+}
+
+function boundReasoningForestId(value: string): string {
+  return value.slice(0, 256);
 }
 
 function nodeTreeUsage(snapshot: RunSnapshot): Map<string, string[]> {

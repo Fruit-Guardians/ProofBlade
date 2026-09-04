@@ -24,12 +24,12 @@
 | materials-effects | 0.2.3 | 2 | 2 | 2026-08-28T16:00:00.000Z | 通过 | `33f00f940019` |
 | materials-evaluation | 0.2.7 | 5 | 5 | 2026-08-28T16:00:00.000Z | 通过 | `f878f6e941d0` |
 | materials-jobs | 0.2.4 | 3 | 3 | 2026-08-28T16:00:00.000Z | 通过 | `6fab4963b5e2` |
-| materials-knowledge | 0.6.5 | 5 | 5 | 2026-08-28T16:00:00.000Z | 通过 | `d8899a59b40e` |
+| materials-knowledge | 0.6.6 | 5 | 5 | 2026-08-28T16:00:00.000Z | 通过 | `d8899a59b40e` |
 | materials-mcp | 0.2.7 | 5 | 5 | 2026-08-28T16:00:00.000Z | 通过 | `4e35b90ddc8b` |
 | materials-observability | 0.1.6 | 6 | 6 | 2026-08-29T10:18:09.178Z | 通过 | `dc99000e770d` |
 | materials-orchestration | 0.1.7 | 7 | 7 | 2026-08-28T16:00:00.000Z | 通过 | `0e0220e2371d` |
 | materials-recovery | 0.1.2 | 2 | 2 | 2026-08-28T16:00:00.000Z | 通过 | `607c8cd2960a` |
-| materials-runtime | 0.10.25 | 23 | 23 | 2026-08-29T10:23:08.975Z | 通过 | `77d35f637162` |
+| materials-runtime | 0.10.26 | 23 | 23 | 2026-08-29T10:23:08.975Z | 通过 | `77d35f637162` |
 | materials-sandbox | 0.1.3 | 3 | 3 | 2026-08-28T16:00:00.000Z | 通过 | `c19de21abe1e` |
 | materials-security | 0.1.1 | 2 | 2 | 2026-08-28T16:00:00.000Z | 通过 | `ac60c98b8722` |
 | materials-skills | 0.1.2 | 2 | 2 | 2026-08-28T16:00:00.000Z | 通过 | `dc746b882d2f` |

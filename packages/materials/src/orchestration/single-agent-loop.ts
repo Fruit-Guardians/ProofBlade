@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AgentLanePort, AgentOutcome } from "../runtime/pi-adapter.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
+import type { AblationPolicyBinding } from "../runtime/coding-turn-projection.js";
 import type { AppServices } from "../app/demo.js";
 import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract } from "../domain/types.js";
 import { id, isTerminal, remainingRunDeadlineMs } from "../domain/utils.js";
@@ -43,6 +44,7 @@ export interface AgentLaneCreateInput {
   sessionHandoffs?: readonly SessionRuntimeHandoff[];
   /** Browser bindings confirmed during recovery and safe for verifier replay. */
   browserHandoffs?: readonly BrowserRuntimeHandoff[];
+  ablationPolicy?: AblationPolicyBinding;
   onEvent?: Parameters<typeof PiCodingLane.create>[0]["onEvent"];
 }
 
@@ -69,6 +71,8 @@ export interface SingleAgentRunOptions {
   userPrompt?: string;
   onTurn?: (outcome: AgentOutcome) => void | Promise<void>;
   onEvent?: Parameters<typeof PiCodingLane.create>[0]["onEvent"];
+  /** Optional strategy binding for a same-model ablation run. */
+  ablationPolicy?: AblationPolicyBinding;
 }
 
 export interface SingleAgentRunOutcome {
@@ -192,6 +196,7 @@ export class SingleAgentCtfLoop {
         ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
         sessionHandoffs: recovery.sessionHandoffs,
         browserHandoffs: recovery.browserHandoffs,
+        ...(options.ablationPolicy ? { ablationPolicy: options.ablationPolicy } : {}),
         ...(options.onEvent ? { onEvent: options.onEvent } : {}),
       });
       const activeLane = lane;
@@ -542,6 +547,7 @@ async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLan
     ...(input.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: input.services.browserRuntimeRequired }),
     sessionHandoffs: input.sessionHandoffs,
     browserHandoffs: input.browserHandoffs,
+    ...(input.ablationPolicy ? { ablationPolicy: input.ablationPolicy } : {}),
     deferClaimAcceptance: true,
     sessionId: `${input.runId}-coding`,
     ...(input.onEvent ? { onEvent: input.onEvent } : {}),

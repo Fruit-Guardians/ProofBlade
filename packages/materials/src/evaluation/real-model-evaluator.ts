@@ -19,6 +19,8 @@ export type RealEvaluationFailureCategory = PrimaryFailureCategory | "unclassifi
 export interface RealEvaluationVariant {
   id: string;
   config: ProofBladeConfig;
+  /** Optional strategy identity used by strict same-model ablation runs. */
+  strategyFingerprint?: string;
 }
 
 export interface RealModelEvaluationOptions {
@@ -27,6 +29,8 @@ export interface RealModelEvaluationOptions {
   allowLive: true;
   /** Require every evaluated Variant to produce real Provider telemetry. */
   requireProviderTraffic?: boolean;
+  /** Permit multiple variants to share one Provider/model when policy is the factor. */
+  allowSharedProviderProfile?: boolean;
   /** Minimum corpus size for a strict live evaluation; defaults to 20 when traffic is required. */
   minimumCorpusCases?: number;
   attempts?: number;
@@ -44,6 +48,11 @@ export interface RealModelEvaluationOptions {
   requiredTargetKinds?: readonly TargetKind[];
   /** Reject corpora whose target files contain the expected answer literally. */
   requireAnswerLiteralsAbsent?: boolean;
+  /** Restrict a resumable evaluation to immutable pairings. */
+  pairingFilter?: readonly { variantId: string; corpusCaseId: string; attempt: number }[];
+  /** Durable hooks around each selected pairing. */
+  onCaseStart?: (pairing: { variantId: string; corpusCaseId: string; attempt: number; runId: string }) => Promise<void> | void;
+  onCaseComplete?: (result: RealModelEvaluationCase) => Promise<void> | void;
 }
 
 export interface RealModelEvaluationGatePolicy {
@@ -218,6 +227,7 @@ export interface RealModelCategorySummary {
 export interface RealModelVariantSummary {
   id: string;
   profileFingerprint: string;
+  strategyFingerprint?: string;
   total: number;
   successCount: number;
   successRate: number;
@@ -287,6 +297,12 @@ export class RealModelEvaluationRunner {
     const gatePolicy = gatePolicyFor(options, variants, minimumCorpusCases);
     const runPrefix = options.runPrefix ?? `REAL-EVAL-${Date.now()}`;
     assertRunId(runPrefix);
+    const selectedPairings = options.pairingFilter
+      ? new Set(options.pairingFilter.map((item) => `${item.variantId}\u0000${item.corpusCaseId}\u0000${item.attempt}`))
+      : undefined;
+    const expectedCasesFor = (variantId: string): number => selectedPairings
+      ? [...selectedPairings].filter((item) => item.startsWith(`${variantId}\u0000`)).length
+      : corpus.cases.length * attempts;
     const results: RealModelVariantSummary[] = [];
     for (const variant of variants) {
       const profileFingerprint = fingerprint(variant.config);
@@ -295,25 +311,34 @@ export class RealModelEvaluationRunner {
       try {
         for (const corpusCase of corpus.cases) {
           for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            if (selectedPairings && !selectedPairings.has(`${variant.id}\u0000${corpusCase.id}\u0000${attempt}`)) continue;
             const runId = `${runPrefix}-${variant.id}-${corpusCase.id}-a${attempt}`;
             assertRunId(runId);
+            await options.onCaseStart?.({ variantId: variant.id, corpusCaseId: corpusCase.id, attempt, runId });
             await stageRealEvaluationCase(join(this.root, variant.config.storage.fixturesDir), runId, corpus, corpusCase);
             const task = realEvaluationTask(runId, corpusCase, this.root, variant.config, { maxCostUsd, deadlineMs });
-            cases.push(await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs));
+            const result = await this.runCase(variant.id, corpusCase, attempt, runId, task, variant.config, services, maxTurns, deadlineMs);
+            cases.push(result);
+            await options.onCaseComplete?.(result);
           }
         }
       } finally {
         await services.sandbox.close();
       }
-      results.push(summarizeVariant(variant.id, profileFingerprint, cases));
+      results.push(summarizeVariant(variant.id, profileFingerprint, cases, variant.strategyFingerprint));
     }
     const comparisons = compareVariants(results, gatePolicy.baselineVariantId);
     const baseline = results.find((item) => item.id === gatePolicy.baselineVariantId)!;
     const distinctProfiles = new Set(results.map((variant) => variant.profileFingerprint)).size;
     const checks = [
       check("minimum_variants", results.length >= 2, results.length, ">=2"),
-      check("distinct_profile_variants", distinctProfiles >= 2, distinctProfiles, ">=2"),
-      check("full_corpus_coverage", results.every((item) => item.total === corpus.cases.length * attempts), results.map((item) => item.total).join(","), corpus.cases.length * attempts),
+      check("distinct_profile_variants", options.allowSharedProviderProfile === true || distinctProfiles >= 2, distinctProfiles, options.allowSharedProviderProfile === true ? ">=1 (shared profile allowed)" : ">=2"),
+      check(
+        selectedPairings ? "selected_pairing_coverage" : "full_corpus_coverage",
+        results.every((item) => item.total === expectedCasesFor(item.id)),
+        results.map((item) => `${item.id}:${item.total}`).join(","),
+        results.map((item) => `${item.id}:${expectedCasesFor(item.id)}`).join(","),
+      ),
       ...(minimumCorpusCases > 0 ? [check("minimum_corpus_cases", corpus.cases.length >= minimumCorpusCases, corpus.cases.length, `>=${minimumCorpusCases}`)] : []),
       ...(requireAnswerLiteralsAbsent ? [check("answer_literals_absent", true, 0, 0)] : []),
       ...gatePolicy.requiredTargetKinds.map((targetKind) => check(
@@ -531,7 +556,7 @@ function realEvaluationTask(runId: string, corpusCase: LoadedRealEvaluationCase,
   };
 }
 
-function summarizeVariant(id: string, profileFingerprint: string, cases: RealModelEvaluationCase[]): RealModelVariantSummary {
+function summarizeVariant(id: string, profileFingerprint: string, cases: RealModelEvaluationCase[], strategyFingerprint?: string): RealModelVariantSummary {
   const successCount = cases.filter((item) => item.success).length;
   const durations = cases.map((item) => item.durationMs).sort((left, right) => left - right);
   const providerRequests = sum(cases.map((item) => item.providerRequests));
@@ -549,6 +574,7 @@ function summarizeVariant(id: string, profileFingerprint: string, cases: RealMod
   return {
     id,
     profileFingerprint,
+    ...(strategyFingerprint ? { strategyFingerprint } : {}),
     total: cases.length,
     successCount,
     successRate: rate(successCount, cases.length),
@@ -629,6 +655,7 @@ function stableReportHash(summary: Omit<RealModelEvaluationSummary, "reportHash"
     variants: summary.variants.map((variant) => ({
       id: variant.id,
       profileFingerprint: variant.profileFingerprint,
+      ...(variant.strategyFingerprint ? { strategyFingerprint: variant.strategyFingerprint } : {}),
       total: variant.total,
       successCount: variant.successCount,
       candidateLeakCount: variant.candidateLeakCount,
