@@ -2816,7 +2816,7 @@
 ### codingCtfCategoryGuidance
 - Kind: `function`
 - Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1172](../../../packages/materials/src/runtime/coding-lane.ts:1172)
+- Source: [src/runtime/coding-lane.ts:1182](../../../packages/materials/src/runtime/coding-lane.ts:1182)
 - Export: `@proofblade/materials`
 - Summary: Category-specialized guidance for the CTF orchestrator.
 - Summary source: `tsdoc`
@@ -2825,7 +2825,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1239](../../../packages/materials/src/runtime/coding-lane.ts:1239)
+- Source: [src/runtime/coding-lane.ts:1249](../../../packages/materials/src/runtime/coding-lane.ts:1249)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2834,7 +2834,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:868](../../../packages/materials/src/runtime/coding-lane.ts:868)
+- Source: [src/runtime/coding-lane.ts:876](../../../packages/materials/src/runtime/coding-lane.ts:876)
 - Export: `@proofblade/materials`
 - Summary: Build the platform submission path for a competition run.
 - Summary source: `tsdoc`
@@ -2843,7 +2843,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:983](../../../packages/materials/src/runtime/coding-lane.ts:983)
+- Source: [src/runtime/coding-lane.ts:991](../../../packages/materials/src/runtime/coding-lane.ts:991)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2852,7 +2852,7 @@
 ### isChallengeTask
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "mode" | "target_kind">): boolean`
-- Source: [src/runtime/coding-lane.ts:1064](../../../packages/materials/src/runtime/coding-lane.ts:1064)
+- Source: [src/runtime/coding-lane.ts:1072](../../../packages/materials/src/runtime/coding-lane.ts:1072)
 - Export: `@proofblade/materials`
 - Summary: Durable task classification used when generated executor prompts omit CTF keywords.
 - Summary source: `tsdoc`
@@ -2861,7 +2861,7 @@
 ### isLikelyCtfPrompt
 - Kind: `function`
 - Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1059](../../../packages/materials/src/runtime/coding-lane.ts:1059)
+- Source: [src/runtime/coding-lane.ts:1067](../../../packages/materials/src/runtime/coding-lane.ts:1067)
 - Export: `@proofblade/materials`
 - Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
 - Summary source: `tsdoc`
@@ -12088,7 +12088,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:795](../../../packages/materials/src/runtime/coding-lane.ts:795)
+- Source: [src/runtime/coding-lane.ts:803](../../../packages/materials/src/runtime/coding-lane.ts:803)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12097,7 +12097,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:807](../../../packages/materials/src/runtime/coding-lane.ts:807)
+- Source: [src/runtime/coding-lane.ts:815](../../../packages/materials/src/runtime/coding-lane.ts:815)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12106,7 +12106,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:799](../../../packages/materials/src/runtime/coding-lane.ts:799)
+- Source: [src/runtime/coding-lane.ts:807](../../../packages/materials/src/runtime/coding-lane.ts:807)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12124,7 +12124,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:803](../../../packages/materials/src/runtime/coding-lane.ts:803)
+- Source: [src/runtime/coding-lane.ts:811](../../../packages/materials/src/runtime/coding-lane.ts:811)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12133,7 +12133,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:717](../../../packages/materials/src/runtime/coding-lane.ts:717)
+- Source: [src/runtime/coding-lane.ts:722](../../../packages/materials/src/runtime/coding-lane.ts:722)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
