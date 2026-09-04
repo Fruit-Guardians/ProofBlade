@@ -57,6 +57,7 @@
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
+    "src/evaluation/ablation.ts": "29cf2cc2b2339435c7af748aa6399ed100ce55b9c72de37c14ed874aa9c72c42",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
@@ -68,7 +69,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "43af361f3e67a0e5f522fedcc483c55d25d446b40355aec18f90dd75b9a99263",
+    "src/index.ts": "b730540823c426f4b4bda4679b0d8ba5c88f648577239f96ef1405c8bceca273",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/evidence-curation-gate.ts": "ffdbabcb138a0aa52ab2f110a4bd409779838617d6df622180bb64c93859d5e5",
@@ -113,7 +114,7 @@
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
     "src/runtime/coding-lane.ts": "cf2e9a49c68ef1442e0aa22b3a53632b4c1f9fea6b4790b3fa174699d35934f0",
-    "src/runtime/coding-resources.ts": "c835b70c5e54ce6575a6aca0daa3a2154fd3cbf337d324326af25d518d93c9df",
+    "src/runtime/coding-resources.ts": "cabf1a7e7b00d20cc75f4463ad88aea202bc8b4e94e8f0200a2a28e290f25fa3",
     "src/runtime/coding-turn-projection.ts": "3400671ee0159c76ae63348035c10bbb91184ab8d0aa1a4052dbf6d6aff059d2",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -3287,6 +3288,88 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::constant::ABLATION_PROTOCOL_VERSION",
+      "name": "ABLATION_PROTOCOL_VERSION",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 7,
+      "signature": "\"ablation-v1\"",
+      "summary": "Inferred summary: ablation protocol version constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::constant::ABLATION_SCHEMA_VERSION",
+      "name": "ABLATION_SCHEMA_VERSION",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 6,
+      "signature": "1",
+      "summary": "Inferred summary: ablation schema version constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::constant::DEFAULT_HARNESS_POLICY",
+      "name": "DEFAULT_HARNESS_POLICY",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 51,
+      "signature": "HarnessPolicy",
+      "summary": "Inferred summary: default harness policy constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::constant::FIXED_SAFETY_BOUNDARY",
+      "name": "FIXED_SAFETY_BOUNDARY",
+      "kind": "constant",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 76,
+      "signature": "FixedSafetyBoundary",
+      "summary": "Inferred summary: fixed safety boundary constant used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::constant::BASELINE_PROTOCOL_VERSION",
       "name": "BASELINE_PROTOCOL_VERSION",
       "kind": "constant",
@@ -3957,7 +4040,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1079,
+      "line": 1092,
       "signature": "2",
       "summary": "How many times identical image CONTENT is re-injected into context before the",
       "summarySource": "tsdoc",
@@ -5630,6 +5713,73 @@
       "imports": [],
       "testRefs": [],
       "structureHash": "7b4133bf36e9aec7c0f47f4cec88282216caffbe10bbbd44b532d87b724c076e"
+    },
+    {
+      "id": "@proofblade/materials::function::buildAblationPairings",
+      "name": "buildAblationPairings",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 230,
+      "signature": "(experiment: Pick<AblationExperimentSnapshot, \"experimentId\" | \"variants\" | \"runOrder\" | \"budget\">, cases: readonly AblationCaseRef[]): AblationPairing[]",
+      "summary": "Inferred summary: build ablation pairings operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ],
+      "structureHash": "19b5577cfee469c30f288dc8846d56748d41a8d95ddcae9929ab4aabb9e15df2"
+    },
+    {
+      "id": "@proofblade/materials::function::snapshotModel",
+      "name": "snapshotModel",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 217,
+      "signature": "(input: AblationModelInput, profile?: ModelProfileConfig): AblationModelSnapshot",
+      "summary": "Inferred summary: snapshot model operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": [],
+      "structureHash": "10b0e169b6243c60c02eb30dd24b0debd79cb5823992686318c7a39f73151fa5"
+    },
+    {
+      "id": "@proofblade/materials::function::validateAblationExperiment",
+      "name": "validateAblationExperiment",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 194,
+      "signature": "(value: unknown, profile?: ModelProfileConfig): AblationExperimentSnapshot",
+      "summary": "Inferred summary: validate ablation experiment operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ],
+      "structureHash": "c39d2a6d95ef885ef6afa6e03f30fc15e1807632d43ed92bf3673fcd5685cc88"
     },
     {
       "id": "@proofblade/materials::function::anonymizeEvaluationSummary",
@@ -7915,7 +8065,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1181,
+      "line": 1194,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -7958,7 +8108,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 998,
+      "line": 1011,
       "signature": "(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]",
       "summary": "Inferred summary: coding active tool names operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -8003,7 +8153,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1015,
+      "line": 1028,
       "signature": "(): Array<{ name: string; description: string; parameters: unknown; }>",
       "summary": "Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -8216,7 +8366,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1093,
+      "line": 1106,
       "signature": "(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>[\"execute\"]>>, imagesSeen: Map<string, number> | undefined): typeof result",
       "summary": "Deduplicate repeated image reads within one run, keyed by the image's CONTENT",
       "summarySource": "tsdoc",
@@ -8259,7 +8409,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1165,
+      "line": 1178,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -8302,7 +8452,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1155,
+      "line": 1168,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -8428,7 +8578,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 881,
+      "line": 894,
       "signature": "(context: CodingResourceContext): Promise<void>",
       "summary": "Stop every current-generation shell job owned by this lane during teardown.",
       "summarySource": "tsdoc",
@@ -13141,6 +13291,7 @@
         "@proofblade/atoms"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-pwn-e2e.test.ts",
@@ -14183,6 +14334,268 @@
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationAttemptRecord",
+      "name": "AblationAttemptRecord",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 181,
+      "signature": "AblationAttemptRecord",
+      "summary": "Inferred summary: ablation attempt record type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationCaseRef",
+      "name": "AblationCaseRef",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 189,
+      "signature": "AblationCaseRef",
+      "summary": "Inferred summary: ablation case ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationCorpusRef",
+      "name": "AblationCorpusRef",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 87,
+      "signature": "AblationCorpusRef",
+      "summary": "Inferred summary: ablation corpus ref type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationExperimentInput",
+      "name": "AblationExperimentInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 113,
+      "signature": "AblationExperimentInput",
+      "summary": "Inferred summary: ablation experiment input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationExperimentSnapshot",
+      "name": "AblationExperimentSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 154,
+      "signature": "AblationExperimentSnapshot",
+      "summary": "Inferred summary: ablation experiment snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationModelInput",
+      "name": "AblationModelInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 92,
+      "signature": "AblationModelInput",
+      "summary": "Inferred summary: ablation model input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationModelSnapshot",
+      "name": "AblationModelSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 127,
+      "signature": "AblationModelSnapshot",
+      "summary": "Inferred summary: ablation model snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPairing",
+      "name": "AblationPairing",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 173,
+      "signature": "AblationPairing",
+      "summary": "Inferred summary: ablation pairing type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": [
+        "packages/materials/tests/ablation.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationPolicySnapshot",
+      "name": "AblationPolicySnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 141,
+      "signature": "AblationPolicySnapshot",
+      "summary": "Inferred summary: ablation policy snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantInput",
+      "name": "AblationVariantInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 101,
+      "signature": "AblationVariantInput",
+      "summary": "Inferred summary: ablation variant input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationVariantSnapshot",
+      "name": "AblationVariantSnapshot",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 148,
+      "signature": "AblationVariantSnapshot",
+      "summary": "Inferred summary: ablation variant snapshot type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::FixedSafetyBoundary",
+      "name": "FixedSafetyBoundary",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 65,
+      "signature": "FixedSafetyBoundary",
+      "summary": "Inferred summary: fixed safety boundary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::HarnessPolicy",
+      "name": "HarnessPolicy",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 37,
+      "signature": "HarnessPolicy",
+      "summary": "Inferred summary: harness policy type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
     },
     {
       "id": "@proofblade/materials::interface::AnonymousEvaluationReplay",
@@ -25605,6 +26018,7 @@
         "./api.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -25838,6 +26252,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -27209,6 +27624,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -27646,6 +28062,7 @@
         "./contracts.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -28134,6 +28551,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -28181,6 +28599,7 @@
         "@earendil-works/pi-agent-core"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -28274,6 +28693,7 @@
         "./control-store.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -30434,6 +30854,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30551,6 +30972,7 @@
         "./real-model-evaluator.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30676,6 +31098,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -30813,6 +31236,7 @@
         "@proofblade/molecules"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -31281,6 +31705,7 @@
         "./evaluation-gates.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -35123,6 +35548,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -35801,6 +36227,7 @@
         "./pwn-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -36209,6 +36636,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -36503,6 +36931,7 @@
         "node:path"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -39377,6 +39806,7 @@
         "../sandbox/fixture.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -41052,6 +41482,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/capability-backend.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -41605,6 +42036,7 @@
         "node:fs/promises"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -42879,6 +43311,7 @@
         "node:util"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -47297,6 +47730,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47704,6 +48138,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -47789,6 +48224,7 @@
         "../recovery/external-resource-registry.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -48109,6 +48545,7 @@
         "./http-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -48272,6 +48709,7 @@
         "./http-session.js"
       ],
       "testRefs": [
+        "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -49850,6 +50288,306 @@
         "../tools/errors.js",
         "../verification/outcome-envelope.js",
         "./artifact-store.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationAttemptStatus",
+      "name": "AblationAttemptStatus",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 171,
+      "signature": "AblationAttemptStatus",
+      "summary": "Inferred summary: ablation attempt status type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationChangedFactor",
+      "name": "AblationChangedFactor",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 10,
+      "signature": "AblationChangedFactor",
+      "summary": "Inferred summary: ablation changed factor type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationExperimentStatus",
+      "name": "AblationExperimentStatus",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 170,
+      "signature": "AblationExperimentStatus",
+      "summary": "Inferred summary: ablation experiment status type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::AblationRunOrder",
+      "name": "AblationRunOrder",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 9,
+      "signature": "AblationRunOrder",
+      "summary": "Inferred summary: ablation run order type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ActionBundleMode",
+      "name": "ActionBundleMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 27,
+      "signature": "ActionBundleMode",
+      "summary": "Inferred summary: action bundle mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CircuitBreakerMode",
+      "name": "CircuitBreakerMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 29,
+      "signature": "CircuitBreakerMode",
+      "summary": "Inferred summary: circuit breaker mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::CompressionMode",
+      "name": "CompressionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 34,
+      "signature": "CompressionMode",
+      "summary": "Inferred summary: compression mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ContextSelectionMode",
+      "name": "ContextSelectionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 30,
+      "signature": "ContextSelectionMode",
+      "summary": "Inferred summary: context selection mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::DuplicateFailureMode",
+      "name": "DuplicateFailureMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 28,
+      "signature": "DuplicateFailureMode",
+      "summary": "Inferred summary: duplicate failure mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::EvidenceCurationMode",
+      "name": "EvidenceCurationMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "EvidenceCurationMode",
+      "summary": "Inferred summary: evidence curation mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::FirstActionMode",
+      "name": "FirstActionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 25,
+      "signature": "FirstActionMode",
+      "summary": "Inferred summary: first action mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::InformationValueEstimator",
+      "name": "InformationValueEstimator",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 33,
+      "signature": "InformationValueEstimator",
+      "summary": "Inferred summary: information value estimator type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::PhaseRouteMode",
+      "name": "PhaseRouteMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 26,
+      "signature": "PhaseRouteMode",
+      "summary": "Inferred summary: phase route mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::RecallMode",
+      "name": "RecallMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 31,
+      "signature": "RecallMode",
+      "summary": "Inferred summary: recall mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::StopSuggestionMode",
+      "name": "StopSuggestionMode",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/ablation.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 35,
+      "signature": "StopSuggestionMode",
+      "summary": "Inferred summary: stop suggestion mode type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../config.js",
+        "../domain/types.js",
+        "../domain/utils.js",
+        "@earendil-works/pi-agent-core"
       ],
       "testRefs": []
     },
