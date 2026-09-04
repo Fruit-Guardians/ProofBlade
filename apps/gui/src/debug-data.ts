@@ -516,7 +516,9 @@ export class DebugDataService {
       }
       if (runKind(snapshot.task) === "chat") {
         const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
-        const challengeClassification = classifyChallengePrompt(`${text}\n${snapshot.task.objective}`, projectRoot);
+        // A workspace path is operational metadata, not user intent. Paths such
+        // as D:\CTF\... must not turn an ordinary greeting into challenge mode.
+        const challengeClassification = classifyChallengePrompt(`${text}\n${snapshot.task.objective}`);
         lane = await this.createCodingLane({
           projectRoot,
           installRoot: this.root,
