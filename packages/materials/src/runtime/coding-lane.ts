@@ -269,8 +269,17 @@ export class PiCodingLane implements AgentLanePort {
     // classification may steer the dynamic suffix, but only the immutable task
     // contract may alter the top-level tool surface.
     const effectiveTargetKind = snapshot.task.target_kind;
-    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers));
-    const activeMcpTools = selectFirstClassMcpTools(mcpFirstClassTools, effectiveTargetKind, snapshot.task.target);
+    const effectiveProfileId = taskProfile?.id;
+    const mcpFirstClassTools = await createMcpFirstClassTools(
+      mcp,
+      firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers, effectiveProfileId),
+    );
+    const activeMcpTools = selectFirstClassMcpTools(
+      mcpFirstClassTools,
+      effectiveTargetKind,
+      snapshot.task.target,
+      effectiveProfileId,
+    );
     const artifactStore = options.artifactStore;
     const checkpointService = new CheckpointService(options.controlStore, artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
@@ -1168,7 +1177,15 @@ function brokerSessionRef(runId: string, generation: number, workspaceHostPath: 
 }
 
 function firstClassMcpServers(targetKind: TaskContract["target_kind"], target: string, enabledServers: Set<string>, profileId?: string): string[] {
-  if (targetKind !== "reverse") return [];
-  const preferred = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target) ? ["jadx"] : ["idalib-mcp"];
+  // Profile and target hints only establish a useful ordering. Explicitly
+  // enabled security MCP servers remain available to general/unknown tasks;
+  // target_kind is a label, not a capability firewall.
+  const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
+  const native = profileId === "reverse" || targetKind === "reverse";
+  const preferred = android
+    ? ["jadx", "idalib-mcp"]
+    : native
+      ? ["idalib-mcp", "jadx"]
+      : ["idalib-mcp", "jadx"];
   return preferred.filter((server) => enabledServers.has(server));
 }

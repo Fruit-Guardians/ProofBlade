@@ -247,14 +247,20 @@ export async function createMcpFirstClassTools(
 }
 
 /**
- * Keep decompiler schemas out of unrelated challenge contexts. The generic
- * `mcp_call` proxy remains active as a deferred escape hatch; only the small
- * category-specific set below is sent as native provider tools.
+ * Select the enabled security MCP tools sent as native provider tools. A
+ * profile or target hint may narrow the preferred decompiler family for a
+ * clearly identified artifact, while general/unknown tasks retain all known
+ * enabled security MCP tools. `mcp_call` remains an escape hatch for tools
+ * that cannot be enumerated at lane startup.
  */
 export function selectFirstClassMcpTools<T extends { name: string }>(tools: T[], targetKind: TargetKind, target = "", profileId?: string): T[] {
-  if (targetKind !== "reverse") return [];
   const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
-  const allowed = android ? JADX_FIRST_CLASS_TOOLS : IDALIB_FIRST_CLASS_TOOLS;
+  const native = profileId === "reverse" || targetKind === "reverse";
+  const allowed = android
+    ? JADX_FIRST_CLASS_TOOLS
+    : native
+      ? IDALIB_FIRST_CLASS_TOOLS
+      : new Set([...IDALIB_FIRST_CLASS_TOOLS, ...JADX_FIRST_CLASS_TOOLS]);
   return tools.filter((tool) => allowed.has(tool.name.slice(tool.name.lastIndexOf("__") + 2)));
 }
 

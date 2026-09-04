@@ -159,20 +159,37 @@ test("verify_result returns actionable feedback when verification is rejected", 
   });
 });
 
-test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
+test("first-class MCP tools stay visible for enabled security capabilities", () => {
   const tools = [
     { name: "mcp__idalib-mcp__idalib_open" },
     { name: "mcp__idalib-mcp__decompile" },
-    { name: "mcp__idalib-mcp__rename" },
+    { name: "mcp__idalib-mcp__survey_binary" },
     { name: "mcp__jadx__get_class_source" },
-    { name: "mcp__jadx__rename_class" },
+    { name: "mcp__jadx__get_strings" },
   ];
   assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.elf").map((tool) => tool.name), [
     "mcp__idalib-mcp__idalib_open",
     "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
   ]);
-  assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.apk").map((tool) => tool.name), ["mcp__jadx__get_class_source"]);
-  assert.deepEqual(selectFirstClassMcpTools(tools, "web", "sample").map((tool) => tool.name), []);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.apk").map((tool) => tool.name), [
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "unknown", "sample").map((tool) => tool.name), [
+    "mcp__idalib-mcp__idalib_open",
+    "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "web", "sample").map((tool) => tool.name), [
+    "mcp__idalib-mcp__idalib_open",
+    "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
 });
 
 test("mobile profile selects JADX first-class tools even when the durable task kind is unknown", () => {
