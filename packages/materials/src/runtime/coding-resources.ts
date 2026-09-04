@@ -32,7 +32,7 @@ import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSear
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -146,6 +146,7 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
 export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
+    verifyResultTool,
     verifyClaimTool,
     evidenceTool,
     loadSkillTool,
@@ -251,6 +252,7 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   edit: WORKSPACE_EFFECT,
   write: WORKSPACE_EFFECT,
   verify_claim: WORKSPACE_EFFECT,
+  verify_result: WORKSPACE_EFFECT,
   load_skill: READ_ONLY_EFFECT,
   // Starting and killing processes is a process side effect; polling a log is not,
   // so shell_job's policy is resolved per-operation below.
@@ -355,6 +357,60 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       output,
     });
     return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
+  },
+};
+
+/**
+ * Domain-neutral verification entry point. `verify_claim` remains registered
+ * as a compatibility alias for existing sessions and competition fixtures;
+ * this name makes it clear that the result can be a file, test output, state,
+ * or protocol value rather than a CTF flag.
+ */
+const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "verify_result",
+  label: "verify_result",
+  description: "Run the task's deterministic verifier or audited workspace check and record the result as durable Evidence. A task-bound verifier can accept a Completion; without one, the check remains an explicitly unverified observation.",
+  parameters: Type.Object({
+    result: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact result value or text that the answer will report." }),
+    command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the result from workspace inputs and prints it." }),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the verification." })),
+    timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(toolCallId, params, signal, onUpdate, context) {
+    const input = params as { result: string; command: string; evidenceIds?: string[]; timeout?: number };
+    const result = input.result.trim();
+    const command = input.command.trim();
+    if (!result || !command) throw new Error("verify_result requires a result and verification command");
+    if (command.includes(result)) throw new Error("Verification command embeds the result literal; derive it from workspace inputs instead");
+    const executor = createBashTool<CodingResourceContext>();
+    let output = "";
+    const reproduction = await context.claimVerifier.record({
+      candidate: result,
+      command,
+      cwd: context.env.cwd,
+      toolCallId,
+      supportingEvidenceIds: input.evidenceIds,
+      signal,
+      execute: async (innerSignal) => {
+        const started = Date.now();
+        const executed = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
+        output = executed.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+        return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
+      },
+    });
+    const response = toolResult({
+      verified: reproduction.verified,
+      result: reproduction.candidate,
+      candidateHash: reproduction.candidateHash,
+      commandHash: reproduction.commandHash,
+      artifactId: reproduction.artifactId,
+      evidenceId: reproduction.evidenceId,
+      completionId: reproduction.completionId,
+      supportingEvidenceIds: reproduction.supportingEvidenceIds,
+      output,
+    });
+    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
   },
 };
 
