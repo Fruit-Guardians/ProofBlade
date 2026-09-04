@@ -58,8 +58,9 @@
     "src/domain/work-item.ts": "f67492f01151ebc8cddc5774e32c666af1d7ecbf0137c0670ffa5d94c5662915",
     "src/effects/artifact-store.ts": "0ad38b76a4436cf37e72db0786117cfedc678c2a061b03998d0a92a3a39784c0",
     "src/effects/effect-journal.ts": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
+    "src/evaluation/ablation-ledger.ts": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
     "src/evaluation/ablation-policy.ts": "1637143b2b582b12b62ac18595991f22a07fd56db7c540d87411e15dc6aca64b",
-    "src/evaluation/ablation.ts": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+    "src/evaluation/ablation.ts": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
@@ -72,7 +73,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "e1e48fbae65879f9ab9ec4d011e9f9081e01f5120e3429209d5049f74ce29e0a",
+    "src/index.ts": "37ca9f7228757581cc0a49681ba0ab2ccb17436fb601954951a4887955545c7b",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
@@ -804,6 +805,22 @@
       "testRefs": []
     },
     {
+      "id": "@proofblade/materials::class::AblationRunLedger",
+      "name": "AblationRunLedger",
+      "kind": "class",
+      "signature": "AblationRunLedger",
+      "summary": "Inferred summary: ablation run ledger class used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 19,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::class::AblationPolicyController",
       "name": "AblationPolicyController",
       "kind": "class",
@@ -830,8 +847,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 308,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 310,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -2324,7 +2341,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 9,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -2338,7 +2355,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 8,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -2352,7 +2369,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 54,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -2370,7 +2387,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 91,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -3975,8 +3992,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 368,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 370,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -3991,8 +4008,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 264,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 266,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -4007,8 +4024,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 294,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 296,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -4021,8 +4038,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 239,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 241,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -4035,9 +4052,10 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 216,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 218,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts"
       ]
     },
@@ -9166,6 +9184,7 @@
       "line": 489,
       "moduleHash": "29b7d43e104b0539c068231f77970aa24310622534653b7db1c6dac9f9578c8e",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -10002,6 +10021,34 @@
       ]
     },
     {
+      "id": "@proofblade/materials::interface::AblationLedgerDocument",
+      "name": "AblationLedgerDocument",
+      "kind": "interface",
+      "signature": "AblationLedgerDocument",
+      "summary": "Inferred summary: ablation ledger document type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 8,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::AblationLedgerSummary",
+      "name": "AblationLedgerSummary",
+      "kind": "interface",
+      "signature": "AblationLedgerSummary",
+      "summary": "Inferred summary: ablation ledger summary type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 17,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": []
+    },
+    {
       "id": "@proofblade/materials::interface::AblationDecisionEvent",
       "name": "AblationDecisionEvent",
       "kind": "interface",
@@ -10040,7 +10087,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 199,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10053,8 +10100,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 207,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 209,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10068,7 +10115,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 102,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10082,7 +10129,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 128,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10096,7 +10143,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 172,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10110,7 +10157,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 107,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10124,7 +10171,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 142,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10138,7 +10185,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 191,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts"
       ]
@@ -10154,7 +10201,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 159,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10167,8 +10214,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 253,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 255,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10181,8 +10228,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 254,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 256,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10195,8 +10242,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 291,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 293,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10210,7 +10257,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 116,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10224,7 +10271,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 166,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10238,7 +10285,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 80,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -10252,7 +10299,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 40,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -15172,6 +15219,7 @@
       "line": 184,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15354,6 +15402,7 @@
       "line": 151,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15627,6 +15676,7 @@
       "line": 225,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15809,6 +15859,7 @@
       "line": 420,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -15991,6 +16042,7 @@
       "line": 319,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -16173,6 +16225,7 @@
       "line": 268,
       "moduleHash": "caf29cbdd29771b51d5ae4b566689d6a2866b34e264267a012cd62f9f8654eae",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -16380,6 +16433,7 @@
       "line": 73,
       "moduleHash": "0ebcaf3fd4127068c8c46702649cd910036f070a989436695e65c082f39a0eff",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -18185,6 +18239,7 @@
       "line": 124,
       "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -18263,6 +18318,7 @@
       "line": 206,
       "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -18410,6 +18466,7 @@
       "line": 193,
       "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -19065,6 +19122,7 @@
       "line": 182,
       "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -19479,6 +19537,7 @@
       "line": 92,
       "moduleHash": "8b0327512454d1ddd8b61ed616d183d9b0048553df3cde1e02f9d06b964bba44",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -20120,6 +20179,7 @@
       "line": 320,
       "moduleHash": "bad04a83f03dff46f144dc56c28bf523ae3069a19215c80f7c6244ef0493a7c0",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -20188,6 +20248,7 @@
       "line": 16,
       "moduleHash": "2f3f775ce80a274cd4972399a89ff745e75e065cb0f376f0f38a7a2f0899574b",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -20322,6 +20383,7 @@
       "line": 44,
       "moduleHash": "02a257f9550ae34a635abe6c4e810d505592038a6521b9f0d95ce2bd948fb8fa",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -20714,6 +20776,7 @@
       "line": 233,
       "moduleHash": "b7c6cd94385533377d7a2ea5b0d7973a698380d295798260cfec3928232c527b",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21110,6 +21173,7 @@
       "line": 268,
       "moduleHash": "b7c6cd94385533377d7a2ea5b0d7973a698380d295798260cfec3928232c527b",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -21471,6 +21535,7 @@
       "line": 74,
       "moduleHash": "544a9052375980e8e7163d713444d9ffdee96d6c74a6a938544241ba4fec964f",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -21766,6 +21831,439 @@
       ]
     },
     {
+      "id": "@proofblade/materials::method::AblationRunLedger.claim",
+      "name": "AblationRunLedger.claim",
+      "kind": "method",
+      "signature": "(pairingId: string, runId: string, clock?: () => string): Promise<AblationAttemptRecord>",
+      "summary": "Inferred summary: claim operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 45,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.complete",
+      "name": "AblationRunLedger.complete",
+      "kind": "method",
+      "signature": "(pairingId: string, status: Extract<AblationAttemptRecord[\"status\"], \"succeeded\" | \"failed\" | \"cancelled\">, error?: string, clock?: () => string, result?: Record<string, unknown>): Promise<AblationAttemptRecord>",
+      "summary": "Inferred summary: complete operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 57,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/intent-filter.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-context-frame.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/provider-retry-harness.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-evaluation-gates.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/workspace-search.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.create",
+      "name": "AblationRunLedger.create",
+      "kind": "method",
+      "signature": "(path: string, experiment: AblationExperimentSnapshot, cases: readonly AblationCaseRef[], clock?: () => string): Promise<AblationRunLedger>",
+      "summary": "Inferred summary: create operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 22,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/challenge-tool-profile.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-remote-query-matrix.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/container-runtime.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-authority-migration.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/demo.test.ts",
+        "packages/materials/tests/docker-resource-adapter.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/durability.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-filter.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-context-frame.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/pi-session.test.ts",
+        "packages/materials/tests/provider-api.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/provider-retry-harness.test.ts",
+        "packages/materials/tests/provider-retry.test.ts",
+        "packages/materials/tests/provider-scheduler.test.ts",
+        "packages/materials/tests/provider-transport.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-session-supervisor.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/runtime-preflight.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/session-runtime-composition.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-coding-tools.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.load",
+      "name": "AblationRunLedger.load",
+      "kind": "method",
+      "signature": "(path: string, expectedExperiment?: Pick<AblationExperimentSnapshot, \"experimentId\" | \"experimentFingerprint\">): Promise<AblationRunLedger>",
+      "summary": "Inferred summary: load operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 32,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-playwright-host.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/challenge-tool-profile.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store-concurrency.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/image-dedup.test.ts",
+        "packages/materials/tests/intent-scheduler-config.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-context-frame.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/output-rewrite.test.ts",
+        "packages/materials/tests/provider-budget.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/web-session.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.markInterrupted",
+      "name": "AblationRunLedger.markInterrupted",
+      "kind": "method",
+      "signature": "(clock?: () => string): Promise<number>",
+      "summary": "Inferred summary: mark interrupted operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 69,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.next",
+      "name": "AblationRunLedger.next",
+      "kind": "method",
+      "signature": "(): AblationAttemptRecord | undefined",
+      "summary": "Inferred summary: next operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 40,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/evidence-search-index.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.snapshot",
+      "name": "AblationRunLedger.snapshot",
+      "kind": "method",
+      "signature": "(): AblationLedgerDocument",
+      "summary": "Inferred summary: snapshot operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 85,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/app-server.test.ts",
+        "packages/materials/tests/binding-transaction.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/capability-jobs.test.ts",
+        "packages/materials/tests/claim-verification-recovery.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-authority-migration.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/demo.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/durability.test.ts",
+        "packages/materials/tests/evaluation-replay.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/intent-scheduler.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/observability.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/provider-pi-http-smoke.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-tools.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-contracts.test.ts",
+        "packages/materials/tests/session-registry.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/skills.test.ts",
+        "packages/materials/tests/tool-catalog.test.ts",
+        "packages/materials/tests/update-proposals.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ]
+    },
+    {
+      "id": "@proofblade/materials::method::AblationRunLedger.summary",
+      "name": "AblationRunLedger.summary",
+      "kind": "method",
+      "signature": "(): AblationLedgerSummary",
+      "summary": "Inferred summary: summary operation used to read or inspect state.",
+      "summarySource": "inferred",
+      "tags": [],
+      "exportPath": "@proofblade/materials",
+      "module": "src/evaluation/ablation-ledger.ts",
+      "line": 79,
+      "moduleHash": "c5dbbf79a3033a69760cff8e9579238fdcc2b5b27e254d6ab7f5e19b1fbc949e",
+      "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
+        "packages/materials/tests/ablation.test.ts",
+        "packages/materials/tests/binary-core.test.ts",
+        "packages/materials/tests/browser-resource-adapter.test.ts",
+        "packages/materials/tests/browser-runtime-broker.test.ts",
+        "packages/materials/tests/browser-runtime-service.test.ts",
+        "packages/materials/tests/capability-backend.test.ts",
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-api.test.ts",
+        "packages/materials/tests/competition-control-plane.test.ts",
+        "packages/materials/tests/competition-convergence.test.ts",
+        "packages/materials/tests/competition-fleet.test.ts",
+        "packages/materials/tests/competition-lifecycle-replay.test.ts",
+        "packages/materials/tests/competition-pwn-e2e.test.ts",
+        "packages/materials/tests/competition-remote-query-matrix.test.ts",
+        "packages/materials/tests/competition-sandbox.test.ts",
+        "packages/materials/tests/competition-solver.test.ts",
+        "packages/materials/tests/context-recovery.test.ts",
+        "packages/materials/tests/context.test.ts",
+        "packages/materials/tests/control-store-evidence-invariants.test.ts",
+        "packages/materials/tests/control-store.test.ts",
+        "packages/materials/tests/dasctf-api.test.ts",
+        "packages/materials/tests/domain-records.test.ts",
+        "packages/materials/tests/environment-janitor.test.ts",
+        "packages/materials/tests/evaluation.test.ts",
+        "packages/materials/tests/event-ingress-scope.test.ts",
+        "packages/materials/tests/evidence-bypass-regressions.test.ts",
+        "packages/materials/tests/evidence-curation-gate.test.ts",
+        "packages/materials/tests/external-resource-registry.test.ts",
+        "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/interruption-recovery.test.ts",
+        "packages/materials/tests/knowledge-projection.test.ts",
+        "packages/materials/tests/knowledge-read-bounds.test.ts",
+        "packages/materials/tests/local-holdout.test.ts",
+        "packages/materials/tests/mcp.test.ts",
+        "packages/materials/tests/model-receipt.test.ts",
+        "packages/materials/tests/outcome-envelope.test.ts",
+        "packages/materials/tests/phase-gate.test.ts",
+        "packages/materials/tests/pwn-coding-tools.test.ts",
+        "packages/materials/tests/pwn-layer.test.ts",
+        "packages/materials/tests/pwn-session-runtime-host.test.ts",
+        "packages/materials/tests/real-model-evaluator.test.ts",
+        "packages/materials/tests/reasoning-forest.test.ts",
+        "packages/materials/tests/reverse-core.test.ts",
+        "packages/materials/tests/run-work-scheduler.test.ts",
+        "packages/materials/tests/runtime-scenario-evaluator.test.ts",
+        "packages/materials/tests/session-resource-adapter.test.ts",
+        "packages/materials/tests/session-runtime-combined-host.test.ts",
+        "packages/materials/tests/session-runtime-service.test.ts",
+        "packages/materials/tests/session-runtime-wire.test.ts",
+        "packages/materials/tests/single-agent-loop.test.ts",
+        "packages/materials/tests/tool-repeat-breaker.test.ts",
+        "packages/materials/tests/verification-recovery.test.ts",
+        "packages/materials/tests/web-session.test.ts",
+        "packages/materials/tests/web-tools.test.ts"
+      ]
+    },
+    {
       "id": "@proofblade/materials::method::AblationPolicyController.decide",
       "name": "AblationPolicyController.decide",
       "kind": "method",
@@ -21823,8 +22321,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 325,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 327,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -21874,9 +22372,10 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 319,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 321,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -21936,8 +22435,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
-      "line": 310,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "line": 312,
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -21958,6 +22457,7 @@
       "line": 122,
       "moduleHash": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22072,6 +22572,7 @@
       "line": 30,
       "moduleHash": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22186,6 +22687,7 @@
       "line": 273,
       "moduleHash": "ac82c8c5128f71c5edd79be6f7865e065ef81686d3ee4c74560ed012147748a2",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22300,6 +22802,7 @@
       "line": 193,
       "moduleHash": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -22448,6 +22951,7 @@
       "line": 26,
       "moduleHash": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -22717,6 +23221,7 @@
       "line": 88,
       "moduleHash": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -22970,6 +23475,7 @@
       "line": 118,
       "moduleHash": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -23124,6 +23630,7 @@
       "line": 186,
       "moduleHash": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -23815,6 +24322,7 @@
       "line": 188,
       "moduleHash": "5e089cbde628eaa3cb15b85b917261798290376be1a04b26f9479e2d36088cab",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -24066,6 +24574,7 @@
       "line": 59,
       "moduleHash": "ca004d56be7d21359d5d254cbf160f6d4ee66564e19093b92133aa8cb56697d8",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -24173,6 +24682,7 @@
       "line": 46,
       "moduleHash": "ca004d56be7d21359d5d254cbf160f6d4ee66564e19093b92133aa8cb56697d8",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binary-core.test.ts",
@@ -24260,6 +24770,7 @@
       "line": 154,
       "moduleHash": "63decfa9f941afdc8d47f95000501347430180a1de02285ff9b7b93cc9fa40d8",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -24746,6 +25257,7 @@
       "line": 96,
       "moduleHash": "d7aa4a0bdfa4d9929ff7b8dd3dfcd0080dcb3d95dfe7d2452b22073e5f9230ba",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -24957,6 +25469,7 @@
       "line": 151,
       "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -25008,6 +25521,7 @@
       "line": 139,
       "moduleHash": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -25284,6 +25798,7 @@
       "line": 167,
       "moduleHash": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
@@ -25335,6 +25850,7 @@
       "line": 19,
       "moduleHash": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -25375,6 +25891,7 @@
       "line": 95,
       "moduleHash": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/capability-jobs.test.ts",
         "packages/materials/tests/coding-resources.test.ts",
@@ -25523,6 +26040,7 @@
       "line": 97,
       "moduleHash": "042d2a440c5cbe445c7ad345d616019a2ce3b18210903d5af896e3249420b0c8",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -26308,6 +26826,7 @@
       "line": 233,
       "moduleHash": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -26484,6 +27003,7 @@
       "line": 245,
       "moduleHash": "a3ff7214586555fc138e6c46496f4a76b28810faa0c58705937bc9bba521cc42",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -26547,6 +27067,7 @@
       "line": 167,
       "moduleHash": "1b0a1224970dc67ae602eddd64904ea553851926685a2b17ef408e2c1f33e282",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -26971,6 +27492,7 @@
       "line": 62,
       "moduleHash": "44a4c3a7db82806c2ba9c9b33c43739ce44810eeee0e0768d6a64b08ce9e1b76",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27289,6 +27811,7 @@
       "line": 156,
       "moduleHash": "1b1970c2da493e3417c39b948c0de27dc385d9159d91a390a0ec071b647c1429",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -27566,6 +28089,7 @@
       "line": 49,
       "moduleHash": "c7500912ed8b226d0b4022924ba25a8157c5dddb4f29d334ede5acab81f86102",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
@@ -27832,6 +28356,7 @@
       "line": 96,
       "moduleHash": "72209091a66db573787dca085190915960e2e8f7f23ac42cb930771a2d7a59df",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28124,6 +28649,7 @@
       "line": 123,
       "moduleHash": "74f2b54c54980d5bfca344e51cf80207335e0d2f17ce670a6c8e2e7f1d747cea",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28504,6 +29030,7 @@
       "line": 279,
       "moduleHash": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -28887,6 +29414,7 @@
       "line": 129,
       "moduleHash": "289fc66f69229e149a1f292b0d3eed7d43bd81a46538bf236a4c6f76fda08224",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -29326,6 +29854,7 @@
       "line": 119,
       "moduleHash": "baa8a00f464895fe76aba7a7d72c97097d24be297f724275fc9aff599462a781",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -29593,6 +30122,7 @@
       "line": 46,
       "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -30657,6 +31187,7 @@
       "line": 53,
       "moduleHash": "b6ec1712043c34dc8cbbaae16b9471ab34540fa52b214b26f5d56e9716617730",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -30853,6 +31384,7 @@
       "line": 31,
       "moduleHash": "fcf355c742eb290c80954e04ee308dc2e1adad87dfb16fcd08c84caec18c1f53",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -31146,6 +31678,7 @@
       "line": 147,
       "moduleHash": "fcf355c742eb290c80954e04ee308dc2e1adad87dfb16fcd08c84caec18c1f53",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31429,6 +31962,7 @@
       "line": 192,
       "moduleHash": "cddd703d8fb99391532eeff23b0758c20970cba4495d50dd6e4e76583a5a2c3c",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -31570,6 +32104,7 @@
       "line": 97,
       "moduleHash": "cddd703d8fb99391532eeff23b0758c20970cba4495d50dd6e4e76583a5a2c3c",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/browser-runtime-playwright-host.test.ts",
@@ -32241,6 +32776,7 @@
       "line": 360,
       "moduleHash": "3e9941f693342aed2597c66f576bf6eb7a2ca05f6b11b11d4b7742c74b80edbd",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -33398,6 +33934,7 @@
       "line": 177,
       "moduleHash": "7e0be302baa27562683fd4442144e63381715c6eea0f3c514e8202d7330e377f",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -33610,6 +34147,7 @@
       "line": 419,
       "moduleHash": "13e6ef8b2f8284e98bd6a53b09201b9c2571bb551539751e980cb151a6de7cbd",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34038,6 +34576,7 @@
       "line": 121,
       "moduleHash": "c8ff04e6dd5eac6af1c609297cef1aeaacb3ceead221e92a9e2b473eda2cc473",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
         "packages/materials/tests/browser-resource-adapter.test.ts",
@@ -34596,6 +35135,7 @@
       "line": 300,
       "moduleHash": "bb5c9bcf79b3da924fbabc316408ac7e8861e96ccfcbb5b0b2372c0da4a1ca6d",
       "testRefs": [
+        "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/app-server.test.ts",
         "packages/materials/tests/approval-policy.test.ts",
@@ -36641,7 +37181,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 189,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36655,7 +37195,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 13,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36669,7 +37209,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 188,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36683,7 +37223,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 10,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36697,7 +37237,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 12,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36711,7 +37251,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 30,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36725,7 +37265,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 32,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36739,7 +37279,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 37,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36753,7 +37293,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 33,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36767,7 +37307,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 31,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36781,7 +37321,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 35,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36795,7 +37335,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 28,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36809,7 +37349,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 36,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36823,7 +37363,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 29,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36837,7 +37377,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 34,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
@@ -36851,7 +37391,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/evaluation/ablation.ts",
       "line": 38,
-      "moduleHash": "7a378e1927471b9aa282833fbbf82d4b19146bc6a4ffeef1ba4172e17af4a3ea",
+      "moduleHash": "fc2e9886137528cde57570322d5d62ea7d2bef0599948cdc2e39bc20ab5d58c5",
       "testRefs": []
     },
     {
