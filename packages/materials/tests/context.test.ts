@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ContextCompiler } from "../src/context/compiler.js";
+import { ContextCompiler, contextText } from "../src/context/compiler.js";
 import { prepareContextMaintenance } from "../src/context/maintenance-coordinator.js";
 import { createInitialSnapshot } from "../src/control/reducer.js";
 import type { TaskContract } from "../src/domain/types.js";
 import { estimateTokens } from "../src/domain/utils.js";
-import { MAX_LEDGER_BLOCK_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
+import { MAX_LEDGER_BLOCK_TOKENS, MAX_PHASE_LAYER_TOKENS, MAX_STANDING_LAYER_TOKENS, MAX_TASK_LAYER_TOKENS } from "../src/context/compiler.js";
 
 const task: TaskContract = {
   schema_version: 1,
@@ -168,6 +168,36 @@ test("context task contract bounds oversized model-facing fields", () => {
   assert.equal(compiled.manifest.layerTokens.L1 <= MAX_TASK_LAYER_TOKENS, true);
 });
 
+test("context bounds standing and phase layers before the final provider envelope", () => {
+  const snapshot = createInitialSnapshot("CTX-STATIC-BOUNDS", task);
+  snapshot.status = "RUNNING";
+  snapshot.workItems = Object.fromEntries(Array.from({ length: 128 }, (_, index) => [`WI-${index}`, {
+    id: `WI-${index}`,
+    runId: snapshot.runId,
+    title: `work-${index}`,
+    objective: "x".repeat(2_000),
+    role: "executor" as const,
+    status: "READY" as const,
+    dependsOn: [], evidenceIds: [], artifactIds: [], attempt: 0, maxAttempts: 1, createdSeq: index, updatedSeq: index,
+  }]));
+  const resources = {
+    version: 1 as const,
+    skillCatalogHash: "s".repeat(64),
+    skills: Array.from({ length: 64 }, (_, index) => ({ name: `skill-${index}`, description: "y".repeat(2_000), contentHash: "a".repeat(64) })),
+    mcpCatalogHash: "m".repeat(64),
+    mcpServers: [],
+    toolCatalogHash: "t".repeat(64),
+    toolCatalog: [],
+  };
+  const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, resources, contextWindow: 100_000 });
+  const l0 = compiled.manifest.blocks?.find((block) => block.id === "context.l0")?.content ?? "";
+  const l2 = compiled.manifest.blocks?.find((block) => block.id === "context.l2")?.content ?? "";
+  assert.ok(estimateTokens(l0) <= MAX_STANDING_LAYER_TOKENS);
+  assert.ok(estimateTokens(l2) <= MAX_PHASE_LAYER_TOKENS);
+  assert.ok(estimateTokens(contextText(compiled)) <= 10_000, "default provider system context must stay below the 10K token hard cap");
+  assert.ok(estimateTokens(contextText(compiled, 512)) <= 512);
+});
+
 test("context keeps each durable ledger block below the absolute token cap", () => {
   const snapshot = createInitialSnapshot("CTX-L3-BOUNDS", task);
   snapshot.facts = Object.fromEntries(Array.from({ length: 2_000 }, (_, index) => [`F-${index}`, {
@@ -274,7 +304,7 @@ test("context maintenance coordinator repairs every view and defers compaction",
   assert.equal(prepared.plan.shouldSnip, true);
   assert.equal(prepared.nextAction, "compact");
   assert.equal(prepared.checkpointRecommended, true);
-  assert.equal(prepared.messages.some((message) => message.role === "toolResult"), true);
+  assert.ok(prepared.estimatedTokens <= 256);
 });
 
 test("context maintenance compacts proactively below the provider hard limit", () => {
@@ -362,6 +392,28 @@ test("context maintenance keeps pruning after snipping drops below the prune thr
   assert.equal(prepared.plan.shouldPrune, true);
   assert.ok(prepared.estimatedTokens <= messageBudget);
   assert.match(JSON.stringify(prepared.messages), /call-7/);
+});
+
+test("context maintenance enforces a final hard cap for an oversized retained tail", () => {
+  const refs = Array.from({ length: 200 }, (_, index) => `A-${String(index).padStart(4, "0")}`).join(" ");
+  const messages = [
+    { role: "user", content: `task ${"x".repeat(8_000)}`, timestamp: 1 },
+    { role: "assistant", content: [{ type: "toolCall", id: "call-tail", name: "bash", arguments: { command: "x".repeat(8_000) } }], api: "openai-completions", provider: "test", model: "test", usage: zeroUsage(), stopReason: "toolUse", timestamp: 2 },
+    { role: "toolResult", toolCallId: "call-tail", toolName: "bash", content: [{ type: "text", text: `${"output ".repeat(4_000)} ${refs}` }], details: { refs }, isError: false, timestamp: 3 },
+    { role: "user", content: `follow-up ${"y".repeat(8_000)}`, timestamp: 4 },
+  ] as never[];
+  const prepared = prepareContextMaintenance({ messages, availableTokens: 1_024, messageBudget: 512 });
+  assert.ok(prepared.estimatedTokens <= 512);
+  const rendered = JSON.stringify(prepared.messages);
+  assert.doesNotMatch(rendered, /x{1000}/);
+  assert.doesNotMatch(rendered, /y{1000}/);
+  const maintenanceRefs = prepared.messages
+    .filter((message) => message.role === "toolResult")
+    .flatMap((message) => {
+      const details = message.details as { contextMaintenance?: { refs?: unknown } } | undefined;
+      return Array.isArray(details?.contextMaintenance?.refs) ? [details.contextMaintenance.refs] : [];
+    });
+  assert.ok(maintenanceRefs.every((refs) => refs.length <= 32));
 });
 
 function zeroUsage() {

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { atomicWriteFile, canonicalJson, FileLockTimeoutError, KeyedOperationQueue, sha256, type ToolAtom, withFileLock } from "../src/index.js";
+import { atomicWriteFile, canonicalJson, estimateTokens, FileLockTimeoutError, KeyedOperationQueue, sha256, type ToolAtom, withFileLock } from "../src/index.js";
 
 test("atoms are deterministic and independently usable", async () => {
   const tool: ToolAtom = { name: "read", description: "read data", parameters: { type: "object" } };
@@ -15,6 +15,12 @@ test("atoms are deterministic and independently usable", async () => {
   const order: number[] = [];
   await Promise.all([1, 2, 3].map((value) => queue.run("stream", async () => { order.push(value); })));
   assert.deepEqual(order, [1, 2, 3]);
+});
+
+test("estimateTokens counts UTF-8 bytes for mixed natural language and code", () => {
+  const value = "中文 😀 {\"key\": \"值\"}\\nconst ok = true;";
+  assert.equal(estimateTokens(value), Buffer.byteLength(value, "utf8"));
+  assert.ok(estimateTokens(value) > value.length, "multibyte text must not be under-counted by character length");
 });
 
 test("file lock serializes operations and releases after failure", async () => {

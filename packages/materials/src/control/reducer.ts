@@ -793,12 +793,16 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const epoch = next.requestEpochs[String(p.requestEpochId)];
       if (!epoch) break;
       const fields = p.fields && typeof p.fields === "object" ? p.fields as Record<string, unknown> : {};
-      for (const key of ["requestBodyHash", "requestHeadersHash", "requestContextHash", "providerBindingId", "scopePolicyHash", "stablePrefixHash", "dynamicSuffixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash"] as const) {
+      for (const key of ["requestBodyHash", "requestHeadersHash", "requestContextHash", "providerBindingId", "scopePolicyHash", "stablePrefixHash", "dynamicSuffixHash", "systemPromptHash", "toolCatalogHash", "capabilityCatalogHash", "contextManifestHash", "modelContextFrameId", "modelContextFrameHash"] as const) {
         if (typeof fields[key] === "string") epoch[key] = fields[key];
       }
       epoch.updatedSeq = event.seq;
       break;
     }
+    case "model_context_frame_recorded":
+      // The frame is a metadata-only observability artifact; it does not alter
+      // the authoritative Run projection.
+      break;
     case "context_overflow_recovered":
       next.contextOverflowRecoveries += 1;
       break;

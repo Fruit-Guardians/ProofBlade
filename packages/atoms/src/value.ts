@@ -37,9 +37,15 @@ function sortValue(value: unknown): unknown {
 }
 
 /**
- * Estimate token count with a bounded character-based approximation.
- * @invariant This is not an exact provider tokenizer count.
+ * Return a conservative upper bound for UTF-8 tokenizer input.
+ *
+ * Tokenizers used by the supported providers operate on UTF-8 bytes (or a
+ * coarser unit), so no token can account for less than one input byte.  Using
+ * the byte length prevents Chinese, JSON punctuation, and code-heavy payloads
+ * from being under-counted by the old `characters / 4` heuristic.  This is
+ * deliberately an upper bound rather than an exact provider tokenizer count:
+ * hard context limits must fail closed across providers.
  */
 export function estimateTokens(value: string): number {
-  return Math.ceil(value.length / 4);
+  return Buffer.byteLength(value, "utf8");
 }

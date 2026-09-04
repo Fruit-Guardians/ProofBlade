@@ -9,6 +9,9 @@ import { captureProviderPrefixShape } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
+import { ContextCompiler, contextText } from "../src/context/compiler.js";
+import { createInitialSnapshot } from "../src/control/reducer.js";
+import { estimateTokens, sha256 } from "../src/domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
@@ -17,6 +20,88 @@ import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtim
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
 const apiKeyEnv = "PROOFBLADE_MOCK_PROVIDER_KEY";
+
+test("default compiled system context stays below 10K after Provider serialization", async () => {
+  let requestBody = "";
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBody = chunks.join("");
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.end(`data: ${JSON.stringify({ id: "context-cap", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: { role: "assistant", content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\ndata: [DONE]\n\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-provider-context-cap-"));
+  const config: ProofBladeConfig = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: {
+      executor: {
+        provider: "mock-http",
+        api: "openai-completions",
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        model: "mock-model",
+        modelDiscoveryPath: "/models",
+        apiKeyEnv,
+        contextWindow: 100_000,
+        maxTokens: 256,
+        requestTimeoutMs: 5_000,
+        maxRetries: 0,
+        input: ["text"],
+      },
+    },
+  };
+  let closeTransport: (() => Promise<void>) | undefined;
+  try {
+    const task = demoTask("PI-CONTEXT-CAP", root, config);
+    const snapshot = createInitialSnapshot("PI-CONTEXT-CAP", task);
+    snapshot.status = "RUNNING";
+    snapshot.facts = Object.fromEntries(Array.from({ length: 2_000 }, (_, index) => [`F-${index}`, {
+      id: `F-${index}`, runId: snapshot.runId, generation: snapshot.generation,
+      statement: `large confirmed finding ${index} ${"x".repeat(300)}`, status: "CONFIRMED" as const, evidenceIds: [], createdSeq: index + 1,
+    }]));
+    const resources = {
+      version: 1 as const,
+      skillCatalogHash: "s".repeat(64),
+      skills: Array.from({ length: 64 }, (_, index) => ({ name: `skill-${index}`, description: "skill description ".repeat(200), contentHash: "a".repeat(64) })),
+      mcpCatalogHash: "m".repeat(64),
+      mcpServers: [],
+      toolCatalogHash: "t".repeat(64),
+      toolCatalog: [],
+    };
+    const compiled = new ContextCompiler().build({ runId: snapshot.runId, lane: "main", phase: snapshot.phase, task, snapshot, contextWindow: 100_000, resources });
+    const rawContext = compiled.messages.map((message) => `[${message.role}]\n${message.content}`).join("\n\n");
+    assert.ok(estimateTokens(rawContext) > 10_000, "fixture must exercise the default cap");
+    const systemPrompt = contextText(compiled);
+    assert.ok(estimateTokens(systemPrompt) <= 10_000);
+
+    process.env[apiKeyEnv] = "mock-key";
+    const env = new NodeExecutionEnv({ cwd: root });
+    const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
+    const session = await repo.create({ id: "context-cap", cwd: root });
+    const configured = createConfiguredModels({ ...config.modelProfiles.executor, modelId: "mock-model" }, undefined);
+    closeTransport = configured.closeTransport;
+    const harness = new AgentHarness({ session, models: configured.models, model: configured.model, systemPrompt });
+    const response = await harness.prompt("Say ok.");
+    assert.equal(response.stopReason, "stop");
+    const payload = JSON.parse(requestBody) as { messages?: Array<{ role?: string; content?: unknown }> };
+    const visibleSystem = (payload.messages ?? [])
+      .filter((message) => message.role === "system" || message.role === "developer")
+      .map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""))
+      .join("\n");
+    assert.ok(estimateTokens(visibleSystem) <= 10_000, "serialized Provider system context must stay below the hard cap");
+    await env.cleanup();
+  } finally {
+    await closeTransport?.();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 test("configured Pi AgentHarness records real HTTP provider traffic", async () => {
   let requests = 0;
@@ -65,7 +150,26 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
     const configured = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     closeTransport = configured.closeTransport;
     const harness = new AgentHarness({ session, models: configured.models, model: configured.model, systemPrompt: "Reply with one short word." });
-    const detach = attachPiObservability(harness, { runId, lane: "main", controlStore: services.control, scheduling });
+    const detach = attachPiObservability(harness, {
+      runId,
+      lane: "main",
+      controlStore: services.control,
+      scheduling,
+      getContextSnapshot: async () => ({
+        omittedItems: [{
+          itemId: "pruned:tool_exchange:123",
+          role: "unknown",
+          source: "context" as const,
+          sourceIds: ["call-123"],
+          contentHash: "a".repeat(64),
+          visibleChars: 0,
+          estimatedTokens: 0,
+          included: false,
+          artifactRefs: [],
+          evidenceRefs: [],
+        }],
+      }),
+    });
     try {
       const response = await harness.prompt("Say ok.");
       assert.equal(response.stopReason, "stop");
@@ -88,6 +192,14 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
     assert.equal(telemetry.provider.byModel[0]?.provider, "mock-http");
     assert.equal(telemetry.provider.byModel[0]?.model, "mock-model");
     assert.equal(telemetry.provider.tokens.total, 4);
+    const frameEvents = (await services.control.events(runId)).filter((event) => event.type === "model_context_frame_recorded");
+    assert.equal(frameEvents.length, 1);
+    const frame = (frameEvents[0]?.payload as { frame?: { messageCount?: number; frameHash?: string; omittedItems?: Array<{ itemId?: string; included?: boolean }> } }).frame;
+    assert.ok((frame?.messageCount ?? 0) > 0);
+    assert.equal(frame?.frameHash?.length, 64);
+    assert.equal(frame?.omittedItems?.[0]?.itemId, "pruned:tool_exchange:123");
+    assert.equal(frame?.omittedItems?.[0]?.included, false);
+    assert.doesNotMatch(JSON.stringify(frameEvents[0]?.payload), /Say ok\.|Reply with one short word/);
   } finally {
     await closeTransport?.();
     delete process.env[apiKeyEnv];
@@ -231,6 +343,10 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.ok((firstRequest.messages ?? []).some((message) => message.role === "user" && messageText(message) === firstPrompt));
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
     assert.match(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
+    const projectionText = messageText((firstRequest.messages ?? []).at(-1) ?? {});
+    const projectionMatch = projectionText.match(/<proofblade-context[^>]*dynamic-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/proofblade-context>/);
+    assert.ok(projectionMatch, "the serialized context projection must expose its visible suffix hash");
+    assert.equal(projectionMatch?.[1], sha256(projectionMatch?.[2] ?? ""), "dynamicSuffixHash must hash the bounded text sent to the Provider");
     assert.doesNotMatch(firstRequestBody, /Categorize: pick the dominant category/);
     assert.doesNotMatch(firstRequestBody, /Load the playbook:/);
     assert.ok(firstRequestEventTypes?.includes("tool_preparation_recorded"));

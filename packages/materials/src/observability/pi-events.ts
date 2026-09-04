@@ -3,6 +3,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { captureProviderPrefixShape, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
 import type { ContextManifest, Lane } from "../domain/types.js";
+import { buildModelContextFrame, type ModelContextFrame, type ModelContextItem } from "../context/model-context-frame.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
 import { toToolFailure } from "../tools/errors.js";
@@ -25,6 +26,8 @@ export interface PiObservabilityOptions {
     capabilityCatalogHash?: string;
     parentEpochId?: string;
     manifestSummary?: ContextManifestSummary;
+    /** Metadata for transcript items removed before this exact request. */
+    omittedItems?: readonly ModelContextItem[];
   } | undefined>;
   requestContext?: {
     contextWindow?: number;
@@ -69,6 +72,8 @@ interface PendingProvider {
   maxInterEventIdleMs?: number;
   maxInterEventIdleAttempt?: number;
   maxInterEventIdleEventType?: string;
+  contextFrame?: ModelContextFrame;
+  omittedItems?: readonly ModelContextItem[];
 }
 
 /** Correlates Pi's pre-request hook with the scheduler's later slot grant. */
@@ -201,9 +206,22 @@ export class ProviderSchedulingTelemetry {
     const pending = requestId ? this.requests.get(requestId) : undefined;
     if (pending) {
       pending.cachePrefix = captureProviderPrefixShape(payload);
+      pending.contextFrame = buildModelContextFrame({
+        runId: this.options.runId,
+        generation: pending.generation ?? 0,
+        requestId: pending.requestId,
+        ...(pending.epochId ? { epochId: pending.epochId } : {}),
+        provider: pending.provider,
+        model: pending.model,
+        api: pending.api,
+        payload,
+        ...(pending.contextManifestHash ? { contextManifestHash: pending.contextManifestHash } : {}),
+        ...(pending.omittedItems ? { omittedItems: pending.omittedItems } : {}),
+      });
+      await append(this.options, "model_context_frame_recorded", "model", { frame: pending.contextFrame });
       if (pending.epochId) await append(this.options, "request_epoch_context", "model", {
         requestEpochId: pending.epochId,
-        fields: { requestBodyHash: hashRequestValue(payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash },
+        fields: { requestBodyHash: hashRequestValue(payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash, modelContextFrameId: pending.contextFrame.frameId, modelContextFrameHash: pending.contextFrame.frameHash },
       });
     }
   }
@@ -282,6 +300,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
           : {}),
       ...(context?.manifestHash ? { contextManifestHash: context.manifestHash } : {}),
       ...(context?.cache ? { contextCache: context.cache } : {}),
+      ...(context?.omittedItems ? { omittedItems: context.omittedItems } : {}),
       api: event.model.api,
       retryLimit: event.streamOptions.maxRetries ?? 0,
       cacheRetention: event.streamOptions.cacheRetention ?? "short",
@@ -347,9 +366,22 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     const pending = providers.find((item) => item.responseStatus === undefined);
     if (pending) {
       pending.cachePrefix = captureProviderPrefixShape(event.payload);
+      pending.contextFrame = buildModelContextFrame({
+        runId: options.runId,
+        generation: pending.generation ?? 0,
+        requestId: pending.requestId,
+        ...(pending.epochId ? { epochId: pending.epochId } : {}),
+        provider: pending.provider,
+        model: pending.model,
+        api: pending.api,
+        payload: event.payload,
+        ...(pending.contextManifestHash ? { contextManifestHash: pending.contextManifestHash } : {}),
+        ...(pending.omittedItems ? { omittedItems: pending.omittedItems } : {}),
+      });
+      await append(options, "model_context_frame_recorded", "model", { frame: pending.contextFrame });
       await append(options, "request_epoch_context", "model", {
         requestEpochId: pending.epochId,
-        fields: { requestBodyHash: hashRequestValue(event.payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash },
+        fields: { requestBodyHash: hashRequestValue(event.payload), requestContextHash: hashRequestValue({ phase: pending.phase, contextManifestHash: pending.contextManifestHash, contextCache: pending.contextCache }), stablePrefixHash: pending.cachePrefix.prefixHash, dynamicSuffixHash: pending.contextCache?.dynamicHash, modelContextFrameId: pending.contextFrame.frameId, modelContextFrameHash: pending.contextFrame.frameHash },
       });
     }
     return undefined;
@@ -433,7 +465,7 @@ export function attachPiObservability<TContext extends object | undefined>(harne
   };
 }
 
-function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
+function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "model_context_frame_recorded" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
   return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]).then(() => undefined);
 }
 

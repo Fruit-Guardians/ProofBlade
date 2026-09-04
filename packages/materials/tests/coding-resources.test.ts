@@ -536,6 +536,8 @@ test("coding bash archives raw output before returning RTK-compressed content", 
     assert.ok(Number(rewrite.savingsRate) > 0.9);
     const artifactId = String(rewrite.artifactId);
     assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`ProofBlade artifact ${artifactId}`));
+    assert.match(result.content.map((item) => item.text ?? "").join("\n"), /\[ProofBlade receipt\][\s\S]*visible=bounded[\s\S]*next=recall/);
+    assert.match(result.content.map((item) => item.text ?? "").join("\n"), new RegExp(`artifact=pb://run/${runId}/artifact/${artifactId}/content`));
     const snapshot = await services.control.snapshot(runId);
     assert.ok(snapshot.artifacts[artifactId]);
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[artifactId]!), raw);
@@ -1109,6 +1111,8 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     const withheldText = withheld.content.map((part) => part.text ?? "").join("\n");
     assert.match(withheldText, /ProofBlade artifact A-2: 4096 bytes withheld/);
     assert.match(withheldText, /do not re-run the command/);
+    assert.match(withheldText, /\[ProofBlade receipt\][\s\S]*visible=bounded[\s\S]*next=recall/);
+    assert.match(withheldText, /artifact=pb:\/\/run\/RUN-anchor\/artifact\/A-2\/content/);
     assert.equal(archived.length, 2);
   } finally {
     try {

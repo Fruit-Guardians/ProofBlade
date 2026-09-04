@@ -3,6 +3,9 @@ import { snipText } from "@proofblade/molecules";
 import { estimateTokens } from "../domain/utils.js";
 import { isRealUserTask, latestExternalUserMessage } from "./user-task-anchor.js";
 
+const MAX_CONTEXT_REFS = 32;
+const MAX_CONTEXT_REF_LENGTH = 128;
+
 export interface AgentContextPruneResult {
   messages: AgentMessage[];
   estimatedTokens: number;
@@ -102,6 +105,9 @@ export function pruneAgentMessages(messages: AgentMessage[], maxTokens: number, 
   }
   repairToolPairs(output, dropped);
   removeInvalidToolResults(output, dropped);
+  enforceFinalTokenBudget(output, maxTokens, dropped);
+  repairToolPairs(output, dropped);
+  removeInvalidToolResults(output, dropped);
   return { messages: output, estimatedTokens: messageTokens(output), dropped };
 }
 
@@ -166,7 +172,10 @@ function outputTier(chars: number): "small" | "medium" | "large" {
 
 function extractContextRefs(text: string, details: unknown): string[] {
   const detailText = isRecord(details) ? JSON.stringify(details) : "";
-  return [...new Set(`${text}\n${detailText}`.match(/\b(?:A|E|F|H|I|C|CP|J)-[a-zA-Z0-9-]+\b/g) ?? [])].sort();
+  return [...new Set(`${text}\n${detailText}`.match(/\b(?:A|E|F|H|I|C|CP|J)-[a-zA-Z0-9-]+\b/g) ?? [])]
+    .sort()
+    .slice(0, MAX_CONTEXT_REFS)
+    .map((ref) => ref.slice(0, MAX_CONTEXT_REF_LENGTH));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -213,6 +222,85 @@ function trimOldMessages(messages: AgentMessage[], maxTokens: number, dropped: A
     messages.splice(index, 1);
     dropped.push({ kind: "message", id: `${message?.role ?? "unknown"}:${index}` });
   }
+}
+
+/**
+ * Pruning preserves useful recent state first, but provider input limits are a
+ * hard invariant.  The retained tail can still contain one enormous tool
+ * result, user task, or historic tool arguments, so finish with a structural
+ * cap rather than relying on the four-message retention floor.
+ */
+function enforceFinalTokenBudget(messages: AgentMessage[], maxTokens: number, dropped: AgentContextPruneResult["dropped"]): void {
+  let guard = Math.max(16, messages.length * 4);
+  while (messageTokens(messages) > maxTokens && guard-- > 0) {
+    const index = largestMessageIndex(messages);
+    if (index < 0) break;
+    const before = messageTokens(messages);
+    if (shrinkMessage(messages[index]!)) {
+      dropped.push({ kind: "tool_result_snip", id: messageId(messages[index]!, index) });
+      if (messageTokens(messages) < before) continue;
+    }
+    if (!dropExchangeAt(messages, index, dropped)) break;
+  }
+}
+
+function largestMessageIndex(messages: AgentMessage[]): number {
+  let selected = -1;
+  let largest = 0;
+  for (let index = 0; index < messages.length; index += 1) {
+    const size = estimateTokens(JSON.stringify(messages[index]));
+    if (size > largest) { largest = size; selected = index; }
+  }
+  return selected;
+}
+
+function shrinkMessage(message: AgentMessage): boolean {
+  if (message.role === "toolResult") {
+    const original = message.content.map((item) => item.type === "text" ? item.text : `[${item.mimeType} image]`).join("\n");
+    const refs = extractContextRefs(original, message.details);
+    const text = snipText(original, 256).text;
+    message.content = [{ type: "text", text: `${text}\n[context hard cap; refs: ${refs.join(", ") || "see control store"}]` }];
+    message.details = { contextMaintenance: { tier: "hard_cap", refs } };
+    return true;
+  }
+  if (message.role === "user" || message.role === "custom") {
+    if (typeof message.content !== "string" || message.content.length <= 256) return false;
+    message.content = snipText(message.content, 256).text;
+    return true;
+  }
+  if (message.role === "assistant") {
+    let changed = false;
+    message.content = message.content.map((item) => {
+      if (item.type === "text" && item.text.length > 256) { changed = true; return { ...item, text: snipText(item.text, 256).text }; }
+      if (item.type === "toolCall" && estimateTokens(JSON.stringify(item.arguments)) > 128) { changed = true; return { ...item, arguments: { contextTruncated: true } }; }
+      return item;
+    });
+    return changed;
+  }
+  return false;
+}
+
+function dropExchangeAt(messages: AgentMessage[], index: number, dropped: AgentContextPruneResult["dropped"]): boolean {
+  const message = messages[index];
+  if (!message) return false;
+  if (message.role === "assistant" && assistantCalls(message).length > 0) {
+    let end = index;
+    while (end + 1 < messages.length && messages[end + 1]?.role === "toolResult") end += 1;
+    messages.splice(index, end - index + 1);
+    dropped.push({ kind: "tool_exchange", id: `hard-cap:${index}` });
+    return true;
+  }
+  if (message.role === "toolResult") {
+    const assistantIndex = messages.findIndex((candidate) => candidate?.role === "assistant" && assistantCalls(candidate).some((call) => call.id === message.toolCallId));
+    if (assistantIndex >= 0) return dropExchangeAt(messages, assistantIndex, dropped);
+  }
+  messages.splice(index, 1);
+  dropped.push({ kind: "message", id: `hard-cap:${messageId(message, index)}` });
+  return true;
+}
+
+function messageId(message: AgentMessage, index: number): string {
+  return message.role === "toolResult" ? message.toolCallId : `${message.role}:${index}`;
 }
 
 function messageTokens(messages: AgentMessage[]): number {

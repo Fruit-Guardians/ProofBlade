@@ -17,7 +17,9 @@ import { latestExternalUserMessage } from "../context/user-task-anchor.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { DurableCompactionCoordinator } from "../context/durable-compaction.js";
 import { canonicalJson, estimateTokens, sha256 } from "../domain/utils.js";
+import { boundModelText } from "../domain/text-bounds.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../observability/pi-events.js";
+import type { ModelContextItem } from "../context/model-context-frame.js";
 import { McpProjectRegistry } from "../mcp/registry.js";
 import { ProofBladeSkillRegistry } from "../skills/registry.js";
 import { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
@@ -35,7 +37,7 @@ import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolP
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import { contextSnapshot, type AgentLanePort, type AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
-import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
+import { attachCodingTurnGuards, finalizeCodingTurn, type AblationPolicyBinding, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker } from "./tool-repeat-breaker.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { SessionRegistry } from "../container/session-registry.js";
@@ -60,6 +62,8 @@ import type { ExternalResourceRegistry } from "../recovery/external-resource-reg
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
+
+const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -170,6 +174,8 @@ export class PiCodingLane implements AgentLanePort {
     sessionId?: string;
     /** Called when the submission path pauses on a pending approval. */
     onApprovalRequired?: (approvalId: string) => void;
+    /** Optional strict-ablation policy binding; safety checks remain unconditional. */
+    ablationPolicy?: AblationPolicyBinding;
     /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
@@ -570,7 +576,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, options.ablationPolicy);
     const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -583,6 +589,7 @@ export class PiCodingLane implements AgentLanePort {
     // actual compact trigger relative to the provider input budget.
     const proactiveMaintenanceLimit = Math.min(contextBudget, Math.max(8_192, Math.floor(contextBudget * threshold / 0.8)));
     let currentContextTokens = 0;
+    let lastOmittedItems: ModelContextItem[] = [];
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
     harness.on("context", async ({ messages }) => {
@@ -616,6 +623,7 @@ export class PiCodingLane implements AgentLanePort {
         messageBudget: targetMessageBudget,
         baseTokens: estimateTokens(JSON.stringify(dynamicProjection)),
       });
+      lastOmittedItems = contextPruneOmissions(prepared.dropped);
       currentContextTokens = prepared.estimatedTokens + estimateTokens(JSON.stringify(dynamicProjection));
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
@@ -662,7 +670,11 @@ export class PiCodingLane implements AgentLanePort {
         });
         previousContextBlocks = compiled.manifest.blocks;
         const summary = contextSnapshot(compiled.manifest);
-        return { ...summary, estimatedTokens: currentContextTokens > 0 ? currentContextTokens : summary.estimatedTokens };
+        return {
+          ...summary,
+          estimatedTokens: currentContextTokens > 0 ? currentContextTokens : summary.estimatedTokens,
+          omittedItems: lastOmittedItems,
+        };
       },
       scheduling,
     });
@@ -943,6 +955,31 @@ async function submissionCounters(
   return { submissionsUsed: used, submissionsRemaining: Math.max(0, snapshot.task.constraints.max_submissions - used) };
 }
 
+function contextPruneOmissions(dropped: readonly { kind: string; id?: string }[]): ModelContextItem[] {
+  const omissions = new Map<string, ModelContextItem>();
+  for (const item of dropped) {
+    const sourceId = item.id?.slice(0, 128);
+    const identity = canonicalJson({ kind: item.kind, ...(sourceId ? { sourceId } : {}) });
+    const contentHash = sha256(identity);
+    omissions.set(identity, {
+      itemId: `pruned:${item.kind.slice(0, 64)}:${contentHash.slice(0, 16)}`,
+      role: "unknown",
+      source: "context",
+      sourceIds: sourceId ? [sourceId] : [],
+      // The pruner reports identities rather than discarded bodies. Recording
+      // a hash of that metadata keeps telemetry informative without retaining
+      // model-visible text that the final request did not contain.
+      contentHash,
+      visibleChars: 0,
+      estimatedTokens: 0,
+      included: false,
+      artifactRefs: [],
+      evidenceRefs: [],
+    });
+  }
+  return [...omissions.values()];
+}
+
 export function injectReasoningForestContext(messages: AgentMessage[], forestContext: string): AgentMessage[] {
   if (!forestContext) return messages;
   const output = [...messages];
@@ -971,8 +1008,18 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
     compiled.messages.slice(1).map((message) => `[${message.role}]\n${message.content}`).join("\n\n"),
     turnGuidance ? `<proofblade-turn-guidance>\n${turnGuidance}\n</proofblade-turn-guidance>` : "",
   ].filter(Boolean).join("\n\n");
-  const dynamicHash = sha256(dynamicContent);
-  const content = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n${dynamicContent}\n</proofblade-context>`;
+  const hashPlaceholder = "0".repeat(64);
+  const prefix = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${hashPlaceholder}">\n`;
+  const suffix = "\n</proofblade-context>";
+  // ContextCompiler bounds individual blocks, but the provider receives this
+  // projection as one message. Bound the final envelope as well.
+  const emptyMessage = createCustomMessage("proofblade_context_projection", `${prefix}${suffix}`, false, undefined, new Date(0).toISOString());
+  const envelopeTokens = estimateTokens(JSON.stringify(emptyMessage));
+  const dynamicBudget = Math.max(16, MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS - envelopeTokens);
+  const bounded = boundModelText(dynamicContent, Math.max(64, dynamicContent.length), dynamicBudget);
+  const dynamicHash = sha256(bounded.text);
+  const prefixWithVisibleHash = `<proofblade-context manifest-hash="${compiled.manifest.hash}" dynamic-hash="${dynamicHash}">\n`;
+  const content = `${prefixWithVisibleHash}${bounded.text}${suffix}`;
   return createCustomMessage(
     "proofblade_context_projection",
     content,
@@ -980,8 +1027,9 @@ function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = "
     {
       manifestHash: compiled.manifest.hash,
       dynamicSuffixHash: dynamicHash,
-      sourceIds: compiled.manifest.sourceIds ?? [],
-      blockIds: compiled.manifest.blocks?.map((block) => block.id) ?? [],
+        sourceIds: compiled.manifest.sourceIds ?? [],
+        blockIds: compiled.manifest.blocks?.map((block) => block.id) ?? [],
+        ...(bounded.truncated ? { truncated: true, maxTokens: MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS } : {}),
     },
     new Date(0).toISOString(),
   );

@@ -31,6 +31,9 @@ import {
   FixtureEvaluationRunner,
   RealModelEvaluationRunner,
   preflightRealModelEvaluation,
+  AblationExperimentStore,
+  preflightAblationExperiment,
+  validateAblationExperiment,
   LocalHoldoutEvaluationRunner,
   anonymizeRunReplay,
   anonymizeEvaluationSummary,
@@ -198,6 +201,29 @@ async function main(): Promise<void> {
       print(summary);
       if (evalArgs.includes("--enforce-gate") && !summary.gate.passed) process.exitCode = 1;
       break;
+    }
+    case "ablation": {
+      const action = arg ?? "list";
+      const store = new AblationExperimentStore(join(root, ".proofblade", "ablation"));
+      if (action === "list") {
+        print(await store.list());
+        break;
+      }
+      if (action === "create") {
+        const configFile = required(rest[0], "experiment config path");
+        const experiment = validateAblationExperiment(JSON.parse(await readFile(resolve(root, configFile), "utf8")), config.modelProfiles.executor);
+        print({ experimentId: experiment.experimentId, path: await store.save(experiment), experimentFingerprint: experiment.experimentFingerprint });
+        break;
+      }
+      const experimentId = required(rest[0], "experiment id");
+      const experiment = await store.load(experimentId);
+      if (action === "preflight") {
+        const result = await preflightAblationExperiment(experiment, config.modelProfiles.executor, { probe: rest.includes("--probe") });
+        print(result);
+        if (!result.ready) process.exitCode = 1;
+        break;
+      }
+      throw new Error("ablation action must be list, create, or preflight");
     }
     case "eval-anonymize": {
       const summaryPath = required(arg, "evaluation summary path");
@@ -697,6 +723,7 @@ function helpText(): string {
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
     "  eval-holdout [manifest.json] [--attempts N] [--max-turns N] [--run-prefix ID] [--min-success-rate 0..1] [--enforce-gate]",
+    "  ablation list|create <experiment.json>|preflight <experiment-id> [--probe]",
     "  eval-anonymize <summary.json>  Remove Run ids/paths before sharing history",
     "  run-anonymize <run-id>  Export a secret-free event-level Run replay",
     "  capabilities",
