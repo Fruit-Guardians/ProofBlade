@@ -574,13 +574,11 @@ function latestAcceptedClaim(snapshot: RunSnapshot, task: TaskContract) {
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
   const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
-  const bundle = snapshot.toolPreparation?.actionBundles?.find((item) => item.domainPhase === snapshot.domainPhase);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
-    `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. Treat this phase as a bounded step, not an invitation to restart the whole analysis.`,
-    ...(bundle ? [`Current action bundle ${bundle.id}: ${bundle.objective} Tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Max calls: ${bundle.maxCalls}.`] : []),
-    `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`,
-    `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
+    `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. This is status context, not a required route.`,
+    `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Choose the next bounded action that best serves the task objective.`,
+    `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
     ...(userPrompt?.trim() ? ["User's latest instruction:", userPrompt.trim()] : []),
     `Task inputs (read-only, relative to the current workspace): ${snapshot.task.inputs.map((input) => input.path).join(", ") || "none listed; inspect the workspace manifest only"}.`,
