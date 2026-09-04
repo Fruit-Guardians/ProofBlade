@@ -64,6 +64,7 @@
     "src/evaluation/anonymous-replay.ts": "9ffd731d6bc458d6e73a534938e694037b19c921c4c20f6339f6ade1199cb076",
     "src/evaluation/failure-attribution.ts": "8260b4593eaed8f3917d59c528923717d2800be904b0d6a61dcdabd804364b77",
     "src/evaluation/fixture-evaluator.ts": "6e1a10ef0abe029a46617bfe1f64103baf7d2c26c9d3b7414555eb1be7339cb6",
+    "src/evaluation/information-value.ts": "f607d133f18f9d9f89f35695d6a63d88b17f5f68a429b5da80c94cf5b4191ab0",
     "src/evaluation/local-holdout.ts": "f34414e8bd24b4cd738ef8c59eb2d06977adfaac50fc753de831dac4005c4d51",
     "src/evaluation/protocol.ts": "76c3cc10b2a25a502b7cd1a087c00b201b00c715441b7a79d6a1e90cc5e8cf13",
     "src/evaluation/real-corpus.ts": "cfd864892d54b2503ad50ae737623232d36a36f381eeecd65bced1e61a6b9ed3",
@@ -72,7 +73,7 @@
     "src/evaluation/runtime-scenario-evaluator.ts": "8f4d37a437b28f2f3f16e1874279d790a2c531d1a9545eb3011373d0a72e9575",
     "src/evolution/evaluation-gates.ts": "4effd0b411fcb2521ebcd4ff98b8d246cd22095bcaa914aba1de47e684ed8f66",
     "src/evolution/update-proposals.ts": "338100f88a8156815d58cbc7506edaa319b319477a88e746deed962afd1f9b56",
-    "src/index.ts": "d1d539d4c0669d0094adfe5cc733951729e09b8648b1f1abca84206cf854caeb",
+    "src/index.ts": "e1e48fbae65879f9ab9ec4d011e9f9081e01f5120e3429209d5049f74ce29e0a",
     "src/jobs/background-runner.ts": "1affaae4a96d86a210e86a69aec88db739f5191085a104a58272fead3da0b358",
     "src/knowledge/consolidation.ts": "dad93c892ebeace9325cad803ecf4476c8cc812d736a794a7e90deafdb0eb1e6",
     "src/knowledge/deterministic-index.ts": "a36e021f0858cb540e1751b566afbd502d75dfa53f3d254eb5e6d128c2619cda",
@@ -6174,6 +6175,106 @@
         "packages/materials/tests/runtime-contracts.test.ts"
       ],
       "structureHash": "9e365909cf1f0961c4813b2c4ce5895f5c52ae06d08171dd4ccd09cc857fd3cb"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateDecisionVoi",
+      "name": "estimateDecisionVoi",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 58,
+      "signature": "(input: DecisionVoiInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate decision voi operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "6ddab53de31e2333cb62353726c7a8933e10e387221c535c36ad0d951706572b"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateHeuristicInformation",
+      "name": "estimateHeuristicInformation",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 18,
+      "signature": "(input: HeuristicInformationInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate heuristic information operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "310f17d01d63af1c34a411f5533dfaa9153764194ad39a077983b3a03c27d0e4"
+    },
+    {
+      "id": "@proofblade/materials::function::estimatePmi",
+      "name": "estimatePmi",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 25,
+      "signature": "(input: PmiInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate pmi operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "94525d50f67c9983672004b33dd38b68991bfdce90c450d7569e9664b5676194"
+    },
+    {
+      "id": "@proofblade/materials::function::estimatePosteriorEIG",
+      "name": "estimatePosteriorEIG",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 33,
+      "signature": "(hypotheses: readonly PosteriorHypothesis[]): InformationValueEstimate",
+      "summary": "Inferred summary: estimate posterior eig operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "ab79b178224017418a780129efe8a9c489090d23416917438871a6805be7cae1"
+    },
+    {
+      "id": "@proofblade/materials::function::estimateVerifiedUplift",
+      "name": "estimateVerifiedUplift",
+      "kind": "function",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 71,
+      "signature": "(input: VerifiedUpliftInput): InformationValueEstimate",
+      "summary": "Inferred summary: estimate verified uplift operation used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": [
+        "packages/materials/tests/information-value.test.ts"
+      ],
+      "structureHash": "115680f4e978f9b0626a181a5f7b35706cb947f66342d08b2b06b86fb42ec09b"
     },
     {
       "id": "@proofblade/materials::function::compareEvaluationAttempts",
@@ -13883,6 +13984,7 @@
         "packages/materials/tests/evidence-curation-gate.test.ts",
         "packages/materials/tests/evidence-search-index.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/information-value.test.ts",
         "packages/materials/tests/intent-filter.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
@@ -15574,6 +15676,108 @@
         "./runtime-scenario-evaluator.js",
         "node:fs/promises",
         "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::DecisionVoiInput",
+      "name": "DecisionVoiInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 57,
+      "signature": "DecisionVoiInput",
+      "summary": "Inferred summary: decision voi input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::HeuristicInformationInput",
+      "name": "HeuristicInformationInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 17,
+      "signature": "HeuristicInformationInput",
+      "summary": "Inferred summary: heuristic information input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::InformationValueEstimate",
+      "name": "InformationValueEstimate",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 5,
+      "signature": "InformationValueEstimate",
+      "summary": "Inferred summary: information value estimate type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PmiInput",
+      "name": "PmiInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 24,
+      "signature": "PmiInput",
+      "summary": "Inferred summary: pmi input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::PosteriorHypothesis",
+      "name": "PosteriorHypothesis",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 32,
+      "signature": "PosteriorHypothesis",
+      "summary": "Inferred summary: posterior hypothesis type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::interface::VerifiedUpliftInput",
+      "name": "VerifiedUpliftInput",
+      "kind": "interface",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 70,
+      "signature": "VerifiedUpliftInput",
+      "summary": "Inferred summary: verified uplift input type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
       ],
       "testRefs": []
     },
@@ -32967,6 +33171,7 @@
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/external-resource-registry.test.ts",
         "packages/materials/tests/handoff.test.ts",
+        "packages/materials/tests/information-value.test.ts",
         "packages/materials/tests/intent-scheduler-config.test.ts",
         "packages/materials/tests/interruption-recovery.test.ts",
         "packages/materials/tests/knowledge-projection.test.ts",
@@ -35515,6 +35720,7 @@
         "packages/materials/tests/dasctf-api.test.ts",
         "packages/materials/tests/evidence-bypass-regressions.test.ts",
         "packages/materials/tests/firmware-core.test.ts",
+        "packages/materials/tests/information-value.test.ts",
         "packages/materials/tests/phase-gate.test.ts",
         "packages/materials/tests/real-model-evaluator.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts",
@@ -52219,6 +52425,23 @@
         "./runtime-scenario-evaluator.js",
         "node:fs/promises",
         "node:path"
+      ],
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::InformationEstimatorKind",
+      "name": "InformationEstimatorKind",
+      "kind": "type",
+      "visibility": "public",
+      "module": "src/evaluation/information-value.ts",
+      "exportPath": "@proofblade/materials",
+      "line": 3,
+      "signature": "InformationEstimatorKind",
+      "summary": "Inferred summary: information estimator kind type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [],
+      "imports": [
+        "../domain/utils.js"
       ],
       "testRefs": []
     },
