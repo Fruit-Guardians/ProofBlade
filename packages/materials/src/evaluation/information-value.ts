@@ -57,6 +57,8 @@ export function estimatePosteriorEIG(hypotheses: readonly PosteriorHypothesis[])
 export interface DecisionVoiInput { currentUtility: number; outcomeUtilities: readonly number[]; outcomeProbabilities: readonly number[]; cost: number; }
 export function estimateDecisionVoi(input: DecisionVoiInput): InformationValueEstimate {
   if (input.outcomeUtilities.length === 0 || input.outcomeUtilities.length !== input.outcomeProbabilities.length) throw new Error("decision VOI outcomes and probabilities must have equal non-zero length");
+  if (input.outcomeUtilities.some((utility) => !Number.isFinite(utility))) throw new Error("decision VOI outcome utilities must be finite");
+  if (input.outcomeProbabilities.some((probability) => !Number.isFinite(probability) || probability < 0 || probability > 1)) throw new Error("decision VOI probabilities must be finite values between 0 and 1");
   const total = input.outcomeProbabilities.reduce((sum, probability) => sum + probability, 0);
   if (Math.abs(total - 1) > 1e-6) throw new Error("decision VOI probabilities must sum to 1");
   if (!Number.isFinite(input.currentUtility) || !Number.isFinite(input.cost) || input.cost < 0) throw new Error("decision VOI utility and cost must be finite");
