@@ -167,6 +167,8 @@ export interface CodingToolOptions {
   webSessionEnabled?: boolean;
   /** Expose the pre-generic verify_claim alias for historical callers only. */
   legacyClaimVerification?: boolean;
+  /** Expose the pre-generic submit_flag alias for historical callers only. */
+  legacySubmissionAlias?: boolean;
 }
 
 export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
@@ -183,12 +185,10 @@ export function createCodingTools(options: CodingToolOptions = {}): AgentHarness
     ...createPwnCodingTools(),
     ...(options.webSessionEnabled ? createWebSessionTools() : []),
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
-    // Registered only when a trusted destination is configured. The legacy
-    // alias remains available for existing Competition clients, but new runs
-    // should use external_submit and provide an explicit target.
-    ...(options.platformJudged
-      ? [externalSubmitTool, submitFlagTool]
-      : options.externalSubmissionEnabled ? [externalSubmitTool] : []),
+    // Registered only when a trusted destination is configured. New runs use
+    // external_submit with an explicit target; submit_flag is legacy-only.
+    ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool] : []),
+    ...((options.externalSubmissionEnabled || options.platformJudged) && options.legacySubmissionAlias ? [submitFlagTool] : []),
   ];
 }
 
@@ -1113,7 +1113,7 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; legacyClaimVerification?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; legacyClaimVerification?: boolean; legacySubmissionAlias?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   const builtinCount = active.length;
@@ -1128,12 +1128,17 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   // Interactive web session tools: only when the task has a resolvable web target.
   if (input.webSessionEnabled) active.push(...CODING_WEB_SESSION_TOOL_NAMES);
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
-  if (input.platformJudged) active.push(externalSubmitTool.name, submitFlagTool.name);
-  else if (input.externalSubmissionEnabled) active.push(externalSubmitTool.name);
+  if (input.platformJudged) {
+    active.push(externalSubmitTool.name);
+    if (input.legacySubmissionAlias) active.push(submitFlagTool.name);
+  } else if (input.externalSubmissionEnabled) {
+    active.push(externalSubmitTool.name);
+    if (input.legacySubmissionAlias) active.push(submitFlagTool.name);
+  }
   return active;
 }
 
-export function codingProviderToolContractSnapshot(options: Pick<CodingToolOptions, "legacyClaimVerification"> = {}): Array<{ name: string; description: string; parameters: unknown }> {
+export function codingProviderToolContractSnapshot(options: Pick<CodingToolOptions, "legacyClaimVerification" | "legacySubmissionAlias"> = {}): Array<{ name: string; description: string; parameters: unknown }> {
   return createCodingTools(options).map((tool) => ({
     name: tool.name,
     description: tool.description,

@@ -150,6 +150,9 @@ export async function runCompetitionLoop(
       // Competition replay still speaks the historical verify_claim protocol;
       // generic security tasks leave this compatibility alias disabled.
       legacyClaimVerification: true,
+      // Keep the old flag-shaped submission alias only for the competition
+      // adapter. New platform tasks use external_submit with an explicit target.
+      legacySubmissionAlias: true,
       ...(options.executionEnv ? { executionEnv: options.executionEnv } : {}),
       ...(options.workspaceRootForPrompt ? { workspaceRootForPrompt: options.workspaceRootForPrompt } : {}),
       ...(options.skillsLibraryPathForPrompt ? { skillsLibraryPathForPrompt: options.skillsLibraryPathForPrompt } : {}),
