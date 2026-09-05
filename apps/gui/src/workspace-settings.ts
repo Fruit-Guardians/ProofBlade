@@ -14,6 +14,7 @@ interface StoredConversationPreferences {
   enabledTools?: string[];
   enabledSkills?: string[];
   enabledMcpServers?: string[];
+  projectPrompt?: string;
 }
 
 interface LocalWorkspaceFile {
@@ -56,7 +57,8 @@ export class WorkspaceSettingsStore {
       workspacePath: input.workspacePath?.trim() || current.workspacePath,
       enabledTools: normalizeList(input.enabledTools ?? current.enabledTools),
       enabledSkills: normalizeList(input.enabledSkills ?? current.enabledSkills),
-      enabledMcpServers: normalizeList(input.enabledMcpServers ?? current.enabledMcpServers),
+    enabledMcpServers: normalizeList(input.enabledMcpServers ?? current.enabledMcpServers),
+      projectPrompt: typeof input.projectPrompt === "string" ? input.projectPrompt.slice(0, 16_000) : current.projectPrompt,
     };
     if (next.folderId && !this.folders.some((folder) => folder.id === next.folderId)) throw new Error(`对话文件夹不存在：${next.folderId}`);
     this.conversations[runId] = next;
@@ -157,6 +159,7 @@ function validatePreferences(value: unknown): StoredConversationPreferences {
     ...(Array.isArray(input.enabledTools) ? { enabledTools: normalizeList(input.enabledTools) } : {}),
     ...(Array.isArray(input.enabledSkills) ? { enabledSkills: normalizeList(input.enabledSkills) } : {}),
     ...(Array.isArray(input.enabledMcpServers) ? { enabledMcpServers: normalizeList(input.enabledMcpServers) } : {}),
+    ...(typeof input.projectPrompt === "string" ? { projectPrompt: input.projectPrompt.slice(0, 16_000) } : {}),
   };
 }
 

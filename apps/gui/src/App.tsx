@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
@@ -315,6 +315,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const [contextSnapshot, setContextSnapshot] = useState<Extract<ChatStreamEvent, { type: "context_snapshot" }>>();
   const [contextOpen, setContextOpen] = useState(false);
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   const [preferences, setPreferences] = useState<ConversationPreferences>();
   const [selectedCallId, setSelectedCallId] = useState<string>();
   const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
@@ -422,6 +423,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{pausePending ? "正在暂停" : runInFlight ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
+        <button type="button" className="icon-button" title="查看和编辑项目提示词" aria-label="查看和编辑项目提示词" onClick={() => setPromptOpen(true)}><FileCode2 size={16} /></button>
       </div>
       {detail.observationQueue.total > 0 && <ObservationQueuePanel detail={detail} />}
       <div className="message-thread" ref={thread}>
@@ -464,6 +466,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
     {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
+    {promptOpen && preferences && <PromptModal runId={detail.snapshot.runId} projectPrompt={preferences.projectPrompt ?? ""} onClose={() => setPromptOpen(false)} onSave={async (projectPrompt) => { await savePreferences({ projectPrompt }); setPromptOpen(false); }} />}
   </div>;
 }
 
@@ -999,6 +1002,19 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
       <footer><button type="button" className="command-button danger-button" disabled={!selectedId || busy || settings?.profiles.length === 1} onClick={() => void remove()}><X size={14} />删除配置</button><span className="status-spacer" /><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !model}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存并使用</button></footer>
     </form>
   </div>;
+}
+
+function PromptModal({ runId, projectPrompt, onClose, onSave }: { runId: string; projectPrompt: string; onClose(): void; onSave(value: string): Promise<void> }) {
+  const [draft, setDraft] = useState(projectPrompt);
+  const [snapshot, setSnapshot] = useState<import("./shared.js").PromptSnapshot>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  useEffect(() => { void getPromptSnapshot(runId).then(setSnapshot).catch((caught) => setError(message(caught))); }, [runId]);
+  const save = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try { await onSave(draft.slice(0, 16_000)); } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal prompt-modal" onSubmit={(event) => void save(event)}><header><div><FileCode2 size={17} /><strong>提示词</strong><span className="modal-subtitle">当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<section className="prompt-section"><div className="section-head"><div><strong>项目附加指令</strong><span>保存后下一轮生效 · 最多 16,000 字符</span></div></div><textarea className="prompt-editor" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="例如：使用中文回答；优先查看 src/security；所有结论附带测试命令。" spellCheck={false} /></section><section className="prompt-section prompt-preview"><div className="section-head"><div><strong>最近一次实际 System Prompt</strong><span>{snapshot ? `生成于 ${new Date(snapshot.generatedAt).toLocaleString()} · ${snapshot.systemPromptHash.slice(0, 12)}...` : "发送一轮消息后可查看"}</span></div></div>{snapshot ? <pre>{snapshot.systemPrompt}</pre> : <div className="output-placeholder">尚未生成提示词快照</div>}</section><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw className="spin" size={14} /> : <Check size={14} />}保存项目指令</button></footer></form></div>;
 }
 
 function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(): Promise<void> }) {

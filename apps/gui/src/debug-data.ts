@@ -1,5 +1,6 @@
 import { access, open, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
@@ -311,6 +312,18 @@ export class DebugDataService {
     return { artifact, ...await this.services.artifacts.readTextRange(runId, artifact, maxBytes, offset) };
   }
 
+  public async promptSnapshot(runId: string): Promise<import("./shared.js").PromptSnapshot | undefined> {
+    assertRunId(runId);
+    try {
+      const parsed = JSON.parse(await readFile(join(this.services.runsRoot, runId, "prompt-snapshot.json"), "utf8")) as Partial<import("./shared.js").PromptSnapshot>;
+      if (parsed.schemaVersion !== 1 || typeof parsed.systemPrompt !== "string" || typeof parsed.projectPrompt !== "string" || typeof parsed.systemPromptHash !== "string" || typeof parsed.generatedAt !== "string") return undefined;
+      return parsed as import("./shared.js").PromptSnapshot;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+  }
+
   public async checkpoint(runId: string, reason: string): Promise<unknown> {
     assertRunId(runId);
     return await new CheckpointService(this.services.control, this.services.artifacts).create(runId, reason || "GUI manual checkpoint");
@@ -438,9 +451,10 @@ export class DebugDataService {
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
     contextCompactionThreshold?: number,
+    projectPrompt?: string,
   ): Promise<void> {
     this.assertOpen();
-    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold);
+    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold, projectPrompt);
     this.chatTasks.add(task);
     try {
       await task;
@@ -457,6 +471,7 @@ export class DebugDataService {
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
     contextCompactionThreshold?: number,
+    projectPrompt?: string,
   ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
@@ -500,6 +515,7 @@ export class DebugDataService {
           ...(input.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: input.services.browserRuntimeRequired }),
           capabilities,
           contextCompactionThreshold,
+          projectPrompt,
           deferClaimAcceptance: true,
           sessionId: `${runId}-chat`,
           sessionHandoffs: input.sessionHandoffs,
