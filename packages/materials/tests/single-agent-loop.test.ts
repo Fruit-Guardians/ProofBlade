@@ -108,6 +108,40 @@ test("local Run prompt carries the remaining deadline into the single coding lan
   }
 });
 
+test("interactive turns send the user's instruction without scheduler status context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-interactive-prompt-"));
+  let promptText = "";
+  const services = createServices(root, config);
+  const lane: AgentLaneFactory = async () => ({
+    async prompt(text) {
+      promptText = text;
+      return { text: "你好，有什么可以帮你？", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "INTERACTIVE-PROMPT-web-source-1";
+    const result = await new SingleAgentLoop(root, config, services, lane).run({
+      runId,
+      task: fixtureTask(runId, "web-source-1", root, config),
+      mode: "assist",
+      maxTurns: 1,
+      userPrompt: "你好",
+    });
+    assert.equal(result.status, "PAUSED");
+    assert.equal(promptText, "你好");
+    const snapshot = await services.control.snapshot(runId);
+    assert.deepEqual(Object.keys(snapshot.schedulerIntents), []);
+    assert.deepEqual(Object.keys(snapshot.handoffs), []);
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("single-agent loop forwards configured session runtime brokers to its lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-loop-session-runtime-"));
   const services = createServices(root, config, { sessionRuntimeBrokers: [sessionRuntimeBroker()], sessionRuntimeRequired: true, browserRuntimeRequired: true });

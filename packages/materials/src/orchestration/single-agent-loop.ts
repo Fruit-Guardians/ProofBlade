@@ -215,11 +215,17 @@ export class SingleAgentLoop {
       await options.onLaneReady?.(lane);
       while (turns < maxTurns) {
         throwIfAborted(options.signal);
-        const activeIntent = await this.claimIntent(options.runId, intentScheduler);
+        // Interactive callers already provide the user-facing turn prompt.
+        // Do not manufacture an exploration intent for that message: exposing
+        // scheduler status as a synthetic user instruction makes a greeting
+        // look like a task and can provoke an unnecessary tool call. Automatic
+        // task runs (which have no userPrompt) retain the durable intent path.
+        const interactivePrompt = Boolean(options.userPrompt?.trim());
+        const activeIntent = interactivePrompt ? undefined : await this.claimIntent(options.runId, intentScheduler);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
         const turnContext = await this.services.control.snapshot(options.runId);
-        await planner.prepare(options.runId);
+        if (!interactivePrompt) await planner.prepare(options.runId);
         activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
@@ -602,6 +608,8 @@ function latestAcceptedVerification(snapshot: RunSnapshot, task: TaskContract) {
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
+  const interactivePrompt = userPrompt?.trim();
+  if (interactivePrompt) return interactivePrompt;
   const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
@@ -609,7 +617,6 @@ function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerInten
     `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Choose the next bounded action that best serves the task objective.`,
     `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
-    ...(userPrompt?.trim() ? ["User's latest instruction:", userPrompt.trim()] : []),
     `Task inputs (read-only, relative to the current workspace): ${snapshot.task.inputs.map((input) => input.path).join(", ") || "none listed; inspect the workspace manifest only"}.`,
     "Stay within the task workspace and use the enabled tools according to their stated safety boundaries.",
     "Inspect relevant inputs before making claims; preserve useful Artifact/Evidence ids and use them to support your reasoning.",
