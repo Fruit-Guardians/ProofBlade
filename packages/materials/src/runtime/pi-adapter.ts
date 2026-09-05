@@ -11,7 +11,7 @@ import type { ControlStore } from "../control/control-store.js";
 import type { Lane } from "../domain/types.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
-import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { createConfiguredModels, effectiveCacheRetention, resolveModelProfile } from "./lmstudio-provider.js";
 import { attachPiObservability, createProviderSchedulingTelemetry, type ContextManifestSummary } from "../observability/pi-events.js";
 import type { ResultVerificationProjection } from "../verification/claim-verification.js";
 import { persistedAssistantText } from "./assistant-message.js";
@@ -83,7 +83,7 @@ export class PiAgentLane implements AgentLanePort {
       toolContext: { env },
       thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: contextText(compiled),
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: effectiveCacheRetention(profile) },
     });
     attachPiObservability(harness, {
       runId: options.runId,

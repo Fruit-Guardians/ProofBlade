@@ -9,7 +9,7 @@ import {
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
-import type { ModelProfileConfig, ProviderApi } from "../config.js";
+import type { CacheRetention, ModelProfileConfig, ProviderApi } from "../config.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import { createProviderTransport, wrapExactEndpointFetch } from "./provider-transport.js";
 import type { ProviderRequestBudget } from "./provider-budget.js";
@@ -17,6 +17,17 @@ import { configuredMaxConcurrentRequests, providerRequestScheduler, type Provide
 
 export interface ResolvedModelProfile extends ModelProfileConfig {
   modelId: string;
+}
+
+/**
+ * Keep the user-facing retention preference, but do not send the Responses
+ * `prompt_cache_retention: 24h` hint to an endpoint that has not declared
+ * support for it. Several OpenAI-compatible relays accept the field while
+ * disabling prefix reuse for tool-rich, replayed conversations.
+ */
+export function effectiveCacheRetention(profile: Pick<ModelProfileConfig, "cacheRetention" | "supportsLongCacheRetention">): CacheRetention | undefined {
+  if (profile.cacheRetention !== "long") return profile.cacheRetention;
+  return profile.supportsLongCacheRetention === true ? "long" : "short";
 }
 
 export async function resolveModelProfile(profile: ModelProfileConfig): Promise<ResolvedModelProfile> {

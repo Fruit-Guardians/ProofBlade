@@ -63,6 +63,12 @@ export interface ModelProfileConfig {
   thinkingLevel?: ThinkingLevel;
   /** Provider prompt-cache retention hint. Omitted keeps Pi's provider default. */
   cacheRetention?: CacheRetention;
+  /**
+   * Whether this endpoint explicitly supports the OpenAI Responses 24h
+   * prompt-cache retention hint. Unknown relays must opt in because some
+   * gateways disable cache reuse when the field is present.
+   */
+  supportsLongCacheRetention?: boolean;
   reasoning?: boolean;
   supportsReasoningEffort?: boolean;
   maxTokensField?: "max_tokens" | "max_completion_tokens";

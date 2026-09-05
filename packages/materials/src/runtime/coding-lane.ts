@@ -35,7 +35,7 @@ import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodi
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
-import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { createConfiguredModels, effectiveCacheRetention, resolveModelProfile } from "./lmstudio-provider.js";
 import { contextSnapshot, type AgentLanePort, type AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
 import { attachCodingTurnGuards, finalizeCodingTurn, type AblationPolicyBinding, type CodingTurnTermination, type FirstActionBudget, type ToolCallBudget } from "./coding-turn-projection.js";
@@ -612,7 +612,7 @@ export class PiCodingLane implements AgentLanePort {
       toolContext,
       thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: () => effectiveSystemPrompt,
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: effectiveCacheRetention(profile) },
     });
     const ablationRoute = options.ablationPolicy ? {
       domainPhase: snapshot.domainPhase,
