@@ -1492,6 +1492,11 @@ function validateVerifierEffectProposal(
     if (snapshot.task.verification.kind !== "reproduction" || !snapshot.task.verification.command || effect.command !== snapshot.task.verification.command) {
       throw new Error(`${effect.operation} command must come from the task verifier policy`);
     }
+    if (effect.args.resultArtifactMode === "artifact") {
+      if (effect.args.resultArtifactId !== completion.artifactId || effect.args.resultHash !== completion.candidateHash) {
+        throw new Error("Result Artifact verifier binding does not match the proposed Completion");
+      }
+    }
   }
   if (effect.operation === "web_reproduce" && !snapshot.task.verification.web?.flag_pattern) {
     throw new Error("web_reproduce is restricted to tasks with an immutable web verification policy");

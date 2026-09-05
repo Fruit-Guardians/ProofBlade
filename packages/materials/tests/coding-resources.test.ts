@@ -36,7 +36,7 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "54f58df300bf1eb38c9f98a8b0bf1fb4ae3d9fd3cf2cdadafa1c120960d68953";
+const CODING_TOOL_CONTRACT_HASH = "819d224d1ed8e5d3bab818b2eefe33fd220f7f25f4b2ddf57244ca45013958b9";
 
 test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
   assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
@@ -127,6 +127,52 @@ test("generic result proposals accept ordinary text without CTF formatting", asy
     assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[completion.artifactId]!), "ordinary report result");
   } finally {
     await runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("verify_result accepts a durable result Artifact with a hash-bound verifier envelope", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-result-artifact-verification-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "RESULT-ARTIFACT-VERIFICATION";
+  const task = demoTask(runId, root, config);
+  task.scope.allowed_workspace = root;
+  task.verification.required_reproductions = 1;
+  task.verification.command = "node verify-result.mjs";
+  await services.control.createRun(runId, task);
+  await writeFile(join(root, "report.json"), "{\"finding\":\"safe\",\"confidence\":0.98}\n", "utf8");
+  const resultArtifact = await services.artifacts.putText(runId, await readFile(join(root, "report.json"), "utf8"), {
+    filename: "report.json",
+    mime: "application/json",
+    sensitivity: "result_candidate",
+  });
+  await writeFile(join(root, "verify-result.mjs"), [
+    "import { readFileSync } from 'node:fs';",
+    "import { createHash } from 'node:crypto';",
+    "const resultHash = createHash('sha256').update(readFileSync('report.json')).digest('hex');",
+    "process.stdout.write(JSON.stringify({ accepted: true, resultHash }));",
+  ].join("\n"), "utf8");
+  try {
+    const verifier = new TaskResultVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const result = await executeTool("verify_result", { resultArtifactId: resultArtifact.id, command: task.verification.command }, {
+      env: { cwd: root },
+      claimVerifier: verifier,
+    } as unknown as CodingResourceContext);
+    assert.equal(result.isError, false);
+    assert.equal((result.details as { verified: boolean }).verified, true);
+    assert.equal((result.details as { resultArtifactId: string }).resultArtifactId, resultArtifact.id);
+    assert.equal((result.details as { resultHash: string }).resultHash, resultArtifact.sha256);
+    const snapshot = await services.control.snapshot(runId);
+    const completion = Object.values(snapshot.completions)[0];
+    assert.equal(completion?.artifactId, resultArtifact.id);
+    assert.equal(completion?.status, "ACCEPTED");
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
