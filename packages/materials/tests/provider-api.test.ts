@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createConfiguredModels, discoveryPathForApi, normalizeProviderBaseUrl, resolveModelProfile } from "../src/runtime/lmstudio-provider.js";
 
@@ -42,4 +44,13 @@ test("configured models retain the selected Provider API", async () => {
     assert.equal(configured.model.api, api);
     await configured.closeTransport();
   }
+});
+
+test("the checked-in aihub evaluation profile uses the Responses wire protocol", () => {
+  const path = fileURLToPath(new URL("../../../examples/real-evaluation-provider.aihub.example.json", import.meta.url));
+  const config = JSON.parse(readFileSync(path, "utf8")) as {
+    modelProfiles?: { executor?: { provider?: string; api?: string } };
+  };
+  assert.equal(config.modelProfiles?.executor?.provider, "aihub");
+  assert.equal(config.modelProfiles?.executor?.api, "openai-responses");
 });
