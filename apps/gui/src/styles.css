@@ -185,9 +185,16 @@ code, pre, textarea { font-family: "Cascadia Code", "SFMono-Regular", Consolas, 
 .claim-verification-note span { display: grid; gap: 2px; }
 .claim-verification-note strong { color: #f0c97f; }
 .message-text { color: #cbd3ce; font-size: 11px; line-height: 19px; }
-.message-text p { margin: 5px 0 0; white-space: pre-wrap; word-break: break-word; }
+.message-text > :first-child { margin-top: 0; }
+.message-text p { margin: 7px 0 0; white-space: pre-wrap; word-break: break-word; }
+.message-text h1, .message-text h2, .message-text h3, .message-text h4 { margin: 13px 0 5px; color: #e0e9e3; line-height: 1.35; }
+.message-text h1 { font-size: 16px; }.message-text h2 { font-size: 14px; }.message-text h3, .message-text h4 { font-size: 12px; }
+.message-text ul, .message-text ol { margin: 7px 0; padding-left: 21px; }.message-text li { margin: 3px 0; }
+.message-text blockquote { margin: 8px 0; padding: 4px 10px; border-left: 3px solid #418362; color: #9db0a4; background: #101812; }
+.message-text a { color: #83cfa4; text-decoration: underline; }.message-text code { padding: 1px 4px; border: 1px solid #29342e; border-radius: 3px; color: #cfe8d7; background: #0e1511; font-size: 10px; }
 .message-text pre { position: relative; max-width: 100%; overflow: auto; margin: 9px 0 2px; padding: 10px 11px; border: 1px solid #29342e; border-radius: 5px; color: #bcd0c5; background: #0a0e0c; font-size: 10px; line-height: 17px; }
-.message-text pre[data-language]::before { display: block; margin-bottom: 6px; color: #5f7067; font-size: 8px; content: attr(data-language); text-transform: uppercase; }
+.message-text pre code { display: block; padding: 0; border: 0; background: transparent; white-space: pre; }
+.message-text table { display: block; max-width: 100%; overflow: auto; margin: 8px 0; border-collapse: collapse; }.message-text th, .message-text td { padding: 4px 7px; border: 1px solid #29342e; text-align: left; }.message-text th { color: #d5e6da; background: #152018; }
 .message-error { display: flex; align-items: flex-start; gap: 7px; margin-top: 7px; padding: 7px 8px; border: 1px solid #6c3d3a; border-radius: 4px; color: #e69a96; background: #281817; font: 9px/15px "Cascadia Code", monospace; overflow-wrap: anywhere; }
 .message-error svg { margin-top: 1px; flex: none; }
 .thinking-block { margin: 4px 0 8px; border-left: 2px solid #635b83; color: #9890b9; }
@@ -689,6 +696,7 @@ select { min-width: 0; padding: 0 27px 0 8px; }
 .chain-relations { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px 7px 33px; }
 .chain-relations span, .artifact-tags em { display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border-radius: 3px; color: #91b8a4; background: #1c2b23; font-size: 8px; font-style: normal; }
 .chain-artifacts { padding: 0 7px 7px 32px; }
+.evidence-artifact { border-top: 1px solid #203027; }.evidence-artifact-trigger { display: flex; width: 100%; align-items: center; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }.evidence-artifact-trigger .semantic-artifact-row { flex: 1; border-top: 0; }.evidence-artifact-action { display: inline-flex; align-items: center; gap: 3px; margin: 0 5px 0 8px; color: #78bc93; font-size: 9px; white-space: nowrap; }.evidence-artifact-action svg { transition: transform .15s ease; }.evidence-artifact-content { margin: 0 5px 7px 32px; border: 1px solid #293b30; border-radius: 4px; background: #0b110d; }.evidence-content-meta { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-bottom: 1px solid #203027; color: #799386; font-size: 9px; }.evidence-content-meta code { color: #5c7768; }.evidence-content-view pre { max-height: 320px; overflow: auto; margin: 0; padding: 9px; color: #c4d7ca; font-size: 10px; line-height: 16px; white-space: pre-wrap; word-break: break-word; }
 .chain-empty { padding: 7px 9px; color: var(--faint); font-size: 8px; }
 .chain-empty-state { display: grid; min-height: 108px; place-content: center; gap: 6px; color: var(--muted); text-align: center; }
 .chain-empty-state svg { margin: 0 auto; color: var(--faint); }

@@ -14,6 +14,8 @@ import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -562,15 +564,12 @@ function formatPercent(value: number): string {
 }
 
 function MessageText({ text }: { text: string }) {
-  const parts = text.split("```");
-  return <div className="message-text">{parts.map((part, index) => {
-    if (index % 2 === 1) {
-      const [language, ...lines] = part.split("\n");
-      const hasLanguage = /^[a-zA-Z0-9_+#.-]{1,20}$/.test(language.trim());
-      return <pre key={index} data-language={hasLanguage ? language.trim() : undefined}><code>{hasLanguage ? lines.join("\n") : part}</code></pre>;
-    }
-    return part && <p key={index}>{part}</p>;
-  })}</div>;
+  const html = useMemo(() => DOMPurify.sanitize(marked.parse(text, { async: false }) as string, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ["style", "iframe", "object", "embed"],
+    FORBID_ATTR: ["style", "srcdoc"],
+  }), [text]);
+  return <div className="message-text markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function ToolDebugger({ detail }: { detail: RunDetail }) {
@@ -784,7 +783,20 @@ function EvidenceChain({ detail }: { detail: RunDetail }) {
 
 function EvidenceBranch({ detail, evidence }: { detail: RunDetail; evidence: RunDetail["snapshot"]["evidence"][string] }) {
   const artifacts = evidenceArtifactIds(evidence).map((id) => detail.snapshot.artifacts[id]).filter(Boolean);
-  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <ArtifactRow key={artifact.id} detail={detail} artifact={artifact} compact />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <EvidenceArtifact key={artifact.id} detail={detail} artifact={artifact} />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+}
+
+function EvidenceArtifact({ detail, artifact }: { detail: RunDetail; artifact: RunDetail["snapshot"]["artifacts"][string] }) {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState<ArtifactContent>();
+  const [error, setError] = useState<string>();
+  const info = artifactInfo(detail, artifact);
+  const load = async () => {
+    setOpen(true);
+    if (content || error) return;
+    try { setContent(await getArtifact(detail.snapshot.runId, artifact.id)); } catch (caught) { setError(message(caught)); }
+  };
+  return <div className="evidence-artifact"><button type="button" className="evidence-artifact-trigger" onClick={() => void load()}><ArtifactRow detail={detail} artifact={artifact} compact /><span className="evidence-artifact-action">{open ? "收起内容" : "查看内容"}<ChevronDown size={12} /></span></button>{open && <div className="evidence-artifact-content">{error ? <div className="script-error">{error}</div> : content ? <div className="evidence-content-view"><div className="evidence-content-meta"><span>{content.artifact.mime}</span><code>{content.artifact.sha256.slice(0, 16)}...</code></div><pre>{content.content}</pre></div> : <div className="provider-loading"><RefreshCw className="spin" size={14} />读取 Artifact</div>}</div>}</div>;
 }
 
 function ArtifactIndex({ detail }: { detail: RunDetail }) {
