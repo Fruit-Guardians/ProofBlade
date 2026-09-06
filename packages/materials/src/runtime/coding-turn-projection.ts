@@ -125,7 +125,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
       const details = isRecord(event.details) ? event.details : {};
-      const verifierReady = event.toolName === "verify_claim" && details.verified === true;
+      const verifierReady = (event.toolName === "verify_claim" || event.toolName === "verify_result") && details.verified === true;
       if (verifierReady && ablationPolicy) {
         const policyEvent = ablationPolicy.controller.decide({
           experimentId: ablationPolicy.experimentId,
@@ -396,7 +396,7 @@ function isFirstActionCompletionTool(toolName: string): boolean {
 }
 
 function isCompletionTool(toolName: string): boolean {
-  return toolName === "verify_claim" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
+  return toolName === "verify_claim" || toolName === "verify_result" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
 }
 
 function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {
@@ -409,8 +409,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stopSuggestionMessage(mode: string): string {
   return mode === "verifier_driven"
-    ? "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
-    : "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
+    ? "[ProofBlade stop suggestion] The result has passed the deterministic verification check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
+    : "[ProofBlade stop suggestion] The result has passed the deterministic verification check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
 }
 
 function matchesActionBundleTool(toolName: string, allowedToolNames: readonly string[]): boolean {

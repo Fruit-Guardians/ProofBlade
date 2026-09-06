@@ -267,12 +267,15 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       () => executeTool("verify_claim", { candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context),
       /exact immutable task-bound verification command/,
     );
+    const generic = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
+    const genericDetails = generic.details as Record<string, unknown>;
+    assert.equal(genericDetails.result, candidate);
+    assert.equal(genericDetails.verified, true);
+    const genericCompletion = Object.values((await services.control.snapshot(runId)).completions)[0];
+    assert.equal(genericCompletion?.purpose, "harness_verification");
     const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const details = result.details as Record<string, unknown>;
     assert.equal(details.verified, true);
-    const generic = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
-    assert.equal((generic.details as Record<string, unknown>).result, candidate);
-    assert.equal((generic.details as Record<string, unknown>).verified, true);
     assert.equal(result.terminate, undefined, "ordinary claim verification keeps the coding turn interactive");
     const snapshot = await services.control.snapshot(runId);
     assert.equal(Object.keys(snapshot.evidence).length, 2);

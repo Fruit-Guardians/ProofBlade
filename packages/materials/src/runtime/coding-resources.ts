@@ -354,6 +354,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       command,
       cwd: context.env.cwd,
       toolCallId,
+      completionPurpose: "claim_reproduction",
       supportingEvidenceIds: input.evidenceIds,
       signal,
       execute: async (innerSignal) => {
@@ -407,6 +408,7 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
       command,
       cwd: context.env.cwd,
       toolCallId,
+      completionPurpose: "harness_verification",
       supportingEvidenceIds: input.evidenceIds,
       signal,
       execute: async (innerSignal) => {
