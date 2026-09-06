@@ -681,6 +681,34 @@ test("ordinary chat in a CTF-named workspace does not enable a challenge profile
   }
 });
 
+test("GUI greeting reaches the coding lane without synthetic task instructions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-greeting-prompt-"));
+  let promptText = "";
+  const lane: AgentLanePort = {
+    async prompt(text) {
+      promptText = text;
+      return { text: "你好，有什么可以帮你？", stopReason: "stop", usage: zeroUsage() };
+    },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-GREETING-PROMPT-001";
+    await data.createConversation({ runId, title: "问候", workspacePath: root });
+    await data.chat(runId, "你好", () => undefined, undefined, undefined, root);
+
+    assert.equal(promptText, "你好");
+    const detail = await data.getRun(runId);
+    assert.deepEqual(Object.keys(detail.snapshot.schedulerIntents), []);
+    assert.deepEqual(Object.keys(detail.snapshot.handoffs), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("GUI fixture conversations enter RECON through RunCoordinator", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-conversation-phase-"));
   try {
