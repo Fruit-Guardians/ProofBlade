@@ -1,7 +1,7 @@
 {
   "name": "proofblade",
   "version": "0.1.0",
-  "description": "ProofBlade (证锋), a Pi-based evidence-driven CTF agent harness.",
+  "description": "ProofBlade (证锋), a Pi-based evidence-driven information-security agent harness.",
   "private": true,
   "type": "module",
   "workspaces": [
