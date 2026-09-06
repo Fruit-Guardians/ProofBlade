@@ -459,7 +459,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 137,
+          "line": 139,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
@@ -488,7 +488,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 141,
+          "line": 143,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         }
       ],
@@ -536,7 +536,7 @@
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 149,
+          "line": 157,
           "summary": "Execute a verifier-owned browser clean-context attestation."
         },
         {
@@ -546,7 +546,7 @@
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 115,
+          "line": 123,
           "summary": "Execute a verifier-owned web attestation without exposing the verifier port to the lane."
         }
       ],
@@ -565,7 +565,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 228,
+          "line": 236,
           "summary": "Mark a browser verifier Completion accepted/rejected after its Evidence is recorded."
         },
         {
@@ -575,7 +575,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 233,
+          "line": 241,
           "summary": "Mark a Pwn verifier Completion accepted/rejected after its bound Evidence."
         },
         {
@@ -585,7 +585,7 @@
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 223,
+          "line": 231,
           "summary": "Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded."
         }
       ],
