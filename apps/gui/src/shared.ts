@@ -1,4 +1,4 @@
-import type { AblationPreflightSummary, AblationReport, AblationExperimentSnapshot, ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { AblationPreflightSummary, AblationReport, AblationExperimentSnapshot, ResultVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -223,7 +223,9 @@ export interface ChatMessageDebug {
   stopReason?: string;
   error?: string;
   usage?: TokenUsage;
-  claimVerification?: ClaimVerificationProjection;
+  resultVerification?: ResultVerificationProjection;
+  /** @deprecated Use resultVerification for new consumers. */
+  claimVerification?: ResultVerificationProjection;
   raw: unknown;
 }
 
@@ -275,7 +277,7 @@ export type ChatStreamEvent =
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
   | { type: "tool_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "context_snapshot"; messages: number; tools: number; systemPromptChars: number; messageChars: number; toolSchemaChars: number; estimatedVisibleTokens: number }
-  | { type: "done"; text: string; stopReason: string; usage: TokenUsage; claimVerification?: ClaimVerificationProjection }
+  | { type: "done"; text: string; stopReason: string; usage: TokenUsage; resultVerification?: ResultVerificationProjection; claimVerification?: ResultVerificationProjection }
   | { type: "error"; error: string };
 
 export interface RunDetail {

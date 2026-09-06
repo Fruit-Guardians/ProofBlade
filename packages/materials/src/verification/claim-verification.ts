@@ -8,7 +8,7 @@ import { beginVerificationRequest, readDurableVerificationResult } from "./verif
 import { parseVerifierOutcomeEnvelope, serializeVerifierOutcomeEnvelope, type VerifierOutcomeEnvelope } from "./outcome-envelope.js";
 import { type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
 
-export interface ClaimReproduction {
+export interface ResultReproduction {
   verified: boolean;
   candidate: string;
   candidateHash: string;
@@ -23,7 +23,10 @@ export interface ClaimReproduction {
   supportingEvidenceIds: string[];
 }
 
-export interface ClaimVerificationProjection {
+/** @deprecated Use ResultReproduction for new task integrations. */
+export type ClaimReproduction = ResultReproduction;
+
+export interface ResultVerificationProjection {
   required: boolean;
   status: "not_required" | "verified" | "unverified";
   candidateHash?: string;
@@ -36,14 +39,19 @@ export interface ClaimVerificationProjection {
   reason?: string;
 }
 
-/** Domain-neutral name for the same durable verification projection. */
-export type ResultVerificationProjection = ClaimVerificationProjection;
+/** @deprecated Use ResultVerificationProjection for new task integrations. */
+export type ClaimVerificationProjection = ResultVerificationProjection;
 
-/** Keep candidate-shaped output visibly non-authoritative until projection verifies it. */
-export function rewriteUnverifiedClaimText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
+/** Keep result-shaped output visibly non-authoritative until projection verifies it. */
+export function rewriteUnverifiedResultText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
   const rewritten = assistantText.replace(/\bflag\s*[:：]/gi, "候选（未验证）：");
   if (rewritten.startsWith("[ProofBlade] 本轮候选未验证：")) return rewritten;
   return [`[ProofBlade] 本轮候选未验证：${reason}`, rewritten].filter((value) => value.length > 0).join("\n");
+}
+
+/** @deprecated Use rewriteUnverifiedResultText for new task integrations. */
+export function rewriteUnverifiedClaimText(assistantText: string, reason?: string): string {
+  return rewriteUnverifiedResultText(assistantText, reason);
 }
 
 interface ClaimReceipt {
@@ -243,7 +251,7 @@ export class TaskResultVerifier {
     supportingEvidenceIds?: string[];
     signal?: AbortSignal;
     execute?: (signal: AbortSignal) => Promise<RawEffectResult>;
-  }): Promise<ClaimReproduction> {
+  }): Promise<ResultReproduction> {
     return await this.record({ ...input, candidate: input.result, completionPurpose: "harness_verification" });
   }
 
@@ -259,7 +267,7 @@ export class TaskResultVerifier {
     signal?: AbortSignal;
     /** Used only for non-task-bound observational commands. */
     execute?: (signal: AbortSignal) => Promise<RawEffectResult>;
-  }): Promise<ClaimReproduction> {
+  }): Promise<ResultReproduction> {
     const snapshot = await this.controlStore.snapshot(this.runId);
     const candidate = input.candidate.trim();
     const command = input.command.trim();
@@ -550,7 +558,7 @@ export class TaskResultVerifier {
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
-  public async project(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection> {
+  public async project(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection> {
     // Verification is enabled by the immutable task contract, never inferred
     // from words such as "flag" or "challenge" in a conversation.
     const task = await this.controlStore.snapshot(this.runId);
@@ -570,7 +578,7 @@ export class TaskResultVerifier {
     return { required: true, status: "unverified", reason: "没有找到与最终候选哈希精确匹配的当前 generation 完整验证链。" };
   }
 
-  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string): Promise<ClaimVerificationProjection | undefined> {
+  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string): Promise<ResultVerificationProjection | undefined> {
     const candidateArtifact = snapshot.artifacts[completion.artifactId];
     if (!candidateArtifact || candidateArtifact.runId !== this.runId || candidateArtifact.generation !== snapshot.generation || candidateArtifact.sha256 !== completion.candidateHash) return undefined;
     try {

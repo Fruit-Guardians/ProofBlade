@@ -122,11 +122,11 @@
     "src/runtime/challenge-tool-profile.ts": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
     "src/runtime/coding-lane.ts": "9081a1b264d448d797cc1617a81ac1dd94e4ff08c2c6a00c4c8e5dddcfb57d9f",
     "src/runtime/coding-resources.ts": "9b1ff6331852fb8e1a6fabdac52d6cfc0af5ba9b8dc0375e7f44567b47523f27",
-    "src/runtime/coding-turn-projection.ts": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+    "src/runtime/coding-turn-projection.ts": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "7a20212a0c4051593022955c9dc1058d0794c18c7b616fa74ccc744872e9f0bb",
-    "src/runtime/pi-adapter.ts": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+    "src/runtime/pi-adapter.ts": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
     "src/runtime/provider-budget.ts": "25ff381a7445336d2b63c5cde0daa77a866142a4f064152fe7b7c1050e64be78",
     "src/runtime/provider-native.ts": "58b941e0c710aa193f370425ab926bb77adb5b5588c09f02fb879ab40fcd3092",
     "src/runtime/provider-scheduler.ts": "e4f36a666b297dd0dccf81f1fccaae7bf06f65cb4176ec24a8f592402b5dfaa5",
@@ -152,7 +152,7 @@
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
     "src/tools/runtime.ts": "cb729dfd2cacbb7e9f9c61107d0fba41a5b2297df3ecbe9fb3288762333e1fd9",
     "src/verification/browser-reproducer.ts": "a301b521c533914d1447064d8a3319e8ac2a3e1da7482d80ec0b6ffbeb66bb06",
-    "src/verification/claim-verification.ts": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+    "src/verification/claim-verification.ts": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
     "src/verification/pwn-replay-recovery.ts": "f1cedc20c4d53e992659c4b80cf970c3bf2ac917e68c7da5bd89fcd4fb7c6213",
     "src/verification/pwn-reproducer.ts": "56578671a8a249cda6a80af971a32b9f5779e889535713203c638e9a886b77b5",
@@ -1598,8 +1598,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 36,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 38,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": []
     },
     {
@@ -1909,8 +1909,8 @@
       ],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 721,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 729,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/claim-verification-recovery.test.ts",
@@ -1933,8 +1933,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 78,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 86,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -5826,7 +5826,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 71,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
@@ -5842,7 +5842,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 63,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
@@ -5858,7 +5858,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 441,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
@@ -5874,7 +5874,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 59,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
@@ -6015,8 +6015,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 154,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 156,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-catalog.test.ts",
@@ -6555,8 +6555,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 738,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 746,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ]
@@ -6566,13 +6566,32 @@
       "name": "rewriteUnverifiedClaimText",
       "kind": "function",
       "signature": "(assistantText: string, reason?: string): string",
-      "summary": "Keep candidate-shaped output visibly non-authoritative until projection verifies it.",
+      "summary": "Inferred summary: rewrite unverified claim text operation used to perform a durable write.",
+      "summarySource": "inferred",
+      "tags": [
+        {
+          "name": "deprecated",
+          "text": "Use rewriteUnverifiedResultText for new task integrations."
+        }
+      ],
+      "exportPath": "@proofblade/materials",
+      "module": "src/verification/claim-verification.ts",
+      "line": 53,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::function::rewriteUnverifiedResultText",
+      "name": "rewriteUnverifiedResultText",
+      "kind": "function",
+      "signature": "(assistantText: string, reason?: string): string",
+      "summary": "Keep result-shaped output visibly non-authoritative until projection verifies it.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 43,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 46,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": []
     },
     {
@@ -13417,7 +13436,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 29,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": []
     },
     {
@@ -13431,7 +13450,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 42,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": []
     },
     {
@@ -13445,7 +13464,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 47,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
@@ -13461,7 +13480,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 22,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": []
     },
     {
@@ -13475,7 +13494,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 12,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": []
     },
     {
@@ -13575,8 +13594,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 28,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 30,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": []
     },
     {
@@ -13590,7 +13609,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
       "line": 19,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": []
     },
     {
@@ -14289,31 +14308,31 @@
       "testRefs": []
     },
     {
-      "id": "@proofblade/materials::interface::ClaimReproduction",
-      "name": "ClaimReproduction",
+      "id": "@proofblade/materials::interface::ResultReproduction",
+      "name": "ResultReproduction",
       "kind": "interface",
-      "signature": "ClaimReproduction",
-      "summary": "Inferred summary: claim reproduction type contract used to provide a reusable operation.",
+      "signature": "ResultReproduction",
+      "summary": "Inferred summary: result reproduction type contract used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
       "line": 11,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": []
     },
     {
-      "id": "@proofblade/materials::interface::ClaimVerificationProjection",
-      "name": "ClaimVerificationProjection",
+      "id": "@proofblade/materials::interface::ResultVerificationProjection",
+      "name": "ResultVerificationProjection",
       "kind": "interface",
-      "signature": "ClaimVerificationProjection",
-      "summary": "Inferred summary: claim verification projection type contract used to provide a reusable operation.",
+      "signature": "ResultVerificationProjection",
+      "summary": "Inferred summary: result verification projection type contract used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 26,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 29,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": []
     },
     {
@@ -30518,8 +30537,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 137,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 139,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/browser-runtime-broker.test.ts",
         "packages/materials/tests/competition-control-plane.test.ts",
@@ -30550,8 +30569,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 149,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 151,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/approval-policy.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -30617,8 +30636,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 141,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 143,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -30641,8 +30660,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 46,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 48,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/app-server.test.ts",
@@ -30736,8 +30755,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 145,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 147,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/competition-pwn-e2e.test.ts",
         "packages/materials/tests/competition-solver.test.ts",
@@ -30757,8 +30776,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/pi-adapter.ts",
-      "line": 104,
-      "moduleHash": "c86421b912593c7a622d795bcb8c1fddc4491a4019a198c6b40a3a8012e52066",
+      "line": 106,
+      "moduleHash": "5f270b8db764c5af8542ccfd7dd311c9edc9823e9f30463862cae75929950037",
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts",
@@ -33535,8 +33554,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 149,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 157,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -33552,8 +33571,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 183,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 191,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -33568,8 +33587,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 115,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 123,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -33584,8 +33603,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 228,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 236,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -33601,8 +33620,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 233,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 241,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -33617,8 +33636,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 223,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 231,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/web-session.test.ts"
       ]
@@ -33633,8 +33652,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 110,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 118,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -33651,8 +33670,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 100,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 108,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -33663,14 +33682,14 @@
       "id": "@proofblade/materials::method::TaskResultVerifier.project",
       "name": "TaskResultVerifier.project",
       "kind": "method",
-      "signature": "(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection>",
+      "signature": "(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection>",
       "summary": "Rebuild verification exclusively from durable current-generation state.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 553,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 561,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/ablation.test.ts",
         "packages/materials/tests/challenge-tool-profile.test.ts",
@@ -33708,14 +33727,14 @@
       "id": "@proofblade/materials::method::TaskResultVerifier.record",
       "name": "TaskResultVerifier.record",
       "kind": "method",
-      "signature": "(input: { candidate: string; command: string; cwd: string; toolCallId: string; completionPurpose?: \"claim_reproduction\" | \"harness_verification\"; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ClaimReproduction>",
+      "signature": "(input: { candidate: string; command: string; cwd: string; toolCallId: string; completionPurpose?: \"claim_reproduction\" | \"harness_verification\"; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ResultReproduction>",
       "summary": "Execute and attest a legacy claim through a journaled verifier Effect.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 251,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 259,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/ablation-policy.test.ts",
         "packages/materials/tests/ablation-report.test.ts",
@@ -33773,14 +33792,14 @@
       "id": "@proofblade/materials::method::TaskResultVerifier.recordResult",
       "name": "TaskResultVerifier.recordResult",
       "kind": "method",
-      "signature": "(input: { result: string; command: string; cwd: string; toolCallId: string; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ClaimReproduction>",
+      "signature": "(input: { result: string; command: string; cwd: string; toolCallId: string; supportingEvidenceIds?: string[]; signal?: AbortSignal; execute?: (signal: AbortSignal) => Promise<RawEffectResult>; }): Promise<ResultReproduction>",
       "summary": "Execute and attest a claim through a journaled verifier Effect.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 238,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 246,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": []
     },
     {
@@ -33793,8 +33812,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 94,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 102,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/web-session.test.ts"
@@ -33810,8 +33829,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 89,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 97,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/pwn-coding-tools.test.ts"
       ]
@@ -33826,8 +33845,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 105,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 113,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": [
         "packages/materials/tests/browser-resource-adapter.test.ts",
         "packages/materials/tests/pwn-coding-tools.test.ts",
@@ -38888,7 +38907,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/coding-turn-projection.ts",
       "line": 10,
-      "moduleHash": "b8e2d57bc55bf92c2c4a38026b79a17f4eccafb43886104f4972a19633556313",
+      "moduleHash": "05c604dd351e079d9ae411d5a85ef4c4314ff48a6a48bc5a6a027cafd0f273d3",
       "testRefs": []
     },
     {
@@ -39062,17 +39081,41 @@
       "testRefs": []
     },
     {
-      "id": "@proofblade/materials::type::ResultVerificationProjection",
-      "name": "ResultVerificationProjection",
+      "id": "@proofblade/materials::type::ClaimReproduction",
+      "name": "ClaimReproduction",
       "kind": "type",
-      "signature": "ClaimVerificationProjection",
-      "summary": "Domain-neutral name for the same durable verification projection.",
-      "summarySource": "tsdoc",
-      "tags": [],
+      "signature": "ResultReproduction",
+      "summary": "Inferred summary: claim reproduction type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [
+        {
+          "name": "deprecated",
+          "text": "Use ResultReproduction for new task integrations."
+        }
+      ],
       "exportPath": "@proofblade/materials",
       "module": "src/verification/claim-verification.ts",
-      "line": 40,
-      "moduleHash": "036deea0c79e83d55050c4172f197570b0e62027f33e6d62eede7c86488197be",
+      "line": 27,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
+      "testRefs": []
+    },
+    {
+      "id": "@proofblade/materials::type::ClaimVerificationProjection",
+      "name": "ClaimVerificationProjection",
+      "kind": "type",
+      "signature": "ResultVerificationProjection",
+      "summary": "Inferred summary: claim verification projection type contract used to provide a reusable operation.",
+      "summarySource": "inferred",
+      "tags": [
+        {
+          "name": "deprecated",
+          "text": "Use ResultVerificationProjection for new task integrations."
+        }
+      ],
+      "exportPath": "@proofblade/materials",
+      "module": "src/verification/claim-verification.ts",
+      "line": 43,
+      "moduleHash": "1d6706635ce4ebc2d50b4e011bb0c47619fd2174da48b881eb1760fd21142600",
       "testRefs": []
     },
     {
