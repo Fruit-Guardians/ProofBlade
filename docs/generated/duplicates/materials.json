@@ -530,23 +530,23 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.executeBrowserReproductionEffect",
+          "id": "@proofblade/materials::method::TaskResultVerifier.executeBrowserReproductionEffect",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.executeBrowserReproductionEffect",
+          "name": "TaskResultVerifier.executeBrowserReproductionEffect",
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 142,
+          "line": 149,
           "summary": "Execute a verifier-owned browser clean-context attestation."
         },
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.executeWebReproductionEffect",
+          "id": "@proofblade/materials::method::TaskResultVerifier.executeWebReproductionEffect",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.executeWebReproductionEffect",
+          "name": "TaskResultVerifier.executeWebReproductionEffect",
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
-          "line": 108,
+          "line": 115,
           "summary": "Execute a verifier-owned web attestation without exposing the verifier port to the lane."
         }
       ],
@@ -559,33 +559,33 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeBrowserReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizeBrowserReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizeBrowserReproduction",
+          "name": "TaskResultVerifier.finalizeBrowserReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 221,
+          "line": 228,
           "summary": "Mark a browser verifier Completion accepted/rejected after its Evidence is recorded."
         },
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizePwnReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizePwnReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizePwnReproduction",
+          "name": "TaskResultVerifier.finalizePwnReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 226,
+          "line": 233,
           "summary": "Mark a Pwn verifier Completion accepted/rejected after its bound Evidence."
         },
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeWebReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizeWebReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizeWebReproduction",
+          "name": "TaskResultVerifier.finalizeWebReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 216,
+          "line": 223,
           "summary": "Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded."
         }
       ],
