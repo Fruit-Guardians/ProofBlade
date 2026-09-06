@@ -119,7 +119,7 @@
     "src/recovery/session-runtime-wire.ts": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
     "src/recovery/verification-recovery.ts": "289fc66f69229e149a1f292b0d3eed7d43bd81a46538bf236a4c6f76fda08224",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
-    "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+    "src/runtime/challenge-tool-profile.ts": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
     "src/runtime/coding-lane.ts": "b38d17598ae75f4f3de9fa44f51acc9d137a9b80e288ffadca0a6da8d7a3591e",
     "src/runtime/coding-resources.ts": "67425b9419290cae6df4aaf85c1ddfb34c64f439b4b2329efbacbd735cf54f24",
     "src/runtime/coding-turn-projection.ts": "72b25e0c2145b045dec9af7a1f2e6ba19318f9ec28ccd8124386fd9feb3fda05",
@@ -1566,8 +1566,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 536,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 529,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5372,8 +5372,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 447,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 440,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5388,8 +5388,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 692,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 685,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5405,7 +5405,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 415,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5421,7 +5421,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 358,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5437,7 +5437,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 364,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5447,13 +5447,13 @@
       "name": "classifyChallengePrompt",
       "kind": "function",
       "signature": "(text: string, workspaceHint?: string): ChallengeClassification | undefined",
-      "summary": "Conservative prompt/workspace classifier used before a GUI lane is created.",
+      "summary": "Explicit opt-in prompt/workspace classifier for legacy integrations. The",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 456,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 449,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5468,8 +5468,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 703,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 696,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5478,14 +5478,14 @@
       "id": "@proofblade/materials::function::profileForTargetKind",
       "name": "profileForTargetKind",
       "kind": "function",
-      "signature": "(targetKind: TargetKind, target?: string): ChallengeToolProfile | undefined",
+      "signature": "(targetKind: TargetKind, _target?: string): ChallengeToolProfile | undefined",
       "summary": "Map a durable task target kind to the default prepared profile.",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 427,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -5500,8 +5500,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 663,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 656,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -13250,7 +13250,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 42,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
@@ -13263,8 +13263,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 488,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 481,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
@@ -13278,7 +13278,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 21,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
@@ -13291,8 +13291,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 482,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 475,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
@@ -13305,8 +13305,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 475,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 468,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
@@ -30150,8 +30150,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 539,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 532,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/binary-core.test.ts",
         "packages/materials/tests/binding-transaction.test.ts",
@@ -30182,8 +30182,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 606,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 599,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -30198,8 +30198,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
-      "line": 579,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "line": 572,
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": [
         "packages/materials/tests/challenge-tool-profile.test.ts"
       ]
@@ -38806,7 +38806,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/runtime/challenge-tool-profile.ts",
       "line": 12,
-      "moduleHash": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
+      "moduleHash": "82c4cf1daf85d04dd01963b010f70dfaff4fd37fe0fda0c442a26fa02eae193e",
       "testRefs": []
     },
     {
