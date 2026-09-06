@@ -6,7 +6,7 @@ import test from "node:test";
 import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
-import { turnPrompt } from "../src/competition/loop.js";
+import { runCompetitionLoop, turnPrompt } from "../src/competition/loop.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { remainingRunDeadlineMs, sha256 } from "../src/domain/utils.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
@@ -109,6 +109,44 @@ test("RunCoordinator keeps generic and CTF phase projections in one replayable p
     const replayed = await services.control.replay(runId);
     assert.equal(replayed.domainPhase, snapshot.domainPhase);
     assert.equal(replayed.phase, snapshot.phase);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("competition turns do not infer a durable domain phase from the turn number", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-advisory-competition-phase-"));
+  try {
+    const services = createServices(root, config);
+    const runId = "ADVISORY-COMPETITION-PHASE";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    await services.control.createRun(runId, task);
+    const fixture = await services.sandbox.build(task);
+    const generation = await services.sandbox.reset(fixture);
+    await services.fixtureControl.reset(runId, generation);
+    const prompts: string[] = [];
+    const outcome = await runCompetitionLoop(root, config, services, {
+      runId,
+      task,
+      workspaceRoot: fixture.path,
+      installRoot: root,
+      maxTurns: 1,
+    }, async () => ({
+      prompt: async (prompt: string) => {
+        prompts.push(prompt);
+        return { text: "", stopReason: "stop", usage: {} };
+      },
+      compact: async () => undefined,
+      abort: async () => undefined,
+      isIdle: async () => true,
+      close: async () => undefined,
+    }));
+    assert.equal(outcome.stopReason, "max_turns");
+    assert.equal(prompts.length, 1);
+    const snapshot = await services.control.snapshot(runId);
+    assert.equal(snapshot.domainPhase, "INTAKE");
+    assert.equal(snapshot.phase, "intake");
+    assert.equal((await services.control.events(runId)).some((event) => event.type === "set_domain_phase"), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
