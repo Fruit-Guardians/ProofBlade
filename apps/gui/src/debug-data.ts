@@ -89,6 +89,7 @@ interface ContentLike {
 const runDetailCacheCapacity = 32;
 const runDetailCacheMaxBytes = 64 * 1024 * 1024;
 const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
+export const ARTIFACT_PREVIEW_MAX_BYTES = 64 * 1024;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -300,12 +301,14 @@ export class DebugDataService {
     }
   }
 
-  public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
+  public async artifact(runId: string, artifactId: string, offset = 0, maxBytes = ARTIFACT_PREVIEW_MAX_BYTES): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string; offset: number; bytesRead: number; totalBytes: number; truncated: boolean }> {
     assertRunId(runId);
     const snapshot = await this.services.control.snapshot(runId);
     const artifact = snapshot.artifacts[artifactId];
     if (!artifact) throw new Error(`Artifact not found: ${artifactId}`);
-    return { artifact, content: await this.services.artifacts.readText(runId, artifact) };
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Artifact preview offset must be a non-negative integer");
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > ARTIFACT_PREVIEW_MAX_BYTES) throw new Error(`Artifact preview maxBytes must be between 1 and ${ARTIFACT_PREVIEW_MAX_BYTES}`);
+    return { artifact, ...await this.services.artifacts.readTextRange(runId, artifact, maxBytes, offset) };
   }
 
   public async checkpoint(runId: string, reason: string): Promise<unknown> {

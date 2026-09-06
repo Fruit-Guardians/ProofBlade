@@ -11,3 +11,11 @@ test("GUI keeps one general task entry instead of a CTF-specific top-level actio
   assert.match(source, /安全任务模板/);
   assert.doesNotMatch(source, /startSolve|createFixtureConversation|\/api\/solve|\/api\/fixture-conversations/);
 });
+
+test("evidence Artifact panels toggle closed and use bounded preview loading", async () => {
+  const source = await readFile(join(import.meta.dirname, "..", "src", "App.tsx"), "utf8");
+  assert.match(source, /if \(open\) \{ setOpen\(false\); return; \}/);
+  assert.match(source, /继续加载/);
+  assert.match(source, /appendArtifactPreview/);
+  assert.match(source, /nextArtifactPreviewOffset/);
+});

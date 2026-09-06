@@ -89,8 +89,9 @@ export async function getRun(runId: string): Promise<RunDetail> {
   return await request(`/api/runs/${encodeURIComponent(runId)}`);
 }
 
-export async function getArtifact(runId: string, artifactId: string): Promise<ArtifactContent> {
-  return await request(`/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`);
+export async function getArtifact(runId: string, artifactId: string, offset = 0, limit = 64 * 1024): Promise<ArtifactContent> {
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+  return await request(`/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}?${query}`);
 }
 
 export async function startTaskFromTemplate(input: { runId: string; templateId: string; mode: "auto" | "assist"; maxTurns: number }): Promise<unknown> {

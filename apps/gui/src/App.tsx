@@ -14,6 +14,8 @@ import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -562,15 +564,12 @@ function formatPercent(value: number): string {
 }
 
 function MessageText({ text }: { text: string }) {
-  const parts = text.split("```");
-  return <div className="message-text">{parts.map((part, index) => {
-    if (index % 2 === 1) {
-      const [language, ...lines] = part.split("\n");
-      const hasLanguage = /^[a-zA-Z0-9_+#.-]{1,20}$/.test(language.trim());
-      return <pre key={index} data-language={hasLanguage ? language.trim() : undefined}><code>{hasLanguage ? lines.join("\n") : part}</code></pre>;
-    }
-    return part && <p key={index}>{part}</p>;
-  })}</div>;
+  const html = useMemo(() => DOMPurify.sanitize(marked.parse(text, { async: false }) as string, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ["style", "iframe", "object", "embed"],
+    FORBID_ATTR: ["style", "srcdoc"],
+  }), [text]);
+  return <div className="message-text markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function ToolDebugger({ detail }: { detail: RunDetail }) {
@@ -784,7 +783,27 @@ function EvidenceChain({ detail }: { detail: RunDetail }) {
 
 function EvidenceBranch({ detail, evidence }: { detail: RunDetail; evidence: RunDetail["snapshot"]["evidence"][string] }) {
   const artifacts = evidenceArtifactIds(evidence).map((id) => detail.snapshot.artifacts[id]).filter(Boolean);
-  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <ArtifactRow key={artifact.id} detail={detail} artifact={artifact} compact />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <EvidenceArtifact key={artifact.id} detail={detail} artifact={artifact} />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+}
+
+function EvidenceArtifact({ detail, artifact }: { detail: RunDetail; artifact: RunDetail["snapshot"]["artifacts"][string] }) {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState<ArtifactContent>();
+  const [error, setError] = useState<string>();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const info = artifactInfo(detail, artifact);
+  const load = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (content || error) return;
+    try { setContent(await getArtifact(detail.snapshot.runId, artifact.id)); } catch (caught) { setError(message(caught)); }
+  };
+  const loadMore = async () => {
+    if (!content || !content.truncated || loadingMore) return;
+    setLoadingMore(true);
+    try { const next = await getArtifact(detail.snapshot.runId, artifact.id, nextArtifactPreviewOffset(content)); setContent((current) => current ? appendArtifactPreview(current, next) : next); } catch (caught) { setError(message(caught)); } finally { setLoadingMore(false); }
+  };
+  return <div className="evidence-artifact"><button type="button" className="evidence-artifact-trigger" onClick={() => void load()}><ArtifactRow detail={detail} artifact={artifact} compact /><span className="evidence-artifact-action">{open ? "收起内容" : "查看内容"}<ChevronDown size={12} /></span></button>{open && <div className="evidence-artifact-content">{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="provider-loading"><RefreshCw className="spin" size={14} />读取 Artifact</div>}</div>}</div>;
 }
 
 function ArtifactIndex({ detail }: { detail: RunDetail }) {
@@ -827,12 +846,36 @@ function Artifacts({ detail }: { detail: RunDetail }) {
   const [selectedId, setSelectedId] = useState(artifacts[0]?.id ?? "");
   const [content, setContent] = useState<ArtifactContent>();
   const [error, setError] = useState<string>();
+  const [loadingMore, setLoadingMore] = useState(false);
   useEffect(() => {
     if (!selectedId) return;
     setContent(undefined); setError(undefined);
     void getArtifact(detail.snapshot.runId, selectedId).then(setContent).catch((caught) => setError(message(caught)));
   }, [detail.snapshot.runId, selectedId]);
-  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+  const loadMore = async () => {
+    if (!content || !content.truncated || loadingMore) return;
+    const artifactId = selectedId;
+    setLoadingMore(true);
+    try { const next = await getArtifact(detail.snapshot.runId, artifactId, nextArtifactPreviewOffset(content)); setContent((current) => current?.artifact.id === artifactId ? appendArtifactPreview(current, next) : current); } catch (caught) { setError(message(caught)); } finally { setLoadingMore(false); }
+  };
+  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+}
+
+function ArtifactPreview({ content, loadingMore, onLoadMore }: { content: ArtifactContent; loadingMore: boolean; onLoadMore(): void }) {
+  return <div className="evidence-content-view"><div className="evidence-content-meta"><span>{content.artifact.mime}</span><code>{content.artifact.sha256.slice(0, 16)}...</code><small>{formatBytes(content.bytesRead)} / {formatBytes(content.totalBytes)}</small></div><pre>{content.content}</pre>{content.truncated && <button type="button" className="artifact-load-more" disabled={loadingMore} onClick={onLoadMore}>{loadingMore ? "读取中" : "继续加载"}</button>}</div>;
+}
+
+function appendArtifactPreview(current: ArtifactContent, next: ArtifactContent): ArtifactContent {
+  const content = current.content + next.content;
+  return { ...next, content, offset: current.offset, bytesRead: utf8ByteLength(content) };
+}
+
+function nextArtifactPreviewOffset(content: ArtifactContent): number {
+  return content.offset + utf8ByteLength(content.content);
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }
 
 function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail; provider: string; model: string; thinkingLevel: string }) {

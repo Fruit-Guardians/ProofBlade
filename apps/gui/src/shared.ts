@@ -326,6 +326,10 @@ export interface ContextRuntimeInfo {
 export interface ArtifactContent {
   artifact: RunSnapshot["artifacts"][string];
   content: string;
+  offset: number;
+  bytesRead: number;
+  totalBytes: number;
+  truncated: boolean;
 }
 
 export type AblationStatus = "draft" | "ready" | "running" | "paused" | "completed" | "failed";

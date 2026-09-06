@@ -4,7 +4,7 @@ import test from "node:test";
 import { appendFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
 import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
@@ -207,6 +207,35 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
+});
+
+test("Artifact previews are range-bounded and can be continued without reading the full content", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-artifact-preview-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-ARTIFACT-PREVIEW-001";
+    await data.createConversation({ runId, title: "artifact preview", workspacePath: root });
+    const services = (data as unknown as { services: { artifacts: { putText: (id: string, content: string, meta: { filename: string }) => Promise<{ id: string }> } } }).services;
+    const source = "x".repeat(ARTIFACT_PREVIEW_MAX_BYTES + 17);
+    const artifact = await services.artifacts.putText(runId, source, { filename: "large-output.txt" });
+    const first = await data.artifact(runId, artifact.id);
+    assert.equal(first.bytesRead, ARTIFACT_PREVIEW_MAX_BYTES);
+    assert.equal(first.totalBytes, Buffer.byteLength(source));
+    assert.equal(first.truncated, true);
+    assert.equal(first.content, source.slice(0, ARTIFACT_PREVIEW_MAX_BYTES));
+    const next = await data.artifact(runId, artifact.id, first.offset + first.bytesRead);
+    assert.equal(next.content, source.slice(ARTIFACT_PREVIEW_MAX_BYTES));
+    assert.equal(next.truncated, false);
+    const multibyte = "中".repeat(Math.ceil((ARTIFACT_PREVIEW_MAX_BYTES + 6) / 3));
+    const multibyteArtifact = await services.artifacts.putText(runId, multibyte, { filename: "multibyte-output.txt" });
+    const multibyteFirst = await data.artifact(runId, multibyteArtifact.id);
+    const multibyteNext = await data.artifact(runId, multibyteArtifact.id, multibyteFirst.offset + Buffer.byteLength(multibyteFirst.content));
+    assert.equal(multibyteFirst.content + multibyteNext.content, multibyte);
+    await assert.rejects(() => data.artifact(runId, artifact.id, -1), /offset must be a non-negative integer/);
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("lists migration-tailed Runs from valid projections without replaying full event streams", async () => {
