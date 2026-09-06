@@ -205,7 +205,7 @@
 ### CompetitionChallengeSolver
 - Kind: `class`
 - Signature: `CompetitionChallengeSolver`
-- Source: [src/competition/solver.ts:79](../../../packages/materials/src/competition/solver.ts:79)
+- Source: [src/competition/solver.ts:77](../../../packages/materials/src/competition/solver.ts:77)
 - Export: `@proofblade/materials`
 - Summary: The real ChallengeSolver: turns one competition challenge into a full harness
 - Summary source: `tsdoc`
@@ -1642,7 +1642,7 @@
 
 ### competitionTask
 - Kind: `function`
-- Signature: `(runId: string, summary: CompetitionChallengeSummary, env: CompetitionEnvironment, root: string, config: ProofBladeConfig, attachments?: readonly CompetitionAttachment[]): TaskContract`
+- Signature: `(runId: string, summary: CompetitionChallengeSummary, env: CompetitionEnvironment, root: string, config: ProofBladeConfig, attachments?: readonly CompetitionAttachment[], platformProvidedResult?: string): TaskContract`
 - Source: [src/competition/task.ts:36](../../../packages/materials/src/competition/task.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Build a TaskContract for a live competition challenge.
@@ -1652,7 +1652,7 @@
 ### parseCompetitionTargets
 - Kind: `function`
 - Signature: `(connectionInfo: string | undefined): ContainerTarget[]`
-- Source: [src/competition/task.ts:105](../../../packages/materials/src/competition/task.ts:105)
+- Source: [src/competition/task.ts:108](../../../packages/materials/src/competition/task.ts:108)
 - Export: `@proofblade/materials`
 - Summary: Extract concrete remote endpoints from platform connection text.
 - Summary source: `tsdoc`
@@ -4165,7 +4165,7 @@
 ### CompetitionChallengeSolverInit
 - Kind: `interface`
 - Signature: `CompetitionChallengeSolverInit`
-- Source: [src/competition/solver.ts:39](../../../packages/materials/src/competition/solver.ts:39)
+- Source: [src/competition/solver.ts:35](../../../packages/materials/src/competition/solver.ts:35)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: competition challenge solver init type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9390,7 +9390,7 @@
 ### CompetitionSandbox.build
 - Kind: `method`
 - Signature: `(task: TaskContract): Promise<FixtureRef>`
-- Source: [src/competition/sandbox.ts:66](../../../packages/materials/src/competition/sandbox.ts:66)
+- Source: [src/competition/sandbox.ts:61](../../../packages/materials/src/competition/sandbox.ts:61)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: build operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9399,7 +9399,7 @@
 ### CompetitionSandbox.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/competition/sandbox.ts:123](../../../packages/materials/src/competition/sandbox.ts:123)
+- Source: [src/competition/sandbox.ts:124](../../../packages/materials/src/competition/sandbox.ts:124)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9408,7 +9408,7 @@
 ### CompetitionSandbox.destroy
 - Kind: `method`
 - Signature: `(_fixture: FixtureRef): Promise<void>`
-- Source: [src/competition/sandbox.ts:119](../../../packages/materials/src/competition/sandbox.ts:119)
+- Source: [src/competition/sandbox.ts:120](../../../packages/materials/src/competition/sandbox.ts:120)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: destroy operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9417,7 +9417,7 @@
 ### CompetitionSandbox.execute
 - Kind: `method`
 - Signature: `(effect: EffectRequest, signal: AbortSignal): Promise<RawEffectResult>`
-- Source: [src/competition/sandbox.ts:90](../../../packages/materials/src/competition/sandbox.ts:90)
+- Source: [src/competition/sandbox.ts:91](../../../packages/materials/src/competition/sandbox.ts:91)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: execute operation used to read or inspect state.
 - Summary source: `inferred`
@@ -9426,7 +9426,7 @@
 ### CompetitionSandbox.health
 - Kind: `method`
 - Signature: `(fixture: FixtureRef, expectedGeneration: number): Promise<FixtureHealth>`
-- Source: [src/competition/sandbox.ts:108](../../../packages/materials/src/competition/sandbox.ts:108)
+- Source: [src/competition/sandbox.ts:109](../../../packages/materials/src/competition/sandbox.ts:109)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: health operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9435,7 +9435,7 @@
 ### CompetitionSandbox.reconcile
 - Kind: `method`
 - Signature: `(effect: Effect): Promise<ReconcileResult>`
-- Source: [src/competition/sandbox.ts:100](../../../packages/materials/src/competition/sandbox.ts:100)
+- Source: [src/competition/sandbox.ts:101](../../../packages/materials/src/competition/sandbox.ts:101)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reconcile operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9444,7 +9444,7 @@
 ### CompetitionSandbox.reconcileFixture
 - Kind: `method`
 - Signature: `(task: TaskContract, expectedGeneration: number): Promise<FixtureReconcileResult>`
-- Source: [src/competition/sandbox.ts:113](../../../packages/materials/src/competition/sandbox.ts:113)
+- Source: [src/competition/sandbox.ts:114](../../../packages/materials/src/competition/sandbox.ts:114)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reconcile fixture operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9452,7 +9452,7 @@
 ### CompetitionSandbox.reset
 - Kind: `method`
 - Signature: `(fixture: FixtureRef): Promise<number>`
-- Source: [src/competition/sandbox.ts:82](../../../packages/materials/src/competition/sandbox.ts:82)
+- Source: [src/competition/sandbox.ts:83](../../../packages/materials/src/competition/sandbox.ts:83)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: reset operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9461,7 +9461,7 @@
 ### CompetitionSandbox.resolveReplayPolicy
 - Kind: `method`
 - Signature: `(operation: string, requested: ReplayPolicy): ReplayPolicy`
-- Source: [src/competition/sandbox.ts:58](../../../packages/materials/src/competition/sandbox.ts:58)
+- Source: [src/competition/sandbox.ts:53](../../../packages/materials/src/competition/sandbox.ts:53)
 - Export: `@proofblade/materials`
 - Summary: Resolve the durable replay policy before an Effect is proposed.
 - Summary source: `tsdoc`
@@ -9469,7 +9469,7 @@
 ### CompetitionChallengeSolver.reconcile
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/competition/solver.ts:97](../../../packages/materials/src/competition/solver.ts:97)
+- Source: [src/competition/solver.ts:95](../../../packages/materials/src/competition/solver.ts:95)
 - Export: `@proofblade/materials`
 - Summary: Reconcile expired environments before the Fleet claims new challenges.
 - Summary source: `tsdoc`
@@ -9478,7 +9478,7 @@
 ### CompetitionChallengeSolver.solve
 - Kind: `method`
 - Signature: `(request: ChallengeSolveRequest): Promise<ChallengeSolveResult>`
-- Source: [src/competition/solver.ts:101](../../../packages/materials/src/competition/solver.ts:101)
+- Source: [src/competition/solver.ts:99](../../../packages/materials/src/competition/solver.ts:99)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: solve operation used to perform a durable write.
 - Summary source: `inferred`
