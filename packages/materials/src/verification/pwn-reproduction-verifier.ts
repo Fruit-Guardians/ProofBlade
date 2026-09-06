@@ -174,7 +174,7 @@ export class PwnReproductionVerifier implements PwnTrustedReproducer {
     const candidateArtifact = await this.artifactStore.putText(runId, candidateToken, {
       filename: `pwn-candidate-${completionId}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: {
         name: "Pwn reproduction candidate",
         summary: `Candidate sha256=${candidateHash}.`,

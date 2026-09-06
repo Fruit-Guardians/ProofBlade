@@ -756,7 +756,7 @@ test("GUI Fixture solve uses the shared verifier-first Run path and replays term
           if (!proposed) {
             proposed = true;
             const candidate = "PB{web_source_trace}";
-            const artifact = await options.services.artifacts.putText(options.runId, candidate, { filename: "gui-candidate.txt", sensitivity: "flag_candidate" });
+            const artifact = await options.services.artifacts.putText(options.runId, candidate, { filename: "gui-candidate.txt", sensitivity: "result_candidate" });
             await options.services.control.dispatch(options.runId, {
               type: "completion_proposed",
               completion: { id: "C-GUI-REPLAY", purpose: "harness_verification", candidateHash: hash(candidate), artifactId: artifact.id },

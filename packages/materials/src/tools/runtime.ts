@@ -3,7 +3,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { CompletionProposal, DomainRecordInput, JobRecord, KnowledgeLevel, KnowledgeProjection, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
+import type { ArtifactSensitivity, CompletionProposal, DomainRecordInput, JobRecord, KnowledgeLevel, KnowledgeProjection, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver, type ObservationOutcome } from "../knowledge/observer.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
@@ -291,7 +291,7 @@ export class ProofBladeToolRuntime {
    * durable Artifact storage, approval/attempt accounting, and hash-bound
    * completion identity.
    */
-  public async submitResult(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
+  public async submitResult(payload: string, options: { target?: string; sensitivity?: ArtifactSensitivity; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = payload.trim();
     const target = options.target?.trim() || "external";
     if (!normalized) throw new Error("External submission payload must not be empty");
@@ -303,7 +303,7 @@ export class ProofBladeToolRuntime {
   }
 
   /** Alias used by external destination adapters. */
-  public async submitExternal(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
+  public async submitExternal(payload: string, options: { target?: string; sensitivity?: ArtifactSensitivity; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
     return this.submitResult(payload, options);
   }
 
@@ -337,10 +337,10 @@ export class ProofBladeToolRuntime {
       }
     }
     if (!platformJudged && !observed) throw new Error("Candidate does not occur in a successful target observation");
-    return this.proposeSubmission(snapshot, normalized, "competition", "flag_candidate");
+    return this.proposeSubmission(snapshot, normalized, "competition", "result_candidate");
   }
 
-  private async proposeSubmission(snapshot: RunSnapshot, normalized: string, target: string, sensitivity: "public" | "secret" | "flag_candidate"): Promise<{ completionId: string; candidateHash: string }> {
+  private async proposeSubmission(snapshot: RunSnapshot, normalized: string, target: string, sensitivity: ArtifactSensitivity): Promise<{ completionId: string; candidateHash: string }> {
     const candidateHash = sha256(normalized);
     const platformJudged = snapshot.task.verification.kind === "platform_submission";
     void target; // Reserved for destination-specific completion metadata in the next schema.

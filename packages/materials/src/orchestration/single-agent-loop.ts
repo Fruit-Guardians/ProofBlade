@@ -403,7 +403,7 @@ export class SingleAgentLoop {
       `Fact: ${verified.factId ?? "none"}`,
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
     ].join("\n");
-    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "result_candidate" });
     const current = await this.services.control.snapshot(runId);
     for (const intent of this.claimedSchedulerIntents(current)) {
       await scheduler.completeIntent(runId, intent.id, {
@@ -459,7 +459,7 @@ export class SingleAgentLoop {
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
       "Verification authority: task-owned deterministic verifier.",
     ].join("\n");
-    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "result_candidate" });
     const current = await this.services.control.snapshot(runId);
     for (const intent of this.claimedSchedulerIntents(current)) {
       await scheduler.completeIntent(runId, intent.id, {

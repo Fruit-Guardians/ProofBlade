@@ -153,11 +153,11 @@ export async function runDemo(root: string, runId: string, config: ProofBladeCon
   const readCommand = process.platform === "win32" ? "type challenge.txt" : "cat challenge.txt";
   const first = await services.journal.execute(runId, { operation: "fixture_read", args: { path: "challenge.txt", generation, attempt: 1 }, replayPolicy: "pure", command: readCommand, cwd: fixture.path });
   const flag = first.result.stdout.match(/PB\{[^}\r\n]+\}/)?.[0];
-  if (!flag) throw new Error("Demo fixture produced no flag candidate");
+  if (!flag) throw new Error("Demo fixture produced no result candidate");
   const evidenceOne = id("EV");
   await services.control.dispatchBatch(runId, [{
       type: "evidence",
-      evidence: { id: evidenceOne, kind: "observation", summary: "The fixture contains a ProofBlade flag candidate.", source: { tool: "fixture_read", effectId: first.effectId, artifactId: first.artifactId, generation }, confidence: 0.95, supports: ["H-001"], refutes: [] },
+      evidence: { id: evidenceOne, kind: "observation", summary: "The fixture contains a ProofBlade result candidate.", source: { tool: "fixture_read", effectId: first.effectId, artifactId: first.artifactId, generation }, confidence: 0.95, supports: ["H-001"], refutes: [] },
       lane: "executor",
     }, {
       type: "hypothesis",
@@ -166,7 +166,7 @@ export async function runDemo(root: string, runId: string, config: ProofBladeCon
     }]);
   await coordinator.setDomainPhase(runId, "TARGET_MODEL");
   await coordinator.setDomainPhase(runId, "HYPOTHESIS");
-  const candidateArtifact = await services.artifacts.putText(runId, flag, { filename: "candidate.txt", sensitivity: "flag_candidate" });
+  const candidateArtifact = await services.artifacts.putText(runId, flag, { filename: "candidate.txt", sensitivity: "result_candidate" });
   await services.control.dispatch(runId, {
       type: "completion_proposed",
       completion: { id: "C-001", purpose: "harness_verification", candidateHash: sha256(flag), artifactId: candidateArtifact.id },
@@ -192,7 +192,7 @@ export async function runDemo(root: string, runId: string, config: ProofBladeCon
     `Candidate: ${flag}`,
     `Evidence: ${verified.evidenceIds.join(", ")}`,
     `Fixture generation: ${generation}`,
-  ].join("\n"), { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+  ].join("\n"), { filename: "report.md", mime: "text/markdown", sensitivity: "result_candidate" });
   const workItem = await coordinator.claim(runId, task, 1);
   await coordinator.settle(runId, workItem.id, true, verified.evidenceIds, [candidateArtifact.id]);
   await coordinator.finishAccepted(runId, workItem.id, "C-001", "Two hidden-scorer reproductions agree.");
