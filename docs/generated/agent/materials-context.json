@@ -45,7 +45,7 @@
     "src/control/reducer.ts": "5a07596ce8c403d27406a6da8f0412951bf16049e49d01294c10a315200e4ba1",
     "src/domain/candidate.ts": "ffaca0c1ecfea0475f2fd50b7ce75de7a30f95ac934317c26b15f38e36c98c6a",
     "src/domain/failure-policy.ts": "b7acc9aa5b2ea36ce5498452c47317f40848897d67420155f5feb9f5099147f1",
-    "src/domain/general-task-contract.ts": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+    "src/domain/general-task-contract.ts": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
     "src/domain/handoff.ts": "c8b05fccff8b0751c98aab3bd8ef5702a1c07fa85084e70b2a72436b4d88f88c",
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
     "src/domain/phase-budget.ts": "b24231dc02e17149347cf84bc2fa6a1178eb27291f6725d56cf48e0091acd6ad",
@@ -3807,8 +3807,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 111,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 113,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -3823,8 +3823,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 102,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 104,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -3839,8 +3839,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 92,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 94,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -3855,8 +3855,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 134,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 137,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -8805,7 +8805,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 17,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -8818,8 +8818,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 80,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 82,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -8835,7 +8835,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 22,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -8849,7 +8849,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 43,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -8863,7 +8863,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 54,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -8879,7 +8879,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 35,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -8892,8 +8892,8 @@
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
-      "line": 72,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "line": 74,
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ]
@@ -8909,7 +8909,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 27,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -36928,7 +36928,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 15,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -36942,7 +36942,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 11,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -36956,7 +36956,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 9,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {
@@ -36970,7 +36970,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/domain/general-task-contract.ts",
       "line": 13,
-      "moduleHash": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+      "moduleHash": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
       "testRefs": []
     },
     {

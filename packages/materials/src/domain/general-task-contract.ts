@@ -57,6 +57,8 @@ export interface GeneralTaskContract {
   title: string;
   kind: TaskKind;
   domainTags: TaskDomainTag[];
+  /** Immutable task target or binding descriptor, distinct from its workspace scope. */
+  target: string;
   objective: string;
   inputs: Array<{ path: string; sha256: string; readOnly: boolean }>;
   successCriteria: string[];
@@ -113,6 +115,7 @@ export function assertGeneralTaskContract(task: GeneralTaskContract): void {
   if (!isIdentifier(task.taskId)) throw new Error("General task id is invalid");
   if (!isText(task.title, 256)) throw new Error("General task title is invalid");
   if (!TASK_KINDS.has(task.kind)) throw new Error(`Unsupported general task kind: ${String(task.kind)}`);
+  if (!isText(task.target, 4_096)) throw new Error("General task target is invalid");
   if (!isText(task.objective, 8_000)) throw new Error("General task objective is invalid");
   assertUniqueBoundedText(task.domainTags, "domain tags", 32, 32, DOMAIN_TAGS);
   assertInputs(task.inputs);
@@ -139,6 +142,7 @@ export function generalTaskFromLegacy(task: TaskContract): GeneralTaskContract {
     title: task.objective.slice(0, 256) || task.task_id,
     kind: legacyTaskKind(task.mode),
     domainTags: legacyDomainTags(task.target_kind),
+    target: task.target,
     objective: task.objective,
     inputs: task.inputs.map((input) => ({ path: input.path, sha256: input.sha256, readOnly: input.read_only })),
     successCriteria: [...task.success_criteria],

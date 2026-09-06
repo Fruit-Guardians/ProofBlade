@@ -46,7 +46,7 @@
     "src/control/reducer.ts": "5a07596ce8c403d27406a6da8f0412951bf16049e49d01294c10a315200e4ba1",
     "src/domain/candidate.ts": "ffaca0c1ecfea0475f2fd50b7ce75de7a30f95ac934317c26b15f38e36c98c6a",
     "src/domain/failure-policy.ts": "b7acc9aa5b2ea36ce5498452c47317f40848897d67420155f5feb9f5099147f1",
-    "src/domain/general-task-contract.ts": "2437cec7328701702162459f33448b8de20ef68e2bbaf2476b2567d79bdcea71",
+    "src/domain/general-task-contract.ts": "b97fc05bcf9f1ffb70bf57ac01b9c124a94cb161b899856b745ee62ed0e61709",
     "src/domain/handoff.ts": "c8b05fccff8b0751c98aab3bd8ef5702a1c07fa85084e70b2a72436b4d88f88c",
     "src/domain/intent.ts": "68773dfc14034905acf9de2d19fe03fae8efebe6c8717d461a308d5784761c9c",
     "src/domain/phase-budget.ts": "b24231dc02e17149347cf84bc2fa6a1178eb27291f6725d56cf48e0091acd6ad",
@@ -5761,7 +5761,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 111,
+      "line": 113,
       "signature": "(task: GeneralTaskContract): void",
       "summary": "Inferred summary: assert general task contract operation used to validate input or state.",
       "summarySource": "inferred",
@@ -5773,7 +5773,7 @@
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ],
-      "structureHash": "3b309e036d112de3ba41e07fcfbb265938b6a1d0347e7d79dafa5d4d7982a0a0"
+      "structureHash": "8d4fb31df1e39b71c77007593f8ffa58486a7f91ff7e800c98df0373becd32e4"
     },
     {
       "id": "@proofblade/materials::function::createCognitiveSnapshot",
@@ -5782,7 +5782,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 102,
+      "line": 104,
       "signature": "(task: Pick<GeneralTaskContract, \"cognitivePolicy\" | \"contextPolicy\">): CognitiveSnapshot",
       "summary": "Inferred summary: create cognitive snapshot operation used to produce a deterministic value.",
       "summarySource": "inferred",
@@ -5803,7 +5803,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 92,
+      "line": 94,
       "signature": "(task: Pick<GeneralTaskContract, \"scope\" | \"pausePolicy\" | \"constraints\">): SafetySnapshot",
       "summary": "Inferred summary: create safety snapshot operation used to produce a deterministic value.",
       "summarySource": "inferred",
@@ -5824,7 +5824,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 134,
+      "line": 137,
       "signature": "(task: TaskContract): GeneralTaskContract",
       "summary": "Projects a legacy CTF-era task into the new generic representation. The",
       "summarySource": "tsdoc",
@@ -5836,7 +5836,7 @@
       "testRefs": [
         "packages/materials/tests/general-task-contract.test.ts"
       ],
-      "structureHash": "3782ad28b7beda185b349c687de823c6dedb21f137a4bd80e15e640a470085fb"
+      "structureHash": "e4c4cc04626b7ba19d116c85cd47fdd8990369b3bf77fdc8bc6c11c9869647c2"
     },
     {
       "id": "@proofblade/materials::function::buildHandoffDraft",
@@ -13649,7 +13649,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 80,
+      "line": 82,
       "signature": "CognitiveSnapshot",
       "summary": "Inferred summary: cognitive snapshot type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -13743,7 +13743,7 @@
       "visibility": "public",
       "module": "src/domain/general-task-contract.ts",
       "exportPath": "@proofblade/materials",
-      "line": 72,
+      "line": 74,
       "signature": "SafetySnapshot",
       "summary": "Inferred summary: safety snapshot type contract used to provide a reusable operation.",
       "summarySource": "inferred",

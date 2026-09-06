@@ -1904,7 +1904,7 @@
 ### assertGeneralTaskContract
 - Kind: `function`
 - Signature: `(task: GeneralTaskContract): void`
-- Source: [src/domain/general-task-contract.ts:111](../../../packages/materials/src/domain/general-task-contract.ts:111)
+- Source: [src/domain/general-task-contract.ts:113](../../../packages/materials/src/domain/general-task-contract.ts:113)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: assert general task contract operation used to validate input or state.
 - Summary source: `inferred`
@@ -1913,7 +1913,7 @@
 ### createCognitiveSnapshot
 - Kind: `function`
 - Signature: `(task: Pick<GeneralTaskContract, "cognitivePolicy" | "contextPolicy">): CognitiveSnapshot`
-- Source: [src/domain/general-task-contract.ts:102](../../../packages/materials/src/domain/general-task-contract.ts:102)
+- Source: [src/domain/general-task-contract.ts:104](../../../packages/materials/src/domain/general-task-contract.ts:104)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create cognitive snapshot operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -1922,7 +1922,7 @@
 ### createSafetySnapshot
 - Kind: `function`
 - Signature: `(task: Pick<GeneralTaskContract, "scope" | "pausePolicy" | "constraints">): SafetySnapshot`
-- Source: [src/domain/general-task-contract.ts:92](../../../packages/materials/src/domain/general-task-contract.ts:92)
+- Source: [src/domain/general-task-contract.ts:94](../../../packages/materials/src/domain/general-task-contract.ts:94)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create safety snapshot operation used to produce a deterministic value.
 - Summary source: `inferred`
@@ -1931,7 +1931,7 @@
 ### generalTaskFromLegacy
 - Kind: `function`
 - Signature: `(task: TaskContract): GeneralTaskContract`
-- Source: [src/domain/general-task-contract.ts:134](../../../packages/materials/src/domain/general-task-contract.ts:134)
+- Source: [src/domain/general-task-contract.ts:137](../../../packages/materials/src/domain/general-task-contract.ts:137)
 - Export: `@proofblade/materials`
 - Summary: Projects a legacy CTF-era task into the new generic representation. The
 - Summary source: `tsdoc`
@@ -4662,7 +4662,7 @@
 ### CognitiveSnapshot
 - Kind: `interface`
 - Signature: `CognitiveSnapshot`
-- Source: [src/domain/general-task-contract.ts:80](../../../packages/materials/src/domain/general-task-contract.ts:80)
+- Source: [src/domain/general-task-contract.ts:82](../../../packages/materials/src/domain/general-task-contract.ts:82)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: cognitive snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -4704,7 +4704,7 @@
 ### SafetySnapshot
 - Kind: `interface`
 - Signature: `SafetySnapshot`
-- Source: [src/domain/general-task-contract.ts:72](../../../packages/materials/src/domain/general-task-contract.ts:72)
+- Source: [src/domain/general-task-contract.ts:74](../../../packages/materials/src/domain/general-task-contract.ts:74)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: safety snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`

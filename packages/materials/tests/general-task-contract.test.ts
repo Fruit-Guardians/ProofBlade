@@ -10,6 +10,7 @@ function task(overrides: Partial<GeneralTaskContract> = {}): GeneralTaskContract
     title: "Inspect the project",
     kind: "coding",
     domainTags: ["documentation"],
+    target: "LOCAL_WORKSPACE:D:/work/project",
     objective: "Read the project and summarize the configuration.",
     inputs: [],
     successCriteria: ["The summary names the relevant configuration."],
@@ -64,6 +65,7 @@ test("legacy CTF tasks project to a generic contract without preserving a CTF mo
   const projected = generalTaskFromLegacy(legacy);
   assert.equal(projected.kind, "evaluation");
   assert.deepEqual(projected.domainTags, ["web"]);
+  assert.equal(projected.target, legacy.target);
   assert.deepEqual(projected.verification, { kind: "rubric", required: true, successCriteria: legacy.success_criteria });
   assert.equal("mode" in projected, false);
   assert.doesNotThrow(() => assertGeneralTaskContract(projected));
@@ -71,6 +73,7 @@ test("legacy CTF tasks project to a generic contract without preserving a CTF mo
 
 test("generic contracts reject domain-dependent safety and invalid verification", () => {
   assert.throws(() => assertGeneralTaskContract(task({ domainTags: ["ctf" as never] })), /domain tags/);
+  assert.throws(() => assertGeneralTaskContract(task({ target: "" })), /target/);
   assert.throws(() => assertGeneralTaskContract(task({ verification: { kind: "none", required: true } })), /cannot be required/);
   assert.throws(() => assertGeneralTaskContract(task({ enabledCapabilities: { enabled: ["filesystem.read"], disabled: ["filesystem.read"] } })), /both enabled and disabled/);
 });
