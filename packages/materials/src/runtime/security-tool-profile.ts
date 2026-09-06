@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { atomicWriteFile, withFileLock } from "@proofblade/atoms";
 import type { McpProjectRegistry, McpServerSummary, McpToolchainState } from "../mcp/registry.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { ActionBundle, FirstActionPlan, RunSnapshot, RunToolPreparation, TargetKind, ToolPreparationRuntime } from "../domain/types.js";
+import type { ActionBundle, FirstActionPlan, RunSnapshot, RunToolPreparation, TargetKind, TaskContract, ToolPreparationRuntime } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { ToolCatalogBootstrapSpec } from "../tools/catalog.js";
@@ -434,6 +434,22 @@ export function profileForTargetKind(targetKind: TargetKind, _target = ""): Secu
   // Unknown and mixed tasks keep the generic capability surface. Callers that
   // explicitly ask for a domain classifier may still use classifySecurityTask.
   return undefined;
+}
+
+/**
+ * Resolve the optional security profile for a task before a lane is created.
+ *
+ * An explicit caller-provided profile wins. Otherwise only a durable,
+ * non-generic target kind selects a profile; task prose is deliberately not
+ * inspected here. This keeps security tooling available for explicitly
+ * labelled Web/Pwn/Reverse/etc. work while ordinary conversations remain on
+ * the generic capability surface.
+ */
+export function securityProfileForTask(
+  task: Pick<TaskContract, "target_kind">,
+  explicitProfile?: SecurityToolProfile,
+): SecurityToolProfile | undefined {
+  return explicitProfile ?? profileForTargetKind(task.target_kind);
 }
 
 /** Return the phase-scoped action contract selected by a prepared profile. */

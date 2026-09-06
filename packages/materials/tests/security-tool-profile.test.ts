@@ -13,6 +13,7 @@ import {
   classifySecurityTask,
   preflightFromRunToolPreparation,
   profileForTargetKind,
+  securityProfileForTask,
   runToolPreparationFromPreflight,
   withFirstClassMcpToolExposure,
 } from "../src/runtime/security-tool-profile.js";
@@ -32,6 +33,17 @@ test("classifies security domains before a lane is created", () => {
   assert.equal(profileForTargetKind("unknown", "remote nc service with a format string"), undefined);
   assert.equal(profileForTargetKind("mixed", "HTTP endpoint with JWT and SSRF"), undefined);
   assert.equal(profileForTargetKind("unknown", "ordinary project refactor"), undefined);
+});
+
+test("explicit security task labels select tooling without inspecting task prose", () => {
+  assert.equal(securityProfileForTask({ target_kind: "reverse" })?.id, "reverse");
+  assert.equal(securityProfileForTask({ target_kind: "pwn" })?.id, "pwn");
+  assert.equal(securityProfileForTask({ target_kind: "web" })?.id, "web");
+  assert.equal(securityProfileForTask({ target_kind: "unknown" }), undefined);
+  assert.equal(securityProfileForTask({ target_kind: "mixed" }), undefined);
+
+  const explicit = securityToolProfile("mobile");
+  assert.equal(securityProfileForTask({ target_kind: "reverse" }, explicit)?.id, "mobile");
 });
 
 test("profiles keep direction-specific tools and fallback order bounded", () => {
