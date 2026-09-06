@@ -282,11 +282,19 @@ export class SingleAgentLoop {
           continue;
         }
         const evidenceIds = newIds(before.evidence, after.evidence);
-        const progressed = newIds(before.observations, after.observations).length > 0
+        const progressed = (options.task.mode === "coding_assistant" && agentOutcome.text.trim().length > 0)
+          || newIds(before.observations, after.observations).length > 0
           || evidenceIds.length > 0
           || newIds(before.facts, after.facts).length > 0
           || newIds(before.hypotheses, after.hypotheses).length > 0;
-        await this.settleIntentAfterTurn(options.runId, intentScheduler, activeIntent, before, after);
+        await this.settleIntentAfterTurn(
+          options.runId,
+          intentScheduler,
+          activeIntent,
+          before,
+          after,
+          options.task.mode === "coding_assistant" && agentOutcome.text.trim().length > 0,
+        );
         await coordinator.settle(options.runId, activeWorkItemId, progressed, evidenceIds, []);
         activeWorkItemId = undefined;
         if (mode() === "assist") {
@@ -485,9 +493,17 @@ export class SingleAgentLoop {
     return await scheduler.schedule(buildSchedulingContext(snapshot)) ?? undefined;
   }
 
-  private async settleIntentAfterTurn(runId: string, scheduler: IntentScheduler, intent: SchedulerIntent | undefined, before: RunSnapshot, after: RunSnapshot): Promise<void> {
+  private async settleIntentAfterTurn(
+    runId: string,
+    scheduler: IntentScheduler,
+    intent: SchedulerIntent | undefined,
+    before: RunSnapshot,
+    after: RunSnapshot,
+    textProgress = false,
+  ): Promise<void> {
     if (!intent) return;
-    const progressed = newIds(before.observations, after.observations).length > 0
+    const progressed = textProgress
+      || newIds(before.observations, after.observations).length > 0
       || newIds(before.evidence, after.evidence).length > 0
       || newIds(before.facts, after.facts).length > 0
       || newIds(before.hypotheses, after.hypotheses).length > 0;
