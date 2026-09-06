@@ -15,7 +15,7 @@ import {
   bashEscapeHatchViolation,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
-import { codingCtfCategoryGuidance, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
+import { codingCtfCategoryGuidance, createDeclaredExternalSubmitter, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -47,11 +47,45 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
   assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
-  // submit_flag is gated on the run being platform-judged, not on tool selection.
+  // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
-  assert.ok(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true }).includes("submit_flag"));
+  const genericExternalTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], externalSubmissionEnabled: true });
+  assert.deepEqual(genericExternalTools.slice(-1), ["external_submit"]);
+  assert.equal(genericExternalTools.includes("submit_flag"), false);
+  const platformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true });
+  assert.deepEqual(platformTools.slice(-2), ["external_submit", "submit_flag"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
+});
+
+test("external_submit exposes an explicit target and forwards an opaque payload", async () => {
+  const tool = createCodingTools({ externalSubmissionEnabled: true }).find((candidate) => candidate.name === "external_submit");
+  assert.ok(tool, "external_submit should be registered for configured destinations");
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((candidate) => candidate.name === "submit_flag"), false);
+  let received: unknown;
+  const context = { externalSubmit: async (request: unknown) => {
+    received = request;
+    return { accepted: true, completionId: "C-EXT", candidateHash: "a".repeat(64), replayed: false, submissionsUsed: 1, submissionsRemaining: 2, target: "review" };
+  } } as unknown as CodingResourceContext;
+  const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("external-call", { target: " review ", payload: "opaque result" }, new AbortController().signal, () => undefined, context);
+  assert.deepEqual(received, { target: "review", payload: "opaque result" });
+  assert.equal((result.details as { target: string }).target, "review");
+});
+
+test("declared external submission rejects destinations outside the immutable task allowlist", async () => {
+  const calls: unknown[] = [];
+  const submit = createDeclaredExternalSubmitter({
+    targets: ["review"],
+    submit: async (request) => {
+      calls.push(request);
+      return { accepted: true, completionId: "C-REVIEW", candidateHash: "b".repeat(64), replayed: false, submissionsUsed: 1, submissionsRemaining: 2, target: request.target };
+    },
+  });
+  const accepted = await submit({ target: " review ", payload: "opaque result" });
+  assert.equal(accepted.target, "review");
+  assert.deepEqual(calls, [{ target: "review", payload: "opaque result" }]);
+  await assert.rejects(() => submit({ target: "deployment", payload: "opaque result" }), /not declared by this task/);
+  assert.deepEqual(calls, [{ target: "review", payload: "opaque result" }]);
 });
 
 test("first-class MCP tools are category-scoped and deferred elsewhere", () => {

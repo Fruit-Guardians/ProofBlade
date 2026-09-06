@@ -279,6 +279,26 @@ export class ProofBladeToolRuntime {
     return { factId };
   }
 
+  /**
+   * Propose an opaque result for a configured external destination. The
+   * destination adapter owns payload semantics; this runtime only provides
+   * durable Artifact storage, approval/attempt accounting, and hash-bound
+   * completion identity.
+   */
+  public async submitExternal(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate" } = {}): Promise<{ completionId: string; candidateHash: string }> {
+    const normalized = payload.trim();
+    const target = options.target?.trim() || "external";
+    if (!normalized) throw new Error("External submission payload must not be empty");
+    if (target.length > 256) throw new Error("External submission target is too long");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return this.proposeSubmission(snapshot, normalized, target, options.sensitivity ?? "secret");
+  }
+
+  /**
+   * Legacy flag-shaped submission entry point. New code should use
+   * submitExternal; the observation and format checks remain here only for
+   * compatibility with old Competition clients.
+   */
   public async submitCandidate(candidate: string): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = candidate.trim();
     if (!isCtfCandidate(normalized)) throw new Error("Candidate must be one complete CTF prefix{...} value");
@@ -304,7 +324,13 @@ export class ProofBladeToolRuntime {
       }
     }
     if (!platformJudged && !observed) throw new Error("Candidate does not occur in a successful target observation");
+    return this.proposeSubmission(snapshot, normalized, "competition", "flag_candidate");
+  }
+
+  private async proposeSubmission(snapshot: RunSnapshot, normalized: string, target: string, sensitivity: "public" | "secret" | "flag_candidate"): Promise<{ completionId: string; candidateHash: string }> {
     const candidateHash = sha256(normalized);
+    const platformJudged = snapshot.task.verification.kind === "platform_submission";
+    void target; // Reserved for destination-specific completion metadata in the next schema.
     // Only completions that are actually SUBMITTABLE count against the budget and
     // are eligible for dedup. `verify_claim` also proposes completions, but its
     // artifact is a claim-reproduction JSON blob, not the bare flag. Counting those
@@ -326,7 +352,7 @@ export class ProofBladeToolRuntime {
     const artifact = await this.artifactStore.putText(this.runId, normalized, {
       filename: `candidate-${candidateHash.slice(0, 12)}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity,
     });
     const completionId = id("C");
     const verificationRequest = platformJudged
@@ -334,7 +360,7 @@ export class ProofBladeToolRuntime {
       : undefined;
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id, ...(verificationRequest ? { verificationKey: verificationRequest.request.key } : {}) },
+      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id, submissionTarget: target, ...(verificationRequest ? { verificationKey: verificationRequest.request.key } : {}) },
       lane: "executor",
     });
     return { completionId, candidateHash };

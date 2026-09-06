@@ -64,6 +64,7 @@ export function competitionTask(
       required_reproductions: 1,
       ...(targetKindForCategory(summary) === "web" ? { web: { flag_pattern: "(?:DASCTF|flag)\\{[^{}\\r\\n]{1,256}\\}" } } : {}),
     },
+    external_submission: { targets: ["competition"] },
     scope: {
       allowed_hosts: targets.length > 0 ? targets.map((target) => target.host) : connection ? [] : [`CHALLENGE:${summary.challengeId}`],
       allowed_ports: [...new Set(targets.map((target) => target.port))],

@@ -85,6 +85,7 @@ test("competitionTask uses platform_submission with a single reproduction", () =
   ]);
   assert.equal(task.verification.kind, "platform_submission");
   assert.equal(task.verification.required_reproductions, 1);
+  assert.deepEqual(task.external_submission, { targets: ["competition"] });
   assert.equal(task.scope.external_network, true);
   assert.equal(task.scope.allowed_workspace, join("/root", "fixtures/runtime", "RUN-1"));
   assert.deepEqual(task.scope.allowed_endpoints, [{ host: "host", port: 1337 }]);

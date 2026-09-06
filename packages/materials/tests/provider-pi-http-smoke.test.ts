@@ -208,6 +208,84 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
   }
 });
 
+test("PiCodingLane exposes generic external_submit only for a declared target with a trusted adapter", async () => {
+  let requestBody = "";
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBody = chunks.join("");
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.write(`data: ${JSON.stringify({ id: "generic-external-submit", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: { role: "assistant", content: "ready" }, finish_reason: null }] })}\n\n`);
+    response.write(`data: ${JSON.stringify({ id: "generic-external-submit", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 } })}\n\n`);
+    response.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-generic-external-submit-"));
+  const config: ProofBladeConfig = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: {
+      executor: {
+        provider: "mock-http",
+        api: "openai-completions",
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        model: "mock-model",
+        modelDiscoveryPath: "/models",
+        apiKeyEnv,
+        contextWindow: 4_096,
+        maxTokens: 256,
+        requestTimeoutMs: 5_000,
+        maxRetries: 0,
+        input: ["text"],
+      },
+    },
+  };
+  let lane: PiCodingLane | undefined;
+  try {
+    process.env[apiKeyEnv] = "mock-key";
+    const services = createServices(root, config);
+    const runId = "PI-GENERIC-EXTERNAL-SUBMIT";
+    const task = demoTask(runId, root, config);
+    task.external_submission = { targets: ["review"] };
+    await services.control.createRun(runId, task);
+    const claimVerifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    lane = await PiCodingLane.create({
+      runId,
+      projectRoot: root,
+      installRoot: root,
+      runDir: join(services.runsRoot, runId),
+      controlStore: services.control,
+      artifactStore: services.artifacts,
+      journal: services.journal,
+      claimVerifier,
+      config,
+      externalSubmission: async (submission) => ({
+        accepted: true,
+        completionId: "C-REVIEW",
+        candidateHash: sha256(submission.payload),
+        replayed: false,
+        submissionsUsed: 1,
+        submissionsRemaining: 1,
+        target: submission.target,
+      }),
+    });
+    const outcome = await lane.prompt("Prepare a review submission.");
+    assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
+    const providerTools = JSON.stringify((JSON.parse(requestBody) as { tools?: unknown[] }).tools ?? []);
+    assert.match(providerTools, /external_submit/);
+    assert.doesNotMatch(providerTools, /submit_flag/);
+  } finally {
+    await lane?.close();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("PiCodingLane persists tool preparation before the first Provider request and reuses it", async () => {
   let services: ReturnType<typeof createServices> | undefined;
   let firstRequestEventTypes: string[] | undefined;

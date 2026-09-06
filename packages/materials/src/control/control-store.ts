@@ -1067,6 +1067,12 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!["submission", "claim_reproduction", "harness_verification"].includes(command.completion.purpose)) {
       throw new Error(`Completion ${command.completion.id} requires an immutable purpose`);
     }
+    if (command.completion.submissionTarget !== undefined
+      && (typeof command.completion.submissionTarget !== "string"
+        || command.completion.submissionTarget.trim().length === 0
+        || command.completion.submissionTarget.length > 256)) {
+      throw new Error(`Completion ${command.completion.id} has an invalid submission target`);
+    }
     const artifact = snapshot.artifacts[command.completion.artifactId];
     if (!artifact) throw new Error(`Unknown completion artifact ${command.completion.artifactId}`);
     if (artifact.generation !== snapshot.generation) throw new Error(`Completion artifact is from generation ${artifact.generation}`);
@@ -1749,6 +1755,16 @@ function validateTaskContract(task: TaskContract): void {
   if (!task.scope.allowed_workspace.trim()) throw new Error("Task allowed_workspace is required");
   if (task.constraints.max_replans !== undefined && (!Number.isInteger(task.constraints.max_replans) || task.constraints.max_replans < 0 || task.constraints.max_replans > 16)) {
     throw new Error("Task constraints max_replans must be an integer between 0 and 16 when provided");
+  }
+  if (task.external_submission !== undefined) {
+    const targets = task.external_submission.targets;
+    if (!Array.isArray(targets) || targets.length === 0 || targets.length > 64) {
+      throw new Error("Task external_submission targets must contain between 1 and 64 destinations");
+    }
+    const normalized = targets.map((target) => typeof target === "string" ? target.trim() : "");
+    if (normalized.some((target) => target.length === 0 || target.length > 256) || new Set(normalized).size !== normalized.length) {
+      throw new Error("Task external_submission targets must be unique non-empty logical destination names up to 256 characters");
+    }
   }
   for (const endpoint of task.scope.allowed_endpoints ?? []) {
     if (!endpoint.host.trim() || !Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65_535) {

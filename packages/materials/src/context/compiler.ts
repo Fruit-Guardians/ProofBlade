@@ -520,6 +520,9 @@ function boundedTaskLayer(task: TaskContract): string {
       } } : {}),
     } } : {}),
   };
+  const externalSubmission = task.external_submission
+    ? { targets: boundedList("external_submission.targets", task.external_submission.targets, 32, 32) }
+    : undefined;
   const scope = {
     allowed_hosts: boundedList("scope.allowed_hosts", task.scope.allowed_hosts, 32, 64),
     allowed_ports: task.scope.allowed_ports.slice(0, 64),
@@ -539,6 +542,7 @@ function boundedTaskLayer(task: TaskContract): string {
     inputs: boundedInputs,
     success_criteria: boundedList("success_criteria", task.success_criteria, 16, 64),
     verification,
+    ...(externalSubmission ? { external_submission: externalSubmission } : {}),
     scope,
     pause_policy: boundedList("pause_policy", task.pause_policy, 16, 64),
     constraints: task.constraints,
@@ -556,6 +560,7 @@ function boundedTaskLayer(task: TaskContract): string {
     input_refs: { count: task.inputs.length, items: boundedInputs.slice(0, 8) },
     success_criteria: boundedList("success_criteria", task.success_criteria, 8, 32),
     verification: { kind: task.verification.kind, required_reproductions: task.verification.required_reproductions },
+    ...(externalSubmission ? { external_submission: externalSubmission } : {}),
     scope: { external_network: task.scope.external_network, allowed_workspace: boundedText("scope.allowed_workspace", task.scope.allowed_workspace, 64) },
     constraints: task.constraints,
     bounds: { max_tokens: MAX_TASK_LAYER_TOKENS, truncated_fields: [...new Set([...truncatedFields, "task_contract"])] },

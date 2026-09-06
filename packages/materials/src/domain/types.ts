@@ -308,6 +308,14 @@ export interface TaskContract {
     /** Task-owned inputs for barrier-gated web reproduction. */
     web?: WebReproductionContract;
   };
+  /**
+   * Logical external destinations the task is permitted to submit to. This is
+   * intentionally data-only: the host must still supply the trusted adapter
+   * that performs a submission for each declared target.
+   */
+  external_submission?: {
+    targets: string[];
+  };
   scope: {
     allowed_hosts: string[];
     allowed_ports: number[];
@@ -706,6 +714,8 @@ export interface CompletionProposal {
   createdSeq: number;
   /** Stable request identity; random Completion IDs remain references only. */
   verificationKey?: string;
+  /** Logical external destination for submission completions. */
+  submissionTarget?: string;
 }
 
 export type VerificationRequestKind = "web" | "browser" | "pwn" | "claim";
