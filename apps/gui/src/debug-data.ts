@@ -316,7 +316,8 @@ export class DebugDataService {
     assertRunId(runId);
     try {
       const parsed = JSON.parse(await readFile(join(this.services.runsRoot, runId, "prompt-snapshot.json"), "utf8")) as Partial<import("./shared.js").PromptSnapshot>;
-      if (parsed.schemaVersion !== 1 || typeof parsed.systemPrompt !== "string" || typeof parsed.projectPrompt !== "string" || typeof parsed.systemPromptHash !== "string" || typeof parsed.generatedAt !== "string") return undefined;
+      if ((parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2) || typeof parsed.systemPrompt !== "string" || typeof parsed.projectPrompt !== "string" || typeof parsed.systemPromptHash !== "string" || typeof parsed.generatedAt !== "string") return undefined;
+      if (parsed.schemaVersion === 2 && (!Number.isInteger(parsed.projectPromptOriginalChars) || !Number.isInteger(parsed.projectPromptOmittedChars) || typeof parsed.projectPromptTruncated !== "boolean")) return undefined;
       return parsed as import("./shared.js").PromptSnapshot;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;

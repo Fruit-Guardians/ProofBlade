@@ -64,6 +64,8 @@ import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
 const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
+/** Hard Provider-facing budget for user-managed project instructions. */
+export const MAX_PROJECT_PROMPT_TOKENS = 2_048;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -556,11 +558,24 @@ export class PiCodingLane implements AgentLanePort {
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
     );
-    const projectPrompt = options.projectPrompt?.trim() ?? "";
+    const requestedProjectPrompt = options.projectPrompt?.trim() ?? "";
+    const boundedProjectPrompt = requestedProjectPrompt
+      ? boundModelText(requestedProjectPrompt, Math.max(64, requestedProjectPrompt.length), MAX_PROJECT_PROMPT_TOKENS)
+      : { text: "", truncated: false, originalChars: 0, omittedChars: 0 };
+    const projectPrompt = boundedProjectPrompt.text;
     const effectiveSystemPrompt = projectPrompt
       ? `${stableSystemPrompt}\n\n## Project instructions\n${projectPrompt}`
       : stableSystemPrompt;
-    await writeFile(join(options.runDir, "prompt-snapshot.json"), `${JSON.stringify({ schemaVersion: 1, generatedAt: new Date().toISOString(), systemPrompt: effectiveSystemPrompt, projectPrompt, systemPromptHash: sha256(effectiveSystemPrompt) }, null, 2)}\n`, "utf8");
+    await writeFile(join(options.runDir, "prompt-snapshot.json"), `${JSON.stringify({
+      schemaVersion: 2,
+      generatedAt: new Date().toISOString(),
+      systemPrompt: effectiveSystemPrompt,
+      projectPrompt,
+      projectPromptOriginalChars: boundedProjectPrompt.originalChars,
+      projectPromptOmittedChars: boundedProjectPrompt.omittedChars,
+      projectPromptTruncated: boundedProjectPrompt.truncated,
+      systemPromptHash: sha256(effectiveSystemPrompt),
+    }, null, 2)}\n`, "utf8");
     const turnContext = { guidance: "" };
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();

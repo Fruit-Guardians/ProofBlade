@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -15,7 +15,7 @@ import { estimateTokens, sha256 } from "../src/domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
-import { PiCodingLane } from "../src/runtime/coding-lane.js";
+import { MAX_PROJECT_PROMPT_TOKENS, PiCodingLane } from "../src/runtime/coding-lane.js";
 import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtime/lmstudio-provider.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
@@ -387,8 +387,23 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       claimVerifier,
       config,
       sessionRuntimeBrokers: [pwnBroker, httpBroker],
+      projectPrompt: `PROJECT_PROMPT_HEAD ${"中".repeat(2_000)} ${"x".repeat(8_000)} PROJECT_PROMPT_TAIL`,
     };
     lane = await PiCodingLane.create(laneOptions);
+    const promptSnapshot = JSON.parse(await readFile(join(services.runsRoot, runId, "prompt-snapshot.json"), "utf8")) as {
+      schemaVersion: number;
+      projectPrompt: string;
+      projectPromptOriginalChars: number;
+      projectPromptOmittedChars: number;
+      projectPromptTruncated: boolean;
+    };
+    assert.equal(promptSnapshot.schemaVersion, 2);
+    assert.ok(Buffer.byteLength(promptSnapshot.projectPrompt, "utf8") <= MAX_PROJECT_PROMPT_TOKENS);
+    assert.ok(promptSnapshot.projectPrompt.includes("PROJECT_PROMPT_HEAD"));
+    assert.ok(promptSnapshot.projectPrompt.includes("PROJECT_PROMPT_TAIL"));
+    assert.equal(promptSnapshot.projectPromptTruncated, true);
+    assert.ok(promptSnapshot.projectPromptOriginalChars > promptSnapshot.projectPrompt.length);
+    assert.ok(promptSnapshot.projectPromptOmittedChars > 0);
     const afterCreate = await services.control.snapshot(runId);
     assert.equal(afterCreate.toolPreparation?.profileId, "web");
     assert.equal(afterCreate.toolPreparation?.runtime, "host");
@@ -417,6 +432,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       return JSON.stringify(message.content ?? "");
     };
     const instructionText = (firstRequest.messages ?? []).filter((message) => message.role === "system" || message.role === "developer").map(messageText).join("\n");
+    assert.ok(instructionText.includes(promptSnapshot.projectPrompt), "Provider must receive the exact bounded project prompt recorded in the snapshot");
     assert.doesNotMatch(instructionText, /ProofBlade prepared CTF path|Prepared challenge tool profile|CTF solving workflow \(prepared direction\)/);
     assert.ok((firstRequest.messages ?? []).some((message) => message.role === "user" && messageText(message) === firstPrompt));
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
