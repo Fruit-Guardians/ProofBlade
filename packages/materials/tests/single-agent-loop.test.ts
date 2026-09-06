@@ -88,7 +88,7 @@ test("local Run prompt carries the remaining deadline into the single coding lan
       maxTurns: 1,
     });
     assert.equal(result.status, "EXHAUSTED");
-    assert.deepEqual(phaseAtLaneCreation, { domainPhase: "RECON", phase: "reconnaissance" });
+    assert.deepEqual(phaseAtLaneCreation, { domainPhase: "INTAKE", phase: "intake" });
     assert.match(promptText, /Remaining deadline: \d+ seconds/);
     assert.match(promptText, /Task inputs \(read-only, relative to the current workspace\):/);
     assert.match(promptText, /Stay within the task workspace/);
@@ -185,7 +185,7 @@ test("auto mode solves all three web and three reverse fixtures through the veri
         .map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string } })
         .filter((event) => event.type === "domain_phase_changed")
         .map((event) => event.payload?.domainPhase);
-      assert.deepEqual(domainPhases, ["RECON", "REPRODUCE", "REPORT", "SUBMIT"], profile.id);
+      assert.deepEqual(domainPhases, ["REPRODUCE", "REPORT", "SUBMIT"], profile.id);
       assert.doesNotMatch(events, new RegExp(escapeRegExp(profile.expected)), `${profile.id} leaked its candidate into the event log`);
     }
   } finally {

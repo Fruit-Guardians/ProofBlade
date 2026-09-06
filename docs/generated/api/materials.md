@@ -1312,7 +1312,7 @@
 ### SingleAgentCtfLoop
 - Kind: `constant`
 - Signature: `typeof SingleAgentLoop`
-- Source: [src/orchestration/single-agent-loop.ts:531](../../../packages/materials/src/orchestration/single-agent-loop.ts:531)
+- Source: [src/orchestration/single-agent-loop.ts:528](../../../packages/materials/src/orchestration/single-agent-loop.ts:528)
 - Export: `@proofblade/materials`
 - Summary: Historical export retained for replay and downstream compatibility. New
 - Summary source: `tsdoc`

@@ -134,11 +134,9 @@ export class SingleAgentLoop {
     const intentScheduler = new IntentScheduler(this.services.control, new LeaseManager(this.services.control), this.config.intentScheduler);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.verifierJournal, this.services.runsRoot, this.services.verifier);
     const coordinator = new RunCoordinator(this.services.control, this.services.verifier, { verifier });
-    // Keep the initial generic projection and the CTF projection in one
-    // transaction.  A direct `start_phase` here used to leave a fresh local
-    // Run at `domainPhase=INTAKE, phase=reconnaissance` until the first model
-    // turn, which made GUI/Fixture replay diverge from Competition replay.
-    if (snapshot.phase === "intake") await coordinator.setDomainPhase(options.runId, "RECON");
+    // A fresh Run remains at INTAKE until the task or verifier has a concrete
+    // reason to publish a domain phase. The loop must not infer a CTF-style
+    // reconnaissance route from the turn number.
     const claimVerifier = new CodingClaimVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
@@ -217,7 +215,6 @@ export class SingleAgentLoop {
         const activeIntent = await this.claimIntent(options.runId, intentScheduler);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
-        await coordinator.setDomainPhase(options.runId, coordinator.domainPhaseForTurn(turns + 1));
         const turnContext = await this.services.control.snapshot(options.runId);
         await planner.prepare(options.runId);
         activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
