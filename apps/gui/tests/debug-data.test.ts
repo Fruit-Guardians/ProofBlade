@@ -5,7 +5,7 @@ import { appendFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import { JsonlControlStore, projectionHash, RunEventIngress, SingleAgentCtfLoop } from "@proofblade/materials";
+import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent, RunDetail } from "../src/shared.js";
@@ -837,7 +837,7 @@ test("GUI CTF input stages attachments and completes through the shared reproduc
   }
 });
 
-test("GUI CTF chat uses the same Coding Lane with the latest user instruction", { timeout: 30_000 }, async () => {
+test("GUI security task chat uses the same Coding Lane with the latest user instruction", { timeout: 30_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-chat-"));
   const source = join(root, "source");
   await mkdir(source, { recursive: true });

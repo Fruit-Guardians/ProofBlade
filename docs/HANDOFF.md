@@ -128,7 +128,7 @@ atoms → molecules → materials → apps
 | 能不能解真题 | 能，已解出多道真题 |
 | 比赛是否使用 | **是** |
 
-`SingleAgentCtfLoop` 仍是 Fixture 自动执行的编排器，但它现在创建统一的 `PiCodingLane`；旧的生产 Solver Lane 已删除。评测和单元测试仍可注入确定性 `AgentLaneFactory` 作为测试替身。
+`SingleAgentLoop` 是 Fixture 自动执行的编排器，它创建统一的 `PiCodingLane`；旧的生产 Solver Lane 已删除。评测和单元测试仍可注入确定性 `AgentLaneFactory` 作为测试替身。
 
 所有入口再经过同一个 `RunCoordinator`：它推进
 `INTAKE → RECON → TARGET_MODEL → HYPOTHESIS → EXPERIMENT → REPRODUCE → REPORT → SUBMIT`，
@@ -146,7 +146,7 @@ FleetScheduler          并发 worker 池 + 控制面
        └─ runCompetitionLoop       唯一 PiCodingLane，有界轮数/deadline/abort/assist
 ```
 
-GUI 和本地 Fixture 通过 `SingleAgentCtfLoop` 进入同一个 Coordinator；区别只在于 Task Contract 的验证类型和是否注入平台 API，不再存在独立的比赛 Solver Lane。
+GUI 和本地 Fixture 通过 `SingleAgentLoop` 进入同一个 Coordinator；区别只在于 Task Contract 的验证类型和是否注入平台 API，不再存在独立的比赛 Solver Lane。
 
 Pwn/HTTP 的跨进程会话不是由 GUI 或 lane 自行猜测。部署时由 `scripts/session-runtime-service.ts` 启动独立 broker：`DurableSessionRuntimeService` 负责 reservation、幂等和账本，部署提供的 `SessionRuntimeHost` 负责真实 socket/process。没有 host、health 或稳定 opaque handle 时，服务必须返回 `DEGRADED/UNKNOWN`，不能伪造可恢复会话。
 

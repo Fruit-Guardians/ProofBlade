@@ -8,7 +8,7 @@
 
 ## 修复
 
-- `SingleAgentCtfLoop` 将 caller-owned `AbortSignal` 与正在等待的 `lane.prompt()` 竞争。
+- `SingleAgentLoop` 将 caller-owned `AbortSignal` 与正在等待的 `lane.prompt()` 竞争。
 - deadline 触发时仍先调用 `lane.abort()` 进行协作式资源释放；即使 Provider 或工具忽略 abort 且 prompt 永不 settle，外层 Run 也会终止并记录 `budget_exhausted`。
 - 晚到的 Provider/tool rejection 由 wrapper 吸收，避免在 Run 已终态后形成未处理 rejection。
 - `finally` 阶段对 `lane.close()` 和 tool runtime cleanup 使用独立 2 秒上限；超时被记录为 cleanup timeout，不会重新阻塞 Run，也不会把迟到的 close rejection 变成未处理 rejection。

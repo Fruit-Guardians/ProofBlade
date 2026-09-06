@@ -24,7 +24,7 @@
 
 ## 入口与边界
 
-- `coding-lane.ts` 是唯一生产 Agent lane：普通 Chat、CTF Chat、Fixture 和 Competition 都由它驱动；差异只来自不可变 `TaskContract` 能力和外层是否需要多轮 Coordinator，不再分叉 Tool、上下文、Evidence 或 Completion 系统。确定性 lane 仅由评测和单元测试注入。
+- `coding-lane.ts` 是唯一生产 Agent lane：交互任务、Fixture 和 Competition 都由它驱动；差异只来自不可变 `TaskContract` 能力和外层是否需要多轮 Coordinator，不再分叉 Tool、上下文、Evidence 或 Completion 系统。确定性 lane 仅由评测和单元测试注入。
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_result` 是通用结果复现门，`verify_claim` 仅作为旧 Session/Fixture 的兼容别名。

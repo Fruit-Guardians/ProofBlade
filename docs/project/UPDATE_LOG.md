@@ -341,7 +341,7 @@
 ### 验证
 
 - [x] npm run build --workspace=@proofblade/materials passed
-- [x] Coding resources + SingleAgentCtfLoop tests: 36/36 passed
+- [x] Coding resources + SingleAgentLoop tests: 36/36 passed
 - [x] component and change-contract gates passed
 - [x] npm run api:index:check passed
 - [x] npm run verify passed: 582/582 repository tests, provider-free evaluation 30/30, npm audit 0 vulnerabilities
@@ -355,7 +355,7 @@
 ### 变更
 
 - 新增 CTF 解题输入对话框与 /api/ctf-solve，校验工作区、附件边界、哈希和不可变验证命令
-- GUI CTF、Fixture 和 Competition 继续共用 SingleAgentCtfLoop、RunCoordinator 与 verifier-first 完成路径
+- GUI、Fixture 和 Competition 继续共用 SingleAgentLoop、RunCoordinator 与 verifier-first 完成路径
 - 工作区附件使用 LOCAL_WORKSPACE 目标和持久化 staging，避免依赖 fixture scorer；接受 claim 后补齐 reproduction/report/submission
 - 修复 assist CTF 暂停后聊天续解等待旧 Solve promise 清理的竞态，并增加 GUI/Materials 端到端回归测试
 

@@ -11,7 +11,7 @@ import { ContextCompiler } from "../src/context/compiler.js";
 import { pruneAgentMessages } from "../src/context/agent-pruner.js";
 import { CheckpointService } from "../src/context/checkpoint.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
-import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { AUTOMATIC_CONTEXT_RECOVERY_MARKER, promptWithContextLengthRecovery } from "../src/runtime/context-length-recovery.js";
 import { isRealUserTask, latestExternalUserMessage } from "../src/context/user-task-anchor.js";
 
@@ -173,7 +173,7 @@ test("mechanical checkpoint is durable and a second context overflow fails expli
       async close() {},
     });
     const overflowRun = "OVERFLOW-001";
-    const loop = new SingleAgentCtfLoop(root, config, services, overflowLane);
+    const loop = new SingleAgentLoop(root, config, services, overflowLane);
     const result = await loop.run({ runId: overflowRun, task: fixtureTask(overflowRun, "web-source-1", root, config), mode: "auto", maxTurns: 3 });
     const overflowSnapshot = await services.control.snapshot(overflowRun);
     assert.equal(result.status, "FAILED");
@@ -252,7 +252,7 @@ test("[contract:solver-length-context-recovery] solver treats a length stop as r
       async isIdle() { return true; },
       async close() {},
     });
-    const result = await new SingleAgentCtfLoop(root, config, services, lane).run({
+    const result = await new SingleAgentLoop(root, config, services, lane).run({
       runId,
       task: fixtureTask(runId, "web-source-1", root, config),
       mode: "auto",

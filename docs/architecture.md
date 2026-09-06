@@ -68,9 +68,9 @@ through the Effect Journal. Only the verifier lane can confirm a fact, verify a
 completion or commit `SUCCEEDED`; recovery also repairs a phase/WorkItem gap
 before the terminal event is appended.
 
-Before the first CTF model turn, the selected `ChallengeToolProfile` contributes a durable `firstActionPlan` to `RunToolPreparation`. It names the small set of tools allowed to establish the initial observation and caps those calls; `verify_claim`, platform submission and reproduction tools remain an explicit completion escape. The Coding lane enforces this at the Pi `tool_call` boundary, and a recovered lane treats the current-generation Observation ledger as the source of truth for whether the first action already completed. This is a coordinator/tool contract, not a prompt-only instruction, so a model cannot spend its initial turn rediscovering tools or launching an unrelated experiment.
+Before a model turn, an optional `ChallengeToolProfile` contributes durable tool-preparation metadata to `RunToolPreparation`. It describes available capabilities and fallback guidance without selecting a loop or imposing a domain-specific first action. The Coding lane keeps safety, approval, budget and verifier boundaries unconditional; a recovered lane treats the current-generation Observation ledger as the source of truth.
 
-For Competition and Fixture Runs, challenge mode is derived from the durable `TaskContract` (`ctf_solve` or a non-unknown target kind), not from keywords in the generated prompt. This keeps the hard CTF experiment budget and evidence-first replan active even when an executor prompt only contains a generic WorkItem objective.
+For Competition and Fixture Runs, execution is derived from the durable `TaskContract` and optional verifier/capability bindings. No task mode or prompt keyword selects a separate challenge loop; all runs use the same generic orchestration and evidence/recovery boundaries.
 
 ## Capabilities and background jobs
 
@@ -111,11 +111,11 @@ Provider-specific reasoning, cache retention and transport behavior is configura
 
 ## Debugging application
 
-`@proofblade/gui` is an application adapter above materials. Its Node server reads snapshots, events, telemetry, Artifacts and Pi JSONL sessions through the existing public repositories. It does not add a third durable state model. Ordinary conversations and Fixture/CTF conversations both use `PiCodingLane`; the latter changes only the visible workspace and keeps claim acceptance deferred until the outer independent verifier. Both stream normalized AgentHarness events as SSE and persist completed turns through Pi Session and Control Store. A Tool debug projection correlates an assistant `toolCall`, the following Pi `toolResult`, Control Store `tool_call_recorded`/`tool_result_recorded` events with the same `toolCallId`, and referenced Artifact/Evidence/Effect records when those records exist.
+`@proofblade/gui` is an application adapter above materials. Its Node server reads snapshots, events, telemetry, Artifacts and Pi JSONL sessions through the existing public repositories. It does not add a third durable state model. Interactive and Fixture conversations both use `PiCodingLane`; a Fixture only changes the visible workspace and verifier binding. Both stream normalized AgentHarness events as SSE and persist completed turns through Pi Session and Control Store. A Tool debug projection correlates an assistant `toolCall`, the following Pi `toolResult`, Control Store `tool_call_recorded`/`tool_result_recorded` events with the same `toolCallId`, and referenced Artifact/Evidence/Effect records when those records exist.
 
 The browser owns only selection, presentation and temporary transformations. Script Lab creates a dedicated Web Worker for one invocation, passes the selected Tool projection as structured-clone data, enforces a 1500 ms termination timer and destroys the Worker after a result or error. User script source is never evaluated by the Node server and is not added to the Run, Pi Session, event log or project configuration.
 
-Run list polling first checks `events.jsonl` modification time and reuses unchanged summaries. The selected Run is reloaded every two seconds so active turns and Tool calls appear without a page reload. Fixture-only mutations call the same `SingleAgentCtfLoop`, `RunRecoveryService` and `CheckpointService` used by the CLI.
+Run list polling first checks `events.jsonl` modification time and reuses unchanged summaries. The selected Run is reloaded every two seconds so active turns and Tool calls appear without a page reload. Fixture-only mutations call the same `SingleAgentLoop`, `RunRecoveryService` and `CheckpointService` used by the CLI.
 
 ## Context and recovery
 
