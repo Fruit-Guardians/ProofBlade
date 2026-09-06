@@ -700,13 +700,8 @@ export class PiCodingLane implements AgentLanePort {
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
-    // Durable TaskContract classification is authoritative for non-chat Runs.
-    // A generated executor prompt may not repeat the words "CTF" or "flag";
-    // falling back to text-only detection would silently disable the hard
-    // experiment budget for Competition/Fixture evaluation.
-    // Prompt wording is not a runtime mode switch. This prevents a normal
-    // coding conversation mentioning "challenge" or "flag" from receiving
-    // CTF workflow constraints or hard experiment semantics.
+    // Prompt wording never changes the runtime policy. Safety boundaries and
+    // any explicitly selected ablation policy remain the only control gates.
     this.repeatBreaker.reset();
     this.progressBreaker.reset();
     this.failureStormBreaker.reset();

@@ -902,11 +902,11 @@ test("[contract:experiment-budget-advisory] inner probe budget nudges without st
   }
 });
 
-test("CTF turns stop at the experiment budget and return a replan signal", async () => {
-  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-ctf-"));
+test("experiment budget is advisory and does not depend on task wording", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
-    const faux = fauxProvider({ provider: "faux-experiment-budget-ctf" });
+    const faux = fauxProvider({ provider: "faux-experiment-budget" });
     const models = createModels();
     models.setProvider(faux.provider);
     faux.setResponses([
@@ -920,9 +920,9 @@ test("CTF turns stop at the experiment budget and return a replan signal", async
       async execute() { return { content: [{ type: "text" as const, text: "probe completed" }] }; },
     };
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
-    const session = await repo.create({ id: "experiment-budget-ctf", cwd: root });
+    const session = await repo.create({ id: "experiment-budget", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
-    const termination: CodingTurnTermination = { ctfMode: true };
+    const termination: CodingTurnTermination = {};
     attachCodingTurnGuards(
       harness,
       new RepeatedToolFailureBreaker(),
@@ -934,14 +934,9 @@ test("CTF turns stop at the experiment budget and return a replan signal", async
     );
 
     const response = await harness.prompt("题目描述：求解flag");
-    assert.equal(faux.state.callCount, 2);
-    // Pi preserves the assistant tool-use stop reason when a tool result asks
-    // to terminate; finalizeCodingTurn converts the requested termination into
-    // the visible replan response.
-    assert.equal(response.stopReason, "toolUse");
-    assert.equal(termination.requested, true);
-    assert.equal(termination.reason, "experiment_budget");
-    assert.match(termination.message ?? "", /turn was stopped/i);
+    assert.equal(faux.state.callCount, 4);
+    assert.equal(response.stopReason, "stop");
+    assert.equal(termination.requested, undefined);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -1017,7 +1012,7 @@ test("[contract:first-action-budget] advises on broad tools while preserving the
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
     const session = await repo.create({ id: "first-action", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, bash], activeToolNames: ["evidence", "bash"], systemPrompt: "test" });
-    const termination: CodingTurnTermination = { ctfMode: true };
+    const termination: CodingTurnTermination = {};
     const firstActionBudget = { allowedToolNames: ["bash"], maxCalls: 1, count: 0, completed: false };
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, undefined, firstActionBudget);
 
@@ -1167,7 +1162,7 @@ test("[contract:stop-suggestion] verified claims emit an advisory result without
     const session = await repo.create({ id: "stop-suggestion", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [verify], activeToolNames: ["verify_claim"], systemPrompt: "test" });
     const events: string[] = [];
-    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, { ctfMode: true }, undefined, undefined, undefined, undefined, undefined, {
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, {}, undefined, undefined, undefined, undefined, undefined, {
       controller: new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, stopSuggestion: "verifier_driven" }),
       experimentId: "AB-STOP", variantId: "candidate", caseId: "case-1", attempt: 1, runId: "stop-suggestion",
       onDecision: (event) => { events.push(`${event.policyName}:${event.decision}`); },

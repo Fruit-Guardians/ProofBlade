@@ -4,7 +4,7 @@ import type { ControlStore } from "../control/control-store.js";
 import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { AblationDecisionEvent, AblationPolicyController } from "../evaluation/ablation-policy.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
@@ -50,8 +50,6 @@ export interface CodingTurnTermination {
   confirmed?: boolean;
   reason?: CodingTurnTerminationReason;
   noProgressWindow?: NoProgressWindow;
-  /** Set for a challenge prompt so experiment limits stop the turn, not just nudge it. */
-  ctfMode?: boolean;
   /** Coding chat uses a nudge for repeated observations; Solver keeps hard stops. */
   softNoProgress?: boolean;
   /** Keep the lane alive and turn guard pressure into an in-band recovery hint. */
@@ -161,17 +159,6 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
             isError: event.isError,
           };
         }
-        if (termination.ctfMode) {
-          termination.message = experimentBudgetMessage(experiment);
-          termination.reason = "experiment_budget";
-          termination.requested = true;
-          return {
-            content: withCognitiveAdvice([{ type: "text" as const, text: termination.message }]),
-            details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
-            isError: false,
-            terminate: true,
-          };
-        }
         // Advisory, non-terminating: keep the model in control and append a
         // change-tactics nudge to the real tool output instead of stopping the
         // turn and forcing a replan (which interrupts a legitimate multi-step
@@ -237,17 +224,6 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
     const experiment = experimentBudgetBreaker?.observe(observation);
     if (experiment?.terminate) {
-      if (termination.ctfMode) {
-        termination.message = experimentBudgetMessage(experiment);
-        termination.reason = "experiment_budget";
-        termination.requested = true;
-        return {
-          content: withCognitiveAdvice([{ type: "text" as const, text: termination.message }]),
-          details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
-          isError: event.isError,
-          terminate: true,
-        };
-      }
       // Advisory, non-terminating (same as the success path): append the nudge
       // to the real error output and reset the window; do not stop the turn.
       experimentBudgetBreaker?.reset();
