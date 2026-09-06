@@ -240,7 +240,9 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
-    if (method === "GET" && parts[3] === "artifacts" && parts[4]) return sendJson(response, 200, await data.artifact(runId, parts[4]));
+    if (method === "GET" && parts[3] === "artifacts" && parts[4]) {
+      return sendJson(response, 200, await data.artifact(runId, parts[4], boundedQueryInteger(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER), boundedQueryInteger(url, "limit", 64 * 1024, 1, 64 * 1024)));
+    }
     if (method === "POST" && parts[3] === "pause") return sendJson(response, 202, await data.pause(runId));
     if (method === "POST" && parts[3] === "chat") {
       const body = await readBody(request);
@@ -410,6 +412,16 @@ function string(value: unknown, label: string): string {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function boundedQueryInteger(url: URL, name: string, fallback: number, minimum: number, maximum: number): number {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
 }
 
 function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
