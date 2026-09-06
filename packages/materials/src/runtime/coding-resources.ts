@@ -40,6 +40,18 @@ export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_re
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 
+/** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
+export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
+export const MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER = 16;
+export const MAX_MCP_FIRST_CLASS_DESCRIPTION_TOKENS = 256;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_BYTES = 3 * 1024;
+/** Total untrusted MCP metadata admitted into the Provider tool surface. */
+export const MAX_MCP_FIRST_CLASS_METADATA_BYTES = 8 * 1024;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_DEPTH = 8;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_PROPERTIES = 64;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_NODES = 192;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_ARRAY_ITEMS = 64;
+
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
   "analyze_batch", "analyze_function", "imports", "xrefs_to", "get_string", "search_text",
@@ -184,6 +196,19 @@ export function mcpToolName(server: string, tool: string): string {
   return `mcp__${server}__${tool}`;
 }
 
+export interface McpFirstClassToolExposure {
+  exposed: number;
+  omitted: number;
+  truncated: boolean;
+  omittedByReason: Readonly<Record<"tool_limit" | "invalid_name" | "schema", number>>;
+  descriptionsTruncated: number;
+}
+
+export interface McpFirstClassToolSelection {
+  tools: AgentHarnessTool<CodingResourceContext>[];
+  exposure: McpFirstClassToolExposure;
+}
+
 /**
  * Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
  * provider tools (mcp__<server>__<tool>) with their real input schemas, the way
@@ -198,7 +223,24 @@ export async function createMcpFirstClassTools(
   enabledServers: Iterable<string>,
   signal?: AbortSignal,
 ): Promise<AgentHarnessTool<CodingResourceContext>[]> {
+  return (await createMcpFirstClassToolSelection(mcp, enabledServers, signal)).tools;
+}
+
+/**
+ * Promote only bounded MCP metadata into provider-visible tools. The generic
+ * `mcp_call` proxy remains available for every omitted tool, so an oversized
+ * or malformed schema cannot consume the model context or remove capability.
+ */
+export async function createMcpFirstClassToolSelection(
+  mcp: McpProjectRegistry,
+  enabledServers: Iterable<string>,
+  signal?: AbortSignal,
+): Promise<McpFirstClassToolSelection> {
   const tools: AgentHarnessTool<CodingResourceContext>[] = [];
+  const omittedByReason = { tool_limit: 0, invalid_name: 0, schema: 0 };
+  let descriptionsTruncated = 0;
+  let metadataBytes = 0;
+  const names = new Set<string>();
   const summaries = mcp.summaries();
   for (const server of enabledServers) {
     const summary = summaries.find((item) => item.name === server && !item.disabled);
@@ -210,11 +252,42 @@ export async function createMcpFirstClassTools(
       continue; // server unreachable at startup; mcp_call stays as fallback
     }
     for (const tool of described.tools) {
+      if (tools.length >= MAX_MCP_FIRST_CLASS_TOOLS || namesForServer(names, server) >= MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER) {
+        omittedByReason.tool_limit += 1;
+        continue;
+      }
+      if (typeof tool.name !== "string") {
+        omittedByReason.invalid_name += 1;
+        continue;
+      }
+      const name = mcpToolName(server, tool.name);
+      if (!isSafeMcpFirstClassToolName(name) || names.has(name)) {
+        omittedByReason.invalid_name += 1;
+        continue;
+      }
+      const schema = boundedMcpInputSchema(tool.inputSchema);
+      if (!schema) {
+        omittedByReason.schema += 1;
+        continue;
+      }
+      const descriptionText = typeof tool.description === "string" ? tool.description : "";
+      const description = boundModelText(`[MCP ${server}] ${descriptionText}`, 1_024, MAX_MCP_FIRST_CLASS_DESCRIPTION_TOKENS);
+      const nextMetadataBytes = metadataBytes
+        + Buffer.byteLength(name, "utf8")
+        + Buffer.byteLength(description.text, "utf8")
+        + Buffer.byteLength(JSON.stringify(schema), "utf8");
+      if (nextMetadataBytes > MAX_MCP_FIRST_CLASS_METADATA_BYTES) {
+        omittedByReason.tool_limit += 1;
+        continue;
+      }
+      metadataBytes = nextMetadataBytes;
+      if (description.truncated) descriptionsTruncated += 1;
+      names.add(name);
       tools.push({
-        name: mcpToolName(server, tool.name),
-        label: mcpToolName(server, tool.name),
-        description: `[MCP ${server}] ${tool.description}`,
-        parameters: (tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : { type: "object" }) as never,
+        name,
+        label: name,
+        description: description.text,
+        parameters: schema as never,
         executionMode: "sequential",
         async execute(_toolCallId, params, sig, _onUpdate, context) {
           assertMcpEnabled(context, server);
@@ -243,18 +316,86 @@ export async function createMcpFirstClassTools(
       });
     }
   }
-  return tools;
+  const omitted = Object.values(omittedByReason).reduce((total, count) => total + count, 0);
+  return {
+    tools,
+    exposure: { exposed: tools.length, omitted, truncated: omitted > 0 || descriptionsTruncated > 0, omittedByReason, descriptionsTruncated },
+  };
+}
+
+function namesForServer(names: ReadonlySet<string>, server: string): number {
+  const prefix = `mcp__${server}__`;
+  return [...names].filter((name) => name.startsWith(prefix)).length;
+}
+
+function isSafeMcpFirstClassToolName(name: string): boolean {
+  return name.length <= 128 && /^[A-Za-z0-9_-]+$/.test(name);
+}
+
+function boundedMcpInputSchema(value: unknown): Record<string, unknown> | undefined {
+  const schema = value && typeof value === "object" && !Array.isArray(value) ? value : { type: "object" };
+  const state = { nodes: 0, properties: 0, scalarBytes: 0, seen: new WeakSet<object>() };
+  if (!isBoundedMcpSchemaValue(schema, 0, state)) return undefined;
+  try {
+    const serialized = JSON.stringify(schema);
+    if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > MAX_MCP_FIRST_CLASS_SCHEMA_BYTES) return undefined;
+    const cloned = JSON.parse(serialized) as unknown;
+    return cloned && typeof cloned === "object" && !Array.isArray(cloned) ? cloned as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isBoundedMcpSchemaValue(
+  value: unknown,
+  depth: number,
+  state: { nodes: number; properties: number; scalarBytes: number; seen: WeakSet<object> },
+): boolean {
+  if (depth > MAX_MCP_FIRST_CLASS_SCHEMA_DEPTH) return false;
+  if (value === null || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    state.scalarBytes += Buffer.byteLength(value, "utf8");
+    return state.scalarBytes <= MAX_MCP_FIRST_CLASS_SCHEMA_BYTES;
+  }
+  if (typeof value !== "object" || state.seen.has(value)) return false;
+  state.seen.add(value);
+  state.nodes += 1;
+  if (state.nodes > MAX_MCP_FIRST_CLASS_SCHEMA_NODES) return false;
+  if (Array.isArray(value)) {
+    if (value.length > MAX_MCP_FIRST_CLASS_SCHEMA_ARRAY_ITEMS) return false;
+    return value.every((item) => isBoundedMcpSchemaValue(item, depth + 1, state));
+  }
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  let entries: Array<[string, unknown]>;
+  try {
+    entries = Object.entries(value);
+  } catch {
+    return false;
+  }
+  state.properties += entries.length;
+  if (state.properties > MAX_MCP_FIRST_CLASS_SCHEMA_PROPERTIES) return false;
+  return entries.every(([key, item]) => {
+    state.scalarBytes += Buffer.byteLength(key, "utf8");
+    return state.scalarBytes <= MAX_MCP_FIRST_CLASS_SCHEMA_BYTES && isBoundedMcpSchemaValue(item, depth + 1, state);
+  });
 }
 
 /**
- * Keep decompiler schemas out of unrelated challenge contexts. The generic
- * `mcp_call` proxy remains active as a deferred escape hatch; only the small
- * category-specific set below is sent as native provider tools.
+ * Select the enabled security MCP tools sent as native provider tools. A
+ * profile or target hint may narrow the preferred decompiler family for a
+ * clearly identified artifact, while general/unknown tasks retain all known
+ * enabled security MCP tools. `mcp_call` remains an escape hatch for tools
+ * that cannot be enumerated at lane startup.
  */
 export function selectFirstClassMcpTools<T extends { name: string }>(tools: T[], targetKind: TargetKind, target = "", profileId?: string): T[] {
-  if (targetKind !== "reverse") return [];
   const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
-  const allowed = android ? JADX_FIRST_CLASS_TOOLS : IDALIB_FIRST_CLASS_TOOLS;
+  const native = profileId === "reverse" || targetKind === "reverse";
+  const allowed = android
+    ? JADX_FIRST_CLASS_TOOLS
+    : native
+      ? IDALIB_FIRST_CLASS_TOOLS
+      : new Set([...IDALIB_FIRST_CLASS_TOOLS, ...JADX_FIRST_CLASS_TOOLS]);
   return tools.filter((tool) => allowed.has(tool.name.slice(tool.name.lastIndexOf("__") + 2)));
 }
 

@@ -30,7 +30,7 @@ import { CodingEvidenceGraph, formatReasoningForestContext } from "../knowledge/
 import { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
 import { createExecutionEnvRtkProcessRunner, createOutputRewritePort } from "../tools/output-rewrite.js";
 import { TaskResultVerifier } from "../verification/claim-verification.js";
-import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassTools, selectFirstClassMcpTools, stopAllShellJobs, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
+import { codingActiveToolNames, createCodingToolEffectPolicyResolver, createCodingTools, createMcpFirstClassToolSelection, selectFirstClassMcpTools, stopAllShellJobs, type CodingResourceContext, type ExternalSubmissionRequest, type ExternalSubmissionResult } from "./coding-resources.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
 import type { ContextBuildOutput, PwnReproductionContract, RunSnapshot, RunToolPreparation, RuntimeResourceSnapshot, TaskContract } from "../domain/types.js";
@@ -54,7 +54,7 @@ import { adoptVerifierBrowserSession, openVerifierBrowserSession, type BrowserVe
 import type { BrowserRuntimeHandoff } from "../web/browser-resource-adapter.js";
 import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
+import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, withFirstClassMcpToolExposure, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
@@ -269,8 +269,25 @@ export class PiCodingLane implements AgentLanePort {
     // classification may steer the dynamic suffix, but only the immutable task
     // contract may alter the top-level tool surface.
     const effectiveTargetKind = snapshot.task.target_kind;
-    const mcpFirstClassTools = await createMcpFirstClassTools(mcp, firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers));
-    const activeMcpTools = selectFirstClassMcpTools(mcpFirstClassTools, effectiveTargetKind, snapshot.task.target);
+    const effectiveProfileId = taskProfile?.id;
+    const mcpFirstClassSelection = await createMcpFirstClassToolSelection(
+      mcp,
+      firstClassMcpServers(effectiveTargetKind, snapshot.task.target, enabledMcpServers, effectiveProfileId),
+    );
+    const activeMcpTools = selectFirstClassMcpTools(
+      mcpFirstClassSelection.tools,
+      effectiveTargetKind,
+      snapshot.task.target,
+      effectiveProfileId,
+    );
+    if (preparation && (activeMcpTools.length > 0 || mcpFirstClassSelection.exposure.omitted > 0)) {
+      const exposure = { exposed: activeMcpTools.length, omitted: mcpFirstClassSelection.exposure.omitted, truncated: mcpFirstClassSelection.exposure.truncated };
+      if (canonicalJson(preparation.firstClassMcpTools ?? null) !== canonicalJson(exposure)) {
+        preparation = withFirstClassMcpToolExposure(preparation, exposure);
+        await new RunCoordinator(options.controlStore).recordToolPreparation(options.runId, preparation);
+        assertToolPreparationPublished(await options.controlStore.snapshot(options.runId), preparation);
+      }
+    }
     const artifactStore = options.artifactStore;
     const checkpointService = new CheckpointService(options.controlStore, artifactStore);
     const compactionCoordinator = new DurableCompactionCoordinator(checkpointService);
@@ -472,7 +489,7 @@ export class PiCodingLane implements AgentLanePort {
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
-    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...activeMcpTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -1168,7 +1185,15 @@ function brokerSessionRef(runId: string, generation: number, workspaceHostPath: 
 }
 
 function firstClassMcpServers(targetKind: TaskContract["target_kind"], target: string, enabledServers: Set<string>, profileId?: string): string[] {
-  if (targetKind !== "reverse") return [];
-  const preferred = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target) ? ["jadx"] : ["idalib-mcp"];
+  // Profile and target hints only establish a useful ordering. Explicitly
+  // enabled security MCP servers remain available to general/unknown tasks;
+  // target_kind is a label, not a capability firewall.
+  const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
+  const native = profileId === "reverse" || targetKind === "reverse";
+  const preferred = android
+    ? ["jadx", "idalib-mcp"]
+    : native
+      ? ["idalib-mcp", "jadx"]
+      : ["idalib-mcp", "jadx"];
   return preferred.filter((server) => enabledServers.has(server));
 }
