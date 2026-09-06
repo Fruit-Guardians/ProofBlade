@@ -103,7 +103,7 @@ test("phase transitions do not implicitly resume a paused run", async () => {
   }
 });
 
-test("CTF control events redact candidate-shaped annotation text at the replay boundary", async () => {
+test("control events redact candidate-shaped annotation text at the replay boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-control-redaction-"));
   try {
     const control = new ControlStore(new JsonlControlStore(join(root, "runs")));

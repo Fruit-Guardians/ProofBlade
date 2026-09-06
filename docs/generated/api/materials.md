@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 168
-- Symbols: 1799
+- Symbols: 1796
 
 ## Public Symbols
 
@@ -746,7 +746,7 @@
 ### PiCodingLane
 - Kind: `class`
 - Signature: `PiCodingLane`
-- Source: [src/runtime/coding-lane.ts:80](../../../packages/materials/src/runtime/coding-lane.ts:80)
+- Source: [src/runtime/coding-lane.ts:79](../../../packages/materials/src/runtime/coding-lane.ts:79)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: pi coding lane class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1810,7 +1810,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2104](../../../packages/materials/src/control/control-store.ts:2104)
+- Source: [src/control/control-store.ts:2107](../../../packages/materials/src/control/control-store.ts:2107)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2858,19 +2858,10 @@
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/challenge-tool-profile.test.ts`
 
-### codingCtfCategoryGuidance
-- Kind: `function`
-- Signature: `(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable?: boolean | undefined, webToolsAvailable?: boolean): string`
-- Source: [src/runtime/coding-lane.ts:1186](../../../packages/materials/src/runtime/coding-lane.ts:1186)
-- Export: `@proofblade/materials`
-- Summary: Category-specialized guidance for the CTF orchestrator.
-- Summary source: `tsdoc`
-- Tests: `packages/materials/tests/coding-resources.test.ts`
-
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1253](../../../packages/materials/src/runtime/coding-lane.ts:1253)
+- Source: [src/runtime/coding-lane.ts:1124](../../../packages/materials/src/runtime/coding-lane.ts:1124)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2879,7 +2870,7 @@
 ### createDeclaredExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { targets: readonly string[]; submit: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:959](../../../packages/materials/src/runtime/coding-lane.ts:959)
+- Source: [src/runtime/coding-lane.ts:960](../../../packages/materials/src/runtime/coding-lane.ts:960)
 - Export: `@proofblade/materials`
 - Summary: Bind a host-owned submission adapter to the immutable logical destinations
 - Summary source: `tsdoc`
@@ -2888,7 +2879,7 @@
 ### createPlatformExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:870](../../../packages/materials/src/runtime/coding-lane.ts:870)
+- Source: [src/runtime/coding-lane.ts:871](../../../packages/materials/src/runtime/coding-lane.ts:871)
 - Export: `@proofblade/materials`
 - Summary: Build the generic external submission path for a task with a trusted
 - Summary source: `tsdoc`
@@ -2896,7 +2887,7 @@
 ### createPlatformFlagSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>`
-- Source: [src/runtime/coding-lane.ts:974](../../../packages/materials/src/runtime/coding-lane.ts:974)
+- Source: [src/runtime/coding-lane.ts:975](../../../packages/materials/src/runtime/coding-lane.ts:975)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create platform flag submitter operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2906,29 +2897,11 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:1028](../../../packages/materials/src/runtime/coding-lane.ts:1028)
+- Source: [src/runtime/coding-lane.ts:1029](../../../packages/materials/src/runtime/coding-lane.ts:1029)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/reasoning-forest.test.ts`
-
-### isChallengeTask
-- Kind: `function`
-- Signature: `(task: Pick<TaskContract, "mode" | "target_kind"> & Partial<Pick<TaskContract, "verification">>): boolean`
-- Source: [src/runtime/coding-lane.ts:1109](../../../packages/materials/src/runtime/coding-lane.ts:1109)
-- Export: `@proofblade/materials`
-- Summary: Durable task classification used when generated executor prompts omit CTF keywords.
-- Summary source: `tsdoc`
-- Tests: `packages/materials/tests/coding-resources.test.ts`
-
-### isLikelyCtfPrompt
-- Kind: `function`
-- Signature: `(text: string): boolean`
-- Source: [src/runtime/coding-lane.ts:1104](../../../packages/materials/src/runtime/coding-lane.ts:1104)
-- Export: `@proofblade/materials`
-- Summary: Detect challenge-shaped prompts at the GUI boundary, where the durable chat
-- Summary source: `tsdoc`
-- Tests: `packages/materials/tests/coding-resources.test.ts`
 
 ### bashEscapeHatchViolation
 - Kind: `function`
@@ -9861,7 +9834,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:653](../../../packages/materials/src/control/control-store.ts:653)
+- Source: [src/control/control-store.ts:656](../../../packages/materials/src/control/control-store.ts:656)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9869,7 +9842,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:687](../../../packages/materials/src/control/control-store.ts:687)
+- Source: [src/control/control-store.ts:690](../../../packages/materials/src/control/control-store.ts:690)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9877,7 +9850,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:668](../../../packages/materials/src/control/control-store.ts:668)
+- Source: [src/control/control-store.ts:671](../../../packages/materials/src/control/control-store.ts:671)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9885,7 +9858,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:630](../../../packages/materials/src/control/control-store.ts:630)
+- Source: [src/control/control-store.ts:633](../../../packages/materials/src/control/control-store.ts:633)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -9893,7 +9866,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:598](../../../packages/materials/src/control/control-store.ts:598)
+- Source: [src/control/control-store.ts:601](../../../packages/materials/src/control/control-store.ts:601)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10731,7 +10704,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: search operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/workspace-search.test.ts`
+- Tests: `packages/materials/tests/capability-jobs.test.ts`, `packages/materials/tests/challenge-tool-profile.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/deterministic-index.test.ts`, `packages/materials/tests/evidence-search-index.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/provider-native.test.ts`, `packages/materials/tests/pwn-layer.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`, `packages/materials/tests/workspace-search.test.ts`
 
 ### CodingEvidenceGraph.searchWithTrace
 - Kind: `method`
@@ -12259,7 +12232,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:794](../../../packages/materials/src/runtime/coding-lane.ts:794)
+- Source: [src/runtime/coding-lane.ts:795](../../../packages/materials/src/runtime/coding-lane.ts:795)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12268,7 +12241,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:806](../../../packages/materials/src/runtime/coding-lane.ts:806)
+- Source: [src/runtime/coding-lane.ts:807](../../../packages/materials/src/runtime/coding-lane.ts:807)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12277,7 +12250,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:798](../../../packages/materials/src/runtime/coding-lane.ts:798)
+- Source: [src/runtime/coding-lane.ts:799](../../../packages/materials/src/runtime/coding-lane.ts:799)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12286,7 +12259,7 @@
 ### PiCodingLane.create
 - Kind: `method`
 - Signature: `(options: { runId: string; projectRoot: string; installRoot?: string; runDir: string; controlStore: ControlStore; artifactStore: ArtifactStore; journal: EffectJournal; claimVerifier: CodingClaimVerifier; platformVerifier?: IndependentVerifier; externalSubmission?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; config: ProofBladeConfig; executionEnv?: ExecutionEnv; browserVerifierFactory?: BrowserVerifierFactory; externalResources?: ExternalResourceRegistry; sessionRuntimeBrokers?: readonly SessionRuntimeCreateBroker[]; sessionRuntimePreflight?: SessionRuntimePreflight; sessionRuntimeRequired?: boolean; browserRuntimeRequired?: boolean; sessionHandoffs?: readonly SessionRuntimeHandoff[]; browserHandoffs?: readonly BrowserRuntimeHandoff[]; workspaceRootForPrompt?: string; executionPlatform?: NodeJS.Platform; hostWorkspaceRootForMcp?: string; capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[]; }; challengeProfile?: ChallengeToolProfile; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; deferClaimAcceptance?: boolean; contextCompactionThreshold?: number; sessionId?: string; onApprovalRequired?: (approvalId: string) => void; ablationPolicy?: AblationPolicyBinding; bashTimeoutSecondsMax?: number; onEvent?: (event: AgentHarnessEvent) => void | Promise<void>; }): Promise<PiCodingLane>`
-- Source: [src/runtime/coding-lane.ts:116](../../../packages/materials/src/runtime/coding-lane.ts:116)
+- Source: [src/runtime/coding-lane.ts:115](../../../packages/materials/src/runtime/coding-lane.ts:115)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12295,7 +12268,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:802](../../../packages/materials/src/runtime/coding-lane.ts:802)
+- Source: [src/runtime/coding-lane.ts:803](../../../packages/materials/src/runtime/coding-lane.ts:803)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12304,7 +12277,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:719](../../../packages/materials/src/runtime/coding-lane.ts:719)
+- Source: [src/runtime/coding-lane.ts:720](../../../packages/materials/src/runtime/coding-lane.ts:720)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`

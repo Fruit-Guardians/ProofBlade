@@ -62,7 +62,6 @@ import type { ExternalResourceRegistry } from "../recovery/external-resource-reg
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
-
 const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
@@ -117,7 +116,7 @@ export class PiCodingLane implements AgentLanePort {
     runId: string;
     projectRoot: string;
     /** ProofBlade install root — where skills/ and .mcp.json live. Distinct from
-     * projectRoot (the challenge workspace where bash runs). Defaults to the
+     * projectRoot (the task workspace where bash runs). Defaults to the
      * ProofBlade root derived from runDir. */
     installRoot?: string;
     runDir: string;
@@ -159,18 +158,18 @@ export class PiCodingLane implements AgentLanePort {
     /** Host path for host-side MCP tools such as IDA; only use it in MCP arguments. */
     hostWorkspaceRootForMcp?: string;
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] };
-    /** Prepared challenge direction; keeps only profile tools resident in the prompt. */
+    /** Prepared task direction; keeps only selected profile tools resident in the prompt. */
     challengeProfile?: ChallengeToolProfile;
     /** Live execution mode for a platform-judged run. "assist" records a flag for
      * operator approval instead of submitting it. Defaults to autonomous play. */
     mode?: () => "auto" | "assist";
     /** Optional durable approval gate for high-risk platform effects. */
     approvalPolicy?: ApprovalPolicy;
-    /** Keep hidden-scorer completions proposed until the outer CTF verifier runs. */
+    /** Keep hidden-scorer completions proposed until the outer verifier runs. */
     deferClaimAcceptance?: boolean;
     /** Percentage of the available input budget used as the proactive compaction soft limit. */
     contextCompactionThreshold?: number;
-    /** Optional session id override for non-chat CTF runs. */
+    /** Optional session id override for non-chat task runs. */
     sessionId?: string;
     /** Called when the submission path pauses on a pending approval. */
     onApprovalRequired?: (approvalId: string) => void;
@@ -221,26 +220,28 @@ export class PiCodingLane implements AgentLanePort {
     if (options.browserRuntimeRequired && snapshot.task.verification.web?.transport === "browser" && !options.browserVerifierFactory) {
       throw new Error("Browser runtime broker is configured but unavailable for browser verification");
     }
-    // Domain labels may select optional capability preparation, but never
-    // change the Agent Loop or inject a domain-specific workflow prompt.
-    const challengeMode = isChallengeTask(snapshot.task) || Boolean(options.challengeProfile);
-    const challengeProfile = options.challengeProfile ?? (challengeMode ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
+    // A task profile only prepares optional tools. It never selects a loop or
+    // injects a domain workflow prompt; ordinary tasks can use the same tools.
+    const profileRequested = Boolean(options.challengeProfile)
+      || snapshot.task.verification.kind === "hidden_scorer"
+      || snapshot.task.verification.kind === "platform_submission";
+    const taskProfile = options.challengeProfile ?? (profileRequested ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
     let preflight: ChallengeToolPreflight | undefined;
     let preparation: RunToolPreparation | undefined;
-    if (challengeProfile) {
+    if (taskProfile) {
       const existing = snapshot.toolPreparation;
       const reusable = existing
         && existing.generation === snapshot.generation
-        && existing.profileId === challengeProfile.id
+        && existing.profileId === taskProfile.id
         && existing.runtime === (inContainer ? "container" : "host")
         && existing.runtimeKey === runtimeKey;
       preflight = reusable
         ? preflightFromRunToolPreparation(existing)
         : inContainer
-          ? await new ToolPreflightService(installRoot).prepareInExecution(challengeProfile, env, mcp, { runtimeKey })
-          : await new ToolPreflightService(installRoot).prepare(challengeProfile, toolCatalog, mcp);
-      preparation = runToolPreparationFromPreflight(preflight, challengeProfile, snapshot.generation);
+          ? await new ToolPreflightService(installRoot).prepareInExecution(taskProfile, env, mcp, { runtimeKey })
+          : await new ToolPreflightService(installRoot).prepare(taskProfile, toolCatalog, mcp);
+      preparation = runToolPreparationFromPreflight(preflight, taskProfile, snapshot.generation);
       if (!reusable) {
         await new RunCoordinator(options.controlStore).recordToolPreparation(options.runId, preparation);
       }
@@ -299,7 +300,7 @@ export class PiCodingLane implements AgentLanePort {
       artifactStore,
       options.journal,
       // MCP capability backends load from the install root (where .mcp.json is),
-      // not the challenge workspace.
+      // not the task workspace.
       installRoot,
       // Enable MCP so the reverse capability backend can route disasm/decompile
       // to a configured decompiler MCP (idalib-mcp / jadx-mcp) instead of only
@@ -541,7 +542,7 @@ export class PiCodingLane implements AgentLanePort {
     const failureStormBreaker = new ToolFailureStormBreaker();
     const experimentBudgetBreaker = new ExperimentBudgetBreaker();
     const toolBudget: ToolCallBudget = { max: Math.max(0, snapshot.task.constraints.max_tool_calls), count: 0 };
-    const firstActionPlan = preflight?.firstActionPlan ?? challengeProfile?.firstActionPlan;
+    const firstActionPlan = preflight?.firstActionPlan ?? taskProfile?.firstActionPlan;
     const firstActionBudget: FirstActionBudget | undefined = firstActionPlan
       ? {
         allowedToolNames: [...firstActionPlan.allowedToolNames],
@@ -1095,30 +1096,6 @@ function pwnReproductionPolicyFor(contract: PwnReproductionContract | undefined)
   };
 }
 
-/**
- * Detect challenge-shaped prompts at the GUI boundary, where the durable chat
- * task is intentionally target-agnostic and therefore cannot provide a
- * category-specific TaskContract. This stays conservative so a normal request
- * about a software "feature flag" remains an ordinary coding turn.
- */
-export function isLikelyCtfPrompt(text: string): boolean {
-  return /(?:\bctf\b|\bchallenge\b|\bpyjail\b|\bpwn\b|\breverse(?:[- ]engineering)?\b|\bapk\b|\bshellcode\b|\bflag\s*\{|(?:题目描述|求解\s*flag|解题|夺旗|靶机|逆向题|破解题|漏洞题|二进制题))/i.test(text);
-}
-
-/** Durable task classification used when generated executor prompts omit CTF keywords. */
-export function isChallengeTask(task: Pick<TaskContract, "mode" | "target_kind"> & Partial<Pick<TaskContract, "verification">>): boolean {
-  // Domain tags and the legacy mode do not select a loop. Challenge-oriented
-  // preparation is needed only for tasks with a scorer or external platform;
-  // ordinary coding tasks may analyze the same web/binary domains directly.
-  return task.verification?.kind === "hidden_scorer"
-    || task.verification?.kind === "platform_submission"
-    || (!task.verification && task.mode === "ctf_solve");
-}
-
-function codingCtfWorkflowGuidance(skillsLibraryPath: string): string {
-  const lib = skillsLibraryPath.replace(/\\/g, "/");
-  return `## CTF solving workflow (follow this loop)\nWhen the task is to solve a CTF challenge / recover a flag:\n1. Recon: list files, \`file *\`, strings/xxd on binaries, read the prompt and any connection info.\n2. Categorize: pick the dominant category — web / crypto / reverse / pwn / forensics / misc / osint / malware.\n3. Load the playbook: a full CTF skills library is on disk at \`${lib}\`. Read the matching category's guide with bash before you start, e.g. \`cat "${lib}/ctf-<category>/SKILL.md"\`, and open the supporting files it references (same directory) as needed. Follow that playbook instead of your default habits.\n4. Converge — this is where solves are usually lost: as soon as you have extracted the data/structure the challenge turns on (a grid, key schedule, table, protocol), STOP re-reading disassembly or dumping bytes. Reconstruct the logic as a small script (Python) and let the machine solve it (search/BFS, reimplement the transform, bounded brute force). Re-reading the same thing a third time is the signal to switch to code.\n5. Produce the flag: apply exactly the transform the challenge states and the exact required flag format — no missing and no extra layers. Validate the candidate, then report it.\nUse read/bash to consult ${lib} at any point; you do not need load_skill for it.\n\n## Interactive native/Pwn protocol discipline\nFor a menu-driven native service, never synchronize on a generic suffix such as \`recv_until(b\": ")\`. Wait for the complete prompt for the current state (for example \`student_ID (0-127): \`, \`Name (max 23 chars): \`, or \`Style (1-3): \`) and consume the complete menu marker before sending the next choice. Every helper must log the step name, timeout, and last received bytes; a timeout is a protocol failure, not evidence that the exploit worked. Use a fresh connection for each retry and do not repeat a destructive heap sequence without first proving the previous step. Set Python output to UTF-8 (\`PYTHONUTF8=1\`, \`PYTHONIOENCODING=utf-8\`) and print undecodable bytes with a reversible error mode. After a suspected shell/control-flow hijack, send a unique marker such as \`echo PB_READY\` and wait for that marker; EOF or a reset alone is never shell success.`;
-}
 
 function codingSystemPrompt(
   skills: Array<{ name: string; description: string; content: string }>,
@@ -1144,112 +1121,6 @@ function codingSystemPrompt(
   return `${CODING_SYSTEM_PROMPT}\n\n${codingHostGuidance(options.executionPlatform ?? process.platform)}${workspaceBlock}${toolCatalogBlock}${nativeSkills}${mcpBlock}${mcpPathBlock}`;
 }
 
-function preparedChallengeProfileBlock(profile: ChallengeToolProfile, preflight?: ChallengeToolPreflight): string {
-  const runtime = preflight?.runtime === "container"
-    ? `the target execution container (${preflight.runtimeKey})`
-    : "the host execution environment";
-  const required = preflight?.missingRequiredTools.length
-    ? `Missing required tools in ${runtime}: ${preflight.missingRequiredTools.join(", ")}. Use a listed fallback; do not install interactively.`
-    : `Required tools in ${runtime} are ready or not applicable.`;
-  const optional = preflight?.missingOptionalTools.length
-    ? ` Missing optional tools in ${runtime}: ${preflight.missingOptionalTools.join(", ")}; do not rediscover or install them during the challenge.`
-    : "";
-  const mcp = preflight?.mcpServers.length
-    ? ` MCP readiness: ${preflight.mcpServers.map((server) => `${server.name}=${server.status}${server.toolchainState ? `/${server.toolchainState}` : ""}`).join(", ")}.`
-    : "";
-  const readiness = preflight?.tools.length
-    ? ` Tool readiness in ${runtime}: ${preflight.tools.map((tool) => `${tool.id}=${tool.status}`).join(", ")}.`
-    : "";
-  const firstAction = profile.firstActionPlan;
-  const firstActionBudget = ` First action budget: at most ${firstAction.maxCalls} calls through ${firstAction.allowedToolNames.join(", ")}; completion tools may be used immediately when a verifier-ready candidate exists.`;
-  const actionBundles = preflight?.actionBundles ?? profile.actionBundles;
-  const actionBundleBlock = actionBundles.length > 0
-    ? `\nPhase action bundles (select the bundle matching the durable phase; do not mix phases):\n${actionBundles.map((bundle) => `- ${bundle.domainPhase} / ${bundle.id}: ${bundle.objective} Tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Max calls: ${bundle.maxCalls}.`).join("\n")}`
-    : "";
-  return `\n\n## Prepared challenge tool profile\nDirection: ${profile.id}; target kind: ${profile.targetKind}. The ${runtime} preflight is authoritative and has already classified this challenge. Do not spend a model turn reclassifying the task, reading unrelated playbooks, discovering tools, installing packages, or retrying a missing binary. Use the selected direction directly. First action contract: ${profile.firstAction}${firstActionBudget} Otherwise persist the new fact before choosing the next action. Required tool ids: ${profile.requiredToolIds.join(", ") || "none"}. Optional tool ids: ${profile.optionalToolIds.join(", ") || "none"}. Prepared fallback order: ${profile.fallbackStrategies.join(" -> ")}.${actionBundleBlock} ${required}${optional}${readiness}${mcp}`;
-}
-
-/**
- * Category-specialized guidance for the CTF orchestrator.
- *
- * The generic playbook already covers recon and skill-library dispatch, but two
- * failure modes recur enough to justify hard-coding them at prompt time instead
- * of hoping the model reads the on-disk guide:
- *
- * - Web: gateway is target-only, so external doc lookups WILL fail; the model
- *   must treat that as expected policy, not a broken tool.
- * - Pwn: Chinese CTF services frequently send GBK-encoded prompts and menus.
- *   The model tends to hand-type those bytes back into a script and produce a
- *   parser that never matches. State the rule once, up-front: capture bytes
- *   from actual recv output, never transcribe non-ASCII prompt text by hand.
- */
-export function codingCtfCategoryGuidance(kind?: TaskContract["target_kind"], target?: string, pwnToolsAvailable?: boolean, pwnReproductionAvailable = pwnToolsAvailable, webToolsAvailable?: boolean): string {
-  if (!kind || kind === "unknown") return "";
-  const remote = typeof target === "string" && target.startsWith("REMOTE:") ? target.slice("REMOTE:".length).trim() : undefined;
-  const remoteBlock = remote ? `\nLive target: ${remote}. The container's egress gateway already permits that host/port; other outbound network is denied by policy, not by a broken tool, so do not retry the same request against a different upstream when it is refused.` : "";
-  if (kind === "pwn") {
-    // The single biggest source of lost pwn turns is running an interactive
-    // exploit as ONE foreground `bash` call: recvuntil/interactive blocks, the
-    // command hits the hard timeout, is killed, and the model rewrites the whole
-    // script and blocks again. State the interaction model up front so the
-    // exploit is driven turn-by-turn, not one monolithic blocking script.
-    const interactionRule = pwnToolsAvailable
-      ? `- INTERACTION MODEL — use the persistent pwn tube, not a blocking bash script. Open the target once with \`pwn_open\` (kind=remote, endpoint=host:port for an \`nc\` target; kind=local, command=[\"./chall\"] for a local binary) and keep the returned sessionId. Drive it turn-by-turn with \`pwn_send\` (encoding=base64 for non-UTF-8 payloads/addresses; line=true for a newline) and \`pwn_recv\` (until=<anchor>). After a bounded observation, persist the primitive hypothesis with \`pwn_record_primitive\` and its Artifact/Evidence ids; confidence is always below 1 and it is never a shell claim. This is how you avoid the #1 pwn failure: a full \`from pwn import *\` script run in one \`bash\` call blocks on recv and dies at the command timeout. Use bash/python only to compute offsets, gadgets, and payload bytes (base64-encode them for pwn_send) — never to hold the live connection.${pwnReproductionAvailable ? " Confirm a solve with \`pwn_reproduce\` (fresh session + shell-marker + flag-extract barriers); proposing a script is not the same as landing a shell." : " The immutable task verifier is not configured for \`pwn_reproduce\`; validate the exploit through the live session and submit through the platform workflow."}`
-      : "- INTERACTION MODEL — never hold a live interactive connection inside one foreground `bash` call: an exploit that calls `recvuntil`/`interactive`/`p.recv()` will block until the command timeout kills it, and rewriting the whole script and re-running it is the #1 way pwn turns are lost. Run any long or interactive exploit under `shell_background` and poll with `shell_job`, so a stall costs one bounded poll instead of the whole command budget. Keep each foreground `bash` short: compute offsets/gadgets/payloads, do a single bounded probe (`timeout 20 python solve.py`), inspect, iterate — do not launch the full interactive solve in the foreground.";
-    return [
-      "\n\n## Pwn category specifics",
-      "- Use the exact paths in the prepared `<tool-catalog>` profile for `pwntools`, `gdb`, `qemu`, `patchelf`, `ropgadget`, or `one_gadget` when present. Optional tools may be absent; do not install or rediscover them during the solve. `context.log_level = 'debug'` when protocol sync is unclear.",
-      interactionRule,
-      "- Always run `file` and `checksec` (or the prepared `capability` proofblade.binary identify/inspect_elf operation) on any provided binary before writing an exploit. If no binary is provided (remote-only pwn), your leak strategy must not depend on offsets from a local copy — derive them from actual leaks.",
-      "- Chinese CTF services often speak GBK, not UTF-8. Never hand-type non-ASCII prompt bytes into a script from what you see in a tool-result echo, because that echo has already been round-tripped through a locale that may not match the wire. Instead: (1) do one probe run, save `p.recv(4096)` to a file, (2) inspect the raw bytes with `xxd`, (3) reference those exact bytes in your parser (`recvuntil(b\"\\xc7\\xeb\\xd1\\xa1\\xd4\\xf1...\")` or a stable ASCII substring/suffix that co-occurs with the prompt). If the banner is confusing, decode with `.decode('gbk', errors='replace')` and `.decode('utf-8', errors='replace')` side by side — whichever produces readable Chinese is the wire encoding, and encoding future sends with the same codec is mandatory.",
-      "- Prefer stable synchronization anchors that appear in a single state, not generic suffixes like `b': '` that appear in every prompt. Log the step name, timeout, and last received bytes on every failed recv so a stall is legible.",
-      "- After a suspected shell hijack, send `echo PB_READY_$RANDOM$RANDOM` and wait for that exact marker. EOF, connection reset, or a timeout is NOT shell success.",
-      "- Every retry uses a fresh `remote(...)`. Do not chain destructive heap operations across attempts without first proving the previous step landed via a confirmed leak or marker.",
-      "- Persist every confirmed fact before moving on. An interactive pwn run is NOT reproducible — heap addresses and one-shot protocol state differ on every fresh connection — so recovering a fact you already proved costs turns and budget. Keep a running notes file (e.g. `/workspace/NOTES.md`) and `write` each confirmed fact to it as a line: the menu byte sequence, field offsets, struct size, input length limit, index semantics, and any leaked address delta. Before rewriting an exploit script, `read` the notes back instead of probing again. If a bash result ended with an `A-*` anchor, `evidence record` that id instead for a searchable durable record.",
-      "- Fix the helper, not the whole script. When a protocol helper desyncs or times out, edit that one function and add a log line (step name + last received bytes); do not rewrite the file as a fresh `mapNN.py`. A full rewrite throws away the working parts you already validated and is the biggest single source of lost turns in pwn.",
-      remoteBlock,
-    ].join("\n");
-  }
-  if (kind === "web") {
-    // When the interactive web session tools are wired, steer stateful work onto
-    // them: a durable session keeps the cookie jar / CSRF across calls, so the
-    // model does not re-establish `requests.Session()` state on every bash call.
-    const webInteractionRule = webToolsAvailable
-      ? "- INTERACTION MODEL — for anything stateful use the persistent web session, not repeated one-shot curls. Open the target once with `web_open` (baseUrl=the target URL) and keep the returned sessionId; drive it with `web_request` (path/method/headers/body) so cookies, CSRF tokens, and redirects persist across the whole chain. Use `web_replay` to check whether a request still works in a clean cookie jar. `curl`/`sqlmap`/`python-requests` remain available for one-shot probes."
-      : "- For stateful flows (login then act, CSRF token reuse) use Python `requests.Session()` in a single script; a chain of separate `curl` calls drops the cookie jar between calls.";
-    return [
-      "\n\n## Web category specifics",
-      webInteractionRule,
-      "- `curl`, `python-requests`, `beautifulsoup4`, `sqlmap`, `chromium` (headless), and `playwright` are already installed. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
-      "- Use the exact prepared catalog paths for `curl`, `chromium`, or `playwright` when present. Python HTTP libraries are the baseline; optional scanners such as `sqlmap` must not be assumed or installed mid-challenge. Prefer `curl -sSik` for one-shot probes and Python `requests.Session()` for anything stateful (cookies, CSRF).",
-      "- Read the initial page and its response headers first: `curl -sSikL <target>` shows the framework fingerprint (Server, X-Powered-By, Set-Cookie shape, error page style) that decides your subsequent playbook branch (SQLi vs SSTI vs SSRF vs auth-bypass vs deserialization).",
-      "- Check `/robots.txt`, `/.git/HEAD`, `/.env`, `/admin`, `/login`, source view (`view-source:` equivalent via `curl`), sitemap, and any JS bundles for endpoints — a large fraction of web CTFs hinge on a route that is not linked from the landing page.",
-      "- Decode any JWT with `python -c 'import jwt,sys;print(jwt.decode(sys.argv[1], options={\"verify_signature\":False}))'` (or manual base64) before treating it as opaque. Note the algorithm — `alg:none` and weak HS256 keys are common CTF traps.",
-      "- Chinese CTF web challenges frequently return GBK-encoded response bodies. If `curl` output looks mojibake, add `--output` and inspect with `file`/`iconv -f gbk -t utf-8`. Do not rely on the terminal echo of Chinese strings for parsing.",
-      "- When `sqlmap` is present in the prepared catalog and the vulnerability looks like SQLi, run it in `shell_background` before hand-rolling payloads; otherwise use a bounded requests reproducer. For SSTI/RCE, jump to `{{7*7}}` and `${{7*7}}` fingerprints across common template engines.",
-      remoteBlock,
-    ].join("\n");
-  }
-  if (kind === "reverse") {
-    return [
-      "\n\n## Reverse category specifics",
-      "- Prefer a decompiler MCP (idalib-mcp / jadx-mcp when available) over hand-reading `objdump -d`. Open the target once, then work from pseudocode.",
-      "- Call `capability` for `proofblade.binary.packed_probe` early. It detects UPX signatures and returns a bounded fallback plan; run the exact catalog UPX path with `-t` before attempting `-d`.",
-      "- If UPX is missing or reports a corrupt header, switch once to `gdb_batch` (`starti`, `info proc mappings`, then a bounded `dump memory` into a workspace-relative file) or QEMU; do not keep retrying the same unpacker download.",
-      "- Use `proofblade.binary.identify` as the portable file-magic baseline, then run the exact prepared catalog paths for `strings`, `readelf`, `objdump`, `gdb`, or `checksec` when present. For packed binaries note the entropy and section layout before decompiling.",
-      "- Once you have identified the transform, reconstruct it in Python instead of stepping through disassembly a fourth time. Search/BFS/bounded brute force is the fifth step of the loop; do not skip it.",
-    ].join("\n");
-  }
-  if (kind === "crypto") {
-    return [
-      "\n\n## Crypto category specifics",
-      "- Use the prepared catalog to decide whether `pycryptodome`, `gmpy2`, Sage, OpenSSL, or `fpylll` are available; otherwise keep a pure-Python implementation as the fallback and do not install packages mid-challenge. For classic modular-arithmetic tasks reach for `gmpy2.iroot`, Chinese Remainder Theorem, and lattice reduction (`fpylll`) before trying to brute force when those tools are ready.",
-      "- Identify the primitive first (RSA / DLP / AES-mode / hash / stream) and the exact operation being requested. A confused primitive check is the top cause of wasted turns in this category.",
-    ].join("\n");
-  }
-  return "";
-}
-
 export function codingHostGuidance(platform: NodeJS.Platform = process.platform): string {
   if (platform !== "win32") return "Keep generated intermediate files inside the current workspace so later tools can read them.";
   return [
@@ -1272,12 +1143,7 @@ function webBaseUrlFromTarget(target: string): string | undefined {
   try { return new URL(value).toString().replace(/\/$/, ""); } catch { return undefined; }
 }
 
-/**
- * Keep the lane's broker health check scoped to the capabilities the task can
- * actually use. A configured deployment may expose both Pwn and HTTP brokers,
- * but a fixture Web task without a web verification contract has no reason to
- * probe either durable transport during lane startup.
- */
+/** Keep broker health checks scoped to capabilities the task can use. */
 function sessionRuntimeBrokersForTask(
   task: TaskContract,
   brokers: readonly SessionRuntimeCreateBroker[],
