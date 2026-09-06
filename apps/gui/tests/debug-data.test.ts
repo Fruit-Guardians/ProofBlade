@@ -686,7 +686,7 @@ test("GUI fixture conversations enter RECON through RunCoordinator", async () =>
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
     const runId = "GUI-FIXTURE-CONVERSATION-001";
-    const snapshot = await data.createFixtureConversation({ runId, fixtureId: "web-source-1", objective: "检查题目并保留第一条证据。" });
+    const snapshot = await data.createTaskFromTemplate({ runId, templateId: "web-source-1", objective: "检查题目并保留第一条证据。" });
     assert.equal(snapshot.domainPhase, "RECON");
     assert.equal(snapshot.phase, "reconnaissance");
     const events = await new JsonlControlStore(join(root, config.storage.runsDir)).events(runId);
@@ -724,14 +724,14 @@ test("persists a solve run before returning so an immediate pause aborts its cod
       return lane;
     });
     const runId = "SOLVE-PAUSE-001";
-    const started = await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    const started = await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     assert.equal(started.state, "running");
     await factoryEntered;
     const paused = await data.pause(runId);
     assert.equal(paused.state, "paused");
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
     await assert.rejects(
-      data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 }),
+      data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 }),
       /Run is already active/,
     );
     releaseFactory();
@@ -772,7 +772,7 @@ test("GUI Fixture solve uses the shared verifier-first Run path and replays term
       };
     });
 
-    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     const store = new JsonlControlStore(join(root, "runs"));
     let snapshot;
     for (let attempt = 0; attempt < 300; attempt += 1) {
@@ -904,14 +904,14 @@ test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => lane);
     const runId = "SOLVE-CLOSE-001";
-    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     await promptStarted;
     const closing = data.close();
     releasePrompt();
     await closing;
     await closed;
     assert.equal(aborts, 1);
-    await assert.rejects(data.startSolve({ runId: "SOLVE-CLOSE-NEW", fixtureId: "web-source-1", mode: "auto" }), /GUI is shutting down/);
+    await assert.rejects(data.startTaskFromTemplate({ runId: "SOLVE-CLOSE-NEW", templateId: "web-source-1", mode: "auto" }), /GUI is shutting down/);
   } finally {
     releasePrompt?.();
     await rm(root, { recursive: true, force: true });

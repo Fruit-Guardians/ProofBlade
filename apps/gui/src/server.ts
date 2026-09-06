@@ -221,21 +221,21 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       return sendJson(response, 200, { ok: true });
     }
   }
-  if (method === "POST" && url.pathname === "/api/fixture-conversations") {
+  if (method === "POST" && url.pathname === "/api/tasks/templates") {
     const body = await readBody(request);
-    const snapshot = await data.createFixtureConversation({
+    const snapshot = await data.createTaskFromTemplate({
       runId: string(body.runId, "runId"),
-      fixtureId: string(body.fixtureId, "fixtureId"),
+      templateId: string(body.templateId, "templateId"),
       objective: string(body.objective, "objective"),
     });
     return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
   }
-  if (method === "POST" && url.pathname === "/api/solve") {
+  if (method === "POST" && url.pathname === "/api/tasks/templates/run") {
     const body = await readBody(request);
     const mode = body.mode === "auto" ? "auto" : "assist";
     const maxTurns = body.maxTurns === undefined ? undefined : Number(body.maxTurns);
     if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("maxTurns must be a positive integer");
-    return sendJson(response, 202, await data.startSolve({ runId: string(body.runId, "runId"), fixtureId: string(body.fixtureId, "fixtureId"), mode, maxTurns }));
+    return sendJson(response, 202, await data.startTaskFromTemplate({ runId: string(body.runId, "runId"), templateId: string(body.templateId, "templateId"), mode, maxTurns }));
   }
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];

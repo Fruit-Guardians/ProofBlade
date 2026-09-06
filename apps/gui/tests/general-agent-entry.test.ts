@@ -8,5 +8,6 @@ test("GUI keeps one general task entry instead of a CTF-specific top-level actio
   assert.doesNotMatch(source, /CTF 解题/);
   assert.doesNotMatch(source, /CtfSolveModal|startCtfSolve|ctfOpen/);
   assert.match(source, /新建对话/);
-  assert.match(source, /Fixture 测试/);
+  assert.match(source, /安全任务模板/);
+  assert.doesNotMatch(source, /startSolve|createFixtureConversation|\/api\/solve|\/api\/fixture-conversations/);
 });
