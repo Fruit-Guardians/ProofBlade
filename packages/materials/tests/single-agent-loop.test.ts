@@ -9,7 +9,7 @@ import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentCtfLoop, SingleAgentLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
@@ -54,6 +54,10 @@ const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async abort() {},
   async isIdle() { return true; },
   async close() {},
+});
+
+test("exports a generic single-agent loop name while preserving the legacy alias", () => {
+  assert.equal(SingleAgentLoop, SingleAgentCtfLoop);
 });
 
 test("local Run prompt carries the remaining deadline into the single coding lane", async () => {

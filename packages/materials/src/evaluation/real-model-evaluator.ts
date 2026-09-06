@@ -8,7 +8,7 @@ import { canonicalJson, isTerminal, sha256 } from "../domain/utils.js";
 import { createServices, type AppServices } from "../app/demo.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
-import { SingleAgentCtfLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
+import { SingleAgentLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import { loadRealEvaluationCorpus, stageRealEvaluationCase, type LoadedRealEvaluationCase, type RealEvaluationCorpusSnapshot } from "./real-corpus.js";
 
@@ -396,8 +396,8 @@ export class RealModelEvaluationRunner {
     const deadlineTimer = setTimeout(() => deadline.abort(new Error("Real evaluation case deadline exhausted")), deadlineMs);
     try {
       const loop = this.createLane
-        ? new SingleAgentCtfLoop(this.root, config, services, this.createLane)
-        : new SingleAgentCtfLoop(this.root, config, services);
+        ? new SingleAgentLoop(this.root, config, services, this.createLane)
+        : new SingleAgentLoop(this.root, config, services);
       const outcome = await loop.run({
         runId,
         task,

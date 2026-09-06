@@ -6,7 +6,7 @@ import { fixtureTask } from "../app/fixture-task.js";
 import { JsonlControlStore } from "../storage/jsonl-store.js";
 import { projectionHash } from "../control/reducer.js";
 import { listFixtureProfiles, type FixtureProfile } from "../sandbox/fixture-catalog.js";
-import { SingleAgentCtfLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
+import { SingleAgentLoop, type AgentLaneFactory } from "../orchestration/single-agent-loop.js";
 import { sha256, canonicalJson } from "../domain/utils.js";
 import { RunTelemetry } from "../observability/run-telemetry.js";
 import type { PrimaryFailureCategory } from "../domain/types.js";
@@ -195,7 +195,7 @@ export class FixtureEvaluationRunner {
     let turns = 0;
     let error: string | undefined;
     try {
-      const outcome = await new SingleAgentCtfLoop(this.root, this.config, services, this.createLane).run({ runId, task, mode: "auto", maxTurns });
+      const outcome = await new SingleAgentLoop(this.root, this.config, services, this.createLane).run({ runId, task, mode: "auto", maxTurns });
       status = outcome.status;
       phase = outcome.phase;
       turns = outcome.turns;

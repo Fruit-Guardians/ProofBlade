@@ -13,7 +13,7 @@ import {
   RunCoordinator,
   ApprovalPolicy,
   ProofBladeAppServer,
-  SingleAgentCtfLoop,
+  SingleAgentLoop,
   createServices,
   assertRunId,
   RUN_ID_PATTERN,
@@ -345,7 +345,7 @@ export class DebugDataService {
     this.assertOpen();
     const info: ActiveRunInfo = { runId: task.task_id, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(task.task_id, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane, this.browserVerifierFactory);
+    const loop = new SingleAgentLoop(this.root, this.config, this.services, this.createCtfLane, this.browserVerifierFactory);
     const controller = new AbortController();
     const runPromise = loop.run({
       runId: task.task_id,
@@ -483,7 +483,7 @@ export class DebugDataService {
     try {
       if (snapshot.task.mode === "ctf_solve") {
         let ctfOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
+        const loop = new SingleAgentLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
         const result = await loop.run({
           runId,
           task: snapshot.task,

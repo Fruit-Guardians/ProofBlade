@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 168
-- Symbols: 1791
+- Symbols: 1792
 
 ## Public Symbols
 
@@ -1308,6 +1308,15 @@
 - Summary: Inferred summary: default agent strategy constant used to provide a reusable operation.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/runtime-contracts.test.ts`
+
+### SingleAgentLoop
+- Kind: `constant`
+- Signature: `typeof SingleAgentCtfLoop`
+- Source: [src/orchestration/single-agent-loop.ts:532](../../../packages/materials/src/orchestration/single-agent-loop.ts:532)
+- Export: `@proofblade/materials`
+- Summary: Generic public name for the single-agent loop. The compatibility alias keeps
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/single-agent-loop.test.ts`
 
 ### SESSION_RUNTIME_WIRE_SCHEMA_VERSION
 - Kind: `constant`
@@ -10918,7 +10927,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: export operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/workspace-search.test.ts`
+- Tests: `packages/materials/tests/browser-runtime-service.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`, `packages/materials/tests/workspace-search.test.ts`
 
 ### RunEventIngress.complete
 - Kind: `method`
