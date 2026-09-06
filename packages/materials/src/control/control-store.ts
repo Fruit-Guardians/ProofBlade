@@ -579,7 +579,10 @@ export class ControlStore {
       const lane = command.lane ?? "main";
       const seq = after.lastSeq + 1;
       const rawPayload = payloadFor(command, seq, after, lane, authority);
-      const payload = after.task.mode === "coding_assistant" ? rawPayload : redactCtfEventPayload(rawPayload);
+      // Candidate-shaped values may appear in any security task's audit
+      // metadata. This is a storage-boundary privacy rule, not a CTF mode
+      // behavior, so general tasks must not bypass it.
+      const payload = redactCtfEventPayload(rawPayload);
       const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payload, `${runId}:system`, {
         generation: after.generation,
         source: command.lane === "verifier" ? "verifier" : command.type === "pause" || command.type === "resume" ? "user" : undefined,
