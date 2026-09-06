@@ -125,7 +125,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
       const details = isRecord(event.details) ? event.details : {};
-      const verifierReady = (event.toolName === "verify_claim" || event.toolName === "verify_result") && details.verified === true;
+      const verifierReady = event.toolName === "verify_result" && details.verified === true;
       if (verifierReady && ablationPolicy) {
         const policyEvent = ablationPolicy.controller.decide({
           experimentId: ablationPolicy.experimentId,
@@ -396,7 +396,7 @@ function isFirstActionCompletionTool(toolName: string): boolean {
 }
 
 function isCompletionTool(toolName: string): boolean {
-  return toolName === "verify_claim" || toolName === "verify_result" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
+  return toolName === "verify_result" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
 }
 
 function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {

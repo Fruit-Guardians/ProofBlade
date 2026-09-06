@@ -44,15 +44,14 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   const snapshot = codingProviderToolContractSnapshot();
   assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
-  assert.equal(codingProviderToolContractSnapshot({ legacyClaimVerification: true }).some((tool) => tool.name === "verify_claim"), true);
-  assert.equal(createCodingTools({ externalSubmissionEnabled: true, legacySubmissionAlias: true }).some((tool) => tool.name === "submit_flag"), true);
+  assert.equal(snapshot.some((tool) => tool.name === "verify_claim"), false);
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((tool) => tool.name === "submit_flag"), false);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
   assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
-  assert.deepEqual(codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [], legacyClaimVerification: true }), ["read", "bash", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
   const genericExternalTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], externalSubmissionEnabled: true });
@@ -60,8 +59,7 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.equal(genericExternalTools.includes("submit_flag"), false);
   const platformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true });
   assert.deepEqual(platformTools.slice(-1), ["external_submit"]);
-  const legacyPlatformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true, legacySubmissionAlias: true });
-  assert.deepEqual(legacyPlatformTools.slice(-2), ["external_submit", "submit_flag"]);
+  assert.equal(platformTools.includes("submit_flag"), false);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
 });
@@ -70,7 +68,6 @@ test("external_submit exposes an explicit target and forwards an opaque payload"
   const tool = createCodingTools({ externalSubmissionEnabled: true }).find((candidate) => candidate.name === "external_submit");
   assert.ok(tool, "external_submit should be registered for configured destinations");
   assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((candidate) => candidate.name === "submit_flag"), false);
-  assert.equal(createCodingTools({ externalSubmissionEnabled: true, legacySubmissionAlias: true }).some((candidate) => candidate.name === "submit_flag"), true);
   let received: unknown;
   const context = { externalSubmit: async (request: unknown) => {
     received = request;
@@ -230,7 +227,7 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
-test("[contract:evidence-inspect-forest-max-chars] coding claim verification rejects decoys and persists a matching reproduction", async () => {
+test("[contract:evidence-inspect-forest-max-chars] generic result verification rejects decoys and persists a matching reproduction", async () => {
   assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
   assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
   assert.equal(requiresClaimVerification("修复 feature flag 的布尔判断"), false);
@@ -299,46 +296,41 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       () => executeTool("evidence", { operation: "annotate", artifactId: analysisArtifact.id, name: "bad", summary: "bad", relatedIds: ["EV-MISSING"] }, context),
       /Unknown related ids/,
     );
-    await assert.rejects(
-      () => executeTool("verify_claim", { candidate, command: `echo ${candidate}` }, context),
-      /embeds the candidate literal/,
-    );
-    await assert.rejects(
-      () => executeTool("verify_claim", { candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context),
-      /exact immutable task-bound verification command/,
-    );
+    const literalFailure = await executeTool("verify_result", { result: candidate, command: `echo ${candidate}` }, context);
+    assert.equal(literalFailure.isError, true);
+    assert.match(JSON.stringify(literalFailure.details), /embeds the result literal/);
+    const policyFailure = await executeTool("verify_result", { result: candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context);
+    assert.equal(policyFailure.isError, true);
+    assert.match(JSON.stringify(policyFailure.details), /exact immutable task-bound verification command/);
     const generic = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const genericDetails = generic.details as Record<string, unknown>;
     assert.equal(genericDetails.result, candidate);
     assert.equal(genericDetails.verified, true);
     const genericCompletion = Object.values((await services.control.snapshot(runId)).completions)[0];
     assert.equal(genericCompletion?.purpose, "harness_verification");
-    const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
-    const details = result.details as Record<string, unknown>;
-    assert.equal(details.verified, true);
-    assert.equal(result.terminate, undefined, "ordinary claim verification keeps the coding turn interactive");
+    assert.equal(generic.terminate, undefined, "ordinary result verification keeps the coding turn interactive");
     const snapshot = await services.control.snapshot(runId);
     assert.equal(Object.keys(snapshot.evidence).length, 2);
     assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction" && item.dependsOn?.includes(evidenceId)).length, 1);
     assert.equal(Object.values(snapshot.completions).filter((item) => item.status === "ACCEPTED").length, 1);
     assert.equal(Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").length, 1);
-    assert.ok(snapshot.artifacts[String(details.artifactId)]);
+    assert.ok(snapshot.artifacts[String(genericDetails.artifactId)]);
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.name, "EF01 受保护记录");
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.role, "supporting");
     assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
     assert.equal((await verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`)).status, "verified");
     assert.equal((await verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042")).status, "unverified");
-    const deferred = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+    const deferred = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
       ...context,
       deferClaimAcceptance: true,
     });
-    assert.equal(deferred.terminate, true, "deferred claim acceptance must return control to the outer verifier");
-    const continuous = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+    assert.equal(deferred.terminate, true, "deferred result acceptance must return control to the outer verifier");
+    const continuous = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
       ...context,
       deferClaimAcceptance: true,
       continuousRecovery: true,
     });
-    assert.equal(continuous.terminate, undefined, "continuous recovery keeps claim verification in the same lane");
+    assert.equal(continuous.terminate, undefined, "continuous recovery keeps result verification in the same lane");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });
@@ -1191,7 +1183,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {
-  const tool = createCodingTools({ legacyClaimVerification: name === "verify_claim" }).find((candidate) => candidate.name === name);
+  const tool = createCodingTools().find((candidate) => candidate.name === name);
   assert.ok(tool, `Missing coding tool: ${name}`);
   const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("test-call", params, new AbortController().signal, () => undefined, context);
   return result as { content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean };

@@ -294,7 +294,7 @@ export async function runCompetitionLoop(
     turns,
     solved: hasAcceptedPlatformSubmission(finalSnapshot),
     heldForApproval: stopReason === "held_for_approval",
-    // Count real platform submissions, not every completion: `verify_claim` also
+    // Count real platform submissions, not every completion: local verification also
     // proposes completions and never contacts the platform, so counting those
     // would inflate the wrong-submission number the rules use as a tiebreaker.
     submissions: Object.values(finalSnapshot.effects).filter((effect) => effect.operation === "fixture_score").length,
@@ -335,7 +335,7 @@ async function blockAndQueueCompetitionWorkItem(control: AppServices["control"],
 
 /**
  * Solved means the PLATFORM accepted, so an accepted completion is not enough on
- * its own: require a real `fixture_score` effect too. `verify_claim` also
+ * its own: require a real `fixture_score` effect too. Local verification also
  * produces completions, and before this check a local reproduction could report a
  * challenge as solved with the platform never contacted.
  */

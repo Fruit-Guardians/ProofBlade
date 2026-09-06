@@ -260,16 +260,12 @@ test("real solver drives a security target to SOLVED on the coding lane via exte
   const root = await mkdtemp(join(tmpdir(), "pb-solver-"));
   try {
     const api = new FakeApi([{ id: "CH1", value: 100, flag: "flag{solver_ok}" }]);
-    let legacyOptions: { legacyClaimVerification?: boolean; legacySubmissionAlias?: boolean } | undefined;
     const genericLane: CompetitionLaneFactory = async (options) => {
-      legacyOptions = { legacyClaimVerification: options.legacyClaimVerification, legacySubmissionAlias: options.legacySubmissionAlias };
       return await flagLane(options);
     };
     const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "auto", maxTurns: 1, createLane: genericLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
     assert.equal(result.solved, true, result.status);
-    assert.equal(legacyOptions?.legacyClaimVerification, undefined, "competition lanes do not force the legacy verification alias");
-    assert.equal(legacyOptions?.legacySubmissionAlias, undefined, "competition lanes do not force the legacy submission alias");
     assert.equal(result.status, "SOLVED");
     assert.equal(result.submissions, 1, "exactly one submission may be spent on a first-try solve");
     assert.match(api.startKeys[0]?.key ?? "", /^proofblade-env-/);

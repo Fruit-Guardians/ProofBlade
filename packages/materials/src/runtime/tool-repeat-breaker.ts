@@ -351,7 +351,7 @@ function isDurableProgressObservation(observation: ToolFailureObservation): bool
   if (observation.isError) return false;
   const declaredProgress = stableBoolean(observation.details, "durableProgress");
   if (declaredProgress !== undefined) return declaredProgress;
-  if (observation.toolName === "verify_claim" || observation.toolName === "verify_result" || observation.toolName === "submit_flag") return true;
+  if (observation.toolName === "verify_result") return true;
   if (observation.toolName !== "evidence") return false;
   const operation = isRecord(observation.input) && typeof observation.input.operation === "string"
     ? observation.input.operation
