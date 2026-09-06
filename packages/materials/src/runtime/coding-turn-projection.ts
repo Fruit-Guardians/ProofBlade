@@ -1,7 +1,7 @@
 import { AgentHarness } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
-import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verification/claim-verification.js";
+import { rewriteUnverifiedClaimText, type TaskResultVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
 import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
@@ -448,7 +448,7 @@ export async function finalizeCodingTurn(options: {
   recoveryExhausted: boolean;
   termination: CodingTurnTermination;
   piEntryId?: string;
-  claimVerifier: Pick<CodingClaimVerifier, "project">;
+  claimVerifier: Pick<TaskResultVerifier, "project">;
   maintainAfterTurn: () => Promise<void>;
 }): Promise<AgentOutcome> {
   const rawOutput = options.response.content

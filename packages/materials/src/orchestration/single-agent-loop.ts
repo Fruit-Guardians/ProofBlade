@@ -9,7 +9,7 @@ import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract }
 import { id, isTerminal, remainingRunDeadlineMs } from "../domain/utils.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
-import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { TaskResultVerifier } from "../verification/claim-verification.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 import { RefinerCoordinator } from "./refiner.js";
@@ -35,7 +35,7 @@ export interface AgentLaneCreateInput {
   /** Deliberately excludes verifier and fixture lifecycle capabilities. */
   services: Pick<AppServices, "control" | "artifacts" | "journal" | "sessionRuntimeBrokers" | "sessionRuntimeRequired" | "browserRuntimeRequired">;
   /** Safe claim service; the lane never receives verifier control directly. */
-  claimVerifier: CodingClaimVerifier;
+  claimVerifier: TaskResultVerifier;
   config: ProofBladeConfig;
   /** Optional application-owned browser verifier; never exposed to the model. */
   browserVerifierFactory?: BrowserVerifierFactory;
@@ -137,7 +137,7 @@ export class SingleAgentLoop {
     // A fresh Run remains at INTAKE until the task or verifier has a concrete
     // reason to publish a domain phase. The loop must not infer a CTF-style
     // reconnaissance route from the turn number.
-    const claimVerifier = new CodingClaimVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
+    const claimVerifier = new TaskResultVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
     const refiner = new RefinerCoordinator(this.services.control);
@@ -418,7 +418,7 @@ export class SingleAgentLoop {
   }
 
   /**
-   * A task-owned reproduction is already verified by CodingClaimVerifier's
+   * A task-owned reproduction is already verified by TaskResultVerifier's
    * verifier journal before the loop observes the turn. Do not send it through
    * the hidden-scorer verifier (which would be a different authority); finish
    * the same durable report/submit edge from the accepted Completion instead.

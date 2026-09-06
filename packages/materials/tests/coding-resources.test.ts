@@ -21,7 +21,7 @@ import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
+import { CodingClaimVerifier, requiresClaimVerification, TaskResultVerifier } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
@@ -35,6 +35,10 @@ import { join, resolve } from "node:path";
  * cache prefix depends on this shape.
  */
 const CODING_TOOL_CONTRACT_HASH = "54f58df300bf1eb38c9f98a8b0bf1fb4ae3d9fd3cf2cdadafa1c120960d68953";
+
+test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
+  assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
+});
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();

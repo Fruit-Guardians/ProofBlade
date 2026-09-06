@@ -6,7 +6,7 @@ import { PiCodingLane } from "../runtime/coding-lane.js";
 import type { AgentLanePort } from "../runtime/pi-adapter.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { isTerminal } from "../domain/utils.js";
-import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { TaskResultVerifier } from "../verification/claim-verification.js";
 import { IndependentVerifier } from "../verification/verifier.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
@@ -124,7 +124,7 @@ export async function runCompetitionLoop(
         services.sessionRuntimeBrokers ?? [],
       ),
     ).recover(options.runId, options.task);
-    const claimVerifier = new CodingClaimVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const claimVerifier = new TaskResultVerifier(options.runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
     const platformVerifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, services.runsRoot, services.verifier);
     const coordinator = new RunCoordinator(services.control, services.verifier, { verifier: platformVerifier });
     lane = await createLane({
