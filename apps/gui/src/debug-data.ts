@@ -481,7 +481,7 @@ export class DebugDataService {
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
-      if (snapshot.task.mode === "ctf_solve") {
+      if (runKind(snapshot.task) === "fixture") {
         let ctfOutcome: AgentOutcome | undefined;
         const loop = new SingleAgentLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
         const result = await loop.run({
@@ -798,8 +798,13 @@ export function boundedJsonByteSize(value: unknown, limit: number): number {
   return bytes;
 }
 
-export function runKind(task: Pick<TaskContract, "mode">): RunKind {
-  return task.mode === "coding_assistant" ? "chat" : "fixture";
+export function runKind(task: Pick<TaskContract, "mode"> & Partial<Pick<TaskContract, "target" | "verification">>): RunKind {
+  // Legacy ctf_solve snapshots remain visible as Fixture runs, but newly
+  // created tasks are classified from their purpose rather than a CTF mode.
+  if (task.mode === "ctf_solve") return "fixture";
+  if (task.verification?.kind === "hidden_scorer" || task.verification?.kind === "platform_submission") return "fixture";
+  if (typeof task.target === "string" && /^(?:FIXTURE:|LOCAL_FIXTURE|REAL_EVALUATION:)/.test(task.target)) return "fixture";
+  return "chat";
 }
 
 export function codingConversationTask(runId: string, title: string, root: string, verificationCommand?: string): TaskContract {
