@@ -674,27 +674,39 @@ export class TaskResultVerifier {
     const task = await this.controlStore.snapshot(this.runId);
     const required = task.task.verification.required_reproductions > 0 || Boolean(task.task.verification.command);
     if (!required) return { required: false, status: "not_required" };
-    const candidate = extractFinalCandidate(assistantText);
-    if (!candidate) return { required: true, status: "unverified", reason: "最终回答没有唯一、明确的候选值。" };
-    const candidateHash = sha256(candidate);
     const snapshot = task;
     const completions = Object.values(snapshot.completions)
-      .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation && completion.candidateHash === candidateHash)
+      .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation)
       .sort((left, right) => right.createdSeq - left.createdSeq || left.id.localeCompare(right.id));
-    for (const completion of completions) {
-      const projection = await this.projectCompletion(snapshot, completion, candidate);
-      if (projection) return projection;
+    const candidate = extractFinalCandidate(assistantText);
+    if (candidate) {
+      const candidateHash = sha256(candidate);
+      for (const completion of completions.filter((item) => item.candidateHash === candidateHash)) {
+        const projection = await this.projectCompletion(snapshot, completion, candidate);
+        if (projection) return projection;
+      }
     }
-    return { required: true, status: "unverified", reason: "没有找到与最终候选哈希精确匹配的当前 generation 完整验证链。" };
+    if (!candidate) {
+      // Generic reports, JSON, and binary outputs are deliberately not reduced
+      // to an assistant-text candidate. Their verifier effect binds the exact
+      // durable Artifact hash to the Completion, which is the projection key.
+      for (const completion of completions) {
+        const projection = await this.projectCompletion(snapshot, completion, undefined);
+        if (projection) return projection;
+      }
+    }
+    return { required: true, status: "unverified", reason: candidate ? "没有找到与最终候选哈希精确匹配的当前 generation 完整验证链。" : "没有找到当前 generation 的完整结果 Artifact 验证链。" };
   }
 
-  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string): Promise<ResultVerificationProjection | undefined> {
+  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string | undefined): Promise<ResultVerificationProjection | undefined> {
     const candidateArtifact = snapshot.artifacts[completion.artifactId];
     if (!candidateArtifact || candidateArtifact.runId !== this.runId || candidateArtifact.generation !== snapshot.generation || candidateArtifact.sha256 !== completion.candidateHash) return undefined;
-    try {
-      if ((await this.artifactStore.readText(this.runId, candidateArtifact)).trim() !== candidate) return undefined;
-    } catch {
-      return undefined;
+    if (candidate !== undefined) {
+      try {
+        if ((await this.artifactStore.readText(this.runId, candidateArtifact)).trim() !== candidate) return undefined;
+      } catch {
+        return undefined;
+      }
     }
     const requiredReproductions = Math.max(1, snapshot.task.verification.required_reproductions);
     if (completion.evidenceIds.length < requiredReproductions) return undefined;
@@ -706,10 +718,15 @@ export class TaskResultVerifier {
     const attemptIds = new Set<string>();
     const transcriptHashes = new Set<string>();
     const receipts: ClaimReceipt[] = [];
+    let artifactResultMode: boolean | undefined;
     for (const item of evidence) {
       const effect = item.provenance.effect ? snapshot.effects[item.provenance.effect.id] : undefined;
       const verdict = effect?.verification;
       const effectArtifact = effect?.artifactId ? snapshot.artifacts[effect.artifactId] : undefined;
+      const thisArtifactMode = effect?.args.resultArtifactMode === "artifact";
+      if (artifactResultMode === undefined) artifactResultMode = thisArtifactMode;
+      else if (artifactResultMode !== thisArtifactMode) return undefined;
+      if (!thisArtifactMode && candidate === undefined) return undefined;
       if (!effect || !effectArtifact || effect.status !== "FINISHED" || effect.outcome !== "success" || effect.exitCode !== 0
         || effect.producerLane !== "verifier" || effect.generation !== snapshot.generation
         || effect.artifactId !== item.source.artifactId || effectArtifact.sourceEffectId !== effect.id
@@ -788,7 +805,7 @@ export class TaskResultVerifier {
   private async findClaimReceipt(
     snapshot: RunSnapshot,
     completion: RunSnapshot["completions"][string],
-    candidate: string,
+    candidate: string | undefined,
     evidence: Evidence,
     effect: RunSnapshot["effects"][string],
   ): Promise<ClaimReceipt | undefined> {
@@ -827,7 +844,7 @@ export class TaskResultVerifier {
         if (typeof execution.stdout !== "string" || typeof execution.stderr !== "string" || execution.exitCode !== 0) continue;
         if (effect.args.resultArtifactMode === "artifact"
           ? !acceptedResultEnvelope(execution.stdout, completion.candidateHash)
-          : !stdoutContainsExactCandidate(execution.stdout, candidate)) continue;
+          : candidate === undefined || !stdoutContainsExactCandidate(execution.stdout, candidate)) continue;
         if (parsed.outputHash !== sha256(`${execution.stdout}\n${execution.stderr}`)) continue;
         return parsed as ClaimReceipt;
       } catch {

@@ -172,6 +172,12 @@ test("verify_result accepts a durable result Artifact with a hash-bound verifier
     const completion = Object.values(snapshot.completions)[0];
     assert.equal(completion?.artifactId, resultArtifact.id);
     assert.equal(completion?.status, "ACCEPTED");
+    const projection = await verifier.project("Verify the report Artifact", "The report Artifact has been verified.");
+    assert.equal(projection.status, "verified");
+    assert.equal(projection.candidateHash, resultArtifact.sha256);
+    assert.equal(projection.completionId, completion?.id);
+    const conflictingText = await verifier.project("Verify the report Artifact", "最终结果：a different text result");
+    assert.equal(conflictingText.status, "unverified", "a stated text result must not inherit a different Artifact verification");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
