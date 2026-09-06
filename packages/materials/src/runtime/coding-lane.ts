@@ -8,6 +8,7 @@ import {
   type AgentHarnessEvent,
   type ExecutionEnv,
 } from "@earendil-works/pi-agent-core/node";
+import { writeFile } from "node:fs/promises";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { resolveOutputRewriteConfig, type ProofBladeConfig } from "../config.js";
 import type { ControlStore } from "../control/control-store.js";
@@ -63,6 +64,8 @@ import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
 import { preflightSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
 const MAX_CONTEXT_PROJECTION_MESSAGE_TOKENS = 10_000;
+/** Hard Provider-facing budget for user-managed project instructions. */
+export const MAX_PROJECT_PROMPT_TOKENS = 2_048;
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -169,6 +172,8 @@ export class PiCodingLane implements AgentLanePort {
     deferClaimAcceptance?: boolean;
     /** Percentage of the available input budget used as the proactive compaction soft limit. */
     contextCompactionThreshold?: number;
+    /** User-controlled project instructions appended after the framework baseline. */
+    projectPrompt?: string;
     /** Optional session id override for non-chat task runs. */
     sessionId?: string;
     /** Called when the submission path pauses on a pending approval. */
@@ -553,6 +558,24 @@ export class PiCodingLane implements AgentLanePort {
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),
       },
     );
+    const requestedProjectPrompt = options.projectPrompt?.trim() ?? "";
+    const boundedProjectPrompt = requestedProjectPrompt
+      ? boundModelText(requestedProjectPrompt, Math.max(64, requestedProjectPrompt.length), MAX_PROJECT_PROMPT_TOKENS)
+      : { text: "", truncated: false, originalChars: 0, omittedChars: 0 };
+    const projectPrompt = boundedProjectPrompt.text;
+    const effectiveSystemPrompt = projectPrompt
+      ? `${stableSystemPrompt}\n\n## Project instructions\n${projectPrompt}`
+      : stableSystemPrompt;
+    await writeFile(join(options.runDir, "prompt-snapshot.json"), `${JSON.stringify({
+      schemaVersion: 2,
+      generatedAt: new Date().toISOString(),
+      systemPrompt: effectiveSystemPrompt,
+      projectPrompt,
+      projectPromptOriginalChars: boundedProjectPrompt.originalChars,
+      projectPromptOmittedChars: boundedProjectPrompt.omittedChars,
+      projectPromptTruncated: boundedProjectPrompt.truncated,
+      systemPromptHash: sha256(effectiveSystemPrompt),
+    }, null, 2)}\n`, "utf8");
     const turnContext = { guidance: "" };
     const repeatBreaker = new RepeatedToolFailureBreaker();
     const progressBreaker = new NoProgressToolBreaker();
@@ -588,7 +611,7 @@ export class PiCodingLane implements AgentLanePort {
       resources: { skills: resources },
       toolContext,
       thinkingLevel: profile.thinkingLevel ?? "off",
-      systemPrompt: () => stableSystemPrompt,
+      systemPrompt: () => effectiveSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
     const ablationRoute = options.ablationPolicy ? {
@@ -601,7 +624,7 @@ export class PiCodingLane implements AgentLanePort {
     attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, ablationBinding, options.deferClaimAcceptance);
     const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
-    const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
+    const fixedContextTokens = estimateTokens(effectiveSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
     const providerSafetyTokens = Math.min(8_192, Math.max(1_024, Math.floor(profile.contextWindow * 0.1)));
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
     const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.35));
@@ -669,7 +692,7 @@ export class PiCodingLane implements AgentLanePort {
       controlStore: options.controlStore,
       requestContext: {
         contextWindow: profile.contextWindow,
-        systemPromptHash: sha256(stableSystemPrompt),
+        systemPromptHash: sha256(effectiveSystemPrompt),
         toolCatalogHash: sha256(canonicalJson(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
         toolNames: activeToolNames,
       },

@@ -85,6 +85,19 @@ export interface ConversationPreferences {
   enabledTools: string[];
   enabledSkills: string[];
   enabledMcpServers: string[];
+  projectPrompt?: string;
+}
+
+export interface PromptSnapshot {
+  schemaVersion: 1 | 2;
+  generatedAt: string;
+  systemPrompt: string;
+  projectPrompt: string;
+  /** Present in schema 2 snapshots after Provider-facing prompt bounding. */
+  projectPromptOriginalChars?: number;
+  projectPromptOmittedChars?: number;
+  projectPromptTruncated?: boolean;
+  systemPromptHash: string;
 }
 
 export interface DirectoryListing {

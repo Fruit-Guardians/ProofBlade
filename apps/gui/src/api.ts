@@ -98,6 +98,10 @@ export async function startTaskFromTemplate(input: { runId: string; templateId: 
   return await request("/api/tasks/templates/run", { method: "POST", body: JSON.stringify(input) });
 }
 
+export async function getPromptSnapshot(runId: string): Promise<import("./shared.js").PromptSnapshot | undefined> {
+  return await request(`/api/runs/${encodeURIComponent(runId)}/prompt`);
+}
+
 export async function createConversation(input: { runId: string; title: string; folderId?: string; workspacePath: string; verificationCommand?: string }): Promise<{ runId: string }> {
   return await request("/api/conversations", { method: "POST", body: JSON.stringify(input) });
 }

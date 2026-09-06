@@ -240,6 +240,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
+    if (method === "GET" && parts[3] === "prompt") return sendJson(response, 200, await data.promptSnapshot(runId));
     if (method === "GET" && parts[3] === "artifacts" && parts[4]) {
       return sendJson(response, 200, await data.artifact(runId, parts[4], boundedQueryInteger(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER), boundedQueryInteger(url, "limit", 64 * 1024, 1, 64 * 1024)));
     }
@@ -271,6 +272,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
           },
           workspacePath,
           preferences.contextCompactionThreshold,
+          preferences.projectPrompt,
         );
       } catch (error) {
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
@@ -495,6 +497,7 @@ function defaultPreferences(capabilities: WorkspaceSettings["capabilities"]): Co
     enabledTools: capabilities.tools.map((tool) => tool.name),
     enabledSkills: capabilities.skills.filter((skill) => !skill.disabled).map((skill) => skill.name),
     enabledMcpServers: capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name),
+    projectPrompt: "",
   };
 }
 
@@ -517,6 +520,7 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
     enabledTools: input.enabledTools.filter((name) => allowedTools.has(name)),
     enabledSkills: input.enabledSkills.filter((name) => allowedSkills.has(name)),
     enabledMcpServers: input.enabledMcpServers.filter((name) => allowedMcp.has(name)),
+    projectPrompt: typeof input.projectPrompt === "string" ? input.projectPrompt.slice(0, 16_000) : "",
   };
 }
 
@@ -532,6 +536,7 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
     ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
     ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
     ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),
+    ...(typeof body.projectPrompt === "string" ? { projectPrompt: body.projectPrompt } : {}),
   };
 }
 
