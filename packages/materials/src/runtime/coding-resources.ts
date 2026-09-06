@@ -483,18 +483,20 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
   label: "verify_result",
   description: "Run the task's deterministic verifier or audited workspace check and record the result as durable Evidence. A task-bound verifier can accept a Completion; without one, the check remains an explicitly unverified observation.",
   parameters: Type.Object({
-    result: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact result value or text that the answer will report." }),
+    result: Type.Optional(Type.String({ minLength: 1, maxLength: 1_024, description: "Short result value or text that the answer will report." })),
+    resultArtifactId: Type.Optional(Type.String({ minLength: 1, maxLength: 256, description: "Existing durable result Artifact to verify (use instead of result for reports, JSON, binaries, or other multi-byte outputs)." })),
     command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the result from workspace inputs and prints it." }),
     evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the verification." })),
     timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(toolCallId, params, signal, onUpdate, context) {
-    const input = params as { result: string; command: string; evidenceIds?: string[]; timeout?: number };
-    const result = input.result.trim();
+    const input = params as { result?: string; resultArtifactId?: string; command: string; evidenceIds?: string[]; timeout?: number };
+    const result = input.result?.trim() ?? "";
+    const resultArtifactId = input.resultArtifactId?.trim() ?? "";
     const command = input.command.trim();
-    if (!result || !command) throw new Error("verify_result requires a result and verification command");
-    if (command.includes(result)) {
+    if ((!result && !resultArtifactId) || (result && resultArtifactId) || !command) throw new Error("verify_result requires exactly one of result or resultArtifactId, plus a verification command");
+    if (result && command.includes(result)) {
       return toolResult({
         verified: false,
         result,
@@ -502,6 +504,36 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
         commandHash: sha256(command),
         verifierFeedback: verifierFailureFeedback(new Error("Verification command embeds the result literal; derive it from workspace inputs instead")),
       }, true);
+    }
+    if (resultArtifactId) {
+      try {
+        const reproduction = await context.claimVerifier.recordArtifactResult({
+          resultArtifactId,
+          command,
+          cwd: context.env.cwd,
+          toolCallId,
+          supportingEvidenceIds: input.evidenceIds,
+          signal,
+        });
+        const response = toolResult({
+          verified: reproduction.verified,
+          resultArtifactId: reproduction.resultArtifactId,
+          resultHash: reproduction.resultHash,
+          commandHash: reproduction.commandHash,
+          artifactId: reproduction.artifactId,
+          evidenceId: reproduction.evidenceId,
+          completionId: reproduction.completionId,
+          supportingEvidenceIds: reproduction.supportingEvidenceIds,
+        });
+        return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
+      } catch (error) {
+        return toolResult({
+          verified: false,
+          resultArtifactId,
+          commandHash: sha256(command),
+          verifierFeedback: verifierFailureFeedback(error),
+        }, true);
+      }
     }
     const executor = createBashTool<CodingResourceContext>();
     let output = "";

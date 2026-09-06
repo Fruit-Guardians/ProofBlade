@@ -630,6 +630,14 @@ export class EffectJournal {
       } catch {
         valid = false;
       }
+    } else if ((operation === "result_verification" || operation === "claim_reproduction") && args.resultArtifactMode === "artifact" && result.exitCode === 0) {
+      try {
+        const parsed = JSON.parse(result.stdout) as { accepted?: unknown; resultHash?: unknown };
+        valid = typeof parsed.accepted === "boolean" && parsed.resultHash === completion.candidateHash;
+        accepted = valid && parsed.accepted === true;
+      } catch {
+        valid = false;
+      }
     } else if ((operation === "result_verification" || operation === "claim_reproduction") && result.exitCode === 0) {
       const candidateArtifact = snapshot.artifacts[completion.artifactId];
       if (candidateArtifact) {

@@ -28,7 +28,7 @@
 - `pi-adapter.ts` 管理 Session；`lmstudio-provider.ts` 解析配置模型；`provider-transport.ts` 处理代理传输。
 - `provider-native.ts` 只声明协议可能提供的原生服务工具及其语义归属，不把未进入 Effect/Artifact/Evidence 链的 Provider 内置能力冒充成可调用 Capability；`provider-scheduler.ts` 按 Provider/model 共享并发槽和 FIFO 等待队列。
 - `coding-resources.ts` 装配最小 Tool/Skill/Capability/MCP 面；`evidence` 是证据图固定代理，`verify_result` 是通用结果复现门。历史 `verify_claim` 事件只由回放/迁移逻辑读取，不再作为模型工具暴露。
-- `CodingClaimVerifier` 是唯一候选验证路径。任务绑定的 reproduction command 对所有模式都走同一 verifier journal；没有绑定命令的普通探索仍可继续，但只能写入明确标记的 observation，不能接受 Completion，最终文本也会统一标记为未验证。`deferClaimAcceptance` 只控制外层编排时机，不改变验证规则。
+- `TaskResultVerifier` 是唯一结果验证路径。任务绑定的 reproduction command 对短文本结果和任意 Result Artifact 都走同一 verifier journal；没有绑定命令的普通探索仍可继续，但只能写入明确标记的 observation，不能接受 Completion，最终文本也会统一标记为未验证。`deferClaimAcceptance` 只控制外层编排时机，不改变验证规则；`CodingClaimVerifier` 仅作为历史类型别名。
 - `SecurityToolProfile.firstActionPlan` 将首个安全任务动作结构化为建议的 Tool 集和有界调用次数；Preflight 结果与该计划一起写入 Run。Coding lane 在 `tool_call` 结果中给出可操作的 advisory，但不会因为模型选择了其他工具而阻断；首个成功 Observation 仍会记录为已完成，恢复时从当前代 Observation 推导状态。
 - `SecurityToolProfile.actionBundles` 将 RECON、TARGET_MODEL、HYPOTHESIS、EXPERIMENT、REPRODUCE 各阶段的工具、能力、前置条件、成功/失败判据和调用上限一次性预计算；Preflight 与 Run replay 携带同一份契约，回合提示只推荐当前 durable phase，不再让模型临场请求或安装缺失工具。阶段路线和动作包默认只产生带原因与下一步的 advisory；只有显式消融 Variant 的 `hard_gate` 才允许认知阻断。
 - Durable session broker 在 Coding lane 装配前先做有界 health/capability preflight，并按不可变 TaskContract 的 target/policy 只筛选当前方向需要的 kind；仅当 broker 报告 `READY`、覆盖对应 `pwn-session`/`http-session` kind 且 `stableAcrossRestart=true` 时才注册。配置存在但 token 缺失、服务降级、能力不匹配或探针失败时，对应 kind 保持不可用，不以 Docker/进程内 HTTP 作为隐式替代。没有 health 方法的注入 broker 仅保留给测试/开发适配器，生产 HTTP broker 必须实现该契约。

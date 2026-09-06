@@ -25,8 +25,8 @@
 ## 入口与边界
 
 - `verifier.ts` 执行配置次数的隐藏 scorer 复现并产出报告。
-- `claim-verification.ts` 为普通 Coding 对话识别高风险确定性结论，从 durable Snapshot/Artifact 重建投影，并把命令执行记录进 Effect Journal。只有 Task Contract 预先绑定且精确匹配的 verifier command 才能走 Verifier-owned Sandbox；该服务会执行 `required_reproductions` 次独立 attempt 后原子接受 Completion。模型自选命令只走普通 Effect 并形成 audited observation。
-- Solver/Planner 只能提出 candidate，不能确认成功。
+- `claim-verification.ts` 为普通安全任务提供统一结果验证，从 durable Snapshot/Artifact 重建投影，并把命令执行记录进 Effect Journal。短文本结果仍可通过逐行复现验证；报告、JSON、反汇编和其他任意结果则通过 `resultArtifactId` 绑定已有 Artifact，并要求任务契约中的 verifier command 输出 `{accepted:true,resultHash}`。只有 Task Contract 预先绑定且精确匹配的 verifier command 才能走 Verifier-owned Sandbox；该服务会执行 `required_reproductions` 次独立 attempt 后原子接受 Completion。模型自选命令只走普通 Effect 并形成 audited observation。
+- Solver/Planner 只能提出结果 Artifact 或短文本结果，不能确认成功。
 - 生产 `AppServices.verifierJournal` 只暴露由配置 Sandbox 执行的 `execute()`；任意 executor callback 仅存在于未从 package root 导出的 test composition，模型 lane 与普通 Solver lane 均拿不到 Verifier/Fixture capability。
 - 候选明文放在敏感 Artifact，事件只保留哈希和引用。
 - `pwn_reproduce` 的输入仍只有模型提出的 ordered stages；target command、remote endpoint、flag path、flag rule/regex、shell marker 和 confidence 来自当前 Run 的 Task Contract/Verifier 私有策略。模型侧的 `PwnReproducer` 只产生观察，配置了容器 verifier 时由 `PwnReproductionVerifier` 在 owner=`verifier` 的新 session/process 中重新执行，并通过 `CodingClaimVerifier.executePwnReproductionEffect` 生成受信 Effect、transcript Artifact、Evidence 和 Completion verdict。
@@ -40,7 +40,7 @@
 
 验证失败保持显式、可重放且不泄漏 scorer 细节。修改接受条件时同步 Task Contract、评测协议和 Auto/Assist 测试。
 
-Coding 复现命令不得包含候选明文，任务绑定命令的 stdout 必须有一行与最终候选完全相等；宽松子串扫描或模型自选命令只能作为观察，不能单独形成 reproduction Evidence。每个 verifier Effect 产出结构化 verdict，绑定 Task hash、Generation、Completion、Candidate Artifact、session、attempt 与 transcript Artifact；ControlStore 会再次核验 verdict 方向和语义绑定。`verify_result` 必须校验传入的支撑 Evidence ID，并将其挂到执行记录、Evidence、Fact 和结果 Artifact 上；历史 `verify_claim` 事件仅在回放/迁移时读取。最终投影按 `completionId + candidateHash` 从 durable state 重建每一条独立复现，不得依赖进程内数组或 `assistantText.includes()`。
+Coding 复现命令不得包含候选明文或结果哈希字面量；短文本结果的任务绑定命令 stdout 必须有一行与结果完全相等，Artifact 结果则必须输出与绑定 Artifact 相同的 `resultHash`。宽松子串扫描或模型自选命令只能作为观察，不能单独形成 reproduction Evidence。每个 verifier Effect 产出结构化 verdict，绑定 Task hash、Generation、Completion、Result Artifact、session、attempt 与 transcript Artifact；ControlStore 会再次核验 verdict 方向和语义绑定。`verify_result` 必须校验传入的支撑 Evidence ID，并将其挂到执行记录、Evidence、Fact 和结果 Artifact 上；历史 `verify_claim` 事件仅在回放/迁移时读取。最终投影按 `completionId + resultHash` 从 durable state 重建每一条独立复现，不得依赖进程内数组或 `assistantText.includes()`。
 
 成功复现还必须生成以 accepted Completion 为根的结果树，并通过 `reproduces/supports/depends_on/derived_from` 边连接上游 Evidence 与复现 Artifact，供主 Agent 和 GUI 回溯完整依据。
 
