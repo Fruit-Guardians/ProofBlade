@@ -992,7 +992,7 @@ test("tool-call budget blocks and terminates the next inner turn", async () => {
   }
 });
 
-test("[contract:first-action-budget] blocks broad tools until the prepared probe produces an observation", async () => {
+test("[contract:first-action-budget] advises on broad tools while preserving the prepared probe", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-first-action-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
@@ -1022,10 +1022,12 @@ test("[contract:first-action-budget] blocks broad tools until the prepared probe
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, undefined, firstActionBudget);
 
     const response = await harness.prompt("CTF challenge: inspect the target");
-    assert.equal(evidenceExecutions, 0);
+    assert.equal(evidenceExecutions, 1);
     assert.equal(bashExecutions, 1);
     assert.equal(firstActionBudget.completed, true);
     assert.equal(response.stopReason, "stop");
+    assert.match(JSON.stringify(await session.getBranch()), /first-action/);
+    assert.match(JSON.stringify(await session.getBranch()), /call was allowed/);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -1099,6 +1101,8 @@ test("[contract:ablation-route-failure] soft route advice preserves a failed too
     assert.equal(response.stopReason, "stop");
     assert.match(JSON.stringify(response), /continued after failed route/);
     assert.ok(events.includes("phase_route:advise"));
+    assert.match(JSON.stringify(await session.getBranch()), /action bundle/);
+    assert.match(JSON.stringify(await session.getBranch()), /phase route/);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });

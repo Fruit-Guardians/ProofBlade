@@ -123,7 +123,7 @@
     "src/runtime/challenge-tool-profile.ts": "5296f035e7e7d25e267854a304d104c388c04900258a711f89ceb71aa9095381",
     "src/runtime/coding-lane.ts": "6ab69afbcc0429d9b27778120c5dfdd0075c6ac4a803a9602c026d9c3ff97594",
     "src/runtime/coding-resources.ts": "e4d662343a3249b24149c167fe404b7b1fc84eff14c6109db9b4fd24d185ee2e",
-    "src/runtime/coding-turn-projection.ts": "a075aa5404ae067dac4b030a2c20ee5786e753016a2dabef676a32f17c5768fe",
+    "src/runtime/coding-turn-projection.ts": "4f287a5ab4b905be29bcecdcf068a3701bc1a2301644d31a665c7db7517e67f7",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "7a20212a0c4051593022955c9dc1058d0794c18c7b616fa74ccc744872e9f0bb",
@@ -9279,7 +9279,7 @@
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
-      "structureHash": "e6041465bd998d0824cdf1c1a8ffd8cba36014d4aba781887fe4cb81371eb929"
+      "structureHash": "4575ec2ca3bc3fd2bd86ee03b8c8f5c92abba1f118b7d52b30cfaa8e2aa6c414"
     },
     {
       "id": "@proofblade/materials::function::attachRepeatedToolFailureBreaker",
@@ -9315,7 +9315,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-turn-projection.ts",
       "exportPath": "@proofblade/materials",
-      "line": 428,
+      "line": 461,
       "signature": "(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<CodingClaimVerifier, \"project\">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>",
       "summary": "Inferred summary: finalize coding turn operation used to perform a durable write.",
       "summarySource": "inferred",
