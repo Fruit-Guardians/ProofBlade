@@ -1,5 +1,6 @@
 export * from "./config.js";
 export * from "./domain/types.js";
+export * from "./domain/general-task-contract.js";
 export type {
   Intent as SchedulerIntent,
   IntentStatus,
