@@ -426,6 +426,12 @@ function boundedQueryInteger(url: URL, name: string, fallback: number, minimum: 
   return value;
 }
 
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+  return value;
+}
+
 function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
   return {
     id: optionalString(body.id),
@@ -438,6 +444,7 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
     models: stringArray(body.models),
     thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
     cacheRetention: typeof body.cacheRetention === "string" ? body.cacheRetention as ProviderCacheRetention : undefined,
+    supportsLongCacheRetention: optionalBoolean(body.supportsLongCacheRetention, "supportsLongCacheRetention"),
     maxConcurrentRequests: body.maxConcurrentRequests === undefined ? undefined : Number(body.maxConcurrentRequests),
     apiKey: optionalString(body.apiKey),
     clearApiKey: body.clearApiKey === true,

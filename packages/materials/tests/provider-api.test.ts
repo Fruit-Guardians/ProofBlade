@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { createConfiguredModels, discoveryPathForApi, normalizeProviderBaseUrl, resolveModelProfile } from "../src/runtime/lmstudio-provider.js";
+import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
+import type { Context, Model } from "@earendil-works/pi-ai";
+import { createConfiguredModels, discoveryPathForApi, effectiveCacheRetention, normalizeProviderBaseUrl, resolveModelProfile } from "../src/runtime/lmstudio-provider.js";
 
 test("Anthropic profiles use a root base URL while discovery retains the API version", async () => {
   assert.equal(normalizeProviderBaseUrl("https://api.anthropic.com/v1/", "anthropic-messages"), "https://api.anthropic.com");
@@ -53,4 +55,46 @@ test("the checked-in aihub evaluation profile uses the Responses wire protocol",
   };
   assert.equal(config.modelProfiles?.executor?.provider, "aihub");
   assert.equal(config.modelProfiles?.executor?.api, "openai-responses");
+});
+
+test("long cache retention requires explicit Provider support", () => {
+  assert.equal(effectiveCacheRetention({ cacheRetention: "long" }), "short");
+  assert.equal(effectiveCacheRetention({ cacheRetention: "long", supportsLongCacheRetention: false }), "short");
+  assert.equal(effectiveCacheRetention({ cacheRetention: "long", supportsLongCacheRetention: true }), "long");
+  assert.equal(effectiveCacheRetention({ cacheRetention: "short", supportsLongCacheRetention: true }), "short");
+  assert.equal(effectiveCacheRetention({ cacheRetention: "none", supportsLongCacheRetention: true }), "none");
+});
+
+test("unsupported long retention is absent from the OpenAI Responses payload", async () => {
+  const api = openAIResponsesApi();
+  const model: Model<"openai-responses"> = {
+    id: "mock-model",
+    name: "mock-model",
+    api: "openai-responses",
+    provider: "mock-relay",
+    baseUrl: "http://127.0.0.1:1/v1",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 16_384,
+    maxTokens: 256,
+  };
+  const context: Context = {
+    messages: [{ role: "user", content: "hello", timestamp: 1 }],
+  };
+  let payload: Record<string, unknown> | undefined;
+  const stream = api.stream(model, context, {
+    apiKey: "test-key",
+    cacheRetention: effectiveCacheRetention({ cacheRetention: "long" }),
+    sessionId: "stable-session",
+    onPayload: (value) => {
+      payload = value as Record<string, unknown>;
+      throw new Error("stop after payload capture");
+    },
+  });
+  for await (const _event of stream) {
+    // The callback intentionally aborts before any network request is made.
+  }
+  assert.equal(payload?.prompt_cache_retention, undefined);
+  assert.equal(payload?.prompt_cache_key, "stable-session");
 });

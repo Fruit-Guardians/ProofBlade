@@ -58,7 +58,10 @@ test("persists provider overrides outside the repository response without exposi
     assert.equal(reloaded.publicSettings().hasApiKey, true);
     assert.equal(reloaded.modelProfile().thinkingLevel, "low");
     assert.equal(reloaded.publicSettings().cacheRetention, "long");
+    assert.equal(reloaded.publicSettings().supportsLongCacheRetention, false);
+    assert.equal(reloaded.publicSettings().effectiveCacheRetention, "short");
     assert.equal(reloaded.modelProfile().cacheRetention, "long");
+    assert.equal(reloaded.modelProfile().supportsLongCacheRetention, false);
     assert.equal(reloaded.modelProfile().proxyUrl, "http://127.0.0.1:7897");
     assert.equal(reloaded.publicSettings().maxConcurrentRequests, 3);
     assert.equal(reloaded.modelProfile().maxConcurrentRequests, 3);
@@ -69,6 +72,34 @@ test("persists provider overrides outside the repository response without exposi
   } finally {
     delete process.env.PROOFBLADE_GUI_TEST_KEY;
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("threads declared Responses long-cache support from the GUI profile into the runtime profile", async () => {
+  const root = resolve(import.meta.dirname, "../../..");
+  const path = join(root, "tmp", `provider-long-cache-${Date.now()}.json`);
+  try {
+    const store = await ProviderSettingsStore.create(config, path);
+    const settings = await store.save({
+      name: "Responses relay",
+      provider: "responses-relay",
+      api: "openai-responses",
+      baseUrl: "https://responses.example/v1",
+      model: "gpt-test",
+      thinkingLevel: "off",
+      cacheRetention: "long",
+      supportsLongCacheRetention: true,
+    });
+    const profile = settings.profiles.find((item) => item.name === "Responses relay");
+    assert.ok(profile);
+    assert.equal(profile.supportsLongCacheRetention, true);
+    assert.equal(profile.effectiveCacheRetention, "long");
+    assert.equal(store.modelProfile(profile.id).cacheRetention, "long");
+    assert.equal(store.modelProfile(profile.id).supportsLongCacheRetention, true);
+    assert.equal(settings.supportsLongCacheRetention, true);
+    assert.equal(settings.effectiveCacheRetention, "long");
+  } finally {
+    await rm(path, { force: true });
   }
 });
 
