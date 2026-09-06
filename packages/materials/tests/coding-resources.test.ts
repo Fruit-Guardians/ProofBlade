@@ -34,18 +34,20 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "696c1dfc6cf978bfce0eb599655d03755cccc8b9543d82725c5c2fc81f353944";
+const CODING_TOOL_CONTRACT_HASH = "54f58df300bf1eb38c9f98a8b0bf1fb4ae3d9fd3cf2cdadafa1c120960d68953";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
+  assert.equal(codingProviderToolContractSnapshot({ legacyClaimVerification: true }).some((tool) => tool.name === "verify_claim"), true);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
+  assert.deepEqual(codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [], legacyClaimVerification: true }), ["read", "bash", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
   const genericExternalTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], externalSubmissionEnabled: true });
@@ -1151,7 +1153,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {
-  const tool = createCodingTools().find((candidate) => candidate.name === name);
+  const tool = createCodingTools({ legacyClaimVerification: name === "verify_claim" }).find((candidate) => candidate.name === name);
   assert.ok(tool, `Missing coding tool: ${name}`);
   const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("test-call", params, new AbortController().signal, () => undefined, context);
   return result as { content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean };

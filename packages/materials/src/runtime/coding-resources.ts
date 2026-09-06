@@ -32,7 +32,10 @@ import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSear
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+/** Provider-facing proxy tools for new generic security tasks. */
+export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+/** Historical alias retained for old sessions and competition integrations. */
+const CODING_LEGACY_PROXY_TOOL_NAMES = ["verify_claim"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -86,10 +89,10 @@ export interface CodingResourceContext extends ExecutionToolContext {
   enabledMcpServers: Set<string>;
   claimVerifier: CodingClaimVerifier;
   /**
-   * Stop the current Pi turn after verify_claim so the outer Run coordinator
-   * can perform verifier-owned scoring before the model issues another tool
-   * call. Competition lanes leave this unset so submit_flag may follow a
-   * preliminary observation in the same turn.
+   * Stop the current Pi turn after result verification so the outer Run
+   * coordinator can perform verifier-owned scoring before the model issues
+   * another tool call. Competition lanes leave this unset so submit_flag may
+   * follow a preliminary observation in the same turn.
    */
   deferClaimAcceptance?: boolean;
   /** Keep claim verification in the same continuous maintenance loop. */
@@ -157,11 +160,20 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
   }));
 }
 
-export function createCodingTools(options: { platformJudged?: boolean; externalSubmissionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
+export interface CodingToolOptions {
+  platformJudged?: boolean;
+  externalSubmissionEnabled?: boolean;
+  webReproductionEnabled?: boolean;
+  webSessionEnabled?: boolean;
+  /** Expose the pre-generic verify_claim alias for historical callers only. */
+  legacyClaimVerification?: boolean;
+}
+
+export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
     verifyResultTool,
-    verifyClaimTool,
+    ...(options.legacyClaimVerification ? [verifyClaimTool] : []),
     evidenceTool,
     loadSkillTool,
     capabilityTool,
@@ -1101,10 +1113,12 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; legacyClaimVerification?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
+  const builtinCount = active.length;
   active.push(...CODING_PROXY_TOOL_NAMES);
+  if (input.legacyClaimVerification) active.splice(builtinCount + 1, 0, ...CODING_LEGACY_PROXY_TOOL_NAMES);
   // Only expose the tube tools when a Docker-backed pwn container or durable
   // session-runtime broker is attached, so a GUI chat run does not advertise
   // seven tools that would fail closed.
@@ -1119,8 +1133,8 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   return active;
 }
 
-export function codingProviderToolContractSnapshot(): Array<{ name: string; description: string; parameters: unknown }> {
-  return createCodingTools().map((tool) => ({
+export function codingProviderToolContractSnapshot(options: Pick<CodingToolOptions, "legacyClaimVerification"> = {}): Array<{ name: string; description: string; parameters: unknown }> {
+  return createCodingTools(options).map((tool) => ({
     name: tool.name,
     description: tool.description,
     parameters: structuredClone(tool.parameters),

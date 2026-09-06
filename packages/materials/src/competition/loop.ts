@@ -147,6 +147,9 @@ export async function runCompetitionLoop(
       // minutes, which in a fleet idles a worker slot for the whole time; long work
       // belongs in shell_background instead.
       bashTimeoutSecondsMax: options.bashTimeoutSecondsMax ?? 180,
+      // Competition replay still speaks the historical verify_claim protocol;
+      // generic security tasks leave this compatibility alias disabled.
+      legacyClaimVerification: true,
       ...(options.executionEnv ? { executionEnv: options.executionEnv } : {}),
       ...(options.workspaceRootForPrompt ? { workspaceRootForPrompt: options.workspaceRootForPrompt } : {}),
       ...(options.skillsLibraryPathForPrompt ? { skillsLibraryPathForPrompt: options.skillsLibraryPathForPrompt } : {}),

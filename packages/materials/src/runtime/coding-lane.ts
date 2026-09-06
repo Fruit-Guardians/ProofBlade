@@ -175,6 +175,8 @@ export class PiCodingLane implements AgentLanePort {
     onApprovalRequired?: (approvalId: string) => void;
     /** Optional strict-ablation policy binding; safety checks remain unconditional. */
     ablationPolicy?: AblationPolicyBinding;
+    /** Expose the pre-generic verify_claim alias for historical callers only. */
+    legacyClaimVerification?: boolean;
     /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
@@ -472,7 +474,12 @@ export class PiCodingLane implements AgentLanePort {
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
-    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
+    // New generic security tasks use verify_result. Historical ctf_solve
+    // snapshots and explicitly opted-in callers retain verify_claim so their
+    // recorded sessions remain replayable.
+    const historicalClaimTask = (snapshot.task as { mode?: string }).mode === "ctf_solve";
+    const legacyClaimVerification = options.legacyClaimVerification === true || historicalClaimTask;
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession), legacyClaimVerification }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -480,6 +487,7 @@ export class PiCodingLane implements AgentLanePort {
         mcpServers: [...enabledMcpServers],
         platformJudged,
         externalSubmissionEnabled,
+        legacyClaimVerification,
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
         webReproductionEnabled: Boolean(webReproducer || browserReproducer),
