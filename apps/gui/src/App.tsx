@@ -935,6 +935,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
   const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
+  const [supportsLongCacheRetention, setSupportsLongCacheRetention] = useState(false);
   const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(1);
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -952,11 +953,11 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
 
   const loadProfile = (profile?: ProviderProfile) => {
     if (!profile) return;
-    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setApi(profile.api); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setMaxConcurrentRequests(profile.maxConcurrentRequests); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setApi(profile.api); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setSupportsLongCacheRetention(profile.supportsLongCacheRetention); setMaxConcurrentRequests(profile.maxConcurrentRequests); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {
@@ -970,7 +971,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const save = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, api, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, maxConcurrentRequests, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
+      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, api, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, supportsLongCacheRetention, maxConcurrentRequests, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
       setSettings(saved); setSelectedId(saved.activeProfileId); loadProfile(saved.profiles.find((profile) => profile.id === saved.activeProfileId)); setHasApiKey(saved.profiles.find((profile) => profile.id === saved.activeProfileId)?.hasApiKey ?? false); await onSaved();
     } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
@@ -989,13 +990,15 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
         <aside className="provider-list"><div className="section-head"><strong>Provider</strong><button type="button" className="icon-button" title="新建 Provider" aria-label="新建 Provider" onClick={createNew}><Plus size={15} /></button></div>{settings?.profiles.map((profile) => <button type="button" key={profile.id} className={`provider-list-item ${selectedId === profile.id ? "selected" : ""}`} onClick={() => loadProfile(profile)}><span className="provider-list-dot" /><span><strong>{profile.name}</strong><small>{profile.provider} · {profile.model}</small></span>{settings.activeProfileId === profile.id && <em>当前</em>}</button>)}</aside>
         <div className="provider-form">
           <div className="provider-grid"><label><span>配置名称</span><input required value={name} onChange={(event) => setName(event.target.value)} /></label><label><span>Provider ID</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label></div>
-          <label><span>Provider API</span><select value={api} onChange={(event) => setApi(event.target.value as ProviderApi)}><option value="openai-completions">OpenAI Chat Completions / compatible</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
+          <label><span>Provider API</span><select value={api} onChange={(event) => { const next = event.target.value as ProviderApi; setApi(next); if (next !== "openai-responses") { setSupportsLongCacheRetention(false); if (cacheRetention === "long") setCacheRetention("short"); } }}><option value="openai-completions">OpenAI Chat Completions / compatible</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
           <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://aihub.top/v1" /></label>
           <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7897" /></label>
           <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
           {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
           <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{[...new Set([model, ...models].filter(Boolean))].map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}刷新模型</button></div></label>
-          <div className="provider-grid"><label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label><label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long">长期（会话键）</option><option value="none">关闭</option></select></label><label><span>并发请求</span><input type="number" min={1} max={32} step={1} value={maxConcurrentRequests} onChange={(event) => setMaxConcurrentRequests(Number(event.target.value))} /></label></div>
+          <div className="provider-grid"><label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label><label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long" disabled={api !== "openai-responses" || !supportsLongCacheRetention}>长期（会话键）</option><option value="none">关闭</option></select></label><label><span>并发请求</span><input type="number" min={1} max={32} step={1} value={maxConcurrentRequests} onChange={(event) => setMaxConcurrentRequests(Number(event.target.value))} /></label></div>
+          {api === "openai-responses" && <label className="clear-key"><input type="checkbox" checked={supportsLongCacheRetention} onChange={(event) => { setSupportsLongCacheRetention(event.target.checked); if (!event.target.checked && cacheRetention === "long") setCacheRetention("short"); }} /><span>该 Provider 支持 Responses 24 小时缓存保留</span></label>}
+          {cacheRetention === "long" && (api !== "openai-responses" || !supportsLongCacheRetention) && <div className="provider-form-note">此配置未声明 Responses 长期缓存支持，实际请求将使用短期缓存。</div>}
           <div className="provider-form-note">Key 只保存在本机配置，API 仅返回已配置状态。保存后新对话默认使用当前配置，已有对话保留自己的选择。</div>
         </div>
       </div>

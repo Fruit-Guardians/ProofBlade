@@ -27,6 +27,10 @@ export interface ProviderProfile {
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  /** The endpoint has explicitly opted into the Responses 24h retention hint. */
+  supportsLongCacheRetention: boolean;
+  /** Retention that will actually be sent to the provider for this profile. */
+  effectiveCacheRetention: ProviderCacheRetention;
   maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
@@ -42,6 +46,8 @@ export interface ProviderSettings {
   model: string;
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  supportsLongCacheRetention: boolean;
+  effectiveCacheRetention: ProviderCacheRetention;
   maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
@@ -57,6 +63,7 @@ export interface ProviderSettingsInput {
   models?: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
+  supportsLongCacheRetention?: boolean;
   maxConcurrentRequests?: ProviderMaxConcurrentRequests;
   apiKey?: string;
   clearApiKey?: boolean;
