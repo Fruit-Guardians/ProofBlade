@@ -18,7 +18,7 @@
     "src/competition/dasctf-api.ts": "538036302b118f2cf9942927c8ba5ca263384326d59b42d82586b1abb46af7b1",
     "src/competition/environment-janitor.ts": "e4d15beb8a2bb5e342fb453e42b5ba6916832493da525c848fb8ede334cac056",
     "src/competition/experiment-gate.ts": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
-    "src/competition/fleet.ts": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+    "src/competition/fleet.ts": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
     "src/competition/loop.ts": "36d2a1a30da6e5ca893512f197fb057267b1979fc6ec9e7b3aa677ccb12beda2",
     "src/competition/sandbox.ts": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
@@ -99,7 +99,7 @@
     "src/orchestration/run-coordinator.ts": "b841e4c77b928f78aff82a401a01b73a7806e80cd33c2333d06a8850d59780f3",
     "src/orchestration/run-work-scheduler.ts": "6cdf1f0dd18fae70e0011074bd507fab10e73fe91c565c758a05a5281bb4f396",
     "src/orchestration/scheduling-context.ts": "ae8552fbaa9f2528dca5d606adcb99eea16f20812e8140536ae37d5a6fa1d1fd",
-    "src/orchestration/single-agent-loop.ts": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+    "src/orchestration/single-agent-loop.ts": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
     "src/pwn/bytes.ts": "dd621830e719b15774f3d63cee44139ce9890a1b67c67edd74928ef7271548fa",
     "src/pwn/leak.ts": "532356173eeda5740eaadb59d858491bd1289aed97f5fff47ad29e20bba955ce",
     "src/pwn/pattern.ts": "ab5ef8a12683d5b35631ebe157b677fd399e78692b5d11ab08dba2fe67716180",
@@ -510,7 +510,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 97,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -1282,19 +1282,18 @@
       ]
     },
     {
-      "id": "@proofblade/materials::class::SingleAgentCtfLoop",
-      "name": "SingleAgentCtfLoop",
+      "id": "@proofblade/materials::class::SingleAgentLoop",
+      "name": "SingleAgentLoop",
       "kind": "class",
-      "signature": "SingleAgentCtfLoop",
-      "summary": "Inferred summary: single agent ctf loop class used to provide a reusable operation.",
+      "signature": "SingleAgentLoop",
+      "summary": "Inferred summary: single agent loop class used to provide a reusable operation.",
       "summarySource": "inferred",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 88,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": [
-        "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
       ]
     },
@@ -2648,18 +2647,19 @@
       ]
     },
     {
-      "id": "@proofblade/materials::constant::SingleAgentLoop",
-      "name": "SingleAgentLoop",
+      "id": "@proofblade/materials::constant::SingleAgentCtfLoop",
+      "name": "SingleAgentCtfLoop",
       "kind": "constant",
-      "signature": "typeof SingleAgentCtfLoop",
-      "summary": "Generic public name for the single-agent loop. The compatibility alias keeps",
+      "signature": "typeof SingleAgentLoop",
+      "summary": "Historical export retained for replay and downstream compatibility. New",
       "summarySource": "tsdoc",
       "tags": [],
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
-      "line": 532,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "line": 531,
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": [
+        "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/single-agent-loop.test.ts"
       ]
     },
@@ -7759,7 +7759,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 27,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-fleet.test.ts",
@@ -7778,7 +7778,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 11,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-fleet.test.ts"
@@ -7795,7 +7795,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 18,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-fleet.test.ts"
@@ -7812,7 +7812,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 43,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": []
     },
     {
@@ -7826,7 +7826,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 80,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": []
     },
     {
@@ -7840,7 +7840,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 72,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": []
     },
     {
@@ -7854,7 +7854,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 61,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": []
     },
     {
@@ -12232,7 +12232,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 28,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": []
     },
     {
@@ -12246,7 +12246,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 53,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": []
     },
     {
@@ -12260,7 +12260,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 78,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": []
     },
     {
@@ -18598,7 +18598,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 173,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts"
       ]
@@ -18614,7 +18614,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 124,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -18678,7 +18678,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 146,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-fleet.test.ts"
       ]
@@ -18694,7 +18694,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 206,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -18811,7 +18811,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 155,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts",
         "packages/materials/tests/competition-solver.test.ts"
@@ -18828,7 +18828,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 187,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/competition-control-plane.test.ts"
       ]
@@ -18844,7 +18844,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 193,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation.test.ts",
@@ -26502,8 +26502,8 @@
       ]
     },
     {
-      "id": "@proofblade/materials::method::SingleAgentCtfLoop.run",
-      "name": "SingleAgentCtfLoop.run",
+      "id": "@proofblade/materials::method::SingleAgentLoop.run",
+      "name": "SingleAgentLoop.run",
       "kind": "method",
       "signature": "(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome>",
       "summary": "Inferred summary: run operation used to perform a durable write.",
@@ -26512,7 +26512,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 97,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": [
         "packages/materials/tests/ablation-ledger.test.ts",
         "packages/materials/tests/ablation-policy.test.ts",
@@ -36702,7 +36702,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/competition/fleet.ts",
       "line": 33,
-      "moduleHash": "685412616af4c0f7fbdb4cd2c17674fe6b85d68dc7911235a73d43a857cc5246",
+      "moduleHash": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
       "testRefs": []
     },
     {
@@ -38423,7 +38423,7 @@
       "exportPath": "@proofblade/materials",
       "module": "src/orchestration/single-agent-loop.ts",
       "line": 51,
-      "moduleHash": "3256204c31ecdfa71de8d164d28e57ad7057a4908543ff5f20c60b76a07cb085",
+      "moduleHash": "d10da353aa306dc86a3700f7467672297d0471545297f7a2fad6432a12f9e299",
       "testRefs": [
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/evaluation.test.ts",

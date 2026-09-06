@@ -85,7 +85,7 @@ export interface SingleAgentRunOutcome {
   evidenceIds: string[];
 }
 
-export class SingleAgentCtfLoop {
+export class SingleAgentLoop {
   public constructor(
     private readonly root: string,
     private readonly config: ProofBladeConfig,
@@ -525,11 +525,10 @@ export class SingleAgentCtfLoop {
 }
 
 /**
- * Generic public name for the single-agent loop. The compatibility alias keeps
- * historical Fixture/Competition imports replayable while the runtime is
- * migrated away from CTF-specific terminology in later PRs.
+ * Historical export retained for replay and downstream compatibility. New
+ * callers must use the domain-neutral SingleAgentLoop implementation above.
  */
-export const SingleAgentLoop = SingleAgentCtfLoop;
+export const SingleAgentCtfLoop = SingleAgentLoop;
 
 function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
   return stopReason === "length" || (stopReason === "error" && /context|token|length|maximum/i.test(errorMessage ?? ""));

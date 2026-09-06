@@ -593,14 +593,14 @@
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/run-work-scheduler.test.ts`
 
-### SingleAgentCtfLoop
+### SingleAgentLoop
 - Kind: `class`
-- Signature: `SingleAgentCtfLoop`
+- Signature: `SingleAgentLoop`
 - Source: [src/orchestration/single-agent-loop.ts:88](../../../packages/materials/src/orchestration/single-agent-loop.ts:88)
 - Export: `@proofblade/materials`
-- Summary: Inferred summary: single agent ctf loop class used to provide a reusable operation.
+- Summary: Inferred summary: single agent loop class used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
+- Tests: `packages/materials/tests/single-agent-loop.test.ts`
 
 ### PwnSession
 - Kind: `class`
@@ -1309,14 +1309,14 @@
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/runtime-contracts.test.ts`
 
-### SingleAgentLoop
+### SingleAgentCtfLoop
 - Kind: `constant`
-- Signature: `typeof SingleAgentCtfLoop`
-- Source: [src/orchestration/single-agent-loop.ts:532](../../../packages/materials/src/orchestration/single-agent-loop.ts:532)
+- Signature: `typeof SingleAgentLoop`
+- Source: [src/orchestration/single-agent-loop.ts:531](../../../packages/materials/src/orchestration/single-agent-loop.ts:531)
 - Export: `@proofblade/materials`
-- Summary: Generic public name for the single-agent loop. The compatibility alias keeps
+- Summary: Historical export retained for replay and downstream compatibility. New
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/single-agent-loop.test.ts`
+- Tests: `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
 
 ### SESSION_RUNTIME_WIRE_SCHEMA_VERSION
 - Kind: `constant`
@@ -11360,7 +11360,7 @@
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/provider-budget.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/single-agent-loop.test.ts`
 
-### SingleAgentCtfLoop.run
+### SingleAgentLoop.run
 - Kind: `method`
 - Signature: `(options: SingleAgentRunOptions): Promise<SingleAgentRunOutcome>`
 - Source: [src/orchestration/single-agent-loop.ts:97](../../../packages/materials/src/orchestration/single-agent-loop.ts:97)
