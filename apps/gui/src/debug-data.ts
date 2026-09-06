@@ -20,7 +20,6 @@ import {
   fixtureTask,
   listFixtureProfiles,
   requiresClaimVerification,
-  classifyChallengePrompt,
   rewriteUnverifiedClaimText,
   type AppServices,
   type AgentLanePort,
@@ -516,9 +515,6 @@ export class DebugDataService {
       }
       if (runKind(snapshot.task) === "chat") {
         const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
-        // A workspace path is operational metadata, not user intent. Paths such
-        // as D:\CTF\... must not turn an ordinary greeting into challenge mode.
-        const challengeClassification = classifyChallengePrompt(`${text}\n${snapshot.task.objective}`);
         lane = await this.createCodingLane({
           projectRoot,
           installRoot: this.root,
@@ -534,7 +530,6 @@ export class DebugDataService {
           ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
           capabilities,
           contextCompactionThreshold,
-          ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
           onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
         });
       } else {

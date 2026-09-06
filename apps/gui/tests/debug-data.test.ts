@@ -606,7 +606,7 @@ test("CTF-shaped chat uses the same continuous coding lane without a mode-specif
   }
 });
 
-test("GUI selects a prepared challenge profile before creating the coding lane", async () => {
+test("ordinary GUI chat does not select a challenge profile from prompt wording", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-profile-selection-"));
   let selectedProfile: string | undefined;
   const lane: AgentLanePort = {
@@ -624,7 +624,7 @@ test("GUI selects a prepared challenge profile before creating the coding lane",
     const runId = "CHAT-PROFILE-001";
     await data.createConversation({ runId, title: "profile selection", workspacePath: root });
     await data.chat(runId, "Android APK native reverse challenge", () => undefined, undefined, undefined, root);
-    assert.equal(selectedProfile, "mobile");
+    assert.equal(selectedProfile, undefined);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
