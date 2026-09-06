@@ -133,7 +133,7 @@ atoms → molecules → materials → apps
 所有入口再经过同一个 `RunCoordinator`：它推进
 `INTAKE → RECON → TARGET_MODEL → HYPOTHESIS → EXPERIMENT → REPRODUCE → REPORT → SUBMIT`，
 认领和结算 `WorkItem`，并把 verifier-owned Evidence、Effect 和 Completion 绑定到终态。
-`submit_flag` 的平台结果不能单独让 Run 成功；动态 flag 快速路径也必须创建候选 Artifact、执行 verifier-owned `fixture_score` Effect，再由 `RunCoordinator` 完成终态。
+外部平台返回的结果不能单独让 Run 成功；平台提供的结果也必须创建 Result Artifact、执行 verifier-owned Effect，再由 `RunCoordinator` 完成终态。
 
 ### 竞赛路径（`packages/materials/src/competition/`）
 
@@ -157,9 +157,9 @@ Pwn/HTTP 的跨进程会话不是由 GUI 或 lane 自行猜测。部署时由 `s
 ## 4. 提交链（最容易改错的地方）
 
 ```
-submit_flag → runtime.submitCandidate(格式校验 / 提交预算 / 候选哈希去重)
-            → IndependentVerifier → Journal fixture_score
-            → CompetitionSandbox → api.submitFlag   ← 真正到平台
+external_submit → runtime.submitExternal(不透明结果 / 提交预算 / 结果哈希去重)
+               → IndependentVerifier → Journal fixture_score
+               → CompetitionSandbox → api.submitFlag   ← 平台适配器内部调用
 ```
 
 ### 三条不能违反的规则
@@ -167,20 +167,20 @@ submit_flag → runtime.submitCandidate(格式校验 / 提交预算 / 候选哈�
 **① 必须走 Effect Journal，不许在 lane 里直接调 `api.submitFlag`。**
 理由就是计分规则：Journal 的 idempotency key 会把重复提交同一 flag 折叠成回放而不是第二次真实 API 调用，事件日志本身就是「错误提交次数」和「API 调用效率」两项的账本。这不是洁癖，是两个计分项。
 
-**② `submit_flag` 只在 `verification.kind === "platform_submission"` 时注册。**
+**② Competition 的 `external_submit` 只在 `verification.kind === "platform_submission"` 时注册。**
 GUI 聊天运行拿的是 `verification: { kind: "reproduction" }` 和 `max_submissions: 0`，没有可提交的对象。**所以你没法在 GUI 聊天框里测提交链** —— 这是结构性的，不是配置问题。要测就用 `e2e-submit.mjs`（见第 5 节）。
 
 **③ 「submittable completion」这个概念必须保持。**
-`verify_claim` 和 `submit_flag` 都会产生 completion，但**产物格式不同**：
+`verify_result` 和 `external_submit` 都会产生 completion，但**产物格式不同**：
 
 | 来源 | artifact 内容 | mime |
 | --- | --- | --- |
-| `submit_flag` | 裸 flag 文本 | `text/plain` |
-| `verify_claim` | 复现记录 JSON blob | `application/json` |
+| `external_submit` | 外部目标所需的不透明结果 | `text/plain` 或目标适配器声明的类型 |
+| `verify_result` | 复现记录 JSON blob | `application/json` |
 
 判定标准是 `sha256(artifact 内容) === candidateHash`，这**正是 `IndependentVerifier` 自己的前置条件**，所以通过判定的 completion 一定能通过验证。别改成按 mime 或文件名判断——那是脆的。
 
-这两个格式混淆过一次，代价是一次已经算对的 flag 根本没提交出去。详见第 6 节 Bug 3、Bug 4。
+这两个格式混淆过一次，代价是一个已经验证的结果没有提交出去。详见第 6 节 Bug 3、Bug 4。
 
 ### assist 模式
 
