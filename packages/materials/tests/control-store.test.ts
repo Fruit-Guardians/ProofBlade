@@ -63,6 +63,26 @@ test("control store replay is deterministic and verifier gated", async () => {
   }
 });
 
+test("task external submission declarations require bounded unique logical destinations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-external-submission-task-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const task = demoTask("EXTERNAL-SUBMISSION-OK", root, config);
+    task.external_submission = { targets: ["review"] };
+    await control.createRun(task.task_id, task);
+
+    const duplicate = demoTask("EXTERNAL-SUBMISSION-DUP", root, config);
+    duplicate.external_submission = { targets: ["review", " review "] };
+    await assert.rejects(control.createRun(duplicate.task_id, duplicate), /must be unique/);
+
+    const empty = demoTask("EXTERNAL-SUBMISSION-EMPTY", root, config);
+    empty.external_submission = { targets: [] };
+    await assert.rejects(control.createRun(empty.task_id, empty), /between 1 and 64/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("phase transitions do not implicitly resume a paused run", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-paused-phase-"));
   try {

@@ -128,6 +128,11 @@ export class PiCodingLane implements AgentLanePort {
     claimVerifier: CodingClaimVerifier;
     /** Present only for platform-judged lanes; executes through the real Sandbox scorer. */
     platformVerifier?: IndependentVerifier;
+    /**
+     * Host-owned generic external-submission adapter. It is usable only when
+     * the immutable task contract declares one or more logical destinations.
+     */
+    externalSubmission?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>;
     config: ProofBladeConfig;
     /** Optional process backend. Files remain on the host; bash/exec runs here. */
     executionEnv?: ExecutionEnv;
@@ -442,22 +447,14 @@ export class PiCodingLane implements AgentLanePort {
         sessionRuntimeRequired: httpRuntimeRequired,
       })
       : undefined;
-    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled: platformJudged, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
-    const activeToolNames = [
-      ...codingActiveToolNames({
-        tools: enabledTools,
-        skills: [...enabledSkills],
-        mcpServers: [...enabledMcpServers],
-        platformJudged,
-        pwnEnabled: Boolean(pwnTools),
-        pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
-        webReproductionEnabled: Boolean(webReproducer || browserReproducer),
-        webSessionEnabled: Boolean(webSession),
-      }),
-      ...activeMcpTools.map((tool) => tool.name),
-    ];
     if (platformJudged && !options.platformVerifier) throw new Error("Platform-judged lane requires a trusted platform verifier");
-    const externalSubmit = platformJudged
+    // A task declares only logical target names. The actual delivery adapter is
+    // host-owned and wrapped here so a model cannot redirect it to another
+    // destination by changing tool arguments.
+    const externalSubmissionTargets = platformJudged
+      ? ["competition"]
+      : snapshot.task.external_submission?.targets ?? [];
+    const configuredExternalSubmit = platformJudged
       ? createPlatformExternalSubmitter({
         runId: options.runId,
         runtime,
@@ -469,7 +466,26 @@ export class PiCodingLane implements AgentLanePort {
         ...(options.approvalPolicy ? { approvalPolicy: options.approvalPolicy } : {}),
         ...(options.onApprovalRequired ? { onApprovalRequired: options.onApprovalRequired } : {}),
       })
+      : options.externalSubmission;
+    const externalSubmit = configuredExternalSubmit && externalSubmissionTargets.length > 0
+      ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
+    const externalSubmissionEnabled = Boolean(externalSubmit);
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...mcpFirstClassTools];
+    const activeToolNames = [
+      ...codingActiveToolNames({
+        tools: enabledTools,
+        skills: [...enabledSkills],
+        mcpServers: [...enabledMcpServers],
+        platformJudged,
+        externalSubmissionEnabled,
+        pwnEnabled: Boolean(pwnTools),
+        pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
+        webReproductionEnabled: Boolean(webReproducer || browserReproducer),
+        webSessionEnabled: Boolean(webSession),
+      }),
+      ...activeMcpTools.map((tool) => tool.name),
+    ];
     const toolContext: CodingResourceContext = {
       env,
       ownerLane: "main",
@@ -503,7 +519,7 @@ export class PiCodingLane implements AgentLanePort {
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
       ...(externalSubmit ? { externalSubmit } : {}),
-      ...(externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
+      ...(platformJudged && externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),
@@ -842,8 +858,8 @@ async function latestExternalUserMessageFromSession(session: { getBranch(): Prom
  * not need to know whether the destination is a platform, review queue, or
  * deployment service.
  *
- * `runtime.submitCandidate` enforces flag format, the submission budget, and
- * candidate-hash dedup, returning the existing completion for a repeat. The
+ * `runtime.submitExternal` enforces the submission budget and candidate-hash
+ * dedup, returning the existing completion for a repeat. The
  * `IndependentVerifier` then drives the journal's `fixture_score` effect, which
  * is what actually reaches `CompetitionApi.submitFlag`. Going through the
  * journal (rather than calling the API directly) is deliberate: its idempotency
@@ -932,6 +948,25 @@ export function createPlatformExternalSubmitter(deps: {
       target,
       ...(await submissionCounters(deps.runtime, after)),
     };
+  };
+}
+
+/**
+ * Bind a host-owned submission adapter to the immutable logical destinations
+ * declared by the task. The adapter is deliberately opaque to task data and
+ * model tool arguments cannot expand this allowlist.
+ */
+export function createDeclaredExternalSubmitter(deps: {
+  targets: readonly string[];
+  submit: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>;
+}): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult> {
+  const targets = new Set(deps.targets.map((target) => target.trim()));
+  return async (request, signal) => {
+    const target = request.target.trim();
+    if (!targets.has(target)) {
+      throw new Error(`external_submit target ${JSON.stringify(target)} is not declared by this task`);
+    }
+    return await deps.submit({ target, payload: request.payload }, signal);
   };
 }
 

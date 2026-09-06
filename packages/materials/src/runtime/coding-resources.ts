@@ -174,7 +174,9 @@ export function createCodingTools(options: { platformJudged?: boolean; externalS
     // Registered only when a trusted destination is configured. The legacy
     // alias remains available for existing Competition clients, but new runs
     // should use external_submit and provide an explicit target.
-    ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool, submitFlagTool] : []),
+    ...(options.platformJudged
+      ? [externalSubmitTool, submitFlagTool]
+      : options.externalSubmissionEnabled ? [externalSubmitTool] : []),
   ];
 }
 
@@ -1098,7 +1100,7 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
@@ -1112,6 +1114,7 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   if (input.webSessionEnabled) active.push(...CODING_WEB_SESSION_TOOL_NAMES);
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
   if (input.platformJudged) active.push(externalSubmitTool.name, submitFlagTool.name);
+  else if (input.externalSubmissionEnabled) active.push(externalSubmitTool.name);
   return active;
 }
 
