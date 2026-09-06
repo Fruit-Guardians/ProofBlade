@@ -177,6 +177,8 @@ export class PiCodingLane implements AgentLanePort {
     ablationPolicy?: AblationPolicyBinding;
     /** Expose the pre-generic verify_claim alias for historical callers only. */
     legacyClaimVerification?: boolean;
+    /** Expose the pre-generic submit_flag alias for historical callers only. */
+    legacySubmissionAlias?: boolean;
     /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
     bashTimeoutSecondsMax?: number;
     onEvent?: (event: AgentHarnessEvent) => void | Promise<void>;
@@ -479,7 +481,8 @@ export class PiCodingLane implements AgentLanePort {
     // recorded sessions remain replayable.
     const historicalClaimTask = (snapshot.task as { mode?: string }).mode === "ctf_solve";
     const legacyClaimVerification = options.legacyClaimVerification === true || historicalClaimTask;
-    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession), legacyClaimVerification }), ...mcpFirstClassTools];
+    const legacySubmissionAlias = options.legacySubmissionAlias === true || historicalClaimTask;
+    const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession), legacyClaimVerification, legacySubmissionAlias }), ...mcpFirstClassTools];
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -488,6 +491,7 @@ export class PiCodingLane implements AgentLanePort {
         platformJudged,
         externalSubmissionEnabled,
         legacyClaimVerification,
+        legacySubmissionAlias,
         pwnEnabled: Boolean(pwnTools),
         pwnReproductionEnabled: Boolean(pwnTools && pwnReproductionPolicy),
         webReproductionEnabled: Boolean(webReproducer || browserReproducer),
@@ -528,7 +532,7 @@ export class PiCodingLane implements AgentLanePort {
       ...(pwnTools ? { pwnTools } : {}),
       ...(webSession ? { webSession } : {}),
       ...(externalSubmit ? { externalSubmit } : {}),
-      ...(platformJudged && externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
+      ...(platformJudged && legacySubmissionAlias && externalSubmit ? { submitFlag: (flag: string, signal?: AbortSignal) => externalSubmit({ target: "competition", payload: flag }, signal) } : {}),
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),

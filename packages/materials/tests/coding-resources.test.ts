@@ -41,6 +41,7 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(codingProviderToolContractSnapshot({ legacyClaimVerification: true }).some((tool) => tool.name === "verify_claim"), true);
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true, legacySubmissionAlias: true }).some((tool) => tool.name === "submit_flag"), true);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
@@ -54,7 +55,9 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.deepEqual(genericExternalTools.slice(-1), ["external_submit"]);
   assert.equal(genericExternalTools.includes("submit_flag"), false);
   const platformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true });
-  assert.deepEqual(platformTools.slice(-2), ["external_submit", "submit_flag"]);
+  assert.deepEqual(platformTools.slice(-1), ["external_submit"]);
+  const legacyPlatformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true, legacySubmissionAlias: true });
+  assert.deepEqual(legacyPlatformTools.slice(-2), ["external_submit", "submit_flag"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
 });
@@ -63,6 +66,7 @@ test("external_submit exposes an explicit target and forwards an opaque payload"
   const tool = createCodingTools({ externalSubmissionEnabled: true }).find((candidate) => candidate.name === "external_submit");
   assert.ok(tool, "external_submit should be registered for configured destinations");
   assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((candidate) => candidate.name === "submit_flag"), false);
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true, legacySubmissionAlias: true }).some((candidate) => candidate.name === "submit_flag"), true);
   let received: unknown;
   const context = { externalSubmit: async (request: unknown) => {
     received = request;
