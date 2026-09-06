@@ -14,6 +14,7 @@ import {
   preflightFromRunToolPreparation,
   profileForTargetKind,
   runToolPreparationFromPreflight,
+  withFirstClassMcpToolExposure,
 } from "../src/runtime/security-tool-profile.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import { ProofBladeToolCatalogRegistry, TOOL_CATALOG_MANIFEST } from "../src/tools/catalog.js";
@@ -160,6 +161,32 @@ test("preflight publication is a durable gate, not a local cache hint", () => {
   assert.doesNotThrow(() => assertToolPreparationPublished({ generation: 2, toolPreparation: preparation }, preparation));
   assert.throws(() => assertToolPreparationPublished({ generation: 3, toolPreparation: preparation }, preparation), /generation is stale/);
   assert.throws(() => assertToolPreparationPublished({ generation: 2, toolPreparation: { ...preparation, hash: "f".repeat(64) } }, preparation), /does not match/);
+});
+
+test("first-class MCP exposure is a hash-bound durable preflight field", () => {
+  const profile = securityToolProfile("misc");
+  const preparation = runToolPreparationFromPreflight({
+    profileId: profile.id,
+    targetKind: profile.targetKind,
+    runtime: "host",
+    runtimeKey: "host",
+    cacheKey: "cache-key",
+    toolCatalogHash: "catalog-hash",
+    mcpCatalogHash: "mcp-hash",
+    cacheHit: false,
+    checkedAt: 1,
+    tools: [],
+    mcpServers: [],
+    missingRequiredTools: [],
+    missingOptionalTools: [],
+    fallbackStrategies: profile.fallbackStrategies,
+    firstActionPlan: profile.firstActionPlan,
+    actionBundles: profile.actionBundles,
+  }, profile, 2);
+  const exposed = withFirstClassMcpToolExposure(preparation, { exposed: 3, omitted: 2, truncated: true });
+  assert.deepEqual(exposed.firstClassMcpTools, { exposed: 3, omitted: 2, truncated: true });
+  assert.notEqual(exposed.hash, preparation.hash);
+  assert.doesNotThrow(() => assertToolPreparationPublished({ generation: 2, toolPreparation: exposed }, exposed));
 });
 
 test("concurrent preflight writers preserve every cache entry", async () => {

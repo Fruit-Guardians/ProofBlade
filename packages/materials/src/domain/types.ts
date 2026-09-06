@@ -250,6 +250,8 @@ export interface RunToolPreparation {
   firstActionPlan?: FirstActionPlan;
   /** Added after schema 1 was introduced; old preparations remain replayable. */
   actionBundles?: ActionBundle[];
+  /** Bounded audit summary of MCP tools promoted into the Provider tool surface. */
+  firstClassMcpTools?: { exposed: number; omitted: number; truncated: boolean };
   hash: string;
 }
 

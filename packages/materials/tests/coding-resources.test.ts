@@ -8,7 +8,9 @@ import {
   codingProviderToolContractSnapshot,
   createCodingToolEffectPolicyResolver,
   createCodingTools,
+  createMcpFirstClassToolSelection,
   createMcpFirstClassTools,
+  MAX_MCP_FIRST_CLASS_METADATA_BYTES,
   selectFirstClassMcpTools,
   interactiveTimeoutHint,
   interactiveCommandHint,
@@ -1033,6 +1035,113 @@ test("polling a background job stays read-only so it cannot mask a stalled agent
   assert.deepEqual(resolve("shell_job", { operation: "read", jobId: "sh-1" }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolve("shell_job", { operation: "list" }), { readOnly: true, sideEffect: "none" });
   assert.deepEqual(resolve("shell_job", { operation: "stop", jobId: "sh-1" }), { readOnly: false, sideEffect: "process" });
+});
+
+test("first-class MCP metadata is bounded while omitted tools remain available through mcp_call", async () => {
+  const deepSchema: Record<string, unknown> = { type: "object" };
+  let cursor = deepSchema;
+  for (let depth = 0; depth <= 8; depth += 1) {
+    const child: Record<string, unknown> = { type: "object" };
+    cursor.properties = { child };
+    cursor = child;
+  }
+  const oversizedProperties = Object.fromEntries(Array.from({ length: 65 }, (_unused, index) => [`field_${index}`, { type: "string" }]));
+  const summaries: McpServerSummary[] = [
+    { name: "bounded", capabilityId: "mcp.bounded", description: "bounded fixture", disabled: false, status: "configured", configHash: "bounded-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "bounded",
+      configHash: "bounded-hash",
+      tools: [
+        { name: "normal", description: "x".repeat(8_000), inputSchema: { type: "object" } },
+        { name: "too-deep", description: "deep schema", inputSchema: deepSchema },
+        { name: "too-wide", description: "wide schema", inputSchema: { type: "object", properties: oversizedProperties } },
+        { name: "unsafe name", description: "unsafe name", inputSchema: { type: "object" } },
+      ],
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["bounded"]);
+  assert.deepEqual(selected.tools.map((tool) => tool.name), ["mcp__bounded__normal"]);
+  assert.ok(Buffer.byteLength(selected.tools[0].description, "utf8") <= 256);
+  assert.equal(selected.exposure.descriptionsTruncated, 1);
+  assert.equal(selected.exposure.omitted, 3);
+  assert.deepEqual(selected.exposure.omittedByReason, { tool_limit: 0, invalid_name: 1, schema: 2 });
+  assert.equal(selected.exposure.truncated, true);
+  assert.ok(createCodingTools().some((tool) => tool.name === "mcp_call"), "mcp_call must remain the fallback for omitted tools");
+});
+
+test("first-class MCP promotion has deterministic per-server and total tool limits", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "one", capabilityId: "mcp.one", description: "first", disabled: false, status: "configured", configHash: "one-hash" },
+    { name: "two", capabilityId: "mcp.two", description: "second", disabled: false, status: "configured", configHash: "two-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async (server: string) => ({
+      server,
+      configHash: `${server}-hash`,
+      tools: Array.from({ length: 20 }, (_unused, index) => ({ name: `tool_${index}`, description: `tool ${index}`, inputSchema: { type: "object" } })),
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["one", "two"]);
+  assert.equal(selected.tools.length, 24);
+  assert.equal(selected.tools.filter((tool) => tool.name.startsWith("mcp__one__")).length, 16);
+  assert.equal(selected.tools.filter((tool) => tool.name.startsWith("mcp__two__")).length, 8);
+  assert.equal(selected.exposure.omitted, 16);
+  assert.equal(selected.exposure.omittedByReason.tool_limit, 16);
+  assert.equal(selected.exposure.truncated, true);
+});
+
+test("first-class MCP exposure reports description truncation without hiding the tool", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "described", capabilityId: "mcp.described", description: "description fixture", disabled: false, status: "configured", configHash: "description-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "described",
+      configHash: "description-hash",
+      tools: [{ name: "inspect", description: "x".repeat(8_000), inputSchema: { type: "object" } }],
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["described"]);
+  assert.equal(selected.tools.length, 1);
+  assert.deepEqual(selected.exposure.omittedByReason, { tool_limit: 0, invalid_name: 0, schema: 0 });
+  assert.equal(selected.exposure.omitted, 0);
+  assert.equal(selected.exposure.descriptionsTruncated, 1);
+  assert.equal(selected.exposure.truncated, true);
+});
+
+test("first-class MCP schemas share a total Provider metadata budget", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "budget", capabilityId: "mcp.budget", description: "budget fixture", disabled: false, status: "configured", configHash: "budget-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "budget",
+      configHash: "budget-hash",
+      tools: Array.from({ length: 8 }, (_unused, index) => ({
+        name: `tool_${index}`,
+        description: "metadata budget fixture",
+        inputSchema: { type: "object", description: "x".repeat(2_700) },
+      })),
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["budget"]);
+  const usedBytes = selected.tools.reduce((total, tool) => total
+    + Buffer.byteLength(tool.name, "utf8")
+    + Buffer.byteLength(tool.description, "utf8")
+    + Buffer.byteLength(JSON.stringify(tool.parameters), "utf8"), 0);
+  assert.ok(selected.tools.length > 0 && selected.tools.length < 8);
+  assert.ok(usedBytes <= MAX_MCP_FIRST_CLASS_METADATA_BYTES);
+  assert.equal(selected.exposure.omittedByReason.tool_limit, 8 - selected.tools.length);
 });
 
 test("MCP results reach the model unwrapped instead of quadruple-encoded JSON", async () => {

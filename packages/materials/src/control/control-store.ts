@@ -1808,6 +1808,15 @@ function validateToolPreparation(snapshot: RunSnapshot, preparation: RunToolPrep
     validateBoundedStringList(plan.allowedToolNames, "first action tools", 128, 32);
   }
   if (preparation.actionBundles !== undefined) validateActionBundles(preparation.actionBundles);
+  if (preparation.firstClassMcpTools !== undefined) {
+    const exposure = preparation.firstClassMcpTools;
+    if (!Number.isInteger(exposure.exposed) || exposure.exposed < 0 || exposure.exposed > 64
+      || !Number.isInteger(exposure.omitted) || exposure.omitted < 0 || exposure.omitted > 4_096
+      || typeof exposure.truncated !== "boolean") {
+      throw new Error("Tool preparation first-class MCP exposure is invalid");
+    }
+    if (exposure.omitted > 0 && !exposure.truncated) throw new Error("Tool preparation first-class MCP truncation marker is invalid");
+  }
   if (!Array.isArray(preparation.tools) || preparation.tools.length > 128) throw new Error("Tool preparation tool list is invalid");
   for (const tool of preparation.tools) {
     if (!tool.id || tool.id.length > 64 || !tool.name || tool.name.length > 128 || !tool.path || tool.path.length > 512) throw new Error("Tool preparation entry is invalid");

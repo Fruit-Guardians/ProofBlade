@@ -677,6 +677,16 @@ export function runToolPreparationFromPreflight(preflight: SecurityToolPreflight
   return { ...base, hash: sha256(canonicalJson(base)) };
 }
 
+/** Attach the bounded Provider-facing MCP exposure summary to a durable preflight. */
+export function withFirstClassMcpToolExposure(
+  preparation: RunToolPreparation,
+  exposure: NonNullable<RunToolPreparation["firstClassMcpTools"]>,
+): RunToolPreparation {
+  const { hash: _hash, ...unsigned } = preparation;
+  const next = { ...unsigned, firstClassMcpTools: { ...exposure } };
+  return { ...next, hash: sha256(canonicalJson(next)) };
+}
+
 /**
  * Assert that a preflight result was durably published before a Provider turn.
  * The local health cache is only an optimization; the Run projection is the
