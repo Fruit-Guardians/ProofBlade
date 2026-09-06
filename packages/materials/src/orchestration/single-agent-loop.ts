@@ -1,5 +1,5 @@
-import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { access, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AgentLanePort, AgentOutcome } from "../runtime/pi-adapter.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
@@ -27,6 +27,8 @@ import { withSessionResourceAdapters, type SessionRuntimeHandoff } from "../reco
 
 export interface AgentLaneCreateInput {
   projectRoot: string;
+  /** Immutable task contract that declares the task-owned execution workspace. */
+  task: TaskContract;
   runId: string;
   runDir: string;
   /** The recovered fixture workspace shared by the loop and its lane. */
@@ -174,6 +176,7 @@ export class SingleAgentLoop {
       throwIfAborted(options.signal);
       lane = await this.createLane({
         projectRoot: this.root,
+        task: snapshot.task,
         runId: options.runId,
         runDir,
         runtime,
@@ -544,7 +547,7 @@ function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
 async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLanePort> {
   const fixture = input.fixture;
   return await PiCodingLane.create({
-    projectRoot: fixture.path,
+    projectRoot: await taskExecutionWorkspace(input.task, fixture.path),
     installRoot: input.projectRoot,
     runId: input.runId,
     runDir: input.runDir,
@@ -565,6 +568,24 @@ async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLan
     sessionId: `${input.runId}-coding`,
     ...(input.onEvent ? { onEvent: input.onEvent } : {}),
   });
+}
+
+/**
+ * The task contract owns the normal coding cwd. Fixture storage is only a
+ * recovery fallback for old or remote tasks whose declared workspace cannot be
+ * mounted locally. This keeps generic CLI tasks from silently editing runs/.
+ */
+export async function taskExecutionWorkspace(task: { scope: Pick<TaskContract["scope"], "allowed_workspace"> }, fixturePath: string): Promise<string> {
+  const workspace = task.scope.allowed_workspace.trim();
+  if (!workspace) return fixturePath;
+  const candidate = resolve(workspace);
+  try {
+    if ((await stat(candidate)).isDirectory()) return candidate;
+  } catch {
+    // The fixture is the established recovery workspace when the declared
+    // location is unavailable in the current execution environment.
+  }
+  return fixturePath;
 }
 
 function latestPending(snapshot: RunSnapshot) {

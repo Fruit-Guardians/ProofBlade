@@ -9,7 +9,7 @@ import { sha256 } from "../src/domain/utils.js";
 import { fixtureTask } from "../src/app/fixture-task.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { listFixtureProfiles } from "../src/sandbox/fixture-catalog.js";
-import { SingleAgentLoop, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
+import { SingleAgentLoop, taskExecutionWorkspace, type AgentLaneFactory } from "../src/orchestration/single-agent-loop.js";
 import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
 import { IndependentVerifier } from "../src/verification/verifier.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
@@ -36,6 +36,20 @@ const config: ProofBladeConfig = {
     },
   },
 };
+
+test("default coding workspace honors the task contract before the fixture fallback", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-agent-workspace-"));
+  const workspace = join(root, "task-workspace");
+  const fixture = join(root, "runs", "TASK-1");
+  await mkdir(workspace, { recursive: true });
+  await mkdir(fixture, { recursive: true });
+  try {
+    assert.equal(await taskExecutionWorkspace({ scope: { allowed_workspace: workspace } }, fixture), workspace);
+    assert.equal(await taskExecutionWorkspace({ scope: { allowed_workspace: join(root, "missing") } }, fixture), fixture);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 const deterministicLane: AgentLaneFactory = async ({ runtime }) => ({
   async prompt() {
