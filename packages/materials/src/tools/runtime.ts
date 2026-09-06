@@ -27,6 +27,12 @@ export interface InspectTargetResult {
   truncated: boolean;
 }
 
+/** Optional domain-owned check for a result before it becomes a Completion. */
+export interface ResultValidationPolicy {
+  id: string;
+  validate(value: string): void | string;
+}
+
 export class ProofBladeToolRuntime {
   private readonly observer: DeterministicObserver;
   private readonly capabilityRouter: ProofBladeCapabilityRouter;
@@ -285,13 +291,20 @@ export class ProofBladeToolRuntime {
    * durable Artifact storage, approval/attempt accounting, and hash-bound
    * completion identity.
    */
-  public async submitExternal(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate" } = {}): Promise<{ completionId: string; candidateHash: string }> {
+  public async submitResult(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = payload.trim();
     const target = options.target?.trim() || "external";
     if (!normalized) throw new Error("External submission payload must not be empty");
     if (target.length > 256) throw new Error("External submission target is too long");
+    const validation = options.validator?.validate(normalized);
+    if (typeof validation === "string" && validation.trim()) throw new Error(validation);
     const snapshot = await this.controlStore.snapshot(this.runId);
     return this.proposeSubmission(snapshot, normalized, target, options.sensitivity ?? "secret");
+  }
+
+  /** Alias used by external destination adapters. */
+  public async submitExternal(payload: string, options: { target?: string; sensitivity?: "public" | "secret" | "flag_candidate"; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
+    return this.submitResult(payload, options);
   }
 
   /**
