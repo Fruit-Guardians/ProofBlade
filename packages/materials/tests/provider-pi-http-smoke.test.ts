@@ -322,8 +322,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     const outcome = await lane.prompt(firstPrompt);
     assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
     assert.equal(requests, 1);
-    assert.match(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
-    assert.match(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
+    assert.doesNotMatch(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
+    assert.doesNotMatch(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
     assert.match(firstRequestBody, /proofblade-context/);
     assert.match(firstRequestBody, /<task-contract>/);
     assert.match(firstRequestBody, /<durable-ledger>/);
@@ -342,7 +342,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.doesNotMatch(instructionText, /ProofBlade prepared CTF path|Prepared challenge tool profile|CTF solving workflow \(prepared direction\)/);
     assert.ok((firstRequest.messages ?? []).some((message) => message.role === "user" && messageText(message) === firstPrompt));
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
-    assert.match(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
+    assert.doesNotMatch(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
     const projectionText = messageText((firstRequest.messages ?? []).at(-1) ?? {});
     const projectionMatch = projectionText.match(/<proofblade-context[^>]*dynamic-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/proofblade-context>/);
     assert.ok(projectionMatch, "the serialized context projection must expose its visible suffix hash");

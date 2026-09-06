@@ -525,12 +525,15 @@ export class CodingClaimVerifier {
 
   /** Rebuild verification exclusively from durable current-generation state. */
   public async project(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection> {
-    const required = requiresClaimVerification(userPrompt, assistantText);
+    // Verification is enabled by the immutable task contract, never inferred
+    // from words such as "flag" or "challenge" in a conversation.
+    const task = await this.controlStore.snapshot(this.runId);
+    const required = task.task.verification.required_reproductions > 0 || Boolean(task.task.verification.command);
     if (!required) return { required: false, status: "not_required" };
     const candidate = extractFinalCandidate(assistantText);
     if (!candidate) return { required: true, status: "unverified", reason: "最终回答没有唯一、明确的候选值。" };
     const candidateHash = sha256(candidate);
-    const snapshot = await this.controlStore.snapshot(this.runId);
+    const snapshot = task;
     const completions = Object.values(snapshot.completions)
       .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation && completion.candidateHash === candidateHash)
       .sort((left, right) => right.createdSeq - left.createdSeq || left.id.localeCompare(right.id));
