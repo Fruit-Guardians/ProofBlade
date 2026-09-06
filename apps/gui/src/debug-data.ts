@@ -39,7 +39,7 @@ import {
   projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
-import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
+import { stageTaskWorkspace, type TaskWorkspaceInput } from "./task-workspace.js";
 import type {
   ActiveRunInfo,
   AssistantTurnDebug,
@@ -121,7 +121,7 @@ export class DebugDataService {
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
     createCodingLane?: CodingLaneFactory,
-    private readonly createCtfLane?: AgentLaneFactory,
+    private readonly createLane?: AgentLaneFactory,
   ) {
     this.browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(config);
     const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(config);
@@ -324,27 +324,27 @@ export class DebugDataService {
     assertRunId(input.runId);
     const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
     await this.ensureRunCreated(input.runId, task);
-    return await this.startCtfTask(task, input.mode, input.maxTurns);
+    return await this.startTaskRun(task, input.mode, input.maxTurns);
   }
 
-  /** Start an arbitrary attachment-backed CTF Run through the same durable loop as Fixture and Competition. */
-  public async startCtfSolve(input: CtfWorkspaceInput & { mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
+  /** Start an arbitrary attachment-backed task through the shared durable loop. */
+  public async startTask(input: TaskWorkspaceInput & { mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
     assertRunId(input.runId);
     if (this.active.has(input.runId)) throw new Error(`Run is already active: ${input.runId}`);
     await this.assertRunDoesNotExist(input.runId);
-    const task = await stageCtfWorkspace(input, this.services.runsRoot);
+    const task = await stageTaskWorkspace(input, this.services.runsRoot);
     await this.ensureRunCreated(input.runId, task);
-    return await this.startCtfTask(task, input.mode, input.maxTurns);
+    return await this.startTaskRun(task, input.mode, input.maxTurns);
   }
 
-  private async startCtfTask(task: TaskContract, mode: "auto" | "assist", maxTurns?: number): Promise<ActiveRunInfo> {
+  private async startTaskRun(task: TaskContract, mode: "auto" | "assist", maxTurns?: number): Promise<ActiveRunInfo> {
     const current = this.active.get(task.task_id);
     if (current && current.state !== "failed") throw new Error(`Run is already active: ${task.task_id}`);
     this.assertOpen();
     const info: ActiveRunInfo = { runId: task.task_id, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(task.task_id, info);
-    const loop = new SingleAgentLoop(this.root, this.config, this.services, this.createCtfLane, this.browserVerifierFactory);
+    const loop = new SingleAgentLoop(this.root, this.config, this.services, this.createLane, this.browserVerifierFactory);
     const controller = new AbortController();
     const runPromise = loop.run({
       runId: task.task_id,
@@ -481,15 +481,15 @@ export class DebugDataService {
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
       if (runKind(snapshot.task) === "fixture") {
-        let ctfOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
+        let taskOutcome: AgentOutcome | undefined;
+        const loop = new SingleAgentLoop(this.root, runConfig, this.services, this.createLane, this.browserVerifierFactory);
         const result = await loop.run({
           runId,
           task: snapshot.task,
           mode: "assist",
           maxTurns: 1,
           userPrompt: text,
-          onTurn: (outcome) => { ctfOutcome = outcome; },
+          onTurn: (outcome) => { taskOutcome = outcome; },
           onEvent: (event) => emitAgentEvent(event, emit),
           onLaneReady: async (activeLane) => {
             this.activeLanes.set(runId, activeLane);
@@ -505,10 +505,10 @@ export class DebugDataService {
         }
         emit({
           type: "done",
-          text: ctfOutcome?.text ?? `CTF turn finished with ${result.status}.`,
-          stopReason: ctfOutcome?.stopReason ?? result.status.toLowerCase(),
-          usage: normalizeUsage(ctfOutcome?.usage) ?? emptyUsage(),
-          claimVerification: ctfOutcome?.claimVerification,
+          text: taskOutcome?.text ?? `Task turn finished with ${result.status}.`,
+          stopReason: taskOutcome?.stopReason ?? result.status.toLowerCase(),
+          usage: normalizeUsage(taskOutcome?.usage) ?? emptyUsage(),
+          claimVerification: taskOutcome?.claimVerification,
         });
         return;
       }
@@ -798,8 +798,7 @@ export function boundedJsonByteSize(value: unknown, limit: number): number {
 }
 
 export function runKind(task: Pick<TaskContract, "mode"> & Partial<Pick<TaskContract, "target" | "verification">>): RunKind {
-  // Legacy ctf_solve snapshots remain visible as Fixture runs, but newly
-  // created tasks are classified from their purpose rather than a CTF mode.
+  // Legacy snapshots from the removed mode remain visible as Fixture runs.
   if (task.mode === "ctf_solve") return "fixture";
   if (task.verification?.kind === "hidden_scorer" || task.verification?.kind === "platform_submission") return "fixture";
   if (typeof task.target === "string" && /^(?:FIXTURE:|LOCAL_FIXTURE|REAL_EVALUATION:)/.test(task.target)) return "fixture";

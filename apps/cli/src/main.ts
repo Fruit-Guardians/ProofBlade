@@ -8,7 +8,6 @@ import {
   CheckpointService,
   createServices,
   demoTask,
-  fixtureTask,
   JsonlControlStore,
   loadConfig,
   listFixtureProfiles,
@@ -428,19 +427,6 @@ async function main(): Promise<void> {
       await handleIntentsCommand([arg ?? "", ...rest], scheduler, services.control, (message) => console.log(message));
       break;
     }
-    case "solve": {
-      const profileId = required(arg, "fixture profile id");
-      const positionals = positional(rest, ["--run-id", "--mode", "--max-turns"]);
-      const runId = option(rest, "--run-id") ?? positionals[0] ?? `PB-${profileId}-${Date.now()}`;
-      const modeValue = option(rest, "--mode") ?? positionals[1] ?? "assist";
-      if (modeValue !== "auto" && modeValue !== "assist") throw new Error("--mode must be auto or assist");
-      const maxTurnsValue = option(rest, "--max-turns") ?? positionals[2];
-      const maxTurns = maxTurnsValue === undefined ? undefined : Number(maxTurnsValue);
-      if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("--max-turns must be a positive integer");
-      const loop = new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory);
-      print(await loop.run({ runId, task: fixtureTask(runId, profileId, root, config), mode: modeValue, maxTurns }));
-      break;
-    }
     case "show": {
       const snapshot = await services.control.snapshot(required(arg, "run id"));
       print({ runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase, generation: snapshot.generation, lastSeq: snapshot.lastSeq, facts: Object.keys(snapshot.facts).length, observations: Object.keys(snapshot.observations).length, evidence: Object.keys(snapshot.evidence).length, completions: Object.keys(snapshot.completions).length, effects: Object.keys(snapshot.effects).length, artifacts: Object.keys(snapshot.artifacts).length, checkpoints: Object.keys(snapshot.checkpoints).length, jobs: Object.keys(snapshot.jobs).length, handoffs: Object.keys(snapshot.handoffs).length, contextOverflowRecoveries: snapshot.contextOverflowRecoveries, failureCategory: snapshot.failureCategory, versionSnapshotHash: snapshot.versionSnapshot?.hash, projectionHash: snapshot.projectionHash });
@@ -827,7 +813,6 @@ function helpText(): string {
     "  competition-api replay <journal.jsonl> --script <requests.json>",
     "  intents list|score|graph|claim <run-id>",
     "  skill <run-id> <skill-name> [additional instructions]",
-    "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
     "  timeline <run-id>",
     "  ledger <run-id>",
