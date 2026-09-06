@@ -1488,9 +1488,9 @@ function validateVerifierEffectProposal(
   if (!effect.cwd?.trim()) throw new Error("Verifier effect requires an auditable cwd");
   if (!pathIsWithin(effect.cwd, snapshot.task.scope.allowed_workspace)) throw new Error(`Verifier cwd escapes allowed_workspace: ${effect.cwd}`);
   if (effect.command && effect.args.commandHash !== sha256(effect.command)) throw new Error("Verifier command hash does not match the immutable command");
-  if (effect.operation === "claim_reproduction") {
+  if (effect.operation === "result_verification" || effect.operation === "claim_reproduction") {
     if (snapshot.task.verification.kind !== "reproduction" || !snapshot.task.verification.command || effect.command !== snapshot.task.verification.command) {
-      throw new Error("claim_reproduction command must come from the task verifier policy");
+      throw new Error(`${effect.operation} command must come from the task verifier policy`);
     }
   }
   if (effect.operation === "web_reproduce" && !snapshot.task.verification.web?.flag_pattern) {
@@ -1543,7 +1543,7 @@ function validateTrustedVerificationEffect(snapshot: RunSnapshot, effect: RunSna
 }
 
 const VERIFIER_REPLAY_OPERATION = "verification_replay";
-const VERIFIER_ATTESTATION_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce", "web_reproduce", "browser_reproduce"]);
+const VERIFIER_ATTESTATION_OPERATIONS = new Set(["fixture_score", "result_verification", "claim_reproduction", "pwn_reproduce", "web_reproduce", "browser_reproduce"]);
 const VERIFIER_EFFECT_OPERATIONS = new Set([...VERIFIER_ATTESTATION_OPERATIONS, VERIFIER_REPLAY_OPERATION]);
 
 function isVerifierReplayOperation(operation: string): boolean {

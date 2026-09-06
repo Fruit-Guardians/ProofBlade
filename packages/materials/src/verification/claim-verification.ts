@@ -56,7 +56,8 @@ export function rewriteUnverifiedClaimText(assistantText: string, reason?: strin
 
 interface ClaimReceipt {
   schemaVersion: 3;
-  kind: "claim_reproduction";
+  /** New receipts use result_verification; claim_reproduction is historical. */
+  kind: "result_verification" | "claim_reproduction";
   runId: string;
   taskId: string;
   taskHash: string;
@@ -352,7 +353,11 @@ export class TaskResultVerifier {
     const boundSnapshot = await this.controlStore.snapshot(this.runId);
     const signal = input.signal ?? new AbortController().signal;
     const requiredAttempts = verifierDefinedCommand ? Math.max(1, boundSnapshot.task.verification.required_reproductions) : 1;
-    const operation = verifierDefinedCommand ? "claim_reproduction" : "claim_observation";
+    // Generic verify_result calls use a domain-neutral operation. The legacy
+    // verify_claim alias keeps its historical operation for replay compatibility.
+    const operation = verifierDefinedCommand
+      ? completionPurpose === "harness_verification" ? "result_verification" : "claim_reproduction"
+      : "claim_observation";
     const attempts: Array<{
       attemptId: string;
       sessionId: string;
@@ -398,7 +403,7 @@ export class TaskResultVerifier {
 
       const receipt: ClaimReceipt = {
         schemaVersion: 3,
-        kind: "claim_reproduction",
+        kind: operation === "result_verification" ? "result_verification" : "claim_reproduction",
         runId: this.runId,
         taskId: boundSnapshot.task.task_id,
         taskHash: boundSnapshot.taskHash,
@@ -471,7 +476,7 @@ export class TaskResultVerifier {
       externalStatus: "CONFIRMED",
       attempts: attempts.map((attempt, index) => ({
         id: attempt.attemptId,
-        phase: verifierDefinedCommand ? "claim_reproduction" : "claim_observation",
+        phase: verifierDefinedCommand ? operation : "claim_observation",
         status: "PASSED",
         artifactId: attempt.execution.artifactId,
         summary: verifierDefinedCommand
@@ -615,7 +620,7 @@ export class TaskResultVerifier {
       sessionIds.add(verdict.sessionId);
       attemptIds.add(verdict.attemptId);
       transcriptHashes.add(verdict.transcriptHash);
-      if (effect.operation !== "claim_reproduction") continue;
+      if (effect.operation !== "result_verification" && effect.operation !== "claim_reproduction") continue;
       const receipt = await this.findClaimReceipt(snapshot, completion, candidate, item, effect);
       if (!receipt) return undefined;
       receipts.push(receipt);
@@ -694,7 +699,7 @@ export class TaskResultVerifier {
       try {
         const parsed = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as Partial<ClaimReceipt>;
         if (parsed.schemaVersion !== 3
-          || parsed.kind !== "claim_reproduction"
+          || parsed.kind !== effect.operation
           || parsed.runId !== this.runId
           || parsed.taskId !== snapshot.task.task_id
           || parsed.taskHash !== snapshot.taskHash
