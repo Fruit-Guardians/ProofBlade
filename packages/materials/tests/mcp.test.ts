@@ -302,6 +302,37 @@ test("MCP close aborts a pending handshake and leaves no child process", async (
   }
 });
 
+test("MCP connection failures explain why an enabled server cannot be used", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-unreachable-"));
+  let registry: McpProjectRegistry | undefined;
+  try {
+    await writeFile(join(root, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        idalib: {
+          url: "http://127.0.0.1:1/mcp",
+          requestTimeoutMs: 1_000,
+          description: "Headless IDALIB MCP",
+        },
+      },
+    }), "utf8");
+    registry = McpProjectRegistry.load(root);
+    await assert.rejects(
+      () => registry!.describeServer("idalib"),
+      /\[ProofBlade MCP diagnostic\].*server=idalib.*enabled=true.*stage=connect.*transport=http endpoint http:\/\/127\.0\.0\.1:1\/mcp.*request_reached_server=false.*error=.*meaning=.*IDALIB is missing.*does not auto-start.*fallback=/i,
+    );
+    const callFailure = await registry.execute("mcp.idalib", "call", { tool: "idalib_open", arguments: {} });
+    assert.equal(callFailure.exitCode, 1);
+    assert.match(callFailure.stderr, /\[ProofBlade MCP diagnostic\].*stage=connect.*request_reached_server=false.*Start the MCP HTTP service/i);
+    const invalidCall = await registry.execute("mcp.idalib", "call", { tool: "idalib_open" });
+    assert.equal(invalidCall.exitCode, 1);
+    assert.match(invalidCall.stderr, /MCP call requires tool and object arguments/);
+    assert.doesNotMatch(invalidCall.stderr, /ProofBlade MCP diagnostic/);
+  } finally {
+    await registry?.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("MCP toolchain profiles default JADX, Ghidra, and Rizin homes to directories", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-mcp-toolchain-directories-"));
   const profiles = [
