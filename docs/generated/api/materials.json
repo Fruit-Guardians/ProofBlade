@@ -21,10 +21,10 @@
     "src/competition/experiment-gate.ts": "6ddcf4f5bc316b4b844588e9d141d5e5b42b4477a6b5517a5b21a9d754b4f8ec",
     "src/competition/fleet.ts": "eae75537158553b3a5781cdbe6a57a712c617b68f2844c4c4c66645911af54db",
     "src/competition/http-body.ts": "f8ce3de1b667bdeb30b7f776b100d5e9f45757db5dbb1bc9efa5d7898663d79e",
-    "src/competition/loop.ts": "51a0a7623d5cac934c2d091d887f91123a057f1e3226fdfa25b77cc96a6c19ef",
+    "src/competition/loop.ts": "3ea75316f2d9e903f6bca95977af5272d001382eaf134ffe0e5d766c104728df",
     "src/competition/sandbox.ts": "14c89111b76aae8f628cf61e731c122410bc4d2953c87392721946b4e3295f50",
     "src/competition/solver.ts": "c34d45a0d33c7ca822999f419bec9ca3a0f17dda7432237807ef2579676b8736",
-    "src/competition/task.ts": "99c453202392fc3f5a021191c36f7b87275c745d9e066d6b839b8da5d3fd1e8b",
+    "src/competition/task.ts": "9489c28033bf13847d50e977d37d390d196c5028928cb605198665429b83ce37",
     "src/config.ts": "54f88ffdcc5b10390e1026a09ad32f65aa8321af5f92ea94dcc12410eecabc2f",
     "src/container/contracts.ts": "5f8465a704cbf0844018bb0332e3d8a65338712a7ab81a2e9b826090cbc218eb",
     "src/container/docker-resource-adapter.ts": "c81ef7be99cae48d9e98393e10a600b3d882279c931d0c9a6e269a10945fc5e8",
@@ -8490,7 +8490,9 @@
         "@earendil-works/pi-ai",
         "node:path"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "packages/materials/tests/competition-solver.test.ts"
+      ],
       "structureHash": "3f70d26109e581a78affd41cae1361a1eb6bc6744f22db026cef8c084428f96d"
     },
     {
@@ -8568,8 +8570,7 @@
         "node:path"
       ],
       "testRefs": [
-        "packages/materials/tests/competition-pwn-e2e.test.ts",
-        "packages/materials/tests/competition-solver.test.ts"
+        "packages/materials/tests/competition-pwn-e2e.test.ts"
       ],
       "structureHash": "3dc40a4b43cfabf98adc2e0dc4f01d06686c2fbba41274a5b9566620f6c3d88c"
     },
@@ -47971,7 +47972,8 @@
         "node:path"
       ],
       "testRefs": [
-        "packages/materials/tests/coding-resources.test.ts"
+        "packages/materials/tests/coding-resources.test.ts",
+        "packages/materials/tests/competition-solver.test.ts"
       ],
       "structureHash": "15d4594bee369b5632d6f88ca1576a15097c0687525e22c13021eb1d05dca47a",
       "parentId": "@proofblade/materials::class::ProofBladeToolRuntime"

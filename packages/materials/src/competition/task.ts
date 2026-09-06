@@ -43,7 +43,7 @@ export function competitionTask(
 ): TaskContract {
   const workspace = join(root, config.storage.fixturesDir, runId);
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
-  const objective = objectiveParts.join("\n\n") || `Solve competition challenge ${summary.challengeId}.`;
+  const objective = objectiveParts.join("\n\n") || `Analyze the configured security target ${summary.challengeId}.`;
   const connection = env.connectionInfo?.trim();
   const targets = parseCompetitionTargets(connection);
 
@@ -56,8 +56,8 @@ export function competitionTask(
     objective,
     inputs: competitionInputs(attachments, env.connectionInfo),
     success_criteria: [
-      "Submit a flag the platform accepts.",
-      "The submitted flag is anchored by a recorded observation or a platform-provided value.",
+      "Submit a result the external platform accepts.",
+      "The submitted result is anchored by a recorded observation or a platform-provided value.",
     ],
     verification: {
       kind: "platform_submission",
