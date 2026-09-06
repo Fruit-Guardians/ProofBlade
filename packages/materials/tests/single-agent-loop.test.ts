@@ -391,7 +391,7 @@ test("attachment-backed reproduction completion finishes through RunCoordinator 
   const task = {
     schema_version: 1 as const,
     task_id: "WORKSPACE-REPRO",
-    mode: "ctf_solve" as const,
+    mode: "vulnerability_discovery" as const,
     target_kind: "misc" as const,
     target: "LOCAL_WORKSPACE:misc",
     objective: "Derive the candidate from the attachment.",

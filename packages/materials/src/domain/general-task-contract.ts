@@ -1,6 +1,9 @@
 import { canonicalJson, sha256 } from "./utils.js";
 import type { TaskContract } from "./types.js";
 
+/** Shape used only when projecting historical snapshots that still say ctf_solve. */
+export type LegacyTaskContract = Omit<TaskContract, "mode"> & { mode: TaskContract["mode"] | "ctf_solve" };
+
 /**
  * The execution loop is domain-agnostic. A task kind describes the shape of
  * the user's work, while optional domain tags are only metadata for templates,
@@ -134,7 +137,7 @@ export function assertGeneralTaskContract(task: GeneralTaskContract): void {
  * adapter is deliberately read-only: old runs remain replayable until their
  * execution path is migrated in a later PR.
  */
-export function generalTaskFromLegacy(task: TaskContract): GeneralTaskContract {
+export function generalTaskFromLegacy(task: LegacyTaskContract): GeneralTaskContract {
   const verification = legacyVerificationPolicy(task);
   const general: GeneralTaskContract = {
     schemaVersion: 1,
@@ -168,7 +171,7 @@ export function generalTaskFromLegacy(task: TaskContract): GeneralTaskContract {
   return general;
 }
 
-function legacyTaskKind(mode: TaskContract["mode"]): TaskKind {
+function legacyTaskKind(mode: LegacyTaskContract["mode"]): TaskKind {
   if (mode === "coding_assistant") return "coding";
   if (mode === "vulnerability_discovery") return "analysis";
   return "evaluation";
@@ -184,7 +187,7 @@ function legacyDomainTags(targetKind: TaskContract["target_kind"]): TaskDomainTa
   }
 }
 
-function legacyVerificationPolicy(task: TaskContract): VerificationPolicy {
+function legacyVerificationPolicy(task: LegacyTaskContract): VerificationPolicy {
   if (task.verification.kind === "platform_submission") {
     return { kind: "platform", required: true, maxAttempts: task.constraints.max_submissions, successCriteria: [...task.success_criteria] };
   }

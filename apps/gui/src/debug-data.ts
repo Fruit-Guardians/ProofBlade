@@ -797,8 +797,9 @@ export function boundedJsonByteSize(value: unknown, limit: number): number {
   return bytes;
 }
 
-export function runKind(task: Pick<TaskContract, "mode"> & Partial<Pick<TaskContract, "target" | "verification">>): RunKind {
-  // Legacy snapshots from the removed mode remain visible as Fixture runs.
+export function runKind(task: { mode: TaskContract["mode"] | "ctf_solve" } & Partial<Pick<TaskContract, "target" | "verification">>): RunKind {
+  // Historical snapshots from the removed mode remain visible as Fixture runs;
+  // task creation never emits this value anymore.
   if (task.mode === "ctf_solve") return "fixture";
   if (task.verification?.kind === "hidden_scorer" || task.verification?.kind === "platform_submission") return "fixture";
   if (typeof task.target === "string" && /^(?:FIXTURE:|LOCAL_FIXTURE|REAL_EVALUATION:)/.test(task.target)) return "fixture";

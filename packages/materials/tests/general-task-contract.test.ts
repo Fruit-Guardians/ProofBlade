@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generalTaskFromLegacy, createCognitiveSnapshot, createSafetySnapshot, assertGeneralTaskContract, type GeneralTaskContract } from "../src/domain/general-task-contract.js";
+import { generalTaskFromLegacy, createCognitiveSnapshot, createSafetySnapshot, assertGeneralTaskContract, type GeneralTaskContract, type LegacyTaskContract } from "../src/domain/general-task-contract.js";
 import type { TaskContract } from "../src/domain/types.js";
 
 function task(overrides: Partial<GeneralTaskContract> = {}): GeneralTaskContract {
@@ -25,7 +25,7 @@ function task(overrides: Partial<GeneralTaskContract> = {}): GeneralTaskContract
   };
 }
 
-const legacy: TaskContract = {
+const legacy: LegacyTaskContract = {
   schema_version: 1,
   task_id: "LEGACY-001",
   mode: "ctf_solve",

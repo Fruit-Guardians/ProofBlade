@@ -31,7 +31,7 @@ test("CTF assistant events hash text instead of persisting candidate plaintext",
   try {
     const runId = "ASSISTANT-REDACTION-001";
     const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
-    await controlStore.createRun(runId, { ...task(runId, root), mode: "ctf_solve", target_kind: "web" });
+    await controlStore.createRun(runId, { ...task(runId, root), mode: "vulnerability_discovery", target_kind: "web" });
     const candidate = "PB{assistant_event_secret}";
     await finalizeCodingTurn({
       runId,

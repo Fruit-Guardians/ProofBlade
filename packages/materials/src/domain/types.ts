@@ -293,7 +293,9 @@ export interface WebReproductionContract {
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
-  mode: "ctf_solve" | "vulnerability_discovery" | "coding_assistant";
+  /** Generic execution mode. The historical ctf_solve value is accepted only
+   * by read-only migration adapters, never by new task creation. */
+  mode: "vulnerability_discovery" | "coding_assistant";
   target_kind: TargetKind;
   target: string;
   objective: string;
