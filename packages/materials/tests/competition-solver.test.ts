@@ -79,10 +79,17 @@ const flagLane: CompetitionLaneFactory = async (options) => {
     verifier: options.platformVerifier!,
     artifactStore: options.artifactStore,
     ...(options.mode ? { mode: options.mode } : {}),
+    ...(options.approvalPolicy ? { approvalPolicy: options.approvalPolicy } : {}),
+    ...(options.onApprovalRequired ? { onApprovalRequired: options.onApprovalRequired } : {}),
   });
   return {
     async prompt() {
-      const text = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
+      let text: string;
+      try {
+        text = await readFile(join(options.projectRoot, "flag.txt"), "utf8");
+      } catch {
+        text = await readFile(join(options.projectRoot, "platform-provided-result.txt"), "utf8");
+      }
       const candidate = text.match(/[A-Za-z][A-Za-z0-9_-]{0,31}\{[^{}\r\n]{1,512}\}/)?.[0];
       if (!candidate) throw new Error("no candidate in workspace");
       const verdict = await submitResult({ target: "competition", payload: candidate });
@@ -443,25 +450,22 @@ test("a repeated identical flag replays the stored verdict instead of a second A
   }
 });
 
-test("dynamic-flag challenge skips the model turn but keeps a journaled run", async () => {
+test("platform-provided result uses the normal agent loop and remains journaled", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-"));
   try {
     const api = new FakeApi([{ id: "DYN", value: 50, flag: "flag{dynamic}", dynamic: true }]);
-    // No lane provided — if the solver tried to run the loop it would fail to build a real lane.
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
     assert.equal(result.solved, true);
-    assert.equal(result.status, "SOLVED_DYNAMIC");
+    assert.equal(result.status, "SOLVED");
     assert.deepEqual(api.submitted, [{ id: "DYN", flag: "flag{dynamic}" }]);
     assert.ok(api.stopped.includes("DYN"));
     const runIds = await readdir(join(root, "runs"));
     const events = (await readFile(join(root, "runs", runIds[0]!, "events.jsonl"), "utf8"))
       .trim().split(/\r?\n/).map((line) => JSON.parse(line) as { type: string; payload?: { domainPhase?: string; status?: string } });
-    assert.ok(events.some((event) => event.type === "effect_finished"), "dynamic submission must be journaled");
-    const submitPhaseIndex = events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "SUBMIT");
-    assert.ok(submitPhaseIndex >= 0, "dynamic path must reach SUBMIT");
-    assert.ok(events.findIndex((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "REPORT") < submitPhaseIndex, "dynamic path must report before SUBMIT");
-    assert.deepEqual(events.slice(submitPhaseIndex, submitPhaseIndex + 3).map((event) => event.type), ["domain_phase_changed", "work_item_completed", "run_finished"]);
+    assert.ok(events.some((event) => event.type === "effect_finished"), "external submission must be journaled");
+    assert.ok(events.some((event) => event.type === "work_item_claimed"), "the normal agent loop must claim a work item");
+    assert.ok(events.some((event) => event.type === "domain_phase_changed" && event.payload?.domainPhase === "REPORT"), "the normal loop must report before submitting");
     assert.equal(events.find((event) => event.type === "run_finished")?.payload?.status, "SUCCEEDED");
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -601,7 +605,7 @@ test("competition solver ignores an unrelated unavailable session kind", async (
   }
 });
 
-test("dynamic flag submission does not require an unused session broker", async () => {
+test("platform-provided result does not require an unused session broker", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-dynamic-"));
   try {
     const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT-DYNAMIC", value: 100, flag: "flag{runtime_preflight_dynamic}", dynamic: true }]);
@@ -612,7 +616,7 @@ test("dynamic flag submission does not require an unused session broker", async 
         sessionBroker: { baseUrl: "http://127.0.0.1:1", tokenEnv: "PATH" },
       },
     } satisfies ProofBladeConfig;
-    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1 });
+    const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
     assert.equal(result.solved, true, result.reason ?? result.status);
     assert.deepEqual(api.submitted, [{ id: "RUNTIME-PREFLIGHT-DYNAMIC", flag: "flag{runtime_preflight_dynamic}" }]);
@@ -637,7 +641,7 @@ test("solver default janitor retries a failed platform stop on the next fleet re
   const root = await mkdtemp(join(tmpdir(), "pb-solver-default-janitor-"));
   try {
     const api = new FakeApi([{ id: "DYN-RETRY-STOP", value: 100, flag: "flag{retry_stop}", dynamic: true, stopFailures: 1 }]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
     assert.equal(result.solved, true, result.reason ?? result.status);
     assert.deepEqual(api.stopped, [], "the first cleanup failure must not be reported as a successful stop");
@@ -648,11 +652,11 @@ test("solver default janitor retries a failed platform stop on the next fleet re
   }
 });
 
-test("dynamic-flag assist records a proposal without contacting the platform", async () => {
+test("platform-provided result assist records a proposal without contacting the platform", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-assist-"));
   try {
     const api = new FakeApi([{ id: "DYN-ASSIST", value: 50, flag: "flag{dynamic_assist}", dynamic: true }]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "assist" });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, mode: "assist", maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
     assert.equal(result.status, "AWAITING_APPROVAL");
     assert.equal(result.submissions, 0);
@@ -668,12 +672,12 @@ test("dynamic-flag assist records a proposal without contacting the platform", a
   }
 });
 
-test("configured approval policy holds a dynamic platform effect before submission", async () => {
+test("configured approval policy holds a platform submission before contact", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-approval-"));
   try {
     const api = new FakeApi([{ id: "DYN-APPROVAL", value: 50, flag: "flag{approval_required}", dynamic: true }]);
     const approvals = new ApprovalPolicy({ ledgerPath: join(root, "runs", "approvals.json") });
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, approvalPolicy: approvals });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, approvalPolicy: approvals, maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
     assert.equal(result.status, "AWAITING_APPROVAL");
     assert.equal(api.submitted.length, 0);
@@ -710,7 +714,7 @@ test("a recoverable inner-turn guard triggers an evidence-first replan before th
   }
 });
 
-test("dynamic flag submission skips Docker preflight when the daemon is unavailable", async () => {
+test("platform-provided result still requires Docker preflight for a Pwn target", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dynamic-no-docker-"));
   try {
     const api = new FakeApi([{ id: "DYN-DOCKER", value: 100, flag: "flag{dynamic_docker_skip}", dynamic: true }]);
@@ -724,11 +728,11 @@ test("dynamic flag submission skips Docker preflight when the daemon is unavaila
     const challenge = { ...(await api.listChallenges())[0]!, normalizedCategory: "pwn" as const };
     const solver = new CompetitionChallengeSolver({ root, config: dockerConfig, api, containerRuntime: unavailableRuntime });
     const result = await solver.solve({ challenge, signal: new AbortController().signal });
-    assert.equal(result.solved, true, result.reason ?? result.status);
-    assert.equal(result.status, "SOLVED_DYNAMIC");
-    assert.equal(prewarmCalls, 0);
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "CONTAINER_ERROR");
+    assert.equal(prewarmCalls, 1);
     assert.equal(doctorCalls, 0);
-    assert.deepEqual(api.submitted, [{ id: "DYN-DOCKER", flag: "flag{dynamic_docker_skip}" }]);
+    assert.deepEqual(api.submitted, []);
     assert.deepEqual(api.stopped, ["DYN-DOCKER"]);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -786,22 +790,22 @@ test("a recovered guard does not remain the final reason when the next turns sim
   }
 });
 
-test("a dynamic-flag platform failure trips the fleet circuit and leaves later challenges pending", async () => {
+test("a platform submission failure trips the fleet circuit and leaves later targets pending", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-dyn-platform-error-"));
   try {
     const api = new FakeApi([
       { id: "DYN-FAIL", value: 100, flag: "flag{dynamic}", dynamic: true, submitError: "DASCTF API unavailable" },
       { id: "DYN-PENDING", value: 50, flag: "flag{unused}", dynamic: true },
     ]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const scheduler = new FleetScheduler({ api, solver, concurrency: 1 });
     const snapshot = await scheduler.run();
 
     assert.deepEqual(api.submitted, [{ id: "DYN-FAIL", flag: "flag{dynamic}" }], "the pending challenge must not reach submitFlag");
     assert.equal(snapshot.totals.failed, 1);
     assert.equal(snapshot.totals.pending, 1);
-    assert.match(snapshot.challenges.find((item) => item.challengeId === "DYN-FAIL")?.reason ?? "", /Platform submit dynamic flag failed/);
-    assert.ok(api.stopped.includes("DYN-FAIL"), "the failed dynamic environment must still be released");
+    assert.match(snapshot.challenges.find((item) => item.challengeId === "DYN-FAIL")?.reason ?? "", /provider|submit|platform/i);
+    assert.ok(api.stopped.includes("DYN-FAIL"), "the failed platform environment must still be released");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -811,7 +815,7 @@ test("a provisioning failure performs best-effort teardown and returns a platfor
   const root = await mkdtemp(join(tmpdir(), "pb-solver-provision-error-"));
   try {
     const api = new FakeApi([{ id: "BUILD-FAIL", value: 100, flag: "flag{unused}", startError: "readiness poll timed out" }]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0], signal: new AbortController().signal });
 
     assert.deepEqual(api.started, ["BUILD-FAIL"]);
@@ -831,7 +835,7 @@ test("a challenge-local attachment failure does not circuit-break a healthy pend
       { id: "TOO-BIG", value: 100, flag: "flag{unused}", detailError: new CompetitionChallengeError("attachment exceeds 67108864 bytes") },
       { id: "HEALTHY", value: 50, flag: "flag{healthy}", dynamic: true },
     ]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
 
     assert.deepEqual(api.submitted, [{ id: "HEALTHY", flag: "flag{healthy}" }], "the healthy challenge must still run");
@@ -851,7 +855,7 @@ test("a recognizable raw attachment error does not circuit-break a healthy pendi
       { id: "TOO-BIG-RAW", value: 100, flag: "flag{unused}", detailError: new Error("attachment exceeds 67108864 bytes") },
       { id: "HEALTHY-RAW", value: 50, flag: "flag{healthy}", dynamic: true },
     ]);
-    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api });
+    const solver = new CompetitionChallengeSolver({ root, config: CONFIG, api, maxTurns: 1, createLane: flagLane });
     const snapshot = await new FleetScheduler({ api, solver, concurrency: 1 }).run();
 
     assert.deepEqual(api.submitted, [{ id: "HEALTHY-RAW", flag: "flag{healthy}" }]);

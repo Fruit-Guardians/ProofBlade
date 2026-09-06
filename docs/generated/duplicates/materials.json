@@ -187,7 +187,7 @@
           "kind": "method",
           "signature": "(): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 123,
+          "line": 124,
           "summary": "Inferred summary: close operation used to provide a reusable operation."
         },
         {
@@ -197,7 +197,7 @@
           "kind": "method",
           "signature": "(_fixture: FixtureRef): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 119,
+          "line": 120,
           "summary": "Inferred summary: destroy operation used to provide a reusable operation."
         }
       ],

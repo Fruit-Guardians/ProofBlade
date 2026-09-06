@@ -2,8 +2,7 @@ import { join } from "node:path";
 import { resolveExecutionConfig, type ProofBladeConfig } from "../config.js";
 import { createServices } from "../app/demo.js";
 import type { ExecutionMode, TaskContract } from "../domain/types.js";
-import { id, isTerminal, sha256 } from "../domain/utils.js";
-import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi, type CompetitionAttachment, type CompetitionEnvironment } from "./api.js";
+import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi, type CompetitionEnvironment } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { countSubmissions, runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
@@ -13,11 +12,8 @@ import type { ContainerRef, ContainerRuntimePort } from "../container/contracts.
 import { SessionRegistry } from "../container/session-registry.js";
 import { CompetitionEnvironmentJanitor, CompetitionEnvironmentResourceAdapter, type CompetitionEnvironmentReservation, type ManagedCompetitionEnvironment } from "./environment-janitor.js";
 import { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
-import { IndependentVerifier } from "../verification/verifier.js";
-import { beginSubmissionVerificationRequest } from "../verification/verification-key.js";
 import { PwnReplayRecoveryAdapter } from "../verification/pwn-replay-recovery.js";
 import type { PwnVerifierPolicy } from "../verification/pwn-reproduction-verifier.js";
-import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { preflightSessionRuntimeBrokers, tryCreateConfiguredSessionRuntimeBrokers, type SessionRuntimePreflight } from "../recovery/session-runtime-composition.js";
 import type { BrowserVerifierFactory } from "../web/browser-session.js";
@@ -72,9 +68,11 @@ function pwnVerifierPolicyFor(contract: TaskContract["verification"]["pwn"]): Pw
 
 /**
  * The real ChallengeSolver: turns one competition challenge into a full harness
- * run. Fetches detail + attachments, provisions the environment, and either
- * takes a journaled no-model dynamic-flag path or drives the CODING lane over
- * a CompetitionSandbox. The provisioned environment is always released.
+ * run. Fetches detail and attachments, provisions the environment, and drives
+ * the same coding lane used by other security tasks over a CompetitionSandbox.
+ * Platform-provided values are ordinary read-only task inputs; they do not
+ * bypass the agent loop, approval gate, budget, or verifier. The provisioned
+ * environment is always released.
  */
 export class CompetitionChallengeSolver implements ChallengeSolver {
   private readonly environmentJanitor: CompetitionEnvironmentJanitor;
@@ -135,30 +133,14 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     }
     if (!environment) throw new Error("Competition environment provisioning returned no environment");
 
-    // Dynamic-flag challenges hand us the flag at provisioning time — submit it
-    // without spending a model turn to rediscover it. It still goes through a
-    // durable Run, Artifact, independent verifier, and journaled fixture_score
-    // so the fast path cannot bypass the single terminal state machine.
-    if (environment.teamFlag && environment.teamFlag.trim()) {
-      const flag = environment.teamFlag.trim();
-      try {
-        return await this.solveDynamicFlag(runId, request, challengeId, detail.attachments, environment, flag);
-      } catch (error) {
-        this.throwIfAborted(request.signal, error);
-        return competitionFailure("submit dynamic flag", error);
-      } finally {
-        await this.stop(challengeId, environment.instanceId, managedEnvironment);
-      }
-    }
-
     // Do not create a Coding lane until every session broker required by this
     // task direction has proved that it can serve restart-stable capabilities.
     // An explicitly injected Browser factory remains an application-owned
     // test/development seam; Browser transport is not part of the current
     // competition task contract. The check
-    // intentionally sits after the dynamic-flag path: the platform only tells
-    // us whether a challenge is dynamic after environment provisioning, and
-    // that path never creates a Coding lane or touches a session runtime.
+    // The platform only tells us whether a provided result exists after
+    // environment provisioning, so all security directions use the same
+    // runtime preflight and lane lifecycle.
     const runtimeKinds = requiredRuntimeKinds(request.challenge.normalizedCategory);
     const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(this.init.config);
     const requiredSessionKinds = [...runtimeKinds];
@@ -176,10 +158,6 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       }
     }
 
-    // Dynamic-flag challenges never execute code in a local container. Delay
-    // Docker preflight until after startEnvironment has told us that this run
-    // actually has a model-solvable target; otherwise a local Docker outage
-    // would incorrectly block a platform-only flag submission.
     const containerRuntime = needsContainer ? (this.init.containerRuntime ?? new DockerContainerRuntime(execution, undefined, undefined, this.externalResources)) : undefined;
     if (containerRuntime) {
       try {
@@ -215,7 +193,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     try {
       let task: ReturnType<typeof competitionTask>;
       try {
-        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config, detail.attachments);
+        task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config, detail.attachments, environment.teamFlag);
       } catch (error) {
         this.throwIfAborted(request.signal, error);
         return competitionFailure("parse challenge targets", error);
@@ -260,29 +238,38 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
           new CompetitionEnvironmentResourceAdapter(this.environmentJanitor),
           ...(containerRuntime instanceof DockerContainerRuntime ? [containerRuntime.externalResourceAdapter()] : []),
         ];
-        const outcome = await runCompetitionLoop(this.init.root, this.init.config, services, {
-          runId,
-          task,
-          workspaceRoot: fixture.path,
-          installRoot: this.init.root,
-          ...(container && containerRuntime ? {
-            executionEnv: containerRuntime.executionEnv(container),
-            workspaceRootForPrompt: "/workspace",
-            skillsLibraryPathForPrompt: "/opt/proofblade/skills",
-            executionPlatform: "linux",
-            hostWorkspaceRootForMcp: fixture.path,
-          } : {}),
-          // A live per-challenge mode getter (from the fleet control plane) wins;
-          // otherwise the solver's configured mode, defaulting to autonomous play.
-          mode: request.mode ?? this.init.mode ?? "auto",
-          ...(this.init.maxTurns === undefined ? {} : { maxTurns: this.init.maxTurns }),
-          ...(request.signal ? { signal: request.signal } : {}),
-          sessionRuntimePreflight,
-          ...(this.init.approvalPolicy ? { approvalPolicy: this.init.approvalPolicy } : {}),
-          ...(this.init.browserVerifierFactory ? { browserVerifierFactory: this.init.browserVerifierFactory } : {}),
-          ...(verificationRecoveryAdapters ? { verificationRecoveryAdapters } : {}),
-          externalResourceAdapters,
-        }, this.init.createLane);
+        let outcome: Awaited<ReturnType<typeof runCompetitionLoop>>;
+        try {
+          outcome = await runCompetitionLoop(this.init.root, this.init.config, services, {
+            runId,
+            task,
+            workspaceRoot: fixture.path,
+            installRoot: this.init.root,
+            ...(container && containerRuntime ? {
+              executionEnv: containerRuntime.executionEnv(container),
+              workspaceRootForPrompt: "/workspace",
+              skillsLibraryPathForPrompt: "/opt/proofblade/skills",
+              executionPlatform: "linux",
+              hostWorkspaceRootForMcp: fixture.path,
+            } : {}),
+            // A live per-challenge mode getter (from the fleet control plane) wins;
+            // otherwise the solver's configured mode, defaulting to autonomous play.
+            mode: request.mode ?? this.init.mode ?? "auto",
+            ...(this.init.maxTurns === undefined ? {} : { maxTurns: this.init.maxTurns }),
+            ...(request.signal ? { signal: request.signal } : {}),
+            sessionRuntimePreflight,
+            ...(this.init.approvalPolicy ? { approvalPolicy: this.init.approvalPolicy } : {}),
+            ...(this.init.browserVerifierFactory ? { browserVerifierFactory: this.init.browserVerifierFactory } : {}),
+            ...(verificationRecoveryAdapters ? { verificationRecoveryAdapters } : {}),
+            externalResourceAdapters,
+          }, this.init.createLane);
+        } catch (error) {
+          this.throwIfAborted(request.signal, error);
+          // A platform submission can fail from inside a lane/tool callback.
+          // Normalize that exception at the solver boundary so Fleet can trip
+          // its shared platform circuit instead of starting another target.
+          return competitionFailure("run security target", error);
+        }
         return {
           solved: outcome.solved,
           status: competitionStatus(outcome.stopReason, outcome.solved),
@@ -306,93 +293,6 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       await this.init.api.stopEnvironment(challengeId, instanceId);
     } catch {
       // Best-effort teardown; the platform reclaims environments on expiry.
-    }
-  }
-
-  private async solveDynamicFlag(
-    runId: string,
-    request: ChallengeSolveRequest,
-    challengeId: string,
-    attachments: CompetitionAttachment[],
-    environment: CompetitionEnvironment,
-    flag: string,
-  ): Promise<ChallengeSolveResult> {
-    const task = competitionTask(runId, request.challenge, environment, this.init.root, this.init.config, attachments);
-    const sandbox = new CompetitionSandbox({
-      api: this.init.api,
-      challengeId,
-      workspaceRoot: join(this.init.root, this.init.config.storage.fixturesDir),
-      attachments,
-      environment,
-    });
-    const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(this.init.config);
-    const services = createServices(this.init.root, this.init.config, {
-      sandbox,
-      externalResources: this.externalResources,
-      externalResourceAdapters: [new CompetitionEnvironmentResourceAdapter(this.environmentJanitor)],
-      ...(sessionRuntime.brokers.length > 0 ? { sessionRuntimeBrokers: sessionRuntime.brokers } : {}),
-      ...(sessionRuntime.configured ? { sessionRuntimeRequired: !sessionRuntime.tokenAvailable } : {}),
-      ...(this.init.config.runtime.browserBroker ? { browserRuntimeRequired: true } : {}),
-    });
-    let created = false;
-    try {
-      await services.control.createRun(runId, task);
-      created = true;
-      const fixture = await sandbox.build(task);
-      const candidateArtifact = await services.artifacts.putText(runId, flag, {
-        filename: "dynamic-flag.txt",
-        sensitivity: "flag_candidate",
-      });
-      const completionId = id("C");
-      const verificationRequest = await beginSubmissionVerificationRequest(services.control, runId, { candidateHash: sha256(flag), candidateArtifactId: candidateArtifact.id });
-      const verifier = new IndependentVerifier(services.control, services.artifacts, services.verifierJournal, join(this.init.root, this.init.config.storage.runsDir), services.verifier);
-      const coordinator = new RunCoordinator(services.control, services.verifier, { verifier });
-      await coordinator.setDomainPhase(runId, "RECON");
-      const workItemId = (await coordinator.claim(runId, task, 0)).id;
-      await services.control.dispatch(runId, {
-        type: "completion_proposed",
-        completion: { id: completionId, purpose: "submission", candidateHash: sha256(flag), artifactId: candidateArtifact.id, verificationKey: verificationRequest.request.key },
-        lane: "executor",
-      });
-      if ((request.mode?.() ?? this.init.mode ?? "auto") === "assist") {
-        await coordinator.block(runId, workItemId, "Completion is waiting for operator approval.");
-        return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: "Completion is waiting for operator approval." };
-      }
-      if (this.init.approvalPolicy) {
-        const approval = await this.init.approvalPolicy.check({
-          runId,
-          operation: "platform.submit",
-          resource: flag,
-          reason: "A platform-provided dynamic flag is ready for submission.",
-        });
-        if (!approval.allowed) {
-          await coordinator.block(runId, workItemId, "Completion is waiting for operator approval.");
-          return { solved: false, status: "AWAITING_APPROVAL", submissions: 0, reason: `${approval.reason ?? "Completion is waiting for operator approval."}${approval.approvalId ? ` approvalId=${approval.approvalId}` : ""}` };
-        }
-      }
-      const verified = await coordinator.verifyCompletion(runId, fixture, completionId, request.signal);
-      const snapshot = await services.control.snapshot(runId);
-      const submissions = countSubmissions(snapshot);
-      if (!verified.accepted) {
-        await coordinator.fail(runId, workItemId, "The platform rejected the dynamic flag.");
-        await services.control.dispatch(runId, { type: "fail", reason: verified.evidenceIds.join(", ") || "The platform rejected the dynamic flag.", category: "verifier_disagreement", lane: "verifier" });
-        return { solved: false, status: "DYNAMIC_REJECTED", submissions, reason: "The platform rejected the dynamic flag." };
-      }
-      await coordinator.finishAccepted(runId, workItemId, completionId, "Platform accepted the candidate and verifier evidence covers the completion.");
-      return { solved: true, status: "SOLVED_DYNAMIC", flag, submissions };
-    } catch (error) {
-      if (created) {
-        const current = await services.control.snapshot(runId);
-        if (!isTerminal(current.status)) {
-          await services.control.dispatch(runId, {
-            type: "fail",
-            reason: error instanceof Error ? error.message : String(error),
-            category: "permission_or_environment",
-            lane: "verifier",
-          }).catch(() => undefined);
-        }
-      }
-      throw error;
     }
   }
 
