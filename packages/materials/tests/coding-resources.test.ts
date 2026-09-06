@@ -132,6 +132,36 @@ test("generic result proposals accept ordinary text without CTF formatting", asy
   }
 });
 
+test("verify_result returns actionable feedback when verification is rejected", async () => {
+  const literal = await executeTool("verify_result", { result: "result-value", command: "printf result-value" }, {} as CodingResourceContext);
+  assert.equal(literal.isError, true);
+  assert.deepEqual(literal.details, {
+    verified: false,
+    result: "result-value",
+    resultHash: sha256("result-value"),
+    commandHash: sha256("printf result-value"),
+    verifierFeedback: {
+      stage: "input",
+      reason: "Verification command embeds the result literal; derive it from workspace inputs instead",
+      retryable: true,
+      nextAction: "Derive the result from workspace inputs; do not place the literal result in the verification command.",
+    },
+  });
+
+  const execution = await executeTool("verify_result", { result: "result-value", command: "node verify.mjs" }, {
+    env: { cwd: "." },
+    claimVerifier: { recordResult: async () => { throw new Error("verifier command exited with code 1"); } },
+  } as unknown as CodingResourceContext);
+  assert.equal(execution.isError, true);
+  const feedback = (execution.details as { verifierFeedback: { stage: string; reason: string; retryable: boolean; nextAction: string } }).verifierFeedback;
+  assert.deepEqual(feedback, {
+    stage: "execution",
+    reason: "verifier command exited with code 1",
+    retryable: true,
+    nextAction: "Inspect the verifier output and supporting Evidence, then change the command or result before retrying.",
+  });
+});
+
 test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
   const tools = [
     { name: "mcp__idalib-mcp__idalib_open" },
