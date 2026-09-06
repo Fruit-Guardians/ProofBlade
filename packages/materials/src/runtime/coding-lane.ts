@@ -542,7 +542,12 @@ export class PiCodingLane implements AgentLanePort {
     const failureStormBreaker = new ToolFailureStormBreaker();
     const experimentBudgetBreaker = new ExperimentBudgetBreaker();
     const toolBudget: ToolCallBudget = { max: Math.max(0, snapshot.task.constraints.max_tool_calls), count: 0 };
-    const firstActionPlan = preflight?.firstActionPlan ?? taskProfile?.firstActionPlan;
+    // Prepared profiles retain first-action metadata for evaluation snapshots,
+    // but ordinary runs must not project it into the model turn. Ablation
+    // callers may opt in explicitly to measure that cognitive intervention.
+    const firstActionPlan = options.ablationPolicy
+      ? preflight?.firstActionPlan ?? taskProfile?.firstActionPlan
+      : undefined;
     const firstActionBudget: FirstActionBudget | undefined = firstActionPlan
       ? {
         allowedToolNames: [...firstActionPlan.allowedToolNames],
