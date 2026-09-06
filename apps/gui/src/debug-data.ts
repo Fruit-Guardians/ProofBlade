@@ -562,16 +562,45 @@ export class DebugDataService {
         emit({ type: "paused", runId });
         return;
       }
-      let outcome = await lane.prompt(text);
+      const coordinator = new RunCoordinator(this.services.control, this.services.verifier);
+      const turnBefore = await this.services.control.snapshot(runId);
+      const workItem = await coordinator.claim(runId, snapshot.task, 1);
+      let outcome: AgentOutcome;
+      try {
+        outcome = await lane.prompt(text);
+      } catch (error) {
+        await coordinator.fail(runId, workItem.id, error instanceof Error ? error.message : String(error)).catch(() => undefined);
+        throw error;
+      }
       if (this.pauseRequests.has(runId)) {
+        await coordinator.block(runId, workItem.id, "Paused by user during the coding turn").catch(() => undefined);
         await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
         return;
       }
       const recoverableTermination = isRecoverableTermination(outcome.termination);
       if (!recoverableTermination && (outcome.errorMessage || outcome.stopReason === "error")) {
+        await coordinator.fail(runId, workItem.id, outcome.errorMessage || "Provider request failed").catch(() => undefined);
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
+      }
+      const afterTurn = await this.services.control.snapshot(runId);
+      const progress = outcome.text.trim().length > 0
+        || newIds(turnBefore.observations, afterTurn.observations).length > 0
+        || newIds(turnBefore.artifacts, afterTurn.artifacts).length > 0
+        || newIds(turnBefore.evidence, afterTurn.evidence).length > 0
+        || newIds(turnBefore.facts, afterTurn.facts).length > 0
+        || newIds(turnBefore.hypotheses, afterTurn.hypotheses).length > 0;
+      await coordinator.settle(runId, workItem.id, progress,
+        newIds(turnBefore.evidence, afterTurn.evidence),
+        newIds(turnBefore.artifacts, afterTurn.artifacts));
+      const accepted = Object.values(afterTurn.completions).find((completion) =>
+        completion.status === "ACCEPTED"
+          && completion.runId === runId
+          && completion.generation === afterTurn.generation
+          && (completion.purpose === "harness_verification" || completion.purpose === "claim_reproduction"));
+      if (accepted && afterTurn.status !== "SUCCEEDED") {
+        await coordinator.finishAccepted(runId, workItem.id, accepted.id, "The task verifier accepted the result.");
       }
       emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
     } catch (error) {
@@ -978,6 +1007,10 @@ export function correlateToolCalls(
 export function codingWorkspace(task: Pick<TaskContract, "mode" | "target" | "scope">, preferred: string | undefined, fallback: string): string {
   if (task.mode !== "coding_assistant") return fallback;
   return preferred || task.scope.allowed_workspace || task.target || fallback;
+}
+
+function newIds(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  return Object.keys(after).filter((key) => !(key in before));
 }
 
 function collectReferencedIds(values: unknown[], snapshot: RunSnapshot): Set<string> {
