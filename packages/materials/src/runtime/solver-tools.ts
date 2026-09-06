@@ -338,29 +338,6 @@ const proposeFactContract: ProofBladeToolContract<typeof factSchema, Static<type
   },
 };
 
-const candidateSchema = Type.Object({
-  candidate: Type.String({ description: "One complete PB{...} candidate from target evidence." }),
-});
-
-const submitCandidateContract: ProofBladeToolContract<typeof candidateSchema, Static<typeof candidateSchema>, unknown, SolverToolContext> = {
-  name: "submit_candidate",
-  version: "1.0.0",
-  description: "Propose a candidate for independent verification. This tool does not mark the run successful.",
-  parameters: candidateSchema,
-  readOnly: false,
-  sideEffect: "workspace",
-  timeoutMs: 10_000,
-  replay: "idempotent",
-  outputPolicy: "summary",
-  resourceKeys: ["submission:current"],
-  sensitivity: "secret",
-  evidenceKinds: [],
-  executionMode: "sequential",
-  async execute(input, context) {
-    return await context.runtime.submitCandidate(input.candidate);
-  },
-};
-
 const statusSchema = Type.Object({});
 
 const readArtifactSchema = Type.Object({
@@ -442,7 +419,6 @@ const solverToolContracts: ReadonlyArray<ProofBladeToolContract<any, any, any, S
   proposeIntentContract,
   proposeHypothesisContract,
   proposeFactContract,
-  submitCandidateContract,
   readArtifactContract,
   searchHistoryContract,
   reportStatusContract,
@@ -460,7 +436,7 @@ function adapt<TParameters extends TSchema, TInput, TResult>(
     async execute(_toolCallId, params, signal, _onUpdate, context) {
       try {
         const details = await contract.execute(params as TInput, context, signal);
-        return { content: [{ type: "text", text: JSON.stringify(details) }], details, isError: false, terminate: contract.name === "submit_candidate" };
+        return { content: [{ type: "text", text: JSON.stringify(details) }], details, isError: false, terminate: false };
       } catch (error) {
         const details = toToolFailure(error);
         return { content: [{ type: "text", text: JSON.stringify(details) }], details, isError: true, terminate: false };

@@ -355,7 +355,7 @@ test("request epochs bind provider events and replay their context hashes", asyn
         adapter: "openai-completions",
         contextWindow: 16_384,
         toolCatalogHash: "tools-v1",
-        toolNames: ["inspect_target", "submit_candidate"],
+        toolNames: ["inspect_target", "external_submit"],
         contextManifestHash: "context-v1",
         status: "STARTED",
         createdAt: new Date().toISOString(),
