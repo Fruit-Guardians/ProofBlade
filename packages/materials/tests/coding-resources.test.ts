@@ -35,17 +35,17 @@ import { codingHostGuidance } from "../src/runtime/coding-lane.js";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "a2995bca1a1a56aaf44126e4ee5b95c994053d1e32689762b19d7497c0dc7f43";
+const CODING_TOOL_CONTRACT_HASH = "696c1dfc6cf978bfce0eb599655d03755cccc8b9543d82725c5c2fc81f353944";
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
   // submit_flag is gated on the run being platform-judged, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
@@ -236,6 +236,9 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
     const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
     const details = result.details as Record<string, unknown>;
     assert.equal(details.verified, true);
+    const generic = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
+    assert.equal((generic.details as Record<string, unknown>).result, candidate);
+    assert.equal((generic.details as Record<string, unknown>).verified, true);
     assert.equal(result.terminate, undefined, "ordinary claim verification keeps the coding turn interactive");
     const snapshot = await services.control.snapshot(runId);
     assert.equal(Object.keys(snapshot.evidence).length, 2);
