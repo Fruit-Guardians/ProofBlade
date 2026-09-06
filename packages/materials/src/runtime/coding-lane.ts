@@ -54,7 +54,7 @@ import { adoptVerifierBrowserSession, openVerifierBrowserSession, type BrowserVe
 import type { BrowserRuntimeHandoff } from "../web/browser-resource-adapter.js";
 import { WebToolHandler } from "../web/web-tools.js";
 import type { ApprovalPolicy } from "../security/approval-policy.js";
-import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type ChallengeToolProfile, type ChallengeToolPreflight } from "./challenge-tool-profile.js";
+import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, profileForTargetKind, runToolPreparationFromPreflight, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
@@ -159,7 +159,7 @@ export class PiCodingLane implements AgentLanePort {
     hostWorkspaceRootForMcp?: string;
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] };
     /** Prepared task direction; keeps only selected profile tools resident in the prompt. */
-    challengeProfile?: ChallengeToolProfile;
+    securityProfile?: SecurityToolProfile;
     /** Live execution mode for a platform-judged run. "assist" records a flag for
      * operator approval instead of submitting it. Defaults to autonomous play. */
     mode?: () => "auto" | "assist";
@@ -226,12 +226,12 @@ export class PiCodingLane implements AgentLanePort {
     }
     // A task profile only prepares optional tools. It never selects a loop or
     // injects a domain workflow prompt; ordinary tasks can use the same tools.
-    const profileRequested = Boolean(options.challengeProfile)
+    const profileRequested = Boolean(options.securityProfile)
       || snapshot.task.verification.kind === "hidden_scorer"
       || snapshot.task.verification.kind === "platform_submission";
-    const taskProfile = options.challengeProfile ?? (profileRequested ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
+    const taskProfile = options.securityProfile ?? (profileRequested ? profileForTargetKind(snapshot.task.target_kind, `${snapshot.task.target}\n${snapshot.task.objective}`) : undefined);
     const runtimeKey = inContainer && env instanceof ContainerExecutionEnv ? `container:${env.containerRef.imageDigest}` : inContainer ? "container" : "host";
-    let preflight: ChallengeToolPreflight | undefined;
+    let preflight: SecurityToolPreflight | undefined;
     let preparation: RunToolPreparation | undefined;
     if (taskProfile) {
       const existing = snapshot.toolPreparation;

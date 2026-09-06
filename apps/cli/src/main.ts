@@ -19,8 +19,8 @@ import {
   ProofBladeToolCatalogRegistry,
   bootstrapToolCatalog,
   ToolPreflightService,
-  challengeToolProfiles,
-  challengeToolCatalogSpecs,
+  securityToolProfiles,
+  securityToolCatalogSpecs,
   McpProjectRegistry,
   listBundledCapabilities,
   projectionHash,
@@ -445,14 +445,14 @@ async function main(): Promise<void> {
       const action = arg ?? "list";
       if (action === "list") print({ catalogHash: registry.catalogHash(), tools: registry.list(), diagnostics: registry.diagnostics });
       else if (action === "probe") print({ catalogHash: registry.catalogHash(), diagnostics: [...registry.diagnostics, ...(await registry.probe())] });
-      else if (action === "init") print(await bootstrapToolCatalog(root, challengeToolCatalogSpecs(), { force: rest.includes("--refresh") }));
+      else if (action === "init") print(await bootstrapToolCatalog(root, securityToolCatalogSpecs(), { force: rest.includes("--refresh") }));
       else if (action === "preflight") {
         const requested = rest[0] ?? "all";
         const profiles = requested === "all"
-          ? challengeToolProfiles()
+          ? securityToolProfiles()
           : (() => {
-            const profile = challengeToolProfiles().find((item) => item.id === requested);
-            if (!profile) throw new Error(`Unknown challenge profile: ${requested}`);
+            const profile = securityToolProfiles().find((item) => item.id === requested);
+            if (!profile) throw new Error(`Unknown security profile: ${requested}`);
             return [profile];
           })();
         const mcp = McpProjectRegistry.load(root);
