@@ -44,7 +44,8 @@ proofblade fixtures
 proofblade eval-holdout fixtures/holdout/manifest.json --enforce-gate
 npm run eval
 npm run eval -- --enforce-gate
-proofblade solve web-source-1 --run-id WEB-001 --mode auto --max-turns 2
+proofblade task create WEB-001 --template web-source-1
+proofblade task run WEB-001 --mode auto --max-turns 2
 proofblade checkpoint WEB-001 manual
 proofblade compact WEB-001 manual
 proofblade history WEB-001 CP
