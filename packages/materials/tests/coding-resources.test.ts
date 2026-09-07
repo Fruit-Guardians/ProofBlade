@@ -256,11 +256,12 @@ test("mobile profile selects JADX first-class tools even when the durable task k
 
 test("coding host guidance uses Windows-compatible Python and workspace paths", () => {
   const guidance = codingHostGuidance("win32");
-  assert.match(guidance, /python or py/);
-  assert.match(guidance, /never python3/);
+  assert.match(guidance, /command -v python3 \|\| command -v python \|\| command -v py/);
+  assert.match(guidance, /reuse the discovered name/);
+  assert.doesNotMatch(guidance, /never python3/);
   assert.match(guidance, /workspace-relative/);
   assert.match(guidance, /\/tmp/);
-  assert.doesNotMatch(codingHostGuidance("linux"), /never python3/);
+  assert.doesNotMatch(codingHostGuidance("linux"), /command -v python3/);
 });
 
 test("a timed-out interactive bash command yields a targeted remediation hint", () => {

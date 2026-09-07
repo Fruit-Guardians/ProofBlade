@@ -1150,7 +1150,7 @@ export function codingHostGuidance(platform: NodeJS.Platform = process.platform)
   return [
     "The host is Windows but bash runs your commands: use bash syntax, never cmd.exe syntax.",
     "Do not use `cd /d`, `dir`, `2>nul`, or `%VAR%`; use `cd`, `ls`, `2>/dev/null`, and `$VAR`.",
-    "Use python or py for Python commands, never python3.",
+    "Use the Python executable available inside this bash environment. If it is unknown, run `command -v python3 || command -v python || command -v py` once, then reuse the discovered name; do not infer it from the Windows host.",
     "Keep generated intermediate files in workspace-relative paths such as work/.",
     "Do not write analysis files to /tmp and then ask the Windows read tool to open them.",
   ].join(" ");
