@@ -101,6 +101,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly experimentBudgetBreaker: ExperimentBudgetBreaker,
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
+    private readonly appendTurnContext: () => Promise<void>,
     private readonly refreshAblationRoute: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Teardown hook for durable shell jobs owned by this lane. */
@@ -659,17 +660,15 @@ export class PiCodingLane implements AgentLanePort {
         previousBlocks: previousContextBlocks,
       });
       previousContextBlocks = compiled.manifest.blocks;
-      const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
-      const contextMessages = injectReasoningForestContext(messages, forestContext.value);
       const prepared = prepareContextMaintenance({
-        messages: contextMessages,
+        messages,
         availableTokens: contextBudget,
         maintenanceLimitTokens: proactiveMaintenanceLimit,
         messageBudget: targetMessageBudget,
-        baseTokens: estimateTokens(JSON.stringify(dynamicProjection)),
+        baseTokens: 0,
       });
       lastOmittedItems = contextPruneOmissions(prepared.dropped);
-      currentContextTokens = prepared.estimatedTokens + estimateTokens(JSON.stringify(dynamicProjection));
+      currentContextTokens = prepared.estimatedTokens;
       if (prepared.checkpointRecommended) {
         // Coding lanes use a stable system prompt rather than ContextCompiler,
         // so persist the bounded ledger checkpoint directly before Pi compacts.
@@ -678,7 +677,7 @@ export class PiCodingLane implements AgentLanePort {
         await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
       }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
-      return { messages: [...prepared.messages, dynamicProjection] };
+      return { messages: prepared.messages };
     });
     harness.on("session_before_compact", async ({ preparation }) => ({
       compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, {
@@ -742,6 +741,32 @@ export class PiCodingLane implements AgentLanePort {
       experimentBudgetBreaker,
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
+      async () => {
+        const current = await options.controlStore.snapshot(options.runId);
+        const observationQueue = projectObservationQueue(await options.controlStore.events(options.runId), current);
+        const compiled = contextCompiler.build({
+          runId: options.runId,
+          lane: "main",
+          phase: current.phase,
+          task: current.task,
+          snapshot: current,
+          contextWindow: profile.contextWindow,
+          outputBudget: profile.maxTokens,
+          safetyMargin: providerSafetyTokens,
+          resources: contextResources,
+          observationQueue: observationQueue.items,
+          previousBlocks: previousContextBlocks,
+        });
+        previousContextBlocks = compiled.manifest.blocks;
+        if (forestContext.value) await harness.appendMessage(createCustomMessage(
+          "proofblade_reasoning_forest",
+          forestContext.value,
+          false,
+          { durable: true, projection: "forest-index" },
+          new Date(0).toISOString(),
+        ));
+        await harness.appendMessage(contextProjectionMessage(compiled, turnContext.guidance));
+      },
       ablationRoute ? async () => {
         const current = await options.controlStore.snapshot(options.runId);
         ablationRoute.domainPhase = current.domainPhase;
@@ -776,6 +801,10 @@ export class PiCodingLane implements AgentLanePort {
     this.turnContext.guidance = "";
     await this.refreshForestContext();
     await this.refreshAblationRoute();
+    // Persist hidden context before the external user message. Every tool
+    // continuation can then append to the exact previous Provider input,
+    // preserving the growing prompt-cache prefix across one agent turn.
+    await this.appendTurnContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     const coordinator = new RunCoordinator(this.controlStore);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -20,6 +20,68 @@ import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtim
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
 const apiKeyEnv = "PROOFBLADE_MOCK_PROVIDER_KEY";
+
+test("Responses tool continuation preserves the complete previous input prefix", async () => {
+  const requestBodies: Array<{ input?: unknown[]; prompt_cache_key?: string }> = [];
+  let requestCount = 0;
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBodies.push(JSON.parse(chunks.join("")) as { input?: unknown[]; prompt_cache_key?: string });
+    requestCount += 1;
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    if (requestCount === 1) {
+      const item = { type: "function_call", id: "fc-prefix-1", call_id: "call-prefix-1", name: "read", arguments: JSON.stringify({ path: "input.txt" }), status: "completed" };
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item })}\n\n`);
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+      response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp-prefix-1", status: "completed", output: [item], usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 } } })}\n\n`);
+      return;
+    }
+    const item = { type: "message", id: "msg-prefix-2", role: "assistant", status: "completed", content: [{ type: "output_text", text: "done", annotations: [] }] };
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } })}\n\n`);
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+    response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp-prefix-2", status: "completed", output: [item], usage: { input_tokens: 120, output_tokens: 5, total_tokens: 125 } } })}\n\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-responses-prefix-"));
+  let lane: PiCodingLane | undefined;
+  try {
+    process.env[apiKeyEnv] = "mock-key";
+    await writeFile(join(root, "input.txt"), "stable fixture\n", "utf8");
+    const config: ProofBladeConfig = {
+      schemaVersion: 1,
+      runtime: { piVersion: "0.83.0" },
+      storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+      modelProfiles: { executor: { provider: "mock-responses", api: "openai-responses", baseUrl: `http://127.0.0.1:${address.port}/v1`, model: "mock-model", modelDiscoveryPath: "/models", apiKeyEnv, contextWindow: 32_000, maxTokens: 256, requestTimeoutMs: 5_000, maxRetries: 0, input: ["text"], cacheRetention: "short" } },
+    };
+    const services = createServices(root, config);
+    const runId = "RESPONSES-APPEND-PREFIX";
+    const task = demoTask(runId, root, config);
+    task.mode = "coding_assistant";
+    task.scope.allowed_workspace = root;
+    task.verification.required_reproductions = 0;
+    delete task.verification.command;
+    await services.control.createRun(runId, task);
+    const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    lane = await PiCodingLane.create({ runId, projectRoot: root, installRoot: root, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: verifier, config });
+    const outcome = await lane.prompt("inspect input.txt");
+    assert.equal(outcome.text, "done");
+    assert.equal(requestBodies.length, 2);
+    const firstInput = requestBodies[0]?.input ?? [];
+    const secondInput = requestBodies[1]?.input ?? [];
+    assert.ok(firstInput.length > 1);
+    assert.deepEqual(secondInput.slice(0, firstInput.length), firstInput, "the next tool continuation must append after the complete prior Provider input");
+    assert.equal(requestBodies[0]?.prompt_cache_key, requestBodies[1]?.prompt_cache_key);
+  } finally {
+    await lane?.close();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 test("default compiled system context stays below 10K after Provider serialization", async () => {
   let requestBody = "";
