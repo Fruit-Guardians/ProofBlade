@@ -548,6 +548,9 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   context.enabledSkills.add("triage");
   const loaded = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
   assert.deepEqual(loaded.details, { name: "triage", maxChars: 2_000, content: "loaded" });
+  const repeated = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
+  assert.equal((repeated.details as { alreadyLoaded?: boolean }).alreadyLoaded, true);
+  assert.doesNotMatch(repeated.content.map((part) => part.text ?? "").join("\n"), /"content":"loaded"/);
 });
 
 test("[contract:coding-capability-proxy] coding capability proxy discovers lazily and invokes through the journaled runtime", async () => {

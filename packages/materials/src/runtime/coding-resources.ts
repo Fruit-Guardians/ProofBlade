@@ -93,6 +93,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
+  /** Skill bodies already injected into this lane, keyed by stable skill name. */
+  loadedSkillContent?: Map<string, { contentHash: string; coverageChars: number }>;
   enabledMcpServers: Set<string>;
   /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
   claimVerifier: TaskResultVerifier;
@@ -1767,7 +1769,24 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
     if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);
-    return toolResult(context.skills.loadForModel(input.name, input.maxChars));
+    const loaded = context.skills.loadForModel(input.name, input.maxChars);
+    const requestedChars = input.maxChars ?? 12_000;
+    const contentHash = typeof loaded.contentHash === "string" ? loaded.contentHash : sha256(String(loaded.content ?? ""));
+    const previous = context.loadedSkillContent?.get(input.name);
+    if (previous?.contentHash === contentHash && previous.coverageChars >= requestedChars) {
+      return toolResult({
+        name: input.name,
+        contentHash,
+        alreadyLoaded: true,
+        message: "This exact Skill content is already present in the conversation. Reuse it instead of loading it again.",
+      });
+    }
+    const loadedSkills = context.loadedSkillContent ??= new Map();
+    loadedSkills.set(input.name, {
+      contentHash,
+      coverageChars: loaded.truncated === true ? requestedChars : Number.MAX_SAFE_INTEGER,
+    });
+    return toolResult(loaded);
   },
 };
 
