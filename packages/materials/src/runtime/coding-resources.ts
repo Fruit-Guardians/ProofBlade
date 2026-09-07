@@ -1461,15 +1461,33 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         result = await executor.execute(toolCallId, { ...input, command: ticket.command }, signal, onUpdate, context);
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
+        const failure = shellFailureDetails(visible);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
-        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
+        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
-        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
+        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
+        await context.experimentGate?.record({
+          runId: context.runtime.runId,
+          action: "bash",
+          input: { command: input.command, timeout: input.timeout },
+          outcome: failure.outcome,
+          summary: failure.summary,
+        }).catch(() => undefined);
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
+        const feedback = [observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n");
+        return {
+          content: [{ type: "text", text: feedback }],
+          details: {
+            exitCode: failure.exitCode,
+            failureKind: failure.kind,
+            outputRewrite,
+            ...observation,
+          },
+          isError: true,
+        };
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
       const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
@@ -1493,7 +1511,7 @@ function isBoundedReadResult(result: { details?: unknown }): boolean {
   return Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true);
 }
 
-async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0): Promise<string | undefined> {
+async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0, state: "success" | "error" = "success"): Promise<string | undefined> {
   try {
     const runId = context.runtime?.runId ?? context.outputRewrite?.runId;
     if (!runId) return undefined;
@@ -1516,6 +1534,7 @@ async function artifactReceipt(context: CodingResourceContext, operationId: stri
       generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
       operationId,
       title,
+      state,
       content,
       artifact,
       summary: `${title} 已归档；完整内容请沿 Artifact URI 使用 evidence.read/Recall。`,
@@ -1528,6 +1547,17 @@ async function artifactReceipt(context: CodingResourceContext, operationId: stri
   } catch {
     return undefined;
   }
+}
+
+function shellFailureDetails(message: string): { exitCode: number | null; kind: "exit" | "timeout" | "aborted" | "execution"; outcome: "failure" | "timeout"; summary: string } {
+  const exitMatch = /Command exited with code (-?\d+)/i.exec(message);
+  if (exitMatch) {
+    const exitCode = Number(exitMatch[1]);
+    return { exitCode: Number.isSafeInteger(exitCode) ? exitCode : 1, kind: "exit", outcome: "failure", summary: `Foreground bash exited with code ${exitMatch[1]}.` };
+  }
+  if (/timed out|timeout/i.test(message)) return { exitCode: null, kind: "timeout", outcome: "timeout", summary: "Foreground bash timed out." };
+  if (/aborted|cancelled/i.test(message)) return { exitCode: null, kind: "aborted", outcome: "failure", summary: "Foreground bash was aborted." };
+  return { exitCode: null, kind: "execution", outcome: "failure", summary: "Foreground bash failed before producing a successful exit status." };
 }
 
 interface AutomaticArtifactDetails {

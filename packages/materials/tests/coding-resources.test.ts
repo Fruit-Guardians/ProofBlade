@@ -1396,6 +1396,54 @@ test("bash anchors an artifact only when output was actually withheld", async (t
   }
 });
 
+test("failed bash returns structured error feedback and records the real experiment outcome", async () => {
+  const archived: string[] = [];
+  const experiments: Array<Record<string, unknown>> = [];
+  const env = {
+    cwd: "/workspace",
+    async exec(_command: string, options: { onStderr?: (text: string) => void }) {
+      options.onStderr?.("missing tool\n");
+      return { ok: true as const, value: { stdout: "", stderr: "missing tool\n", exitCode: 17 } };
+    },
+  };
+  const pipeline = {
+    port: {
+      async prepare(request: { toolCallId: string; command: string }) {
+        return { toolCallId: request.toolCallId, command: request.command, provider: "builtin", requestedProvider: "builtin", providerVersion: "1", applied: false, executionEnv: {}, originalCommandHash: "h1", rewrittenCommandHash: "h1" };
+      },
+      async finalize(_ticket: unknown, visible: string) {
+        return { rawOutput: visible, rawBytes: visible.length, visibleBytes: visible.length, rawTruncated: false, rawCapture: "full" };
+      },
+    } as unknown as OutputRewritePort,
+    artifactStore: {
+      async putText(_runId: string, text: string) {
+        archived.push(text);
+        return { id: `A-${archived.length}`, sha256: "deadbeef" };
+      },
+    },
+    runId: "RUN-bash-failure",
+  } as unknown as NonNullable<CodingResourceContext["outputRewrite"]>;
+  const context = {
+    env,
+    outputRewrite: pipeline,
+    runtime: { runId: "RUN-bash-failure" },
+    experimentGate: { async assertAllowed() {}, async record(input: Record<string, unknown>) { experiments.push(input); } },
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+  } as unknown as CodingResourceContext;
+
+  const result = await executeTool("bash", { command: "missing-command" }, context);
+  const text = result.content.map((part) => part.text ?? "").join("\n");
+  assert.equal(result.isError, true);
+  assert.equal((result.details as { exitCode: number }).exitCode, 17);
+  assert.equal((result.details as { failureKind: string }).failureKind, "exit");
+  assert.match(text, /missing tool[\s\S]*Command exited with code 17/);
+  assert.match(text, /\[ProofBlade receipt\][\s\S]*state=error/);
+  assert.equal(experiments.length, 1);
+  assert.equal(experiments[0]?.outcome, "failure");
+  assert.equal(experiments[0]?.summary, "Foreground bash exited with code 17.");
+});
+
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {
   const tool = createCodingTools().find((candidate) => candidate.name === name);
   assert.ok(tool, `Missing coding tool: ${name}`);
