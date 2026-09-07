@@ -73,6 +73,9 @@ test("Responses tool continuation preserves the complete previous input prefix",
     const firstInput = requestBodies[0]?.input ?? [];
     const secondInput = requestBodies[1]?.input ?? [];
     assert.ok(firstInput.length > 1);
+    const instructionText = JSON.stringify(firstInput.find((item) => item && typeof item === "object" && ["system", "developer"].includes(String((item as { role?: unknown }).role))) ?? {});
+    assert.doesNotMatch(instructionText, /continue only after the next replan turn/);
+    assert.match(instructionText, /does not require ending the current turn/);
     assert.deepEqual(secondInput.slice(0, firstInput.length), firstInput, "the next tool continuation must append after the complete prior Provider input");
     assert.equal(requestBodies[0]?.prompt_cache_key, requestBodies[1]?.prompt_cache_key);
   } finally {

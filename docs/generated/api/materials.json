@@ -120,7 +120,7 @@
     "src/recovery/session-runtime-wire.ts": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
-    "src/runtime/coding-lane.ts": "3288c40aa8648746ea6332613018fc55a12ab9c3dea5f559d07d2d4276c3ea61",
+    "src/runtime/coding-lane.ts": "546b8ffc30b835befe60820e705290996c6c9ae59b900b2d7df1326c5fd44ef8",
     "src/runtime/coding-resources.ts": "c4be7d939036f583323163a08e447be63c5a37017982edb8ab554ac1fff3d10c",
     "src/runtime/coding-turn-projection.ts": "bb4d41657a37f9545a328c2b7bfdccd77580abe6114ff1fd374110d6c9c9a7d5",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
