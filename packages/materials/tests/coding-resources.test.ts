@@ -1437,18 +1437,24 @@ test("failed bash returns structured error feedback and records the real experim
     enabledMcpServers: new Set<string>(),
   } as unknown as CodingResourceContext;
 
-  const result = await executeTool("bash", { command: "missing-command" }, context);
+  const workspaceResult = await executeTool("bash", { command: "cat /workspace/input.txt" }, context);
+  assert.deepEqual((workspaceResult.details as { sourceScope: unknown }).sourceScope, { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] });
+  assert.doesNotMatch(workspaceResult.content.map((part) => part.text ?? "").join("\n"), /\[ProofBlade source scope\]/);
+
+  const result = await executeTool("bash", { command: "cat /flag; find ../other -type f 2>/dev/null" }, context);
   const text = result.content.map((part) => part.text ?? "").join("\n");
   assert.equal(result.isError, true);
   assert.equal((result.details as { exitCode: number }).exitCode, 17);
   assert.equal((result.details as { failureKind: string }).failureKind, "exit");
+  assert.deepEqual((result.details as { sourceScope: unknown }).sourceScope, { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths: ["/flag", "../other"] });
   assert.match(text, /missing tool[\s\S]*Command exited with code 17/);
+  assert.match(text, /\[ProofBlade source scope\][\s\S]*authoritative_for_task_result=false/);
   assert.match(text, /\[ProofBlade receipt\][\s\S]*state=error/);
   assert.match(text, /next=none/);
   assert.equal(text.match(/missing tool/g)?.length, 1, "the error body must not be duplicated in receipt preview");
-  assert.equal(experiments.length, 1);
-  assert.equal(experiments[0]?.outcome, "failure");
-  assert.equal(experiments[0]?.summary, "Foreground bash exited with code 17.");
+  assert.equal(experiments.length, 2);
+  assert.ok(experiments.every((experiment) => experiment.outcome === "failure"));
+  assert.equal(experiments[1]?.summary, "Foreground bash exited with code 17.");
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {

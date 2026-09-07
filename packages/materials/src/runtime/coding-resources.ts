@@ -1423,6 +1423,44 @@ export function bashEscapeHatchViolation(command: string): string | undefined {
   return undefined;
 }
 
+function shellSourceScope(command: string, cwd: string): {
+  status: "workspace" | "outside_workspace";
+  authoritativeForTaskResult: boolean;
+  outsidePaths: string[];
+} {
+  const normalizedCwd = cwd.replaceAll("\\", "/").replace(/\/$/, "");
+  const roots = new Set([normalizedCwd, "/workspace"]);
+  const windowsRoot = /^([a-z]):\/(.*)$/i.exec(normalizedCwd);
+  if (windowsRoot) roots.add(`/mnt/${windowsRoot[1]!.toLowerCase()}/${windowsRoot[2]}`.replace(/\/$/, ""));
+  const candidates = [
+    ...[...command.matchAll(/(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)/g)].map((match) => match[1] ?? ""),
+    ...[...command.matchAll(/(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi)].map((match) => match[1] ?? ""),
+  ].map((value) => value.replace(/[,:]+$/, "")).filter((value) => value.length > 1 && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value));
+  const outsidePaths = [...new Set(candidates.filter((candidate) => {
+    if (candidate.startsWith("../")) return true;
+    const normalized = candidate.replaceAll("\\", "/").replace(/\/$/, "");
+    const fold = /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
+    return ![...roots].some((root) => {
+      const comparableRoot = /^[a-z]:\//i.test(root) ? root.toLowerCase() : root;
+      return fold === comparableRoot || fold.startsWith(`${comparableRoot}/`);
+    });
+  }))].slice(0, 8);
+  return outsidePaths.length > 0
+    ? { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths }
+    : { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] };
+}
+
+function renderShellSourceScope(scope: ReturnType<typeof shellSourceScope>): string | undefined {
+  if (scope.status === "workspace") return undefined;
+  return [
+    "[ProofBlade source scope]",
+    "status=outside-workspace",
+    "authoritative_for_task_result=false",
+    `paths=${scope.outsidePaths.join(",")}`,
+    "reason=This output includes host or runtime state outside the task workspace. Use it for diagnostics only; reproduce a final result from workspace inputs or the configured task verifier.",
+  ].join("\n");
+}
+
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createBashTool<CodingResourceContext>();
   return {
@@ -1437,6 +1475,8 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
+      const sourceScope = shellSourceScope(input.command, context.env.cwd);
+      const sourceScopeNotice = renderShellSourceScope(sourceScope);
       const escapeHatchViolation = bashEscapeHatchViolation(input.command);
       if (escapeHatchViolation) throw new Error(escapeHatchViolation);
       const preflightHint = interactiveCommandHint(input.command, Boolean(context.pwnTools));
@@ -1477,12 +1517,13 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        const feedback = [observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n");
+        const feedback = [observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...(sourceScopeNotice ? [sourceScopeNotice] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n");
         return {
           content: [{ type: "text", text: feedback }],
           details: {
             exitCode: failure.exitCode,
             failureKind: failure.kind,
+            sourceScope,
             outputRewrite,
             ...observation,
           },
@@ -1490,16 +1531,18 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         };
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
-      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
+      const outsideWorkspace = sourceScope.status === "outside_workspace";
+      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
+      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])]);
       const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(sourceScopeNotice ? [{ type: "text" as const, text: sourceScopeNotice }] : []), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
+          sourceScope,
           ...observation,
         },
       };
