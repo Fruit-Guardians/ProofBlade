@@ -23,11 +23,19 @@ export interface ProviderPrefixComparison {
  */
 export function captureProviderPrefixShape(payload: unknown, rewriteVersion = 1): ProviderPrefixShape {
   const body = record(payload);
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const instructions = messages.filter((message) => {
+  const messages = Array.isArray(body.messages)
+    ? body.messages
+    : Array.isArray(body.input)
+      ? body.input
+      : [];
+  const instructions = [
+    ...(body.instructions === undefined ? [] : [{ role: "developer", content: body.instructions }]),
+    ...(body.system === undefined ? [] : [{ role: "system", content: body.system }]),
+    ...messages.filter((message) => {
     const role = record(message).role;
     return role === "system" || role === "developer";
-  });
+    }),
+  ];
   const tools = Array.isArray(body.tools) ? body.tools : [];
   const systemJson = canonicalJson(instructions);
   const toolsJson = canonicalJson(tools);

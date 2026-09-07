@@ -38,6 +38,23 @@ test("provider prefix shape records rewrite version without retaining prompt tex
   assert.doesNotMatch(JSON.stringify(first), /sensitive body/);
 });
 
+test("provider prefix shape reads Responses input and top-level instructions", () => {
+  const inputRole = captureProviderPrefixShape({
+    input: [
+      { role: "developer", content: [{ type: "input_text", text: "stable Responses instructions" }] },
+      { role: "user", content: [{ type: "input_text", text: "dynamic request" }] },
+    ],
+    tools: [tool("read")],
+  });
+  assert.equal(inputRole.instructionMessageCount, 1);
+  assert.ok(inputRole.systemTokens > 2);
+
+  const topLevel = captureProviderPrefixShape({ instructions: "stable top-level instructions", input: [{ role: "user", content: "dynamic request" }], tools: [] });
+  assert.equal(topLevel.instructionMessageCount, 1);
+  assert.ok(topLevel.systemTokens > 2);
+  assert.doesNotMatch(JSON.stringify(topLevel), /stable top-level instructions/);
+});
+
 function tool(name: string): Record<string, unknown> {
   return { type: "function", function: { name, description: `${name} tool`, parameters: { type: "object", properties: {} } } };
 }

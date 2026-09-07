@@ -13,7 +13,7 @@
     "src/layered-context.ts": "2c53870b27b56c275f6ecd743cd37095ccb19aaa480b403eb295b844f2bfe4cc",
     "src/output-rewrite.ts": "41ad548a6df035ad589a9b23a712d38469fbacd875ba22b8a750d15b9ac2b5be",
     "src/prompt-cache.ts": "7f54789bd8b58e64e1a1200f9acdfbd35921d6b05f7f38779ef155392cf569b5",
-    "src/provider-prefix.ts": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+    "src/provider-prefix.ts": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
     "src/text-window.ts": "0f61e31ffb7e73d6ee6f3b43b2fb703e80679539495cd5fa1dc27333c529b5f1"
   },
   "instructions": [
@@ -217,7 +217,7 @@
       "exportPath": "@proofblade/molecules",
       "module": "src/provider-prefix.ts",
       "line": 24,
-      "moduleHash": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+      "moduleHash": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
       "testRefs": [
         "packages/molecules/tests/provider-prefix.test.ts"
       ]
@@ -232,8 +232,8 @@
       "tags": [],
       "exportPath": "@proofblade/molecules",
       "module": "src/provider-prefix.ts",
-      "line": 47,
-      "moduleHash": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+      "line": 55,
+      "moduleHash": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
       "testRefs": [
         "packages/molecules/tests/provider-prefix.test.ts"
       ]
@@ -509,7 +509,7 @@
       "exportPath": "@proofblade/molecules",
       "module": "src/provider-prefix.ts",
       "line": 15,
-      "moduleHash": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+      "moduleHash": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
       "testRefs": []
     },
     {
@@ -523,7 +523,7 @@
       "exportPath": "@proofblade/molecules",
       "module": "src/provider-prefix.ts",
       "line": 3,
-      "moduleHash": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+      "moduleHash": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
       "testRefs": [
         "packages/molecules/tests/provider-prefix.test.ts"
       ]
@@ -571,7 +571,8 @@
       "line": 12,
       "moduleHash": "1aa9daa3c3e588fc61aebfb052781d6e41533b02fc2f7df7d7532fb6091db0f2",
       "testRefs": [
-        "packages/molecules/tests/molecules.test.ts"
+        "packages/molecules/tests/molecules.test.ts",
+        "packages/molecules/tests/provider-prefix.test.ts"
       ]
     },
     {

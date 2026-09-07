@@ -14,7 +14,7 @@
     "src/layered-context.ts": "2c53870b27b56c275f6ecd743cd37095ccb19aaa480b403eb295b844f2bfe4cc",
     "src/output-rewrite.ts": "41ad548a6df035ad589a9b23a712d38469fbacd875ba22b8a750d15b9ac2b5be",
     "src/prompt-cache.ts": "7f54789bd8b58e64e1a1200f9acdfbd35921d6b05f7f38779ef155392cf569b5",
-    "src/provider-prefix.ts": "042e3db700e83790bfc60b984acc880bd6bc41566002737d8856328193a9969f",
+    "src/provider-prefix.ts": "00d810eb92cb873889bf91c7793371abffb27bd7803c9c5f7b2f921ef392e0a1",
     "src/text-window.ts": "0f61e31ffb7e73d6ee6f3b43b2fb703e80679539495cd5fa1dc27333c529b5f1"
   },
   "symbols": [
@@ -257,7 +257,7 @@
       "testRefs": [
         "packages/molecules/tests/provider-prefix.test.ts"
       ],
-      "structureHash": "d1bda3f7b072af957afc190d62325191415b93d009c8c6052f5a03301e840dfe"
+      "structureHash": "c7694e743ba461baebf05ceaa06e77fd7fd2b79a9baf8e81cab45529577caa67"
     },
     {
       "id": "@proofblade/molecules::function::compareProviderPrefixShapes",
@@ -266,7 +266,7 @@
       "visibility": "public",
       "module": "src/provider-prefix.ts",
       "exportPath": "@proofblade/molecules",
-      "line": 47,
+      "line": 55,
       "signature": "(previous: ProviderPrefixShape, current: ProviderPrefixShape): ProviderPrefixComparison",
       "summary": "Inferred summary: compare provider prefix shapes operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -668,7 +668,8 @@
         "node:path"
       ],
       "testRefs": [
-        "packages/molecules/tests/molecules.test.ts"
+        "packages/molecules/tests/molecules.test.ts",
+        "packages/molecules/tests/provider-prefix.test.ts"
       ],
       "structureHash": "f3ff8a95cdf0591a8e64b79f34967e615a8b38cb644c7f8e929e97fbaef96dba",
       "parentId": "@proofblade/molecules::class::FileArtifactRepository"

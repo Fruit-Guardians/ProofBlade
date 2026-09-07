@@ -124,7 +124,7 @@
 ### compareProviderPrefixShapes
 - Kind: `function`
 - Signature: `(previous: ProviderPrefixShape, current: ProviderPrefixShape): ProviderPrefixComparison`
-- Source: [src/provider-prefix.ts:47](../../../packages/molecules/src/provider-prefix.ts:47)
+- Source: [src/provider-prefix.ts:55](../../../packages/molecules/src/provider-prefix.ts:55)
 - Export: `@proofblade/molecules`
 - Summary: Inferred summary: compare provider prefix shapes operation used to perform a durable write.
 - Summary source: `inferred`
@@ -319,7 +319,7 @@
 - Export: `@proofblade/molecules`
 - Summary: Inferred summary: put operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/molecules/tests/molecules.test.ts`
+- Tests: `packages/molecules/tests/molecules.test.ts`, `packages/molecules/tests/provider-prefix.test.ts`
 
 ### FileArtifactRepository.read
 - Kind: `method`
