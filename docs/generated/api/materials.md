@@ -9465,7 +9465,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: assert allowed operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/competition-convergence.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-convergence.test.ts`
 
 ### ExperimentGate.record
 - Kind: `method`

@@ -121,7 +121,7 @@
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
     "src/runtime/coding-lane.ts": "a939a2390d17542021886021646db655859ac5c3cc2558504b0447e4decda138",
-    "src/runtime/coding-resources.ts": "71d8ed7a0e106987f56e31027729a198492aedd10ef1d6fd132232ff31c714e0",
+    "src/runtime/coding-resources.ts": "4c3d78bfa05117c49915bc2f66e8d0f28e38a7fee2ba4c50f08ba1fb4b7a692d",
     "src/runtime/coding-turn-projection.ts": "bb4d41657a37f9545a328c2b7bfdccd77580abe6114ff1fd374110d6c9c9a7d5",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
@@ -28267,6 +28267,7 @@
         "../domain/utils.js"
       ],
       "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-convergence.test.ts"
       ],
       "structureHash": "8eab79aeda2c58b22d645d25bb7ebb7d56baa142c84c5f36c59ae786aacc8e4b",
