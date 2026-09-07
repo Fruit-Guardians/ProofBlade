@@ -1097,10 +1097,11 @@ export function injectReasoningForestContext(messages: AgentMessage[], forestCon
 }
 
 /**
- * Attach the compiler's current dynamic projection to the provider view only.
- * The message is hidden from the session UI and never persisted as a Pi entry;
- * its hash/details make the exact provider suffix explainable from the same
- * snapshot and ContextManifest used by observability.
+ * Build the compiler's current dynamic projection for the provider view.
+ * Outer user turns persist this hidden message before the user entry so tool
+ * continuations append after a stable prefix; the hash/details keep the exact
+ * projection explainable from the same snapshot and ContextManifest used by
+ * observability.
  */
 function contextProjectionMessage(compiled: ContextBuildOutput, turnGuidance = ""): AgentMessage {
   const dynamicContent = [
