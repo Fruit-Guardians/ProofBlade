@@ -730,7 +730,9 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     const artifactId = String((read.details as Record<string, unknown>).artifactId);
     // The artifact is archived for the evidence graph, but read output is
     // already complete, so the model must not be told content was withheld.
-    assert.equal(/ProofBlade artifact/.test(read.content.map((item) => item.text ?? "").join("\n")), false);
+    const readText = read.content.map((item) => item.text ?? "").join("\n");
+    assert.equal(/ProofBlade artifact/.test(readText), false);
+    assert.doesNotMatch(readText, /\[ProofBlade receipt\]/);
     assert.match(artifactId, /^A-/);
     const readDetails = read.details as Record<string, unknown>;
     assert.equal(readDetails.durableProgress, false, "routine reads must not reset solver experiment budgets");
@@ -741,7 +743,9 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     assert.ok(observedSnapshot.observations[String(readDetails.observationId)]);
     assert.ok(observedSnapshot.evidence[String(readDetails.evidenceId)]);
     const repeated = await executeTool("read", { path: "source.txt" }, context);
-    assert.match(repeated.content.map((item) => item.text ?? "").join("\n"), /same artifact content as/);
+    const repeatedText = repeated.content.map((item) => item.text ?? "").join("\n");
+    assert.match(repeatedText, /same artifact content as/);
+    assert.doesNotMatch(repeatedText, /did=0xEF01/, "repeat notice must not re-inject the archived content through a receipt preview");
     const autoReviewed = (await services.control.snapshot(runId)).artifacts[artifactId]!;
     assert.equal(autoReviewed.semantic?.annotatedBy, "agent", "routine read output should be auto-reviewed by the observer");
     const searched = await executeTool("evidence", { operation: "search", query: "source.txt DID protected" }, context);
@@ -1378,6 +1382,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     const completeText = complete.content.map((part) => part.text ?? "").join("\n");
     assert.match(completeText, /hello/);
     assert.equal(/ProofBlade artifact/.test(completeText), false, "complete output must not claim an artifact holds more");
+    assert.doesNotMatch(completeText, /\[ProofBlade receipt\]/, "complete output must not be duplicated in a receipt");
 
     savedBytes = 4096;
     const withheld = await executeTool("bash", { command: "echo hello" }, context);
@@ -1439,6 +1444,8 @@ test("failed bash returns structured error feedback and records the real experim
   assert.equal((result.details as { failureKind: string }).failureKind, "exit");
   assert.match(text, /missing tool[\s\S]*Command exited with code 17/);
   assert.match(text, /\[ProofBlade receipt\][\s\S]*state=error/);
+  assert.match(text, /next=none/);
+  assert.equal(text.match(/missing tool/g)?.length, 1, "the error body must not be duplicated in receipt preview");
   assert.equal(experiments.length, 1);
   assert.equal(experiments[0]?.outcome, "failure");
   assert.equal(experiments[0]?.summary, "Foreground bash exited with code 17.");

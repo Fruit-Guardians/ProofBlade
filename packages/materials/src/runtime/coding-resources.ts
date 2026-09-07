@@ -1465,7 +1465,7 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
         const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
-        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
+        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
         await context.experimentGate?.record({
           runId: context.runtime.runId,
           action: "bash",
@@ -1512,6 +1512,10 @@ function isBoundedReadResult(result: { details?: unknown }): boolean {
 }
 
 async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0, state: "success" | "error" = "success"): Promise<string | undefined> {
+  // Complete successful output is already present in the tool result. Repeating
+  // it in a receipt preview only grows the conversation and destabilizes the
+  // longest cacheable history prefix.
+  if (!bounded && state === "success") return undefined;
   try {
     const runId = context.runtime?.runId ?? context.outputRewrite?.runId;
     if (!runId) return undefined;
@@ -1538,7 +1542,7 @@ async function artifactReceipt(context: CodingResourceContext, operationId: stri
       content,
       artifact,
       summary: `${title} 已归档；完整内容请沿 Artifact URI 使用 evidence.read/Recall。`,
-      mode: bounded ? "receipt" : "full",
+      mode: bounded ? "receipt" : "path_only",
       ...(bounded ? { omittedChars: Math.max(omittedChars, artifactBytes - content.length) } : {}),
       maxInlineChars: 2_048,
       maxPreviewChars: 512,
