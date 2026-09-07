@@ -153,7 +153,7 @@
     "src/tools/output-rewrite.ts": "866e9ad24bb33cbe18cafe633db6b029c6cb4ed1a0d83ac443ab82fab007e1d1",
     "src/tools/runtime.ts": "122ab4de63d6cdfb744bb945fceed1ef3e016eab078738b3bdffe16c55ff87bc",
     "src/verification/browser-reproducer.ts": "d342fabacc36244352902bdd1205b15f070f683fddf0cfa04ffa874fc58a5637",
-    "src/verification/claim-verification.ts": "2eae8e69354b80175a9bc1cf388ff0a2c83c89f6d5dba337c454d69cdffb2227",
+    "src/verification/claim-verification.ts": "fced1a8ed053e684d80733d40dc89538e048b747b7fe8d7d7b6dec71a2b14851",
     "src/verification/outcome-envelope.ts": "b436f6fea396edcc72623b63061193eeeeb9f0c5276ec39b255dd44af205e144",
     "src/verification/pwn-replay-recovery.ts": "f1cedc20c4d53e992659c4b80cf970c3bf2ac917e68c7da5bd89fcd4fb7c6213",
     "src/verification/pwn-reproducer.ts": "56578671a8a249cda6a80af971a32b9f5779e889535713203c638e9a886b77b5",
@@ -2775,7 +2775,7 @@
       "visibility": "public",
       "module": "src/verification/claim-verification.ts",
       "exportPath": "@proofblade/materials",
-      "line": 859,
+      "line": 865,
       "signature": "CodingClaimVerifier",
       "summary": "Inferred summary: coding claim verifier class used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -10808,7 +10808,7 @@
       "visibility": "public",
       "module": "src/verification/claim-verification.ts",
       "exportPath": "@proofblade/materials",
-      "line": 876,
+      "line": 882,
       "signature": "(userPrompt: string, assistantText?: string): boolean",
       "summary": "Inferred summary: requires claim verification operation used to read or inspect state.",
       "summarySource": "inferred",
@@ -49166,7 +49166,7 @@
         "packages/materials/tests/skills.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
-      "structureHash": "01e1ce5f5faaa0d7d7fabcb9af49c59510b371bcf5643de9f6f26523dcc4aa21",
+      "structureHash": "bdebd2db2eabea7fe504e7e74b44944573e57ec657be44ffef9659c3476fc861",
       "parentId": "@proofblade/materials::class::TaskResultVerifier"
     },
     {

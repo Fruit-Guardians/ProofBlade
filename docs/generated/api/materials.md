@@ -907,7 +907,7 @@
 ### CodingClaimVerifier
 - Kind: `class`
 - Signature: `CodingClaimVerifier`
-- Source: [src/verification/claim-verification.ts:859](../../../packages/materials/src/verification/claim-verification.ts:859)
+- Source: [src/verification/claim-verification.ts:865](../../../packages/materials/src/verification/claim-verification.ts:865)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding claim verifier class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -3548,7 +3548,7 @@
 ### requiresClaimVerification
 - Kind: `function`
 - Signature: `(userPrompt: string, assistantText?: string): boolean`
-- Source: [src/verification/claim-verification.ts:876](../../../packages/materials/src/verification/claim-verification.ts:876)
+- Source: [src/verification/claim-verification.ts:882](../../../packages/materials/src/verification/claim-verification.ts:882)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: requires claim verification operation used to read or inspect state.
 - Summary source: `inferred`
