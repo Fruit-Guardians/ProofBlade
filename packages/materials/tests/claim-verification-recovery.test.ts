@@ -7,6 +7,30 @@ import { createServices, demoTask } from "../src/app/demo.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 
+test("an explicit deterministic result stays unverified when the task has no verifier", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-unverified-result-"));
+  try {
+    const config = testConfig();
+    const runId = "UNVERIFIED-RESULT-001";
+    const services = createServices(root, config);
+    const task = demoTask(runId, root, config);
+    task.mode = "coding_assistant";
+    task.scope.allowed_workspace = root;
+    task.verification.required_reproductions = 0;
+    delete task.verification.command;
+    await services.control.createRun(runId, task);
+    const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+
+    const projection = await verifier.project("完成当前目录的题，给出结果", "Flag：`FLAGTEST`");
+    assert.equal(projection.required, true);
+    assert.equal(projection.status, "unverified");
+    assert.match(projection.reason ?? "", /没有配置可验证该结果的复现规则/);
+    assert.deepEqual(await verifier.project("解释一下当前思路", "还在分析中。"), { required: false, status: "not_required" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("claim verification rebuilds from durable state, matches the exact final candidate, and rejects a stale generation", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-claim-recovery-"));
   try {

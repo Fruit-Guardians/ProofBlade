@@ -670,15 +670,21 @@ export class TaskResultVerifier {
   /** Rebuild verification exclusively from durable current-generation state. */
   public async project(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection> {
     // Verification is enabled by the immutable task contract, never inferred
-    // from words such as "flag" or "challenge" in a conversation.
+    // from the user's topic words. An explicit result declaration in the model
+    // output is still a claim: without a task-owned verifier it must remain
+    // visibly unverified instead of silently becoming authoritative.
     const task = await this.controlStore.snapshot(this.runId);
-    const required = task.task.verification.required_reproductions > 0 || Boolean(task.task.verification.command);
+    const candidate = extractFinalCandidate(assistantText);
+    const taskRequiresVerification = task.task.verification.required_reproductions > 0 || Boolean(task.task.verification.command);
+    const required = taskRequiresVerification || candidate !== undefined;
     if (!required) return { required: false, status: "not_required" };
+    if (!taskRequiresVerification) {
+      return { required: true, status: "unverified", reason: "当前任务没有配置可验证该结果的复现规则；该值只能作为候选，不能标记为已确认结果。" };
+    }
     const snapshot = task;
     const completions = Object.values(snapshot.completions)
       .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation)
       .sort((left, right) => right.createdSeq - left.createdSeq || left.id.localeCompare(right.id));
-    const candidate = extractFinalCandidate(assistantText);
     if (candidate) {
       const candidateHash = sha256(candidate);
       for (const completion of completions.filter((item) => item.candidateHash === candidateHash)) {
@@ -889,7 +895,7 @@ function extractFinalCandidate(assistantText: string): string | undefined {
   const shaped = [...assistantText.matchAll(/\b(?:[a-z0-9_]{0,32})?flag\{[^}\r\n]{1,512}\}|\bPB\{[^}\r\n]{1,512}\}/gi)].map((match) => match[0]);
   const unique = [...new Set(shaped)];
   if (unique.length === 1) return unique[0];
-  const explicit = [...assistantText.matchAll(/(?:最终(?:结果|答案|候选)|final(?:\s+answer)?|answer)\s*[:：]\s*[`"']?([^`"'\r\n]{1,1024})/gi)]
+  const explicit = [...assistantText.matchAll(/(?:最终(?:结果|答案|候选)|结果|答案|候选|final(?:\s+answer)?|answer|result|candidate|flag)\s*[:：]\s*[`"']?([^`"'\r\n]{1,1024})/gi)]
     .map((match) => match[1]?.trim().replace(/[。.;；]+$/, ""))
     .filter((value): value is string => Boolean(value));
   const explicitUnique = [...new Set(explicit)];
