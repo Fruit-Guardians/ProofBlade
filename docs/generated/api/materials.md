@@ -794,7 +794,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: scope class used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/general-task-contract.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/event-ingress-scope.test.ts`, `packages/materials/tests/general-task-contract.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/pwn-session-supervisor.test.ts`, `packages/materials/tests/pwn-tools.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ToolPreflightService
 - Kind: `class`
