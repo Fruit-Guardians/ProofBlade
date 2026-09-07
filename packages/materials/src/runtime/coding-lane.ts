@@ -101,7 +101,7 @@ export class PiCodingLane implements AgentLanePort {
     private readonly experimentBudgetBreaker: ExperimentBudgetBreaker,
     private readonly termination: CodingTurnTermination,
     private readonly refreshForestContext: () => Promise<void>,
-    private readonly appendTurnContext: () => Promise<void>,
+    private readonly resetContextForTurn: () => void,
     private readonly refreshAblationRoute: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Teardown hook for durable shell jobs owned by this lane. */
@@ -638,6 +638,7 @@ export class PiCodingLane implements AgentLanePort {
     let lastOmittedItems: ModelContextItem[] = [];
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
+    let persistedContextForTurn = false;
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
       const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
@@ -660,6 +661,25 @@ export class PiCodingLane implements AgentLanePort {
         previousBlocks: previousContextBlocks,
       });
       previousContextBlocks = compiled.manifest.blocks;
+      const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
+      const contextPrefix = forestContext.value
+        ? [createCustomMessage(
+          "proofblade_reasoning_forest",
+          forestContext.value,
+          false,
+          { durable: true, projection: "forest-index" },
+          new Date(0).toISOString(),
+        ), dynamicProjection]
+        : [dynamicProjection];
+      const injectContextForRequest = !persistedContextForTurn;
+      if (injectContextForRequest) {
+        // The user message is already in the session when this hook runs. Keep
+        // dynamic context after it so the relay can cache the stable
+        // instructions/tools/user prefix, while later tool continuations append
+        // after this exact context sequence.
+        for (const message of contextPrefix) await session.appendMessage(message);
+        persistedContextForTurn = true;
+      }
       const prepared = prepareContextMaintenance({
         messages,
         availableTokens: contextBudget,
@@ -677,7 +697,7 @@ export class PiCodingLane implements AgentLanePort {
         await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
       }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
-      return { messages: prepared.messages };
+      return { messages: injectContextForRequest ? [...prepared.messages, ...contextPrefix] : prepared.messages };
     });
     harness.on("session_before_compact", async ({ preparation }) => ({
       compaction: await compactionCoordinator.provide(options.runId, preparation, undefined, {
@@ -741,32 +761,7 @@ export class PiCodingLane implements AgentLanePort {
       experimentBudgetBreaker,
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
-      async () => {
-        const current = await options.controlStore.snapshot(options.runId);
-        const observationQueue = projectObservationQueue(await options.controlStore.events(options.runId), current);
-        const compiled = contextCompiler.build({
-          runId: options.runId,
-          lane: "main",
-          phase: current.phase,
-          task: current.task,
-          snapshot: current,
-          contextWindow: profile.contextWindow,
-          outputBudget: profile.maxTokens,
-          safetyMargin: providerSafetyTokens,
-          resources: contextResources,
-          observationQueue: observationQueue.items,
-          previousBlocks: previousContextBlocks,
-        });
-        previousContextBlocks = compiled.manifest.blocks;
-        if (forestContext.value) await harness.appendMessage(createCustomMessage(
-          "proofblade_reasoning_forest",
-          forestContext.value,
-          false,
-          { durable: true, projection: "forest-index" },
-          new Date(0).toISOString(),
-        ));
-        await harness.appendMessage(contextProjectionMessage(compiled, turnContext.guidance));
-      },
+      () => { persistedContextForTurn = false; },
       ablationRoute ? async () => {
         const current = await options.controlStore.snapshot(options.runId);
         ablationRoute.domainPhase = current.domainPhase;
@@ -801,10 +796,7 @@ export class PiCodingLane implements AgentLanePort {
     this.turnContext.guidance = "";
     await this.refreshForestContext();
     await this.refreshAblationRoute();
-    // Persist hidden context before the external user message. Every tool
-    // continuation can then append to the exact previous Provider input,
-    // preserving the growing prompt-cache prefix across one agent turn.
-    await this.appendTurnContext();
+    this.resetContextForTurn();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     const coordinator = new RunCoordinator(this.controlStore);

@@ -76,6 +76,10 @@ test("Responses tool continuation preserves the complete previous input prefix",
     const instructionText = JSON.stringify(firstInput.find((item) => item && typeof item === "object" && ["system", "developer"].includes(String((item as { role?: unknown }).role))) ?? {});
     assert.doesNotMatch(instructionText, /continue only after the next replan turn/);
     assert.match(instructionText, /does not require ending the current turn/);
+    assert.equal((firstInput[1] as { role?: string })?.role, "user", "the external user message must precede dynamic context for relay cacheability");
+    assert.equal((firstInput[2] as { role?: string })?.role, "user", "the persisted dynamic context follows the external user message");
+    assert.match(JSON.stringify(firstInput[1]), /inspect input\.txt/);
+    assert.match(JSON.stringify(firstInput[2]), /<proofblade-context/);
     assert.deepEqual(secondInput.slice(0, firstInput.length), firstInput, "the next tool continuation must append after the complete prior Provider input");
     assert.equal(requestBodies[0]?.prompt_cache_key, requestBodies[1]?.prompt_cache_key);
   } finally {
