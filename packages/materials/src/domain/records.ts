@@ -4,7 +4,7 @@ const RECORD_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/;
 const SHA256 = /^[a-f0-9]{64}$/i;
 const HEX = /^(?:0x)?[0-9a-f]+$/i;
 const WEB_KINDS = new Set<DomainRecordKind>(["web_baseline", "web_endpoint", "web_request", "web_exploit_chain"]);
-const PWN_KINDS = new Set<DomainRecordKind>(["pwn_binary_profile", "pwn_protocol_transcript", "pwn_primitive", "pwn_leak", "pwn_exploit_stage"]);
+const PWN_KINDS = new Set<DomainRecordKind>(["pwn_binary_profile", "pwn_protocol_transcript", "pwn_primitive", "pwn_leak", "pwn_crash", "pwn_exploit_stage"]);
 
 /** Validate the bounded, non-secret shape of one Web/Pwn domain record. */
 export function validateDomainRecordShape(record: DomainRecord): void {
@@ -64,13 +64,22 @@ export function validateDomainRecordShape(record: DomainRecord): void {
       if (!HEX.test(record.sourceHex) || record.sourceHex.replace(/^0x/i, "").length % 2 !== 0) throw new Error(`Domain record ${record.id} sourceHex is invalid`);
       if (!["le64", "le32", "be64", "be32"].includes(record.format)) throw new Error(`Domain record ${record.id} leak format is invalid`);
       if (!HEX.test(record.value) || record.value.length > 66) throw new Error(`Domain record ${record.id} leak value is invalid`);
-      boundedText(record.addressKind, `Domain record ${record.id} address kind`, 32);
+      if (!["stack", "heap", "libc", "pie", "code", "unknown"].includes(record.addressKind)) throw new Error(`Domain record ${record.id} address kind is invalid`);
+      if (record.confidence !== undefined && (!Number.isFinite(record.confidence) || record.confidence < 0 || record.confidence >= 1)) throw new Error(`Domain record ${record.id} leak confidence must be in [0,1)`);
       if (record.symbol !== undefined) boundedText(record.symbol, `Domain record ${record.id} symbol`, 128);
       if (record.derivation !== undefined) {
         boundedText(record.derivation.expression, `Domain record ${record.id} derivation`, 512);
         boundedList(record.derivation.sourceRecordIds, `Domain record ${record.id} derivation sources`, 16, 96);
         unique(record.derivation.sourceRecordIds, `Domain record ${record.id} derivation sources`);
       }
+      break;
+    case "pwn_crash":
+      if (!["crash", "timeout", "exit", "unknown"].includes(record.classification)) throw new Error(`Domain record ${record.id} crash classification is invalid`);
+      if (record.signal !== undefined) boundedText(record.signal, `Domain record ${record.id} signal`, 32);
+      if (record.controlRegister !== undefined && !["rip", "eip", "pc"].includes(record.controlRegister)) throw new Error(`Domain record ${record.id} control register is invalid`);
+      if (record.faultAddress !== undefined && !HEX.test(record.faultAddress)) throw new Error(`Domain record ${record.id} fault address is invalid`);
+      if (record.cyclicOffset !== undefined && (!Number.isInteger(record.cyclicOffset) || record.cyclicOffset < 0 || record.cyclicOffset > 1_048_576)) throw new Error(`Domain record ${record.id} cyclic offset is invalid`);
+      if (typeof record.ripControlled !== "boolean" || typeof record.transcriptTruncated !== "boolean") throw new Error(`Domain record ${record.id} crash flags are invalid`);
       break;
     case "pwn_exploit_stage":
       if (!Number.isInteger(record.stageIndex) || record.stageIndex < 0 || record.stageIndex > 128) throw new Error(`Domain record ${record.id} stage index is invalid`);
