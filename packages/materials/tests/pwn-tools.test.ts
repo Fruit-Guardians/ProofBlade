@@ -11,6 +11,7 @@ import { PwnReproducer, type ExploitRecipe } from "../src/verification/pwn-repro
 import { PwnToolHandler } from "../src/pwn/pwn-tools.js";
 import { ExperimentGate } from "../src/competition/experiment-gate.js";
 import { ArtifactStore } from "../src/effects/artifact-store.js";
+import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import type { ContainerRef, ContainerRuntimePort, ContainerSessionHandle, ContainerSessionResult } from "../src/container/contracts.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
@@ -187,6 +188,106 @@ test("pwn interactions archive a bounded transcript domain record when the targe
     assert.equal(transcript.sessionId, opened.sessionId);
     assert.equal(transcript.artifactIds.length, 1);
     assert.ok(snapshot.artifacts[transcript.artifactIds[0]!]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("crash analysis persists bounded debugger evidence without claiming success", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-crash-analysis-"));
+  try {
+    const runId = "PWN-CRASH-ANALYSIS";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const registry = new SessionRegistry(runId, new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(
+      runId,
+      registry,
+      new PwnReproducer(control),
+      () => ({ ...REF, runId, generation: 0 }),
+      "executor",
+      undefined,
+      undefined,
+      undefined,
+      artifacts,
+      control,
+      undefined,
+      undefined,
+      false,
+      graph,
+    );
+    const result = await handler.analyzeCrash({
+      transcript: [
+        "Program received signal SIGSEGV, Segmentation fault.",
+        "rip            0x6161617461616173",
+        "rsp            0x7fffffffe000",
+        "Cannot access memory at address 0x41414141",
+      ].join("\n"),
+    });
+    const snapshot = await control.replay(runId);
+    const record = snapshot.domainRecords[result.recordId];
+    assert.equal(record?.kind, "pwn_crash");
+    assert.equal(record?.classification, "crash");
+    assert.equal(record?.cyclicOffset, 72);
+    assert.equal(record?.ripControlled, true);
+    assert.ok(snapshot.artifacts[result.artifactId]);
+    assert.equal(Object.keys(snapshot.completions).length, 0, "crash evidence must not mint a completion");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("leak and base tools persist auditable formulas through the evidence graph", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pb-pwn-leak-tools-"));
+  try {
+    const runId = "PWN-LEAK-TOOLS";
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    const artifacts = new ArtifactStore(join(root, "runs"), control);
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
+    const source = await artifacts.putText(runId, "raw leak: 30f4e1f7ff7f0000", { filename: "leak.txt" });
+    const registry = new SessionRegistry(runId, new EchoTubeRuntime("flag{x}", "/flag") as unknown as ContainerRuntimePort, control);
+    const handler = new PwnToolHandler(
+      runId,
+      registry,
+      new PwnReproducer(control),
+      () => ({ ...REF, runId, generation: 0 }),
+      "executor",
+      undefined,
+      undefined,
+      undefined,
+      artifacts,
+      control,
+      undefined,
+      undefined,
+      false,
+      graph,
+    );
+    const leak = await handler.recordLeak({
+      id: "LEAK-LIBC-TOOLS",
+      sourceHex: "30f4e1f7ff7f0000",
+      format: "le64",
+      addressKind: "libc",
+      symbol: "puts@GLIBC",
+      confidence: 0.8,
+      artifactIds: [source.id],
+    });
+    assert.equal(leak.value, "0x7ffff7e1f430");
+    const base = await handler.deriveBase({ sourceLeakId: leak.leakId, knownOffset: "0x84430", label: "libc_base" });
+    assert.equal(base.value, "0x7ffff7d9b000");
+    assert.equal(base.pageAligned, true);
+    const snapshot = await control.replay(runId);
+    const baseRecord = snapshot.domainRecords[base.recordId];
+    assert.equal(baseRecord?.kind, "pwn_leak");
+    assert.equal(baseRecord?.confidence, 0.8);
+    assert.deepEqual(baseRecord?.derivation?.sourceRecordIds, [leak.recordId]);
+    assert.deepEqual(baseRecord?.artifactIds, [source.id]);
+    await assert.rejects(
+      handler.recordLeak({ sourceHex: "30f4e1f7ff7f0000", format: "le64", addressKind: "libc", confidence: 1, artifactIds: [source.id] }),
+      /confidence must be in \[0,1\)/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

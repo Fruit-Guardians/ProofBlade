@@ -5,6 +5,7 @@ import type { CodingResourceContext } from "./coding-resources.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import type { ExploitRecipe } from "../verification/pwn-reproducer.js";
 import { decodeBase64Strict } from "../pwn/bytes.js";
+import { generateCyclicPattern } from "../pwn/analysis.js";
 
 /**
  * Model-facing pwn interaction tools. They all route to `context.pwnTools`,
@@ -19,7 +20,7 @@ import { decodeBase64Strict } from "../pwn/bytes.js";
  * the same as claiming a shell.
  */
 export function createPwnCodingTools(): AgentHarnessTool<CodingResourceContext>[] {
-  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnRecordPrimitiveTool, pwnReproduceTool];
+  return [pwnOpenTool, pwnSendTool, pwnRecvTool, pwnSignalTool, pwnCloseTool, pwnListTool, pwnCyclicTool, pwnCrashAnalyzeTool, pwnRecordLeakTool, pwnDeriveBaseTool, pwnRecordPrimitiveTool, pwnReproduceTool];
 }
 
 function requireHandler(context: CodingResourceContext): PwnToolHandler {
@@ -124,6 +125,99 @@ const pwnListTool: AgentHarnessTool<CodingResourceContext> = {
   executionMode: "sequential",
   async execute(_id, _params, _signal, _onUpdate, context) {
     return pwnResult({ sessions: requireHandler(context).list() });
+  },
+};
+
+const pwnCyclicTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_cyclic",
+  label: "pwn_cyclic",
+  description: "Generate a bounded pwntools-compatible cyclic pattern for an offset probe. Keep the returned pattern in the current workspace or send it as base64; this tool only generates bytes and does not imply control-flow control.",
+  parameters: Type.Object({
+    length: Type.Integer({ minimum: 1, maximum: 1_048_576 }),
+    alphabet: Type.Optional(Type.String({ minLength: 2, maxLength: 128 })),
+    n: Type.Optional(Type.Integer({ minimum: 1, maximum: 8 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    requireHandler(context);
+    const input = params as { length: number; alphabet?: string; n?: number };
+    const pattern = generateCyclicPattern(input.length, { ...(input.alphabet === undefined ? {} : { alphabet: input.alphabet }), ...(input.n === undefined ? {} : { n: input.n }) });
+    return pwnResult({ pattern, length: pattern.length, alphabet: input.alphabet ?? "abcdefghijklmnopqrstuvwxyz", n: input.n ?? 4 });
+  },
+};
+
+const pwnCrashAnalyzeTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_crash_analyze",
+  label: "pwn_crash_analyze",
+  description: "Parse one bounded GDB/pwndbg transcript into signal, registers, fault address, mappings, cyclic offset, and a conservative next-action list; persist the transcript Artifact and a pwn_crash DomainRecord. This is crash evidence, never exploit success.",
+  parameters: Type.Object({
+    transcript: Type.String({ minLength: 1, maxLength: 256 * 1024, description: "Bounded raw debugger transcript, preferably including the signal and info registers output." }),
+    pattern: Type.Optional(Type.String({ maxLength: 1_048_576 })),
+    patternLength: Type.Optional(Type.Integer({ minimum: 1, maximum: 1_048_576 })),
+    alphabet: Type.Optional(Type.String({ minLength: 2, maxLength: 128 })),
+    n: Type.Optional(Type.Integer({ minimum: 1, maximum: 8 })),
+    endian: Type.Optional(Type.String({ enum: ["little", "big"] })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as {
+      transcript: string;
+      pattern?: string;
+      patternLength?: number;
+      alphabet?: string;
+      n?: number;
+      endian?: "little" | "big";
+      artifactIds?: string[];
+      evidenceIds?: string[];
+    };
+    return pwnResult(await requireHandler(context).analyzeCrash(input));
+  },
+};
+
+const pwnRecordLeakTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_record_leak",
+  label: "pwn_record_leak",
+  description: "Parse exact leaked bytes, persist the leak in the durable reasoning graph and pwn_leak ledger, and return its stable leakId/value. Provide supporting Artifact or Evidence ids; confidence stays below 1 until a fresh reproduction confirms the exploit.",
+  parameters: Type.Object({
+    sourceHex: Type.String({ minLength: 2, maxLength: 512, description: "Exact leaked wire bytes as hexadecimal, for example 30f4e1f7ff7f0000." }),
+    format: Type.String({ enum: ["le64", "le32", "be64", "be32"] }),
+    addressKind: Type.String({ enum: ["stack", "heap", "libc", "pie", "code", "unknown"] }),
+    confidence: Type.Number({ minimum: 0, maximum: 0.9999 }),
+    id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
+    symbol: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+    tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+    explanation: Type.Optional(Type.String({ minLength: 1, maxLength: 2_000 })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["recordLeak"]>[0];
+    return pwnResult(await requireHandler(context).recordLeak(input));
+  },
+};
+
+const pwnDeriveBaseTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "pwn_derive_base",
+  label: "pwn_derive_base",
+  description: "Derive and persist a libc/PIE/heap base formula from an existing pwn leak record and a known symbol offset. The source leak must already be in the current generation; the result remains a hypothesis until reproduced.",
+  parameters: Type.Object({
+    sourceLeakId: Type.String({ minLength: 1, maxLength: 96 }),
+    knownOffset: Type.String({ minLength: 1, maxLength: 66, description: "Non-negative hexadecimal symbol offset, for example 0x84420." }),
+    label: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+    confidence: Type.Optional(Type.Number({ minimum: 0, maximum: 0.9999 })),
+    id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
+    tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+    explanation: Type.Optional(Type.String({ minLength: 1, maxLength: 2_000 })),
+    artifactIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 32 })),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_id, params, _signal, _onUpdate, context) {
+    const input = params as Parameters<PwnToolHandler["deriveBase"]>[0];
+    return pwnResult(await requireHandler(context).deriveBase(input));
   },
 };
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-29T11:55:00+08:00",
+  "updatedAt": "2026-09-11T18:45:03+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -181,8 +181,8 @@
       "priority": "P0",
       "milestone": "Milestone 2 / 5",
       "owner": "unassigned",
-      "progress": 45,
-      "updatedAt": "2026-08-20T12:15:00+08:00",
+      "progress": 55,
+      "updatedAt": "2026-09-11T18:45:03+08:00",
       "objective": "把 Planner、Coding/Web/Pwn 执行和验证之间的工作边界落到现有 Control Store，使并行解题可认领、可阻塞、可重规划、可恢复且不重复跑偏。",
       "deliverables": [
         "WorkItem 状态机、依赖校验和可重放租约事件",
@@ -1398,6 +1398,30 @@
         "npm run typecheck passed",
         "162/162 Materials tests passed",
         "component documentation check passed (25 components, 6 affected)"
+      ]
+    },
+    {
+      "id": "UPDATE-20260911-001",
+      "occurredAt": "2026-09-11T18:45:03+08:00",
+      "summary": "Add a structured Pwn intelligence loop while preserving the persistent solver container and fresh reproduction verifier.",
+      "branch": "codex/pwn-intelligence-layer",
+      "commit": "self",
+      "planIds": [
+        "PLAN-220"
+      ],
+      "changes": [
+        "Add bounded cyclic pattern generation and GDB transcript parsing for signals, registers, faults, mappings, control offsets, and next actions.",
+        "Add pwn_cyclic and pwn_crash_analyze tools with Artifact-backed crash transcripts and non-success pwn_crash records.",
+        "Add pwn_record_leak and pwn_derive_base tools backed by the existing CodingEvidenceGraph, with auditable source bytes and hypothesis confidence below one.",
+        "Expose the new tools through the Pwn action bundles and coding tool contract without creating a second state system or container lifecycle.",
+        "Add regression coverage for analysis, crash persistence, leak/base derivation, tool schemas, and the updated contract hash."
+      ],
+      "validation": [
+        "npm run build --workspace=@proofblade/atoms passed",
+        "npm run build --workspace=@proofblade/molecules passed",
+        "npm run build --workspace=@proofblade/materials passed",
+        "Pwn analysis, Pwn tool, Pwn coding tool, DomainRecord, and coding resource targeted tests passed",
+        "component audit recorded for materials, materials-domain, and materials-runtime"
       ]
     }
   ],

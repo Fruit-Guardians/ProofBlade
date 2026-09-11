@@ -390,6 +390,7 @@ export class PiCodingLane implements AgentLanePort {
         pwnTrustedReproducer,
         pwnBroker,
         pwnRuntimeRequired,
+        evidenceGraph,
       )
       : undefined;
     for (const session of recoveredPwnSessions) pwnTools?.adopt(session);

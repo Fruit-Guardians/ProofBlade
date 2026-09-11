@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-29T11:55:00+08:00
+> 状态更新时间：2026-09-11T18:45:03+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260911-001 | 2026-09-11T18:45:03+08:00 | PLAN-220 | codex/pwn-intelligence-layer | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -55,6 +56,28 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260911-001
+
+时间：2026-09-11T18:45:03+08:00
+
+摘要：Add a structured Pwn intelligence loop while preserving the persistent solver container and fresh reproduction verifier.
+
+### 变更
+
+- Add bounded cyclic pattern generation and GDB transcript parsing for signals, registers, faults, mappings, control offsets, and next actions.
+- Add pwn_cyclic and pwn_crash_analyze tools with Artifact-backed crash transcripts and non-success pwn_crash records.
+- Add pwn_record_leak and pwn_derive_base tools backed by the existing CodingEvidenceGraph, with auditable source bytes and hypothesis confidence below one.
+- Expose the new tools through the Pwn action bundles and coding tool contract without creating a second state system or container lifecycle.
+- Add regression coverage for analysis, crash persistence, leak/base derivation, tool schemas, and the updated contract hash.
+
+### 验证
+
+- [x] npm run build --workspace=@proofblade/atoms passed
+- [x] npm run build --workspace=@proofblade/molecules passed
+- [x] npm run build --workspace=@proofblade/materials passed
+- [x] Pwn analysis, Pwn tool, Pwn coding tool, DomainRecord, and coding resource targeted tests passed
+- [x] component audit recorded for materials, materials-domain, and materials-runtime
 
 ## UPDATE-20260829-009
 

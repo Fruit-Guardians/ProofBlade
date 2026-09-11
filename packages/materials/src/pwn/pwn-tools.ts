@@ -1,10 +1,13 @@
-import type { DomainRecordInput, Lane } from "../domain/types.js";
+import type { DomainRecordInput, Lane, RunSnapshot, TargetKind } from "../domain/types.js";
 import type { ContainerRef } from "../container/contracts.js";
 import type { SessionRegistry } from "../container/session-registry.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
+import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { PwnSession } from "./pwn-session.js";
 import { appendByte } from "./bytes.js";
+import { analyzeGdbTranscript, type PwnCrashReport } from "./analysis.js";
+import { deriveBaseRecord, parseLeakHex, toHex, type AddressKind, type LeakFormat, type LeakRecord } from "./leak.js";
 import type { PwnReproducer, ExploitRecipe, ExploitStage, PwnReproduceOutcome } from "../verification/pwn-reproducer.js";
 import type { PwnTrustedReproducer } from "../verification/pwn-reproduction-verifier.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
@@ -83,6 +86,8 @@ export class PwnToolHandler {
     private readonly sessionBroker?: SessionRuntimeCreateBroker,
     /** Set when runtime.sessionBroker is configured but its token/host is unavailable. */
     private readonly sessionRuntimeRequired = false,
+    /** Shared evidence graph used to expose the durable leak ledger to Pwn tools. */
+    private readonly evidenceGraph?: CodingEvidenceGraph,
   ) {}
 
   /** Register a broker-reconnected session without emitting a new open event. */
@@ -400,6 +405,184 @@ export class PwnToolHandler {
     return { recordId };
   }
 
+  /** Parse a bounded debugger transcript and persist its crash facts as a Pwn record. */
+  public async analyzeCrash(input: {
+    transcript: string;
+    pattern?: string;
+    patternLength?: number;
+    alphabet?: string;
+    n?: number;
+    endian?: "little" | "big";
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<PwnCrashReport & { recordId: string; artifactId: string }> {
+    const report = analyzeGdbTranscript(input.transcript, {
+      ...(input.pattern === undefined ? {} : { pattern: input.pattern }),
+      ...(input.patternLength === undefined ? {} : { patternLength: input.patternLength }),
+      ...(input.alphabet === undefined ? {} : { alphabet: input.alphabet }),
+      ...(input.n === undefined ? {} : { n: input.n }),
+      ...(input.endian === undefined ? {} : { endian: input.endian }),
+    });
+    const persisted = await this.recordCrash({
+      report,
+      transcript: input.transcript,
+      artifactIds: input.artifactIds,
+      evidenceIds: input.evidenceIds,
+    });
+    return { ...report, ...persisted };
+  }
+
+  /** Persist a crash analysis without treating it as exploit success. */
+  public async recordCrash(input: {
+    report: PwnCrashReport;
+    transcript: string;
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<{ recordId: string; artifactId: string }> {
+    if (!this.artifactStore || !this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_crash_analyze]\nReason: crash analysis requires the durable Artifact and Control Stores, which are not attached to this run. The transcript was not recorded.\nNext: restart the task with a Control Store-enabled pwn profile.");
+    if (typeof input.transcript !== "string" || input.transcript.length === 0) throw new Error(pwnRequestRefusal("pwn crash analysis requires a non-empty transcript", "pass the bounded GDB or debugger transcript"));
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    assertPwnTarget(snapshot.task.target_kind);
+    const artifactIds = uniqueIds(input.artifactIds ?? []);
+    const evidenceIds = uniqueIds(input.evidenceIds ?? []);
+    assertCurrentReferences(snapshot, artifactIds, evidenceIds);
+    const maxTranscript = 256 * 1024;
+    const storedTranscript = input.transcript.length > maxTranscript ? input.transcript.slice(-maxTranscript) : input.transcript;
+    const artifact = await this.artifactStore.putText(this.runId, storedTranscript, {
+      filename: `pwn-crash-${snapshot.generation}.txt`,
+      mime: "text/plain",
+      sensitivity: "public",
+      truncated: input.transcript.length > storedTranscript.length,
+      semantic: {
+        name: "Pwn crash transcript",
+        summary: "Bounded debugger transcript used to classify a Pwn crash.",
+        tags: ["pwn", "crash", "debugger"],
+        role: "supporting",
+        relatedIds: [],
+        annotatedBy: "harness",
+      },
+    });
+    const allArtifactIds = uniqueIds([artifact.id, ...artifactIds]);
+    const summary = crashSummary(input.report);
+    const recordId = `PWN-CRASH-${snapshot.generation}-${sha256(`${artifact.id}:${canonicalJson(input.report)}`).slice(0, 32)}`;
+    const record: Extract<DomainRecordInput, { kind: "pwn_crash" }> = {
+      id: recordId,
+      kind: "pwn_crash",
+      summary,
+      artifactIds: allArtifactIds,
+      evidenceIds,
+      classification: input.report.classification,
+      ...(input.report.signal ? { signal: input.report.signal } : {}),
+      ...(input.report.controlRegister ? { controlRegister: input.report.controlRegister } : {}),
+      ...(input.report.faultAddress ? { faultAddress: input.report.faultAddress } : {}),
+      ...(input.report.cyclic?.offset === undefined ? {} : { cyclicOffset: input.report.cyclic.offset }),
+      ripControlled: input.report.ripControlled,
+      transcriptTruncated: input.report.transcriptTruncated || input.transcript.length > storedTranscript.length,
+    };
+    await this.controlStore.dispatch(this.runId, { type: "domain_record", record, lane: this.ownerLane });
+    return { recordId, artifactId: artifact.id };
+  }
+
+  /** Parse and persist one leak, reusing the existing reasoning/evidence graph. */
+  public async recordLeak(input: {
+    sourceHex: string;
+    format: LeakFormat;
+    addressKind: AddressKind;
+    confidence: number;
+    id?: string;
+    symbol?: string;
+    derivation?: { expression: string; sourceLeakIds: string[] };
+    tags?: string[];
+    explanation?: string;
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean }> {
+    assertLeakInput(input.format, input.addressKind);
+    const sourceHex = normalizeSourceHex(input.sourceHex);
+    const value = toHex(parseLeakHex(sourceHex, input.format));
+    const leakId = normalizeLeakId(input.id, { sourceHex, format: input.format, addressKind: input.addressKind, symbol: input.symbol, value });
+    const leak: LeakRecord = {
+      id: leakId,
+      sourceHex,
+      format: input.format,
+      value,
+      addressKind: input.addressKind,
+      confidence: input.confidence,
+      ...(input.symbol ? { symbol: input.symbol } : {}),
+      ...(input.derivation ? { derivation: input.derivation } : {}),
+    };
+    return await this.persistLeak(leak, input);
+  }
+
+  /** Derive a base from a previously recorded leak and persist the formula. */
+  public async deriveBase(input: {
+    sourceLeakId: string;
+    knownOffset: string;
+    label?: string;
+    confidence?: number;
+    id?: string;
+    tags?: string[];
+    explanation?: string;
+    artifactIds?: string[];
+    evidenceIds?: string[];
+  }): Promise<{ leakId: string; recordId: string; value: string; reused: boolean; pageAligned: boolean }> {
+    if (!this.controlStore) throw new Error("[ProofBlade tool unavailable: pwn_derive_base]\nReason: base derivation requires the durable Control Store, which is not attached to this run. The derivation was not recorded.\nNext: restart the task with a Control Store-enabled pwn profile.");
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    assertPwnTarget(snapshot.task.target_kind);
+    const sourceLeakId = input.sourceLeakId.replace(/^PWN-LEAK-/, "");
+    const sourceRecord = snapshot.domainRecords[`PWN-LEAK-${sourceLeakId}`];
+    if (!sourceRecord || sourceRecord.kind !== "pwn_leak") throw new Error(pwnRequestRefusal(`unknown source leak record: ${input.sourceLeakId}`, "record the leak first with pwn_record_leak and use its leakId"));
+    const knownOffset = parseHexInteger(input.knownOffset, "knownOffset");
+    const sourceConfidence = typeof sourceRecord.confidence === "number" ? sourceRecord.confidence : 0.5;
+    const confidence = Math.min(input.confidence ?? sourceConfidence, sourceConfidence);
+    const source: LeakRecord = {
+      id: sourceLeakId,
+      sourceHex: sourceRecord.sourceHex,
+      format: sourceRecord.format,
+      value: sourceRecord.value,
+      addressKind: sourceRecord.addressKind,
+      confidence: confidence,
+      ...(sourceRecord.symbol ? { symbol: sourceRecord.symbol } : {}),
+    };
+    const derived = deriveBaseRecord(source, {
+      id: normalizeLeakId(input.id, { sourceLeakId, knownOffset: toHex(knownOffset), label: input.label }),
+      knownOffset,
+      ...(input.label ? { label: input.label } : {}),
+      confidence,
+    });
+    return {
+      ...(await this.persistLeak(derived, {
+        tags: input.tags,
+        explanation: input.explanation,
+        artifactIds: input.artifactIds ?? sourceRecord.artifactIds,
+        evidenceIds: input.evidenceIds ?? sourceRecord.evidenceIds,
+      })),
+      pageAligned: knownOffset >= 0n && BigInt(derived.value) % 0x1000n === 0n,
+    };
+  }
+
+  private async persistLeak(
+    leak: LeakRecord,
+    input: { tags?: string[]; explanation?: string; artifactIds?: string[]; evidenceIds?: string[] },
+  ): Promise<{ leakId: string; recordId: string; value: string; reused: boolean }> {
+    if (!this.controlStore || !this.evidenceGraph) throw new Error("[ProofBlade tool unavailable: pwn_record_leak]\nReason: the durable Pwn evidence graph is not attached to this run. The leak was not recorded.\nNext: restart the task with a Control Store and evidence graph-enabled pwn profile.");
+    if (!Number.isFinite(leak.confidence) || leak.confidence < 0 || leak.confidence >= 1) throw new Error(pwnRequestRefusal("pwn leak confidence must be in [0,1)", "use a finite confidence below 1 until fresh reproduction confirms the exploit"));
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    assertPwnTarget(snapshot.task.target_kind);
+    const artifactIds = uniqueIds(input.artifactIds ?? []);
+    const evidenceIds = uniqueIds(input.evidenceIds ?? []);
+    if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error(pwnRequestRefusal("pwn leak requires supporting artifactIds or evidenceIds", "read or inspect the leak source first, then pass its A-* or EV-* id"));
+    assertCurrentReferences(snapshot, artifactIds, evidenceIds);
+    const result = await this.evidenceGraph.recordLeak({
+      leak,
+      tags: input.tags?.slice(0, 32),
+      explanation: input.explanation,
+      artifactIds,
+      evidenceIds,
+    });
+    return { leakId: leak.id, recordId: `PWN-LEAK-${leak.id}`, value: leak.value, reused: result.reused };
+  }
+
   private async recordTranscript(sessionId: string, operation: string, anchors: string[]): Promise<void> {
     if (!this.artifactStore || !this.controlStore) return;
     const snapshot = await this.controlStore.snapshot(this.runId);
@@ -479,6 +662,67 @@ export class PwnToolHandler {
 
 function pwnRequestRefusal(reason: string, next: string): string {
   return `[ProofBlade tool request rejected: pwn]\nReason: ${reason}. The requested action was not executed.\nNext: ${next}.`;
+}
+
+function assertPwnTarget(targetKind: TargetKind): void {
+  if (!(["pwn", "mixed", "unknown"] as TargetKind[]).includes(targetKind)) {
+    throw new Error(pwnRequestRefusal(`Pwn analysis is not allowed for target kind ${targetKind}`, "use the task's target-appropriate tools, or run this analysis on a pwn/mixed target"));
+  }
+}
+
+function assertCurrentReferences(snapshot: RunSnapshot, artifactIds: string[], evidenceIds: string[]): void {
+  for (const artifactId of artifactIds) {
+    const artifact = snapshot.artifacts[artifactId];
+    if (!artifact) throw new Error(pwnRequestRefusal(`unknown artifact ${artifactId}`, "read the artifact result and pass its current A-* id"));
+    if (artifact.runId !== snapshot.runId || artifact.generation !== snapshot.generation) throw new Error(pwnRequestRefusal(`artifact ${artifactId} is stale`, "use an Artifact from the current target generation"));
+  }
+  for (const evidenceId of evidenceIds) {
+    const evidence = snapshot.evidence[evidenceId];
+    if (!evidence) throw new Error(pwnRequestRefusal(`unknown evidence ${evidenceId}`, "record or inspect the supporting Evidence before linking it"));
+    if (evidence.provenance.runId !== snapshot.runId || evidence.provenance.generation !== snapshot.generation) throw new Error(pwnRequestRefusal(`evidence ${evidenceId} is stale`, "use Evidence from the current target generation"));
+  }
+}
+
+function uniqueIds(values: string[]): string[] {
+  return [...new Set(values.map((value) => String(value).trim()).filter(Boolean))].slice(0, 32);
+}
+
+function normalizeSourceHex(value: string): string {
+  const compact = value.trim().replace(/^0x/i, "").replace(/\s+/g, "");
+  if (!compact || compact.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(compact) || compact.length > 512) {
+    throw new Error(pwnRequestRefusal("leak sourceHex must contain whole hexadecimal bytes", "pass bytes such as 30f4e1f7ff7f0000"));
+  }
+  return compact.toLowerCase();
+}
+
+function assertLeakInput(format: LeakFormat, addressKind: AddressKind): void {
+  if (!( ["le64", "le32", "be64", "be32"] as string[]).includes(format)) throw new Error(pwnRequestRefusal("leak format is invalid", "use le64, le32, be64, or be32"));
+  if (!( ["stack", "heap", "libc", "pie", "code", "unknown"] as string[]).includes(addressKind)) throw new Error(pwnRequestRefusal("leak address kind is invalid", "use stack, heap, libc, pie, code, or unknown"));
+}
+
+function parseHexInteger(value: string, label: string): bigint {
+  const trimmed = value.trim();
+  if (!/^(?:0x)?[0-9a-f]+$/i.test(trimmed) || trimmed.length > 66) throw new Error(pwnRequestRefusal(`${label} must be a bounded non-negative hexadecimal integer`, `pass ${label} such as 0x84420`));
+  return BigInt(`0x${trimmed.replace(/^0x/i, "")}`);
+}
+
+function normalizeLeakId(value: string | undefined, seed: Record<string, unknown>): string {
+  const explicit = value?.trim();
+  if (explicit) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/.test(explicit)) throw new Error(pwnRequestRefusal("leak id contains unsupported characters", "use letters, digits, dot, underscore, colon, or hyphen"));
+    return explicit;
+  }
+  return `LEAK-${sha256(canonicalJson(seed)).slice(0, 32)}`;
+}
+
+function crashSummary(report: PwnCrashReport): string {
+  const signal = report.signal ? ` ${report.signal}` : "";
+  const control = report.ripControlled
+    ? `control register matched the cyclic pattern at offset ${report.cyclic?.offset ?? "unknown"}`
+    : report.controlRegister
+      ? `${report.controlRegister} was not matched by the cyclic pattern`
+      : "no control register was parsed";
+  return `Pwn ${report.classification}${signal}; ${control}.`;
 }
 
 /** Parse "host:port" (rejecting IPv6/garbage) for scope checks. */
