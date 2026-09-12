@@ -3,7 +3,7 @@ import type { ArtifactStore } from "../effects/artifact-store.js";
 import type { ControlStore } from "../control/control-store.js";
 import type { EffectJournal } from "../effects/effect-journal.js";
 import type { FixtureRef } from "../sandbox/fixture.js";
-import type { CompletionProposal, DomainRecordInput, JobRecord, KnowledgeLevel, KnowledgeProjection, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
+import type { ArtifactSensitivity, CompletionProposal, DomainRecordInput, JobRecord, KnowledgeLevel, KnowledgeProjection, RawEffectResult, RunSnapshot, RuntimeResourceSnapshot } from "../domain/types.js";
 import { DeterministicObserver, type ObservationOutcome } from "../knowledge/observer.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { isCtfCandidate, redactCtfCandidates } from "../domain/candidate.js";
@@ -25,6 +25,12 @@ export interface InspectTargetResult {
   evidenceId: string;
   artifactId: string;
   truncated: boolean;
+}
+
+/** Optional domain-owned check for a result before it becomes a Completion. */
+export interface ResultValidationPolicy {
+  id: string;
+  validate(value: string): void | string;
 }
 
 export class ProofBladeToolRuntime {
@@ -279,6 +285,33 @@ export class ProofBladeToolRuntime {
     return { factId };
   }
 
+  /**
+   * Propose an opaque result for a configured external destination. The
+   * destination adapter owns payload semantics; this runtime only provides
+   * durable Artifact storage, approval/attempt accounting, and hash-bound
+   * completion identity.
+   */
+  public async submitResult(payload: string, options: { target?: string; sensitivity?: ArtifactSensitivity; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
+    const normalized = payload.trim();
+    const target = options.target?.trim() || "external";
+    if (!normalized) throw new Error("External submission payload must not be empty");
+    if (target.length > 256) throw new Error("External submission target is too long");
+    const validation = options.validator?.validate(normalized);
+    if (typeof validation === "string" && validation.trim()) throw new Error(validation);
+    const snapshot = await this.controlStore.snapshot(this.runId);
+    return this.proposeSubmission(snapshot, normalized, target, options.sensitivity ?? "secret");
+  }
+
+  /** Alias used by external destination adapters. */
+  public async submitExternal(payload: string, options: { target?: string; sensitivity?: ArtifactSensitivity; validator?: ResultValidationPolicy } = {}): Promise<{ completionId: string; candidateHash: string }> {
+    return this.submitResult(payload, options);
+  }
+
+  /**
+   * Legacy flag-shaped submission entry point. New code should use
+   * submitExternal; the observation and format checks remain here only for
+   * compatibility with old Competition clients.
+   */
   public async submitCandidate(candidate: string): Promise<{ completionId: string; candidateHash: string }> {
     const normalized = candidate.trim();
     if (!isCtfCandidate(normalized)) throw new Error("Candidate must be one complete CTF prefix{...} value");
@@ -304,11 +337,17 @@ export class ProofBladeToolRuntime {
       }
     }
     if (!platformJudged && !observed) throw new Error("Candidate does not occur in a successful target observation");
+    return this.proposeSubmission(snapshot, normalized, "competition", "result_candidate");
+  }
+
+  private async proposeSubmission(snapshot: RunSnapshot, normalized: string, target: string, sensitivity: ArtifactSensitivity): Promise<{ completionId: string; candidateHash: string }> {
     const candidateHash = sha256(normalized);
+    const platformJudged = snapshot.task.verification.kind === "platform_submission";
+    void target; // Reserved for destination-specific completion metadata in the next schema.
     // Only completions that are actually SUBMITTABLE count against the budget and
     // are eligible for dedup. `verify_claim` also proposes completions, but its
-    // artifact is a claim-reproduction JSON blob, not the bare flag. Counting those
-    // let a few verify_claim calls exhaust max_submissions with nothing ever sent,
+    // artifact is a verification record, not the bare submission payload. Counting those
+    // let a few verification calls exhaust max_submissions with nothing ever sent,
     // and deduping against one handed it back to IndependentVerifier, which
     // compared sha256(json blob) to candidateHash and threw "Candidate hash
     // mismatch" — losing an already-correct flag. The predicate below IS the
@@ -326,7 +365,7 @@ export class ProofBladeToolRuntime {
     const artifact = await this.artifactStore.putText(this.runId, normalized, {
       filename: `candidate-${candidateHash.slice(0, 12)}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity,
     });
     const completionId = id("C");
     const verificationRequest = platformJudged
@@ -334,7 +373,7 @@ export class ProofBladeToolRuntime {
       : undefined;
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id, ...(verificationRequest ? { verificationKey: verificationRequest.request.key } : {}) },
+      completion: { id: completionId, purpose: "submission", candidateHash, artifactId: artifact.id, submissionTarget: target, ...(verificationRequest ? { verificationKey: verificationRequest.request.key } : {}) },
       lane: "executor",
     });
     return { completionId, candidateHash };

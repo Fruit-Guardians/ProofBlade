@@ -18,7 +18,7 @@ import type { ProofBladeSkillRegistry } from "../skills/registry.js";
 import type { CodingEvidenceGraph } from "../knowledge/evidence-graph.js";
 import { KNOWLEDGE_READ_MAX_TOKENS } from "../knowledge/projection.js";
 import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.js";
-import type { CodingClaimVerifier } from "../verification/claim-verification.js";
+import type { TaskResultVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
 import type { Lane, RawEffectResult, TargetKind } from "../domain/types.js";
@@ -32,12 +32,27 @@ import { globWorkspace, grepWorkspace, limitWorkspaceSearchResult, workspaceSear
 import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
-export const CODING_PROXY_TOOL_NAMES = ["verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+/** Provider-facing proxy tools for generic security tasks. */
+export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
+/** Maximum size of an implicit complete read returned in one model turn. */
+const MAX_COMPLETE_READ_BYTES = 256 * 1024;
+
+/** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
+export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
+export const MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER = 16;
+export const MAX_MCP_FIRST_CLASS_DESCRIPTION_TOKENS = 256;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_BYTES = 3 * 1024;
+/** Total untrusted MCP metadata admitted into the Provider tool surface. */
+export const MAX_MCP_FIRST_CLASS_METADATA_BYTES = 8 * 1024;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_DEPTH = 8;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_PROPERTIES = 64;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_NODES = 192;
+export const MAX_MCP_FIRST_CLASS_SCHEMA_ARRAY_ITEMS = 64;
 
 const IDALIB_FIRST_CLASS_TOOLS = new Set([
   "idalib_open", "idalib_current", "survey_binary", "list_funcs", "lookup_funcs", "decompile", "disasm",
@@ -49,18 +64,27 @@ const JADX_FIRST_CLASS_TOOLS = new Set([
   "search_method_by_name", "get_xrefs_to_class", "get_xrefs_to_method",
 ]);
 
-/** Verdict returned by a real platform submission. */
-export interface CodingFlagSubmission {
+/** Request sent through the run's externally configured submission capability. */
+export interface ExternalSubmissionRequest {
+  /** Stable logical destination, for example a competition, review queue, or deployment. */
+  target: string;
+  /** Payload is kept opaque to the generic harness and persisted as an Artifact. */
+  payload: string;
+}
+
+/** Verdict returned by a real external submission. */
+export interface ExternalSubmissionResult {
   accepted: boolean;
   completionId: string;
   candidateHash: string;
-  /** True when this exact flag was already submitted and the stored verdict was replayed. */
+  /** True when this exact payload was already submitted and the stored verdict was replayed. */
   replayed: boolean;
-  /** True in assist mode: recorded for operator approval, platform not contacted. */
+  /** True in assist mode: recorded for operator approval, destination not contacted. */
   heldForApproval?: boolean;
   message?: string;
   submissionsUsed: number;
   submissionsRemaining: number;
+  target?: string;
 }
 
 export interface CodingResourceContext extends ExecutionToolContext {
@@ -71,13 +95,16 @@ export interface CodingResourceContext extends ExecutionToolContext {
   skills: ProofBladeSkillRegistry;
   mcp: McpProjectRegistry;
   enabledSkills: Set<string>;
+  /** Skill bodies already injected into this lane, keyed by stable skill name. */
+  loadedSkillContent?: Map<string, { contentHash: string; coverageChars: number }>;
   enabledMcpServers: Set<string>;
-  claimVerifier: CodingClaimVerifier;
+  /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
+  claimVerifier: TaskResultVerifier;
   /**
-   * Stop the current Pi turn after verify_claim so the outer Run coordinator
-   * can perform verifier-owned scoring before the model issues another tool
-   * call. Competition lanes leave this unset so submit_flag may follow a
-   * preliminary observation in the same turn.
+   * Stop the current Pi turn after result verification so the outer Run
+   * coordinator can perform verifier-owned scoring before the model issues
+   * another tool call. Platform-judged lanes leave this unset so external_submit
+   * may follow a preliminary observation in the same turn.
    */
   deferClaimAcceptance?: boolean;
   /** Keep claim verification in the same continuous maintenance loop. */
@@ -94,8 +121,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * runs, in which case those tools fail closed with a clear message.
    */
   webSession?: WebToolHandler;
-  /** Present only when the run is judged by a live competition platform. */
-  submitFlag?: (flag: string, signal?: AbortSignal) => Promise<CodingFlagSubmission>;
+  /** Present when a configured external destination accepts submissions. */
+  externalSubmit?: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>;
   /** Hard ceiling in seconds on any single `bash` call. Unset means no ceiling. */
   bashTimeoutSecondsMax?: number;
   /**
@@ -116,6 +143,13 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * reinjecting the entire stdout into the next provider request.
    */
   artifactOutputRefs?: Map<string, { artifactId: string; count: number }>;
+  /**
+   * Paths that have been read completely during this lane. This is advisory
+   * state used to stop the model from repeatedly paging through a file it has
+   * already received in full; edit/write wrappers clear it when the workspace
+   * may have changed.
+   */
+  completedReads?: Map<string, { artifactId: string; contentHash: string; bytes: number }>;
   /**
    * Per-run count of how many times each distinct image has been read, keyed by
    * the image CONTENT hash (not path). Identical bytes give no new information on
@@ -143,10 +177,17 @@ export function codingToolCatalog(): CodingToolCatalogEntry[] {
   }));
 }
 
-export function createCodingTools(options: { platformJudged?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean } = {}): AgentHarnessTool<CodingResourceContext>[] {
+export interface CodingToolOptions {
+  platformJudged?: boolean;
+  externalSubmissionEnabled?: boolean;
+  webReproductionEnabled?: boolean;
+  webSessionEnabled?: boolean;
+}
+
+export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
-    verifyClaimTool,
+    verifyResultTool,
     evidenceTool,
     loadSkillTool,
     capabilityTool,
@@ -156,15 +197,27 @@ export function createCodingTools(options: { platformJudged?: boolean; webReprod
     ...createPwnCodingTools(),
     ...(options.webSessionEnabled ? createWebSessionTools() : []),
     ...(options.webReproductionEnabled ? [webReproduceTool] : []),
-    // Registered only for platform-judged runs: it spends a real submission, and
-    // a GUI chat run has no platform to submit to.
-    ...(options.platformJudged ? [submitFlagTool] : []),
+    // Registered only when a trusted destination is configured.
+    ...(options.externalSubmissionEnabled || options.platformJudged ? [externalSubmitTool] : []),
   ];
 }
 
 /** First-class tool name for an MCP server tool: mcp__<server>__<tool>. */
 export function mcpToolName(server: string, tool: string): string {
   return `mcp__${server}__${tool}`;
+}
+
+export interface McpFirstClassToolExposure {
+  exposed: number;
+  omitted: number;
+  truncated: boolean;
+  omittedByReason: Readonly<Record<"tool_limit" | "invalid_name" | "schema", number>>;
+  descriptionsTruncated: number;
+}
+
+export interface McpFirstClassToolSelection {
+  tools: AgentHarnessTool<CodingResourceContext>[];
+  exposure: McpFirstClassToolExposure;
 }
 
 /**
@@ -181,7 +234,24 @@ export async function createMcpFirstClassTools(
   enabledServers: Iterable<string>,
   signal?: AbortSignal,
 ): Promise<AgentHarnessTool<CodingResourceContext>[]> {
+  return (await createMcpFirstClassToolSelection(mcp, enabledServers, signal)).tools;
+}
+
+/**
+ * Promote only bounded MCP metadata into provider-visible tools. The generic
+ * `mcp_call` proxy remains available for every omitted tool, so an oversized
+ * or malformed schema cannot consume the model context or remove capability.
+ */
+export async function createMcpFirstClassToolSelection(
+  mcp: McpProjectRegistry,
+  enabledServers: Iterable<string>,
+  signal?: AbortSignal,
+): Promise<McpFirstClassToolSelection> {
   const tools: AgentHarnessTool<CodingResourceContext>[] = [];
+  const omittedByReason = { tool_limit: 0, invalid_name: 0, schema: 0 };
+  let descriptionsTruncated = 0;
+  let metadataBytes = 0;
+  const names = new Set<string>();
   const summaries = mcp.summaries();
   for (const server of enabledServers) {
     const summary = summaries.find((item) => item.name === server && !item.disabled);
@@ -193,51 +263,154 @@ export async function createMcpFirstClassTools(
       continue; // server unreachable at startup; mcp_call stays as fallback
     }
     for (const tool of described.tools) {
+      if (tools.length >= MAX_MCP_FIRST_CLASS_TOOLS || namesForServer(names, server) >= MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER) {
+        omittedByReason.tool_limit += 1;
+        continue;
+      }
+      if (typeof tool.name !== "string") {
+        omittedByReason.invalid_name += 1;
+        continue;
+      }
+      const name = mcpToolName(server, tool.name);
+      if (!isSafeMcpFirstClassToolName(name) || names.has(name)) {
+        omittedByReason.invalid_name += 1;
+        continue;
+      }
+      const schema = boundedMcpInputSchema(tool.inputSchema);
+      if (!schema) {
+        omittedByReason.schema += 1;
+        continue;
+      }
+      const descriptionText = typeof tool.description === "string" ? tool.description : "";
+      const description = boundModelText(`[MCP ${server}] ${descriptionText}`, 1_024, MAX_MCP_FIRST_CLASS_DESCRIPTION_TOKENS);
+      const nextMetadataBytes = metadataBytes
+        + Buffer.byteLength(name, "utf8")
+        + Buffer.byteLength(description.text, "utf8")
+        + Buffer.byteLength(JSON.stringify(schema), "utf8");
+      if (nextMetadataBytes > MAX_MCP_FIRST_CLASS_METADATA_BYTES) {
+        omittedByReason.tool_limit += 1;
+        continue;
+      }
+      metadataBytes = nextMetadataBytes;
+      if (description.truncated) descriptionsTruncated += 1;
+      names.add(name);
       tools.push({
-        name: mcpToolName(server, tool.name),
-        label: mcpToolName(server, tool.name),
-        description: `[MCP ${server}] ${tool.description}`,
-        parameters: (tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : { type: "object" }) as never,
+        name,
+        label: name,
+        description: description.text,
+        parameters: schema as never,
         executionMode: "sequential",
         async execute(_toolCallId, params, sig, _onUpdate, context) {
-          assertMcpEnabled(context, server);
-          const capabilityId = context.mcp.summaries().find((item) => item.name === server)?.capabilityId;
-          if (!capabilityId) throw new Error(`Unknown MCP server: ${server}`);
-          // Production lanes route MCP calls through the journaled capability
-          // runtime so the raw response is archived and observed. Keep the
-          // direct registry fallback for small/fake tool contexts used by
-          // contract tests and offline callers.
-          if (context.runtime && typeof context.runtime.invokeCapability === "function") {
-            const invocation = await context.runtime.invokeCapability({
+          try {
+            assertMcpEnabled(context, server);
+            const capabilityId = context.mcp.summaries().find((item) => item.name === server)?.capabilityId;
+            if (!capabilityId) throw new Error(`Unknown MCP server: ${server}`);
+            // Production lanes route MCP calls through the journaled capability
+            // runtime so the raw response is archived and observed. Keep the
+            // direct registry fallback for small/fake tool contexts used by
+            // contract tests and offline callers.
+            if (context.runtime && typeof context.runtime.invokeCapability === "function") {
+              const invocation = await context.runtime.invokeCapability({
+                capabilityId,
+                operation: "call",
+                input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
+              }, sig);
+              return toolResult(invocation);
+            }
+            const result = await context.mcp.execute(
               capabilityId,
-              operation: "call",
-              input: { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
-            }, sig);
-            return toolResult(invocation);
+              "call",
+              { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
+              sig,
+            );
+            return mcpToolResult(result, { server, tool: tool.name });
+          } catch (error) {
+            return mcpFailureResult(server, tool.name, error);
           }
-          const result = await context.mcp.execute(
-            capabilityId,
-            "call",
-            { tool: tool.name, arguments: (params && typeof params === "object" ? params : {}) as Record<string, unknown> },
-            sig,
-          );
-          return mcpToolResult(result);
         },
       });
     }
   }
-  return tools;
+  const omitted = Object.values(omittedByReason).reduce((total, count) => total + count, 0);
+  return {
+    tools,
+    exposure: { exposed: tools.length, omitted, truncated: omitted > 0 || descriptionsTruncated > 0, omittedByReason, descriptionsTruncated },
+  };
+}
+
+function namesForServer(names: ReadonlySet<string>, server: string): number {
+  const prefix = `mcp__${server}__`;
+  return [...names].filter((name) => name.startsWith(prefix)).length;
+}
+
+function isSafeMcpFirstClassToolName(name: string): boolean {
+  return name.length <= 128 && /^[A-Za-z0-9_-]+$/.test(name);
+}
+
+function boundedMcpInputSchema(value: unknown): Record<string, unknown> | undefined {
+  const schema = value && typeof value === "object" && !Array.isArray(value) ? value : { type: "object" };
+  const state = { nodes: 0, properties: 0, scalarBytes: 0, seen: new WeakSet<object>() };
+  if (!isBoundedMcpSchemaValue(schema, 0, state)) return undefined;
+  try {
+    const serialized = JSON.stringify(schema);
+    if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > MAX_MCP_FIRST_CLASS_SCHEMA_BYTES) return undefined;
+    const cloned = JSON.parse(serialized) as unknown;
+    return cloned && typeof cloned === "object" && !Array.isArray(cloned) ? cloned as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isBoundedMcpSchemaValue(
+  value: unknown,
+  depth: number,
+  state: { nodes: number; properties: number; scalarBytes: number; seen: WeakSet<object> },
+): boolean {
+  if (depth > MAX_MCP_FIRST_CLASS_SCHEMA_DEPTH) return false;
+  if (value === null || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    state.scalarBytes += Buffer.byteLength(value, "utf8");
+    return state.scalarBytes <= MAX_MCP_FIRST_CLASS_SCHEMA_BYTES;
+  }
+  if (typeof value !== "object" || state.seen.has(value)) return false;
+  state.seen.add(value);
+  state.nodes += 1;
+  if (state.nodes > MAX_MCP_FIRST_CLASS_SCHEMA_NODES) return false;
+  if (Array.isArray(value)) {
+    if (value.length > MAX_MCP_FIRST_CLASS_SCHEMA_ARRAY_ITEMS) return false;
+    return value.every((item) => isBoundedMcpSchemaValue(item, depth + 1, state));
+  }
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+  let entries: Array<[string, unknown]>;
+  try {
+    entries = Object.entries(value);
+  } catch {
+    return false;
+  }
+  state.properties += entries.length;
+  if (state.properties > MAX_MCP_FIRST_CLASS_SCHEMA_PROPERTIES) return false;
+  return entries.every(([key, item]) => {
+    state.scalarBytes += Buffer.byteLength(key, "utf8");
+    return state.scalarBytes <= MAX_MCP_FIRST_CLASS_SCHEMA_BYTES && isBoundedMcpSchemaValue(item, depth + 1, state);
+  });
 }
 
 /**
- * Keep decompiler schemas out of unrelated challenge contexts. The generic
- * `mcp_call` proxy remains active as a deferred escape hatch; only the small
- * category-specific set below is sent as native provider tools.
+ * Select the enabled security MCP tools sent as native provider tools. A
+ * profile or target hint may narrow the preferred decompiler family for a
+ * clearly identified artifact, while general/unknown tasks retain all known
+ * enabled security MCP tools. `mcp_call` remains an escape hatch for tools
+ * that cannot be enumerated at lane startup.
  */
 export function selectFirstClassMcpTools<T extends { name: string }>(tools: T[], targetKind: TargetKind, target = "", profileId?: string): T[] {
-  if (targetKind !== "reverse") return [];
   const android = profileId === "mobile" || /\.(?:apk|dex|aab)\b|android|jadx/i.test(target);
-  const allowed = android ? JADX_FIRST_CLASS_TOOLS : IDALIB_FIRST_CLASS_TOOLS;
+  const native = profileId === "reverse" || targetKind === "reverse";
+  const allowed = android
+    ? JADX_FIRST_CLASS_TOOLS
+    : native
+      ? IDALIB_FIRST_CLASS_TOOLS
+      : new Set([...IDALIB_FIRST_CLASS_TOOLS, ...JADX_FIRST_CLASS_TOOLS]);
   return tools.filter((tool) => allowed.has(tool.name.slice(tool.name.lastIndexOf("__") + 2)));
 }
 
@@ -250,7 +423,7 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   bash: PROCESS_EFFECT,
   edit: WORKSPACE_EFFECT,
   write: WORKSPACE_EFFECT,
-  verify_claim: WORKSPACE_EFFECT,
+  verify_result: WORKSPACE_EFFECT,
   load_skill: READ_ONLY_EFFECT,
   // Starting and killing processes is a process side effect; polling a log is not,
   // so shell_job's policy is resolved per-operation below.
@@ -311,41 +484,98 @@ export function createCodingToolEffectPolicyResolver(
   };
 }
 
-const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "verify_claim",
-  label: "verify_claim",
-  description: "Run the task's deterministic workspace verifier and journal its exact candidate output. A task-bound command creates trusted reproduction Evidence and accepts a Completion; when a task has no verifier policy, the same call is retained as an explicitly unverified observation.",
+/**
+ * Domain-neutral verification entry point. The provider-facing contract uses
+ * `verify_result`; historical claim events are handled by replay/migration
+ * code and are never exposed as a new model tool.
+ */
+const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "verify_result",
+  label: "verify_result",
+  description: "Run the task's deterministic verifier or audited workspace check and record the result as durable Evidence. A task-bound verifier can accept a Completion; without one, the check remains an explicitly unverified observation.",
   parameters: Type.Object({
-    candidate: Type.String({ minLength: 1, maxLength: 1_024, description: "Exact final candidate that the answer will report." }),
-    command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the candidate from workspace inputs and prints it." }),
-    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the reproduction." })),
+    result: Type.Optional(Type.String({ minLength: 1, maxLength: 1_024, description: "Short result value or text that the answer will report." })),
+    resultArtifactId: Type.Optional(Type.String({ minLength: 1, maxLength: 256, description: "Existing durable result Artifact to verify (use instead of result for reports, JSON, binaries, or other multi-byte outputs)." })),
+    command: Type.String({ minLength: 1, maxLength: 16_000, description: "Deterministic command that derives the result from workspace inputs and prints it." }),
+    evidenceIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 16, description: "Supporting evidence ids used by the verification." })),
     timeout: Type.Optional(Type.Number({ minimum: 1, maximum: 120 })),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(toolCallId, params, signal, onUpdate, context) {
-    const input = params as { candidate: string; command: string; evidenceIds?: string[]; timeout?: number };
-    const candidate = input.candidate.trim();
+    const input = params as { result?: string; resultArtifactId?: string; command: string; evidenceIds?: string[]; timeout?: number };
+    const result = input.result?.trim() ?? "";
+    const resultArtifactId = input.resultArtifactId?.trim() ?? "";
     const command = input.command.trim();
-    if (!candidate || !command) throw new Error("verify_claim requires a candidate and reproduction command");
-    if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
+    if ((!result && !resultArtifactId) || (result && resultArtifactId) || !command) throw new Error("verify_result requires exactly one of result or resultArtifactId, plus a verification command");
+    if (result && command.includes(result)) {
+      return toolResult({
+        verified: false,
+        result,
+        resultHash: sha256(result),
+        commandHash: sha256(command),
+        verifierFeedback: verifierFailureFeedback(new Error("Verification command embeds the result literal; derive it from workspace inputs instead")),
+      }, true);
+    }
+    if (resultArtifactId) {
+      try {
+        const reproduction = await context.claimVerifier.recordArtifactResult({
+          resultArtifactId,
+          command,
+          cwd: context.env.cwd,
+          toolCallId,
+          supportingEvidenceIds: input.evidenceIds,
+          signal,
+        });
+        const response = toolResult({
+          verified: reproduction.verified,
+          resultArtifactId: reproduction.resultArtifactId,
+          resultHash: reproduction.resultHash,
+          commandHash: reproduction.commandHash,
+          artifactId: reproduction.artifactId,
+          evidenceId: reproduction.evidenceId,
+          completionId: reproduction.completionId,
+          supportingEvidenceIds: reproduction.supportingEvidenceIds,
+        });
+        return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
+      } catch (error) {
+        return toolResult({
+          verified: false,
+          resultArtifactId,
+          commandHash: sha256(command),
+          verifierFeedback: verifierFailureFeedback(error),
+        }, true);
+      }
+    }
     const executor = createBashTool<CodingResourceContext>();
     let output = "";
-    const reproduction = await context.claimVerifier.record({
-      candidate,
-      command,
-      cwd: context.env.cwd,
-      toolCallId,
-      supportingEvidenceIds: input.evidenceIds,
-      signal,
-      execute: async (innerSignal) => {
-        const started = Date.now();
-        const result = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
-        output = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-        return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
-      },
-    });
-    const result = toolResult({
+    let reproduction: Awaited<ReturnType<CodingResourceContext["claimVerifier"]["recordResult"]>>;
+    try {
+      reproduction = await context.claimVerifier.recordResult({
+        result,
+        command,
+        cwd: context.env.cwd,
+        toolCallId,
+        supportingEvidenceIds: input.evidenceIds,
+        signal,
+        execute: async (innerSignal) => {
+          const started = Date.now();
+          const executed = await executor.execute(toolCallId, { command, timeout: input.timeout }, innerSignal, onUpdate, context);
+          output = executed.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
+          return { stdout: output, stderr: "", exitCode: 0, durationMs: Date.now() - started };
+        },
+      });
+    } catch (error) {
+      return toolResult({
+        verified: false,
+        result,
+        resultHash: sha256(result),
+        commandHash: sha256(command),
+        verifierFeedback: verifierFailureFeedback(error),
+      }, true);
+    }
+    const response = toolResult({
       verified: reproduction.verified,
+      result: reproduction.candidate,
       candidateHash: reproduction.candidateHash,
       commandHash: reproduction.commandHash,
       artifactId: reproduction.artifactId,
@@ -354,7 +584,7 @@ const verifyClaimTool: AgentHarnessTool<CodingResourceContext> = {
       supportingEvidenceIds: reproduction.supportingEvidenceIds,
       output,
     });
-    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...result, terminate: true } : result;
+    return context.deferClaimAcceptance && !context.continuousRecovery ? { ...response, terminate: true } : response;
   },
 };
 
@@ -498,16 +728,11 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
 };
 
 /**
- * Submit a flag candidate to the live competition platform.
+ * Submit a model-derived result to a configured external destination.
  *
- * Only registered when the run's `verification.kind` is `platform_submission`,
- * because it is the one path that spends a real submission against the
- * platform. Routes through `runtime.submitCandidate` (format check, submission
- * budget, candidate-hash dedup) and then the effect journal's `fixture_score`,
- * whose idempotency key collapses a repeated identical submission into the
- * stored result instead of a second API call. Both tiebreakers the rules score
- * — wrong-submission count and API-call efficiency — are therefore accounted
- * for in the journal rather than tracked separately.
+ * Only registered when the run has an external destination. The destination
+ * adapter owns payload semantics; this resource remains generic and routes
+ * through the durable completion, verification, approval, and replay path.
  */
 /**
  * Start a long command WITHOUT blocking the turn.
@@ -964,18 +1189,19 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-const submitFlagTool: AgentHarnessTool<CodingResourceContext> = {
-  name: "submit_flag",
-  label: "submit_flag",
-  description: "Submit one complete flag to the competition platform and return its verdict. Each distinct flag costs one real submission from a limited budget, so submit only a flag you have derived; resubmitting the same value returns the stored verdict without a second API call.",
+const externalSubmitTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "external_submit",
+  label: "external_submit",
+  description: "Submit an opaque result payload to an explicitly configured external destination. The harness records the payload as an Artifact, applies approval and attempt limits, and returns the verifier's structured outcome; do not retry an unknown outcome blindly.",
   parameters: Type.Object({
-    flag: Type.String({ minLength: 1, description: "One complete flag value, e.g. prefix{...}." }),
+    target: Type.String({ minLength: 1, maxLength: 256, description: "Logical destination declared by the task, such as a competition or review queue." }),
+    payload: Type.String({ minLength: 1, maxLength: 1_048_576, description: "Opaque submission payload. The destination adapter determines its format." }),
   }, { additionalProperties: false }),
   executionMode: "sequential",
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const input = params as { flag: string };
-    if (!context.submitFlag) throw new Error("submit_flag is unavailable: this run is not judged by a competition platform");
-    return toolResult(await context.submitFlag(input.flag, signal));
+    const input = params as ExternalSubmissionRequest;
+    if (!context.externalSubmit) throw new Error("external_submit is unavailable: this run has no configured external destination");
+    return toolResult(await context.externalSubmit({ target: input.target.trim(), payload: input.payload }, signal));
   },
 };
 
@@ -1010,7 +1236,7 @@ const webReproduceTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
-export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
+export function codingActiveToolNames(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean }): string[] {
   const selected = new Set(input.tools);
   const active: string[] = CODING_BUILTIN_TOOL_NAMES.filter((name) => selected.has(name));
   active.push(...CODING_PROXY_TOOL_NAMES);
@@ -1023,12 +1249,16 @@ export function codingActiveToolNames(input: { tools: string[]; skills: string[]
   // Interactive web session tools: only when the task has a resolvable web target.
   if (input.webSessionEnabled) active.push(...CODING_WEB_SESSION_TOOL_NAMES);
   if (input.webReproductionEnabled) active.push(...CODING_WEB_TOOL_NAMES);
-  if (input.platformJudged) active.push(submitFlagTool.name);
+  if (input.platformJudged) {
+    active.push(externalSubmitTool.name);
+  } else if (input.externalSubmissionEnabled) {
+    active.push(externalSubmitTool.name);
+  }
   return active;
 }
 
-export function codingProviderToolContractSnapshot(): Array<{ name: string; description: string; parameters: unknown }> {
-  return createCodingTools().map((tool) => ({
+export function codingProviderToolContractSnapshot(options: CodingToolOptions = {}): Array<{ name: string; description: string; parameters: unknown }> {
+  return createCodingTools(options).map((tool) => ({
     name: tool.name,
     description: tool.description,
     parameters: structuredClone(tool.parameters),
@@ -1039,11 +1269,35 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     createCodingReadTool(),
     createCodingBashTool(),
-    createEditTool<CodingResourceContext>(),
-    createWriteTool<CodingResourceContext>(),
+    createCodingEditTool(),
+    createCodingWriteTool(),
     createGlobTool(),
     createGrepTool(),
   ];
+}
+
+function createCodingEditTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createEditTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const result = await contract.execute(toolCallId, params as { path: string; edits: Array<{ oldText: string; newText: string }> }, signal, onUpdate, context);
+      context.completedReads?.clear();
+      return result;
+    },
+  };
+}
+
+function createCodingWriteTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createWriteTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const result = await contract.execute(toolCallId, params as { path: string; content: string }, signal, onUpdate, context);
+      context.completedReads?.clear();
+      return result;
+    },
+  };
 }
 
 function createGlobTool(): AgentHarnessTool<CodingResourceContext> {
@@ -1128,13 +1382,34 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
     ...contract,
     async execute(toolCallId, params, signal, onUpdate, context) {
       const input = params as { path: string; offset?: number; limit?: number };
-      const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+      const completed = context.completedReads?.get(normalizeReadPath(input.path));
+      if (completed && (input.offset !== undefined || input.limit !== undefined)) {
+        const artifact = completed.artifactId ? `, artifact ${completed.artifactId}` : "";
+        const text = `[ProofBlade read complete: ${input.path} was already delivered in full (${completed.bytes} bytes${artifact}). Do not page through it again unless the file has changed; re-read from the beginning after a change.]`;
+        return {
+          content: [{ type: "text" as const, text }],
+          details: { complete: true, contentHash: completed.contentHash, artifactId: completed.artifactId, skippedDuplicateRange: true },
+          isError: false,
+        } as never;
+      }
+      // The model-facing read contract is intentionally simpler than the
+      // underlying bounded Pi read: an ordinary read follows continuation
+      // markers until the file is complete, so README-sized files do not
+      // consume several turns just to page through predictable output.
+      const result = await readCompleteFile(contract, toolCallId, input, signal, onUpdate, context);
       if (result.content.some((item) => item.type === "image")) {
-        return dedupeImageRead(input.path, result, context.imagesSeen);
+        return dedupeImageRead(input.path, result as never, context.imagesSeen);
       }
       const pipeline = context.outputRewrite;
       const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
-      if (!pipeline || !visible) return result;
+      const complete = isCompleteReadResult(result, visible);
+      const pathKey = normalizeReadPath(input.path);
+      const contentHash = sha256(visible);
+      if (!pipeline || !visible) {
+        if (complete && context.completedReads) context.completedReads.set(pathKey, { artifactId: "", contentHash, bytes: Buffer.byteLength(visible) });
+        return result;
+      }
+      const previousComplete = context.completedReads?.get(pathKey);
       const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
         filename: `read-${toolCallId}.txt`,
         mime: "text/plain",
@@ -1152,10 +1427,19 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
+      const repeatedComplete = previousComplete && previousComplete.contentHash === contentHash;
+      if (complete && context.completedReads) {
+        context.completedReads.set(pathKey, { artifactId: artifact.id, contentHash, bytes: Buffer.byteLength(visible) });
+      }
+      const readStatus = repeatedComplete
+        ? `[ProofBlade read complete: ${input.path} is unchanged from the previous complete read; do not page through it again.]`
+        : complete
+          ? `[ProofBlade read complete: ${input.path} was delivered in full (${Buffer.byteLength(visible)} bytes); no offset read is needed unless the file changes.]`
+          : undefined;
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
-        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
+        content: [...(repeatedComplete ? [{ type: "text" as const, text: readStatus! }] : observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(readStatus && !repeatedComplete ? [{ type: "text" as const, text: readStatus }] : []), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
+        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, complete, contentHash, ...observation },
       };
     },
   };
@@ -1204,6 +1488,44 @@ export function bashEscapeHatchViolation(command: string): string | undefined {
   return undefined;
 }
 
+function shellSourceScope(command: string, cwd: string): {
+  status: "workspace" | "outside_workspace";
+  authoritativeForTaskResult: boolean;
+  outsidePaths: string[];
+} {
+  const normalizedCwd = cwd.replaceAll("\\", "/").replace(/\/$/, "");
+  const roots = new Set([normalizedCwd, "/workspace"]);
+  const windowsRoot = /^([a-z]):\/(.*)$/i.exec(normalizedCwd);
+  if (windowsRoot) roots.add(`/mnt/${windowsRoot[1]!.toLowerCase()}/${windowsRoot[2]}`.replace(/\/$/, ""));
+  const candidates = [
+    ...[...command.matchAll(/(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)/g)].map((match) => match[1] ?? ""),
+    ...[...command.matchAll(/(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi)].map((match) => match[1] ?? ""),
+  ].map((value) => value.replace(/[,:]+$/, "")).filter((value) => value.length > 1 && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value));
+  const outsidePaths = [...new Set(candidates.filter((candidate) => {
+    if (candidate.startsWith("../")) return true;
+    const normalized = candidate.replaceAll("\\", "/").replace(/\/$/, "");
+    const fold = /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
+    return ![...roots].some((root) => {
+      const comparableRoot = /^[a-z]:\//i.test(root) ? root.toLowerCase() : root;
+      return fold === comparableRoot || fold.startsWith(`${comparableRoot}/`);
+    });
+  }))].slice(0, 8);
+  return outsidePaths.length > 0
+    ? { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths }
+    : { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] };
+}
+
+function renderShellSourceScope(scope: ReturnType<typeof shellSourceScope>): string | undefined {
+  if (scope.status === "workspace") return undefined;
+  return [
+    "[ProofBlade source scope]",
+    "status=outside-workspace",
+    "authoritative_for_task_result=false",
+    `paths=${scope.outsidePaths.join(",")}`,
+    "reason=This output includes host or runtime state outside the task workspace. Use it for diagnostics only; reproduce a final result from workspace inputs or the configured task verifier.",
+  ].join("\n");
+}
+
 function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   const contract = createBashTool<CodingResourceContext>();
   return {
@@ -1218,6 +1540,8 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
+      const sourceScope = shellSourceScope(input.command, context.env.cwd);
+      const sourceScopeNotice = renderShellSourceScope(sourceScope);
       const escapeHatchViolation = bashEscapeHatchViolation(input.command);
       if (escapeHatchViolation) throw new Error(escapeHatchViolation);
       const preflightHint = interactiveCommandHint(input.command, Boolean(context.pwnTools));
@@ -1242,27 +1566,48 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
         result = await executor.execute(toolCallId, { ...input, command: ticket.command }, signal, onUpdate, context);
       } catch (error) {
         const visible = error instanceof Error ? error.message : String(error);
+        const failure = shellFailureDetails(visible);
         const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "debug");
-        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", 1, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
+        const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash:error", failure.exitCode, `失败命令 · ${commandTitle(input.command)}`, "命令失败输出已自动归档；如它支持或反驳当前假设，再用 evidence record 提升为正式证据。", "debug", ["bash", "command-output", "debug"]);
         const anchor = artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)).map((part) => part.text);
-        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), true, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
+        const receipt = await artifactReceipt(context, toolCallId, `失败命令 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0), "error");
+        await context.experimentGate?.record({
+          runId: context.runtime.runId,
+          action: "bash",
+          input: { command: input.command, timeout: input.timeout },
+          outcome: failure.outcome,
+          summary: failure.summary,
+        }).catch(() => undefined);
         // A timeout on an interactive exploit is the #1 pwn stall: the command
         // blocked on recv and was killed at the ceiling. Instead of a bare
         // "timed out" that invites a full script rewrite, name the fix directly.
         const hint = interactiveTimeoutHint(visible, input.command, Boolean(context.pwnTools));
-        throw new Error([observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n"), { cause: error });
+        const feedback = [observation.repeatedArtifactId ? repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) : visible, ...(hint ? [hint] : []), ...(sourceScopeNotice ? [sourceScopeNotice] : []), ...anchor, ...(receipt ? [receipt] : []), observationNotice(observation)].filter(Boolean).join("\n\n");
+        return {
+          content: [{ type: "text", text: feedback }],
+          details: {
+            exitCode: failure.exitCode,
+            failureKind: failure.kind,
+            sourceScope,
+            outputRewrite,
+            ...observation,
+          },
+          isError: true,
+        };
       }
       const visible = result.content.map((item) => item.type === "text" ? item.text : "[image]").join("\n");
-      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, "intermediate");
-      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), "bash", 0, `命令输出 · ${commandTitle(input.command)}`, "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", "intermediate", ["bash", "command-output"]);
+      const outsideWorkspace = sourceScope.status === "outside_workspace";
+      const outputRewrite = await finalizeAndArchive(pipeline, ticket, visible, toolCallId, input.command, outsideWorkspace ? "debug" : "intermediate");
+      const observation = await observeCodingArtifact(context, String(outputRewrite.artifactId), String(outputRewrite.artifactHash ?? ""), outsideWorkspace ? "bash:outside-workspace" : "bash", 0, `${outsideWorkspace ? "外部环境" : "命令"}输出 · ${commandTitle(input.command)}`, outsideWorkspace ? "输出包含任务工作区之外的运行环境数据，仅可用于诊断，不能作为任务结果的权威来源。" : "命令输出已自动归档为 routine observation；只有推进假设的结论才需要 evidence record。", outsideWorkspace ? "debug" : "intermediate", ["bash", "command-output", ...(outsideWorkspace ? ["outside-workspace"] : [])]);
       const receipt = await artifactReceipt(context, toolCallId, `命令输出 · ${commandTitle(input.command)}`, visible, String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0) > 0, String(outputRewrite.artifactHash ?? ""), Number(outputRewrite.rawBytes ?? 0), Number(outputRewrite.savedBytes ?? 0));
       await context.experimentGate?.record({ runId: context.runtime.runId, action: "bash", input: { command: input.command, timeout: input.timeout }, outcome: "success", summary: "Foreground bash completed." });
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
+        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(sourceScopeNotice ? [{ type: "text" as const, text: sourceScopeNotice }] : []), ...artifactAnchor(String(outputRewrite.artifactId), Number(outputRewrite.savedBytes ?? 0)), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
         details: {
           ...(isRecord(result.details) ? result.details : result.details === undefined ? {} : { toolDetails: result.details }),
           outputRewrite,
+          sourceScope,
           ...observation,
         },
       };
@@ -1270,11 +1615,69 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   };
 }
 
-function isBoundedReadResult(result: { details?: unknown }): boolean {
-  return Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true);
+async function readCompleteFile(
+  contract: AgentHarnessTool<CodingResourceContext>,
+  toolCallId: string,
+  input: { path: string; offset?: number; limit?: number },
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<AgentHarnessTool<CodingResourceContext>["execute"]>[3],
+  context: CodingResourceContext,
+): Promise<Awaited<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]>>> {
+  const first = await contract.execute(toolCallId, input, signal, onUpdate, context);
+  if (input.offset !== undefined || input.limit !== undefined || first.content.some((item) => item.type === "image")) return first;
+  const pages: typeof first[] = [first];
+  let totalBytes = Buffer.byteLength(first.content.filter((item) => item.type === "text").map((item) => item.text).join("\n"));
+  let nextOffset = nextReadOffset(first.content);
+  while (nextOffset !== undefined) {
+    if (totalBytes >= MAX_COMPLETE_READ_BYTES) break;
+    const page = await contract.execute(`${toolCallId}:page:${nextOffset}`, { path: input.path, offset: nextOffset }, signal, onUpdate, context);
+    if (page.content.some((item) => item.type === "image")) break;
+    const pageText = page.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
+    const pageBytes = Buffer.byteLength(pageText);
+    if (totalBytes + pageBytes > MAX_COMPLETE_READ_BYTES) break;
+    pages.push(page);
+    totalBytes += pageBytes;
+    nextOffset = nextReadOffset(page.content);
+  }
+  if (pages.length === 1 && nextOffset === undefined) return first;
+  const text = pages.flatMap((page) => page.content.filter((item) => item.type === "text").map((item) => stripReadContinuation(item.text))).join("\n");
+  const capped = nextOffset !== undefined;
+  return {
+    ...pages.at(-1)!,
+    content: [{ type: "text" as const, text: capped ? `${text}\n\n[ProofBlade read capped at ${MAX_COMPLETE_READ_BYTES} bytes. Use offset=${nextOffset} to continue.]` : text }],
+    details: capped ? { truncation: { truncated: true, nextOffset }, implicitRead: true } : undefined,
+  } as typeof first;
 }
 
-async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0): Promise<string | undefined> {
+function nextReadOffset(content: Array<{ type?: string; text?: string }>): number | undefined {
+  const text = content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n");
+  const match = text.match(/Use offset=(\d+) to continue\.?\]/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+function stripReadContinuation(text: string): string {
+  return text.replace(/\n\n\[(?:Showing lines[^\]]+|\d+ more lines in file\.[^\]]+)\]/gi, "");
+}
+
+function isBoundedReadResult(result: { details?: unknown; content?: Array<{ type?: string; text?: string }> }): boolean {
+  if (Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true)) return true;
+  return Boolean(result.content?.some((item) => typeof item.text === "string" && /\[(?:Showing lines|\d+ more lines in file|Line \d+ is )/.test(item.text)));
+}
+
+function isCompleteReadResult(result: { details?: unknown }, visible: string): boolean {
+  if (Boolean(result.details && typeof result.details === "object" && ((result.details as { truncated?: unknown }).truncated === true || (result.details as { truncation?: { truncated?: unknown } }).truncation?.truncated === true))) return false;
+  return !/(?:\[(?:Showing lines|\d+ more lines in file|Line \d+ is )|\.\.\.\s*\[.*(?:omitted|truncated))/i.test(visible);
+}
+
+function normalizeReadPath(path: string): string {
+  return path.trim().replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0, state: "success" | "error" = "success"): Promise<string | undefined> {
+  // Complete successful output is already present in the tool result. Repeating
+  // it in a receipt preview only grows the conversation and destabilizes the
+  // longest cacheable history prefix.
+  if (!bounded && state === "success") return undefined;
   try {
     const runId = context.runtime?.runId ?? context.outputRewrite?.runId;
     if (!runId) return undefined;
@@ -1297,10 +1700,11 @@ async function artifactReceipt(context: CodingResourceContext, operationId: stri
       generation: context.runtime?.fixture?.generation ?? snapshot?.generation ?? 0,
       operationId,
       title,
+      state,
       content,
       artifact,
       summary: `${title} 已归档；完整内容请沿 Artifact URI 使用 evidence.read/Recall。`,
-      mode: bounded ? "receipt" : "full",
+      mode: bounded ? "receipt" : "path_only",
       ...(bounded ? { omittedChars: Math.max(omittedChars, artifactBytes - content.length) } : {}),
       maxInlineChars: 2_048,
       maxPreviewChars: 512,
@@ -1309,6 +1713,17 @@ async function artifactReceipt(context: CodingResourceContext, operationId: stri
   } catch {
     return undefined;
   }
+}
+
+function shellFailureDetails(message: string): { exitCode: number | null; kind: "exit" | "timeout" | "aborted" | "execution"; outcome: "failure" | "timeout"; summary: string } {
+  const exitMatch = /Command exited with code (-?\d+)/i.exec(message);
+  if (exitMatch) {
+    const exitCode = Number(exitMatch[1]);
+    return { exitCode: Number.isSafeInteger(exitCode) ? exitCode : 1, kind: "exit", outcome: "failure", summary: `Foreground bash exited with code ${exitMatch[1]}.` };
+  }
+  if (/timed out|timeout/i.test(message)) return { exitCode: null, kind: "timeout", outcome: "timeout", summary: "Foreground bash timed out." };
+  if (/aborted|cancelled/i.test(message)) return { exitCode: null, kind: "aborted", outcome: "failure", summary: "Foreground bash was aborted." };
+  return { exitCode: null, kind: "execution", outcome: "failure", summary: "Foreground bash failed before producing a successful exit status." };
 }
 
 interface AutomaticArtifactDetails {
@@ -1471,7 +1886,24 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
     if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);
-    return toolResult(context.skills.loadForModel(input.name, input.maxChars));
+    const loaded = context.skills.loadForModel(input.name, input.maxChars);
+    const requestedChars = input.maxChars ?? 12_000;
+    const contentHash = typeof loaded.contentHash === "string" ? loaded.contentHash : sha256(String(loaded.content ?? ""));
+    const previous = context.loadedSkillContent?.get(input.name);
+    if (previous?.contentHash === contentHash && previous.coverageChars >= requestedChars) {
+      return toolResult({
+        name: input.name,
+        contentHash,
+        alreadyLoaded: true,
+        message: "This exact Skill content is already present in the conversation. Reuse it instead of loading it again.",
+      });
+    }
+    const loadedSkills = context.loadedSkillContent ??= new Map();
+    loadedSkills.set(input.name, {
+      contentHash,
+      coverageChars: loaded.truncated === true ? requestedChars : Number.MAX_SAFE_INTEGER,
+    });
+    return toolResult(loaded);
   },
 };
 
@@ -1555,15 +1987,23 @@ const mcpCallTool: AgentHarnessTool<CodingResourceContext> = {
     const capabilityId = context.mcp.summaries().find((server) => server.name === input.server)?.capabilityId;
     if (!capabilityId) throw new Error(`Unknown MCP server: ${input.server}`);
     if (context.runtime && typeof context.runtime.invokeCapability === "function") {
-      const invocation = await context.runtime.invokeCapability({
-        capabilityId,
-        operation: "call",
-        input: { tool: input.tool, arguments: input.arguments },
-      }, signal);
-      return toolResult(invocation);
+      try {
+        const invocation = await context.runtime.invokeCapability({
+          capabilityId,
+          operation: "call",
+          input: { tool: input.tool, arguments: input.arguments },
+        }, signal);
+        return toolResult(invocation);
+      } catch (error) {
+        return mcpFailureResult(input.server, input.tool, error);
+      }
     }
-    const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
-    return mcpToolResult(result);
+    try {
+      const result = await context.mcp.execute(capabilityId, "call", { tool: input.tool, arguments: input.arguments }, signal);
+      return mcpToolResult(result, { server: input.server, tool: input.tool });
+    } catch (error) {
+      return mcpFailureResult(input.server, input.tool, error);
+    }
   },
 };
 
@@ -1684,13 +2124,70 @@ function scalarOrJson(value: unknown): string {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : JSON.stringify(value);
 }
 
-function mcpToolResult(result: RawEffectResult): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+function mcpToolResult(result: RawEffectResult, identity?: { server: string; tool: string }): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
   const visible = boundModelText(renderMcpPayload(result), Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
+  const failed = result.exitCode !== 0;
+  const feedback = failed && identity ? mcpFailureFeedback(identity.server, identity.tool, result.stderr || visible.text) : undefined;
+  const bounded = boundModelText(feedback ? `${visible.text}\n\n${renderMcpFailureFeedback(feedback)}` : visible.text, Number.MAX_SAFE_INTEGER, MODEL_TOOL_RESULT_MAX_TOKENS);
   return {
-    content: [{ type: "text", text: visible.text }],
-    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}) },
-    isError: result.exitCode !== 0,
+    content: [{ type: "text", text: bounded.text }],
+    details: { exitCode: result.exitCode, durationMs: result.durationMs, ...(result.externalId ? { externalId: result.externalId } : {}), ...(visible.truncated || bounded.truncated ? { truncated: true, maxTokens: MODEL_TOOL_RESULT_MAX_TOKENS } : {}), ...(feedback ? { failureFeedback: feedback } : {}) },
+    isError: failed,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+interface McpFailureFeedback {
+  status: "failed";
+  server: string;
+  tool: string;
+  reason: string;
+  retryable: boolean;
+  nextActions: string[];
+}
+
+function mcpFailureResult(server: string, tool: string, error: unknown): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
+  const feedback = mcpFailureFeedback(server, tool, error);
+  return {
+    content: [{ type: "text", text: renderMcpFailureFeedback(feedback) }],
+    details: { failureFeedback: feedback },
+    isError: true,
+  } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+function mcpFailureFeedback(server: string, tool: string, error: unknown): McpFailureFeedback {
+  const reason = boundedFailureReason(error);
+  const inputFailure = /(?:argument|input|schema|required|unsupported|invalid|unknown .*tool|tool .*not allowed)/i.test(reason)
+    || (/(?:missing|required)/i.test(reason) && !/(?:path|toolchain|executable|binary) .*missing/i.test(reason));
+  const unavailable = !inputFailure && /(?:permission|disabled|unavailable|missing toolchain|toolchain unavailable|path is missing|stale generation|connection refused|timed out)/i.test(reason);
+  const retryable = !unavailable;
+  const nextActions = inputFailure
+    ? [
+      "Read the exact MCP tool schema and correct the arguments; do not repeat the unchanged call.",
+      "If the operation is unavailable, use mcp_call operation=describe for the same server and tool before retrying.",
+    ]
+    : [
+      "Confirm the MCP server is enabled, reachable, and its declared toolchain is ready before retrying.",
+      "For binary or firmware analysis, fall back to bounded read/bash probes such as file, strings, readelf, or objdump and preserve their output as Evidence.",
+    ];
+  if (/idalib/i.test(server)) nextActions.push("If IDA/idalib remains unavailable, use the local static fallback; do not treat the MCP failure as evidence about the target.");
+  if (/jadx/i.test(server)) nextActions.push("If JADX remains unavailable, inspect the APK with bounded unzip/apktool/read probes and preserve the manifest or source artifact.");
+  return { status: "failed", server, tool, reason, retryable, nextActions };
+}
+
+function renderMcpFailureFeedback(feedback: McpFailureFeedback): string {
+  return [
+    "[ProofBlade MCP failure]",
+    `server=${feedback.server} tool=${feedback.tool}`,
+    `reason=${feedback.reason}`,
+    `retryable=${feedback.retryable}`,
+    `next=${feedback.nextActions.join(" | ")}`,
+  ].join("\n");
+}
+
+function boundedFailureReason(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const normalized = raw.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+  return normalized.length > 1_000 ? `${normalized.slice(0, 997)}...` : normalized || "MCP call failed without a diagnostic.";
 }
 
 function toolResult(details: unknown, isError = false, maxChars?: number): ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never {
@@ -1702,4 +2199,23 @@ function toolResult(details: unknown, isError = false, maxChars?: number): Retur
     details,
     isError,
   } as ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+}
+
+function verifierFailureFeedback(error: unknown): {
+  stage: "input" | "policy" | "execution" | "recovery";
+  reason: string;
+  retryable: boolean;
+  nextAction: string;
+} {
+  const reason = error instanceof Error ? error.message : String(error);
+  if (/embeds the (?:candidate|result) literal/i.test(reason)) {
+    return { stage: "input", reason, retryable: true, nextAction: "Derive the result from workspace inputs; do not place the literal result in the verification command." };
+  }
+  if (/exact immutable task-bound verification command/i.test(reason)) {
+    return { stage: "policy", reason, retryable: true, nextAction: "Use the command declared by the task verifier, or ask the user to update the task contract." };
+  }
+  if (/requires durable recovery|durable .* (?:missing|incomplete|no valid)/i.test(reason)) {
+    return { stage: "recovery", reason, retryable: false, nextAction: "Reconcile or resume the run before issuing another verification request; do not blindly rerun the command." };
+  }
+  return { stage: "execution", reason, retryable: true, nextAction: "Inspect the verifier output and supporting Evidence, then change the command or result before retrying." };
 }

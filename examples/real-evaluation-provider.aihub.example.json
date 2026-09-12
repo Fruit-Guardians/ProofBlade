@@ -10,7 +10,7 @@
   "modelProfiles": {
     "executor": {
       "provider": "aihub",
-      "api": "openai-completions",
+      "api": "openai-responses",
       "baseUrl": "https://aihub.top/v1",
       "model": "replace-with-aihub-model",
       "modelDiscoveryPath": "/models",

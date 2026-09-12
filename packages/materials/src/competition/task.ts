@@ -29,7 +29,7 @@ function targetKindForCategory(summary: CompetitionChallengeSummary): TargetKind
  * that the platform — not a local scorer — is the judge:
  *  - verification.kind = "platform_submission" (the dormant enum), so scoring is
  *    a single real API submission rather than local reproduction.
- *  - required_reproductions = 1, so a correct flag is never submitted twice
+ *  - required_reproductions = 1, so a correct result is never submitted twice
  *    (which would inflate the wrong-submission tiebreaker or hit "already solved").
  *  - external_network = true and the live connection host is in scope.
  */
@@ -40,30 +40,33 @@ export function competitionTask(
   root: string,
   config: ProofBladeConfig,
   attachments: readonly CompetitionAttachment[] = [],
+  /** Optional value supplied by the platform; it is exposed as a read-only task input. */
+  platformProvidedResult?: string,
 ): TaskContract {
   const workspace = join(root, config.storage.fixturesDir, runId);
   const objectiveParts = [summary.title, summary.description].filter((part): part is string => Boolean(part && part.trim()));
-  const objective = objectiveParts.join("\n\n") || `Solve competition challenge ${summary.challengeId}.`;
+  const objective = objectiveParts.join("\n\n") || `Analyze the configured security target ${summary.challengeId}.`;
   const connection = env.connectionInfo?.trim();
   const targets = parseCompetitionTargets(connection);
 
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: targetKindForCategory(summary),
     target: connection ? `REMOTE:${connection}` : `CHALLENGE:${summary.challengeId}`,
     objective,
-    inputs: competitionInputs(attachments, env.connectionInfo),
+    inputs: competitionInputs(attachments, env.connectionInfo, platformProvidedResult),
     success_criteria: [
-      "Submit a flag the platform accepts.",
-      "The submitted flag is anchored by a recorded observation or a platform-provided value.",
+      "Submit a result the external platform accepts.",
+      "The submitted result is anchored by a recorded observation or a platform-provided value.",
     ],
     verification: {
       kind: "platform_submission",
       required_reproductions: 1,
       ...(targetKindForCategory(summary) === "web" ? { web: { flag_pattern: "(?:DASCTF|flag)\\{[^{}\\r\\n]{1,256}\\}" } } : {}),
     },
+    external_submission: { targets: ["competition"] },
     scope: {
       allowed_hosts: targets.length > 0 ? targets.map((target) => target.host) : connection ? [] : [`CHALLENGE:${summary.challengeId}`],
       allowed_ports: [...new Set(targets.map((target) => target.port))],
@@ -90,13 +93,14 @@ export function competitionTask(
  * their contents in the control projection. The sandbox creates
  * `connection-info.txt` from the same value, so it is included as an input too.
  */
-function competitionInputs(attachments: readonly CompetitionAttachment[], connectionInfo?: string): TaskContract["inputs"] {
+function competitionInputs(attachments: readonly CompetitionAttachment[], connectionInfo?: string, platformProvidedResult?: string): TaskContract["inputs"] {
   const inputs = attachments.map((attachment) => ({
     path: attachment.name,
     sha256: sha256(Buffer.from(attachment.base64, "base64")),
     read_only: true,
   }));
   if (connectionInfo?.trim()) inputs.push({ path: "connection-info.txt", sha256: sha256(`${connectionInfo}\n`), read_only: true });
+  if (platformProvidedResult?.trim()) inputs.push({ path: "platform-provided-result.txt", sha256: sha256(`${platformProvidedResult.trim()}\n`), read_only: true });
   return inputs.sort((left, right) => left.path.localeCompare(right.path));
 }
 

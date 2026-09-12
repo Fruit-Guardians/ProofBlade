@@ -1,4 +1,5 @@
 import type { ArtifactAtom, EffectAtom, MessageAtom, ReplayPolicyAtom, SequencedEventAtom } from "@proofblade/atoms";
+import type { CognitiveSnapshot, GeneralTaskContract, SafetySnapshot } from "./general-task-contract.js";
 
 export type Lane = "main" | "planner" | "executor" | "verifier";
 
@@ -250,6 +251,8 @@ export interface RunToolPreparation {
   firstActionPlan?: FirstActionPlan;
   /** Added after schema 1 was introduced; old preparations remain replayable. */
   actionBundles?: ActionBundle[];
+  /** Bounded audit summary of MCP tools promoted into the Provider tool surface. */
+  firstClassMcpTools?: { exposed: number; omitted: number; truncated: boolean };
   hash: string;
 }
 
@@ -293,7 +296,9 @@ export interface WebReproductionContract {
 export interface TaskContract {
   schema_version: 1;
   task_id: string;
-  mode: "ctf_solve" | "vulnerability_discovery" | "coding_assistant";
+  /** Generic execution mode. The historical ctf_solve value is accepted only
+   * by read-only migration adapters, never by new task creation. */
+  mode: "vulnerability_discovery" | "coding_assistant";
   target_kind: TargetKind;
   target: string;
   objective: string;
@@ -307,6 +312,14 @@ export interface TaskContract {
     pwn?: PwnReproductionContract;
     /** Task-owned inputs for barrier-gated web reproduction. */
     web?: WebReproductionContract;
+  };
+  /**
+   * Logical external destinations the task is permitted to submit to. This is
+   * intentionally data-only: the host must still supply the trusted adapter
+   * that performs a submission for each declared target.
+   */
+  external_submission?: {
+    targets: string[];
   };
   scope: {
     allowed_hosts: string[];
@@ -706,6 +719,8 @@ export interface CompletionProposal {
   createdSeq: number;
   /** Stable request identity; random Completion IDs remain references only. */
   verificationKey?: string;
+  /** Logical external destination for submission completions. */
+  submissionTarget?: string;
 }
 
 export type VerificationRequestKind = "web" | "browser" | "pwn" | "claim";
@@ -914,17 +929,33 @@ export interface ArtifactRef extends ArtifactAtom {
     operation?: string;
     tags: string[];
   };
-  sensitivity: "public" | "secret" | "flag_candidate";
+  /**
+   * Controls whether model-facing projections may expose the Artifact body.
+   * `flag_candidate` is retained as a read-compatible legacy value for
+   * artifacts written by pre-security-agent releases.
+   */
+  sensitivity: ArtifactSensitivity;
   sourceEffectId?: string;
   truncated?: boolean;
   semantic?: ArtifactSemanticMetadata;
 }
 
+export type ArtifactSensitivity = "public" | "secret" | "result_candidate" | "flag_candidate";
+
+/** Verifier-owned effect operations that can produce a trusted verdict. */
+export type VerifierAttestationOperation =
+  | "fixture_score"
+  | "result_verification"
+  | "claim_reproduction"
+  | "pwn_reproduce"
+  | "web_reproduce"
+  | "browser_reproduce";
+
 export interface VerificationVerdict {
   schemaVersion: 1;
   valid: boolean;
   accepted: boolean;
-  operation: "fixture_score" | "claim_reproduction" | "pwn_reproduce" | "web_reproduce" | "browser_reproduce";
+  operation: VerifierAttestationOperation;
   runId: string;
   taskId: string;
   taskHash: string;
@@ -973,6 +1004,14 @@ export interface Lease {
 export interface RunSnapshot {
   runId: string;
   task: TaskContract;
+  /**
+   * Domain-neutral view of the task. This is materialized for newly-created
+   * Runs while the legacy `task` shape remains the replay compatibility anchor.
+   */
+  generalTask?: GeneralTaskContract;
+  /** Safety and cognitive policy are persisted independently of domain tags. */
+  safetySnapshot?: SafetySnapshot;
+  cognitiveSnapshot?: CognitiveSnapshot;
   taskHash: string;
   /** Hash of the in-memory control authority that created this Run. */
   authorityHash: string;

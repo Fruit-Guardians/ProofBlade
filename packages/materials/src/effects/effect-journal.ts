@@ -455,7 +455,7 @@ export class EffectJournal {
         const staged = await this.artifactStore.stageText(runId, input.recoveryInput.content, {
           filename: input.recoveryInput.filename,
           mime: input.recoveryInput.mime ?? "application/json",
-          sensitivity: input.recoveryInput.sensitivity ?? "flag_candidate",
+          sensitivity: input.recoveryInput.sensitivity ?? "result_candidate",
           semantic: { name: "Verifier recovery input", summary: `Durable verifier input sha256=${recoveryArtifactSha256}.`, tags: ["verification", "recovery-input"], role: "supporting", relatedIds: [], annotatedBy: "harness" },
         });
         await this.#verifierControl.registerInputArtifact(runId, { type: "artifact", generation: staged.generation, artifact: staged });
@@ -501,7 +501,7 @@ export class EffectJournal {
 
   private async readVerifierRecoveryInput(runId: string, effect: RunSnapshot["effects"][string]): Promise<RawEffectResult | undefined> {
     const hash = typeof effect.args.recoveryArtifactSha256 === "string" ? effect.args.recoveryArtifactSha256 : undefined;
-    if (!hash || !["claim_reproduction", "web_reproduce", "browser_reproduce", "pwn_reproduce"].includes(effect.operation)) return undefined;
+    if (!hash || !["result_verification", "claim_reproduction", "web_reproduce", "browser_reproduce", "pwn_reproduce"].includes(effect.operation)) return undefined;
     const snapshot = await this.controlStore.snapshot(runId);
     const artifacts = Object.values(snapshot.artifacts).filter((artifact) => artifact.origin.registeredBy === "verifier"
       && artifact.generation === snapshot.generation
@@ -583,7 +583,7 @@ export class EffectJournal {
       mime: "application/json",
       sourceEffectId: effectId,
       filename: `${operation}-${effectId}.json`,
-      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "flag_candidate" : "public"),
+      sensitivity: artifactSensitivity ?? (/(?:PB|FLAG)\{[^}\r\n]+\}/.test(`${result.stdout}\n${result.stderr}`) ? "result_candidate" : "public"),
     } satisfies Parameters<ArtifactStore["putText"]>[2];
     let artifact: ArtifactRef;
     if (trustedVerifier) {
@@ -630,7 +630,15 @@ export class EffectJournal {
       } catch {
         valid = false;
       }
-    } else if (operation === "claim_reproduction" && result.exitCode === 0) {
+    } else if ((operation === "result_verification" || operation === "claim_reproduction") && args.resultArtifactMode === "artifact" && result.exitCode === 0) {
+      try {
+        const parsed = JSON.parse(result.stdout) as { accepted?: unknown; resultHash?: unknown };
+        valid = typeof parsed.accepted === "boolean" && parsed.resultHash === completion.candidateHash;
+        accepted = valid && parsed.accepted === true;
+      } catch {
+        valid = false;
+      }
+    } else if ((operation === "result_verification" || operation === "claim_reproduction") && result.exitCode === 0) {
       const candidateArtifact = snapshot.artifacts[completion.artifactId];
       if (candidateArtifact) {
         try {

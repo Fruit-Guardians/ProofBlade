@@ -1,5 +1,5 @@
-import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { access, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import type { ProofBladeConfig } from "../config.js";
 import type { AgentLanePort, AgentOutcome } from "../runtime/pi-adapter.js";
 import { PiCodingLane } from "../runtime/coding-lane.js";
@@ -9,7 +9,7 @@ import type { ExecutionMode, PrimaryFailureCategory, RunSnapshot, TaskContract }
 import { id, isTerminal, remainingRunDeadlineMs } from "../domain/utils.js";
 import { ProofBladeToolRuntime } from "../tools/runtime.js";
 import { IndependentVerifier, type VerificationOutcome } from "../verification/verifier.js";
-import { CodingClaimVerifier } from "../verification/claim-verification.js";
+import { TaskResultVerifier } from "../verification/claim-verification.js";
 import { CheckpointService } from "../context/checkpoint.js";
 import { PlannerCoordinator } from "./planner.js";
 import { RefinerCoordinator } from "./refiner.js";
@@ -27,6 +27,8 @@ import { withSessionResourceAdapters, type SessionRuntimeHandoff } from "../reco
 
 export interface AgentLaneCreateInput {
   projectRoot: string;
+  /** Immutable task contract that declares the task-owned execution workspace. */
+  task: TaskContract;
   runId: string;
   runDir: string;
   /** The recovered fixture workspace shared by the loop and its lane. */
@@ -35,7 +37,7 @@ export interface AgentLaneCreateInput {
   /** Deliberately excludes verifier and fixture lifecycle capabilities. */
   services: Pick<AppServices, "control" | "artifacts" | "journal" | "sessionRuntimeBrokers" | "sessionRuntimeRequired" | "browserRuntimeRequired">;
   /** Safe claim service; the lane never receives verifier control directly. */
-  claimVerifier: CodingClaimVerifier;
+  claimVerifier: TaskResultVerifier;
   config: ProofBladeConfig;
   /** Optional application-owned browser verifier; never exposed to the model. */
   browserVerifierFactory?: BrowserVerifierFactory;
@@ -85,7 +87,7 @@ export interface SingleAgentRunOutcome {
   evidenceIds: string[];
 }
 
-export class SingleAgentCtfLoop {
+export class SingleAgentLoop {
   public constructor(
     private readonly root: string,
     private readonly config: ProofBladeConfig,
@@ -134,12 +136,10 @@ export class SingleAgentCtfLoop {
     const intentScheduler = new IntentScheduler(this.services.control, new LeaseManager(this.services.control), this.config.intentScheduler);
     const verifier = new IndependentVerifier(this.services.control, this.services.artifacts, this.services.verifierJournal, this.services.runsRoot, this.services.verifier);
     const coordinator = new RunCoordinator(this.services.control, this.services.verifier, { verifier });
-    // Keep the initial generic projection and the CTF projection in one
-    // transaction.  A direct `start_phase` here used to leave a fresh local
-    // Run at `domainPhase=INTAKE, phase=reconnaissance` until the first model
-    // turn, which made GUI/Fixture replay diverge from Competition replay.
-    if (snapshot.phase === "intake") await coordinator.setDomainPhase(options.runId, "RECON");
-    const claimVerifier = new CodingClaimVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
+    // A fresh Run remains at INTAKE until the task or verifier has a concrete
+    // reason to publish a domain phase. The loop must not infer a CTF-style
+    // reconnaissance route from the turn number.
+    const claimVerifier = new TaskResultVerifier(options.runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier);
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
     const refiner = new RefinerCoordinator(this.services.control);
@@ -157,11 +157,11 @@ export class SingleAgentCtfLoop {
       }
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
-    const acceptedAtStart = latestAcceptedClaim(await this.services.control.snapshot(options.runId), options.task);
+    const acceptedAtStart = latestAcceptedVerification(await this.services.control.snapshot(options.runId), options.task);
     if (acceptedAtStart) {
       const current = await this.services.control.snapshot(options.runId);
       const workItem = Object.values(current.workItems).find((item) => item.status === "RUNNING" && item.ownerLane === "executor");
-      const verified = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedAtStart.id, workItem?.id, options.signal);
+      const verified = await this.finalizeAcceptedVerification(options.runId, coordinator, intentScheduler, acceptedAtStart.id, workItem?.id, options.signal);
       return outcome(await this.services.control.snapshot(options.runId), mode, 0, verified);
     }
     const runtime = new ProofBladeToolRuntime(options.runId, fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
@@ -176,6 +176,7 @@ export class SingleAgentCtfLoop {
       throwIfAborted(options.signal);
       lane = await this.createLane({
         projectRoot: this.root,
+        task: snapshot.task,
         runId: options.runId,
         runDir,
         runtime,
@@ -214,12 +215,17 @@ export class SingleAgentCtfLoop {
       await options.onLaneReady?.(lane);
       while (turns < maxTurns) {
         throwIfAborted(options.signal);
-        const activeIntent = await this.claimIntent(options.runId, intentScheduler);
+        // Interactive callers already provide the user-facing turn prompt.
+        // Do not manufacture an exploration intent for that message: exposing
+        // scheduler status as a synthetic user instruction makes a greeting
+        // look like a task and can provoke an unnecessary tool call. Automatic
+        // task runs (which have no userPrompt) retain the durable intent path.
+        const interactivePrompt = Boolean(options.userPrompt?.trim());
+        const activeIntent = interactivePrompt ? undefined : await this.claimIntent(options.runId, intentScheduler);
         const before = await this.services.control.snapshot(options.runId);
         if (isTerminal(before.status) || before.status === "PAUSED") break;
-        await coordinator.setDomainPhase(options.runId, coordinator.domainPhaseForTurn(turns + 1));
         const turnContext = await this.services.control.snapshot(options.runId);
-        await planner.prepare(options.runId);
+        if (!interactivePrompt) await planner.prepare(options.runId);
         activeWorkItemId = (await coordinator.claim(options.runId, options.task, turns + 1, activeIntent)).id;
         throwIfAborted(options.signal);
         turns += 1;
@@ -238,6 +244,12 @@ export class SingleAgentCtfLoop {
         }
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
+          if (options.userPrompt?.trim()) {
+            await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery is available from the next chat turn", "context_overflow");
+            activeWorkItemId = undefined;
+            await this.services.control.dispatch(options.runId, { type: "pause", reason: "Context length recovery needs a fresh chat turn." });
+            break;
+          }
           if (failed.contextOverflowRecoveries >= 1) {
             await coordinator.fail(options.runId, activeWorkItemId, "context_overflow: recovery already used for this run.");
             await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });
@@ -256,9 +268,9 @@ export class SingleAgentCtfLoop {
         }
         const after = await this.services.control.snapshot(options.runId);
         if (after.status === "PAUSED") break;
-        const acceptedClaim = latestAcceptedClaim(after, options.task);
+        const acceptedClaim = latestAcceptedVerification(after, options.task);
         if (acceptedClaim) {
-          verification = await this.finalizeAcceptedClaim(options.runId, coordinator, intentScheduler, acceptedClaim.id, activeWorkItemId, options.signal);
+          verification = await this.finalizeAcceptedVerification(options.runId, coordinator, intentScheduler, acceptedClaim.id, activeWorkItemId, options.signal);
           activeWorkItemId = undefined;
           break;
         }
@@ -285,11 +297,19 @@ export class SingleAgentCtfLoop {
           continue;
         }
         const evidenceIds = newIds(before.evidence, after.evidence);
-        const progressed = newIds(before.observations, after.observations).length > 0
+        const progressed = (options.task.mode === "coding_assistant" && agentOutcome.text.trim().length > 0)
+          || newIds(before.observations, after.observations).length > 0
           || evidenceIds.length > 0
           || newIds(before.facts, after.facts).length > 0
           || newIds(before.hypotheses, after.hypotheses).length > 0;
-        await this.settleIntentAfterTurn(options.runId, intentScheduler, activeIntent, before, after);
+        await this.settleIntentAfterTurn(
+          options.runId,
+          intentScheduler,
+          activeIntent,
+          before,
+          after,
+          options.task.mode === "coding_assistant" && agentOutcome.text.trim().length > 0,
+        );
         await coordinator.settle(options.runId, activeWorkItemId, progressed, evidenceIds, []);
         activeWorkItemId = undefined;
         if (mode() === "assist") {
@@ -406,7 +426,7 @@ export class SingleAgentCtfLoop {
       `Fact: ${verified.factId ?? "none"}`,
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
     ].join("\n");
-    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "result_candidate" });
     const current = await this.services.control.snapshot(runId);
     for (const intent of this.claimedSchedulerIntents(current)) {
       await scheduler.completeIntent(runId, intent.id, {
@@ -421,12 +441,12 @@ export class SingleAgentCtfLoop {
   }
 
   /**
-   * A task-owned reproduction is already verified by CodingClaimVerifier's
+   * A task-owned reproduction is already verified by TaskResultVerifier's
    * verifier journal before the loop observes the turn. Do not send it through
    * the hidden-scorer verifier (which would be a different authority); finish
    * the same durable report/submit edge from the accepted Completion instead.
    */
-  private async finalizeAcceptedClaim(
+  private async finalizeAcceptedVerification(
     runId: string,
     coordinator: RunCoordinator,
     scheduler: IntentScheduler,
@@ -437,12 +457,12 @@ export class SingleAgentCtfLoop {
     throwIfAborted(signal);
     const snapshot = await this.services.control.snapshot(runId);
     const completion = snapshot.completions[completionId];
-    if (!completion || completion.status !== "ACCEPTED") throw new Error(`Task-owned completion is not accepted: ${completionId}`);
+    if (!completion || completion.status !== "ACCEPTED") throw new Error(`Task verification completion is not accepted: ${completionId}`);
     const artifact = snapshot.artifacts[completion.artifactId];
-    if (!artifact) throw new Error(`Task-owned completion candidate artifact is missing: ${completion.artifactId}`);
+    if (!artifact) throw new Error(`Task verification result artifact is missing: ${completion.artifactId}`);
     const candidate = (await this.services.artifacts.readText(runId, artifact)).trim();
     const evidenceIds = [...completion.evidenceIds];
-    if (evidenceIds.length === 0) throw new Error(`Task-owned completion has no reproduction Evidence: ${completionId}`);
+    if (evidenceIds.length === 0) throw new Error(`Task verification completion has no Evidence: ${completionId}`);
     if (snapshot.domainPhase !== "REPORT" && snapshot.domainPhase !== "SUBMIT") {
       await coordinator.setDomainPhase(runId, "REPRODUCE");
       await coordinator.moveToPhase(runId, "verification");
@@ -460,9 +480,9 @@ export class SingleAgentCtfLoop {
       `Evidence: ${evidenceIds.join(", ")}`,
       `Fact: ${fact?.id ?? "none"}`,
       `Fixture generation: ${(await this.services.control.snapshot(runId)).generation}`,
-      "Verification authority: task-owned reproduction command.",
+      "Verification authority: task-owned deterministic verifier.",
     ].join("\n");
-    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "flag_candidate" });
+    await this.services.artifacts.putText(runId, report, { filename: "report.md", mime: "text/markdown", sensitivity: "result_candidate" });
     const current = await this.services.control.snapshot(runId);
     for (const intent of this.claimedSchedulerIntents(current)) {
       await scheduler.completeIntent(runId, intent.id, {
@@ -472,7 +492,7 @@ export class SingleAgentCtfLoop {
       });
     }
     throwIfAborted(signal);
-    await coordinator.finishAccepted(runId, workItemId, completion.id, "Task-owned reproduction command accepted the candidate.");
+    await coordinator.finishAccepted(runId, workItemId, completion.id, "Task-owned deterministic verifier accepted the result.");
     return { completionId: completion.id, accepted: true, candidate, candidateHash: completion.candidateHash, evidenceIds, ...(fact ? { factId: fact.id } : {}) };
   }
 
@@ -488,9 +508,17 @@ export class SingleAgentCtfLoop {
     return await scheduler.schedule(buildSchedulingContext(snapshot)) ?? undefined;
   }
 
-  private async settleIntentAfterTurn(runId: string, scheduler: IntentScheduler, intent: SchedulerIntent | undefined, before: RunSnapshot, after: RunSnapshot): Promise<void> {
+  private async settleIntentAfterTurn(
+    runId: string,
+    scheduler: IntentScheduler,
+    intent: SchedulerIntent | undefined,
+    before: RunSnapshot,
+    after: RunSnapshot,
+    textProgress = false,
+  ): Promise<void> {
     if (!intent) return;
-    const progressed = newIds(before.observations, after.observations).length > 0
+    const progressed = textProgress
+      || newIds(before.observations, after.observations).length > 0
       || newIds(before.evidence, after.evidence).length > 0
       || newIds(before.facts, after.facts).length > 0
       || newIds(before.hypotheses, after.hypotheses).length > 0;
@@ -531,7 +559,7 @@ function isContextOverflow(stopReason: string, errorMessage?: string): boolean {
 async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLanePort> {
   const fixture = input.fixture;
   return await PiCodingLane.create({
-    projectRoot: fixture.path,
+    projectRoot: await taskExecutionWorkspace(input.task, fixture.path),
     installRoot: input.projectRoot,
     runId: input.runId,
     runDir: input.runDir,
@@ -554,34 +582,51 @@ async function defaultLaneFactory(input: AgentLaneCreateInput): Promise<AgentLan
   });
 }
 
+/**
+ * The task contract owns the normal coding cwd. Fixture storage is only a
+ * recovery fallback for old or remote tasks whose declared workspace cannot be
+ * mounted locally. This keeps generic CLI tasks from silently editing runs/.
+ */
+export async function taskExecutionWorkspace(task: { scope: Pick<TaskContract["scope"], "allowed_workspace"> }, fixturePath: string): Promise<string> {
+  const workspace = task.scope.allowed_workspace.trim();
+  if (!workspace) return fixturePath;
+  const candidate = resolve(workspace);
+  try {
+    if ((await stat(candidate)).isDirectory()) return candidate;
+  } catch {
+    // The fixture is the established recovery workspace when the declared
+    // location is unavailable in the current execution environment.
+  }
+  return fixturePath;
+}
+
 function latestPending(snapshot: RunSnapshot) {
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
-function latestAcceptedClaim(snapshot: RunSnapshot, task: TaskContract) {
+function latestAcceptedVerification(snapshot: RunSnapshot, task: TaskContract) {
   if (task.verification.kind !== "reproduction") return undefined;
   return Object.values(snapshot.completions)
-    .filter((item) => item.status === "ACCEPTED" && item.purpose === "claim_reproduction" && item.generation === snapshot.generation)
+    .filter((item) => item.status === "ACCEPTED"
+      && (item.purpose === "claim_reproduction" || item.purpose === "harness_verification")
+      && item.generation === snapshot.generation)
     .sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
+  const interactivePrompt = userPrompt?.trim();
+  if (interactivePrompt) return interactivePrompt;
   const remainingDeadline = remainingRunDeadlineMs(snapshot.startedAt, snapshot.task.constraints.deadline_ms);
-  const bundle = snapshot.toolPreparation?.actionBundles?.find((item) => item.domainPhase === snapshot.domainPhase);
   return [
     `Solve run ${snapshot.runId}. This is executor turn ${turn}.`,
-    `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. Treat this phase as a bounded step, not an invitation to restart the whole analysis.`,
-    ...(bundle ? [`Current action bundle ${bundle.id}: ${bundle.objective} Tools: ${bundle.toolNames.join(", ")}. Preconditions: ${bundle.preconditions.join("; ")}. Success: ${bundle.successCriteria.join("; ")}. Failure: ${bundle.failureCriteria.join("; ")}. Max calls: ${bundle.maxCalls}.`] : []),
-    `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Prioritize one concrete observation, evidence item, or verifier-ready candidate before broadening the search.`,
-    `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}. Every call must produce a new fact, evidence item, or candidate check.`,
+    `Durable phase: ${snapshot.domainPhase}; generic phase: ${snapshot.phase}. This is status context, not a required route.`,
+    `Remaining deadline: ${Math.ceil(remainingDeadline / 1000)} seconds. Choose the next bounded action that best serves the task objective.`,
+    `Remaining effect budget: ${Math.max(0, snapshot.task.constraints.max_tool_calls - Object.keys(snapshot.effects).length)} of ${snapshot.task.constraints.max_tool_calls}.`,
     ...(intent ? [`Current Intent ${intent.id}: ${intent.objective}`, `Suggested tools: ${intent.suggestedTools.join(", ") || "none"}.`] : []),
-    ...(userPrompt?.trim() ? ["User's latest challenge instruction:", userPrompt.trim()] : []),
-    `Task inputs (read-only, relative to the current challenge workspace): ${snapshot.task.inputs.map((input) => input.path).join(", ") || "none listed; inspect the workspace manifest only"}.`,
-    "Do not search the ProofBlade install root, skills library, runs/, or parent directories for challenge answers; those are framework resources, not target data.",
-    "Inspect every visible target file with read or a bounded bash command; do not guess from the task description.",
-    "Preserve useful Artifact/Evidence ids and use them to support your reasoning.",
-    "When a candidate is ready, call verify_claim with the exact candidate and a deterministic command that derives it from workspace inputs without embedding the candidate literal.",
-    "Do not stop at a prose answer; the verify_claim tool is required.",
+    `Task inputs (read-only, relative to the current workspace): ${snapshot.task.inputs.map((input) => input.path).join(", ") || "none listed; inspect the workspace manifest only"}.`,
+    "Stay within the task workspace and use the enabled tools according to their stated safety boundaries.",
+    "Inspect relevant inputs before making claims; preserve useful Artifact/Evidence ids and use them to support your reasoning.",
+    "When the task has a verifier, use the available verification capability before marking a result as verified; otherwise report uncertainty clearly.",
   ].join("\n");
 }
 

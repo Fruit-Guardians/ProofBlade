@@ -22,11 +22,16 @@ test("formats coding tool instructions and returned text for direct inspection",
   assert.equal(mcp.output, "等待返回");
 
   const verification = toolPresentation("verify_claim", { candidate: "flag{derived}", command: "node solve.mjs" }, { details: { verified: true, evidenceId: "EV-1" } });
-  assert.equal(verification.summary, "复现最终结论");
-  assert.equal(verification.inputLabel, "复现指令");
+  assert.equal(verification.summary, "验证最终结果");
+  assert.equal(verification.inputLabel, "验证指令");
   assert.match(verification.input, /node solve\.mjs/);
   assert.match(verification.input, /flag\{derived\}/);
   assert.equal(verification.outputLabel, "验证记录");
+
+  const genericVerification = toolPresentation("verify_result", { result: "build passed", command: "npm test" }, { details: { verified: true } });
+  assert.equal(genericVerification.summary, "验证最终结果");
+  assert.match(genericVerification.input, /build passed/);
+  assert.equal(genericVerification.outputLabel, "验证记录");
 
   const evidence = toolPresentation("evidence", {
     operation: "record",

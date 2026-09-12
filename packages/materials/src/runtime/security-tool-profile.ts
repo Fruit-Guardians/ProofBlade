@@ -3,26 +3,26 @@ import { join } from "node:path";
 import { atomicWriteFile, withFileLock } from "@proofblade/atoms";
 import type { McpProjectRegistry, McpServerSummary, McpToolchainState } from "../mcp/registry.js";
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { ActionBundle, FirstActionPlan, RunSnapshot, RunToolPreparation, TargetKind, ToolPreparationRuntime } from "../domain/types.js";
+import type { ActionBundle, FirstActionPlan, RunSnapshot, RunToolPreparation, TargetKind, TaskContract, ToolPreparationRuntime } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ProofBladeToolCatalogRegistry } from "../tools/catalog.js";
 import type { ToolCatalogBootstrapSpec } from "../tools/catalog.js";
 
-/** The stable challenge directions known to the solver. */
-export type ChallengeCategory = "reverse" | "pwn" | "web" | "crypto" | "forensics" | "misc" | "malware" | "osint" | "mobile";
+/** Stable information-security domains with optional tool preparation. */
+export type SecurityDomain = "reverse" | "pwn" | "web" | "crypto" | "forensics" | "misc" | "malware" | "osint" | "mobile";
 
 /**
- * A prepared, bounded capability set for one challenge direction.
+ * A prepared, bounded capability set for one information-security domain.
  *
  * `hostToolIds` describes tools that should already be installed and health
  * checked on the operator machine. It is intentionally separate from the
  * tools exposed to Pi: prepared does not mean every tool is sent to the model.
  */
-export interface ChallengeToolProfile {
-  id: ChallengeCategory;
+export interface SecurityToolProfile {
+  id: SecurityDomain;
   targetKind: Exclude<TargetKind, "unknown" | "mixed">;
   /**
-   * The bounded action the first solver turn must perform for this direction.
+   * The bounded action suggested for the first security-task turn.
    * This is deliberately a contract, not a tool list: it turns preflight's
    * classification into useful progress without asking the model to rediscover
    * the direction or launch an unbounded experiment.
@@ -39,15 +39,15 @@ export interface ChallengeToolProfile {
   actionBundles: ActionBundle[];
 }
 
-export interface ChallengeClassification {
-  profile: ChallengeToolProfile;
+export interface SecurityTaskClassification {
+  profile: SecurityToolProfile;
   confidence: "high" | "medium";
   reasons: string[];
 }
 
 const COMMON_HOST_TOOLS = ["python311", "python", "jq", "xxd"];
 
-const FIRST_ACTION_PLANS: Record<ChallengeCategory, FirstActionPlan> = {
+const FIRST_ACTION_PLANS: Record<SecurityDomain, FirstActionPlan> = {
   reverse: { id: "reverse-recon", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
   mobile: { id: "mobile-manifest", allowedToolNames: ["read", "bash", "capability", "mcp_call", "mcp__*"], maxCalls: 3 },
   pwn: { id: "pwn-binary-or-tube", allowedToolNames: ["read", "bash", "capability", "pwn_open", "pwn_recv"], maxCalls: 2 },
@@ -67,7 +67,7 @@ function genericActionBundles(toolNames: string[], capabilityIds: string[]): Act
       objective: "Establish the input format, execution boundary, and one reliable observation.",
       toolNames: [...toolNames],
       capabilityIds: [...capabilityIds],
-      preconditions: ["The challenge workspace and task inputs are available."],
+      preconditions: ["The security-task workspace and task inputs are available."],
       successCriteria: ["A bounded observation identifies the target format or surface."],
       failureCriteria: ["The tool is missing, times out, or returns an untrusted/no-signal observation."],
       maxCalls: 3,
@@ -109,7 +109,7 @@ function genericActionBundles(toolNames: string[], capabilityIds: string[]): Act
       id: "clean-reproduce",
       domainPhase: "REPRODUCE",
       objective: "Re-run the candidate path from clean state and bind the result to verifier-owned evidence.",
-      toolNames: ["verify_claim", "read", "bash"],
+      toolNames: ["verify_result", "read", "bash"],
       capabilityIds: ["verifier.reproduce"],
       preconditions: ["A candidate is derived from current-generation evidence."],
       successCriteria: ["A clean reproduction produces verifier-accepted evidence."],
@@ -119,7 +119,7 @@ function genericActionBundles(toolNames: string[], capabilityIds: string[]): Act
   ];
 }
 
-const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
+const ACTION_BUNDLES: Record<SecurityDomain, ActionBundle[]> = {
   pwn: [
     {
       id: "pwn-recon",
@@ -169,7 +169,7 @@ const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
       id: "pwn-reproduce",
       domainPhase: "REPRODUCE",
       objective: "Use a fresh tube and verifier barriers to confirm shell control and extract the candidate.",
-      toolNames: ["pwn_reproduce", "verify_claim", "read"],
+      toolNames: ["pwn_reproduce", "verify_result", "read"],
       capabilityIds: ["pwn.reproduce", "verifier.reproduce"],
       preconditions: ["A current-generation exploit path and task-owned pwn verifier contract exist."],
       successCriteria: ["Fresh-session shell marker and flag extraction both pass."],
@@ -226,7 +226,7 @@ const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
       id: "web-reproduce",
       domainPhase: "REPRODUCE",
       objective: "Replay the complete exploit chain in a clean HTTP session and bind the extracted candidate to evidence.",
-      toolNames: ["web_reproduce", "verify_claim", "read"],
+      toolNames: ["web_reproduce", "verify_result", "read"],
       capabilityIds: ["web.reproduce", "verifier.reproduce"],
       preconditions: ["A complete chain and immutable web flag policy exist."],
       successCriteria: ["Every chain assertion passes in a clean session and the candidate is extracted from its response."],
@@ -243,7 +243,7 @@ const ACTION_BUNDLES: Record<ChallengeCategory, ActionBundle[]> = {
   misc: genericActionBundles(["read", "bash", "capability", "mcp_call", "mcp__*"], ["misc.solver"]),
 };
 
-const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id" | "actionBundles">> = {
+const PROFILE_DATA: Record<SecurityDomain, Omit<SecurityToolProfile, "id" | "actionBundles">> = {
   reverse: {
     targetKind: "reverse",
     firstAction: "Identify the artifact once with file/headers/strings and one targeted entrypoint or decompiler probe; persist format, architecture, and mitigations before following xrefs.",
@@ -355,14 +355,14 @@ const PROFILE_DATA: Record<ChallengeCategory, Omit<ChallengeToolProfile, "id" | 
 };
 
 /** Return a fresh immutable-by-convention profile object for a category. */
-export function challengeToolProfile(category: ChallengeCategory): ChallengeToolProfile {
+export function securityToolProfile(category: SecurityDomain): SecurityToolProfile {
   const data = PROFILE_DATA[category];
   return { id: category, ...data, firstActionPlan: copyFirstActionPlan(data.firstActionPlan), skillNames: [...data.skillNames], hostToolIds: [...data.hostToolIds], requiredToolIds: [...data.requiredToolIds], optionalToolIds: [...data.optionalToolIds], mcpServers: [...data.mcpServers], capabilities: [...data.capabilities], fallbackStrategies: [...data.fallbackStrategies], actionBundles: copyActionBundles(ACTION_BUNDLES[category]) };
 }
 
 /** Return every built-in profile in deterministic order for one-time setup/doctor commands. */
-export function challengeToolProfiles(): ChallengeToolProfile[] {
-  return (Object.keys(PROFILE_DATA) as ChallengeCategory[]).sort().map((category) => challengeToolProfile(category));
+export function securityToolProfiles(): SecurityToolProfile[] {
+  return (Object.keys(PROFILE_DATA) as SecurityDomain[]).sort().map((category) => securityToolProfile(category));
 }
 
 const TOOL_BOOTSTRAP_DEFINITIONS: Record<string, Omit<ToolCatalogBootstrapSpec, "id" | "profiles">> = {
@@ -412,8 +412,8 @@ const TOOL_BOOTSTRAP_DEFINITIONS: Record<string, Omit<ToolCatalogBootstrapSpec, 
 };
 
 /** Build the reviewed executable aliases used by `proofblade tools init`. */
-export function challengeToolCatalogSpecs(): ToolCatalogBootstrapSpec[] {
-  const profiles = challengeToolProfiles();
+export function securityToolCatalogSpecs(): ToolCatalogBootstrapSpec[] {
+  const profiles = securityToolProfiles();
   const profileIds = new Map<string, string[]>();
   for (const profile of profiles) {
     for (const id of profile.hostToolIds) profileIds.set(id, [...(profileIds.get(id) ?? []), profile.id]);
@@ -424,40 +424,49 @@ export function challengeToolCatalogSpecs(): ToolCatalogBootstrapSpec[] {
 }
 
 /** Map a durable task target kind to the default prepared profile. */
-export function profileForTargetKind(targetKind: TargetKind, target = ""): ChallengeToolProfile | undefined {
-  if (targetKind === "reverse") return classifyChallengePrompt(target)?.profile ?? challengeToolProfile("reverse");
-  if (targetKind === "pwn" || targetKind === "web" || targetKind === "crypto") return challengeToolProfile(targetKind);
-  if (targetKind === "misc") {
-    // Platforms often collapse forensics, malware, OSINT and misc into one
-    // bucket. Keep the durable TargetKind compatible with that wire value, but
-    // still select the specialized prepared tool profile when the target text
-    // carries a stronger direction marker.
-    return classifyChallengePrompt(`CTF ${target}`)?.profile ?? challengeToolProfile("misc");
-  }
-  // GUI/chat tasks can legitimately arrive with an unknown or mixed wire kind.
-  // Do the same deterministic text classification before the first Pi turn so
-  // they receive a bounded profile instead of falling through to an unprepared
-  // generic tool set. Ordinary non-challenge conversations still return none.
-  if (targetKind === "mixed") return classifyChallengePrompt(`CTF ${target}`)?.profile;
-  if (targetKind === "unknown") return classifyChallengePrompt(target)?.profile;
+export function profileForTargetKind(targetKind: TargetKind, _target = ""): SecurityToolProfile | undefined {
+  // Capability preparation is selected by the durable task contract only. Do
+  // not inspect target/objective text here: words such as "flag" or
+  // Security-task vocabulary is ordinary project text and must never reroute a run.
+  if (targetKind === "reverse") return securityToolProfile("reverse");
+  if (targetKind === "pwn" || targetKind === "web" || targetKind === "crypto") return securityToolProfile(targetKind);
+  if (targetKind === "misc") return securityToolProfile("misc");
+  // Unknown and mixed tasks keep the generic capability surface. Callers that
+  // explicitly ask for a domain classifier may still use classifySecurityTask.
   return undefined;
 }
 
+/**
+ * Resolve the optional security profile for a task before a lane is created.
+ *
+ * An explicit caller-provided profile wins. Otherwise only a durable,
+ * non-generic target kind selects a profile; task prose is deliberately not
+ * inspected here. This keeps security tooling available for explicitly
+ * labelled Web/Pwn/Reverse/etc. work while ordinary conversations remain on
+ * the generic capability surface.
+ */
+export function securityProfileForTask(
+  task: Pick<TaskContract, "target_kind">,
+  explicitProfile?: SecurityToolProfile,
+): SecurityToolProfile | undefined {
+  return explicitProfile ?? profileForTargetKind(task.target_kind);
+}
+
 /** Return the phase-scoped action contract selected by a prepared profile. */
-export function actionBundleForPhase(profile: ChallengeToolProfile, domainPhase: string): ActionBundle | undefined {
+export function actionBundleForPhase(profile: SecurityToolProfile, domainPhase: string): ActionBundle | undefined {
   return profile.actionBundles.find((bundle) => bundle.domainPhase === domainPhase);
 }
 
 /**
- * Conservative prompt/workspace classifier used before a GUI lane is created.
- * Ordinary coding requests return undefined; challenge-shaped requests receive
- * one deterministic profile and a small confidence explanation.
+ * Explicit opt-in prompt/workspace classifier for legacy integrations. The
+ * runtime does not call this function while creating a lane; target text never
+ * changes a task's default capability route.
  */
-export function classifyChallengePrompt(text: string, workspaceHint = ""): ChallengeClassification | undefined {
+export function classifySecurityTask(text: string, workspaceHint = ""): SecurityTaskClassification | undefined {
   const haystack = `${text}\n${workspaceHint}`.toLowerCase();
-  const challengeSignal = /\b(?:ctf|challenge|flag|pyjail|pwn|nc|netcat|apk|dex|aab|elf|upx|shellcode|remote service)\b|flag\s*\{/i.test(haystack) || /题目|附件|靶机|求解|解题|夺旗|逆向题|漏洞题|二进制题/i.test(haystack);
-  if (!challengeSignal) return undefined;
-  const rules: Array<{ category: ChallengeCategory; confidence: "high" | "medium"; markers: RegExp; reason: string }> = [
+  const securitySignal = /\b(?:ctf|challenge|flag|pyjail|pwn|nc|netcat|apk|dex|aab|elf|upx|shellcode|remote service)\b|flag\s*\{/i.test(haystack) || /题目|附件|靶机|求解|解题|夺旗|逆向题|漏洞题|二进制题/i.test(haystack);
+  if (!securitySignal) return undefined;
+  const rules: Array<{ category: SecurityDomain; confidence: "high" | "medium"; markers: RegExp; reason: string }> = [
     { category: "mobile", confidence: "high", markers: /\b(?:android|apk|dex|aab|jadx|adb|manifest|smali)\b/i, reason: "Android/mobile artifact marker" },
     { category: "pwn", confidence: "high", markers: /\b(?:pwn|pwntools|buffer overflow|format string|ret2|rop|heap|libc|nc\s+|netcat|栈溢出|堆利用|远程服务)\b/i, reason: "native exploitation or service marker" },
     { category: "web", confidence: "high", markers: /\b(?:web|http|https|xss|sqli|sql injection|ssti|ssrf|csrf|jwt|cookie|浏览器|网页)\b/i, reason: "HTTP/web vulnerability marker" },
@@ -466,10 +475,10 @@ export function classifyChallengePrompt(text: string, workspaceHint = ""): Chall
     { category: "forensics", confidence: "high", markers: /\b(?:forensics?|pcap|memory dump|volatility|binwalk|exiftool|取证|流量分析|磁盘镜像)\b/i, reason: "forensics marker" },
     { category: "osint", confidence: "medium", markers: /\b(?:osint|open source intelligence|geolocation|dns|wayback|社工|公开信息)\b/i, reason: "OSINT marker" },
     { category: "reverse", confidence: "high", markers: /\b(?:reverse(?:[- ]engineering)?|reversing|binary|elf|pe file|ida|ghidra|upx|packed|shellcode|native|逆向|二进制|脱壳|反调试)\b/i, reason: "native reverse-engineering marker" },
-    { category: "misc", confidence: "medium", markers: /(?:\b(?:ctf|challenge|pyjail)\b|flag\s*\{|题目描述|求解\s*flag|解题|夺旗|杂项|编码题)/i, reason: "generic challenge marker" },
+    { category: "misc", confidence: "medium", markers: /(?:\b(?:ctf|challenge|pyjail)\b|flag\s*\{|题目描述|求解\s*flag|解题|夺旗|杂项|编码题)/i, reason: "generic security-task marker" },
   ];
   const match = rules.find((rule) => rule.markers.test(haystack));
-  return match ? { profile: challengeToolProfile(match.category), confidence: match.confidence, reasons: [match.reason] } : undefined;
+  return match ? { profile: securityToolProfile(match.category), confidence: match.confidence, reasons: [match.reason] } : undefined;
 }
 
 export interface ToolHealthRecord {
@@ -485,8 +494,8 @@ export interface McpHealthRecord {
   toolchainState?: McpToolchainState;
 }
 
-export interface ChallengeToolPreflight {
-  profileId: ChallengeCategory;
+export interface SecurityToolPreflight {
+  profileId: SecurityDomain;
   targetKind: Exclude<TargetKind, "unknown" | "mixed">;
   runtime: ToolPreparationRuntime;
   runtimeKey: string;
@@ -507,8 +516,8 @@ export interface ChallengeToolPreflight {
 interface PersistedPreflight {
   schemaVersion: 1;
   cacheKey: string;
-  profileId: ChallengeCategory;
-  targetKind: ChallengeToolPreflight["targetKind"];
+  profileId: SecurityDomain;
+  targetKind: SecurityToolPreflight["targetKind"];
   runtime?: ToolPreparationRuntime;
   runtimeKey?: string;
   tools: ToolHealthRecord[];
@@ -530,13 +539,13 @@ interface PersistedPreflightCache {
 
 /**
  * Performs one bounded local readiness check and persists the result by catalog
- * and MCP config hash. A later challenge reuses the result instead of asking
+ * and MCP config hash. A later security task reuses the result instead of asking
  * the model to rediscover or request the same tools again.
  */
 export class ToolPreflightService {
   public constructor(private readonly cacheRoot?: string, private readonly options: { maxAgeMs?: number; force?: boolean } = {}) {}
 
-  public async prepare(profile: ChallengeToolProfile, catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight> {
+  public async prepare(profile: SecurityToolProfile, catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<SecurityToolPreflight> {
     const selected = catalog.selectForProfile(profile.id, profile.hostToolIds);
     const cacheKey = sha256(canonicalJson({
       profile: {
@@ -577,12 +586,12 @@ export class ToolPreflightService {
    * trusting the host machine.
    */
   public async prepareInExecution(
-    profile: ChallengeToolProfile,
+    profile: SecurityToolProfile,
     env: ExecutionEnv,
     mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">,
     options: { runtimeKey: string; force?: boolean } = { runtimeKey: "container" },
-  ): Promise<ChallengeToolPreflight> {
-    const specs = challengeToolCatalogSpecs().filter((spec) => profile.hostToolIds.includes(spec.id));
+  ): Promise<SecurityToolPreflight> {
+    const specs = securityToolCatalogSpecs().filter((spec) => profile.hostToolIds.includes(spec.id));
     const toolCatalogHash = sha256(canonicalJson(specs.map(({ id, name, kind, candidates }) => ({ id, name, kind, candidates }))));
     const runtimeKey = options.runtimeKey.trim() || "container";
     const cacheKey = sha256(canonicalJson({ profile: profile.id, targetKind: profile.targetKind, firstActionPlan: profile.firstActionPlan, actionBundles: profile.actionBundles, runtime: "container", runtimeKey, catalog: toolCatalogHash, mcp: mcp.catalogHash(), tools: specs.map((entry) => entry.id) }));
@@ -603,20 +612,20 @@ export class ToolPreflightService {
     return { ...persisted, runtime: "container", runtimeKey, toolCatalogHash, mcpCatalogHash: persisted.mcpCatalogHash!, missingOptionalTools, fallbackStrategies: [...profile.fallbackStrategies], firstActionPlan: copyFirstActionPlan(profile.firstActionPlan), actionBundles: copyActionBundles(profile.actionBundles), cacheHit: false };
   }
 
-  public async prepareAll(profiles: readonly ChallengeToolProfile[], catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<ChallengeToolPreflight[]> {
-    const results: ChallengeToolPreflight[] = [];
+  public async prepareAll(profiles: readonly SecurityToolProfile[], catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<SecurityToolPreflight[]> {
+    const results: SecurityToolPreflight[] = [];
     for (const profile of profiles) results.push(await this.prepare(profile, catalog, mcp));
     return results;
   }
 
-  private async readCached(cacheKey: string): Promise<ChallengeToolPreflight | undefined> {
+  private async readCached(cacheKey: string): Promise<SecurityToolPreflight | undefined> {
     if (!this.cacheRoot || this.options.force === true) return undefined;
     try {
       const parsed = JSON.parse(await readFile(join(this.cacheRoot, ".proofblade", "tool-health.json"), "utf8")) as PersistedPreflightCache | PersistedPreflight;
       const cached = "entries" in parsed ? parsed.entries[cacheKey] : parsed.cacheKey === cacheKey ? parsed : undefined;
       const maxAgeMs = this.options.maxAgeMs ?? 10 * 60_000;
       if (!cached || cached.schemaVersion !== 1 || cached.cacheKey !== cacheKey || !Number.isFinite(cached.checkedAt) || Date.now() - cached.checkedAt > maxAgeMs) return undefined;
-      const profile = challengeToolProfile(cached.profileId);
+      const profile = securityToolProfile(cached.profileId);
       return {
         ...cached,
         runtime: cached.runtime ?? "host",
@@ -660,7 +669,7 @@ export class ToolPreflightService {
 }
 
 /** Convert the transient preflight result into the bounded durable Run state. */
-export function runToolPreparationFromPreflight(preflight: ChallengeToolPreflight, profile: ChallengeToolProfile, generation: number): RunToolPreparation {
+export function runToolPreparationFromPreflight(preflight: SecurityToolPreflight, profile: SecurityToolProfile, generation: number): RunToolPreparation {
   const base = {
     schemaVersion: 1 as const,
     generation,
@@ -684,6 +693,16 @@ export function runToolPreparationFromPreflight(preflight: ChallengeToolPrefligh
   return { ...base, hash: sha256(canonicalJson(base)) };
 }
 
+/** Attach the bounded Provider-facing MCP exposure summary to a durable preflight. */
+export function withFirstClassMcpToolExposure(
+  preparation: RunToolPreparation,
+  exposure: NonNullable<RunToolPreparation["firstClassMcpTools"]>,
+): RunToolPreparation {
+  const { hash: _hash, ...unsigned } = preparation;
+  const next = { ...unsigned, firstClassMcpTools: { ...exposure } };
+  return { ...next, hash: sha256(canonicalJson(next)) };
+}
+
 /**
  * Assert that a preflight result was durably published before a Provider turn.
  * The local health cache is only an optimization; the Run projection is the
@@ -700,10 +719,10 @@ export function assertToolPreparationPublished(
 }
 
 /** Rehydrate the prompt-facing preflight view from a persisted Run state. */
-export function preflightFromRunToolPreparation(preparation: RunToolPreparation): ChallengeToolPreflight {
-  const profile = challengeToolProfile(preparation.profileId as ChallengeCategory);
+export function preflightFromRunToolPreparation(preparation: RunToolPreparation): SecurityToolPreflight {
+  const profile = securityToolProfile(preparation.profileId as SecurityDomain);
   return {
-    profileId: preparation.profileId as ChallengeCategory,
+    profileId: preparation.profileId as SecurityDomain,
     targetKind: preparation.targetKind,
     runtime: preparation.runtime,
     runtimeKey: preparation.runtimeKey,

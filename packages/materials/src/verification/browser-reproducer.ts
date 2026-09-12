@@ -308,7 +308,7 @@ export class BrowserReproducer {
     const candidateArtifact = await this.artifactStore.putText(runId, candidate, {
       filename: `browser-candidate-${completionId}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: { name: "Browser reproduction candidate", summary: `Candidate sha256=${candidateHash}.`, tags: ["web", "browser", "verification", "candidate"], role: "result", relatedIds: [], annotatedBy: "harness" },
     });
     await this.controlStore.dispatch(runId, {

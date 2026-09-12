@@ -4,11 +4,16 @@ import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } f
 import { validateDomainRecordShape } from "../domain/records.js";
 import { completedWorkItemForCompletion } from "../domain/work-item.js";
 import { validateUpdateEvaluationGate } from "../evolution/evaluation-gates.js";
+import { createCognitiveSnapshot, createSafetySnapshot, generalTaskFromLegacy } from "../domain/general-task-contract.js";
 
 export function createInitialSnapshot(runId: string, task: TaskContract): RunSnapshot {
+  const generalTask = generalTaskFromLegacy(task);
   return {
     runId,
     task,
+    generalTask,
+    safetySnapshot: createSafetySnapshot(generalTask),
+    cognitiveSnapshot: createCognitiveSnapshot(generalTask),
     taskHash: sha256(canonicalJson(task)),
     authorityHash: "UNANCHORED",
     status: "CREATED",

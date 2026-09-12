@@ -1,10 +1,10 @@
 import { AgentHarness } from "@earendil-works/pi-agent-core/node";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
-import { rewriteUnverifiedClaimText, type CodingClaimVerifier } from "../verification/claim-verification.js";
+import { rewriteUnverifiedResultText, type TaskResultVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
 import { persistedAssistantText } from "./assistant-message.js";
-import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetMessage, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
+import { ExperimentBudgetBreaker, NoProgressToolBreaker, RepeatedToolFailureBreaker, ToolFailureStormBreaker, experimentBudgetNudge, noProgressToolMessage, noProgressToolNudge, repeatedToolFailureMessage, toolFailureStormMessage, type NoProgressWindow, type ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { AblationDecisionEvent, AblationPolicyController } from "../evaluation/ablation-policy.js";
 
 export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted";
@@ -15,9 +15,9 @@ export interface ToolCallBudget {
 }
 
 /**
- * Guard for the first challenge action. It is intentionally independent from
- * the generic tool-call budget: the first action constrains *which* tools may
- * establish the initial fact, while the run budget constrains total volume.
+ * Tracks the prepared first-action recommendation independently from the
+ * generic tool-call budget. The recommendation can explain a better initial
+ * probe, but it never replaces the safety or resource boundaries.
  */
 export interface FirstActionBudget {
   allowedToolNames: readonly string[];
@@ -50,8 +50,6 @@ export interface CodingTurnTermination {
   confirmed?: boolean;
   reason?: CodingTurnTerminationReason;
   noProgressWindow?: NoProgressWindow;
-  /** Set for a challenge prompt so experiment limits stop the turn, not just nudge it. */
-  ctfMode?: boolean;
   /** Coding chat uses a nudge for repeated observations; Solver keeps hard stops. */
   softNoProgress?: boolean;
   /** Keep the lane alive and turn guard pressure into an in-band recovery hint. */
@@ -85,6 +83,10 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
 ): () => void {
   let batchOpen = false;
   let batchHasSuccess = false;
+  // Cognitive routing is guidance, not a second safety plane. Keep advice
+  // attached to the exact tool call so the model receives it alongside the
+  // real result instead of losing the reason at the hook boundary.
+  const pendingCognitiveAdvice = new Map<string, string[]>();
   const unsubscribeEvents = harness.subscribe((event) => {
     if (event.type === "message_end" && event.message.role === "assistant") {
       batchOpen = event.message.content.some((item) => item.type === "toolCall");
@@ -97,12 +99,17 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     }
   });
   const unsubscribeResult = harness.on("tool_result", (event) => {
+    const cognitiveAdvice = pendingCognitiveAdvice.get(event.toolCallId) ?? [];
+    pendingCognitiveAdvice.delete(event.toolCallId);
+    const withCognitiveAdvice = (content: typeof event.content) => cognitiveAdvice.length === 0
+      ? content
+      : [...content, { type: "text" as const, text: cognitiveAdvice.join("\n") }];
     if (firstActionBudget && !firstActionBudget.completed && !event.isError && matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
       firstActionBudget.completed = true;
     }
     if (termination.reason === "tool_budget_exhausted" && !termination.continuousRecovery) {
       return {
-        content: [{ type: "text" as const, text: termination.message ?? "[ProofBlade tool budget exhausted]" }],
+        content: withCognitiveAdvice([{ type: "text" as const, text: termination.message ?? "[ProofBlade tool budget exhausted]" }]),
         details: { toolBudget: true, count: toolBudget?.count ?? 0, max: toolBudget?.max ?? 0 },
         isError: true,
         terminate: true,
@@ -118,7 +125,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         effectPolicy: resolveEffectPolicy?.(event.toolName, event.input),
       };
       const details = isRecord(event.details) ? event.details : {};
-      const verifierReady = event.toolName === "verify_claim" && details.verified === true;
+      const verifierReady = event.toolName === "verify_result" && details.verified === true;
       if (verifierReady && ablationPolicy) {
         const policyEvent = ablationPolicy.controller.decide({
           experimentId: ablationPolicy.experimentId,
@@ -135,7 +142,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         void ablationPolicy.onDecision?.(policyEvent);
         if (policyEvent.decision === "advise") {
           return {
-            content: [...event.content, { type: "text" as const, text: stopSuggestionMessage(policyEvent.policyMode) }],
+            content: withCognitiveAdvice([...event.content, { type: "text" as const, text: stopSuggestionMessage(policyEvent.policyMode) }]),
             details: { ...details, stopSuggestion: true, stopSuggestionMode: policyEvent.policyMode },
             isError: false,
             ...(deferClaimAcceptance ? { terminate: true } : {}),
@@ -147,20 +154,9 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         if (termination.continuousRecovery) {
           experimentBudgetBreaker?.reset();
           return {
-            content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: experimentBudgetNudge(experiment) }],
+            content: withCognitiveAdvice([...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: experimentBudgetNudge(experiment) }]),
             details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
             isError: event.isError,
-          };
-        }
-        if (termination.ctfMode) {
-          termination.message = experimentBudgetMessage(experiment);
-          termination.reason = "experiment_budget";
-          termination.requested = true;
-          return {
-            content: [{ type: "text" as const, text: termination.message }],
-            details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
-            isError: false,
-            terminate: true,
           };
         }
         // Advisory, non-terminating: keep the model in control and append a
@@ -170,7 +166,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         experimentBudgetBreaker?.reset();
         const nudge = experimentBudgetNudge(experiment);
         return {
-          content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }],
+          content: withCognitiveAdvice([...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }]),
           details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
           isError: false,
         };
@@ -196,7 +192,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
             content: [
               ...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item),
               { type: "text" as const, text: noProgressToolNudge(event.toolName, progress.count) },
-            ],
+            ].concat(cognitiveAdvice.length === 0 ? [] : [{ type: "text" as const, text: cognitiveAdvice.join("\n") }]),
             details: { noProgress: true, advisory: true, toolName: event.toolName, count: progress.count, key: progress.key, window: progress.window },
             isError: false,
           };
@@ -208,7 +204,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
           termination.requested = true;
         }
         return {
-          content: [{ type: "text" as const, text: terminationMessage }],
+          content: withCognitiveAdvice([{ type: "text" as const, text: terminationMessage }]),
           details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key, window: termination.noProgressWindow },
           isError: false,
           terminate: true,
@@ -216,7 +212,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       }
       if (batchOpen) batchHasSuccess = true;
       else repeatBreaker.reset();
-      return undefined;
+      return cognitiveAdvice.length === 0 ? undefined : { content: withCognitiveAdvice(event.content) };
     }
     const observation = {
       toolName: event.toolName,
@@ -228,23 +224,12 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     };
     const experiment = experimentBudgetBreaker?.observe(observation);
     if (experiment?.terminate) {
-      if (termination.ctfMode) {
-        termination.message = experimentBudgetMessage(experiment);
-        termination.reason = "experiment_budget";
-        termination.requested = true;
-        return {
-          content: [{ type: "text" as const, text: termination.message }],
-          details: { experimentBudget: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
-          isError: event.isError,
-          terminate: true,
-        };
-      }
       // Advisory, non-terminating (same as the success path): append the nudge
       // to the real error output and reset the window; do not stop the turn.
       experimentBudgetBreaker?.reset();
       const nudge = experimentBudgetNudge(experiment);
       return {
-        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }],
+        content: withCognitiveAdvice([...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: nudge }]),
         details: { experimentBudget: true, advisory: true, count: experiment.count, key: experiment.key, reason: experiment.reason, family: experiment.family },
         isError: event.isError,
       };
@@ -269,7 +254,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     if (ablationRelaxesFailureGuard && storm?.terminate) {
       failureStormBreaker?.reset();
       return {
-        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: toolFailureStormMessage(storm.count) }],
+        content: withCognitiveAdvice([...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: toolFailureStormMessage(storm.count) }]),
         details: { failureStorm: true, advisory: true, count: storm.count, key: storm.key },
         isError: true,
       };
@@ -277,7 +262,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     if (ablationRelaxesFailureGuard && decision.terminate) {
       repeatBreaker.reset();
       return {
-        content: [...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: repeatedToolFailureMessage(event.toolName, decision.count) }],
+        content: withCognitiveAdvice([...event.content.map((item) => item.type === "text" ? { type: "text" as const, text: item.text } : item), { type: "text" as const, text: repeatedToolFailureMessage(event.toolName, decision.count) }]),
         details: { repeatedFailure: true, advisory: true, toolName: event.toolName, count: decision.count, key: decision.key },
         isError: true,
       };
@@ -301,11 +286,11 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
         terminate: true,
       };
     }
-    if (!decision.terminate) return undefined;
+    if (!decision.terminate) return cognitiveAdvice.length === 0 ? undefined : { content: withCognitiveAdvice(event.content) };
     if (termination.continuousRecovery) {
       repeatBreaker.reset();
       return {
-        content: [{ type: "text" as const, text: `${repeatedToolFailureMessage(event.toolName, decision.count)}\n${experimentBudgetNudge({ count: decision.count, terminate: false, key: decision.key, reason: "tool_calls" })}` }],
+        content: withCognitiveAdvice([{ type: "text" as const, text: `${repeatedToolFailureMessage(event.toolName, decision.count)}\n${experimentBudgetNudge({ count: decision.count, terminate: false, key: decision.key, reason: "tool_calls" })}` }]),
         details: { repeatedFailure: true, advisory: true, toolName: event.toolName, count: decision.count, key: decision.key },
         isError: true,
       };
@@ -314,7 +299,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
     termination.reason = "repeated_tool_failure";
     termination.requested = true;
     return {
-      content: [{ type: "text" as const, text: termination.message }],
+      content: withCognitiveAdvice([{ type: "text" as const, text: termination.message }]),
       details: { repeatedFailure: true, toolName: event.toolName, count: decision.count, key: decision.key },
       isError: true,
       terminate: true,
@@ -351,28 +336,34 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       },
     });
     if (policyEvent) void ablationPolicy?.onDecision?.(policyEvent);
-    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") return { block: true, reason: `[ProofBlade ablation] ${policyEvent.reasonCode}` };
-    const ablationRelaxesFirstAction = policyEvent?.policyName === "first_action"
-      && (policyEvent.decision === "allow" || policyEvent.decision === "advise");
-    if (firstActionBudget && !firstActionBudget.completed && !ablationRelaxesFirstAction) {
+    if (policyEvent?.decision === "terminate" || policyEvent?.decision === "block") {
+      return { block: true, reason: cognitiveGateBlockReason(policyEvent.reasonCode, event.toolName, firstActionBudget, route?.domainPhase, activeBundle?.toolNames) };
+    }
+    const cognitiveAdvice: string[] = [];
+    const adviceEnabled = policyEvent?.policyMode !== "off";
+    if (firstActionBudget && !firstActionBudget.completed && adviceEnabled) {
       if (isFirstActionCompletionTool(event.toolName)) {
         firstActionBudget.completed = true;
       } else if (!matchesFirstActionTool(event.toolName, firstActionBudget.allowedToolNames)) {
-        return {
-          block: true,
-          reason: `[ProofBlade first action] Use one bounded first-action tool (${firstActionBudget.allowedToolNames.join(", ")}) before ${event.toolName}. Persist its result, then continue with the next hypothesis.`,
-        };
+        cognitiveAdvice.push(`[ProofBlade advisory: first action] ${event.toolName} is outside the suggested initial probe (${firstActionBudget.allowedToolNames.join(", ")}). The call was allowed; keep it if it is the best next step, and persist the resulting fact before branching.`);
       } else if (firstActionBudget.count >= firstActionBudget.maxCalls) {
-        return {
-          block: true,
-          reason: `[ProofBlade first action budget exhausted] The initial probe is limited to ${firstActionBudget.maxCalls} tool calls; preserve the strongest observation and continue on the next bounded step.`,
-        };
+        cognitiveAdvice.push(`[ProofBlade advisory: first action budget] The suggested initial probe has reached ${firstActionBudget.maxCalls} call${firstActionBudget.maxCalls === 1 ? "" : "s"}. This is guidance only; preserve the strongest observation and choose the next bounded action.`);
       } else {
         firstActionBudget.count += 1;
       }
     }
+    if (adviceEnabled && activeBundle && !completionTool && !matchesActiveBundle) {
+      cognitiveAdvice.push(`[ProofBlade advisory: action bundle] ${event.toolName} is outside the suggested ${activeBundle.domainPhase} bundle (${activeBundle.toolNames.join(", ")}). The call was allowed; continue when justified and record the observation.`);
+    }
+    if (adviceEnabled && activeBundle && !completionTool && !matchesActiveBundle && appearsInAnotherPhase) {
+      cognitiveAdvice.push(`[ProofBlade advisory: phase route] ${event.toolName} belongs to another suggested phase while the durable phase is ${route?.domainPhase ?? "unknown"}. The route is advisory; continue if this is the best action and explain the phase transition in evidence.`);
+    }
+    const queueCognitiveAdvice = () => {
+      if (cognitiveAdvice.length > 0) pendingCognitiveAdvice.set(event.toolCallId, cognitiveAdvice);
+    };
     if (!toolBudget || (termination.reason === "tool_budget_exhausted" && !termination.continuousRecovery)) {
       if (termination.reason === "tool_budget_exhausted") return { block: true, reason: termination.message };
+      queueCognitiveAdvice();
       return undefined;
     }
     if (toolBudget.count >= toolBudget.max) {
@@ -385,6 +376,7 @@ export function attachCodingTurnGuards<TContext extends object | undefined>(
       return { block: true, reason: termination.message };
     }
     toolBudget.count += 1;
+    queueCognitiveAdvice();
     return undefined;
   });
   const unsubscribeProvider = harness.on("before_provider_request", () => {
@@ -404,7 +396,7 @@ function isFirstActionCompletionTool(toolName: string): boolean {
 }
 
 function isCompletionTool(toolName: string): boolean {
-  return toolName === "verify_claim" || toolName === "submit_flag" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
+  return toolName === "verify_result" || toolName === "pwn_reproduce" || toolName === "web_reproduce";
 }
 
 function matchesFirstActionTool(toolName: string, allowedToolNames: readonly string[]): boolean {
@@ -417,12 +409,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stopSuggestionMessage(mode: string): string {
   return mode === "verifier_driven"
-    ? "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
-    : "[ProofBlade stop suggestion] The candidate has passed the deterministic claim check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
+    ? "[ProofBlade stop suggestion] The result has passed the deterministic verification check. Stop exploratory calls and let the outer independent Verifier finish the Completion; keep the existing Artifact/Evidence references."
+    : "[ProofBlade stop suggestion] The result has passed the deterministic verification check. Prefer stopping exploration and preserving the current Artifact/Evidence while the outer Verifier completes the run.";
 }
 
 function matchesActionBundleTool(toolName: string, allowedToolNames: readonly string[]): boolean {
   return matchesFirstActionTool(toolName, allowedToolNames);
+}
+
+function cognitiveGateBlockReason(
+  reasonCode: string,
+  toolName: string,
+  firstActionBudget: FirstActionBudget | undefined,
+  domainPhase: string | undefined,
+  activeBundleTools: readonly string[] | undefined,
+): string {
+  if (reasonCode === "first_action_gate") {
+    const tools = firstActionBudget?.allowedToolNames.join(", ") || "the prepared first-action tool";
+    return `[ProofBlade ablation] Experimental first-action gate rejected ${toolName}: use ${tools} first, persist its observation, then retry this action.`;
+  }
+  if (reasonCode === "phase_route_gate") {
+    return `[ProofBlade ablation] Experimental phase-route gate rejected ${toolName}: the durable phase is ${domainPhase ?? "unknown"}. Complete or explicitly record the current phase before moving to another phase.`;
+  }
+  if (reasonCode === "action_bundle_gate") {
+    const tools = activeBundleTools?.join(", ") || "the current phase bundle";
+    return `[ProofBlade ablation] Experimental action-bundle gate rejected ${toolName}: use one of ${tools} for ${domainPhase ?? "the current phase"}, or record why the route must change.`;
+  }
+  return `[ProofBlade ablation] ${reasonCode}; the experimental policy did not allow ${toolName}.`;
 }
 
 export async function finalizeCodingTurn(options: {
@@ -435,7 +448,7 @@ export async function finalizeCodingTurn(options: {
   recoveryExhausted: boolean;
   termination: CodingTurnTermination;
   piEntryId?: string;
-  claimVerifier: Pick<CodingClaimVerifier, "project">;
+  claimVerifier: Pick<TaskResultVerifier, "project">;
   maintainAfterTurn: () => Promise<void>;
 }): Promise<AgentOutcome> {
   const rawOutput = options.response.content
@@ -459,11 +472,11 @@ export async function finalizeCodingTurn(options: {
     : options.recoveryExhausted
       ? `Context length recovery exhausted after ${options.recoveryCount} attempts.`
       : options.response.errorMessage;
-  const initialClaimVerification = await options.claimVerifier.project(options.userPrompt, projectedOutput);
-  const output = initialClaimVerification.status === "unverified"
-    ? rewriteUnverifiedClaimText(projectedOutput, initialClaimVerification.reason)
+  const resultVerification = await options.claimVerifier.project(options.userPrompt, projectedOutput);
+  const output = resultVerification.status === "unverified"
+    ? rewriteUnverifiedResultText(projectedOutput, resultVerification.reason)
     : projectedOutput;
-  const claimVerification = initialClaimVerification;
+  const claimVerification = resultVerification;
   const task = await options.controlStore.snapshot(options.runId);
   await options.controlStore.append(options.runId, [{
     schemaVersion: 1,
@@ -474,6 +487,7 @@ export async function finalizeCodingTurn(options: {
     payload: {
       ...persistedAssistantText(task.task.mode, output),
       stopReason,
+      resultVerification,
       claimVerification,
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
@@ -488,6 +502,7 @@ export async function finalizeCodingTurn(options: {
     stopReason,
     usage: options.response.usage,
     errorMessage,
+    resultVerification,
     claimVerification,
     termination: confirmed ? options.termination.reason : undefined,
   };

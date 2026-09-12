@@ -31,7 +31,7 @@ test("CTF assistant events hash text instead of persisting candidate plaintext",
   try {
     const runId = "ASSISTANT-REDACTION-001";
     const controlStore = new ControlStore(new JsonlControlStore(join(root, "runs")));
-    await controlStore.createRun(runId, { ...task(runId, root), mode: "ctf_solve", target_kind: "web" });
+    await controlStore.createRun(runId, { ...task(runId, root), mode: "vulnerability_discovery", target_kind: "web" });
     const candidate = "PB{assistant_event_secret}";
     await finalizeCodingTurn({
       runId,
@@ -902,11 +902,11 @@ test("[contract:experiment-budget-advisory] inner probe budget nudges without st
   }
 });
 
-test("CTF turns stop at the experiment budget and return a replan signal", async () => {
-  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-ctf-"));
+test("experiment budget is advisory and does not depend on task wording", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-experiment-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
-    const faux = fauxProvider({ provider: "faux-experiment-budget-ctf" });
+    const faux = fauxProvider({ provider: "faux-experiment-budget" });
     const models = createModels();
     models.setProvider(faux.provider);
     faux.setResponses([
@@ -920,9 +920,9 @@ test("CTF turns stop at the experiment budget and return a replan signal", async
       async execute() { return { content: [{ type: "text" as const, text: "probe completed" }] }; },
     };
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
-    const session = await repo.create({ id: "experiment-budget-ctf", cwd: root });
+    const session = await repo.create({ id: "experiment-budget", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [bash], activeToolNames: ["bash"], systemPrompt: "test" });
-    const termination: CodingTurnTermination = { ctfMode: true };
+    const termination: CodingTurnTermination = {};
     attachCodingTurnGuards(
       harness,
       new RepeatedToolFailureBreaker(),
@@ -934,14 +934,9 @@ test("CTF turns stop at the experiment budget and return a replan signal", async
     );
 
     const response = await harness.prompt("题目描述：求解flag");
-    assert.equal(faux.state.callCount, 2);
-    // Pi preserves the assistant tool-use stop reason when a tool result asks
-    // to terminate; finalizeCodingTurn converts the requested termination into
-    // the visible replan response.
-    assert.equal(response.stopReason, "toolUse");
-    assert.equal(termination.requested, true);
-    assert.equal(termination.reason, "experiment_budget");
-    assert.match(termination.message ?? "", /turn was stopped/i);
+    assert.equal(faux.state.callCount, 4);
+    assert.equal(response.stopReason, "stop");
+    assert.equal(termination.requested, undefined);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -992,7 +987,7 @@ test("tool-call budget blocks and terminates the next inner turn", async () => {
   }
 });
 
-test("[contract:first-action-budget] blocks broad tools until the prepared probe produces an observation", async () => {
+test("[contract:first-action-budget] advises on broad tools while preserving the prepared probe", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-first-action-budget-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
@@ -1017,15 +1012,17 @@ test("[contract:first-action-budget] blocks broad tools until the prepared probe
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
     const session = await repo.create({ id: "first-action", cwd: root });
     const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [evidence, bash], activeToolNames: ["evidence", "bash"], systemPrompt: "test" });
-    const termination: CodingTurnTermination = { ctfMode: true };
+    const termination: CodingTurnTermination = {};
     const firstActionBudget = { allowedToolNames: ["bash"], maxCalls: 1, count: 0, completed: false };
     attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, termination, undefined, undefined, undefined, undefined, firstActionBudget);
 
     const response = await harness.prompt("CTF challenge: inspect the target");
-    assert.equal(evidenceExecutions, 0);
+    assert.equal(evidenceExecutions, 1);
     assert.equal(bashExecutions, 1);
     assert.equal(firstActionBudget.completed, true);
     assert.equal(response.stopReason, "stop");
+    assert.match(JSON.stringify(await session.getBranch()), /first-action/);
+    assert.match(JSON.stringify(await session.getBranch()), /call was allowed/);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -1099,6 +1096,8 @@ test("[contract:ablation-route-failure] soft route advice preserves a failed too
     assert.equal(response.stopReason, "stop");
     assert.match(JSON.stringify(response), /continued after failed route/);
     assert.ok(events.includes("phase_route:advise"));
+    assert.match(JSON.stringify(await session.getBranch()), /action bundle/);
+    assert.match(JSON.stringify(await session.getBranch()), /phase route/);
   } finally {
     await env.cleanup();
     await rm(root, { recursive: true, force: true });
@@ -1147,23 +1146,23 @@ test("[contract:ablation-route-abort] a real Harness abort remains observable af
   }
 });
 
-test("[contract:stop-suggestion] verified claims emit an advisory result without blocking the outer verifier", async () => {
+test("[contract:stop-suggestion] verified results emit an advisory result without blocking the outer verifier", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-stop-suggestion-"));
   const env = new NodeExecutionEnv({ cwd: root });
   try {
     const faux = fauxProvider({ provider: "faux-stop-suggestion" });
     const models = createModels();
     models.setProvider(faux.provider);
-    faux.setResponses([fauxAssistantMessage(fauxToolCall("verify_claim", { candidate: "PB{ok}", command: "cat answer.txt" }, { id: "verified-claim" }), { stopReason: "toolUse" })]);
+    faux.setResponses([fauxAssistantMessage(fauxToolCall("verify_result", { result: "PB{ok}", command: "cat answer.txt" }, { id: "verified-result" }), { stopReason: "toolUse" })]);
     const verify: AgentHarnessTool<undefined> = {
-      name: "verify_claim", label: "verify_claim", description: "verify", parameters: Type.Object({ candidate: Type.String(), command: Type.String() }),
+      name: "verify_result", label: "verify_result", description: "verify", parameters: Type.Object({ result: Type.String(), command: Type.String() }),
       async execute() { return { content: [{ type: "text" as const, text: "verified" }], details: { verified: true, completionId: "C-1" }, terminate: true }; },
     };
     const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: join(root, "pi-sessions") });
     const session = await repo.create({ id: "stop-suggestion", cwd: root });
-    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [verify], activeToolNames: ["verify_claim"], systemPrompt: "test" });
+    const harness = new AgentHarness({ session, models, model: faux.getModel(), tools: [verify], activeToolNames: ["verify_result"], systemPrompt: "test" });
     const events: string[] = [];
-    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, { ctfMode: true }, undefined, undefined, undefined, undefined, undefined, {
+    attachCodingTurnGuards(harness, new RepeatedToolFailureBreaker(), undefined, {}, undefined, undefined, undefined, undefined, undefined, {
       controller: new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, stopSuggestion: "verifier_driven" }),
       experimentId: "AB-STOP", variantId: "candidate", caseId: "case-1", attempt: 1, runId: "stop-suggestion",
       onDecision: (event) => { events.push(`${event.policyName}:${event.decision}`); },

@@ -1,10 +1,11 @@
-import type { ArtifactRef } from "../domain/types.js";
+import type { ArtifactRef, ArtifactSensitivity } from "../domain/types.js";
 import { canonicalJson, sha256 } from "../domain/utils.js";
 import type { ArtifactStore } from "../effects/artifact-store.js";
 
 export type ContextLevel = "L0" | "L1" | "L2";
 export type ContextTrust = "untrusted" | "observed" | "proposed" | "verified";
-export type ContextSensitivity = "public" | "secret" | "flag_candidate";
+/** Sensitivity values carried into model-facing context, including legacy data. */
+export type ContextSensitivity = ArtifactSensitivity;
 
 export interface ContextRef {
   uri: string;
@@ -73,13 +74,18 @@ export function createModelReceipt(options: ModelReceiptOptions): ModelReceipt {
     uri: artifactUri(options.runId, options.artifact.id), kind: "artifact", runId: options.runId, generation: options.generation, scope: "current-run", level: "L2", contentHash: options.artifact.sha256, sourceIds: [options.artifact.id], trust: options.trust ?? "observed", sensitivity, stale: options.artifact.generation !== options.generation, readPolicy: { maxChars: 6_000, maxBytes: 64 * 1024, allowRange: true },
   } : undefined;
   const mode = options.mode ?? "receipt";
-  const preview = mode === "path_only" || sensitivity === "secret"
+  const preview = mode === "path_only" || sensitivity !== "public"
     ? undefined
     : options.omittedChars !== undefined
       ? { omittedChars: Math.max(0, Math.floor(options.omittedChars)) }
       : boundedPreview(content, maxPreviewChars, maxInlineChars);
+  // A caller-provided summary is still model-visible. Never allow a
+  // sensitive result to smuggle its plaintext through that field.
+  const summary = sensitivity === "public"
+    ? options.summary ?? summarize(content)
+    : "restricted artifact receipt";
   const receiptBase = {
-    schemaVersion: 1 as const, operationId: options.operationId, state: options.state ?? "success", title: bounded(options.title, 256), summary: bounded(options.summary ?? summarize(content), 1_024), keyFacts: (options.keyFacts ?? []).slice(0, 16).map((item) => ({ key: bounded(item.key, 128), value: bounded(item.value, 512) })), refs: ref ? [ref] : [], ...(preview ? { preview } : {}), nextActions: [...new Set(options.nextActions ?? (ref ? ["recall"] : ["none"]))] as ReceiptNextAction[], resultHash, generatedAt: options.generatedAt ?? new Date().toISOString(),
+    schemaVersion: 1 as const, operationId: options.operationId, state: options.state ?? "success", title: bounded(options.title, 256), summary: bounded(summary, 1_024), keyFacts: (options.keyFacts ?? []).slice(0, 16).map((item) => ({ key: bounded(item.key, 128), value: bounded(item.value, 512) })), refs: ref ? [ref] : [], ...(preview ? { preview } : {}), nextActions: [...new Set(options.nextActions ?? (ref ? ["recall"] : ["none"]))] as ReceiptNextAction[], resultHash, generatedAt: options.generatedAt ?? new Date().toISOString(),
   };
   return { ...receiptBase, presentationHash: sha256(canonicalJson(receiptBase)) };
 }
@@ -93,7 +99,7 @@ export function renderModelReceipt(receipt: ModelReceipt): string {
     "[ProofBlade receipt]",
     `operation=${receipt.operationId}`,
     `state=${receipt.state}`,
-    `visible=${receipt.preview?.omittedChars ? "bounded" : "complete"}`,
+    `visible=${receipt.preview ? (receipt.preview.omittedChars ? "bounded" : "complete") : "restricted"}`,
     // Prefer the canonical L2 Artifact hash; resultHash is the visible
     // projection hash and may intentionally cover only a bounded viewport.
     `content_sha256=${ref?.contentHash ?? receipt.resultHash}`,

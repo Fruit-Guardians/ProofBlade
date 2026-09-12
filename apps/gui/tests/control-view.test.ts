@@ -7,7 +7,7 @@ import { buildRunControlView } from "../src/control-view.js";
 const task: TaskContract = {
   schema_version: 1,
   task_id: "GUI-CONTROL-001",
-  mode: "ctf_solve",
+  mode: "vulnerability_discovery",
   target_kind: "web",
   target: "fixture",
   objective: "inspect",

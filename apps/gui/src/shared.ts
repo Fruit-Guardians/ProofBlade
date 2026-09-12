@@ -1,4 +1,4 @@
-import type { AblationPreflightSummary, AblationReport, AblationExperimentSnapshot, ClaimVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
+import type { AblationPreflightSummary, AblationReport, AblationExperimentSnapshot, ResultVerificationProjection, HarnessEvent, ObservationQueueProjection, ProviderApi, ProviderNativeCapabilityStatus, RunSnapshot, RunTelemetryReport } from "@proofblade/materials";
 
 export type RunKind = "chat" | "fixture";
 
@@ -27,6 +27,10 @@ export interface ProviderProfile {
   models: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  /** The endpoint has explicitly opted into the Responses 24h retention hint. */
+  supportsLongCacheRetention: boolean;
+  /** Retention that will actually be sent to the provider for this profile. */
+  effectiveCacheRetention: ProviderCacheRetention;
   maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
@@ -42,6 +46,8 @@ export interface ProviderSettings {
   model: string;
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention: ProviderCacheRetention;
+  supportsLongCacheRetention: boolean;
+  effectiveCacheRetention: ProviderCacheRetention;
   maxConcurrentRequests: ProviderMaxConcurrentRequests;
   hasApiKey: boolean;
 }
@@ -57,6 +63,7 @@ export interface ProviderSettingsInput {
   models?: string[];
   thinkingLevel: ProviderThinkingLevel;
   cacheRetention?: ProviderCacheRetention;
+  supportsLongCacheRetention?: boolean;
   maxConcurrentRequests?: ProviderMaxConcurrentRequests;
   apiKey?: string;
   clearApiKey?: boolean;
@@ -85,6 +92,19 @@ export interface ConversationPreferences {
   enabledTools: string[];
   enabledSkills: string[];
   enabledMcpServers: string[];
+  projectPrompt?: string;
+}
+
+export interface PromptSnapshot {
+  schemaVersion: 1 | 2;
+  generatedAt: string;
+  systemPrompt: string;
+  projectPrompt: string;
+  /** Present in schema 2 snapshots after Provider-facing prompt bounding. */
+  projectPromptOriginalChars?: number;
+  projectPromptOmittedChars?: number;
+  projectPromptTruncated?: boolean;
+  systemPromptHash: string;
 }
 
 export interface DirectoryListing {
@@ -223,7 +243,9 @@ export interface ChatMessageDebug {
   stopReason?: string;
   error?: string;
   usage?: TokenUsage;
-  claimVerification?: ClaimVerificationProjection;
+  resultVerification?: ResultVerificationProjection;
+  /** @deprecated Use resultVerification for new consumers. */
+  claimVerification?: ResultVerificationProjection;
   raw: unknown;
 }
 
@@ -275,7 +297,7 @@ export type ChatStreamEvent =
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
   | { type: "tool_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "context_snapshot"; messages: number; tools: number; systemPromptChars: number; messageChars: number; toolSchemaChars: number; estimatedVisibleTokens: number }
-  | { type: "done"; text: string; stopReason: string; usage: TokenUsage; claimVerification?: ClaimVerificationProjection }
+  | { type: "done"; text: string; stopReason: string; usage: TokenUsage; resultVerification?: ResultVerificationProjection; claimVerification?: ResultVerificationProjection }
   | { type: "error"; error: string };
 
 export interface RunDetail {
@@ -324,6 +346,10 @@ export interface ContextRuntimeInfo {
 export interface ArtifactContent {
   artifact: RunSnapshot["artifacts"][string];
   content: string;
+  offset: number;
+  bytesRead: number;
+  totalBytes: number;
+  truncated: boolean;
 }
 
 export type AblationStatus = "draft" | "ready" | "running" | "paused" | "completed" | "failed";

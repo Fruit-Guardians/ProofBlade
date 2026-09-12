@@ -92,12 +92,12 @@ export class SandboxClaimRecoveryAdapter implements VerificationRecoveryAdapter 
   public constructor(private readonly sandbox: SandboxPort) {}
 
   public supports(operation: string): boolean {
-    return operation === "claim_reproduction" || operation === "fixture_score";
+    return operation === "result_verification" || operation === "claim_reproduction" || operation === "fixture_score";
   }
 
   public async resumeProposed(request: EffectRequest, signal: AbortSignal): Promise<RawEffectResult> {
-    if (request.operation !== "claim_reproduction" && request.operation !== "fixture_score") throw new Error(`Claim recovery cannot resume ${request.operation}`);
-    if (request.operation === "claim_reproduction" && request.replayPolicy !== "pure") throw new Error(`Claim recovery refuses replay policy ${request.replayPolicy}`);
+    if (request.operation !== "result_verification" && request.operation !== "claim_reproduction" && request.operation !== "fixture_score") throw new Error(`Result verification recovery cannot resume ${request.operation}`);
+    if ((request.operation === "result_verification" || request.operation === "claim_reproduction") && request.replayPolicy !== "pure") throw new Error(`Result verification recovery refuses replay policy ${request.replayPolicy}`);
     if (request.operation === "fixture_score" && request.replayPolicy !== "forbidden-replay") throw new Error(`Platform recovery refuses replay policy ${request.replayPolicy}`);
     return await this.sandbox.execute(request, signal);
   }
@@ -150,6 +150,7 @@ export async function resolveVerificationRecoveryAdapters(
 }
 
 const VERIFIER_OPERATIONS = new Set([
+  "result_verification",
   "claim_reproduction",
   "fixture_score",
   "web_reproduce",

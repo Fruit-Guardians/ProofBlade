@@ -4,8 +4,8 @@ import test from "node:test";
 import { appendFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
-import { JsonlControlStore, projectionHash, RunEventIngress, SingleAgentCtfLoop } from "@proofblade/materials";
+import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
+import { JsonlControlStore, projectionHash, RunEventIngress } from "@proofblade/materials";
 import { JsonlSessionRepo, NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import type { AgentLanePort, AgentOutcome, HarnessEvent, ProofBladeConfig, RunSnapshot } from "@proofblade/materials";
 import type { ChatStreamEvent, RunDetail } from "../src/shared.js";
@@ -179,15 +179,14 @@ test("projects durable claim verification onto the matching assistant message", 
   assert.match(projected[1]?.text ?? "", /本轮候选未验证/);
 });
 
-test("marks a legacy challenge answer without reproduction metadata as unverified", () => {
+test("does not infer verification requirements from legacy prompt wording", () => {
   const legacy = conversationMessagesFromEntries([
     { type: "message", id: "legacy-user", message: { role: "user", content: [{ type: "text", text: "完成这道题，并得到flag" }] } },
     { type: "message", id: "legacy-tool-turn", message: { role: "assistant", stopReason: "toolUse", content: [{ type: "text", text: "正在检查文件" }] } },
     { type: "message", id: "legacy-answer", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "最终答案：LCTF2026EV-ARM-GW-042" }] } },
   ]);
   assert.equal(legacy[1]?.claimVerification, undefined);
-  assert.equal(legacy[2]?.claimVerification?.status, "unverified");
-  assert.equal(legacy[2]?.claimVerification?.reason, "历史消息没有候选复现记录。");
+  assert.equal(legacy[2]?.claimVerification, undefined);
 });
 
 test("rejects path-like run identifiers", () => {
@@ -208,6 +207,35 @@ test("creates ordinary coding conversations without fixture semantics", () => {
   assert.equal(runKind({ mode: "ctf_solve" }), "fixture");
   assert.equal(codingWorkspace(task, "D:/selected", "D:/fallback"), "D:/selected");
   assert.equal(codingWorkspace(task, undefined, "D:/fallback"), "D:/workspace");
+});
+
+test("Artifact previews are range-bounded and can be continued without reading the full content", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-artifact-preview-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-ARTIFACT-PREVIEW-001";
+    await data.createConversation({ runId, title: "artifact preview", workspacePath: root });
+    const services = (data as unknown as { services: { artifacts: { putText: (id: string, content: string, meta: { filename: string }) => Promise<{ id: string }> } } }).services;
+    const source = "x".repeat(ARTIFACT_PREVIEW_MAX_BYTES + 17);
+    const artifact = await services.artifacts.putText(runId, source, { filename: "large-output.txt" });
+    const first = await data.artifact(runId, artifact.id);
+    assert.equal(first.bytesRead, ARTIFACT_PREVIEW_MAX_BYTES);
+    assert.equal(first.totalBytes, Buffer.byteLength(source));
+    assert.equal(first.truncated, true);
+    assert.equal(first.content, source.slice(0, ARTIFACT_PREVIEW_MAX_BYTES));
+    const next = await data.artifact(runId, artifact.id, first.offset + first.bytesRead);
+    assert.equal(next.content, source.slice(ARTIFACT_PREVIEW_MAX_BYTES));
+    assert.equal(next.truncated, false);
+    const multibyte = "中".repeat(Math.ceil((ARTIFACT_PREVIEW_MAX_BYTES + 6) / 3));
+    const multibyteArtifact = await services.artifacts.putText(runId, multibyte, { filename: "multibyte-output.txt" });
+    const multibyteFirst = await data.artifact(runId, multibyteArtifact.id);
+    const multibyteNext = await data.artifact(runId, multibyteArtifact.id, multibyteFirst.offset + Buffer.byteLength(multibyteFirst.content));
+    assert.equal(multibyteFirst.content + multibyteNext.content, multibyte);
+    await assert.rejects(() => data.artifact(runId, artifact.id, -1), /offset must be a non-negative integer/);
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("lists migration-tailed Runs from valid projections without replaying full event streams", async () => {
@@ -575,6 +603,30 @@ test("[contract:no-progress-chat-done] streams a convergence stop as a normal as
   }
 });
 
+test("ordinary GUI chat records a durable executor work item for each turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-chat-work-item-"));
+  const lane: AgentLanePort = {
+    async prompt() { return { text: "已完成检查", stopReason: "stop", usage: zeroUsage() }; },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-WORK-ITEM-001";
+    await data.createConversation({ runId, title: "持久化对话", workspacePath: root });
+    await data.chat(runId, "检查当前目录", () => undefined, undefined, undefined, root);
+    const detail = await data.getRun(runId);
+    const workItems = Object.values(detail.snapshot.workItems);
+    assert.equal(workItems.length, 1);
+    assert.equal(workItems[0]?.ownerLane, "executor");
+    assert.equal(workItems[0]?.status, "SUCCEEDED");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("CTF-shaped chat uses the same continuous coding lane without a mode-specific replan", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-replan-"));
   const prompts: string[] = [];
@@ -606,7 +658,7 @@ test("CTF-shaped chat uses the same continuous coding lane without a mode-specif
   }
 });
 
-test("GUI selects a prepared challenge profile before creating the coding lane", async () => {
+test("ordinary GUI chat does not select a challenge profile from prompt wording", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-profile-selection-"));
   let selectedProfile: string | undefined;
   const lane: AgentLanePort = {
@@ -618,13 +670,13 @@ test("GUI selects a prepared challenge profile before creating the coding lane",
   };
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
-      selectedProfile = options.challengeProfile?.id;
+      selectedProfile = options.securityProfile?.id;
       return lane;
     });
     const runId = "CHAT-PROFILE-001";
     await data.createConversation({ runId, title: "profile selection", workspacePath: root });
     await data.chat(runId, "Android APK native reverse challenge", () => undefined, undefined, undefined, root);
-    assert.equal(selectedProfile, "mobile");
+    assert.equal(selectedProfile, undefined);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -642,7 +694,7 @@ test("ordinary chat in a CTF-named workspace does not enable a challenge profile
   };
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => {
-      selectedProfile = options.challengeProfile?.id;
+      selectedProfile = options.securityProfile?.id;
       return lane;
     });
     const runId = "CHAT-ORDINARY-CTF-PATH-001";
@@ -658,12 +710,40 @@ test("ordinary chat in a CTF-named workspace does not enable a challenge profile
   }
 });
 
+test("GUI greeting reaches the coding lane without synthetic task instructions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-greeting-prompt-"));
+  let promptText = "";
+  const lane: AgentLanePort = {
+    async prompt(text) {
+      promptText = text;
+      return { text: "你好，有什么可以帮你？", stopReason: "stop", usage: zeroUsage() };
+    },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-GREETING-PROMPT-001";
+    await data.createConversation({ runId, title: "问候", workspacePath: root });
+    await data.chat(runId, "你好", () => undefined, undefined, undefined, root);
+
+    assert.equal(promptText, "你好");
+    const detail = await data.getRun(runId);
+    assert.deepEqual(Object.keys(detail.snapshot.schedulerIntents), []);
+    assert.deepEqual(Object.keys(detail.snapshot.handoffs), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("GUI fixture conversations enter RECON through RunCoordinator", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-fixture-conversation-phase-"));
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
     const runId = "GUI-FIXTURE-CONVERSATION-001";
-    const snapshot = await data.createFixtureConversation({ runId, fixtureId: "web-source-1", objective: "检查题目并保留第一条证据。" });
+    const snapshot = await data.createTaskFromTemplate({ runId, templateId: "web-source-1", objective: "检查题目并保留第一条证据。" });
     assert.equal(snapshot.domainPhase, "RECON");
     assert.equal(snapshot.phase, "reconnaissance");
     const events = await new JsonlControlStore(join(root, config.storage.runsDir)).events(runId);
@@ -701,14 +781,14 @@ test("persists a solve run before returning so an immediate pause aborts its cod
       return lane;
     });
     const runId = "SOLVE-PAUSE-001";
-    const started = await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    const started = await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     assert.equal(started.state, "running");
     await factoryEntered;
     const paused = await data.pause(runId);
     assert.equal(paused.state, "paused");
     assert.equal((await data.getRun(runId)).snapshot.status, "PAUSED");
     await assert.rejects(
-      data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 }),
+      data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 }),
       /Run is already active/,
     );
     releaseFactory();
@@ -733,7 +813,7 @@ test("GUI Fixture solve uses the shared verifier-first Run path and replays term
           if (!proposed) {
             proposed = true;
             const candidate = "PB{web_source_trace}";
-            const artifact = await options.services.artifacts.putText(options.runId, candidate, { filename: "gui-candidate.txt", sensitivity: "flag_candidate" });
+            const artifact = await options.services.artifacts.putText(options.runId, candidate, { filename: "gui-candidate.txt", sensitivity: "result_candidate" });
             await options.services.control.dispatch(options.runId, {
               type: "completion_proposed",
               completion: { id: "C-GUI-REPLAY", purpose: "harness_verification", candidateHash: hash(candidate), artifactId: artifact.id },
@@ -749,7 +829,7 @@ test("GUI Fixture solve uses the shared verifier-first Run path and replays term
       };
     });
 
-    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     const store = new JsonlControlStore(join(root, "runs"));
     let snapshot;
     for (let attempt = 0; attempt < 300; attempt += 1) {
@@ -795,7 +875,7 @@ test("GUI CTF input stages attachments and completes through the shared reproduc
       async close() {},
     }));
     const runId = "GUI-CTF-WORKSPACE-001";
-    await data.startCtfSolve({ runId, objective: "从附件中恢复候选。", workspacePath: source, attachmentPaths: ["answer.txt"], targetKind: "misc", verificationCommand: command, mode: "auto", maxTurns: 1 });
+    await data.startTask({ runId, objective: "从附件中恢复候选。", workspacePath: source, attachmentPaths: ["answer.txt"], targetKind: "misc", verificationCommand: command, mode: "auto", maxTurns: 1 });
     let detail: RunDetail | undefined;
     for (let attempt = 0; attempt < 300; attempt += 1) {
       detail = await data.getRun(runId);
@@ -814,7 +894,7 @@ test("GUI CTF input stages attachments and completes through the shared reproduc
   }
 });
 
-test("GUI CTF chat uses the same Coding Lane with the latest user instruction", { timeout: 30_000 }, async () => {
+test("GUI security task chat uses the same Coding Lane with the latest user instruction", { timeout: 30_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-ctf-chat-"));
   const source = join(root, "source");
   await mkdir(source, { recursive: true });
@@ -839,7 +919,7 @@ test("GUI CTF chat uses the same Coding Lane with the latest user instruction", 
     data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async (options) => makeLane(options.onEvent), async (options) => makeLane(options.onEvent));
     const runId = "GUI-CTF-CHAT-001";
     const command = process.platform === "win32" ? "type challenge.md" : "cat challenge.md";
-    await data.startCtfSolve({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
+    await data.startTask({ runId, objective: "分析附件并提出下一步。", workspacePath: source, verificationCommand: command, mode: "assist", maxTurns: 1 });
     for (let attempt = 0; attempt < 100; attempt += 1) {
       if ((await data.getRun(runId)).snapshot.status === "PAUSED") break;
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -881,14 +961,14 @@ test("[contract:shutdown-awaits-active-runs] [contract:coding-abort-exactly-once
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), undefined, async () => lane);
     const runId = "SOLVE-CLOSE-001";
-    await data.startSolve({ runId, fixtureId: "web-source-1", mode: "auto", maxTurns: 1 });
+    await data.startTaskFromTemplate({ runId, templateId: "web-source-1", mode: "auto", maxTurns: 1 });
     await promptStarted;
     const closing = data.close();
     releasePrompt();
     await closing;
     await closed;
     assert.equal(aborts, 1);
-    await assert.rejects(data.startSolve({ runId: "SOLVE-CLOSE-NEW", fixtureId: "web-source-1", mode: "auto" }), /GUI is shutting down/);
+    await assert.rejects(data.startTaskFromTemplate({ runId: "SOLVE-CLOSE-NEW", templateId: "web-source-1", mode: "auto" }), /GUI is shutting down/);
   } finally {
     releasePrompt?.();
     await rm(root, { recursive: true, force: true });

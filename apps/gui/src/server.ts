@@ -221,45 +221,29 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
       return sendJson(response, 200, { ok: true });
     }
   }
-  if (method === "POST" && url.pathname === "/api/fixture-conversations") {
+  if (method === "POST" && url.pathname === "/api/tasks/templates") {
     const body = await readBody(request);
-    const snapshot = await data.createFixtureConversation({
+    const snapshot = await data.createTaskFromTemplate({
       runId: string(body.runId, "runId"),
-      fixtureId: string(body.fixtureId, "fixtureId"),
+      templateId: string(body.templateId, "templateId"),
       objective: string(body.objective, "objective"),
     });
     return sendJson(response, 201, { runId: snapshot.runId, status: snapshot.status, phase: snapshot.phase });
   }
-  if (method === "POST" && url.pathname === "/api/solve") {
+  if (method === "POST" && url.pathname === "/api/tasks/templates/run") {
     const body = await readBody(request);
     const mode = body.mode === "auto" ? "auto" : "assist";
     const maxTurns = body.maxTurns === undefined ? undefined : Number(body.maxTurns);
     if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("maxTurns must be a positive integer");
-    return sendJson(response, 202, await data.startSolve({ runId: string(body.runId, "runId"), fixtureId: string(body.fixtureId, "fixtureId"), mode, maxTurns }));
-  }
-  if (method === "POST" && url.pathname === "/api/ctf-solve") {
-    const body = await readBody(request);
-    const mode = body.mode === "auto" ? "auto" : "assist";
-    const maxTurns = body.maxTurns === undefined ? undefined : Number(body.maxTurns);
-    if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 20)) throw new Error("maxTurns must be an integer between 1 and 20");
-    const targetKind = optionalString(body.targetKind);
-    if (targetKind !== undefined && !["unknown", "web", "reverse", "pwn", "crypto", "misc", "mixed"].includes(targetKind)) throw new Error("targetKind is invalid");
-    const workspacePath = await requireDirectory(string(body.workspacePath, "workspacePath"));
-    return sendJson(response, 202, await data.startCtfSolve({
-      runId: string(body.runId, "runId"),
-      objective: string(body.objective, "objective"),
-      workspacePath,
-      attachmentPaths: stringArray(body.attachmentPaths),
-      ...(targetKind === undefined ? {} : { targetKind: targetKind as import("@proofblade/materials").TargetKind }),
-      verificationCommand: string(body.verificationCommand, "verificationCommand"),
-      mode,
-      maxTurns,
-    }));
+    return sendJson(response, 202, await data.startTaskFromTemplate({ runId: string(body.runId, "runId"), templateId: string(body.templateId, "templateId"), mode, maxTurns }));
   }
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const runId = parts[2];
     if (method === "GET" && parts.length === 3) return sendJson(response, 200, await data.getRun(runId));
-    if (method === "GET" && parts[3] === "artifacts" && parts[4]) return sendJson(response, 200, await data.artifact(runId, parts[4]));
+    if (method === "GET" && parts[3] === "prompt") return sendJson(response, 200, await data.promptSnapshot(runId));
+    if (method === "GET" && parts[3] === "artifacts" && parts[4]) {
+      return sendJson(response, 200, await data.artifact(runId, parts[4], boundedQueryInteger(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER), boundedQueryInteger(url, "limit", 64 * 1024, 1, 64 * 1024)));
+    }
     if (method === "POST" && parts[3] === "pause") return sendJson(response, 202, await data.pause(runId));
     if (method === "POST" && parts[3] === "chat") {
       const body = await readBody(request);
@@ -288,6 +272,7 @@ async function api(method: string, url: URL, request: import("node:http").Incomi
           },
           workspacePath,
           preferences.contextCompactionThreshold,
+          preferences.projectPrompt,
         );
       } catch (error) {
         emit({ type: "error", error: error instanceof Error ? error.message : String(error) });
@@ -431,6 +416,22 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function boundedQueryInteger(url: URL, name: string, fallback: number, minimum: number, maximum: number): number {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+  return value;
+}
+
 function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
   return {
     id: optionalString(body.id),
@@ -443,6 +444,7 @@ function providerInput(body: Record<string, unknown>): ProviderSettingsInput {
     models: stringArray(body.models),
     thinkingLevel: string(body.thinkingLevel, "thinkingLevel") as ProviderThinkingLevel,
     cacheRetention: typeof body.cacheRetention === "string" ? body.cacheRetention as ProviderCacheRetention : undefined,
+    supportsLongCacheRetention: optionalBoolean(body.supportsLongCacheRetention, "supportsLongCacheRetention"),
     maxConcurrentRequests: body.maxConcurrentRequests === undefined ? undefined : Number(body.maxConcurrentRequests),
     apiKey: optionalString(body.apiKey),
     clearApiKey: body.clearApiKey === true,
@@ -502,6 +504,7 @@ function defaultPreferences(capabilities: WorkspaceSettings["capabilities"]): Co
     enabledTools: capabilities.tools.map((tool) => tool.name),
     enabledSkills: capabilities.skills.filter((skill) => !skill.disabled).map((skill) => skill.name),
     enabledMcpServers: capabilities.mcpServers.filter((server) => !server.disabled).map((server) => server.name),
+    projectPrompt: "",
   };
 }
 
@@ -524,6 +527,7 @@ function normalizedPreferences(input: ConversationPreferences, capabilities: Wor
     enabledTools: input.enabledTools.filter((name) => allowedTools.has(name)),
     enabledSkills: input.enabledSkills.filter((name) => allowedSkills.has(name)),
     enabledMcpServers: input.enabledMcpServers.filter((name) => allowedMcp.has(name)),
+    projectPrompt: typeof input.projectPrompt === "string" ? input.projectPrompt.slice(0, 16_000) : "",
   };
 }
 
@@ -539,6 +543,7 @@ function conversationPreferencesInput(body: Record<string, unknown>, current: Co
     ...(Array.isArray(body.enabledTools) ? { enabledTools: stringArray(body.enabledTools) } : {}),
     ...(Array.isArray(body.enabledSkills) ? { enabledSkills: stringArray(body.enabledSkills) } : {}),
     ...(Array.isArray(body.enabledMcpServers) ? { enabledMcpServers: stringArray(body.enabledMcpServers) } : {}),
+    ...(typeof body.projectPrompt === "string" ? { projectPrompt: body.projectPrompt } : {}),
   };
 }
 

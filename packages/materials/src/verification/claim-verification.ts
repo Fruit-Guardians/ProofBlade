@@ -8,7 +8,7 @@ import { beginVerificationRequest, readDurableVerificationResult } from "./verif
 import { parseVerifierOutcomeEnvelope, serializeVerifierOutcomeEnvelope, type VerifierOutcomeEnvelope } from "./outcome-envelope.js";
 import { type LinkReasoningNodesInput } from "../knowledge/evidence-graph.js";
 
-export interface ClaimReproduction {
+export interface ResultReproduction {
   verified: boolean;
   candidate: string;
   candidateHash: string;
@@ -23,7 +23,25 @@ export interface ClaimReproduction {
   supportingEvidenceIds: string[];
 }
 
-export interface ClaimVerificationProjection {
+/** A verifier result bound to an existing durable Artifact rather than text. */
+export interface ResultArtifactReproduction {
+  verified: boolean;
+  resultHash: string;
+  resultArtifactId: string;
+  commandHash: string;
+  artifactId: string;
+  executionArtifactId: string;
+  outcomeArtifactId: string;
+  evidenceId: string;
+  completionId: string;
+  toolCallId: string;
+  supportingEvidenceIds: string[];
+}
+
+/** @deprecated Use ResultReproduction for new task integrations. */
+export type ClaimReproduction = ResultReproduction;
+
+export interface ResultVerificationProjection {
   required: boolean;
   status: "not_required" | "verified" | "unverified";
   candidateHash?: string;
@@ -36,16 +54,25 @@ export interface ClaimVerificationProjection {
   reason?: string;
 }
 
-/** Keep candidate-shaped output visibly non-authoritative until projection verifies it. */
-export function rewriteUnverifiedClaimText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
+/** @deprecated Use ResultVerificationProjection for new task integrations. */
+export type ClaimVerificationProjection = ResultVerificationProjection;
+
+/** Keep result-shaped output visibly non-authoritative until projection verifies it. */
+export function rewriteUnverifiedResultText(assistantText: string, reason = "没有找到当前 generation 的受信复现链。"): string {
   const rewritten = assistantText.replace(/\bflag\s*[:：]/gi, "候选（未验证）：");
   if (rewritten.startsWith("[ProofBlade] 本轮候选未验证：")) return rewritten;
   return [`[ProofBlade] 本轮候选未验证：${reason}`, rewritten].filter((value) => value.length > 0).join("\n");
 }
 
+/** @deprecated Use rewriteUnverifiedResultText for new task integrations. */
+export function rewriteUnverifiedClaimText(assistantText: string, reason?: string): string {
+  return rewriteUnverifiedResultText(assistantText, reason);
+}
+
 interface ClaimReceipt {
   schemaVersion: 3;
-  kind: "claim_reproduction";
+  /** New receipts use result_verification; claim_reproduction is historical. */
+  kind: "result_verification" | "claim_reproduction";
   runId: string;
   taskId: string;
   taskHash: string;
@@ -65,7 +92,14 @@ interface ClaimReceipt {
   recordedAt: string;
 }
 
-export class CodingClaimVerifier {
+/**
+ * Domain-neutral verifier facade for task results.
+ *
+ * The implementation deliberately lives in the historical module for wire
+ * compatibility, but its public name no longer implies that every task has a
+ * claim or a CTF-style candidate.
+ */
+export class TaskResultVerifier {
   public constructor(
     private readonly runId: string,
     private readonly controlStore: ControlStore,
@@ -129,8 +163,8 @@ export class CodingClaimVerifier {
       replayPolicy: "pure",
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `web-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `web-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -163,8 +197,8 @@ export class CodingClaimVerifier {
       replayPolicy: "pure",
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `browser-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `browser-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -203,8 +237,8 @@ export class CodingClaimVerifier {
       command: snapshot.task.verification.command,
       cwd: input.cwd,
       sessionId: input.sessionId,
-      artifactSensitivity: "flag_candidate",
-      recoveryInput: { content: input.payload, filename: `pwn-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "flag_candidate" },
+      artifactSensitivity: "result_candidate",
+      recoveryInput: { content: input.payload, filename: `pwn-verifier-input-${input.attemptId}.json`, mime: "application/json", sensitivity: "result_candidate" },
     }, async () => ({ stdout: input.payload, stderr: "", exitCode: 0, durationMs: 0 }), signal);
     return { effectId: execution.effectId, artifactId: execution.artifactId };
   }
@@ -225,32 +259,93 @@ export class CodingClaimVerifier {
   }
 
   /** Execute and attest a claim through a journaled verifier Effect. */
-  public async record(input: {
-    candidate: string;
+  public async recordResult(input: {
+    result: string;
     command: string;
     cwd: string;
     toolCallId: string;
     supportingEvidenceIds?: string[];
     signal?: AbortSignal;
+    execute?: (signal: AbortSignal) => Promise<RawEffectResult>;
+  }): Promise<ResultReproduction> {
+    return await this.record({ ...input, candidate: input.result, completionPurpose: "harness_verification" });
+  }
+
+  /** Verify an arbitrary result Artifact with the immutable task command. */
+  public async recordArtifactResult(input: {
+    resultArtifactId: string;
+    command: string;
+    cwd: string;
+    toolCallId: string;
+    supportingEvidenceIds?: string[];
+    signal?: AbortSignal;
+  }): Promise<ResultArtifactReproduction> {
+    const reproduction = await this.record({
+      resultArtifactId: input.resultArtifactId,
+      command: input.command,
+      cwd: input.cwd,
+      toolCallId: input.toolCallId,
+      supportingEvidenceIds: input.supportingEvidenceIds,
+      signal: input.signal,
+      completionPurpose: "harness_verification",
+    });
+    return {
+      verified: reproduction.verified,
+      resultHash: reproduction.candidateHash,
+      resultArtifactId: reproduction.candidateArtifactId,
+      commandHash: reproduction.commandHash,
+      artifactId: reproduction.artifactId,
+      executionArtifactId: reproduction.executionArtifactId,
+      outcomeArtifactId: reproduction.outcomeArtifactId,
+      evidenceId: reproduction.evidenceId,
+      completionId: reproduction.completionId,
+      toolCallId: reproduction.toolCallId,
+      supportingEvidenceIds: reproduction.supportingEvidenceIds,
+    };
+  }
+
+  /** Execute and attest a legacy claim through a journaled verifier Effect. */
+  public async record(input: {
+    candidate?: string;
+    resultArtifactId?: string;
+    command: string;
+    cwd: string;
+    toolCallId: string;
+    /** Public callers may opt into the domain-neutral completion purpose. */
+    completionPurpose?: "claim_reproduction" | "harness_verification";
+    supportingEvidenceIds?: string[];
+    signal?: AbortSignal;
     /** Used only for non-task-bound observational commands. */
     execute?: (signal: AbortSignal) => Promise<RawEffectResult>;
-  }): Promise<ClaimReproduction> {
+  }): Promise<ResultReproduction> {
     const snapshot = await this.controlStore.snapshot(this.runId);
-    const candidate = input.candidate.trim();
+    const resultArtifactMode = typeof input.resultArtifactId === "string";
+    if (resultArtifactMode && input.candidate !== undefined) throw new Error("Result verification accepts either candidate text or resultArtifactId, not both");
+    let candidate = input.candidate?.trim() ?? "";
     const command = input.command.trim();
-    if (!candidate || !command || !input.toolCallId.trim()) throw new Error("Claim reproduction requires a candidate, command, and tool call id");
-    if (command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
-    const candidateHash = sha256(candidate);
+    if ((!candidate && !resultArtifactMode) || !command || !input.toolCallId.trim()) throw new Error("Result verification requires a result, command, and tool call id");
+    let candidateArtifact: ArtifactRef | undefined;
+    if (resultArtifactMode) {
+      const artifactId = input.resultArtifactId!.trim();
+      candidateArtifact = snapshot.artifacts[artifactId];
+      if (!candidateArtifact) throw new Error(`Unknown result Artifact: ${artifactId}`);
+      if (candidateArtifact.runId !== this.runId || candidateArtifact.generation !== snapshot.generation) throw new Error(`Result Artifact ${artifactId} is stale or belongs to another Run`);
+      if (candidateArtifact.origin.registeredBy !== "agent") throw new Error(`Result Artifact ${artifactId} must be an agent-owned result, not a verifier transcript`);
+      if (candidateArtifact.bytes <= 0) throw new Error(`Result Artifact ${artifactId} is empty`);
+    }
+    const candidateHash = candidateArtifact?.sha256 ?? sha256(candidate);
     const commandHash = sha256(command);
+    if (resultArtifactMode && command.includes(candidateHash)) throw new Error("Verification command embeds the result hash literal; derive it from workspace inputs instead");
+    if (!resultArtifactMode && command.includes(candidate)) throw new Error("Reproduction command embeds the candidate literal; derive it from workspace inputs instead");
     const supportingEvidenceIds = [...new Set(input.supportingEvidenceIds ?? [])];
+    const completionPurpose = input.completionPurpose ?? "claim_reproduction";
     const taskBoundCommand = snapshot.task.verification.kind === "reproduction"
       && typeof snapshot.task.verification.command === "string"
       ? snapshot.task.verification.command.trim()
       : undefined;
     const verifierDefinedCommand = taskBoundCommand === command;
-    if (taskBoundCommand && !verifierDefinedCommand) {
-      throw new Error("verify_claim must use the exact immutable task-bound verification command");
-    }
+    if (taskBoundCommand && !verifierDefinedCommand) throw new Error("verify_result must use the exact immutable task-bound verification command");
+    if (resultArtifactMode && !verifierDefinedCommand) throw new Error("Artifact verification requires the task's immutable verification command");
     const missingEvidence = supportingEvidenceIds.filter((evidenceId) => !snapshot.evidence[evidenceId]);
     if (missingEvidence.length > 0) throw new Error(`Unknown supporting evidence ids: ${missingEvidence.join(", ")}`);
     for (const evidenceId of supportingEvidenceIds) {
@@ -261,16 +356,37 @@ export class CodingClaimVerifier {
     const request = await beginVerificationRequest(this.controlStore, this.runId, {
       kind: "claim",
       policyHash: sha256(canonicalJson({ taskHash: snapshot.taskHash, verification: snapshot.task.verification })),
-      recipeHash: sha256(canonicalJson({ candidateHash, commandHash })),
+      recipeHash: sha256(canonicalJson({ candidateHash, commandHash, ...(resultArtifactMode ? { resultArtifactMode: true } : {}) })),
       sourceIds: supportingEvidenceIds,
     });
     if (!request.created) {
       const durable = await readDurableVerificationResult(this.controlStore, this.runId, request.request);
       if (!durable) throw new Error(`Claim verification request ${request.request.id} requires durable recovery; refusing to execute another command`);
       const durableSnapshot = await this.controlStore.snapshot(this.runId);
-      const candidateArtifact = durableSnapshot.artifacts[durable.completion.artifactId];
-      if (!candidateArtifact) throw new Error(`Durable claim candidate is missing: ${durable.completion.artifactId}`);
-      const durableCandidate = (await this.artifactStore.readText(this.runId, candidateArtifact)).trim();
+      const durableCandidateArtifact = durableSnapshot.artifacts[durable.completion.artifactId];
+      if (!durableCandidateArtifact) throw new Error(`Durable result Artifact is missing: ${durable.completion.artifactId}`);
+      if (resultArtifactMode) {
+        const durableEvidenceId = durable.completion.evidenceIds[0];
+        const durableEvidence = durableEvidenceId ? durableSnapshot.evidence[durableEvidenceId] : undefined;
+        const durableEffect = durableEvidence?.source.effectId ? durableSnapshot.effects[durableEvidence.source.effectId] : undefined;
+        const durableExecutionArtifactId = durableEffect?.artifactId ?? durableEvidence?.source.artifactId ?? durable.completion.artifactId;
+        const durableReceiptArtifactId = durableEvidence?.provenance.artifactIds.find((artifactId) => artifactId !== durableExecutionArtifactId && durableSnapshot.artifacts[artifactId]?.sourceEffectId === undefined) ?? durableExecutionArtifactId;
+        return {
+          verified: durable.completion.status === "ACCEPTED",
+          candidate: "",
+          candidateHash: durable.completion.candidateHash,
+          commandHash,
+          artifactId: durableReceiptArtifactId,
+          candidateArtifactId: durable.completion.artifactId,
+          executionArtifactId: durableExecutionArtifactId,
+          outcomeArtifactId: durableReceiptArtifactId,
+          evidenceId: durableEvidenceId ?? "",
+          completionId: durable.completion.id,
+          toolCallId: input.toolCallId,
+          supportingEvidenceIds,
+        };
+      }
+      const durableCandidate = (await this.artifactStore.readText(this.runId, durableCandidateArtifact)).trim();
       const projection = await this.projectCompletion(durableSnapshot, durable.completion, durableCandidate);
       if (!projection || !projection.evidenceId) throw new Error(`Durable claim verification ${durable.completion.id} is incomplete`);
       const evidence = durableSnapshot.evidence[projection.evidenceId];
@@ -296,10 +412,10 @@ export class CodingClaimVerifier {
 
     const completionId = id("C");
     const factId = id("F");
-    const candidateArtifact = await this.artifactStore.putText(this.runId, candidate, {
+    if (!candidateArtifact) candidateArtifact = await this.artifactStore.putText(this.runId, candidate, {
       filename: `claim-candidate-${input.toolCallId}.txt`,
       mime: "text/plain",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: {
         name: "最终候选",
         summary: `等待受信复现的候选 sha256=${candidateHash}.`,
@@ -311,14 +427,18 @@ export class CodingClaimVerifier {
     });
     await this.controlStore.dispatch(this.runId, {
       type: "completion_proposed",
-      completion: { id: completionId, purpose: "claim_reproduction", candidateHash, artifactId: candidateArtifact.id, verificationKey: request.request.key },
+      completion: { id: completionId, purpose: completionPurpose, candidateHash, artifactId: candidateArtifact.id, verificationKey: request.request.key },
       lane: "main",
     });
 
     const boundSnapshot = await this.controlStore.snapshot(this.runId);
     const signal = input.signal ?? new AbortController().signal;
     const requiredAttempts = verifierDefinedCommand ? Math.max(1, boundSnapshot.task.verification.required_reproductions) : 1;
-    const operation = verifierDefinedCommand ? "claim_reproduction" : "claim_observation";
+    // Generic verify_result calls use a domain-neutral operation. The legacy
+    // verify_claim alias keeps its historical operation for replay compatibility.
+    const operation = verifierDefinedCommand
+      ? completionPurpose === "harness_verification" ? "result_verification" : "claim_reproduction"
+      : "claim_observation";
     const attempts: Array<{
       attemptId: string;
       sessionId: string;
@@ -338,6 +458,7 @@ export class CodingClaimVerifier {
           completionId,
           candidateHash,
           candidateArtifactId: candidateArtifact.id,
+          ...(resultArtifactMode ? { resultArtifactMode: "artifact" as const, resultArtifactId: candidateArtifact.id, resultHash: candidateHash } : {}),
           taskHash: boundSnapshot.taskHash,
           targetHash: sha256(boundSnapshot.task.target),
           verificationRuleHash: sha256(canonicalJson(boundSnapshot.task.verification)),
@@ -349,7 +470,7 @@ export class CodingClaimVerifier {
         command,
         cwd: input.cwd,
         sessionId,
-        artifactSensitivity: "flag_candidate",
+        artifactSensitivity: "result_candidate",
       } as const;
       const execution = verifierDefinedCommand
         ? await this.verifierJournal.execute(this.runId, effectInput, signal)
@@ -360,11 +481,18 @@ export class CodingClaimVerifier {
           if (!stdoutContainsExactCandidate(result.stdout, candidate)) return { ...result, stderr: `${result.stderr}\nreproduction output did not contain the exact candidate`, exitCode: 1 };
           return result;
         }, signal);
-      if (execution.result.exitCode !== 0 || !stdoutContainsExactCandidate(execution.result.stdout, candidate)) throw new Error("Reproduction command did not successfully derive the exact candidate");
+      if (execution.result.exitCode !== 0 || (!resultArtifactMode && !stdoutContainsExactCandidate(execution.result.stdout, candidate))) {
+        throw new Error(resultArtifactMode
+          ? "Result verifier command did not complete successfully"
+          : "Reproduction command did not successfully derive the exact candidate");
+      }
+      if (resultArtifactMode && !acceptedResultEnvelope(execution.result.stdout, candidateHash)) {
+        throw new Error("Result verifier must print {\"accepted\":true,\"resultHash\":\"<artifact sha256>\"}");
+      }
 
       const receipt: ClaimReceipt = {
         schemaVersion: 3,
-        kind: "claim_reproduction",
+        kind: operation === "result_verification" ? "result_verification" : "claim_reproduction",
         runId: this.runId,
         taskId: boundSnapshot.task.task_id,
         taskHash: boundSnapshot.taskHash,
@@ -386,11 +514,13 @@ export class CodingClaimVerifier {
       const receiptArtifact = await this.artifactStore.putText(this.runId, canonicalJson(receipt), {
         filename: `claim-reproduction-${input.toolCallId}-${attemptIndex + 1}.json`,
         mime: "application/json",
-        sensitivity: "flag_candidate",
+        sensitivity: "result_candidate",
         semantic: {
-          name: "最终候选复现收据",
-          summary: `候选 ${candidateHash.slice(0, 12)}... 由 effect ${execution.effectId} 成功复现。`,
-          tags: ["verification", "candidate", "reproduction", "receipt"],
+          name: resultArtifactMode ? "结果 Artifact 验证收据" : "最终候选复现收据",
+          summary: resultArtifactMode
+            ? `Result Artifact sha256=${candidateHash} 由 effect ${execution.effectId} 验证。`
+            : `候选 ${candidateHash.slice(0, 12)}... 由 effect ${execution.effectId} 成功复现。`,
+          tags: resultArtifactMode ? ["verification", "result", "reproduction", "receipt"] : ["verification", "candidate", "reproduction", "receipt"],
           role: "result",
           relatedIds: [...supportingEvidenceIds, completionId, candidateArtifact.id, execution.artifactId],
           annotatedBy: "harness",
@@ -404,11 +534,15 @@ export class CodingClaimVerifier {
       evidence: {
         id: evidenceId,
         kind: verifierDefinedCommand ? "reproduction" as const : "observation" as const,
-        name: verifierDefinedCommand ? "最终候选复现通过" : "候选命令执行记录",
+        name: verifierDefinedCommand ? (resultArtifactMode ? "结果 Artifact 验证通过" : "最终候选复现通过") : "候选命令执行记录",
         summary: verifierDefinedCommand
-          ? `Candidate sha256=${candidateHash} reproduced by the task-defined command sha256=${commandHash}.`
+          ? resultArtifactMode
+            ? `Result Artifact sha256=${candidateHash} accepted by the task-defined verifier sha256=${commandHash}.`
+            : `Candidate sha256=${candidateHash} reproduced by the task-defined command sha256=${commandHash}.`
           : `Candidate sha256=${candidateHash} appeared in an audited model-supplied command sha256=${commandHash}; this is not verifier-grade reproduction Evidence.`,
-        tags: verifierDefinedCommand ? ["verification", "candidate", "reproduction"] : ["verification", "candidate", "untrusted-command"],
+        tags: verifierDefinedCommand
+          ? (resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"])
+          : ["verification", "candidate", "untrusted-command"],
         dependsOn: supportingEvidenceIds,
         source: {
           tool: operation,
@@ -437,11 +571,13 @@ export class CodingClaimVerifier {
       externalStatus: "CONFIRMED",
       attempts: attempts.map((attempt, index) => ({
         id: attempt.attemptId,
-        phase: verifierDefinedCommand ? "claim_reproduction" : "claim_observation",
+        phase: verifierDefinedCommand ? operation : "claim_observation",
         status: "PASSED",
         artifactId: attempt.execution.artifactId,
         summary: verifierDefinedCommand
-          ? `Verifier attempt ${index + 1} derived the exact candidate.`
+          ? resultArtifactMode
+            ? `Verifier attempt ${index + 1} accepted the bound result Artifact.`
+            : `Verifier attempt ${index + 1} derived the exact candidate.`
           : `Audited observation ${index + 1} contained the exact candidate.`,
       })),
       primaryArtifactId: primary.execution.artifactId,
@@ -458,11 +594,13 @@ export class CodingClaimVerifier {
     const outcomeArtifact = await this.artifactStore.putText(this.runId, outcomeEnvelope, {
       filename: `claim-outcome-${input.toolCallId}.json`,
       mime: "application/json",
-      sensitivity: "flag_candidate",
+      sensitivity: "result_candidate",
       semantic: {
-        name: "最终候选验证结果索引",
-        summary: `Claim outcome envelope for candidate sha256=${candidateHash}.`,
-        tags: ["verification", "candidate", "outcome", "attestation"],
+        name: resultArtifactMode ? "结果 Artifact 验证结果索引" : "最终候选验证结果索引",
+        summary: resultArtifactMode
+          ? `Result verification outcome for Artifact sha256=${candidateHash}.`
+          : `Claim outcome envelope for candidate sha256=${candidateHash}.`,
+        tags: resultArtifactMode ? ["verification", "result", "outcome", "attestation"] : ["verification", "candidate", "outcome", "attestation"],
         role: "result",
         relatedIds: [...supportingEvidenceIds, completionId, candidateArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id])],
         annotatedBy: "harness",
@@ -481,7 +619,9 @@ export class CodingClaimVerifier {
       type: "fact" as const,
       fact: {
         id: factId,
-        statement: `${verifierDefinedCommand ? "Reproduced" : "Observed"} claim sha256=${candidateHash}`,
+        statement: resultArtifactMode
+          ? `${verifierDefinedCommand ? "Verified" : "Observed"} result Artifact sha256=${candidateHash}`
+          : `${verifierDefinedCommand ? "Reproduced" : "Observed"} claim sha256=${candidateHash}`,
         status: verifierDefinedCommand ? "CONFIRMED" as const : "PROPOSED" as const,
         evidenceIds: [...supportingEvidenceIds, ...evidenceIds],
       },
@@ -490,33 +630,37 @@ export class CodingClaimVerifier {
     else await this.controlStore.dispatch(this.runId, { ...factCommand, lane: "executor" });
 
     const graph = new CodingEvidenceGraph(this.runId, this.controlStore, this.artifactStore);
-    const graphLinks: LinkReasoningNodesInput[] = [{ from: candidateArtifact.id, to: completionId, relation: "derived_from", explanation: "The exact candidate Artifact is hash-bound to this Completion.", confidence: 1 }];
+    const graphLinks: LinkReasoningNodesInput[] = [{ from: candidateArtifact.id, to: completionId, relation: "derived_from", explanation: resultArtifactMode ? "The result Artifact is hash-bound to this Completion." : "The exact candidate Artifact is hash-bound to this Completion.", confidence: 1 }];
     for (const attempt of attempts) {
       graphLinks.push(
         { from: attempt.execution.artifactId, to: attempt.evidenceId, relation: "derived_from", explanation: "Journaled execution Artifact generated verifier Evidence.", confidence: 1 },
         { from: attempt.receiptArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "Immutable verifier receipt anchors the reproduction provenance.", confidence: 1 },
         { from: outcomeArtifact.id, to: attempt.evidenceId, relation: "derived_from", explanation: "The bounded outcome envelope indexes the final claim attestation.", confidence: 1 },
         ...supportingEvidenceIds.map((supportingEvidenceId) => ({ from: supportingEvidenceId, to: attempt.evidenceId, relation: "depends_on" as const, explanation: "Final reproduction uses this upstream Evidence.", confidence: 1 })),
-        { from: attempt.evidenceId, to: factId, relation: "supports", explanation: "Reproduction Evidence confirms the hash-bound claim.", confidence: 1 },
-        { from: attempt.evidenceId, to: completionId, relation: "reproduces", explanation: "Reproduction Evidence verifies this exact Completion.", confidence: 1 },
+        { from: attempt.evidenceId, to: factId, relation: "supports", explanation: resultArtifactMode ? "Verifier Evidence confirms the hash-bound result Artifact." : "Reproduction Evidence confirms the hash-bound claim.", confidence: 1 },
+        { from: attempt.evidenceId, to: completionId, relation: "reproduces", explanation: resultArtifactMode ? "Verifier Evidence verifies this exact result Completion." : "Reproduction Evidence verifies this exact Completion.", confidence: 1 },
       );
     }
     await graph.linkNodesBatch(graphLinks);
     const graphSnapshot = await this.controlStore.snapshot(this.runId);
     const relatedTreeIds = Object.values(graphSnapshot.reasoningTrees).filter((tree) => supportingEvidenceIds.some((value) => tree.nodeIds.includes(value))).map((tree) => tree.id);
     await graph.createTree({
-      name: locallyJudged ? "最终候选复现" : "候选观察链",
+      name: locallyJudged ? (resultArtifactMode ? "结果 Artifact 验证" : "最终候选复现") : "候选观察链",
       summary: locallyJudged
-        ? `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`
+        ? resultArtifactMode
+          ? `结果 Artifact ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 验证。`
+          : `候选 ${candidateHash.slice(0, 12)}... 已由当前 generation 的 journaled verifier effect 复现。`
         : `候选 ${candidateHash.slice(0, 12)}... 来自模型命令观察，等待任务绑定的 verifier 规则。`,
       purpose: "汇总最终结论、上游分析依据与可重复验证结果。",
       explanation: locallyJudged
-        ? "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
+        ? resultArtifactMode
+          ? "该树以 Completion 为根，连接结果 Artifact、执行记录、收据、验证 Evidence 与确认 Fact。"
+          : "该树以 Completion 为根，连接候选、执行记录、收据、reproduction Evidence 与确认 Fact。"
         : "该树只记录模型命令观察，不代表候选已通过受信 verifier。",
       rootNodeId: completionId,
       nodeIds: [candidateArtifact.id, outcomeArtifact.id, ...attempts.flatMap((attempt) => [attempt.execution.artifactId, attempt.receiptArtifact.id, attempt.evidenceId]), ...supportingEvidenceIds, factId, completionId],
       relatedTreeIds,
-      tags: ["verification", "candidate", "reproduction"],
+      tags: resultArtifactMode ? ["verification", "result", "reproduction"] : ["verification", "candidate", "reproduction"],
       status: locallyJudged ? "SUPPORTED" : "ACTIVE",
     });
 
@@ -524,30 +668,51 @@ export class CodingClaimVerifier {
   }
 
   /** Rebuild verification exclusively from durable current-generation state. */
-  public async project(userPrompt: string, assistantText: string): Promise<ClaimVerificationProjection> {
-    const required = requiresClaimVerification(userPrompt, assistantText);
-    if (!required) return { required: false, status: "not_required" };
+  public async project(userPrompt: string, assistantText: string): Promise<ResultVerificationProjection> {
+    // Verification is enabled by the immutable task contract, never inferred
+    // from the user's topic words. An explicit result declaration in the model
+    // output is still a claim: without a task-owned verifier it must remain
+    // visibly unverified instead of silently becoming authoritative.
+    const task = await this.controlStore.snapshot(this.runId);
     const candidate = extractFinalCandidate(assistantText);
-    if (!candidate) return { required: true, status: "unverified", reason: "最终回答没有唯一、明确的候选值。" };
-    const candidateHash = sha256(candidate);
-    const snapshot = await this.controlStore.snapshot(this.runId);
-    const completions = Object.values(snapshot.completions)
-      .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation && completion.candidateHash === candidateHash)
-      .sort((left, right) => right.createdSeq - left.createdSeq || left.id.localeCompare(right.id));
-    for (const completion of completions) {
-      const projection = await this.projectCompletion(snapshot, completion, candidate);
-      if (projection) return projection;
+    const taskRequiresVerification = task.task.verification.required_reproductions > 0 || Boolean(task.task.verification.command);
+    const required = taskRequiresVerification || candidate !== undefined;
+    if (!required) return { required: false, status: "not_required" };
+    if (!taskRequiresVerification) {
+      return { required: true, status: "unverified", reason: "当前任务没有配置可验证该结果的复现规则；该值只能作为候选，不能标记为已确认结果。" };
     }
-    return { required: true, status: "unverified", reason: "没有找到与最终候选哈希精确匹配的当前 generation 完整验证链。" };
+    const snapshot = task;
+    const completions = Object.values(snapshot.completions)
+      .filter((completion) => completion.status === "ACCEPTED" && completion.runId === this.runId && completion.generation === snapshot.generation)
+      .sort((left, right) => right.createdSeq - left.createdSeq || left.id.localeCompare(right.id));
+    if (candidate) {
+      const candidateHash = sha256(candidate);
+      for (const completion of completions.filter((item) => item.candidateHash === candidateHash)) {
+        const projection = await this.projectCompletion(snapshot, completion, candidate);
+        if (projection) return projection;
+      }
+    }
+    if (!candidate) {
+      // Generic reports, JSON, and binary outputs are deliberately not reduced
+      // to an assistant-text candidate. Their verifier effect binds the exact
+      // durable Artifact hash to the Completion, which is the projection key.
+      for (const completion of completions) {
+        const projection = await this.projectCompletion(snapshot, completion, undefined);
+        if (projection) return projection;
+      }
+    }
+    return { required: true, status: "unverified", reason: candidate ? "没有找到与最终候选哈希精确匹配的当前 generation 完整验证链。" : "没有找到当前 generation 的完整结果 Artifact 验证链。" };
   }
 
-  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string): Promise<ClaimVerificationProjection | undefined> {
+  private async projectCompletion(snapshot: RunSnapshot, completion: RunSnapshot["completions"][string], candidate: string | undefined): Promise<ResultVerificationProjection | undefined> {
     const candidateArtifact = snapshot.artifacts[completion.artifactId];
     if (!candidateArtifact || candidateArtifact.runId !== this.runId || candidateArtifact.generation !== snapshot.generation || candidateArtifact.sha256 !== completion.candidateHash) return undefined;
-    try {
-      if ((await this.artifactStore.readText(this.runId, candidateArtifact)).trim() !== candidate) return undefined;
-    } catch {
-      return undefined;
+    if (candidate !== undefined) {
+      try {
+        if ((await this.artifactStore.readText(this.runId, candidateArtifact)).trim() !== candidate) return undefined;
+      } catch {
+        return undefined;
+      }
     }
     const requiredReproductions = Math.max(1, snapshot.task.verification.required_reproductions);
     if (completion.evidenceIds.length < requiredReproductions) return undefined;
@@ -559,10 +724,15 @@ export class CodingClaimVerifier {
     const attemptIds = new Set<string>();
     const transcriptHashes = new Set<string>();
     const receipts: ClaimReceipt[] = [];
+    let artifactResultMode: boolean | undefined;
     for (const item of evidence) {
       const effect = item.provenance.effect ? snapshot.effects[item.provenance.effect.id] : undefined;
       const verdict = effect?.verification;
       const effectArtifact = effect?.artifactId ? snapshot.artifacts[effect.artifactId] : undefined;
+      const thisArtifactMode = effect?.args.resultArtifactMode === "artifact";
+      if (artifactResultMode === undefined) artifactResultMode = thisArtifactMode;
+      else if (artifactResultMode !== thisArtifactMode) return undefined;
+      if (!thisArtifactMode && candidate === undefined) return undefined;
       if (!effect || !effectArtifact || effect.status !== "FINISHED" || effect.outcome !== "success" || effect.exitCode !== 0
         || effect.producerLane !== "verifier" || effect.generation !== snapshot.generation
         || effect.artifactId !== item.source.artifactId || effectArtifact.sourceEffectId !== effect.id
@@ -578,7 +748,7 @@ export class CodingClaimVerifier {
       sessionIds.add(verdict.sessionId);
       attemptIds.add(verdict.attemptId);
       transcriptHashes.add(verdict.transcriptHash);
-      if (effect.operation !== "claim_reproduction") continue;
+      if (effect.operation !== "result_verification" && effect.operation !== "claim_reproduction") continue;
       const receipt = await this.findClaimReceipt(snapshot, completion, candidate, item, effect);
       if (!receipt) return undefined;
       receipts.push(receipt);
@@ -641,7 +811,7 @@ export class CodingClaimVerifier {
   private async findClaimReceipt(
     snapshot: RunSnapshot,
     completion: RunSnapshot["completions"][string],
-    candidate: string,
+    candidate: string | undefined,
     evidence: Evidence,
     effect: RunSnapshot["effects"][string],
   ): Promise<ClaimReceipt | undefined> {
@@ -657,7 +827,7 @@ export class CodingClaimVerifier {
       try {
         const parsed = JSON.parse(await this.artifactStore.readText(this.runId, artifact)) as Partial<ClaimReceipt>;
         if (parsed.schemaVersion !== 3
-          || parsed.kind !== "claim_reproduction"
+          || parsed.kind !== effect.operation
           || parsed.runId !== this.runId
           || parsed.taskId !== snapshot.task.task_id
           || parsed.taskHash !== snapshot.taskHash
@@ -677,7 +847,10 @@ export class CodingClaimVerifier {
         const executionArtifact = snapshot.artifacts[parsed.executionArtifactId];
         if (!executionArtifact || executionArtifact.sourceEffectId !== effect.id || executionArtifact.generation !== snapshot.generation) continue;
         const execution = JSON.parse(await this.artifactStore.readText(this.runId, executionArtifact)) as Partial<RawEffectResult>;
-        if (typeof execution.stdout !== "string" || typeof execution.stderr !== "string" || execution.exitCode !== 0 || !stdoutContainsExactCandidate(execution.stdout, candidate)) continue;
+        if (typeof execution.stdout !== "string" || typeof execution.stderr !== "string" || execution.exitCode !== 0) continue;
+        if (effect.args.resultArtifactMode === "artifact"
+          ? !acceptedResultEnvelope(execution.stdout, completion.candidateHash)
+          : candidate === undefined || !stdoutContainsExactCandidate(execution.stdout, candidate)) continue;
         if (parsed.outputHash !== sha256(`${execution.stdout}\n${execution.stderr}`)) continue;
         return parsed as ClaimReceipt;
       } catch {
@@ -687,6 +860,9 @@ export class CodingClaimVerifier {
     return undefined;
   }
 }
+
+/** @deprecated Use TaskResultVerifier for new generic security tasks. */
+export class CodingClaimVerifier extends TaskResultVerifier {}
 
 function parsePwnEndpoint(endpoint: string | undefined): { host: string; port: number } | undefined {
   if (!endpoint) return undefined;
@@ -719,7 +895,7 @@ function extractFinalCandidate(assistantText: string): string | undefined {
   const shaped = [...assistantText.matchAll(/\b(?:[a-z0-9_]{0,32})?flag\{[^}\r\n]{1,512}\}|\bPB\{[^}\r\n]{1,512}\}/gi)].map((match) => match[0]);
   const unique = [...new Set(shaped)];
   if (unique.length === 1) return unique[0];
-  const explicit = [...assistantText.matchAll(/(?:最终(?:结果|答案|候选)|final(?:\s+answer)?|answer)\s*[:：]\s*[`"']?([^`"'\r\n]{1,1024})/gi)]
+  const explicit = [...assistantText.matchAll(/(?:最终(?:结果|答案|候选)|结果|答案|候选|final(?:\s+answer)?|answer|result|candidate|flag)\s*[:：]\s*[`"']?([^`"'\r\n]{1,1024})/gi)]
     .map((match) => match[1]?.trim().replace(/[。.;；]+$/, ""))
     .filter((value): value is string => Boolean(value));
   const explicitUnique = [...new Set(explicit)];
@@ -728,6 +904,15 @@ function extractFinalCandidate(assistantText: string): string | undefined {
 
 function stdoutContainsExactCandidate(stdout: string, candidate: string): boolean {
   return stdout.split(/\r?\n/).some((line) => line.trim() === candidate);
+}
+
+function acceptedResultEnvelope(stdout: string, resultHash: string): boolean {
+  try {
+    const parsed = JSON.parse(stdout) as { accepted?: unknown; resultHash?: unknown };
+    return parsed.accepted === true && parsed.resultHash === resultHash;
+  } catch {
+    return false;
+  }
 }
 
 function sameIds(left: string[], right: string[]): boolean {

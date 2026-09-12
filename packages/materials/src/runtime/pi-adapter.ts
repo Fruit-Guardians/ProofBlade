@@ -11,9 +11,9 @@ import type { ControlStore } from "../control/control-store.js";
 import type { Lane } from "../domain/types.js";
 import { ContextCompiler, contextText } from "../context/compiler.js";
 import type { ProofBladeConfig } from "../config.js";
-import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
+import { createConfiguredModels, effectiveCacheRetention, resolveModelProfile } from "./lmstudio-provider.js";
 import { attachPiObservability, createProviderSchedulingTelemetry, type ContextManifestSummary } from "../observability/pi-events.js";
-import type { ClaimVerificationProjection } from "../verification/claim-verification.js";
+import type { ResultVerificationProjection } from "../verification/claim-verification.js";
 import { persistedAssistantText } from "./assistant-message.js";
 
 export interface AgentOutcome {
@@ -21,7 +21,9 @@ export interface AgentOutcome {
   stopReason: string;
   usage: AssistantMessage["usage"];
   errorMessage?: string;
-  claimVerification?: ClaimVerificationProjection;
+  resultVerification?: ResultVerificationProjection;
+  /** @deprecated Use resultVerification for new consumers. */
+  claimVerification?: ResultVerificationProjection;
   termination?: "repeated_tool_failure" | "no_progress" | "tool_failure_storm" | "experiment_budget" | "tool_budget_exhausted" | "budget_exhausted" | "deadline_exhausted";
 }
 
@@ -81,7 +83,7 @@ export class PiAgentLane implements AgentLanePort {
       toolContext: { env },
       thinkingLevel: profile.thinkingLevel ?? "off",
       systemPrompt: contextText(compiled),
-      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
+      streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: effectiveCacheRetention(profile) },
     });
     attachPiObservability(harness, {
       runId: options.runId,

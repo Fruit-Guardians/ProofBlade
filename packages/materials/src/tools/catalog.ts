@@ -194,7 +194,7 @@ export class ProofBladeToolCatalogRegistry {
     return this.entries.find((entry) => entry.id === id);
   }
 
-  /** Select only the host entries prepared for one challenge profile. */
+  /** Select only the host entries prepared for one security profile. */
   public selectForProfile(profileId: string, toolIds: readonly string[] = []): ToolCatalogEntry[] {
     if (this.disabled) return [];
     const requested = new Set(toolIds);

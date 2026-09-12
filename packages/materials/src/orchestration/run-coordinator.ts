@@ -120,14 +120,6 @@ export class RunCoordinator {
     }
   }
 
-  /** Select the durable investigation phase for a bounded model turn. */
-  public domainPhaseForTurn(turn: number): DomainPhase {
-    if (turn <= 1) return "RECON";
-    if (turn === 2) return "TARGET_MODEL";
-    if (turn === 3) return "HYPOTHESIS";
-    return "EXPERIMENT";
-  }
-
   /** Persist the bounded tool readiness snapshot before a model turn. */
   public async recordToolPreparation(runId: string, preparation: RunToolPreparation): Promise<void> {
     const snapshot = await this.control.snapshot(runId);

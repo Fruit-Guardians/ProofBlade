@@ -13,7 +13,8 @@ const defaults: ConversationPreferences = {
   thinkingLevel: "low",
   enabledTools: ["read", "bash", "edit", "write"],
   enabledSkills: ["evidence-triage"],
-  enabledMcpServers: [],
+    enabledMcpServers: [],
+    projectPrompt: "",
 };
 
 const capabilities: WorkspaceSettings["capabilities"] = {
@@ -48,6 +49,7 @@ test("persists folders and per-conversation provider and capability choices", as
       enabledTools: ["read", "read"],
       enabledSkills: [],
       enabledMcpServers: ["local"],
+      projectPrompt: "Use Chinese and run tests before claiming success.",
     }, defaults);
     assert.deepEqual(saved.enabledTools, ["read"]);
 
@@ -60,6 +62,7 @@ test("persists folders and per-conversation provider and capability choices", as
     assert.equal(publicSettings.conversations["CHAT-1"]?.title, "研究会话");
     assert.equal(publicSettings.conversations["CHAT-1"]?.contextCompactionThreshold, 60);
     assert.deepEqual(publicSettings.conversations["CHAT-1"]?.enabledMcpServers, ["local"]);
+    assert.equal(publicSettings.conversations["CHAT-1"]?.projectPrompt, "Use Chinese and run tests before claiming success.");
 
     assert.equal((await reloaded.renameFolder(folder.id, "Cases")).name, "Cases");
     await reloaded.removeFolder(folder.id);

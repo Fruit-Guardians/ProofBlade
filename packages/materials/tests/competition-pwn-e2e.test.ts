@@ -12,7 +12,7 @@ import type { ContainerCreateRequest, ContainerRef, ContainerRuntimePort, Contai
 import { SessionRegistry } from "../src/container/session-registry.js";
 import { PwnSession } from "../src/pwn/pwn-session.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
-import { createPlatformFlagSubmitter } from "../src/runtime/coding-lane.js";
+import { createPlatformExternalSubmitter } from "../src/runtime/coding-lane.js";
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -65,7 +65,7 @@ test("competition pwn path provisions the pwn profile, uses a durable tube, repr
       const snapshot = await options.controlStore.snapshot(options.runId);
       const fixture = { fixtureId: options.runId, generation: snapshot.generation, path: options.projectRoot, privatePath: join(options.projectRoot, ".proofblade") };
       const toolRuntime = new ProofBladeToolRuntime(options.runId, fixture, join(options.runDir, ".."), options.controlStore, options.artifactStore, options.journal, options.installRoot ?? options.projectRoot, { includeMcp: false });
-      const submit = createPlatformFlagSubmitter({ runId: options.runId, runtime: toolRuntime, fixture, controlStore: options.controlStore, verifier: options.platformVerifier!, artifactStore: options.artifactStore, mode: options.mode });
+      const submit = createPlatformExternalSubmitter({ runId: options.runId, runtime: toolRuntime, fixture, controlStore: options.controlStore, verifier: options.platformVerifier!, artifactStore: options.artifactStore, mode: options.mode });
       return {
         async prompt() {
           const tube = await PwnSession.openRemote(registry, { ref, ownerLane: "executor", command: ["nc", "127.0.0.1", "31337"], endpoint: "127.0.0.1:31337" });
@@ -74,7 +74,7 @@ test("competition pwn path provisions the pwn profile, uses a durable tube, repr
           const found = await tube.readFlag("/flag", /flag\{[^}]+\}/);
           await tube.close();
           if (!found.flag) throw new Error("flag was not reproduced");
-          const verdict = await submit(found.flag);
+          const verdict = await submit({ target: "competition", payload: found.flag });
           return { text: `submitted=${verdict.accepted}`, stopReason: "stop", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
         },
         async compact() {}, async abort() {}, async isIdle() { return true; }, async close() { await registry.disposeAll("lane-close"); await toolRuntime.close(); },

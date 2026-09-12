@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-29T11:55:00+08:00
+> 状态更新时间：2026-09-12T13:45:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260912-001 | 2026-09-12T13:45:00+08:00 | PLAN-230 | codex/fix-chat-1789026563795 | 本条记录所在提交 |
 | UPDATE-20260829-009 | 2026-08-29T11:55:00+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-008 | 2026-08-29T10:24:52+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
 | UPDATE-20260829-007 | 2026-08-29T09:36:31+08:00 | PLAN-230 | codex/unified-agent-development | 本条记录所在提交 |
@@ -55,6 +56,27 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260912-001
+
+时间：2026-09-12T13:45:00+08:00
+
+摘要：修复 CHAT-1789026563795 的大文件读取分页、交互式上下文恢复和 REMOTE:nc 持久化 Pwn 会话能力。
+
+### 变更
+
+- 普通 read 自动合并底层有界 continuation 页面，并记录完整读取状态以抑制重复分页
+- 交互式聊天在上下文恢复耗尽后保持 PAUSED，可由下一轮用户消息继续，不再进入不可继续的终态
+- misc、crypto、reverse 等类别声明 REMOTE:nc endpoint 时启用 pwn-session broker 和对应 Docker profile
+- 新增读取、上下文恢复、竞赛 solver 和远程目标识别回归测试
+
+### 验证
+
+- [x] npm run build passed
+- [x] targeted coding-resources, single-agent-loop and competition-solver tests passed
+- [x] npm run api:index:check passed
+- [x] component, change-contract and changed-test checks passed
+- [x] npm test: 988 passed, 4 skipped; 3 existing Windows/base-fixture failures remain documented in the PR
 
 ## UPDATE-20260829-009
 

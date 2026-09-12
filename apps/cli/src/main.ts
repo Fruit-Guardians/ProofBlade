@@ -8,11 +8,9 @@ import {
   CheckpointService,
   createServices,
   demoTask,
-  fixtureTask,
   JsonlControlStore,
   loadConfig,
   listFixtureProfiles,
-  PiAgentLane,
   PiCodingLane,
   PlannerCoordinator,
   ProofBladeToolRuntime,
@@ -20,13 +18,13 @@ import {
   ProofBladeToolCatalogRegistry,
   bootstrapToolCatalog,
   ToolPreflightService,
-  challengeToolProfiles,
-  challengeToolCatalogSpecs,
+  securityToolProfiles,
+  securityToolCatalogSpecs,
   McpProjectRegistry,
   listBundledCapabilities,
   projectionHash,
   runDemo,
-  SingleAgentCtfLoop,
+  SingleAgentLoop,
   snapshotContext,
   FixtureEvaluationRunner,
   RealModelEvaluationRunner,
@@ -48,6 +46,7 @@ import {
   replayStats,
   compareReplayStats,
   shadowReplay,
+  fixtureTask,
   CompetitionApiJournal,
   replayCompetitionApiScript,
   RunTelemetry,
@@ -63,7 +62,7 @@ import {
   preflightConfiguredRuntimes,
   withSessionResourceAdapters,
 } from "@proofblade/materials";
-import type { CompetitionApiReplayStep } from "@proofblade/materials";
+import type { AgentOutcome, CompetitionApiReplayStep, RunSnapshot } from "@proofblade/materials";
 
 const root = resolve(process.cwd());
 
@@ -114,6 +113,52 @@ async function main(): Promise<void> {
       const snapshot = await services.control.createRun(runId, demoTask(runId, root, config));
       print({ runId, status: snapshot.status, phase: snapshot.phase });
       break;
+    }
+    case "task": {
+      const action = arg ?? "help";
+      if (action === "templates") {
+        print(listFixtureProfiles().map((profile) => ({ id: profile.id, targetKind: profile.targetKind, description: profile.description })));
+        break;
+      }
+      if (action === "create") {
+        const runId = required(rest[0], "task id");
+        const templateId = option(rest, "--template") ?? (rest[1] && !rest[1].startsWith("--") ? rest[1] : undefined);
+        const template = required(templateId, "task template id");
+        const task = fixtureTask(runId, template, root, config);
+        const objective = option(rest, "--objective");
+        if (objective?.trim()) task.objective = objective.trim();
+        const snapshot = await services.control.createRun(runId, task);
+        print({ runId, templateId: template, status: snapshot.status, phase: snapshot.phase });
+        break;
+      }
+      const runId = required(rest[0], "run id");
+      if (action === "status") {
+        const snapshot = await services.control.snapshot(runId);
+        print(taskStatus(snapshot));
+        break;
+      }
+      if (action === "cancel") {
+        const snapshot = await services.control.snapshot(runId);
+        if (!["SUCCEEDED", "FAILED", "EXHAUSTED", "CANCELLED", "NEED_HUMAN"].includes(snapshot.status)) {
+          await services.control.dispatch(runId, { type: "cancel", reason: rest.slice(1).join(" ").trim() || "Cancelled by user", lane: "main" });
+        }
+        print(taskStatus(await services.control.snapshot(runId)));
+        break;
+      }
+      if (action === "run") {
+        const modeValue = option(rest, "--mode") ?? "assist";
+        if (modeValue !== "auto" && modeValue !== "assist") throw new Error("task run --mode must be auto or assist");
+        const taskSnapshot = await services.control.snapshot(runId);
+        const result = await new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory).run({
+          runId,
+          task: taskSnapshot.task,
+          mode: modeValue,
+          maxTurns: parsePositiveOption(rest, "--max-turns"),
+        });
+        print(result);
+        break;
+      }
+      throw new Error("task action must be templates, create, run, status, or cancel");
     }
     case "run": {
       if (arg !== "demo") throw new Error("The first fixture profile is named 'demo'");
@@ -399,14 +444,14 @@ async function main(): Promise<void> {
       const action = arg ?? "list";
       if (action === "list") print({ catalogHash: registry.catalogHash(), tools: registry.list(), diagnostics: registry.diagnostics });
       else if (action === "probe") print({ catalogHash: registry.catalogHash(), diagnostics: [...registry.diagnostics, ...(await registry.probe())] });
-      else if (action === "init") print(await bootstrapToolCatalog(root, challengeToolCatalogSpecs(), { force: rest.includes("--refresh") }));
+      else if (action === "init") print(await bootstrapToolCatalog(root, securityToolCatalogSpecs(), { force: rest.includes("--refresh") }));
       else if (action === "preflight") {
         const requested = rest[0] ?? "all";
         const profiles = requested === "all"
-          ? challengeToolProfiles()
+          ? securityToolProfiles()
           : (() => {
-            const profile = challengeToolProfiles().find((item) => item.id === requested);
-            if (!profile) throw new Error(`Unknown challenge profile: ${requested}`);
+            const profile = securityToolProfiles().find((item) => item.id === requested);
+            if (!profile) throw new Error(`Unknown security profile: ${requested}`);
             return [profile];
           })();
         const mcp = McpProjectRegistry.load(root);
@@ -426,19 +471,6 @@ async function main(): Promise<void> {
       const scheduler = new IntentScheduler(services.control, new LeaseManager(services.control), config.intentScheduler);
       const { handleIntentsCommand } = await import("./commands/intents.js");
       await handleIntentsCommand([arg ?? "", ...rest], scheduler, services.control, (message) => console.log(message));
-      break;
-    }
-    case "solve": {
-      const profileId = required(arg, "fixture profile id");
-      const positionals = positional(rest, ["--run-id", "--mode", "--max-turns"]);
-      const runId = option(rest, "--run-id") ?? positionals[0] ?? `PB-${profileId}-${Date.now()}`;
-      const modeValue = option(rest, "--mode") ?? positionals[1] ?? "assist";
-      if (modeValue !== "auto" && modeValue !== "assist") throw new Error("--mode must be auto or assist");
-      const maxTurnsValue = option(rest, "--max-turns") ?? positionals[2];
-      const maxTurns = maxTurnsValue === undefined ? undefined : Number(maxTurnsValue);
-      if (maxTurns !== undefined && (!Number.isInteger(maxTurns) || maxTurns < 1)) throw new Error("--max-turns must be a positive integer");
-      const loop = new SingleAgentCtfLoop(root, config, services, undefined, browserVerifierFactory);
-      print(await loop.run({ runId, task: fixtureTask(runId, profileId, root, config), mode: modeValue, maxTurns }));
       break;
     }
     case "show": {
@@ -654,7 +686,7 @@ async function main(): Promise<void> {
       const normalized = candidate.trim();
       const candidateArtifact = await services.artifacts.putText(runId, normalized, {
         filename: "cli-fixture-score-candidate.txt",
-        sensitivity: "flag_candidate",
+        sensitivity: "result_candidate",
       });
       const completionId = `C-CLI-${randomUUID()}`;
       await services.control.dispatch(runId, {
@@ -684,15 +716,17 @@ async function main(): Promise<void> {
     case "agent": {
       const runId = required(arg, "run id");
       const prompt = rest.join(" ").trim() || "Summarize the current verified facts and evidence ids in JSON.";
-      const runDir = join(services.runsRoot, runId);
-      await access(runDir);
-      const lane = await PiAgentLane.create({ runId, runDir, controlStore: services.control, config });
-      try {
-        const outcome = await lane.prompt(prompt);
-        print(outcome);
-      } finally {
-        await lane.close();
-      }
+      const taskSnapshot = await services.control.snapshot(runId);
+      let response: AgentOutcome | undefined;
+      const result = await new SingleAgentLoop(root, config, services, undefined, browserVerifierFactory).run({
+        runId,
+        task: taskSnapshot.task,
+        mode: "assist",
+        maxTurns: 1,
+        userPrompt: prompt,
+        onTurn: (outcome) => { response = outcome; },
+      });
+      print(response ?? result);
       break;
     }
     case "help":
@@ -773,6 +807,27 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
+function taskStatus(snapshot: RunSnapshot): Record<string, unknown> {
+  return {
+    runId: snapshot.runId,
+    status: snapshot.status,
+    phase: snapshot.phase,
+    targetKind: snapshot.task.target_kind,
+    generation: snapshot.generation,
+    lastSeq: snapshot.lastSeq,
+    counts: {
+      facts: Object.keys(snapshot.facts).length,
+      observations: Object.keys(snapshot.observations).length,
+      evidence: Object.keys(snapshot.evidence).length,
+      artifacts: Object.keys(snapshot.artifacts).length,
+      effects: Object.keys(snapshot.effects).length,
+      completions: Object.keys(snapshot.completions).length,
+    },
+    finalResult: snapshot.finalResult,
+    failureCategory: snapshot.failureCategory,
+  };
+}
+
 function parseObject(value: string, label: string): Record<string, unknown> {
   const parsed = JSON.parse(value) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${label} must be a JSON object`);
@@ -811,6 +866,11 @@ function helpText(): string {
     "Commands:",
     "  init <run-id>",
     "  run demo [--run-id ID]",
+    "  task templates",
+    "  task create <task-id> --template <template-id> [--objective TEXT]",
+    "  task run <task-id> [--mode auto|assist] [--max-turns N]",
+    "  task status <task-id>",
+    "  task cancel <task-id> [reason]",
     "  fixtures",
     "  eval [--attempts N] [--max-turns N] [--run-prefix ID] [--enforce-gate]",
     "  eval-real <corpus.json> [--preflight] [--allow-live] --variant ID=config.json --variant ID=config.json [--attempts N] [--max-turns N] [--max-cost-usd USD] [--deadline-ms N] [--min-success-rate 0..1] [--baseline ID] [--max-success-rate-drop 0..1] [--enforce-gate]",
@@ -827,7 +887,6 @@ function helpText(): string {
     "  competition-api replay <journal.jsonl> --script <requests.json>",
     "  intents list|score|graph|claim <run-id>",
     "  skill <run-id> <skill-name> [additional instructions]",
-    "  solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]",
     "  show <run-id>",
     "  timeline <run-id>",
     "  ledger <run-id>",

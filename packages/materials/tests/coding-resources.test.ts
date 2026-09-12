@@ -8,66 +8,268 @@ import {
   codingProviderToolContractSnapshot,
   createCodingToolEffectPolicyResolver,
   createCodingTools,
+  createMcpFirstClassToolSelection,
   createMcpFirstClassTools,
+  MAX_MCP_FIRST_CLASS_METADATA_BYTES,
   selectFirstClassMcpTools,
   interactiveTimeoutHint,
   interactiveCommandHint,
   bashEscapeHatchViolation,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
-import { codingCtfCategoryGuidance, isChallengeTask, isLikelyCtfPrompt } from "../src/runtime/coding-lane.js";
+import { codingHostGuidance, createDeclaredExternalSubmitter, taskDeclaresRemotePwnTarget } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { ProofBladeToolRuntime } from "../src/tools/runtime.js";
 import type { ProofBladeConfig } from "../src/config.js";
-import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
+import { CodingClaimVerifier, requiresClaimVerification, TaskResultVerifier } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { codingHostGuidance } from "../src/runtime/coding-lane.js";
 
 /**
  * Pinned so an accidental schema/description/order change is caught. Update it
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "a2995bca1a1a56aaf44126e4ee5b95c994053d1e32689762b19d7497c0dc7f43";
+const CODING_TOOL_CONTRACT_HASH = "819d224d1ed8e5d3bab818b2eefe33fd220f7f25f4b2ddf57244ca45013958b9";
+
+test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
+  assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
+});
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
+  assert.equal(snapshot.some((tool) => tool.name === "verify_claim"), false);
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((tool) => tool.name === "submit_flag"), false);
   assert.equal(snapshot.some((tool) => ["list_mcp_servers", "describe_mcp_server", "call_mcp_tool"].includes(tool.name)), false);
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_claim", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
-  // submit_flag is gated on the run being platform-judged, not on tool selection.
+  // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
-  assert.ok(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true }).includes("submit_flag"));
+  const genericExternalTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], externalSubmissionEnabled: true });
+  assert.deepEqual(genericExternalTools.slice(-1), ["external_submit"]);
+  assert.equal(genericExternalTools.includes("submit_flag"), false);
+  const platformTools = codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], platformJudged: true });
+  assert.deepEqual(platformTools.slice(-1), ["external_submit"]);
+  assert.equal(platformTools.includes("submit_flag"), false);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
 });
 
-test("first-class MCP tools are category-scoped and deferred elsewhere", () => {
+test("ordinary read follows bounded continuation pages into one complete model result", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-complete-read-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  try {
+    const lines = Array.from({ length: 2_500 }, (_, index) => `README line ${index + 1}`);
+    await writeFile(join(dir, "README.md"), `${lines.join("\n")}\n`, "utf8");
+    const context = { env, completedReads: new Map(), enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const result = await executeTool("read", { path: "README.md" }, context);
+    const text = result.content.map((part) => part.text ?? "").join("\n");
+    assert.match(text, /README line 1\b/);
+    assert.match(text, /README line 2500\b/);
+    assert.doesNotMatch(text, /Use offset=\d+ to continue/);
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("remote nc targets enable the durable pwn session broker across task categories", () => {
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:nc challenge.internal 31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:nc://challenge.internal:31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:challenge.internal:31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:http://challenge.internal:8080" }), false);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "CHALLENGE:crypto-1" }), false);
+});
+
+test("external_submit exposes an explicit target and forwards an opaque payload", async () => {
+  const tool = createCodingTools({ externalSubmissionEnabled: true }).find((candidate) => candidate.name === "external_submit");
+  assert.ok(tool, "external_submit should be registered for configured destinations");
+  assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((candidate) => candidate.name === "submit_flag"), false);
+  let received: unknown;
+  const context = { externalSubmit: async (request: unknown) => {
+    received = request;
+    return { accepted: true, completionId: "C-EXT", candidateHash: "a".repeat(64), replayed: false, submissionsUsed: 1, submissionsRemaining: 2, target: "review" };
+  } } as unknown as CodingResourceContext;
+  const result = await (tool as AgentHarnessTool<CodingResourceContext>).execute("external-call", { target: " review ", payload: "opaque result" }, new AbortController().signal, () => undefined, context);
+  assert.deepEqual(received, { target: "review", payload: "opaque result" });
+  assert.equal((result.details as { target: string }).target, "review");
+});
+
+test("declared external submission rejects destinations outside the immutable task allowlist", async () => {
+  const calls: unknown[] = [];
+  const submit = createDeclaredExternalSubmitter({
+    targets: ["review"],
+    submit: async (request) => {
+      calls.push(request);
+      return { accepted: true, completionId: "C-REVIEW", candidateHash: "b".repeat(64), replayed: false, submissionsUsed: 1, submissionsRemaining: 2, target: request.target };
+    },
+  });
+  const accepted = await submit({ target: " review ", payload: "opaque result" });
+  assert.equal(accepted.target, "review");
+  assert.deepEqual(calls, [{ target: "review", payload: "opaque result" }]);
+  await assert.rejects(() => submit({ target: "deployment", payload: "opaque result" }), /not declared by this task/);
+  assert.deepEqual(calls, [{ target: "review", payload: "opaque result" }]);
+});
+
+test("generic result proposals accept ordinary text without CTF formatting", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-generic-result-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "GENERIC-RESULT-TEST";
+  await services.control.createRun(runId, demoTask(runId, root, config));
+  const runtime = new ProofBladeToolRuntime(
+    runId,
+    { fixtureId: runId, generation: 0, path: root, privatePath: join(root, ".proofblade") },
+    services.runsRoot,
+    services.control,
+    services.artifacts,
+    services.journal,
+    root,
+    { includeMcp: false },
+  );
+  try {
+    const proposed = await runtime.submitResult("ordinary report result", { target: "review" });
+    const snapshot = await services.control.snapshot(runId);
+    const completion = snapshot.completions[proposed.completionId];
+    assert.ok(completion);
+    assert.equal(completion.purpose, "submission");
+    assert.equal(completion.submissionTarget, "review");
+    assert.equal(await services.artifacts.readText(runId, snapshot.artifacts[completion.artifactId]!), "ordinary report result");
+  } finally {
+    await runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("verify_result accepts a durable result Artifact with a hash-bound verifier envelope", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-result-artifact-verification-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "RESULT-ARTIFACT-VERIFICATION";
+  const task = demoTask(runId, root, config);
+  task.scope.allowed_workspace = root;
+  task.verification.required_reproductions = 1;
+  task.verification.command = "node verify-result.mjs";
+  await services.control.createRun(runId, task);
+  await writeFile(join(root, "report.json"), "{\"finding\":\"safe\",\"confidence\":0.98}\n", "utf8");
+  const resultArtifact = await services.artifacts.putText(runId, await readFile(join(root, "report.json"), "utf8"), {
+    filename: "report.json",
+    mime: "application/json",
+    sensitivity: "result_candidate",
+  });
+  await writeFile(join(root, "verify-result.mjs"), [
+    "import { readFileSync } from 'node:fs';",
+    "import { createHash } from 'node:crypto';",
+    "const resultHash = createHash('sha256').update(readFileSync('report.json')).digest('hex');",
+    "process.stdout.write(JSON.stringify({ accepted: true, resultHash }));",
+  ].join("\n"), "utf8");
+  try {
+    const verifier = new TaskResultVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const result = await executeTool("verify_result", { resultArtifactId: resultArtifact.id, command: task.verification.command }, {
+      env: { cwd: root },
+      claimVerifier: verifier,
+    } as unknown as CodingResourceContext);
+    assert.equal(result.isError, false);
+    assert.equal((result.details as { verified: boolean }).verified, true);
+    assert.equal((result.details as { resultArtifactId: string }).resultArtifactId, resultArtifact.id);
+    assert.equal((result.details as { resultHash: string }).resultHash, resultArtifact.sha256);
+    const snapshot = await services.control.snapshot(runId);
+    const completion = Object.values(snapshot.completions)[0];
+    assert.equal(completion?.artifactId, resultArtifact.id);
+    assert.equal(completion?.status, "ACCEPTED");
+    const projection = await verifier.project("Verify the report Artifact", "The report Artifact has been verified.");
+    assert.equal(projection.status, "verified");
+    assert.equal(projection.candidateHash, resultArtifact.sha256);
+    assert.equal(projection.completionId, completion?.id);
+    const conflictingText = await verifier.project("Verify the report Artifact", "最终结果：a different text result");
+    assert.equal(conflictingText.status, "unverified", "a stated text result must not inherit a different Artifact verification");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("verify_result returns actionable feedback when verification is rejected", async () => {
+  const literal = await executeTool("verify_result", { result: "result-value", command: "printf result-value" }, {} as CodingResourceContext);
+  assert.equal(literal.isError, true);
+  assert.deepEqual(literal.details, {
+    verified: false,
+    result: "result-value",
+    resultHash: sha256("result-value"),
+    commandHash: sha256("printf result-value"),
+    verifierFeedback: {
+      stage: "input",
+      reason: "Verification command embeds the result literal; derive it from workspace inputs instead",
+      retryable: true,
+      nextAction: "Derive the result from workspace inputs; do not place the literal result in the verification command.",
+    },
+  });
+
+  const execution = await executeTool("verify_result", { result: "result-value", command: "node verify.mjs" }, {
+    env: { cwd: "." },
+    claimVerifier: { recordResult: async () => { throw new Error("verifier command exited with code 1"); } },
+  } as unknown as CodingResourceContext);
+  assert.equal(execution.isError, true);
+  const feedback = (execution.details as { verifierFeedback: { stage: string; reason: string; retryable: boolean; nextAction: string } }).verifierFeedback;
+  assert.deepEqual(feedback, {
+    stage: "execution",
+    reason: "verifier command exited with code 1",
+    retryable: true,
+    nextAction: "Inspect the verifier output and supporting Evidence, then change the command or result before retrying.",
+  });
+});
+
+test("first-class MCP tools stay visible for enabled security capabilities", () => {
   const tools = [
     { name: "mcp__idalib-mcp__idalib_open" },
     { name: "mcp__idalib-mcp__decompile" },
-    { name: "mcp__idalib-mcp__rename" },
+    { name: "mcp__idalib-mcp__survey_binary" },
     { name: "mcp__jadx__get_class_source" },
-    { name: "mcp__jadx__rename_class" },
+    { name: "mcp__jadx__get_strings" },
   ];
   assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.elf").map((tool) => tool.name), [
     "mcp__idalib-mcp__idalib_open",
     "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
   ]);
-  assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.apk").map((tool) => tool.name), ["mcp__jadx__get_class_source"]);
-  assert.deepEqual(selectFirstClassMcpTools(tools, "web", "sample").map((tool) => tool.name), []);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "reverse", "sample.apk").map((tool) => tool.name), [
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "unknown", "sample").map((tool) => tool.name), [
+    "mcp__idalib-mcp__idalib_open",
+    "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
+  assert.deepEqual(selectFirstClassMcpTools(tools, "web", "sample").map((tool) => tool.name), [
+    "mcp__idalib-mcp__idalib_open",
+    "mcp__idalib-mcp__decompile",
+    "mcp__idalib-mcp__survey_binary",
+    "mcp__jadx__get_class_source",
+    "mcp__jadx__get_strings",
+  ]);
 });
 
 test("mobile profile selects JADX first-class tools even when the durable task kind is unknown", () => {
@@ -80,45 +282,12 @@ test("mobile profile selects JADX first-class tools even when the durable task k
 
 test("coding host guidance uses Windows-compatible Python and workspace paths", () => {
   const guidance = codingHostGuidance("win32");
-  assert.match(guidance, /python or py/);
-  assert.match(guidance, /never python3/);
+  assert.match(guidance, /command -v python3 \|\| command -v python \|\| command -v py/);
+  assert.match(guidance, /reuse the discovered name/);
+  assert.doesNotMatch(guidance, /never python3/);
   assert.match(guidance, /workspace-relative/);
   assert.match(guidance, /\/tmp/);
-  assert.doesNotMatch(codingHostGuidance("linux"), /never python3/);
-});
-
-test("coding prompt carries strict interactive Pwn synchronization guidance", () => {
-  const source = readFileSync(resolve(import.meta.dirname, "../src/runtime/coding-lane.ts"), "utf8");
-  assert.match(source, /generic suffix/);
-  assert.match(source, /PB_READY/);
-  assert.match(source, /PYTHONIOENCODING=utf-8/);
-  assert.match(source, /First action contract/);
-  assert.match(source, /PREPARED_CTF_WORKFLOW_PROMPT/);
-  assert.match(source, /first assistant action MUST be one allowed tool call/);
-  assert.match(source, /PREPARED_CTF_FAST_PATH_PROMPT/);
-  assert.match(source, /contextProjectionMessage\(compiled, turnContext\.guidance\)/);
-  assert.match(source, /<proofblade-turn-guidance>/);
-});
-
-test("pwn guidance steers interactive work to the tube when available, background otherwise", () => {
-  const withTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true);
-  // Tube path: point at pwn_open/send/recv/reproduce, not a blocking bash script.
-  assert.match(withTube, /pwn_open/);
-  assert.match(withTube, /pwn_recv/);
-  assert.match(withTube, /pwn_reproduce/);
-  // The old "Use `from pwn import *` directly" nudge that produced monolithic
-  // blocking scripts must be gone.
-  assert.doesNotMatch(withTube, /Use `from pwn import \*` directly/);
-
-  const noTube = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", false);
-  // No-tube path: forbid blocking a foreground bash; use shell_background.
-  assert.match(noTube, /shell_background/);
-  assert.match(noTube, /shell_job/);
-  assert.doesNotMatch(noTube, /pwn_open/);
-
-  const noVerifier = codingCtfCategoryGuidance("pwn", "REMOTE:nc 1.14.76.59:23984", true, false);
-  assert.match(noVerifier, /immutable task verifier is not configured/);
-  assert.doesNotMatch(noVerifier, /Confirm a solve with `pwn_reproduce`/);
+  assert.doesNotMatch(codingHostGuidance("linux"), /command -v python3/);
 });
 
 test("a timed-out interactive bash command yields a targeted remediation hint", () => {
@@ -156,7 +325,7 @@ test("coding provider tools use object-root schemas accepted by strict OpenAI-co
   assert.equal(evidence.properties?.maxChars?.type, "number");
 });
 
-test("[contract:evidence-inspect-forest-max-chars] coding claim verification rejects decoys and persists a matching reproduction", async () => {
+test("[contract:evidence-inspect-forest-max-chars] generic result verification rejects decoys and persists a matching reproduction", async () => {
   assert.equal(requiresClaimVerification("完成这道题，并得到flag"), true);
   assert.equal(requiresClaimVerification("分析这些文件", "结果是 flag{derived}"), true);
   assert.equal(requiresClaimVerification("修复 feature flag 的布尔判断"), false);
@@ -225,40 +394,41 @@ test("[contract:evidence-inspect-forest-max-chars] coding claim verification rej
       () => executeTool("evidence", { operation: "annotate", artifactId: analysisArtifact.id, name: "bad", summary: "bad", relatedIds: ["EV-MISSING"] }, context),
       /Unknown related ids/,
     );
-    await assert.rejects(
-      () => executeTool("verify_claim", { candidate, command: `echo ${candidate}` }, context),
-      /embeds the candidate literal/,
-    );
-    await assert.rejects(
-      () => executeTool("verify_claim", { candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context),
-      /exact immutable task-bound verification command/,
-    );
-    const result = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
-    const details = result.details as Record<string, unknown>;
-    assert.equal(details.verified, true);
-    assert.equal(result.terminate, undefined, "ordinary claim verification keeps the coding turn interactive");
+    const literalFailure = await executeTool("verify_result", { result: candidate, command: `echo ${candidate}` }, context);
+    assert.equal(literalFailure.isError, true);
+    assert.match(JSON.stringify(literalFailure.details), /embeds the result literal/);
+    const policyFailure = await executeTool("verify_result", { result: candidate, command: "node other-solver.mjs", evidenceIds: [evidenceId] }, context);
+    assert.equal(policyFailure.isError, true);
+    assert.match(JSON.stringify(policyFailure.details), /exact immutable task-bound verification command/);
+    const generic = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, context);
+    const genericDetails = generic.details as Record<string, unknown>;
+    assert.equal(genericDetails.result, candidate);
+    assert.equal(genericDetails.verified, true);
+    const genericCompletion = Object.values((await services.control.snapshot(runId)).completions)[0];
+    assert.equal(genericCompletion?.purpose, "harness_verification");
+    assert.equal(generic.terminate, undefined, "ordinary result verification keeps the coding turn interactive");
     const snapshot = await services.control.snapshot(runId);
     assert.equal(Object.keys(snapshot.evidence).length, 2);
     assert.equal(Object.values(snapshot.evidence).filter((item) => item.kind === "reproduction" && item.dependsOn?.includes(evidenceId)).length, 1);
     assert.equal(Object.values(snapshot.completions).filter((item) => item.status === "ACCEPTED").length, 1);
     assert.equal(Object.values(snapshot.facts).filter((item) => item.status === "CONFIRMED").length, 1);
-    assert.ok(snapshot.artifacts[String(details.artifactId)]);
+    assert.ok(snapshot.artifacts[String(genericDetails.artifactId)]);
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.name, "EF01 受保护记录");
     assert.equal(snapshot.artifacts[analysisArtifact.id]?.semantic?.role, "supporting");
     assert.ok(snapshot.artifacts[analysisArtifact.id]?.semantic?.relatedIds.includes(evidenceId));
     assert.equal((await verifier.project("完成这道题，并得到flag", `最终结果：${candidate}`)).status, "verified");
     assert.equal((await verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042")).status, "unverified");
-    const deferred = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+    const deferred = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
       ...context,
       deferClaimAcceptance: true,
     });
-    assert.equal(deferred.terminate, true, "deferred claim acceptance must return control to the outer verifier");
-    const continuous = await executeTool("verify_claim", { candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
+    assert.equal(deferred.terminate, true, "deferred result acceptance must return control to the outer verifier");
+    const continuous = await executeTool("verify_result", { result: candidate, command: "node solve.mjs", evidenceIds: [evidenceId] }, {
       ...context,
       deferClaimAcceptance: true,
       continuousRecovery: true,
     });
-    assert.equal(continuous.terminate, undefined, "continuous recovery keeps claim verification in the same lane");
+    assert.equal(continuous.terminate, undefined, "continuous recovery keeps result verification in the same lane");
   } finally {
     await env.cleanup();
     await rm(dir, { recursive: true, force: true });
@@ -404,6 +574,9 @@ test("coding resource proxies enforce conversation enablement and route MCP lazi
   context.enabledSkills.add("triage");
   const loaded = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
   assert.deepEqual(loaded.details, { name: "triage", maxChars: 2_000, content: "loaded" });
+  const repeated = await executeTool("load_skill", { name: "triage", maxChars: 2_000 }, context);
+  assert.equal((repeated.details as { alreadyLoaded?: boolean }).alreadyLoaded, true);
+  assert.doesNotMatch(repeated.content.map((part) => part.text ?? "").join("\n"), /"content":"loaded"/);
 });
 
 test("[contract:coding-capability-proxy] coding capability proxy discovers lazily and invokes through the journaled runtime", async () => {
@@ -587,7 +760,9 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     const artifactId = String((read.details as Record<string, unknown>).artifactId);
     // The artifact is archived for the evidence graph, but read output is
     // already complete, so the model must not be told content was withheld.
-    assert.equal(/ProofBlade artifact/.test(read.content.map((item) => item.text ?? "").join("\n")), false);
+    const readText = read.content.map((item) => item.text ?? "").join("\n");
+    assert.equal(/ProofBlade artifact/.test(readText), false);
+    assert.doesNotMatch(readText, /\[ProofBlade receipt\]/);
     assert.match(artifactId, /^A-/);
     const readDetails = read.details as Record<string, unknown>;
     assert.equal(readDetails.durableProgress, false, "routine reads must not reset solver experiment budgets");
@@ -598,7 +773,9 @@ test("coding read creates a searchable source artifact for the evidence graph", 
     assert.ok(observedSnapshot.observations[String(readDetails.observationId)]);
     assert.ok(observedSnapshot.evidence[String(readDetails.evidenceId)]);
     const repeated = await executeTool("read", { path: "source.txt" }, context);
-    assert.match(repeated.content.map((item) => item.text ?? "").join("\n"), /same artifact content as/);
+    const repeatedText = repeated.content.map((item) => item.text ?? "").join("\n");
+    assert.match(repeatedText, /same artifact content as/);
+    assert.doesNotMatch(repeatedText, /did=0xEF01/, "repeat notice must not re-inject the archived content through a receipt preview");
     const autoReviewed = (await services.control.snapshot(runId)).artifacts[artifactId]!;
     assert.equal(autoReviewed.semantic?.annotatedBy, "agent", "routine read output should be auto-reviewed by the observer");
     const searched = await executeTool("evidence", { operation: "search", query: "source.txt DID protected" }, context);
@@ -615,25 +792,11 @@ test("coding read creates a searchable source artifact for the evidence graph", 
   }
 });
 
-test("legacy CTF prompt detection remains descriptive and does not redefine general task mode", () => {
-  assert.equal(isLikelyCtfPrompt("题目描述：求解flag"), true);
-  assert.equal(isLikelyCtfPrompt("reverse engineering an APK"), true);
-  assert.equal(isLikelyCtfPrompt("修复 feature flag 的布尔判断"), false);
-  assert.equal(isLikelyCtfPrompt("重构普通 Python 服务"), false);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
-});
-
 test("bash remains an untrusted escape hatch and cannot write the control ledger", () => {
   assert.match(bashEscapeHatchViolation("node -e 'controlStore.dispatchTransaction(run, { type: \\\"domain_record\\\" })'") ?? "", /cannot write ProofBlade control records/);
   assert.match(bashEscapeHatchViolation("python -c 'open(\\\"runs/CONTROL/events.jsonl\\\", \\\"a\\\").write(\\\"fake\\\")'") ?? "", /cannot write ProofBlade control records/);
   assert.equal(bashEscapeHatchViolation("rg -n domain_record packages/materials/src"), undefined);
   assert.equal(bashEscapeHatchViolation("python -c 'print(2 + 2)'"), undefined);
-});
-
-test("durable CTF task classification enables challenge guards without prompt keywords", () => {
-  assert.equal(isChallengeTask({ mode: "ctf_solve", target_kind: "unknown" }), true);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "web" }), false);
-  assert.equal(isChallengeTask({ mode: "coding_assistant", target_kind: "unknown" }), false);
 });
 
 test("shell_background returns immediately and shell_job polls then stops the real process", async (t) => {
@@ -960,6 +1123,113 @@ test("polling a background job stays read-only so it cannot mask a stalled agent
   assert.deepEqual(resolve("shell_job", { operation: "stop", jobId: "sh-1" }), { readOnly: false, sideEffect: "process" });
 });
 
+test("first-class MCP metadata is bounded while omitted tools remain available through mcp_call", async () => {
+  const deepSchema: Record<string, unknown> = { type: "object" };
+  let cursor = deepSchema;
+  for (let depth = 0; depth <= 8; depth += 1) {
+    const child: Record<string, unknown> = { type: "object" };
+    cursor.properties = { child };
+    cursor = child;
+  }
+  const oversizedProperties = Object.fromEntries(Array.from({ length: 65 }, (_unused, index) => [`field_${index}`, { type: "string" }]));
+  const summaries: McpServerSummary[] = [
+    { name: "bounded", capabilityId: "mcp.bounded", description: "bounded fixture", disabled: false, status: "configured", configHash: "bounded-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "bounded",
+      configHash: "bounded-hash",
+      tools: [
+        { name: "normal", description: "x".repeat(8_000), inputSchema: { type: "object" } },
+        { name: "too-deep", description: "deep schema", inputSchema: deepSchema },
+        { name: "too-wide", description: "wide schema", inputSchema: { type: "object", properties: oversizedProperties } },
+        { name: "unsafe name", description: "unsafe name", inputSchema: { type: "object" } },
+      ],
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["bounded"]);
+  assert.deepEqual(selected.tools.map((tool) => tool.name), ["mcp__bounded__normal"]);
+  assert.ok(Buffer.byteLength(selected.tools[0].description, "utf8") <= 256);
+  assert.equal(selected.exposure.descriptionsTruncated, 1);
+  assert.equal(selected.exposure.omitted, 3);
+  assert.deepEqual(selected.exposure.omittedByReason, { tool_limit: 0, invalid_name: 1, schema: 2 });
+  assert.equal(selected.exposure.truncated, true);
+  assert.ok(createCodingTools().some((tool) => tool.name === "mcp_call"), "mcp_call must remain the fallback for omitted tools");
+});
+
+test("first-class MCP promotion has deterministic per-server and total tool limits", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "one", capabilityId: "mcp.one", description: "first", disabled: false, status: "configured", configHash: "one-hash" },
+    { name: "two", capabilityId: "mcp.two", description: "second", disabled: false, status: "configured", configHash: "two-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async (server: string) => ({
+      server,
+      configHash: `${server}-hash`,
+      tools: Array.from({ length: 20 }, (_unused, index) => ({ name: `tool_${index}`, description: `tool ${index}`, inputSchema: { type: "object" } })),
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["one", "two"]);
+  assert.equal(selected.tools.length, 24);
+  assert.equal(selected.tools.filter((tool) => tool.name.startsWith("mcp__one__")).length, 16);
+  assert.equal(selected.tools.filter((tool) => tool.name.startsWith("mcp__two__")).length, 8);
+  assert.equal(selected.exposure.omitted, 16);
+  assert.equal(selected.exposure.omittedByReason.tool_limit, 16);
+  assert.equal(selected.exposure.truncated, true);
+});
+
+test("first-class MCP exposure reports description truncation without hiding the tool", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "described", capabilityId: "mcp.described", description: "description fixture", disabled: false, status: "configured", configHash: "description-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "described",
+      configHash: "description-hash",
+      tools: [{ name: "inspect", description: "x".repeat(8_000), inputSchema: { type: "object" } }],
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["described"]);
+  assert.equal(selected.tools.length, 1);
+  assert.deepEqual(selected.exposure.omittedByReason, { tool_limit: 0, invalid_name: 0, schema: 0 });
+  assert.equal(selected.exposure.omitted, 0);
+  assert.equal(selected.exposure.descriptionsTruncated, 1);
+  assert.equal(selected.exposure.truncated, true);
+});
+
+test("first-class MCP schemas share a total Provider metadata budget", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "budget", capabilityId: "mcp.budget", description: "budget fixture", disabled: false, status: "configured", configHash: "budget-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "budget",
+      configHash: "budget-hash",
+      tools: Array.from({ length: 8 }, (_unused, index) => ({
+        name: `tool_${index}`,
+        description: "metadata budget fixture",
+        inputSchema: { type: "object", description: "x".repeat(2_700) },
+      })),
+    }),
+  } as unknown as McpProjectRegistry;
+
+  const selected = await createMcpFirstClassToolSelection(mcp, ["budget"]);
+  const usedBytes = selected.tools.reduce((total, tool) => total
+    + Buffer.byteLength(tool.name, "utf8")
+    + Buffer.byteLength(tool.description, "utf8")
+    + Buffer.byteLength(JSON.stringify(tool.parameters), "utf8"), 0);
+  assert.ok(selected.tools.length > 0 && selected.tools.length < 8);
+  assert.ok(usedBytes <= MAX_MCP_FIRST_CLASS_METADATA_BYTES);
+  assert.equal(selected.exposure.omittedByReason.tool_limit, 8 - selected.tools.length);
+});
+
 test("MCP results reach the model unwrapped instead of quadruple-encoded JSON", async () => {
   // Exact wire shape observed in run CHAT-1786697151961: the tool's JSON is a
   // string inside result.content[].text, inside the {server,tool,result}
@@ -1073,6 +1343,42 @@ test("first-class MCP calls use the journaled runtime when a coding lane provide
   assert.equal((result.details as { artifactId: string }).artifactId, "A-1");
 });
 
+test("failed security MCP calls return an actionable fallback instead of a bare rejection", async () => {
+  const summaries: McpServerSummary[] = [
+    { name: "idalib-mcp", capabilityId: "mcp.idalib", description: "IDA", disabled: false, status: "configured", configHash: "ida-hash" },
+  ];
+  const mcp = {
+    summaries: () => summaries,
+    describeServer: async () => ({
+      server: "idalib-mcp",
+      configHash: "ida-hash",
+      tools: [{ name: "decompile", description: "Decompile", inputSchema: { type: "object" }, readOnlyHint: true }],
+    }),
+  } as unknown as McpProjectRegistry;
+  const context = {
+    mcp,
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set(["idalib-mcp"]),
+    runtime: {
+      async invokeCapability() {
+        throw new Error("idalib toolchain unavailable: IDA path is missing");
+      },
+    },
+  } as unknown as CodingResourceContext;
+  const tools = await createMcpFirstClassTools(mcp, ["idalib-mcp"]);
+  const decompile = tools.find((tool) => tool.name === "mcp__idalib-mcp__decompile");
+  assert.ok(decompile);
+  const result = await decompile.execute("call-failed", { path: "sample.bin" }, new AbortController().signal, () => undefined, context);
+  const text = (result.content as Array<{ text?: string }>).map((part) => part.text ?? "").join("\n");
+  assert.equal(result.isError, true);
+  assert.match(text, /\[ProofBlade MCP failure\]/);
+  assert.match(text, /server=idalib-mcp tool=decompile/);
+  assert.match(text, /retryable=false/);
+  assert.match(text, /file, strings, readelf, or objdump/);
+  const feedback = (result.details as { failureFeedback: { status: string; server: string; tool: string; reason: string; retryable: boolean; nextActions: string[] } }).failureFeedback;
+  assert.deepEqual({ status: feedback.status, server: feedback.server, tool: feedback.tool, retryable: feedback.retryable }, { status: "failed", server: "idalib-mcp", tool: "decompile", retryable: false });
+});
+
 test("bash anchors an artifact only when output was actually withheld", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "proofblade-anchor-test-"));
   const env = new NodeExecutionEnv({ cwd: dir });
@@ -1106,6 +1412,7 @@ test("bash anchors an artifact only when output was actually withheld", async (t
     const completeText = complete.content.map((part) => part.text ?? "").join("\n");
     assert.match(completeText, /hello/);
     assert.equal(/ProofBlade artifact/.test(completeText), false, "complete output must not claim an artifact holds more");
+    assert.doesNotMatch(completeText, /\[ProofBlade receipt\]/, "complete output must not be duplicated in a receipt");
 
     savedBytes = 4096;
     const withheld = await executeTool("bash", { command: "echo hello" }, context);
@@ -1122,6 +1429,62 @@ test("bash anchors an artifact only when output was actually withheld", async (t
       await rm(dir, { recursive: true, force: true });
     }
   }
+});
+
+test("failed bash returns structured error feedback and records the real experiment outcome", async () => {
+  const archived: string[] = [];
+  const experiments: Array<Record<string, unknown>> = [];
+  const env = {
+    cwd: "/workspace",
+    async exec(_command: string, options: { onStderr?: (text: string) => void }) {
+      options.onStderr?.("missing tool\n");
+      return { ok: true as const, value: { stdout: "", stderr: "missing tool\n", exitCode: 17 } };
+    },
+  };
+  const pipeline = {
+    port: {
+      async prepare(request: { toolCallId: string; command: string }) {
+        return { toolCallId: request.toolCallId, command: request.command, provider: "builtin", requestedProvider: "builtin", providerVersion: "1", applied: false, executionEnv: {}, originalCommandHash: "h1", rewrittenCommandHash: "h1" };
+      },
+      async finalize(_ticket: unknown, visible: string) {
+        return { rawOutput: visible, rawBytes: visible.length, visibleBytes: visible.length, rawTruncated: false, rawCapture: "full" };
+      },
+    } as unknown as OutputRewritePort,
+    artifactStore: {
+      async putText(_runId: string, text: string) {
+        archived.push(text);
+        return { id: `A-${archived.length}`, sha256: "deadbeef" };
+      },
+    },
+    runId: "RUN-bash-failure",
+  } as unknown as NonNullable<CodingResourceContext["outputRewrite"]>;
+  const context = {
+    env,
+    outputRewrite: pipeline,
+    runtime: { runId: "RUN-bash-failure" },
+    experimentGate: { async assertAllowed() {}, async record(input: Record<string, unknown>) { experiments.push(input); } },
+    enabledSkills: new Set<string>(),
+    enabledMcpServers: new Set<string>(),
+  } as unknown as CodingResourceContext;
+
+  const workspaceResult = await executeTool("bash", { command: "cat /workspace/input.txt" }, context);
+  assert.deepEqual((workspaceResult.details as { sourceScope: unknown }).sourceScope, { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] });
+  assert.doesNotMatch(workspaceResult.content.map((part) => part.text ?? "").join("\n"), /\[ProofBlade source scope\]/);
+
+  const result = await executeTool("bash", { command: "cat /flag; find ../other -type f 2>/dev/null" }, context);
+  const text = result.content.map((part) => part.text ?? "").join("\n");
+  assert.equal(result.isError, true);
+  assert.equal((result.details as { exitCode: number }).exitCode, 17);
+  assert.equal((result.details as { failureKind: string }).failureKind, "exit");
+  assert.deepEqual((result.details as { sourceScope: unknown }).sourceScope, { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths: ["/flag", "../other"] });
+  assert.match(text, /missing tool[\s\S]*Command exited with code 17/);
+  assert.match(text, /\[ProofBlade source scope\][\s\S]*authoritative_for_task_result=false/);
+  assert.match(text, /\[ProofBlade receipt\][\s\S]*state=error/);
+  assert.match(text, /next=none/);
+  assert.equal(text.match(/missing tool/g)?.length, 1, "the error body must not be duplicated in receipt preview");
+  assert.equal(experiments.length, 2);
+  assert.ok(experiments.every((experiment) => experiment.outcome === "failure"));
+  assert.equal(experiments[1]?.summary, "Foreground bash exited with code 17.");
 });
 
 async function executeTool(name: string, params: Record<string, unknown>, context: CodingResourceContext): Promise<{ content: Array<{ type: string; text?: string }>; details: unknown; isError: boolean }> {

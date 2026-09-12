@@ -63,6 +63,26 @@ test("control store replay is deterministic and verifier gated", async () => {
   }
 });
 
+test("task external submission declarations require bounded unique logical destinations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-external-submission-task-"));
+  try {
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    const task = demoTask("EXTERNAL-SUBMISSION-OK", root, config);
+    task.external_submission = { targets: ["review"] };
+    await control.createRun(task.task_id, task);
+
+    const duplicate = demoTask("EXTERNAL-SUBMISSION-DUP", root, config);
+    duplicate.external_submission = { targets: ["review", " review "] };
+    await assert.rejects(control.createRun(duplicate.task_id, duplicate), /must be unique/);
+
+    const empty = demoTask("EXTERNAL-SUBMISSION-EMPTY", root, config);
+    empty.external_submission = { targets: [] };
+    await assert.rejects(control.createRun(empty.task_id, empty), /between 1 and 64/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("phase transitions do not implicitly resume a paused run", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-paused-phase-"));
   try {
@@ -83,13 +103,13 @@ test("phase transitions do not implicitly resume a paused run", async () => {
   }
 });
 
-test("CTF control events redact candidate-shaped annotation text at the replay boundary", async () => {
+test("control events redact candidate-shaped annotation text at the replay boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-control-redaction-"));
   try {
     const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
     const runId = "CTF-REDACTION-001";
     const candidate = "PB{control_event_secret}";
-    await control.createRun(runId, demoTask(runId, root, config));
+    await control.createRun(runId, { ...demoTask(runId, root, config), mode: "vulnerability_discovery" });
     const snapshot = await control.snapshot(runId);
     await control.dispatch(runId, {
       type: "artifact",
@@ -335,7 +355,7 @@ test("request epochs bind provider events and replay their context hashes", asyn
         adapter: "openai-completions",
         contextWindow: 16_384,
         toolCatalogHash: "tools-v1",
-        toolNames: ["inspect_target", "submit_candidate"],
+        toolNames: ["inspect_target", "external_submit"],
         contextManifestHash: "context-v1",
         status: "STARTED",
         createdAt: new Date().toISOString(),

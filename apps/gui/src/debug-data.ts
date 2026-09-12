@@ -1,27 +1,25 @@
 import { access, open, readdir, rm, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { JsonlSessionRepo, NodeExecutionEnv, type AgentHarnessEvent } from "@earendil-works/pi-agent-core/node";
 import {
   CheckpointService,
-  CodingClaimVerifier,
+  TaskResultVerifier,
   AUTOMATIC_CONTEXT_RECOVERY_MARKER,
   PiCodingLane,
-  ProofBladeToolRuntime,
   RunRecoveryService,
   RunTelemetry,
   RunCoordinator,
   ApprovalPolicy,
   ProofBladeAppServer,
-  SingleAgentCtfLoop,
+  SingleAgentLoop,
   createServices,
   assertRunId,
   RUN_ID_PATTERN,
   fixtureTask,
   listFixtureProfiles,
-  requiresClaimVerification,
-  classifyChallengePrompt,
-  rewriteUnverifiedClaimText,
+  rewriteUnverifiedResultText,
   type AppServices,
   type AgentLanePort,
   type AgentOutcome,
@@ -41,7 +39,7 @@ import {
   projectionHash,
 } from "@proofblade/materials";
 import { buildRunControlView } from "./control-view.js";
-import { stageCtfWorkspace, type CtfWorkspaceInput } from "./ctf-workspace.js";
+import { stageTaskWorkspace, type TaskWorkspaceInput } from "./task-workspace.js";
 import type {
   ActiveRunInfo,
   AssistantTurnDebug,
@@ -92,6 +90,7 @@ interface ContentLike {
 const runDetailCacheCapacity = 32;
 const runDetailCacheMaxBytes = 64 * 1024 * 1024;
 const runDetailCacheMaxEntryBytes = 8 * 1024 * 1024;
+export const ARTIFACT_PREVIEW_MAX_BYTES = 64 * 1024;
 type CodingLaneFactory = (options: Parameters<typeof PiCodingLane.create>[0]) => Promise<AgentLanePort>;
 
 export class DebugDataService {
@@ -103,7 +102,7 @@ export class DebugDataService {
   private readonly active = new Map<string, ActiveRunInfo>();
   private readonly activeLanes = new Map<string, AgentLanePort>();
   private readonly chatTasks = new Set<Promise<void>>();
-  private readonly solveTasks = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
+  private readonly taskRuns = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
   private readonly pauseRequests = new Set<string>();
   private readonly streamEmitters = new Map<string, (event: ChatStreamEvent) => void>();
   private readonly runListCache = new Map<string, { mtimeMs: number; item: RunListItem }>();
@@ -123,7 +122,7 @@ export class DebugDataService {
     private readonly config: ProofBladeConfig,
     private readonly configPath: string,
     createCodingLane?: CodingLaneFactory,
-    private readonly createCtfLane?: AgentLaneFactory,
+    private readonly createLane?: AgentLaneFactory,
   ) {
     this.browserVerifierFactory = tryCreateConfiguredBrowserVerifierFactory(config);
     const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(config);
@@ -157,13 +156,13 @@ export class DebugDataService {
     this.runDetailLoads.clear();
     const aborts: Promise<unknown>[] = [];
     for (const [runId, lane] of this.activeLanes) {
-      if (!this.solveTasks.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
+      if (!this.taskRuns.has(runId)) aborts.push(Promise.resolve().then(() => lane.abort("GUI shutting down")));
     }
-    for (const task of this.solveTasks.values()) task.controller.abort("GUI shutting down");
+    for (const task of this.taskRuns.values()) task.controller.abort("GUI shutting down");
     const abortResults = await Promise.allSettled(aborts);
     const taskResults = await Promise.allSettled([
       ...this.chatTasks,
-      ...[...this.solveTasks.values()].map((task) => task.promise),
+      ...[...this.taskRuns.values()].map((task) => task.promise),
     ]);
     const sandboxResult = await Promise.allSettled([this.services.sandbox.close()]);
     const failures = [...abortResults, ...taskResults, ...sandboxResult]
@@ -303,12 +302,27 @@ export class DebugDataService {
     }
   }
 
-  public async artifact(runId: string, artifactId: string): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string }> {
+  public async artifact(runId: string, artifactId: string, offset = 0, maxBytes = ARTIFACT_PREVIEW_MAX_BYTES): Promise<{ artifact: RunSnapshot["artifacts"][string]; content: string; offset: number; bytesRead: number; totalBytes: number; truncated: boolean }> {
     assertRunId(runId);
     const snapshot = await this.services.control.snapshot(runId);
     const artifact = snapshot.artifacts[artifactId];
     if (!artifact) throw new Error(`Artifact not found: ${artifactId}`);
-    return { artifact, content: await this.services.artifacts.readText(runId, artifact) };
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Artifact preview offset must be a non-negative integer");
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > ARTIFACT_PREVIEW_MAX_BYTES) throw new Error(`Artifact preview maxBytes must be between 1 and ${ARTIFACT_PREVIEW_MAX_BYTES}`);
+    return { artifact, ...await this.services.artifacts.readTextRange(runId, artifact, maxBytes, offset) };
+  }
+
+  public async promptSnapshot(runId: string): Promise<import("./shared.js").PromptSnapshot | undefined> {
+    assertRunId(runId);
+    try {
+      const parsed = JSON.parse(await readFile(join(this.services.runsRoot, runId, "prompt-snapshot.json"), "utf8")) as Partial<import("./shared.js").PromptSnapshot>;
+      if ((parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2) || typeof parsed.systemPrompt !== "string" || typeof parsed.projectPrompt !== "string" || typeof parsed.systemPromptHash !== "string" || typeof parsed.generatedAt !== "string") return undefined;
+      if (parsed.schemaVersion === 2 && (!Number.isInteger(parsed.projectPromptOriginalChars) || !Number.isInteger(parsed.projectPromptOmittedChars) || typeof parsed.projectPromptTruncated !== "boolean")) return undefined;
+      return parsed as import("./shared.js").PromptSnapshot;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
   }
 
   public async checkpoint(runId: string, reason: string): Promise<unknown> {
@@ -321,32 +335,32 @@ export class DebugDataService {
     return await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
   }
 
-  public async startSolve(input: { runId: string; fixtureId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
+  public async startTaskFromTemplate(input: { runId: string; templateId: string; mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
     assertRunId(input.runId);
-    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    const task = fixtureTask(input.runId, input.templateId, this.root, this.config);
     await this.ensureRunCreated(input.runId, task);
-    return await this.startCtfTask(task, input.mode, input.maxTurns);
+    return await this.startTaskRun(task, input.mode, input.maxTurns);
   }
 
-  /** Start an arbitrary attachment-backed CTF Run through the same durable loop as Fixture and Competition. */
-  public async startCtfSolve(input: CtfWorkspaceInput & { mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
+  /** Start an arbitrary attachment-backed task through the shared durable loop. */
+  public async startTask(input: TaskWorkspaceInput & { mode: "auto" | "assist"; maxTurns?: number }): Promise<ActiveRunInfo> {
     this.assertOpen();
     assertRunId(input.runId);
     if (this.active.has(input.runId)) throw new Error(`Run is already active: ${input.runId}`);
     await this.assertRunDoesNotExist(input.runId);
-    const task = await stageCtfWorkspace(input, this.services.runsRoot);
+    const task = await stageTaskWorkspace(input, this.services.runsRoot);
     await this.ensureRunCreated(input.runId, task);
-    return await this.startCtfTask(task, input.mode, input.maxTurns);
+    return await this.startTaskRun(task, input.mode, input.maxTurns);
   }
 
-  private async startCtfTask(task: TaskContract, mode: "auto" | "assist", maxTurns?: number): Promise<ActiveRunInfo> {
+  private async startTaskRun(task: TaskContract, mode: "auto" | "assist", maxTurns?: number): Promise<ActiveRunInfo> {
     const current = this.active.get(task.task_id);
     if (current && current.state !== "failed") throw new Error(`Run is already active: ${task.task_id}`);
     this.assertOpen();
     const info: ActiveRunInfo = { runId: task.task_id, startedAt: new Date().toISOString(), state: "running" };
     this.active.set(task.task_id, info);
-    const loop = new SingleAgentCtfLoop(this.root, this.config, this.services, this.createCtfLane, this.browserVerifierFactory);
+    const loop = new SingleAgentLoop(this.root, this.config, this.services, this.createLane, this.browserVerifierFactory);
     const controller = new AbortController();
     const runPromise = loop.run({
       runId: task.task_id,
@@ -373,9 +387,9 @@ export class DebugDataService {
     }).finally(() => {
       this.activeLanes.delete(task.task_id);
       this.pauseRequests.delete(task.task_id);
-      if (this.solveTasks.get(task.task_id)?.promise === runPromise) this.solveTasks.delete(task.task_id);
+      if (this.taskRuns.get(task.task_id)?.promise === runPromise) this.taskRuns.delete(task.task_id);
     });
-    this.solveTasks.set(task.task_id, { controller, promise: runPromise });
+    this.taskRuns.set(task.task_id, { controller, promise: runPromise });
     void runPromise.catch(() => undefined);
     return info;
   }
@@ -406,11 +420,11 @@ export class DebugDataService {
     this.runDetailCache.delete(runId);
   }
 
-  public async createFixtureConversation(input: { runId: string; fixtureId: string; objective: string }): Promise<RunSnapshot> {
+  public async createTaskFromTemplate(input: { runId: string; templateId: string; objective: string }): Promise<RunSnapshot> {
     this.assertOpen();
     assertRunId(input.runId);
     await this.assertRunDoesNotExist(input.runId);
-    const task = fixtureTask(input.runId, input.fixtureId, this.root, this.config);
+    const task = fixtureTask(input.runId, input.templateId, this.root, this.config);
     task.objective = input.objective.trim() || task.objective;
     await this.services.control.createRun(input.runId, task);
     const fixture = await this.services.sandbox.build(task);
@@ -438,9 +452,10 @@ export class DebugDataService {
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
     contextCompactionThreshold?: number,
+    projectPrompt?: string,
   ): Promise<void> {
     this.assertOpen();
-    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold);
+    const task = this.runChat(runId, prompt, emit, profile, capabilities, workspacePath, contextCompactionThreshold, projectPrompt);
     this.chatTasks.add(task);
     try {
       await task;
@@ -457,15 +472,16 @@ export class DebugDataService {
     capabilities?: { enabledTools?: string[]; enabledSkills?: string[]; enabledMcpServers?: string[] },
     workspacePath?: string,
     contextCompactionThreshold?: number,
+    projectPrompt?: string,
   ): Promise<void> {
     assertRunId(runId);
     const text = prompt.trim();
     if (!text) throw new Error("Prompt is required");
     const active = this.active.get(runId);
     if (active) {
-      const solveTask = this.solveTasks.get(runId);
-      const pausedSnapshot = solveTask ? await this.services.control.snapshot(runId) : undefined;
-      if (solveTask && pausedSnapshot?.status === "PAUSED") await solveTask.promise.catch(() => undefined);
+      const taskRun = this.taskRuns.get(runId);
+      const pausedSnapshot = taskRun ? await this.services.control.snapshot(runId) : undefined;
+      if (taskRun && pausedSnapshot?.status === "PAUSED") await taskRun.promise.catch(() => undefined);
       if (this.active.has(runId)) throw new Error(`Run is already active: ${runId}`);
     }
     const snapshot = await this.services.control.snapshot(runId);
@@ -478,108 +494,66 @@ export class DebugDataService {
     this.active.set(runId, info);
     this.streamEmitters.set(runId, emit);
     emit({ type: "started", runId });
-    let runtime: ProofBladeToolRuntime | undefined;
     let lane: AgentLanePort | undefined;
     const runConfig = profile ? { ...this.config, modelProfiles: { ...this.config.modelProfiles, executor: profile } } : this.config;
     try {
-      if (snapshot.task.mode === "ctf_solve") {
-        let ctfOutcome: AgentOutcome | undefined;
-        const loop = new SingleAgentCtfLoop(this.root, runConfig, this.services, this.createCtfLane, this.browserVerifierFactory);
-        const result = await loop.run({
-          runId,
-          task: snapshot.task,
-          mode: "assist",
-          maxTurns: 1,
-          userPrompt: text,
-          onTurn: (outcome) => { ctfOutcome = outcome; },
-          onEvent: (event) => emitAgentEvent(event, emit),
-          onLaneReady: async (activeLane) => {
-            this.activeLanes.set(runId, activeLane);
-            if (this.pauseRequests.has(runId)) {
-              await this.ensurePaused(runId, "Paused by user");
-              await activeLane.abort("Paused by user");
-            }
-          },
-        });
-        if (this.pauseRequests.has(runId)) {
-          emit({ type: "paused", runId });
-          return;
-        }
-        emit({
-          type: "done",
-          text: ctfOutcome?.text ?? `CTF turn finished with ${result.status}.`,
-          stopReason: ctfOutcome?.stopReason ?? result.status.toLowerCase(),
-          usage: normalizeUsage(ctfOutcome?.usage) ?? emptyUsage(),
-          claimVerification: ctfOutcome?.claimVerification,
-        });
-        return;
-      }
-      if (runKind(snapshot.task) === "chat") {
-        const projectRoot = codingWorkspace(snapshot.task, workspacePath, this.root);
-        // A workspace path is operational metadata, not user intent. Paths such
-        // as D:\CTF\... must not turn an ordinary greeting into challenge mode.
-        const challengeClassification = classifyChallengePrompt(`${text}\n${snapshot.task.objective}`);
-        lane = await this.createCodingLane({
-          projectRoot,
+      let taskOutcome: AgentOutcome | undefined;
+      const laneFactory: AgentLaneFactory | undefined = runKind(snapshot.task) === "chat"
+        ? async (input) => await this.createCodingLane({
+          projectRoot: codingWorkspace(snapshot.task, workspacePath, this.root),
           installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
+          runId: input.runId,
+          runDir: input.runDir,
+          controlStore: input.services.control,
+          artifactStore: input.services.artifacts,
+          journal: input.services.journal,
+          claimVerifier: input.claimVerifier,
           config: runConfig,
-          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
-          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
-          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
+          ...(input.browserVerifierFactory ? { browserVerifierFactory: input.browserVerifierFactory } : {}),
+          ...(input.externalResources ? { externalResources: input.externalResources } : {}),
+          ...(input.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: input.services.sessionRuntimeBrokers } : {}),
+          ...(input.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: input.services.sessionRuntimeRequired }),
+          ...(input.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: input.services.browserRuntimeRequired }),
           capabilities,
           contextCompactionThreshold,
-          ...(challengeClassification ? { challengeProfile: challengeClassification.profile } : {}),
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      } else {
-        this.assertOpen();
-        const recovery = await new RunRecoveryService(this.services.control, this.services.journal, this.services.sandbox, this.services.fixtureControl, undefined, this.services.verificationRecovery, this.services.verificationRecoveryAdapters, this.services.externalResources, withSessionResourceAdapters(withBrowserResourceAdapter(this.services.externalResourceAdapters, this.browserVerifierFactory), this.services.sessionRuntimeBrokers ?? [])).recover(runId);
-        runtime = new ProofBladeToolRuntime(runId, recovery.fixture, this.services.runsRoot, this.services.control, this.services.artifacts, this.services.journal, this.root);
-        lane = await PiCodingLane.create({
-          projectRoot: recovery.fixture.path,
-          installRoot: this.root,
-          runId,
-          runDir: join(this.services.runsRoot, runId),
-          controlStore: this.services.control,
-          artifactStore: this.services.artifacts,
-          journal: this.services.journal,
-          claimVerifier: new CodingClaimVerifier(runId, this.services.control, this.services.artifacts, this.services.journal, this.services.verifierJournal, this.services.verifier),
-          config: runConfig,
-          browserVerifierFactory: this.browserVerifierFactory,
-          ...(this.services.sessionRuntimeBrokers ? { sessionRuntimeBrokers: this.services.sessionRuntimeBrokers } : {}),
-          ...(this.services.sessionRuntimeRequired === undefined ? {} : { sessionRuntimeRequired: this.services.sessionRuntimeRequired }),
-          ...(this.services.browserRuntimeRequired === undefined ? {} : { browserRuntimeRequired: this.services.browserRuntimeRequired }),
+          projectPrompt,
           deferClaimAcceptance: true,
-          sessionId: `${runId}-coding`,
-          sessionHandoffs: recovery.sessionHandoffs,
-          onEvent: (event: AgentHarnessEvent) => emitAgentEvent(event, emit),
-        });
-      }
-      this.assertOpen();
-      this.activeLanes.set(runId, lane);
+          sessionId: `${runId}-chat`,
+          sessionHandoffs: input.sessionHandoffs,
+          browserHandoffs: input.browserHandoffs,
+          onEvent: input.onEvent,
+        })
+        : this.createLane;
+      const loop = new SingleAgentLoop(this.root, runConfig, this.services, laneFactory, this.browserVerifierFactory);
+      const result = await loop.run({
+        runId,
+        task: snapshot.task,
+        mode: "assist",
+        maxTurns: 1,
+        userPrompt: text,
+        onTurn: (outcome) => { taskOutcome = outcome; },
+        onEvent: (event) => emitAgentEvent(event, emit),
+        onLaneReady: async (activeLane) => {
+          lane = activeLane;
+          this.activeLanes.set(runId, activeLane);
+          if (this.pauseRequests.has(runId)) {
+            await this.ensurePaused(runId, "Paused by user");
+            await activeLane.abort("Paused by user");
+          }
+        },
+      });
       if (this.pauseRequests.has(runId)) {
-        await this.ensurePaused(runId, "Paused by user");
         emit({ type: "paused", runId });
         return;
       }
-      let outcome = await lane.prompt(text);
-      if (this.pauseRequests.has(runId)) {
-        await this.ensurePaused(runId, "Paused by user");
-        emit({ type: "paused", runId });
-        return;
-      }
-      const recoverableTermination = isRecoverableTermination(outcome.termination);
-      if (!recoverableTermination && (outcome.errorMessage || outcome.stopReason === "error")) {
-        emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
-        return;
-      }
-      emit({ type: "done", text: outcome.text, stopReason: recoverableTermination ? "stop" : outcome.stopReason, usage: normalizeUsage(outcome.usage) ?? emptyUsage(), claimVerification: outcome.claimVerification });
+      emit({
+        type: "done",
+        text: taskOutcome?.text ?? `Task turn finished with ${result.status}.`,
+        stopReason: taskOutcome?.termination && isRecoverableTermination(taskOutcome.termination) ? "stop" : taskOutcome?.stopReason ?? result.status.toLowerCase(),
+        usage: normalizeUsage(taskOutcome?.usage) ?? emptyUsage(),
+        resultVerification: taskOutcome?.resultVerification ?? taskOutcome?.claimVerification,
+        claimVerification: taskOutcome?.claimVerification,
+      });
     } catch (error) {
       if (this.pauseRequests.has(runId)) {
         await this.ensurePaused(runId, "Paused by user");
@@ -612,8 +586,8 @@ export class DebugDataService {
     await this.ensurePaused(runId, reason);
     const paused: ActiveRunInfo = { ...current, state: "paused" };
     this.active.set(runId, paused);
-    const solveTask = this.solveTasks.get(runId);
-    if (solveTask) solveTask.controller.abort(reason);
+    const taskRun = this.taskRuns.get(runId);
+    if (taskRun) taskRun.controller.abort(reason);
     else await this.activeLanes.get(runId)?.abort(reason);
     return paused;
   }
@@ -803,8 +777,13 @@ export function boundedJsonByteSize(value: unknown, limit: number): number {
   return bytes;
 }
 
-export function runKind(task: Pick<TaskContract, "mode">): RunKind {
-  return task.mode === "coding_assistant" ? "chat" : "fixture";
+export function runKind(task: { mode: TaskContract["mode"] | "ctf_solve" } & Partial<Pick<TaskContract, "target" | "verification">>): RunKind {
+  // Historical snapshots from the removed mode remain visible as Fixture runs;
+  // task creation never emits this value anymore.
+  if (task.mode === "ctf_solve") return "fixture";
+  if (task.verification?.kind === "hidden_scorer" || task.verification?.kind === "platform_submission") return "fixture";
+  if (typeof task.target === "string" && /^(?:FIXTURE:|LOCAL_FIXTURE|REAL_EVALUATION:)/.test(task.target)) return "fixture";
+  return "chat";
 }
 
 export function codingConversationTask(runId: string, title: string, root: string, verificationCommand?: string): TaskContract {
@@ -903,32 +882,21 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
         interrupted.error = undefined;
       }
     }
-    if (!isRecord(event.payload?.claimVerification)) continue;
-    const claimVerification = event.payload?.claimVerification as unknown as ChatMessageDebug["claimVerification"];
+    const verificationPayload = isRecord(event.payload?.resultVerification)
+      ? event.payload?.resultVerification
+      : event.payload?.claimVerification;
+    if (!isRecord(verificationPayload)) continue;
+    const resultVerification = verificationPayload as unknown as ChatMessageDebug["resultVerification"];
     const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
     const message = (piEntryId ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId) : undefined)
-      ?? [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.claimVerification === undefined);
+      ?? [...messages].reverse().find((item) => item.role === "assistant" && item.text === text && item.resultVerification === undefined && item.claimVerification === undefined);
     if (message) {
-      message.claimVerification = claimVerification;
-      if (claimVerification?.status === "unverified") {
-        message.text = rewriteUnverifiedClaimText(message.text, claimVerification.reason);
+      message.resultVerification = resultVerification;
+      // Keep the old field populated while clients migrate to the generic name.
+      message.claimVerification = resultVerification;
+      if (resultVerification?.status === "unverified") {
+        message.text = rewriteUnverifiedResultText(message.text, resultVerification.reason);
       }
-    }
-  }
-  let latestUserPrompt = "";
-  for (const message of messages) {
-    if (message.role === "user") {
-      latestUserPrompt = message.text;
-      continue;
-    }
-    if (message.claimVerification || message.stopReason === "toolUse" || !message.text) continue;
-    if (requiresClaimVerification(latestUserPrompt, message.text)) {
-      message.claimVerification = {
-        required: true,
-        status: "unverified",
-        reason: "历史消息没有候选复现记录。",
-      };
-      message.text = rewriteUnverifiedClaimText(message.text, message.claimVerification.reason);
     }
   }
   return messages;

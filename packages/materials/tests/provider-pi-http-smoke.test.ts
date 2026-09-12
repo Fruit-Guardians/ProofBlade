@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -15,11 +15,80 @@ import { estimateTokens, sha256 } from "../src/domain/utils.js";
 import { attachPiObservability, createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
 import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
-import { PiCodingLane } from "../src/runtime/coding-lane.js";
+import { MAX_PROJECT_PROMPT_TOKENS, PiCodingLane } from "../src/runtime/coding-lane.js";
 import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtime/lmstudio-provider.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
 
 const apiKeyEnv = "PROOFBLADE_MOCK_PROVIDER_KEY";
+
+test("Responses tool continuation preserves the complete previous input prefix", async () => {
+  const requestBodies: Array<{ input?: unknown[]; prompt_cache_key?: string }> = [];
+  let requestCount = 0;
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBodies.push(JSON.parse(chunks.join("")) as { input?: unknown[]; prompt_cache_key?: string });
+    requestCount += 1;
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    if (requestCount === 1) {
+      const item = { type: "function_call", id: "fc-prefix-1", call_id: "call-prefix-1", name: "read", arguments: JSON.stringify({ path: "input.txt" }), status: "completed" };
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item })}\n\n`);
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+      response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp-prefix-1", status: "completed", output: [item], usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 } } })}\n\n`);
+      return;
+    }
+    const item = { type: "message", id: "msg-prefix-2", role: "assistant", status: "completed", content: [{ type: "output_text", text: "done", annotations: [] }] };
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } })}\n\n`);
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+    response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp-prefix-2", status: "completed", output: [item], usage: { input_tokens: 120, output_tokens: 5, total_tokens: 125 } } })}\n\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-responses-prefix-"));
+  let lane: PiCodingLane | undefined;
+  try {
+    process.env[apiKeyEnv] = "mock-key";
+    await writeFile(join(root, "input.txt"), "stable fixture\n", "utf8");
+    const config: ProofBladeConfig = {
+      schemaVersion: 1,
+      runtime: { piVersion: "0.83.0" },
+      storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+      modelProfiles: { executor: { provider: "mock-responses", api: "openai-responses", baseUrl: `http://127.0.0.1:${address.port}/v1`, model: "mock-model", modelDiscoveryPath: "/models", apiKeyEnv, contextWindow: 32_000, maxTokens: 256, requestTimeoutMs: 5_000, maxRetries: 0, input: ["text"], cacheRetention: "short" } },
+    };
+    const services = createServices(root, config);
+    const runId = "RESPONSES-APPEND-PREFIX";
+    const task = demoTask(runId, root, config);
+    task.mode = "coding_assistant";
+    task.scope.allowed_workspace = root;
+    task.verification.required_reproductions = 0;
+    delete task.verification.command;
+    await services.control.createRun(runId, task);
+    const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    lane = await PiCodingLane.create({ runId, projectRoot: root, installRoot: root, runDir: join(services.runsRoot, runId), controlStore: services.control, artifactStore: services.artifacts, journal: services.journal, claimVerifier: verifier, config });
+    const outcome = await lane.prompt("inspect input.txt");
+    assert.equal(outcome.text, "done");
+    assert.equal(requestBodies.length, 2);
+    const firstInput = requestBodies[0]?.input ?? [];
+    const secondInput = requestBodies[1]?.input ?? [];
+    assert.ok(firstInput.length > 1);
+    const instructionText = JSON.stringify(firstInput.find((item) => item && typeof item === "object" && ["system", "developer"].includes(String((item as { role?: unknown }).role))) ?? {});
+    assert.doesNotMatch(instructionText, /continue only after the next replan turn/);
+    assert.match(instructionText, /does not require ending the current turn/);
+    assert.equal((firstInput[1] as { role?: string })?.role, "user", "the external user message must precede dynamic context for relay cacheability");
+    assert.equal((firstInput[2] as { role?: string })?.role, "user", "the persisted dynamic context follows the external user message");
+    assert.match(JSON.stringify(firstInput[1]), /inspect input\.txt/);
+    assert.match(JSON.stringify(firstInput[2]), /<proofblade-context/);
+    assert.deepEqual(secondInput.slice(0, firstInput.length), firstInput, "the next tool continuation must append after the complete prior Provider input");
+    assert.equal(requestBodies[0]?.prompt_cache_key, requestBodies[1]?.prompt_cache_key);
+  } finally {
+    await lane?.close();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 test("default compiled system context stays below 10K after Provider serialization", async () => {
   let requestBody = "";
@@ -208,6 +277,84 @@ test("configured Pi AgentHarness records real HTTP provider traffic", async () =
   }
 });
 
+test("PiCodingLane exposes generic external_submit only for a declared target with a trusted adapter", async () => {
+  let requestBody = "";
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBody = chunks.join("");
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.write(`data: ${JSON.stringify({ id: "generic-external-submit", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: { role: "assistant", content: "ready" }, finish_reason: null }] })}\n\n`);
+    response.write(`data: ${JSON.stringify({ id: "generic-external-submit", object: "chat.completion.chunk", created: 1, model: "mock-model", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 } })}\n\n`);
+    response.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-generic-external-submit-"));
+  const config: ProofBladeConfig = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: {
+      executor: {
+        provider: "mock-http",
+        api: "openai-completions",
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        model: "mock-model",
+        modelDiscoveryPath: "/models",
+        apiKeyEnv,
+        contextWindow: 4_096,
+        maxTokens: 256,
+        requestTimeoutMs: 5_000,
+        maxRetries: 0,
+        input: ["text"],
+      },
+    },
+  };
+  let lane: PiCodingLane | undefined;
+  try {
+    process.env[apiKeyEnv] = "mock-key";
+    const services = createServices(root, config);
+    const runId = "PI-GENERIC-EXTERNAL-SUBMIT";
+    const task = demoTask(runId, root, config);
+    task.external_submission = { targets: ["review"] };
+    await services.control.createRun(runId, task);
+    const claimVerifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    lane = await PiCodingLane.create({
+      runId,
+      projectRoot: root,
+      installRoot: root,
+      runDir: join(services.runsRoot, runId),
+      controlStore: services.control,
+      artifactStore: services.artifacts,
+      journal: services.journal,
+      claimVerifier,
+      config,
+      externalSubmission: async (submission) => ({
+        accepted: true,
+        completionId: "C-REVIEW",
+        candidateHash: sha256(submission.payload),
+        replayed: false,
+        submissionsUsed: 1,
+        submissionsRemaining: 1,
+        target: submission.target,
+      }),
+    });
+    const outcome = await lane.prompt("Prepare a review submission.");
+    assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
+    const providerTools = JSON.stringify((JSON.parse(requestBody) as { tools?: unknown[] }).tools ?? []);
+    assert.match(providerTools, /external_submit/);
+    assert.doesNotMatch(providerTools, /submit_flag/);
+  } finally {
+    await lane?.close();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("PiCodingLane persists tool preparation before the first Provider request and reuses it", async () => {
   let services: ReturnType<typeof createServices> | undefined;
   let firstRequestEventTypes: string[] | undefined;
@@ -309,8 +456,23 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       claimVerifier,
       config,
       sessionRuntimeBrokers: [pwnBroker, httpBroker],
+      projectPrompt: `PROJECT_PROMPT_HEAD ${"中".repeat(2_000)} ${"x".repeat(8_000)} PROJECT_PROMPT_TAIL`,
     };
     lane = await PiCodingLane.create(laneOptions);
+    const promptSnapshot = JSON.parse(await readFile(join(services.runsRoot, runId, "prompt-snapshot.json"), "utf8")) as {
+      schemaVersion: number;
+      projectPrompt: string;
+      projectPromptOriginalChars: number;
+      projectPromptOmittedChars: number;
+      projectPromptTruncated: boolean;
+    };
+    assert.equal(promptSnapshot.schemaVersion, 2);
+    assert.ok(Buffer.byteLength(promptSnapshot.projectPrompt, "utf8") <= MAX_PROJECT_PROMPT_TOKENS);
+    assert.ok(promptSnapshot.projectPrompt.includes("PROJECT_PROMPT_HEAD"));
+    assert.ok(promptSnapshot.projectPrompt.includes("PROJECT_PROMPT_TAIL"));
+    assert.equal(promptSnapshot.projectPromptTruncated, true);
+    assert.ok(promptSnapshot.projectPromptOriginalChars > promptSnapshot.projectPrompt.length);
+    assert.ok(promptSnapshot.projectPromptOmittedChars > 0);
     const afterCreate = await services.control.snapshot(runId);
     assert.equal(afterCreate.toolPreparation?.profileId, "web");
     assert.equal(afterCreate.toolPreparation?.runtime, "host");
@@ -322,8 +484,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     const outcome = await lane.prompt(firstPrompt);
     assert.equal(outcome.stopReason, "stop", outcome.errorMessage ?? "Provider returned a non-stop response");
     assert.equal(requests, 1);
-    assert.match(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
-    assert.match(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
+    assert.doesNotMatch(firstRequestBody, /CTF solving workflow \(prepared direction\)/);
+    assert.doesNotMatch(firstRequestBody, /\[ProofBlade prepared CTF path\]/);
     assert.match(firstRequestBody, /proofblade-context/);
     assert.match(firstRequestBody, /<task-contract>/);
     assert.match(firstRequestBody, /<durable-ledger>/);
@@ -339,10 +501,11 @@ test("PiCodingLane persists tool preparation before the first Provider request a
       return JSON.stringify(message.content ?? "");
     };
     const instructionText = (firstRequest.messages ?? []).filter((message) => message.role === "system" || message.role === "developer").map(messageText).join("\n");
+    assert.ok(instructionText.includes(promptSnapshot.projectPrompt), "Provider must receive the exact bounded project prompt recorded in the snapshot");
     assert.doesNotMatch(instructionText, /ProofBlade prepared CTF path|Prepared challenge tool profile|CTF solving workflow \(prepared direction\)/);
     assert.ok((firstRequest.messages ?? []).some((message) => message.role === "user" && messageText(message) === firstPrompt));
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
-    assert.match(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
+    assert.doesNotMatch(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
     const projectionText = messageText((firstRequest.messages ?? []).at(-1) ?? {});
     const projectionMatch = projectionText.match(/<proofblade-context[^>]*dynamic-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/proofblade-context>/);
     assert.ok(projectionMatch, "the serialized context projection must expose its visible suffix hash");

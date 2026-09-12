@@ -46,7 +46,7 @@
 ### ✅ 测试(离线契约覆盖)
 - `packages/materials/tests/competition-sandbox.test.ts`(4)
 - `packages/materials/tests/competition-fleet.test.ts`(6)—— 并发上限、优先级、失败隔离、跳过已解、取消
-- `packages/materials/tests/competition-solver.test.ts`(7)—— coding lane 经 `submit_flag` 解出、assist 只记录不联系平台、重复同一 flag 只调一次 API、动态 flag 的无模型但 journaled run、动态 flag assist 只记录 proposal、运行中翻 assist 拦下下一次提交、fleet 跑真 solver
+- `packages/materials/tests/competition-solver.test.ts`(7)—— coding lane 经 `external_submit` 解出、assist 只记录不联系平台、重复同一结果只调一次 API、平台提供结果的无模型但 journaled run、assist 只记录 proposal、运行中翻 assist 拦下下一次提交、fleet 跑真 solver
 - `packages/materials/tests/competition-control-plane.test.ts`(5)—— 取消 pending/running、动态增/减并发、运行中翻 mode
 - `dasctf-api.test.ts` 与 `competition-api.test.ts` 使用 fake `fetch` 覆盖平台链接契约；不需要真实 DASCTF 凭据，也不建立远程 tube。
 
@@ -54,15 +54,15 @@
 
 ### ✅ 提交链(coding lane)
 
-`submit_flag` 只在 `verification.kind = "platform_submission"` 时注册,GUI 聊天运行拿不到它。链路:
+Competition 的 `external_submit` 只在 `verification.kind = "platform_submission"` 时注册,GUI 聊天运行拿不到它。链路:
 
 ```
-submit_flag → runtime.submitCandidate(格式校验/提交预算/候选哈希去重)
-            → IndependentVerifier → Journal fixture_score
-            → CompetitionSandbox → api.submitFlag   ← 真正到平台
+external_submit → runtime.submitExternal(不透明结果/提交预算/结果哈希去重)
+               → IndependentVerifier → Journal fixture_score
+               → CompetitionSandbox → api.submitFlag   ← 平台适配器内部调用
 ```
 
-走 Journal 而不是直接调 API 是刻意的:规则把**错误提交次数**和 **API 调用效率**并列作为 tiebreaker,Journal 的 idempotency key 会把重复提交同一 flag 折叠成回放而非第二次真实调用,事件日志本身就是这两项的账本。assist 模式下候选只记录为 PROPOSED completion,**完全不联系平台**,fleet 里显示为 `awaiting_approval`(待放行)而非失败。
+走 Journal 而不是直接调 API 是刻意的:规则把**错误提交次数**和 **API 调用效率**并列作为 tiebreaker,Journal 的 idempotency key 会把重复提交同一结果折叠成回放而非第二次真实调用,事件日志本身就是这两项的账本。assist 模式下结果只记录为 PROPOSED completion,**完全不联系平台**,fleet 里显示为 `awaiting_approval`(待放行)而非失败。
 
 `max_tool_calls` 提到 200:它只约束进 Journal 的调用(capability invoke / artifact read / fixture_score),coding lane 的 bash/read/edit/write 和一等 MCP 工具都不过 Journal。实跑已出现过 130+ 次工具调用,原来的 40 会因为记账把一次本可成功的解题打断。
 

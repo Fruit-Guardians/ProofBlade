@@ -147,7 +147,7 @@ function fixtureTask(runId: string): TaskContract {
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: "misc",
     target: "LOCAL_FIXTURE",
     objective: "verify skill context",

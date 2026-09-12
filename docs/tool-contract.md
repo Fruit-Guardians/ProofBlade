@@ -30,12 +30,12 @@ Every contract records `version`, `readOnly`, `sideEffect`, `timeoutMs`, `output
 | `propose_intent` | Propose and deduplicate an evidence-seeking action. |
 | `propose_hypothesis` | Process observations into a falsifiable statement linked to evidence ids. |
 | `propose_fact` | Propose a ledger fact; it remains unconfirmed until verifier action. |
-| `submit_candidate` | Transmit one observed `PB{...}` value as a completion proposal. |
+| `external_submit` | Send an opaque, model-derived security result to an explicitly configured destination through approval, budget, verification and replay controls. |
 | `read_artifact` | Retrieve a bounded head/tail window from a referenced immutable artifact. |
 | `search_history` | Query durable facts, hypotheses, observations, evidence and checkpoints by id or text. |
 | `report_status` | Read authoritative phase, ids, proposals and remaining budget. |
 
-`submit_candidate` checks the exact candidate against successful current-generation observation artifacts before writing a proposal. It returns a hash and completion id to the model and requests early turn termination. Hidden scoring is not model-visible and executes as separate `fixture_score` effects.
+`external_submit` does not prescribe a result format or infer a destination from task text. The destination adapter owns payload semantics; the runtime stores a hash-bound completion proposal and applies the configured approval, budget, verifier and idempotency rules. Competition adapters may map an opaque result to a platform-specific submission internally, but CTF-only candidate tools are not part of the provider-facing solver surface.
 
 ## Structured failures
 

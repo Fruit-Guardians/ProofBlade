@@ -7,13 +7,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ProviderApi, ProviderNativeCapabilityStatus } from "@proofblade/materials";
-import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFixtureConversation, createFolder, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startSolve, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
+import { activateProvider, cancelFleetChallenge, createCheckpoint, createConversation, createFolder, createTaskFromTemplate, deleteConversation, discoverProviderModels, getArtifact, getBootstrap, getConversationPreferences, getDirectories, getPromptSnapshot, getProviderSettings, getRun, getRuns, getWorkspaceSettings, pauseRun, reconcileRun, removeFolder, removeProvider, renameConversation, renameFolder, reprioritizeFleetChallenge, setFleetChallengeMode, setFleetConcurrency, startFleet, startTaskFromTemplate, streamChat, streamFleet, updateConversationPreferences, updateProviderSettings } from "./api.js";
 import { currentModelLabel, isConversationInFlight, projectCacheUsage } from "./conversation-projection.js";
 import { FlatTable, JsonTree, RawJson, pretty } from "./json-view.js";
 import { SingleFlightPoller } from "./polling.js";
 import type { ArtifactContent, BootstrapData, ChatStreamEvent, ConversationFolder, ConversationPreferences, DirectoryListing, FleetChallengeStatus, FleetSnapshot, PiSessionDebug, ProviderCacheRetention, ProviderProfile, ProviderSettings, ProviderThinkingLevel, RunDetail, RunListItem, ToolCallDebug, ToolPresentation, WorkspaceSettings } from "./shared.js";
 import { toolPresentation } from "./tool-presentation.js";
 import { AblationWorkspace } from "./ablation-workspace.js";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 type MainTab = "chat" | "overview" | "debugger" | "timeline" | "evidence" | "artifacts";
 type InspectorSource = "arguments" | "result" | "pi-entry" | "telemetry" | "full";
@@ -75,7 +77,7 @@ export function App() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [newRunOpen, setNewRunOpen] = useState(false);
-  const [fixtureOpen, setFixtureOpen] = useState(false);
+  const [taskTemplateOpen, setTaskTemplateOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [capabilityOpen, setCapabilityOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -195,7 +197,7 @@ export function App() {
     <div className={`mobile-backdrop ${leftOpen || rightOpen ? "show" : ""}`} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
     <aside className={`run-sidebar ${leftOpen ? "drawer-open" : ""}`}>
       <div className="brand-row"><div className="blade-mark"><Zap size={18} /></div><div><strong>ProofBlade</strong><span>证锋 · 调试台</span></div><button className="icon-button mobile-only" onClick={() => setLeftOpen(false)} aria-label="关闭 Run 列表"><X size={18} /></button></div>
-      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="fixture-test-button" onClick={() => setFixtureOpen(true)}><FlaskConical size={15} />Fixture 测试</button></div>
+      <div className="new-run-actions"><button className="new-run-button" onClick={() => setNewRunOpen(true)}><Plus size={16} />新建对话</button><button className="task-template-button" onClick={() => setTaskTemplateOpen(true)}><FlaskConical size={15} />安全任务模板</button></div>
       <button className={`fleet-entry ${fleetView ? "active" : ""}`} onClick={() => { setFleetView(true); setAblationView(false); setLeftOpen(false); }}><Layers3 size={15} />并行解题 (Fleet)</button>
       <button className={`fleet-entry ${ablationView ? "active" : ""}`} onClick={() => { setAblationView(true); setFleetView(false); setDetail(undefined); setLeftOpen(false); }}><FlaskConical size={15} />消融实验</button>
       <div className="run-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={runKindFilter === "chat" ? "搜索对话" : "搜索 Fixture Run"} aria-label="搜索 Run" /></div>
@@ -263,7 +265,7 @@ export function App() {
       {detail ? <Metrics detail={detail} provider={currentProviderName} model={currentModelName} thinkingLevel={currentThinkingLevel} /> : <div className="empty-list">选择 Run 后显示</div>}
     </aside>
     {newRunOpen && <NewConversationModal folders={workspaceSettings?.folders ?? []} defaultWorkspace={bootstrap?.projectRoot ?? ""} onClose={() => setNewRunOpen(false)} onCreated={(id) => { setNewRunOpen(false); setRunKindFilter("chat"); setFolderFilter("ALL"); setRunId(id); void refreshWorkspace(); }} />}
-    {fixtureOpen && bootstrap && <FixtureTestModal bootstrap={bootstrap} onClose={() => setFixtureOpen(false)} onCreated={(id) => { setFixtureOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
+    {taskTemplateOpen && bootstrap && <TaskTemplateModal bootstrap={bootstrap} onClose={() => setTaskTemplateOpen(false)} onCreated={(id) => { setTaskTemplateOpen(false); setRunKindFilter("fixture"); setRunId(id); }} />}
     {providerOpen && <ProviderProfilesModal onClose={() => setProviderOpen(false)} onSaved={async () => { setBootstrap(await getBootstrap()); setProviders(await getProviderSettings()); setWorkspaceSettings(await getWorkspaceSettings()); setNotice("Provider 配置已保存，将用于下一轮对话"); }} />}
     {folderOpen && workspaceSettings && <FolderManagerModal folders={workspaceSettings.folders} onClose={() => setFolderOpen(false)} onChanged={refreshWorkspace} />}
     {renameOpen && detail?.kind === "chat" && <RenameConversationModal initialTitle={workspaceSettings?.conversations[detail.snapshot.runId]?.title ?? detail.snapshot.task.objective} onClose={() => setRenameOpen(false)} onSaved={async (title) => { await renameConversation(detail.snapshot.runId, title); await refreshWorkspace(); setRenameOpen(false); setNotice("对话名称已更新"); }} />}
@@ -313,6 +315,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
   const [contextSnapshot, setContextSnapshot] = useState<Extract<ChatStreamEvent, { type: "context_snapshot" }>>();
   const [contextOpen, setContextOpen] = useState(false);
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   const [preferences, setPreferences] = useState<ConversationPreferences>();
   const [selectedCallId, setSelectedCallId] = useState<string>();
   const selectedCall = session?.toolCalls.find((call) => call.id === selectedCallId);
@@ -420,6 +423,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         <div><Bot size={16} /><strong>ProofBlade Agent</strong><span className="model-live"><i />{pausePending ? "正在暂停" : runInFlight ? "生成中" : detail.snapshot.status === "PAUSED" ? "已暂停" : "就绪"}</span></div>
         {detail.sessions.length > 1 && <select aria-label="对话 Session" value={session?.id ?? ""} onChange={(event) => setSessionId(event.target.value)}>{detail.sessions.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select>}
         <span className="conversation-model" title={latestAssistant?.model && latestAssistant.model !== displayedModel ? `当前选择：${displayedModel}；最近响应：${latestAssistant.model}` : `当前选择：${displayedModel}`}>{displayedModel}</span>
+        <button type="button" className="icon-button" title="查看和编辑项目提示词" aria-label="查看和编辑项目提示词" onClick={() => setPromptOpen(true)}><FileCode2 size={16} /></button>
       </div>
       {detail.observationQueue.total > 0 && <ObservationQueuePanel detail={detail} />}
       <div className="message-thread" ref={thread}>
@@ -427,13 +431,14 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
         {session?.messages.map((chat) => {
           const isPendingMessage = Boolean(pendingUser && chat.role === "user" && chat.text === pendingUser && chat.id === session.messages.slice().reverse().find((item) => item.role === "user")?.id);
           const calls = session.toolCalls.filter((call) => call.assistantEntryId === chat.entryId);
+          const verification = chat.resultVerification ?? chat.claimVerification;
           return <article className={`chat-message role-${chat.role}`} key={chat.id}>
             <div className="message-avatar">{chat.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
             <div className="message-content">
-              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && chat.claimVerification?.status === "verified" && <span className="claim-status verified" title={`Evidence ${chat.claimVerification.evidenceId ?? ""}`}><ShieldCheck size={11} />已验证{chat.claimVerification.evidenceId ? ` · ${chat.claimVerification.evidenceId}` : ""}</span>}{chat.role === "assistant" && chat.claimVerification?.status === "unverified" && <span className="claim-status unverified" title={chat.claimVerification.reason}><CircleAlert size={11} />未验证</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <TurnCacheUsage usage={chat.usage} />}</div>
+              <div className="message-meta"><strong>{chat.role === "user" ? "你" : "ProofBlade"}</strong><time>{chat.timestamp ? clock(chat.timestamp) : ""}</time>{isPendingMessage && <span className="sending-label"><i />发送中</span>}{chat.role === "assistant" && verification?.status === "verified" && <span className="claim-status verified" title={`Evidence ${verification.evidenceId ?? ""}`}><ShieldCheck size={11} />已验证{verification.evidenceId ? ` · ${verification.evidenceId}` : ""}</span>}{chat.role === "assistant" && verification?.status === "unverified" && <span className="claim-status unverified" title={verification.reason}><CircleAlert size={11} />未验证</span>}{chat.role === "assistant" && chat.stopReason && <span>{chat.stopReason}</span>}{chat.role === "assistant" && chat.usage && <TurnCacheUsage usage={chat.usage} />}</div>
               {chat.thinking && <details className="thinking-block"><summary><BrainCircuit size={13} />思考过程<ChevronDown size={12} /></summary><pre>{chat.thinking}</pre></details>}
               {chat.text && <MessageText text={chat.text} />}
-              {chat.claimVerification?.status === "unverified" && <div className="claim-verification-note"><CircleAlert size={14} /><span><strong>本轮结论没有通过复现门</strong>{chat.claimVerification.reason ?? "缺少与最终候选直接对应的成功复现记录。"}</span></div>}
+              {verification?.status === "unverified" && <div className="claim-verification-note"><CircleAlert size={14} /><span><strong>本轮结论没有通过复现门</strong>{verification.reason ?? "缺少与最终候选直接对应的成功复现记录。"}</span></div>}
               {chat.error && <div className="message-error"><CircleAlert size={14} /><span>{chat.error}</span></div>}
               {calls.length > 0 && <div className="message-tools">{calls.map((call) => <ToolExecutionCard key={call.id} call={call} selected={selectedCallId === call.id} onInspect={() => setSelectedCallId(call.id)} />)}</div>}
             </div>
@@ -461,6 +466,7 @@ function Conversation({ detail, providers, workspace, onWorkspaceChange, onRefre
     </div>
     {selectedCall && <ConversationToolInspector call={selectedCall} onClose={() => setSelectedCallId(undefined)} />}
     {directoryOpen && preferences && <DirectoryPickerModal initialPath={preferences.workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={async (path) => { try { await savePreferences({ workspacePath: path }); setDirectoryOpen(false); } catch (caught) { onError(message(caught)); } }} />}
+    {promptOpen && preferences && <PromptModal runId={detail.snapshot.runId} projectPrompt={preferences.projectPrompt ?? ""} onClose={() => setPromptOpen(false)} onSave={async (projectPrompt) => { await savePreferences({ projectPrompt }); setPromptOpen(false); }} />}
   </div>;
 }
 
@@ -561,15 +567,12 @@ function formatPercent(value: number): string {
 }
 
 function MessageText({ text }: { text: string }) {
-  const parts = text.split("```");
-  return <div className="message-text">{parts.map((part, index) => {
-    if (index % 2 === 1) {
-      const [language, ...lines] = part.split("\n");
-      const hasLanguage = /^[a-zA-Z0-9_+#.-]{1,20}$/.test(language.trim());
-      return <pre key={index} data-language={hasLanguage ? language.trim() : undefined}><code>{hasLanguage ? lines.join("\n") : part}</code></pre>;
-    }
-    return part && <p key={index}>{part}</p>;
-  })}</div>;
+  const html = useMemo(() => DOMPurify.sanitize(marked.parse(text, { async: false }) as string, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ["style", "iframe", "object", "embed"],
+    FORBID_ATTR: ["style", "srcdoc"],
+  }), [text]);
+  return <div className="message-text markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function ToolDebugger({ detail }: { detail: RunDetail }) {
@@ -783,7 +786,27 @@ function EvidenceChain({ detail }: { detail: RunDetail }) {
 
 function EvidenceBranch({ detail, evidence }: { detail: RunDetail; evidence: RunDetail["snapshot"]["evidence"][string] }) {
   const artifacts = evidenceArtifactIds(evidence).map((id) => detail.snapshot.artifacts[id]).filter(Boolean);
-  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <ArtifactRow key={artifact.id} detail={detail} artifact={artifact} compact />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+  return <div className="evidence-branch"><div className="evidence-branch-head"><ShieldCheck size={13} /><span><strong>{evidence.name ?? evidence.summary}</strong><small>{evidence.summary}</small></span><StatusMini status={evidence.kind} /><code>{evidence.id}</code></div>{(evidence.tags?.length || evidence.dependsOn?.length) ? <div className="chain-relations">{evidence.tags?.map((tag) => <span key={tag}>#{tag}</span>)}{evidence.dependsOn?.map((id) => <span key={id} title={id}><Link2 size={10} />依赖 {detail.snapshot.evidence[id]?.name ?? shortId(id)}</span>)}</div> : null}<div className="chain-artifacts">{artifacts.map((artifact) => <EvidenceArtifact key={artifact.id} detail={detail} artifact={artifact} />)}{artifacts.length === 0 && <div className="chain-empty">没有关联 Artifact</div>}</div></div>;
+}
+
+function EvidenceArtifact({ detail, artifact }: { detail: RunDetail; artifact: RunDetail["snapshot"]["artifacts"][string] }) {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState<ArtifactContent>();
+  const [error, setError] = useState<string>();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const info = artifactInfo(detail, artifact);
+  const load = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (content || error) return;
+    try { setContent(await getArtifact(detail.snapshot.runId, artifact.id)); } catch (caught) { setError(message(caught)); }
+  };
+  const loadMore = async () => {
+    if (!content || !content.truncated || loadingMore) return;
+    setLoadingMore(true);
+    try { const next = await getArtifact(detail.snapshot.runId, artifact.id, nextArtifactPreviewOffset(content)); setContent((current) => current ? appendArtifactPreview(current, next) : next); } catch (caught) { setError(message(caught)); } finally { setLoadingMore(false); }
+  };
+  return <div className="evidence-artifact"><button type="button" className="evidence-artifact-trigger" onClick={() => void load()}><ArtifactRow detail={detail} artifact={artifact} compact /><span className="evidence-artifact-action">{open ? "收起内容" : "查看内容"}<ChevronDown size={12} /></span></button>{open && <div className="evidence-artifact-content">{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="provider-loading"><RefreshCw className="spin" size={14} />读取 Artifact</div>}</div>}</div>;
 }
 
 function ArtifactIndex({ detail }: { detail: RunDetail }) {
@@ -826,12 +849,36 @@ function Artifacts({ detail }: { detail: RunDetail }) {
   const [selectedId, setSelectedId] = useState(artifacts[0]?.id ?? "");
   const [content, setContent] = useState<ArtifactContent>();
   const [error, setError] = useState<string>();
+  const [loadingMore, setLoadingMore] = useState(false);
   useEffect(() => {
     if (!selectedId) return;
     setContent(undefined); setError(undefined);
     void getArtifact(detail.snapshot.runId, selectedId).then(setContent).catch((caught) => setError(message(caught)));
   }, [detail.snapshot.runId, selectedId]);
-  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <RawJson value={content.content} label="复制 Artifact" /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+  const loadMore = async () => {
+    if (!content || !content.truncated || loadingMore) return;
+    const artifactId = selectedId;
+    setLoadingMore(true);
+    try { const next = await getArtifact(detail.snapshot.runId, artifactId, nextArtifactPreviewOffset(content)); setContent((current) => current?.artifact.id === artifactId ? appendArtifactPreview(current, next) : current); } catch (caught) { setError(message(caught)); } finally { setLoadingMore(false); }
+  };
+  return <div className="artifact-grid"><section className="artifact-list"><div className="section-head"><strong>Artifacts</strong><span>{artifacts.length}</span></div>{artifacts.map((item) => { const info = artifactInfo(detail, item); return <button className={selectedId === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedId(item.id)}><FileCode2 size={16} /><span><strong>{info.name}</strong><small>{info.summary}</small><code>{item.id}</code></span><StatusMini status={info.role} /><em>{formatBytes(item.bytes)}</em></button>; })}{artifacts.length === 0 && <div className="empty-list">当前对话还没有归档产物</div>}</section><section className="artifact-view"><div className="section-head"><div><strong>{content ? artifactInfo(detail, content.artifact).name : (selectedId || "产物内容")}</strong><span>{content?.artifact.mime}</span></div>{content && <code>{content.artifact.sha256.slice(0, 16)}...</code>}</div>{error ? <div className="script-error">{error}</div> : content ? <ArtifactPreview content={content} loadingMore={loadingMore} onLoadMore={() => void loadMore()} /> : <div className="output-placeholder">{selectedId ? "正在读取" : "选择产物后查看内容"}</div>}</section></div>;
+}
+
+function ArtifactPreview({ content, loadingMore, onLoadMore }: { content: ArtifactContent; loadingMore: boolean; onLoadMore(): void }) {
+  return <div className="evidence-content-view"><div className="evidence-content-meta"><span>{content.artifact.mime}</span><code>{content.artifact.sha256.slice(0, 16)}...</code><small>{formatBytes(content.bytesRead)} / {formatBytes(content.totalBytes)}</small></div><pre>{content.content}</pre>{content.truncated && <button type="button" className="artifact-load-more" disabled={loadingMore} onClick={onLoadMore}>{loadingMore ? "读取中" : "继续加载"}</button>}</div>;
+}
+
+function appendArtifactPreview(current: ArtifactContent, next: ArtifactContent): ArtifactContent {
+  const content = current.content + next.content;
+  return { ...next, content, offset: current.offset, bytesRead: utf8ByteLength(content) };
+}
+
+function nextArtifactPreviewOffset(content: ArtifactContent): number {
+  return content.offset + utf8ByteLength(content.content);
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }
 
 function Metrics({ detail, provider, model, thinkingLevel }: { detail: RunDetail; provider: string; model: string; thinkingLevel: string }) {
@@ -888,6 +935,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState<ProviderThinkingLevel>("off");
   const [cacheRetention, setCacheRetention] = useState<ProviderCacheRetention>("short");
+  const [supportsLongCacheRetention, setSupportsLongCacheRetention] = useState(false);
   const [maxConcurrentRequests, setMaxConcurrentRequests] = useState(1);
   const [models, setModels] = useState<string[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -905,11 +953,11 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
 
   const loadProfile = (profile?: ProviderProfile) => {
     if (!profile) return;
-    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setApi(profile.api); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setMaxConcurrentRequests(profile.maxConcurrentRequests); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(profile.id); setName(profile.name); setProvider(profile.provider); setApi(profile.api); setBaseUrl(profile.baseUrl); setProxyUrl(profile.proxyUrl); setModel(profile.model); setModels(profile.models); setThinkingLevel(profile.thinkingLevel); setCacheRetention(profile.cacheRetention); setSupportsLongCacheRetention(profile.supportsLongCacheRetention); setMaxConcurrentRequests(profile.maxConcurrentRequests); setHasApiKey(profile.hasApiKey); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const createNew = () => {
-    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
+    setSelectedId(""); setName("新中转站"); setProvider("custom"); setApi("openai-completions"); setBaseUrl("https://example.com/v1"); setProxyUrl(""); setModel(""); setModels([]); setThinkingLevel("off"); setCacheRetention("short"); setSupportsLongCacheRetention(false); setMaxConcurrentRequests(1); setHasApiKey(false); setApiKey(""); setClearApiKey(false); setError(undefined);
   };
 
   const discover = async () => {
@@ -923,7 +971,7 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
   const save = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, api, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, maxConcurrentRequests, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
+      const saved = await updateProviderSettings({ ...(selectedId ? { id: selectedId } : {}), name, provider, api, baseUrl, proxyUrl: proxyUrl.trim(), model, models, thinkingLevel, cacheRetention, supportsLongCacheRetention, maxConcurrentRequests, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}), clearApiKey, setActive: true });
       setSettings(saved); setSelectedId(saved.activeProfileId); loadProfile(saved.profiles.find((profile) => profile.id === saved.activeProfileId)); setHasApiKey(saved.profiles.find((profile) => profile.id === saved.activeProfileId)?.hasApiKey ?? false); await onSaved();
     } catch (caught) { setError(message(caught)); } finally { setBusy(false); }
   };
@@ -942,19 +990,37 @@ function ProviderProfilesModal({ onClose, onSaved }: { onClose(): void; onSaved(
         <aside className="provider-list"><div className="section-head"><strong>Provider</strong><button type="button" className="icon-button" title="新建 Provider" aria-label="新建 Provider" onClick={createNew}><Plus size={15} /></button></div>{settings?.profiles.map((profile) => <button type="button" key={profile.id} className={`provider-list-item ${selectedId === profile.id ? "selected" : ""}`} onClick={() => loadProfile(profile)}><span className="provider-list-dot" /><span><strong>{profile.name}</strong><small>{profile.provider} · {profile.model}</small></span>{settings.activeProfileId === profile.id && <em>当前</em>}</button>)}</aside>
         <div className="provider-form">
           <div className="provider-grid"><label><span>配置名称</span><input required value={name} onChange={(event) => setName(event.target.value)} /></label><label><span>Provider ID</span><input required value={provider} onChange={(event) => setProvider(event.target.value)} /></label></div>
-          <label><span>Provider API</span><select value={api} onChange={(event) => setApi(event.target.value as ProviderApi)}><option value="openai-completions">OpenAI Chat Completions / compatible</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
+          <label><span>Provider API</span><select value={api} onChange={(event) => { const next = event.target.value as ProviderApi; setApi(next); if (next !== "openai-responses") { setSupportsLongCacheRetention(false); if (cacheRetention === "long") setCacheRetention("short"); } }}><option value="openai-completions">OpenAI Chat Completions / compatible</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
           <label><span>Base URL</span><input required type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://aihub.top/v1" /></label>
           <label><span>代理 URL</span><input type="url" value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7897" /></label>
           <label><span>API Key {hasApiKey && !clearApiKey ? "· 已保存" : ""}</span><div className="key-input"><KeyRound size={14} /><input type="password" autoComplete="new-password" value={apiKey} disabled={clearApiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={hasApiKey ? "留空以继续使用已保存的 Key" : "sk-..."} /></div></label>
           {hasApiKey && <label className="clear-key"><input type="checkbox" checked={clearApiKey} onChange={(event) => { setClearApiKey(event.target.checked); if (event.target.checked) setApiKey(""); }} /><span>清除已保存的 Key</span></label>}
           <label><span>模型</span><div className="model-picker"><select required value={model} onChange={(event) => setModel(event.target.value)}>{[...new Set([model, ...models].filter(Boolean))].map((id) => <option value={id} key={id}>{id}</option>)}</select><button type="button" className="command-button" disabled={discovering || !baseUrl.trim()} onClick={() => void discover()}>{discovering ? <RefreshCw className="spin" size={14} /> : <RefreshCw size={14} />}刷新模型</button></div></label>
-          <div className="provider-grid"><label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label><label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long">长期（会话键）</option><option value="none">关闭</option></select></label><label><span>并发请求</span><input type="number" min={1} max={32} step={1} value={maxConcurrentRequests} onChange={(event) => setMaxConcurrentRequests(Number(event.target.value))} /></label></div>
+          <div className="provider-grid"><label><span>思考等级</span><select value={thinkingLevel} onChange={(event) => setThinkingLevel(event.target.value as ProviderThinkingLevel)}>{["off", "minimal", "low", "medium", "high", "xhigh", "max"].map((level) => <option value={level} key={level}>{level}</option>)}</select></label><label><span>缓存保留</span><select value={cacheRetention} onChange={(event) => setCacheRetention(event.target.value as ProviderCacheRetention)}><option value="short">短期（默认）</option><option value="long" disabled={api !== "openai-responses" || !supportsLongCacheRetention}>长期（会话键）</option><option value="none">关闭</option></select></label><label><span>并发请求</span><input type="number" min={1} max={32} step={1} value={maxConcurrentRequests} onChange={(event) => setMaxConcurrentRequests(Number(event.target.value))} /></label></div>
+          {api === "openai-responses" && <label className="clear-key"><input type="checkbox" checked={supportsLongCacheRetention} onChange={(event) => { setSupportsLongCacheRetention(event.target.checked); if (!event.target.checked && cacheRetention === "long") setCacheRetention("short"); }} /><span>该 Provider 支持 Responses 24 小时缓存保留</span></label>}
+          {cacheRetention === "long" && (api !== "openai-responses" || !supportsLongCacheRetention) && <div className="provider-form-note">此配置未声明 Responses 长期缓存支持，实际请求将使用短期缓存。</div>}
           <div className="provider-form-note">Key 只保存在本机配置，API 仅返回已配置状态。保存后新对话默认使用当前配置，已有对话保留自己的选择。</div>
         </div>
       </div>
       <footer><button type="button" className="command-button danger-button" disabled={!selectedId || busy || settings?.profiles.length === 1} onClick={() => void remove()}><X size={14} />删除配置</button><span className="status-spacer" /><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !model}>{busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}保存并使用</button></footer>
     </form>
   </div>;
+}
+
+function PromptModal({ runId, projectPrompt, onClose, onSave }: { runId: string; projectPrompt: string; onClose(): void; onSave(value: string): Promise<void> }) {
+  const [draft, setDraft] = useState(projectPrompt);
+  const [snapshot, setSnapshot] = useState<import("./shared.js").PromptSnapshot>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  useEffect(() => { void getPromptSnapshot(runId).then(setSnapshot).catch((caught) => setError(message(caught))); }, [runId]);
+  const save = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(undefined);
+    try { await onSave(draft.slice(0, 16_000)); } catch (caught) { setError(message(caught)); setBusy(false); }
+  };
+  const truncation = snapshot?.projectPromptTruncated
+    ? `实际发送的项目指令已截断：省略 ${formatNumber(snapshot.projectPromptOmittedChars ?? 0)} 字符。`
+    : undefined;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal prompt-modal" onSubmit={(event) => void save(event)}><header><div><FileCode2 size={17} /><strong>提示词</strong><span className="modal-subtitle">当前对话</span></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<section className="prompt-section"><div className="section-head"><div><strong>项目附加指令</strong><span>保存后下一轮生效 · 最多 16,000 字符；模型实际最多 2,048 tokens</span></div></div><textarea className="prompt-editor" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="例如：使用中文回答；优先查看 src/security；所有结论附带测试命令。" spellCheck={false} /></section><section className="prompt-section prompt-preview"><div className="section-head"><div><strong>最近一次实际 System Prompt</strong><span>{snapshot ? `生成于 ${new Date(snapshot.generatedAt).toLocaleString()} · ${snapshot.systemPromptHash.slice(0, 12)}...` : "发送一轮消息后可查看"}</span></div></div>{truncation && <div className="script-error">{truncation}</div>}{snapshot ? <pre>{snapshot.systemPrompt}</pre> : <div className="output-placeholder">尚未生成提示词快照</div>}</section><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw className="spin" size={14} /> : <Check size={14} />}保存项目指令</button></footer></form></div>;
 }
 
 function ProviderSettingsModal({ onClose, onSaved }: { onClose(): void; onSaved(): Promise<void> }) {
@@ -1113,7 +1179,7 @@ function NewConversationModal({ folders, defaultWorkspace, onClose, onCreated }:
     event.preventDefault(); setBusy(true); setError(undefined);
     try { await createConversation({ runId, title, folderId: folderId || undefined, workspacePath, ...(verificationCommand.trim() ? { verificationCommand: verificationCommand.trim() } : {}) }); onCreated(runId); } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><label><span>任务验证命令（可选；填写后与 CTF 使用同一受信复现链）</span><textarea rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：node solve.mjs" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><MessageSquare size={17} /><strong>新建对话</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<label><span>对话名称</span><input required value={title} onChange={(event) => setTitle(event.target.value)} autoFocus /></label><label><span>对话 ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>工作目录</span><div className="directory-input"><input required value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} /><button type="button" className="command-button" onClick={() => setDirectoryOpen(true)}><FolderOpen size={14} />选择</button></div></label><label><span>文件夹</span><select value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">未分类</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label><label><span>任务验证命令（可选；填写后使用同一受信复现链）</span><textarea rows={3} value={verificationCommand} onChange={(event) => setVerificationCommand(event.target.value)} placeholder="例如：node solve.mjs" /></label><footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !workspacePath.trim()}>{busy ? <RefreshCw size={14} className="spin" /> : <MessageSquare size={14} />}创建对话</button></footer>{directoryOpen && <DirectoryPickerModal initialPath={workspacePath} onClose={() => setDirectoryOpen(false)} onSelect={(path) => { setWorkspacePath(path); setDirectoryOpen(false); }} />}</form></div>;
 }
 
 function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath: string; onClose(): void; onSelect(path: string): void | Promise<void> }) {
@@ -1129,24 +1195,24 @@ function DirectoryPickerModal({ initialPath, onClose, onSelect }: { initialPath:
   return <div className="modal-backdrop directory-backdrop" role="presentation" onMouseDown={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) onClose(); }}><div className="modal directory-modal"><header><div><FolderOpen size={17} /><strong>选择工作目录</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="directory-location"><input value={path} onChange={(event) => setPath(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void open(path); } }} aria-label="工作目录绝对路径" /><button type="button" className="command-button" disabled={loading} onClick={() => void open(path)}><ChevronRight size={14} />打开</button></div><div className="directory-roots">{listing?.roots.map((root) => <button type="button" key={root} onClick={() => void open(root)}><Database size={13} />{root}</button>)}</div><div className="directory-list">{loading ? <div className="provider-loading"><RefreshCw className="spin" size={18} />读取目录</div> : <>{listing?.parent && <button type="button" className="directory-parent" onClick={() => void open(listing.parent)}><FolderOpen size={15} /><span>上一级</span><code>{listing.parent}</code><ChevronRight size={14} /></button>}{listing?.directories.map((item) => <button type="button" key={item.path} onDoubleClick={() => void open(item.path)} onClick={() => { setPath(item.path); }}><Folder size={15} /><span>{item.name}</span><code>{item.path}</code><ChevronRight size={14} /></button>)}{listing?.directories.length === 0 && <div className="empty-list">没有子目录</div>}</>}</div><footer><code className="selected-directory" title={path}>{path}</code><button type="button" className="command-button" onClick={onClose}>取消</button><button type="button" className="primary-button" disabled={loading || !path.trim()} onClick={() => void onSelect(path)}><Check size={14} />使用此目录</button></footer></div></div>;
 }
 
-function FixtureTestModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
-  const [fixtureId, setFixtureId] = useState(bootstrap.fixtures[0]?.id ?? "");
-  const [launch, setLaunch] = useState<"chat" | "solve">("chat");
+function TaskTemplateModal({ bootstrap, onClose, onCreated }: { bootstrap: BootstrapData; onClose(): void; onCreated(id: string): void }) {
+  const [templateId, setTemplateId] = useState(bootstrap.fixtures[0]?.id ?? "");
+  const [launch, setLaunch] = useState<"create" | "run">("create");
   const [mode, setMode] = useState<"auto" | "assist">("assist");
   const [maxTurns, setMaxTurns] = useState(3);
   const [runId, setRunId] = useState(`FIXTURE-${Date.now()}`);
-  const [objective, setObjective] = useState(bootstrap.fixtures[0]?.description ?? "分析 Fixture");
+  const [objective, setObjective] = useState(bootstrap.fixtures[0]?.description ?? "分析安全任务模板");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(undefined);
     try {
-      if (launch === "chat") await createFixtureConversation({ runId, fixtureId, objective });
-      else await startSolve({ runId, fixtureId, mode, maxTurns });
+      if (launch === "create") await createTaskFromTemplate({ runId, templateId, objective });
+      else await startTaskFromTemplate({ runId, templateId, mode, maxTurns });
       onCreated(runId);
     } catch (caught) { setError(message(caught)); setBusy(false); }
   };
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><FlaskConical size={17} /><strong>Fixture 测试</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="launch-switch segmented"><button type="button" className={launch === "chat" ? "active" : ""} onClick={() => setLaunch("chat")}><MessageSquare size={13} />交互调试</button><button type="button" className={launch === "solve" ? "active" : ""} onClick={() => setLaunch("solve")}><Play size={13} />自动执行</button></div><label><span>Run ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>Fixture</span><select value={fixtureId} onChange={(event) => { setFixtureId(event.target.value); const fixture = bootstrap.fixtures.find((item) => item.id === event.target.value); if (fixture) setObjective(fixture.description); }}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label>{launch === "chat" ? <label><span>目标</span><textarea required rows={3} value={objective} onChange={(event) => setObjective(event.target.value)} /></label> : <div className="modal-row"><label><span>模式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>Assist</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>Auto</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : launch === "chat" ? <MessageSquare size={14} /> : <Play size={14} />}{launch === "chat" ? "开始调试" : "开始运行"}</button></footer></form></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal" onSubmit={(event) => void submit(event)}><header><div><FlaskConical size={17} /><strong>安全任务模板</strong></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={17} /></button></header>{error && <div className="script-error">{error}</div>}<div className="task-launch-switch segmented"><button type="button" className={launch === "create" ? "active" : ""} onClick={() => setLaunch("create")}><MessageSquare size={13} />创建任务</button><button type="button" className={launch === "run" ? "active" : ""} onClick={() => setLaunch("run")}><Play size={13} />立即运行</button></div><label><span>Run ID</span><input required pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,95}" value={runId} onChange={(event) => setRunId(event.target.value)} /></label><label><span>任务模板</span><select value={templateId} onChange={(event) => { setTemplateId(event.target.value); const template = bootstrap.fixtures.find((item) => item.id === event.target.value); if (template) setObjective(template.description); }}>{bootstrap.fixtures.map((item) => <option value={item.id} key={item.id}>{item.id} · {item.targetKind}</option>)}</select></label><label><span>任务目标</span><textarea required rows={3} value={objective} onChange={(event) => setObjective(event.target.value)} /></label>{launch === "run" && <div className="modal-row"><label><span>执行方式</span><div className="segmented"><button type="button" className={mode === "assist" ? "active" : ""} onClick={() => setMode("assist")}>辅助</button><button type="button" className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")}>自动</button></div></label><label><span>最大轮次</span><input type="number" min={1} max={20} value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} /></label></div>}<footer><button type="button" className="command-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy}>{busy ? <RefreshCw size={14} className="spin" /> : launch === "create" ? <MessageSquare size={14} /> : <Play size={14} />}{launch === "create" ? "创建任务" : "开始运行"}</button></footer></form></div>;
 }
 
 function PhaseStrip({ current }: { current: string }) { const currentIndex = phases.indexOf(current as typeof phases[number]); return <div className="phase-strip">{phases.map((phase, index) => <div key={phase} className={`${index < currentIndex ? "done" : ""} ${phase === current ? "current" : ""}`}><span>{index < currentIndex ? <Check size={12} /> : index + 1}</span><strong>{phaseLabels[phase]}</strong><i /></div>)}</div>; }

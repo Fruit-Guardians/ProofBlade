@@ -19,7 +19,7 @@ export interface CompetitionSandboxInit {
   workspaceRoot: string;
   /** Attachments already fetched from the platform for this challenge. */
   attachments: CompetitionAttachment[];
-  /** Provisioned environment (connection info, dynamic flag, expiry). */
+  /** Provisioned environment (connection info, platform-provided result, expiry). */
   environment: CompetitionEnvironment;
 }
 
@@ -50,11 +50,6 @@ export class CompetitionSandbox implements SandboxPort {
     return this.environment.connectionInfo;
   }
 
-  /** The platform-provided flag for dynamic-flag challenges, if any. */
-  public get dynamicFlag(): string | undefined {
-    return this.environment.teamFlag;
-  }
-
   public resolveReplayPolicy(operation: string, requested: ReplayPolicy): ReplayPolicy {
     // A platform submission is externally irreversible and the platform API has
     // no query-by-idempotency-key contract. A crash after submitFlag returns but
@@ -69,12 +64,18 @@ export class CompetitionSandbox implements SandboxPort {
     await mkdir(path, { recursive: true });
     await mkdir(privatePath, { recursive: true });
     for (const attachment of this.init.attachments) {
+      if (attachment.name.replace(/\\/g, "/") === "platform-provided-result.txt") {
+        throw new Error("Attachment name is reserved: platform-provided-result.txt");
+      }
       const target = safeJoin(path, attachment.name);
       await mkdir(join(target, ".."), { recursive: true });
       await writeFile(target, Buffer.from(attachment.base64, "base64"));
     }
     if (this.environment.connectionInfo) {
       await writeFile(join(path, "connection-info.txt"), `${this.environment.connectionInfo}\n`, "utf8");
+    }
+    if (this.environment.teamFlag?.trim()) {
+      await writeFile(join(path, "platform-provided-result.txt"), `${this.environment.teamFlag.trim()}\n`, "utf8");
     }
     return { fixtureId: task.task_id, generation: 1, path, privatePath };
   }

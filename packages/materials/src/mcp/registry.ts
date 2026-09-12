@@ -380,7 +380,11 @@ export class McpProjectRegistry {
       const tool = typeof input.tool === "string" ? input.tool : "";
       const args = input.arguments;
       if (!tool || !args || typeof args !== "object" || Array.isArray(args)) throw new Error("MCP call requires tool and object arguments");
-      connection = await this.ensureConnection(entry.name, signal);
+      try {
+        connection = await this.ensureConnection(entry.name, signal);
+      } catch (error) {
+        throw new Error(mcpConnectionFailureMessage(entry, error, "connect"), { cause: error });
+      }
       const tools = await this.describe(entry.name, signal);
       if (!tools.some((item) => item.name === tool)) throw new Error(`MCP tool is not allowed: ${entry.name}.${tool}`);
       const result = await connection.client.callTool({ name: tool, arguments: args as Record<string, unknown> }, requestOptions(entry.definition, signal));
@@ -389,7 +393,13 @@ export class McpProjectRegistry {
       return { stdout, stderr: result.isError ? `MCP tool reported an error: ${entry.name}.${tool}` : "", exitCode: result.isError ? 1 : 0, durationMs: Date.now() - started, externalId: externalId(connection) };
     } catch (error) {
       if (connection && isTransportFailure(error)) await this.invalidateConnection(entry.name, connection);
-      return { stdout: "", stderr: redactText(error instanceof Error ? error.message : String(error), [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain)]), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const message = rawMessage.startsWith("[ProofBlade MCP diagnostic]")
+        ? rawMessage
+        : connection && isTransportFailure(error)
+          ? mcpConnectionFailureMessage(entry, error, "operation")
+          : rawMessage;
+      return { stdout: "", stderr: redactText(message, [...resolvedEnvSecrets(entry.definition.env), ...resolvedToolchainValues(entry.definition.toolchain)]), exitCode: signal?.aborted ? null : 1, durationMs: Date.now() - started, externalId: externalId(this.connections.get(entry.name)) };
     }
   }
 
@@ -398,7 +408,12 @@ export class McpProjectRegistry {
     const cached = this.schemaCache.get(name);
     const existing = this.connections.get(name);
     if (!existing && cached) return cloneToolSummaries(cached);
-    const connection = existing ?? await this.ensureConnection(name, signal);
+    let connection: McpConnection;
+    try {
+      connection = existing ?? await this.ensureConnection(name, signal);
+    } catch (error) {
+      throw new Error(mcpConnectionFailureMessage(entry, error, "connect"), { cause: error });
+    }
     if (!connection.tools) {
       if (cached) {
         connection.tools = cloneToolSummaries(cached);
@@ -410,7 +425,9 @@ export class McpProjectRegistry {
           await this.persistSchemaCache();
         } catch (error) {
           if (isTransportFailure(error)) await this.invalidateConnection(name, connection);
-          throw error;
+          throw isTransportFailure(error)
+            ? new Error(mcpConnectionFailureMessage(entry, error, "discover"), { cause: error })
+            : error;
         }
       }
     }
@@ -547,7 +564,69 @@ function isTransportFailure(error: unknown): boolean {
   const code = "code" in error ? String((error as { code?: unknown }).code) : "";
   if ([SdkErrorCode.ConnectionClosed, SdkErrorCode.NotConnected, SdkErrorCode.SendFailed].includes(code as SdkErrorCode)) return true;
   const message = error instanceof Error ? error.message : String(error);
-  return /connection\s+(?:closed|lost)|transport\s+(?:closed|error)|broken\s+pipe|not\s+connected/i.test(message);
+  return /connection\s+(?:closed|lost)|transport\s+(?:closed|error)|broken\s+pipe|not\s+connected|fetch\s+failed|econn(?:refused|reset)|timed?\s*out/i.test(message);
+}
+
+function mcpConnectionFailureMessage(entry: McpServerEntry, error: unknown, stage: "connect" | "discover" | "operation"): string {
+  const detail = describeError(error);
+  const endpoint = entry.definition.url ? safeMcpEndpoint(entry.definition.url) : undefined;
+  const transport = endpoint ? `http endpoint ${endpoint}` : "the configured stdio process";
+  const reached = stage === "connect" ? "false" : "unknown";
+  const meaning = stage === "connect"
+    ? "The MCP server is configured and enabled, but the connection could not be established; this does not prove that the MCP tool or IDALIB is missing."
+    : stage === "discover"
+      ? "The MCP transport failed while discovering tools; the server may have started but its tool list was not obtained."
+      : "The MCP transport failed during the tool call; the request may have reached the server and its side effects are unknown.";
+  const next = stage === "connect" && endpoint
+    ? "Start the MCP HTTP service at that endpoint (this URL configuration does not auto-start it), then retry mcp_call describe/call."
+    : endpoint
+      ? "Check the MCP HTTP service and its logs, then retry once; do not assume the operation had no side effect."
+      : "Check the configured MCP command and its dependencies, then retry mcp_call describe/call.";
+  return [
+    "[ProofBlade MCP diagnostic]",
+    `server=${entry.name}`,
+    "enabled=true",
+    `stage=${stage}`,
+    `transport=${transport}`,
+    `request_reached_server=${reached}`,
+    `error=${detail}`,
+    `meaning=${meaning}`,
+    `next=${next}`,
+    "fallback=Use another available analysis tool if needed, and report MCP as unavailable instead of claiming it is not installed.",
+  ].join(" ");
+}
+
+function describeError(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && !seen.has(current) && parts.length < 4) {
+    seen.add(current);
+    if (current instanceof Error) {
+      if (current.message) parts.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "object") {
+      const record = current as Record<string, unknown>;
+      if (typeof record.message === "string" && record.message) parts.push(record.message);
+      if (typeof record.code === "string" && record.code) parts.push(`code=${record.code}`);
+      current = record.cause;
+      continue;
+    }
+    parts.push(String(current));
+    break;
+  }
+  return [...new Set(parts)].join("; ") || "unknown connection error";
+}
+
+function safeMcpEndpoint(value: string): string {
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return "configured HTTP endpoint";
+  }
 }
 
 function validateServer(name: string, definition: McpServerDefinition, projectRoot: string): void {

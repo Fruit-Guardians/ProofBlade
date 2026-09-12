@@ -34,7 +34,7 @@
 
 `PROPOSED` 已落盘但外部执行尚未开始时，重复请求复用原 Effect 和原始参数，只补一次 `STARTED`，不会制造第二个 idempotency key；Verifier attestation 的输入先写入独立 verifier-owned recovery Artifact，恢复只按其稳定哈希读取，不把候选明文塞进 Effect 事件；`STARTED`、`UNKNOWN`、`RECONCILED` 或缺少结果 Artifact 的记录必须先走 reconcile，禁止调用方猜测性重跑。
 
-调用方可以为 Effect 结果提供 Artifact sensitivity；显式分类优先于内容形状启发式，未提供时继续检测 flag candidate 并默认使用 `public`。
+调用方可以为 Effect 结果提供 Artifact sensitivity；生产路径使用 `result_candidate` 表示待验证的安全结果，`flag_candidate` 仅作为旧 Artifact 的读取兼容值。显式分类优先于内容形状启发式，未提供时仍按 `public` 保存；内容形状不会改变任务路由或验证结论。
 
 ```powershell
 npm run test:materials

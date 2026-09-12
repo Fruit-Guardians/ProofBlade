@@ -10,7 +10,7 @@ import { MAX_LEDGER_BLOCK_TOKENS, MAX_PHASE_LAYER_TOKENS, MAX_STANDING_LAYER_TOK
 const task: TaskContract = {
   schema_version: 1,
   task_id: "CTX-001",
-  mode: "ctf_solve",
+  mode: "vulnerability_discovery",
   target_kind: "web",
   target: "LOCAL_FIXTURE",
   objective: "verify fixture",

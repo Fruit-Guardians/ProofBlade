@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-29T11:55:00+08:00",
+  "updatedAt": "2026-09-12T13:45:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -274,6 +274,29 @@
     }
   ],
   "updates": [
+    {
+      "id": "UPDATE-20260912-001",
+      "occurredAt": "2026-09-12T13:45:00+08:00",
+      "summary": "修复 CHAT-1789026563795 的大文件读取分页、交互式上下文恢复和 REMOTE:nc 持久化 Pwn 会话能力。",
+      "branch": "codex/fix-chat-1789026563795",
+      "commit": "self",
+      "planIds": [
+        "PLAN-230"
+      ],
+      "changes": [
+        "普通 read 自动合并底层有界 continuation 页面，并记录完整读取状态以抑制重复分页",
+        "交互式聊天在上下文恢复耗尽后保持 PAUSED，可由下一轮用户消息继续，不再进入不可继续的终态",
+        "misc、crypto、reverse 等类别声明 REMOTE:nc endpoint 时启用 pwn-session broker 和对应 Docker profile",
+        "新增读取、上下文恢复、竞赛 solver 和远程目标识别回归测试"
+      ],
+      "validation": [
+        "npm run build passed",
+        "targeted coding-resources, single-agent-loop and competition-solver tests passed",
+        "npm run api:index:check passed",
+        "component, change-contract and changed-test checks passed",
+        "npm test: 988 passed, 4 skipped; 3 existing Windows/base-fixture failures remain documented in the PR"
+      ]
+    },
     {
       "id": "UPDATE-20260829-009",
       "occurredAt": "2026-08-29T11:55:00+08:00",

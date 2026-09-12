@@ -579,7 +579,10 @@ export class ControlStore {
       const lane = command.lane ?? "main";
       const seq = after.lastSeq + 1;
       const rawPayload = payloadFor(command, seq, after, lane, authority);
-      const payload = after.task.mode === "coding_assistant" ? rawPayload : redactCtfEventPayload(rawPayload);
+      // Candidate-shaped values may appear in any security task's audit
+      // metadata. This is a storage-boundary privacy rule, not a CTF mode
+      // behavior, so general tasks must not bypass it.
+      const payload = redactCtfEventPayload(rawPayload);
       const event = makeEvent(runId, seq, eventType(command), commandActor(command), lane, payload, `${runId}:system`, {
         generation: after.generation,
         source: command.lane === "verifier" ? "verifier" : command.type === "pause" || command.type === "resume" ? "user" : undefined,
@@ -1067,6 +1070,12 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (!["submission", "claim_reproduction", "harness_verification"].includes(command.completion.purpose)) {
       throw new Error(`Completion ${command.completion.id} requires an immutable purpose`);
     }
+    if (command.completion.submissionTarget !== undefined
+      && (typeof command.completion.submissionTarget !== "string"
+        || command.completion.submissionTarget.trim().length === 0
+        || command.completion.submissionTarget.length > 256)) {
+      throw new Error(`Completion ${command.completion.id} has an invalid submission target`);
+    }
     const artifact = snapshot.artifacts[command.completion.artifactId];
     if (!artifact) throw new Error(`Unknown completion artifact ${command.completion.artifactId}`);
     if (artifact.generation !== snapshot.generation) throw new Error(`Completion artifact is from generation ${artifact.generation}`);
@@ -1479,9 +1488,14 @@ function validateVerifierEffectProposal(
   if (!effect.cwd?.trim()) throw new Error("Verifier effect requires an auditable cwd");
   if (!pathIsWithin(effect.cwd, snapshot.task.scope.allowed_workspace)) throw new Error(`Verifier cwd escapes allowed_workspace: ${effect.cwd}`);
   if (effect.command && effect.args.commandHash !== sha256(effect.command)) throw new Error("Verifier command hash does not match the immutable command");
-  if (effect.operation === "claim_reproduction") {
+  if (effect.operation === "result_verification" || effect.operation === "claim_reproduction") {
     if (snapshot.task.verification.kind !== "reproduction" || !snapshot.task.verification.command || effect.command !== snapshot.task.verification.command) {
-      throw new Error("claim_reproduction command must come from the task verifier policy");
+      throw new Error(`${effect.operation} command must come from the task verifier policy`);
+    }
+    if (effect.args.resultArtifactMode === "artifact") {
+      if (effect.args.resultArtifactId !== completion.artifactId || effect.args.resultHash !== completion.candidateHash) {
+        throw new Error("Result Artifact verifier binding does not match the proposed Completion");
+      }
     }
   }
   if (effect.operation === "web_reproduce" && !snapshot.task.verification.web?.flag_pattern) {
@@ -1534,7 +1548,7 @@ function validateTrustedVerificationEffect(snapshot: RunSnapshot, effect: RunSna
 }
 
 const VERIFIER_REPLAY_OPERATION = "verification_replay";
-const VERIFIER_ATTESTATION_OPERATIONS = new Set(["fixture_score", "claim_reproduction", "pwn_reproduce", "web_reproduce", "browser_reproduce"]);
+const VERIFIER_ATTESTATION_OPERATIONS = new Set(["fixture_score", "result_verification", "claim_reproduction", "pwn_reproduce", "web_reproduce", "browser_reproduce"]);
 const VERIFIER_EFFECT_OPERATIONS = new Set([...VERIFIER_ATTESTATION_OPERATIONS, VERIFIER_REPLAY_OPERATION]);
 
 function isVerifierReplayOperation(operation: string): boolean {
@@ -1750,6 +1764,16 @@ function validateTaskContract(task: TaskContract): void {
   if (task.constraints.max_replans !== undefined && (!Number.isInteger(task.constraints.max_replans) || task.constraints.max_replans < 0 || task.constraints.max_replans > 16)) {
     throw new Error("Task constraints max_replans must be an integer between 0 and 16 when provided");
   }
+  if (task.external_submission !== undefined) {
+    const targets = task.external_submission.targets;
+    if (!Array.isArray(targets) || targets.length === 0 || targets.length > 64) {
+      throw new Error("Task external_submission targets must contain between 1 and 64 destinations");
+    }
+    const normalized = targets.map((target) => typeof target === "string" ? target.trim() : "");
+    if (normalized.some((target) => target.length === 0 || target.length > 256) || new Set(normalized).size !== normalized.length) {
+      throw new Error("Task external_submission targets must be unique non-empty logical destination names up to 256 characters");
+    }
+  }
   for (const endpoint of task.scope.allowed_endpoints ?? []) {
     if (!endpoint.host.trim() || !Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65_535) {
       throw new Error("Task allowed_endpoints must contain valid host/port tuples");
@@ -1789,6 +1813,15 @@ function validateToolPreparation(snapshot: RunSnapshot, preparation: RunToolPrep
     validateBoundedStringList(plan.allowedToolNames, "first action tools", 128, 32);
   }
   if (preparation.actionBundles !== undefined) validateActionBundles(preparation.actionBundles);
+  if (preparation.firstClassMcpTools !== undefined) {
+    const exposure = preparation.firstClassMcpTools;
+    if (!Number.isInteger(exposure.exposed) || exposure.exposed < 0 || exposure.exposed > 64
+      || !Number.isInteger(exposure.omitted) || exposure.omitted < 0 || exposure.omitted > 4_096
+      || typeof exposure.truncated !== "boolean") {
+      throw new Error("Tool preparation first-class MCP exposure is invalid");
+    }
+    if (exposure.omitted > 0 && !exposure.truncated) throw new Error("Tool preparation first-class MCP truncation marker is invalid");
+  }
   if (!Array.isArray(preparation.tools) || preparation.tools.length > 128) throw new Error("Tool preparation tool list is invalid");
   for (const tool of preparation.tools) {
     if (!tool.id || tool.id.length > 64 || !tool.name || tool.name.length > 128 || !tool.path || tool.path.length > 512) throw new Error("Tool preparation entry is invalid");

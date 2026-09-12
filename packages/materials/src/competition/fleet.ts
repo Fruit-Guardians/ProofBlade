@@ -6,7 +6,7 @@ import type { CompetitionApi, CompetitionCategory, CompetitionChallengeSummary }
  * only — bounded concurrency, priority ordering, lifecycle, and an aggregate
  * snapshot for the human supervisor. HOW a single challenge is solved is behind
  * the ChallengeSolver seam so the scheduler can be validated with a fake solver
- * before the real SingleAgentCtfLoop-backed one is wired in.
+ * before the real SingleAgentLoop-backed one is wired in.
  */
 export interface ChallengeSolveRequest {
   challenge: CompetitionChallengeSummary;
@@ -310,4 +310,3 @@ export class FleetScheduler {
     this.onUpdate?.(this.snapshot());
   }
 }
-

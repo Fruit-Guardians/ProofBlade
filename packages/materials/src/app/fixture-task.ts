@@ -8,7 +8,7 @@ export function fixtureTask(runId: string, profileId: string, root: string, conf
   return {
     schema_version: 1,
     task_id: runId,
-    mode: "ctf_solve",
+    mode: "vulnerability_discovery",
     target_kind: profile.targetKind,
     target: `FIXTURE:${profile.id}`,
     objective: profile.description,

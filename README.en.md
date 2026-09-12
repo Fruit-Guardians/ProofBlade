@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-ProofBlade is an evidence-driven CTF agent harness built on the Pi AgentHarness runtime. It keeps Pi sessions and the CTF control store separate, records every state transition as an append-only event, and makes completion a verifier-gated decision.
+ProofBlade is an evidence-driven information-security agent harness built on the Pi AgentHarness runtime. It separates Pi sessions from durable control state, records every transition as an append-only event, and makes completion a verifier-gated decision. Web, Pwn, Reverse, Forensics, mobile, and external-platform tasks share the same tool, evidence, verification, and recovery path; CTF/Competition is an optional platform adapter and evaluation source.
 
 ## Current scope
 
@@ -39,7 +39,8 @@ npm ci
 npm run build
 npm run cli -- run demo DEMO-001
 npm run cli -- fixtures
-npm run cli -- solve web-source-1 WEB-001 auto 2
+npm run cli -- task create WEB-001 --template web-source-1
+npm run cli -- task run WEB-001 --mode auto --max-turns 2
 npm run cli -- show DEMO-001
 npm run cli -- timeline DEMO-001
 npm run cli -- cost DEMO-001
@@ -139,7 +140,9 @@ proofblade capabilities
 proofblade mcp [list|describe|call] [run-id] [server] [tool] [json-arguments]
 proofblade skills [list|show] [skill-name] [max-chars]
 proofblade skill <run-id> <skill-name> [additional instructions]
-proofblade solve <fixture-id> [--run-id ID] [--mode auto|assist] [--max-turns N]
+proofblade task templates
+proofblade task create <task-id> --template <template-id> [--objective TEXT]
+proofblade task run <task-id> [--mode auto|assist] [--max-turns N]
 proofblade show <run-id>
 proofblade timeline <run-id>
 proofblade ledger <run-id>
@@ -166,7 +169,7 @@ proofblade agent <run-id> [prompt]
 
 ```text
 apps/cli + apps/gui          user intent, debugging and delivery
-   -> packages/materials     ProofBlade, CTF, Pi and provider knowledge
+   -> packages/materials     ProofBlade, information security, Pi and provider knowledge
       -> packages/molecules  generic acquisition/processing composition
          -> packages/atoms   minimal types, values and storage primitives
 ```

@@ -187,7 +187,7 @@
           "kind": "method",
           "signature": "(): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 123,
+          "line": 124,
           "summary": "Inferred summary: close operation used to provide a reusable operation."
         },
         {
@@ -197,7 +197,7 @@
           "kind": "method",
           "signature": "(_fixture: FixtureRef): Promise<void>",
           "module": "src/competition/sandbox.ts",
-          "line": 119,
+          "line": 120,
           "summary": "Inferred summary: destroy operation used to provide a reusable operation."
         }
       ],
@@ -449,7 +449,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 817,
+          "line": 862,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -459,7 +459,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 137,
+          "line": 139,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
@@ -478,7 +478,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 821,
+          "line": 866,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -488,7 +488,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 141,
+          "line": 143,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         }
       ],
@@ -530,23 +530,23 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.executeBrowserReproductionEffect",
+          "id": "@proofblade/materials::method::TaskResultVerifier.executeBrowserReproductionEffect",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.executeBrowserReproductionEffect",
+          "name": "TaskResultVerifier.executeBrowserReproductionEffect",
+          "kind": "method",
+          "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
+          "module": "src/verification/claim-verification.ts",
+          "line": 173,
+          "summary": "Execute a verifier-owned browser clean-context attestation."
+        },
+        {
+          "id": "@proofblade/materials::method::TaskResultVerifier.executeWebReproductionEffect",
+          "package": "@proofblade/materials",
+          "name": "TaskResultVerifier.executeWebReproductionEffect",
           "kind": "method",
           "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
           "module": "src/verification/claim-verification.ts",
           "line": 139,
-          "summary": "Execute a verifier-owned browser clean-context attestation."
-        },
-        {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.executeWebReproductionEffect",
-          "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.executeWebReproductionEffect",
-          "kind": "method",
-          "signature": "(input: { completionId: string; candidateHash: string; candidateArtifactId: string; attemptId: string; sessionId: string; cwd: string; payload: string; }, signal?: AbortSignal): Promise<{ effectId: string; artifactId: string; }>",
-          "module": "src/verification/claim-verification.ts",
-          "line": 105,
           "summary": "Execute a verifier-owned web attestation without exposing the verifier port to the lane."
         }
       ],
@@ -559,33 +559,33 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeBrowserReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizeBrowserReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizeBrowserReproduction",
+          "name": "TaskResultVerifier.finalizeBrowserReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 218,
+          "line": 252,
           "summary": "Mark a browser verifier Completion accepted/rejected after its Evidence is recorded."
         },
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizePwnReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizePwnReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizePwnReproduction",
+          "name": "TaskResultVerifier.finalizePwnReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 223,
+          "line": 257,
           "summary": "Mark a Pwn verifier Completion accepted/rejected after its bound Evidence."
         },
         {
-          "id": "@proofblade/materials::method::CodingClaimVerifier.finalizeWebReproduction",
+          "id": "@proofblade/materials::method::TaskResultVerifier.finalizeWebReproduction",
           "package": "@proofblade/materials",
-          "name": "CodingClaimVerifier.finalizeWebReproduction",
+          "name": "TaskResultVerifier.finalizeWebReproduction",
           "kind": "method",
           "signature": "(completionId: string, accepted: boolean, evidenceIds: string[]): Promise<void>",
           "module": "src/verification/claim-verification.ts",
-          "line": 213,
+          "line": 247,
           "summary": "Mark a web verifier Completion accepted/rejected after its bound Evidence is recorded."
         }
       ],
