@@ -102,7 +102,7 @@ test("competition API and environment lifecycle replay without contacting a plat
       target_kind: "pwn",
       mode: "auto",
       scope: { allowed_hosts: ["replay"], allowed_ports: [31337], external_network: false, allowed_workspace: root },
-      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000 },
+      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000, max_cost_usd: 0 },
       verification: { kind: "platform_submission" },
     });
     const candidatePath = join(fixture.path, "candidate.txt");
@@ -128,7 +128,7 @@ test("competition API and environment lifecycle replay without contacting a plat
       target_kind: "pwn",
       mode: "auto",
       scope: { allowed_hosts: ["replay"], allowed_ports: [31337], external_network: false, allowed_workspace: join(root, "replay") },
-      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000 },
+      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000, max_cost_usd: 0 },
       verification: { kind: "platform_submission" },
     });
     const replayCandidatePath = join(replayFixture.path, "candidate.txt");
@@ -161,7 +161,7 @@ test("competition scoring is verifier-owned and leaves replayable Evidence", asy
       inputs: [],
       success_criteria: ["The platform verifier accepts the candidate."],
       scope: { allowed_hosts: ["replay"], allowed_ports: [31337], external_network: false, allowed_workspace: join(root, "workspace", runId) },
-      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000, max_submissions: 2 },
+      constraints: { max_tool_calls: 10, deadline_ms: 30_000, max_output_bytes: 10_000, max_artifact_bytes: 10_000, max_context_tokens: 4_000, max_submissions: 2, max_cost_usd: 0 },
       verification: { kind: "platform_submission" as const, required_reproductions: 1 },
       pause_policy: ["irreversible_external_effect" as const],
     };
