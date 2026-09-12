@@ -547,6 +547,7 @@ export class PiCodingLane implements AgentLanePort {
       ...(options.bashTimeoutSecondsMax === undefined ? {} : { bashTimeoutSecondsMax: options.bashTimeoutSecondsMax }),
       outputRewrite: { port: outputRewrite, artifactStore, runId: options.runId },
       artifactOutputRefs: new Map(),
+      completedReads: new Map(),
       imagesSeen: new Map<string, number>(),
     };
     const stableSystemPrompt = codingSystemPrompt(
@@ -1195,10 +1196,23 @@ function sessionRuntimeBrokersForTask(
   brokers: readonly SessionRuntimeCreateBroker[],
 ): readonly SessionRuntimeCreateBroker[] {
   const requiredKinds = new Set<SessionRuntimeCreateBroker["kind"]>();
-  if (task.target_kind === "pwn" || task.verification.pwn) requiredKinds.add("pwn-session");
+  if (task.target_kind === "pwn" || task.verification.pwn || taskDeclaresRemotePwnTarget(task)) requiredKinds.add("pwn-session");
   const webTransport = task.verification.web?.transport ?? "http";
   if (webTransport === "http" && (task.verification.web || webBaseUrlFromTarget(task.target))) requiredKinds.add("http-session");
   return brokers.filter((broker) => requiredKinds.has(broker.kind));
+}
+
+/**
+ * Competition tasks can be labelled misc/crypto/reverse while still exposing
+ * a raw TCP challenge through `REMOTE:nc ...`. Keep those sessions on the
+ * durable pwn broker even when no reproduction contract was declared.
+ */
+export function taskDeclaresRemotePwnTarget(task: Pick<TaskContract, "target">): boolean {
+  const target = task.target.trim();
+  if (!/^REMOTE:/i.test(target) || /^REMOTE:https?:/i.test(target)) return false;
+  const endpoint = target.slice("REMOTE:".length).trim();
+  return /^(?:nc(?:\s+|:\/\/)|tcp:\/\/)?(?:\[[^\]]+\]|[A-Za-z0-9.-]+):\d{1,5}$/i.test(endpoint)
+    || /^nc\s+(?:\[[^\]]+\]|[A-Za-z0-9.-]+)\s+\d{1,5}$/i.test(endpoint);
 }
 
 function sessionIdFromResourceId(resourceId: string): string {

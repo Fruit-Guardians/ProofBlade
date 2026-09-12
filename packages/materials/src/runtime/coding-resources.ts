@@ -39,6 +39,8 @@ export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
 export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"] as const;
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
+/** Maximum size of an implicit complete read returned in one model turn. */
+const MAX_COMPLETE_READ_BYTES = 256 * 1024;
 
 /** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
 export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
@@ -141,6 +143,13 @@ export interface CodingResourceContext extends ExecutionToolContext {
    * reinjecting the entire stdout into the next provider request.
    */
   artifactOutputRefs?: Map<string, { artifactId: string; count: number }>;
+  /**
+   * Paths that have been read completely during this lane. This is advisory
+   * state used to stop the model from repeatedly paging through a file it has
+   * already received in full; edit/write wrappers clear it when the workspace
+   * may have changed.
+   */
+  completedReads?: Map<string, { artifactId: string; contentHash: string; bytes: number }>;
   /**
    * Per-run count of how many times each distinct image has been read, keyed by
    * the image CONTENT hash (not path). Identical bytes give no new information on
@@ -1260,11 +1269,35 @@ function builtinTools(): AgentHarnessTool<CodingResourceContext>[] {
   return [
     createCodingReadTool(),
     createCodingBashTool(),
-    createEditTool<CodingResourceContext>(),
-    createWriteTool<CodingResourceContext>(),
+    createCodingEditTool(),
+    createCodingWriteTool(),
     createGlobTool(),
     createGrepTool(),
   ];
+}
+
+function createCodingEditTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createEditTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const result = await contract.execute(toolCallId, params as { path: string; edits: Array<{ oldText: string; newText: string }> }, signal, onUpdate, context);
+      context.completedReads?.clear();
+      return result;
+    },
+  };
+}
+
+function createCodingWriteTool(): AgentHarnessTool<CodingResourceContext> {
+  const contract = createWriteTool<CodingResourceContext>();
+  return {
+    ...contract,
+    async execute(toolCallId, params, signal, onUpdate, context) {
+      const result = await contract.execute(toolCallId, params as { path: string; content: string }, signal, onUpdate, context);
+      context.completedReads?.clear();
+      return result;
+    },
+  };
 }
 
 function createGlobTool(): AgentHarnessTool<CodingResourceContext> {
@@ -1349,13 +1382,34 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
     ...contract,
     async execute(toolCallId, params, signal, onUpdate, context) {
       const input = params as { path: string; offset?: number; limit?: number };
-      const result = await contract.execute(toolCallId, input, signal, onUpdate, context);
+      const completed = context.completedReads?.get(normalizeReadPath(input.path));
+      if (completed && (input.offset !== undefined || input.limit !== undefined)) {
+        const artifact = completed.artifactId ? `, artifact ${completed.artifactId}` : "";
+        const text = `[ProofBlade read complete: ${input.path} was already delivered in full (${completed.bytes} bytes${artifact}). Do not page through it again unless the file has changed; re-read from the beginning after a change.]`;
+        return {
+          content: [{ type: "text" as const, text }],
+          details: { complete: true, contentHash: completed.contentHash, artifactId: completed.artifactId, skippedDuplicateRange: true },
+          isError: false,
+        } as never;
+      }
+      // The model-facing read contract is intentionally simpler than the
+      // underlying bounded Pi read: an ordinary read follows continuation
+      // markers until the file is complete, so README-sized files do not
+      // consume several turns just to page through predictable output.
+      const result = await readCompleteFile(contract, toolCallId, input, signal, onUpdate, context);
       if (result.content.some((item) => item.type === "image")) {
-        return dedupeImageRead(input.path, result, context.imagesSeen);
+        return dedupeImageRead(input.path, result as never, context.imagesSeen);
       }
       const pipeline = context.outputRewrite;
       const visible = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
-      if (!pipeline || !visible) return result;
+      const complete = isCompleteReadResult(result, visible);
+      const pathKey = normalizeReadPath(input.path);
+      const contentHash = sha256(visible);
+      if (!pipeline || !visible) {
+        if (complete && context.completedReads) context.completedReads.set(pathKey, { artifactId: "", contentHash, bytes: Buffer.byteLength(visible) });
+        return result;
+      }
+      const previousComplete = context.completedReads?.get(pathKey);
       const artifact = await pipeline.artifactStore.putText(pipeline.runId, visible, {
         filename: `read-${toolCallId}.txt`,
         mime: "text/plain",
@@ -1373,10 +1427,19 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
       // The archived text IS the visible text, so there is nothing to point the
       // model at; the id stays in details for the GUI/evidence graph only.
       const receipt = await artifactReceipt(context, toolCallId, `文件读取 · ${pathTitle(input.path)}`, visible, artifact.id, isBoundedReadResult(result));
+      const repeatedComplete = previousComplete && previousComplete.contentHash === contentHash;
+      if (complete && context.completedReads) {
+        context.completedReads.set(pathKey, { artifactId: artifact.id, contentHash, bytes: Buffer.byteLength(visible) });
+      }
+      const readStatus = repeatedComplete
+        ? `[ProofBlade read complete: ${input.path} is unchanged from the previous complete read; do not page through it again.]`
+        : complete
+          ? `[ProofBlade read complete: ${input.path} was delivered in full (${Buffer.byteLength(visible)} bytes); no offset read is needed unless the file changes.]`
+          : undefined;
       return {
         ...result,
-        content: [...(observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
-        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, ...observation },
+        content: [...(repeatedComplete ? [{ type: "text" as const, text: readStatus! }] : observation.repeatedArtifactId ? [{ type: "text" as const, text: repeatedArtifactNotice(observation.repeatedArtifactId, Number(observation.repetitionCount)) }] : result.content), ...(readStatus && !repeatedComplete ? [{ type: "text" as const, text: readStatus }] : []), ...(receipt ? [{ type: "text" as const, text: receipt }] : [])],
+        details: { ...(result.details ?? {}), artifactId: artifact.id, artifactHash: artifact.sha256, complete, contentHash, ...observation },
       };
     },
   };
@@ -1552,8 +1615,62 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
   };
 }
 
-function isBoundedReadResult(result: { details?: unknown }): boolean {
-  return Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true);
+async function readCompleteFile(
+  contract: AgentHarnessTool<CodingResourceContext>,
+  toolCallId: string,
+  input: { path: string; offset?: number; limit?: number },
+  signal: AbortSignal | undefined,
+  onUpdate: Parameters<AgentHarnessTool<CodingResourceContext>["execute"]>[3],
+  context: CodingResourceContext,
+): Promise<Awaited<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]>>> {
+  const first = await contract.execute(toolCallId, input, signal, onUpdate, context);
+  if (input.offset !== undefined || input.limit !== undefined || first.content.some((item) => item.type === "image")) return first;
+  const pages: typeof first[] = [first];
+  let totalBytes = Buffer.byteLength(first.content.filter((item) => item.type === "text").map((item) => item.text).join("\n"));
+  let nextOffset = nextReadOffset(first.content);
+  while (nextOffset !== undefined) {
+    if (totalBytes >= MAX_COMPLETE_READ_BYTES) break;
+    const page = await contract.execute(`${toolCallId}:page:${nextOffset}`, { path: input.path, offset: nextOffset }, signal, onUpdate, context);
+    if (page.content.some((item) => item.type === "image")) break;
+    const pageText = page.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
+    const pageBytes = Buffer.byteLength(pageText);
+    if (totalBytes + pageBytes > MAX_COMPLETE_READ_BYTES) break;
+    pages.push(page);
+    totalBytes += pageBytes;
+    nextOffset = nextReadOffset(page.content);
+  }
+  if (pages.length === 1 && nextOffset === undefined) return first;
+  const text = pages.flatMap((page) => page.content.filter((item) => item.type === "text").map((item) => stripReadContinuation(item.text))).join("\n");
+  const capped = nextOffset !== undefined;
+  return {
+    ...pages.at(-1)!,
+    content: [{ type: "text" as const, text: capped ? `${text}\n\n[ProofBlade read capped at ${MAX_COMPLETE_READ_BYTES} bytes. Use offset=${nextOffset} to continue.]` : text }],
+    details: capped ? { truncation: { truncated: true, nextOffset }, implicitRead: true } : undefined,
+  } as typeof first;
+}
+
+function nextReadOffset(content: Array<{ type?: string; text?: string }>): number | undefined {
+  const text = content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n");
+  const match = text.match(/Use offset=(\d+) to continue\.?\]/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+function stripReadContinuation(text: string): string {
+  return text.replace(/\n\n\[(?:Showing lines[^\]]+|\d+ more lines in file\.[^\]]+)\]/gi, "");
+}
+
+function isBoundedReadResult(result: { details?: unknown; content?: Array<{ type?: string; text?: string }> }): boolean {
+  if (Boolean(result.details && typeof result.details === "object" && (result.details as { truncated?: unknown }).truncated === true)) return true;
+  return Boolean(result.content?.some((item) => typeof item.text === "string" && /\[(?:Showing lines|\d+ more lines in file|Line \d+ is )/.test(item.text)));
+}
+
+function isCompleteReadResult(result: { details?: unknown }, visible: string): boolean {
+  if (Boolean(result.details && typeof result.details === "object" && ((result.details as { truncated?: unknown }).truncated === true || (result.details as { truncation?: { truncated?: unknown } }).truncation?.truncated === true))) return false;
+  return !/(?:\[(?:Showing lines|\d+ more lines in file|Line \d+ is )|\.\.\.\s*\[.*(?:omitted|truncated))/i.test(visible);
+}
+
+function normalizeReadPath(path: string): string {
+  return path.trim().replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
 async function artifactReceipt(context: CodingResourceContext, operationId: string, title: string, content: string, artifactId: string, bounded: boolean, artifactHash = "", artifactBytes = 0, omittedChars = 0, state: "success" | "error" = "success"): Promise<string | undefined> {

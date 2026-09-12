@@ -244,6 +244,12 @@ export class SingleAgentLoop {
         }
         if (isContextOverflow(agentOutcome.stopReason, agentOutcome.errorMessage)) {
           const failed = await this.services.control.snapshot(options.runId);
+          if (options.userPrompt?.trim()) {
+            await coordinator.blockAndQueue(options.runId, options.task, activeWorkItemId, "context-overflow recovery is available from the next chat turn", "context_overflow");
+            activeWorkItemId = undefined;
+            await this.services.control.dispatch(options.runId, { type: "pause", reason: "Context length recovery needs a fresh chat turn." });
+            break;
+          }
           if (failed.contextOverflowRecoveries >= 1) {
             await coordinator.fail(options.runId, activeWorkItemId, "context_overflow: recovery already used for this run.");
             await this.services.control.dispatch(options.runId, { type: "fail", reason: "context_overflow: recovery already used for this run.", category: "context_overflow" });

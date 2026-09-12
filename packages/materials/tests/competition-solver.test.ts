@@ -582,7 +582,7 @@ test("competition solver probes one required broker and forwards that result to 
   }
 });
 
-test("competition solver ignores an unrelated unavailable session kind", async () => {
+test("competition solver requires a pwn broker for a raw nc target even when category is crypto", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-solver-runtime-preflight-unrelated-"));
   try {
     const api = new FakeApi([{ id: "RUNTIME-PREFLIGHT-CRYPTO", value: 100, flag: "flag{runtime_preflight_crypto}", category: "Crypto" }]);
@@ -595,8 +595,10 @@ test("competition solver ignores an unrelated unavailable session kind", async (
     } satisfies ProofBladeConfig;
     const solver = new CompetitionChallengeSolver({ root, config, api, mode: "auto", maxTurns: 1, createLane: flagLane });
     const result = await solver.solve({ challenge: (await api.listChallenges())[0]!, signal: new AbortController().signal });
-    assert.equal(result.solved, true, result.reason ?? result.status);
-    assert.deepEqual(api.submitted, [{ id: "RUNTIME-PREFLIGHT-CRYPTO", flag: "flag{runtime_preflight_crypto}" }]);
+    assert.equal(result.solved, false);
+    assert.equal(result.status, "PLATFORM_ERROR");
+    assert.match(result.reason ?? "", /runtime preflight/i);
+    assert.deepEqual(api.submitted, []);
     assert.deepEqual(api.stopped, ["RUNTIME-PREFLIGHT-CRYPTO"]);
   } finally {
     await rm(root, { recursive: true, force: true });

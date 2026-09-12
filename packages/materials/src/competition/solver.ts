@@ -4,6 +4,7 @@ import { createServices } from "../app/demo.js";
 import type { ExecutionMode, TaskContract } from "../domain/types.js";
 import { CompetitionChallengeError, CompetitionContainerError, CompetitionHttpError, type CompetitionApi, type CompetitionEnvironment } from "./api.js";
 import { competitionTask, parseCompetitionTargets } from "./task.js";
+import { taskDeclaresRemotePwnTarget } from "../runtime/coding-lane.js";
 import { CompetitionSandbox } from "./sandbox.js";
 import { countSubmissions, runCompetitionLoop, type CompetitionLaneFactory } from "./loop.js";
 import type { ChallengeSolveRequest, ChallengeSolveResult, ChallengeSolver } from "./fleet.js";
@@ -26,8 +27,8 @@ type RequiredRuntimeKind = "http-session" | "pwn-session";
  * block the solve; an unrelated configured broker must not turn a healthy
  * challenge into a platform error.
  */
-function requiredRuntimeKinds(targetKind: string): ReadonlySet<RequiredRuntimeKind> {
-  if (targetKind === "pwn") return new Set(["pwn-session"]);
+function requiredRuntimeKinds(targetKind: string, connectionInfo?: string): ReadonlySet<RequiredRuntimeKind> {
+  if (targetKind === "pwn" || taskDeclaresRemotePwnTarget({ target: connectionInfo ? `REMOTE:${connectionInfo}` : "" })) return new Set(["pwn-session"]);
   if (targetKind === "web") return new Set(["http-session"]);
   return new Set();
 }
@@ -108,8 +109,6 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     }
 
     const execution = resolveExecutionConfig(this.init.config);
-    const profile = profileForCategory(request.challenge.normalizedCategory);
-    const needsContainer = execution.backend === "docker" && profile !== undefined && execution.requireFor?.includes(request.challenge.normalizedCategory as never);
 
     let environment: Awaited<ReturnType<CompetitionApi["startEnvironment"]>> | undefined;
     let reservation: CompetitionEnvironmentReservation | undefined;
@@ -132,6 +131,11 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
       return competitionFailure("provision environment", error);
     }
     if (!environment) throw new Error("Competition environment provisioning returned no environment");
+    const profile = profileForCategory(request.challenge.normalizedCategory, environment.connectionInfo);
+    const profileRequired = profile === "pwn"
+      ? execution.requireFor?.some((kind) => kind === request.challenge.normalizedCategory || kind === "pwn")
+      : execution.requireFor?.includes(request.challenge.normalizedCategory as never);
+    const needsContainer = execution.backend === "docker" && profile !== undefined && profileRequired;
 
     // Do not create a Coding lane until every session broker required by this
     // task direction has proved that it can serve restart-stable capabilities.
@@ -141,7 +145,7 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
     // The platform only tells us whether a provided result exists after
     // environment provisioning, so all security directions use the same
     // runtime preflight and lane lifecycle.
-    const runtimeKinds = requiredRuntimeKinds(request.challenge.normalizedCategory);
+    const runtimeKinds = requiredRuntimeKinds(request.challenge.normalizedCategory, environment.connectionInfo);
     const sessionRuntime = tryCreateConfiguredSessionRuntimeBrokers(this.init.config);
     const requiredSessionKinds = [...runtimeKinds];
     const hasConfiguredRuntime = requiredSessionKinds.length > 0 && sessionRuntime.configured;
@@ -302,9 +306,9 @@ export class CompetitionChallengeSolver implements ChallengeSolver {
   }
 }
 
-function profileForCategory(category: string): ContainerRef["profile"] | undefined {
+function profileForCategory(category: string, connectionInfo?: string): ContainerRef["profile"] | undefined {
   if (category === "web") return "web";
-  if (category === "pwn") return "pwn";
+  if (category === "pwn" || taskDeclaresRemotePwnTarget({ target: connectionInfo ? `REMOTE:${connectionInfo}` : "" })) return "pwn";
   return undefined;
 }
 

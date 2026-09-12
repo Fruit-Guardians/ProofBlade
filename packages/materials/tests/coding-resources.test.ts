@@ -17,7 +17,7 @@ import {
   bashEscapeHatchViolation,
   type CodingResourceContext,
 } from "../src/runtime/coding-resources.js";
-import { codingHostGuidance, createDeclaredExternalSubmitter } from "../src/runtime/coding-lane.js";
+import { codingHostGuidance, createDeclaredExternalSubmitter, taskDeclaresRemotePwnTarget } from "../src/runtime/coding-lane.js";
 import type { ProofBladeSkillRegistry } from "../src/skills/registry.js";
 import type { OutputRewritePort } from "@proofblade/molecules";
 import { createServices, demoTask } from "../src/app/demo.js";
@@ -64,6 +64,32 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.equal(platformTools.includes("submit_flag"), false);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
+});
+
+test("ordinary read follows bounded continuation pages into one complete model result", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "proofblade-complete-read-"));
+  const env = new NodeExecutionEnv({ cwd: dir });
+  try {
+    const lines = Array.from({ length: 2_500 }, (_, index) => `README line ${index + 1}`);
+    await writeFile(join(dir, "README.md"), `${lines.join("\n")}\n`, "utf8");
+    const context = { env, completedReads: new Map(), enabledSkills: new Set<string>(), enabledMcpServers: new Set<string>() } as unknown as CodingResourceContext;
+    const result = await executeTool("read", { path: "README.md" }, context);
+    const text = result.content.map((part) => part.text ?? "").join("\n");
+    assert.match(text, /README line 1\b/);
+    assert.match(text, /README line 2500\b/);
+    assert.doesNotMatch(text, /Use offset=\d+ to continue/);
+  } finally {
+    await env.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("remote nc targets enable the durable pwn session broker across task categories", () => {
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:nc challenge.internal 31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:nc://challenge.internal:31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:challenge.internal:31337" }), true);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "REMOTE:http://challenge.internal:8080" }), false);
+  assert.equal(taskDeclaresRemotePwnTarget({ target: "CHALLENGE:crypto-1" }), false);
 });
 
 test("external_submit exposes an explicit target and forwards an opaque payload", async () => {

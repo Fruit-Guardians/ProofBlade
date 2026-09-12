@@ -142,6 +142,37 @@ test("interactive turns send the user's instruction without scheduler status con
   }
 });
 
+test("interactive context recovery exhaustion pauses the Run for a fresh chat turn", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-interactive-context-recovery-"));
+  const services = createServices(root, config);
+  let prompts = 0;
+  const lane: AgentLaneFactory = async () => ({
+    async prompt() {
+      prompts += 1;
+      if (prompts < 2) return { text: "", stopReason: "length", usage: zeroUsage() };
+      return { text: "continued", stopReason: "stop", usage: zeroUsage() };
+    },
+    async compact() {},
+    async abort() {},
+    async isIdle() { return true; },
+    async close() {},
+  });
+  try {
+    const runId = "INTERACTIVE-CONTEXT-web-source-1";
+    const task = fixtureTask(runId, "web-source-1", root, config);
+    const first = await new SingleAgentLoop(root, config, services, lane).run({ runId, task, mode: "assist", maxTurns: 1, userPrompt: "继续分析" });
+    assert.equal(first.status, "PAUSED");
+    assert.equal(prompts, 1);
+    assert.equal((await services.control.snapshot(runId)).status, "PAUSED");
+    const second = await new SingleAgentLoop(root, config, services, lane).run({ runId, task, mode: "assist", maxTurns: 1, userPrompt: "继续" });
+    assert.equal(second.status, "PAUSED");
+    assert.equal(prompts, 2);
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("single-agent loop forwards configured session runtime brokers to its lane", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-loop-session-runtime-"));
   const services = createServices(root, config, { sessionRuntimeBrokers: [sessionRuntimeBroker()], sessionRuntimeRequired: true, browserRuntimeRequired: true });

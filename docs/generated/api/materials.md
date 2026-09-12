@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 168
-- Symbols: 1820
+- Symbols: 1821
 
 ## Public Symbols
 
@@ -1382,7 +1382,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1315](../../../packages/materials/src/runtime/coding-resources.ts:1315)
+- Source: [src/runtime/coding-resources.ts:1348](../../../packages/materials/src/runtime/coding-resources.ts:1348)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -1391,7 +1391,7 @@
 ### MAX_MCP_FIRST_CLASS_DESCRIPTION_TOKENS
 - Kind: `constant`
 - Signature: `256`
-- Source: [src/runtime/coding-resources.ts:46](../../../packages/materials/src/runtime/coding-resources.ts:46)
+- Source: [src/runtime/coding-resources.ts:48](../../../packages/materials/src/runtime/coding-resources.ts:48)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class description tokens constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1399,7 +1399,7 @@
 ### MAX_MCP_FIRST_CLASS_METADATA_BYTES
 - Kind: `constant`
 - Signature: `number`
-- Source: [src/runtime/coding-resources.ts:49](../../../packages/materials/src/runtime/coding-resources.ts:49)
+- Source: [src/runtime/coding-resources.ts:51](../../../packages/materials/src/runtime/coding-resources.ts:51)
 - Export: `@proofblade/materials`
 - Summary: Total untrusted MCP metadata admitted into the Provider tool surface.
 - Summary source: `tsdoc`
@@ -1408,7 +1408,7 @@
 ### MAX_MCP_FIRST_CLASS_SCHEMA_ARRAY_ITEMS
 - Kind: `constant`
 - Signature: `64`
-- Source: [src/runtime/coding-resources.ts:53](../../../packages/materials/src/runtime/coding-resources.ts:53)
+- Source: [src/runtime/coding-resources.ts:55](../../../packages/materials/src/runtime/coding-resources.ts:55)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class schema array items constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1416,7 +1416,7 @@
 ### MAX_MCP_FIRST_CLASS_SCHEMA_BYTES
 - Kind: `constant`
 - Signature: `number`
-- Source: [src/runtime/coding-resources.ts:47](../../../packages/materials/src/runtime/coding-resources.ts:47)
+- Source: [src/runtime/coding-resources.ts:49](../../../packages/materials/src/runtime/coding-resources.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class schema bytes constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1424,7 +1424,7 @@
 ### MAX_MCP_FIRST_CLASS_SCHEMA_DEPTH
 - Kind: `constant`
 - Signature: `8`
-- Source: [src/runtime/coding-resources.ts:50](../../../packages/materials/src/runtime/coding-resources.ts:50)
+- Source: [src/runtime/coding-resources.ts:52](../../../packages/materials/src/runtime/coding-resources.ts:52)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class schema depth constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1432,7 +1432,7 @@
 ### MAX_MCP_FIRST_CLASS_SCHEMA_NODES
 - Kind: `constant`
 - Signature: `192`
-- Source: [src/runtime/coding-resources.ts:52](../../../packages/materials/src/runtime/coding-resources.ts:52)
+- Source: [src/runtime/coding-resources.ts:54](../../../packages/materials/src/runtime/coding-resources.ts:54)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class schema nodes constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1440,7 +1440,7 @@
 ### MAX_MCP_FIRST_CLASS_SCHEMA_PROPERTIES
 - Kind: `constant`
 - Signature: `64`
-- Source: [src/runtime/coding-resources.ts:51](../../../packages/materials/src/runtime/coding-resources.ts:51)
+- Source: [src/runtime/coding-resources.ts:53](../../../packages/materials/src/runtime/coding-resources.ts:53)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class schema properties constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1448,7 +1448,7 @@
 ### MAX_MCP_FIRST_CLASS_TOOLS
 - Kind: `constant`
 - Signature: `24`
-- Source: [src/runtime/coding-resources.ts:44](../../../packages/materials/src/runtime/coding-resources.ts:44)
+- Source: [src/runtime/coding-resources.ts:46](../../../packages/materials/src/runtime/coding-resources.ts:46)
 - Export: `@proofblade/materials`
 - Summary: Provider-facing bounds for untrusted MCP `tools/list` metadata.
 - Summary source: `tsdoc`
@@ -1456,7 +1456,7 @@
 ### MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER
 - Kind: `constant`
 - Signature: `16`
-- Source: [src/runtime/coding-resources.ts:45](../../../packages/materials/src/runtime/coding-resources.ts:45)
+- Source: [src/runtime/coding-resources.ts:47](../../../packages/materials/src/runtime/coding-resources.ts:47)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: max mcp first class tools per server constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2654,7 +2654,7 @@
 ### taskExecutionWorkspace
 - Kind: `function`
 - Signature: `(task: { scope: Pick<TaskContract["scope"], "allowed_workspace">; }, fixturePath: string): Promise<string>`
-- Source: [src/orchestration/single-agent-loop.ts:584](../../../packages/materials/src/orchestration/single-agent-loop.ts:584)
+- Source: [src/orchestration/single-agent-loop.ts:590](../../../packages/materials/src/orchestration/single-agent-loop.ts:590)
 - Export: `@proofblade/materials`
 - Summary: The task contract owns the normal coding cwd. Fixture storage is only a
 - Summary source: `tsdoc`
@@ -2872,7 +2872,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1170](../../../packages/materials/src/runtime/coding-lane.ts:1170)
+- Source: [src/runtime/coding-lane.ts:1171](../../../packages/materials/src/runtime/coding-lane.ts:1171)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2881,7 +2881,7 @@
 ### createDeclaredExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { targets: readonly string[]; submit: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:1021](../../../packages/materials/src/runtime/coding-lane.ts:1021)
+- Source: [src/runtime/coding-lane.ts:1022](../../../packages/materials/src/runtime/coding-lane.ts:1022)
 - Export: `@proofblade/materials`
 - Summary: Bind a host-owned submission adapter to the immutable logical destinations
 - Summary source: `tsdoc`
@@ -2890,7 +2890,7 @@
 ### createPlatformExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:932](../../../packages/materials/src/runtime/coding-lane.ts:932)
+- Source: [src/runtime/coding-lane.ts:933](../../../packages/materials/src/runtime/coding-lane.ts:933)
 - Export: `@proofblade/materials`
 - Summary: Build the generic external submission path for a task with a trusted
 - Summary source: `tsdoc`
@@ -2899,16 +2899,25 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:1074](../../../packages/materials/src/runtime/coding-lane.ts:1074)
+- Source: [src/runtime/coding-lane.ts:1075](../../../packages/materials/src/runtime/coding-lane.ts:1075)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/reasoning-forest.test.ts`
 
+### taskDeclaresRemotePwnTarget
+- Kind: `function`
+- Signature: `(task: Pick<TaskContract, "target">): boolean`
+- Source: [src/runtime/coding-lane.ts:1210](../../../packages/materials/src/runtime/coding-lane.ts:1210)
+- Export: `@proofblade/materials`
+- Summary: Competition tasks can be labelled misc/crypto/reverse while still exposing
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/coding-resources.test.ts`
+
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1418](../../../packages/materials/src/runtime/coding-resources.ts:1418)
+- Source: [src/runtime/coding-resources.ts:1477](../../../packages/materials/src/runtime/coding-resources.ts:1477)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2917,7 +2926,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1230](../../../packages/materials/src/runtime/coding-resources.ts:1230)
+- Source: [src/runtime/coding-resources.ts:1239](../../../packages/materials/src/runtime/coding-resources.ts:1239)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2926,7 +2935,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1251](../../../packages/materials/src/runtime/coding-resources.ts:1251)
+- Source: [src/runtime/coding-resources.ts:1260](../../../packages/materials/src/runtime/coding-resources.ts:1260)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2935,7 +2944,7 @@
 ### codingToolCatalog
 - Kind: `function`
 - Signature: `(): CodingToolCatalogEntry[]`
-- Source: [src/runtime/coding-resources.ts:163](../../../packages/materials/src/runtime/coding-resources.ts:163)
+- Source: [src/runtime/coding-resources.ts:172](../../../packages/materials/src/runtime/coding-resources.ts:172)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2943,7 +2952,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:427](../../../packages/materials/src/runtime/coding-resources.ts:427)
+- Source: [src/runtime/coding-resources.ts:436](../../../packages/materials/src/runtime/coding-resources.ts:436)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2952,7 +2961,7 @@
 ### createCodingTools
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): AgentHarnessTool<CodingResourceContext>[]`
-- Source: [src/runtime/coding-resources.ts:178](../../../packages/materials/src/runtime/coding-resources.ts:178)
+- Source: [src/runtime/coding-resources.ts:187](../../../packages/materials/src/runtime/coding-resources.ts:187)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create coding tools operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2961,7 +2970,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:223](../../../packages/materials/src/runtime/coding-resources.ts:223)
+- Source: [src/runtime/coding-resources.ts:232](../../../packages/materials/src/runtime/coding-resources.ts:232)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2970,7 +2979,7 @@
 ### createMcpFirstClassToolSelection
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<McpFirstClassToolSelection>`
-- Source: [src/runtime/coding-resources.ts:236](../../../packages/materials/src/runtime/coding-resources.ts:236)
+- Source: [src/runtime/coding-resources.ts:245](../../../packages/materials/src/runtime/coding-resources.ts:245)
 - Export: `@proofblade/materials`
 - Summary: Promote only bounded MCP metadata into provider-visible tools. The generic
 - Summary source: `tsdoc`
@@ -2979,7 +2988,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1329](../../../packages/materials/src/runtime/coding-resources.ts:1329)
+- Source: [src/runtime/coding-resources.ts:1362](../../../packages/materials/src/runtime/coding-resources.ts:1362)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2988,7 +2997,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1402](../../../packages/materials/src/runtime/coding-resources.ts:1402)
+- Source: [src/runtime/coding-resources.ts:1461](../../../packages/materials/src/runtime/coding-resources.ts:1461)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -2997,7 +3006,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1392](../../../packages/materials/src/runtime/coding-resources.ts:1392)
+- Source: [src/runtime/coding-resources.ts:1451](../../../packages/materials/src/runtime/coding-resources.ts:1451)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -3006,7 +3015,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:197](../../../packages/materials/src/runtime/coding-resources.ts:197)
+- Source: [src/runtime/coding-resources.ts:206](../../../packages/materials/src/runtime/coding-resources.ts:206)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -3014,7 +3023,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:397](../../../packages/materials/src/runtime/coding-resources.ts:397)
+- Source: [src/runtime/coding-resources.ts:406](../../../packages/materials/src/runtime/coding-resources.ts:406)
 - Export: `@proofblade/materials`
 - Summary: Select the enabled security MCP tools sent as native provider tools. A
 - Summary source: `tsdoc`
@@ -3023,7 +3032,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:1112](../../../packages/materials/src/runtime/coding-resources.ts:1112)
+- Source: [src/runtime/coding-resources.ts:1121](../../../packages/materials/src/runtime/coding-resources.ts:1121)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
@@ -7225,7 +7234,7 @@
 ### CodingResourceContext
 - Kind: `interface`
 - Signature: `CodingResourceContext`
-- Source: [src/runtime/coding-resources.ts:88](../../../packages/materials/src/runtime/coding-resources.ts:88)
+- Source: [src/runtime/coding-resources.ts:90](../../../packages/materials/src/runtime/coding-resources.ts:90)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding resource context type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7234,7 +7243,7 @@
 ### CodingToolCatalogEntry
 - Kind: `interface`
 - Signature: `CodingToolCatalogEntry`
-- Source: [src/runtime/coding-resources.ts:157](../../../packages/materials/src/runtime/coding-resources.ts:157)
+- Source: [src/runtime/coding-resources.ts:166](../../../packages/materials/src/runtime/coding-resources.ts:166)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog entry type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7242,7 +7251,7 @@
 ### CodingToolOptions
 - Kind: `interface`
 - Signature: `CodingToolOptions`
-- Source: [src/runtime/coding-resources.ts:171](../../../packages/materials/src/runtime/coding-resources.ts:171)
+- Source: [src/runtime/coding-resources.ts:180](../../../packages/materials/src/runtime/coding-resources.ts:180)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7250,7 +7259,7 @@
 ### ExternalSubmissionRequest
 - Kind: `interface`
 - Signature: `ExternalSubmissionRequest`
-- Source: [src/runtime/coding-resources.ts:66](../../../packages/materials/src/runtime/coding-resources.ts:66)
+- Source: [src/runtime/coding-resources.ts:68](../../../packages/materials/src/runtime/coding-resources.ts:68)
 - Export: `@proofblade/materials`
 - Summary: Request sent through the run's externally configured submission capability.
 - Summary source: `tsdoc`
@@ -7258,7 +7267,7 @@
 ### ExternalSubmissionResult
 - Kind: `interface`
 - Signature: `ExternalSubmissionResult`
-- Source: [src/runtime/coding-resources.ts:74](../../../packages/materials/src/runtime/coding-resources.ts:74)
+- Source: [src/runtime/coding-resources.ts:76](../../../packages/materials/src/runtime/coding-resources.ts:76)
 - Export: `@proofblade/materials`
 - Summary: Verdict returned by a real external submission.
 - Summary source: `tsdoc`
@@ -7266,7 +7275,7 @@
 ### McpFirstClassToolExposure
 - Kind: `interface`
 - Signature: `McpFirstClassToolExposure`
-- Source: [src/runtime/coding-resources.ts:201](../../../packages/materials/src/runtime/coding-resources.ts:201)
+- Source: [src/runtime/coding-resources.ts:210](../../../packages/materials/src/runtime/coding-resources.ts:210)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool exposure type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7274,7 +7283,7 @@
 ### McpFirstClassToolSelection
 - Kind: `interface`
 - Signature: `McpFirstClassToolSelection`
-- Source: [src/runtime/coding-resources.ts:209](../../../packages/materials/src/runtime/coding-resources.ts:209)
+- Source: [src/runtime/coding-resources.ts:218](../../../packages/materials/src/runtime/coding-resources.ts:218)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool selection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12358,7 +12367,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:861](../../../packages/materials/src/runtime/coding-lane.ts:861)
+- Source: [src/runtime/coding-lane.ts:862](../../../packages/materials/src/runtime/coding-lane.ts:862)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12367,7 +12376,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:873](../../../packages/materials/src/runtime/coding-lane.ts:873)
+- Source: [src/runtime/coding-lane.ts:874](../../../packages/materials/src/runtime/coding-lane.ts:874)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12376,7 +12385,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:865](../../../packages/materials/src/runtime/coding-lane.ts:865)
+- Source: [src/runtime/coding-lane.ts:866](../../../packages/materials/src/runtime/coding-lane.ts:866)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12394,7 +12403,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:869](../../../packages/materials/src/runtime/coding-lane.ts:869)
+- Source: [src/runtime/coding-lane.ts:870](../../../packages/materials/src/runtime/coding-lane.ts:870)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12403,7 +12412,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:785](../../../packages/materials/src/runtime/coding-lane.ts:785)
+- Source: [src/runtime/coding-lane.ts:786](../../../packages/materials/src/runtime/coding-lane.ts:786)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
