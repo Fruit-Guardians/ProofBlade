@@ -170,6 +170,7 @@ export class DebugDataService {
     this.runListCache.clear();
     this.runDetailCache.clear();
     this.runDetailLoads.clear();
+    this.services.control.clearReadCaches();
     if (failures.length > 0) throw new AggregateError(failures, "GUI shutdown failed");
   }
 
