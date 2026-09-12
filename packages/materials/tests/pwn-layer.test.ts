@@ -109,15 +109,20 @@ test("leak parsing handles little/big-endian 32/64-bit and base derivation", () 
   assert.equal(isPageAligned(0x7ffff7d9b000n), true);
   assert.equal(isPageAligned(base), false);
   assert.throws(() => parseLeakAddress(new Uint8Array([1, 2]), "le64"), /needs 8 bytes/);
+  assert.throws(() => parseLeakHex("0x12zz34", "be32"), /whole hexadecimal bytes/);
   assert.throws(() => deriveBase(0x1000n, 0x2000n), /negative/);
+  assert.throws(() => deriveBase(0x1000n, -1n), /non-negative/);
 });
 
 test("recordLeak persists an idempotent reasoning node and makes it searchable", async () => {
   const root = await mkdtemp(join(tmpdir(), "pb-leak-graph-"));
   try {
     const runId = "PWN-LEAK-GRAPH";
-    const control = await makeControl(root, runId);
-    const graph = new CodingEvidenceGraph(runId, control, new ArtifactStore(root, control));
+    const control = new ControlStore(new JsonlControlStore(join(root, "runs")));
+    await control.createRun(runId, { ...demoTask(runId, root, config), target_kind: "pwn", target: "LOCAL:chall" });
+    const artifacts = new ArtifactStore(root, control);
+    const source = await artifacts.putText(runId, "puts leak source", { filename: "leak.txt" });
+    const graph = new CodingEvidenceGraph(runId, control, artifacts);
     const leak = {
       id: "LEAK-LIBC-1",
       sourceHex: "30f4e1f7ff7f0000",
@@ -127,19 +132,19 @@ test("recordLeak persists an idempotent reasoning node and makes it searchable",
       symbol: "puts@GLIBC",
       confidence: 0.95,
     };
-    const first = await graph.recordLeak({ leak, tags: ["base-formula"], explanation: "puts leak is consistent with the libc image." });
+    const first = await graph.recordLeak({ leak, artifactIds: [source.id], tags: ["base-formula"], explanation: "puts leak is consistent with the libc image." });
     assert.equal(first.reused, false);
     assert.equal(first.node.id, leak.id);
     assert.equal(first.node.kind, "inference");
-    assert.equal(first.node.status, "CONFIRMED");
+    assert.equal(first.node.status, "SUPPORTED");
     assert.match(first.node.summary, /0x7ffff7e1f430/);
     assert.ok(first.node.tags.includes("base-formula"));
 
     const base = deriveBaseRecord(leak, { id: "LEAK-LIBC-BASE", knownOffset: 0x84420n, label: "libc_base" });
-    const baseNode = await graph.recordLeak({ leak: base, tags: ["base-formula"] });
+    const baseNode = await graph.recordLeak({ leak: base, artifactIds: [source.id], tags: ["base-formula"] });
     assert.match(baseNode.node.summary, /formula=libc_base = LEAK-LIBC-1/);
 
-    const second = await graph.recordLeak({ leak, tags: ["base-formula"], explanation: "same observation" });
+    const second = await graph.recordLeak({ leak, artifactIds: [source.id], tags: ["base-formula"], explanation: "same observation" });
     assert.equal(second.reused, true);
     assert.equal(second.node.createdSeq, first.node.createdSeq);
 
@@ -147,8 +152,12 @@ test("recordLeak persists an idempotent reasoning node and makes it searchable",
     assert.ok(results.some((item) => item.id === leak.id && item.kind === "reasoning_node"));
 
     await assert.rejects(
-      graph.recordLeak({ leak: { ...leak, value: "0x41414141" }, tags: ["base-formula"] }),
+      graph.recordLeak({ leak: { ...leak, value: "0x41414141" }, artifactIds: [source.id], tags: ["base-formula"] }),
       /different contents/,
+    );
+    await assert.rejects(
+      graph.recordLeak({ leak: { ...leak, id: "LEAK-CONFIDENT", confidence: 1 }, artifactIds: [source.id] }),
+      /confidence must be in \[0,1\)/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

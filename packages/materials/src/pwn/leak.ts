@@ -44,8 +44,8 @@ export function parseLeakAddress(bytes: Uint8Array, format: LeakFormat): bigint 
 
 /** Parse from a hex string (whitespace/0x tolerated) rather than a byte buffer. */
 export function parseLeakHex(hex: string, format: LeakFormat): bigint {
-  const cleaned = hex.replace(/0x/gi, "").replace(/[^0-9a-fA-F]/g, "");
-  if (cleaned.length % 2 !== 0) throw new Error(`Leak hex must be whole bytes: ${hex}`);
+  const cleaned = hex.trim().replace(/^0x/i, "").replace(/\s+/g, "");
+  if (!cleaned || cleaned.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(cleaned)) throw new Error(`Leak hex must contain whole hexadecimal bytes: ${hex}`);
   const bytes = new Uint8Array(cleaned.length / 2);
   for (let index = 0; index < bytes.length; index += 1) bytes[index] = Number.parseInt(cleaned.slice(index * 2, index * 2 + 2), 16);
   return parseLeakAddress(bytes, format);
@@ -61,12 +61,15 @@ export function toHex(value: bigint): string {
  * payload stages can be expressed as base + targetOffset rather than absolute.
  */
 export function deriveBase(leaked: bigint, knownOffset: bigint): bigint {
+  if (knownOffset < 0n) throw new Error(`Known offset must be non-negative: ${toHex(knownOffset)}`);
   const base = leaked - knownOffset;
   if (base < 0n) throw new Error(`Derived base is negative: leak=${toHex(leaked)} offset=${toHex(knownOffset)}`);
   return base;
 }
 
 export function deriveBaseRecord(source: LeakRecord, options: { id: string; knownOffset: bigint; label?: string; confidence?: number }): LeakRecord {
+  validateConfidence(source.confidence);
+  validateConfidence(options.confidence ?? source.confidence);
   const base = deriveBase(BigInt(source.value), options.knownOffset);
   const label = options.label?.trim() || `${source.addressKind}_base`;
   return {
@@ -83,5 +86,10 @@ export function deriveBaseRecord(source: LeakRecord, options: { id: string; know
 
 /** A page-aligned base is a strong sanity signal for libc/PIE leaks. */
 export function isPageAligned(base: bigint, pageSize = 0x1000n): boolean {
+  if (pageSize <= 0n) throw new Error("Page size must be positive");
   return base % pageSize === 0n;
+}
+
+function validateConfidence(value: number): void {
+  if (!Number.isFinite(value) || value < 0 || value >= 1) throw new Error("Leak confidence must be in [0,1)");
 }

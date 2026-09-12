@@ -293,23 +293,33 @@ export class CodingEvidenceGraph {
     evidenceIds?: string[];
   }): Promise<RecordLeakResult> {
     return await this.controlStore.dispatchTransaction<RecordLeakResult>(this.runId, (snapshot) => {
+      const artifactIds = unique(input.artifactIds ?? []);
+      const evidenceIds = unique(input.evidenceIds ?? []);
+      if (artifactIds.length === 0 && evidenceIds.length === 0) throw new Error("record leak requires supporting artifact or evidence");
+      assertKnown(artifactIds, snapshot.artifacts, "artifacts");
+      assertKnown(evidenceIds, snapshot.evidence, "evidence");
+      if (artifactIds.some((artifactId) => snapshot.artifacts[artifactId]!.runId !== snapshot.runId || snapshot.artifacts[artifactId]!.generation !== snapshot.generation)) throw new Error("record leak requires current-generation artifacts");
+      if (evidenceIds.some((evidenceId) => snapshot.evidence[evidenceId]!.provenance.runId !== snapshot.runId || snapshot.evidence[evidenceId]!.provenance.generation !== snapshot.generation)) throw new Error("record leak requires current-generation evidence");
+      const sourceRecordIds = input.leak.derivation?.sourceLeakIds.map((sourceId) => `PWN-LEAK-${sourceId}`) ?? [];
+      if (["pwn", "mixed", "unknown"].includes(snapshot.task.target_kind)) assertKnown(sourceRecordIds, snapshot.domainRecords, "leak source records");
       const node = leakReasoningNode(input.leak, snapshot.generation, input.tags, input.explanation);
       const domainRecordId = `PWN-LEAK-${input.leak.id}`;
       const domainRecord = {
         id: domainRecordId,
         kind: "pwn_leak" as const,
         summary: node.summary,
-        artifactIds: [...(input.artifactIds ?? [])],
-        evidenceIds: [...(input.evidenceIds ?? [])],
+        artifactIds,
+        evidenceIds,
         sourceHex: input.leak.sourceHex,
         format: input.leak.format,
         value: input.leak.value,
         addressKind: input.leak.addressKind,
+        confidence: input.leak.confidence,
         ...(input.leak.symbol ? { symbol: input.leak.symbol } : {}),
         ...(input.leak.derivation ? {
           derivation: {
             expression: input.leak.derivation.expression,
-            sourceRecordIds: input.leak.derivation.sourceLeakIds.map((sourceId) => `PWN-LEAK-${sourceId}`).filter((sourceId) => snapshot.domainRecords[sourceId]),
+            sourceRecordIds,
           },
         } : {}),
       };
@@ -798,8 +808,8 @@ function leakReasoningNode(
   extraTags?: string[],
   explanation?: string,
 ): Omit<ReasoningNode, "createdSeq" | "updatedSeq"> {
-  if (!Number.isFinite(leak.confidence) || leak.confidence < 0 || leak.confidence > 1) {
-    throw new Error(`Leak confidence must be between 0 and 1: ${leak.id}`);
+  if (!Number.isFinite(leak.confidence) || leak.confidence < 0 || leak.confidence >= 1) {
+    throw new Error(`Leak confidence must be in [0,1): ${leak.id}`);
   }
   const leakId = requiredText(leak.id, "Leak id", 160);
   const sourceHex = requiredText(displayText(leak.sourceHex, 256), "Leak source", 256);
@@ -819,7 +829,7 @@ function leakReasoningNode(
     name: displayText(`Leak ${leakId} (${leak.addressKind})`, 160),
     summary,
     tags: normalizedTags(["pwn", "leak", `address:${leak.addressKind}`, `format:${leak.format}`, ...(extraTags ?? [])]),
-    status: leak.confidence >= 0.9 ? "CONFIRMED" : leak.confidence > 0 ? "SUPPORTED" : "OPEN",
+    status: leak.confidence > 0 ? "SUPPORTED" : "OPEN",
     explanation: optionalText(explanation, "Leak explanation", 2_000) ?? "由 Pwn tube 输出解析得到的地址记录；后续 payload 应引用此节点而不是硬编码绝对地址。",
     generation,
     explainedBy: "harness",
