@@ -41,7 +41,7 @@ import { validateReasoningEdge, validateReasoningNode, validateReasoningTree } f
 import { canonicalJson, id, isTerminal, sha256 } from "../domain/utils.js";
 import { redactCtfCandidates } from "../domain/candidate.js";
 import { handoffKnowledgeVersion } from "../domain/handoff.js";
-import { JsonlControlStore, makeEvent, type JsonlRunWriter } from "../storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent, type JsonlRunRevision, type JsonlRunWriter } from "../storage/jsonl-store.js";
 import { resolveControlAuthority } from "../storage/control-authority.js";
 import { projectionHash, reduce } from "./reducer.js";
 import { KeyedOperationQueue } from "@proofblade/atoms";
@@ -214,6 +214,23 @@ export type DomainCommand =
   | { type: "session_superseded"; sessionId: string; reason: string; lane?: Lane }
   | { type: "context_recovery"; checkpointId: string; lane?: Lane };
 
+interface SnapshotCacheEntry {
+  snapshot: RunSnapshot;
+  revision: JsonlRunRevision;
+}
+
+export interface ControlAppendOptions {
+  /** Defer projection.json for hot telemetry paths; the event log remains durable. */
+  persistProjection?: boolean;
+}
+
+export interface ControlDispatchOptions {
+  /** Defer projection.json when the event log and live fold are sufficient. */
+  persistProjection?: boolean;
+}
+
+const SNAPSHOT_CACHE_LIMIT = 64;
+
 export interface IngressClaim {
   ingressId: string;
   envelope: RunEventEnvelope;
@@ -228,6 +245,17 @@ type WorkItemCommand = Extract<DomainCommand, { type: `work_item_${string}` }>;
 
 export class ControlStore {
   private readonly operations = new KeyedOperationQueue();
+  /**
+   * Live projection cache. The JSONL stream remains authoritative; this is
+   * only a fold shortcut and is invalidated whenever the stream revision
+   * changes. Keeping it bounded prevents long-lived GUI processes from
+   * retaining every Run they have ever observed.
+   */
+  private readonly snapshotCache = new Map<string, SnapshotCacheEntry>();
+  /** Runs with events newer than projection.json; flushed at turn/lane fences. */
+  private readonly deferredProjectionRuns = new Set<string>();
+  /** Legacy migration is a cold-start concern, not a per-read operation. */
+  private readonly migrationStates = new Map<string, string>();
   #authoritySecret: string;
   #authorityHash: string;
 
@@ -261,24 +289,34 @@ export class ControlStore {
 
   public async createRun(runId: string, task: TaskContract): Promise<RunSnapshot> {
     validateTaskContract(task);
-    return await this.operations.run(runId, async () => {
+    const snapshot = await this.operations.run(runId, async () => {
       return await this.eventStore.create(runId, task, await this.versionProvider?.(), this.#authorityHash, this.#authoritySecret);
     });
+    this.migrationStates.set(runId, "anchored");
+    this.deferredProjectionRuns.delete(runId);
+    await this.#cacheSnapshot(runId, snapshot);
+    return snapshot;
   }
 
   public async snapshot(runId: string): Promise<RunSnapshot> {
-    await this.#migrateLegacyRunBestEffort(runId);
-    return await this.eventStore.replay(runId);
+    return await this.#readSnapshot(runId);
   }
 
   public async replay(runId: string): Promise<RunSnapshot> {
-    await this.#migrateLegacyRunBestEffort(runId);
-    return await this.eventStore.replay(runId);
+    return await this.#readSnapshot(runId, { forceReplay: true });
+  }
+
+  /** Drop process-local read shortcuts without changing durable Run state. */
+  public clearReadCaches(): void {
+    this.snapshotCache.clear();
+    this.migrationStates.clear();
   }
 
   async #migrateLegacyRunBestEffort(runId: string): Promise<void> {
+    if (this.migrationStates.has(runId)) return;
     try {
-      await this.eventStore.migrateLegacyRun(runId, this.#authorityHash);
+      const status = await this.eventStore.migrateLegacyRun(runId, this.#authorityHash);
+      this.migrationStates.set(runId, status);
     } catch {
       // Migration is an availability enhancement, never a replay prerequisite.
       // replay() below still validates the full stream and exposes a legacy Run
@@ -456,28 +494,39 @@ export class ControlStore {
     return await this.eventStore.withRunMaintenanceLock(runId, operation);
   }
 
-  public async dispatch(runId: string, command: DomainCommand): Promise<HarnessEvent[]> {
-    return await this.dispatchBatch(runId, [command]);
+  public async dispatch(runId: string, command: DomainCommand, options: ControlDispatchOptions = {}): Promise<HarnessEvent[]> {
+    return await this.dispatchBatch(runId, [command], options);
   }
 
-  public async dispatchBatch(runId: string, commands: DomainCommand[]): Promise<HarnessEvent[]> {
+  public async dispatchBatch(runId: string, commands: DomainCommand[], options: ControlDispatchOptions = {}): Promise<HarnessEvent[]> {
     if (commands.length === 0) return [];
-    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
-      const { events } = await this.#commitCommands(runId, before, commands, "public", writer);
+    return await this.operations.run(runId, async () => {
+      const events = await this.#withWrite(runId, async (before, writer) => {
+        const { events } = await this.#commitCommands(runId, before, commands, "public", writer, options);
+        return events;
+      });
+      this.#recordProjectionMode(runId, options.persistProjection);
       return events;
-    }));
+    });
   }
 
   public async dispatchTransaction<TResult>(
     runId: string,
     prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult },
+    options: ControlDispatchOptions = {},
   ): Promise<TResult> {
-    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (before, writer) => {
-      const transaction = prepare(before);
-      if (transaction.commands.length === 0) return transaction.project(before);
-      const { after } = await this.#commitCommands(runId, before, transaction.commands, "public", writer);
-      return transaction.project(after);
-    }));
+    return await this.operations.run(runId, async () => {
+      let committed = false;
+      const result = await this.#withWrite(runId, async (before, writer) => {
+        const transaction = prepare(before);
+        if (transaction.commands.length === 0) return transaction.project(before);
+        committed = true;
+        const { after } = await this.#commitCommands(runId, before, transaction.commands, "public", writer, options);
+        return transaction.project(after);
+      });
+      if (committed) this.#recordProjectionMode(runId, options.persistProjection);
+      return result;
+    });
   }
 
   /**
@@ -497,28 +546,36 @@ export class ControlStore {
     }));
   }
 
-  public async append(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>): Promise<HarnessEvent[]> {
-    return await this.operations.run(runId, async () => await this.#withWrite(runId, async (snapshot, writer) => {
-      const forbidden = events.filter((event) => !TELEMETRY_EVENT_TYPES.has(event.type));
-      if (forbidden.length > 0) {
-        throw new Error(`Raw append is restricted to telemetry events; use a validated command for ${forbidden.map((event) => event.type).join(", ")}`);
-      }
-      const materialized = events.map((event, index) => makeEvent(
-        runId,
-        snapshot.lastSeq + index + 1,
-        event.type,
-        event.actor,
-        event.lane,
-        event.payload,
-        event.correlationId,
-        { ...event.envelope, generation: event.envelope?.generation ?? snapshot.generation },
-      ));
-      let validated = snapshot;
-      for (const event of materialized) validated = reduce(validated, event);
-      await writer.append(materialized, this.#authoritySecret);
-      await writer.saveProjection(validated, this.#authoritySecret);
+  public async append(
+    runId: string,
+    events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>,
+    options: ControlAppendOptions = {},
+  ): Promise<HarnessEvent[]> {
+    if (events.length === 0) return [];
+    return await this.operations.run(runId, async () => {
+      const materialized = await this.#withWrite(runId, async (snapshot, writer) => {
+        const forbidden = events.filter((event) => !TELEMETRY_EVENT_TYPES.has(event.type));
+        if (forbidden.length > 0) {
+          throw new Error(`Raw append is restricted to telemetry events; use a validated command for ${forbidden.map((event) => event.type).join(", ")}`);
+        }
+        const materialized = events.map((event, index) => makeEvent(
+          runId,
+          snapshot.lastSeq + index + 1,
+          event.type,
+          event.actor,
+          event.lane,
+          event.payload,
+          event.correlationId,
+          { ...event.envelope, generation: event.envelope?.generation ?? snapshot.generation },
+        ));
+        const validated = materialized.reduce(reduce, snapshot);
+        await writer.append(materialized, this.#authoritySecret);
+        if (options.persistProjection !== false) await writer.saveProjection(validated, this.#authoritySecret);
+        return materialized;
+      });
+      this.#recordProjectionMode(runId, options.persistProjection);
       return materialized;
-    }));
+    });
   }
 
   public async runHash(runId: string): Promise<string> {
@@ -548,14 +605,131 @@ export class ControlStore {
         }
         if (persisted && projectionHash(persisted) === replayHash) return { repaired: false, replayHash };
         await writer.saveProjection(replayed, this.#authoritySecret);
+        this.deferredProjectionRuns.delete(runId);
         return { repaired: true, replayHash };
       });
     });
   }
 
+  /**
+   * Persist the current in-memory fold at a turn/lane quiescence barrier.
+   * Hot tool paths may leave projection.json stale because the append-only
+  * event stream and this process-local fold are already authoritative.
+  */
+  public async flushProjection(runId: string): Promise<void> {
+    await this.operations.run(runId, async () => {
+      // Check after entering the per-Run queue so a flush cannot race a
+      // deferred append that is still committing its marker.
+      if (!this.deferredProjectionRuns.has(runId)) return;
+      await this.#migrateLegacyRunBestEffort(runId);
+      await this.eventStore.withRunLock(runId, async (writer) => {
+        const snapshot = await this.#readSnapshot(runId, { skipMigration: true });
+        const persisted = await this.eventStore.loadProjection(runId).catch(() => undefined);
+        if (persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot)) {
+          this.deferredProjectionRuns.delete(runId);
+          return;
+        }
+        await writer.saveProjection(snapshot, this.#authoritySecret);
+        this.deferredProjectionRuns.delete(runId);
+      });
+    });
+  }
+
+  #recordProjectionMode(runId: string, persistProjection: boolean | undefined): void {
+    if (persistProjection === false) this.deferredProjectionRuns.add(runId);
+    else this.deferredProjectionRuns.delete(runId);
+  }
+
   async #withWrite<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T> {
     await this.#migrateLegacyRunBestEffort(runId);
-    return await this.eventStore.withRunLock(runId, async (writer) => await operation(await this.eventStore.replay(runId), writer));
+    return await this.eventStore.withRunLock(runId, async (rawWriter) => {
+      const committed: HarnessEvent[] = [];
+      const writer: JsonlRunWriter = {
+        append: async (events, authoritySecret) => {
+          await rawWriter.append(events, authoritySecret);
+          committed.push(...events);
+        },
+        saveProjection: rawWriter.saveProjection,
+      };
+      const before = await this.#readSnapshot(runId, { skipMigration: true });
+      try {
+        return await operation(before, writer);
+      } finally {
+        if (committed.length > 0) {
+          try {
+            const after = committed.reduce(reduce, before);
+            await this.#cacheSnapshot(runId, after);
+          } catch {
+            // The event stream is authoritative. If a write completed but the
+            // local fold could not be refreshed, force the next read to rebuild.
+            this.snapshotCache.delete(runId);
+          }
+        }
+      }
+    });
+  }
+
+  /** Read a Run using the in-memory fold, a durable projection, or full replay. */
+  async #readSnapshot(runId: string, options: { forceReplay?: boolean; skipMigration?: boolean } = {}): Promise<RunSnapshot> {
+    if (!options.skipMigration) await this.#migrateLegacyRunBestEffort(runId);
+    if (options.forceReplay) {
+      const snapshot = await this.eventStore.replay(runId);
+      await this.#cacheSnapshot(runId, snapshot);
+      return snapshot;
+    }
+
+    const revision = await this.eventStore.revision(runId);
+    const cached = this.snapshotCache.get(runId);
+    if (cached && sameRevision(cached.revision, revision)) {
+      this.snapshotCache.delete(runId);
+      this.snapshotCache.set(runId, cached);
+      return cached.snapshot;
+    }
+
+    const events = await this.eventStore.events(runId);
+    const streamLastSeq = events.at(-1)?.seq ?? 0;
+    let snapshot: RunSnapshot | undefined;
+    // A cache revision mismatch means another process (or an operator) changed
+    // durable state. Do not assume that change was append-only: replay the full
+    // stream so modified prefixes and task-contract tampering are revalidated.
+    const durableStateChanged = cached !== undefined;
+    if (durableStateChanged) this.snapshotCache.delete(runId);
+    if (!durableStateChanged && snapshot === undefined) {
+      const persisted = await this.eventStore.loadProjection(runId).catch(() => undefined);
+      if (persisted
+        && persisted.runId === runId
+        && persisted.lastSeq <= streamLastSeq
+        && persisted.projectionHash === projectionHash(persisted)) {
+        try {
+          const task = await this.eventStore.loadTask(runId);
+          const anchoredTaskHash = events.find((event) => event.type === "run_started")?.payload?.taskHash;
+          if (task && typeof anchoredTaskHash === "string" && anchoredTaskHash !== sha256(canonicalJson(task))) {
+            throw new Error("Task contract hash does not match the immutable run anchor");
+          }
+          snapshot = applyTail(persisted, events);
+        } catch {
+          snapshot = undefined;
+        }
+      }
+    }
+    if (snapshot === undefined) snapshot = await this.eventStore.replay(runId);
+    await this.#cacheSnapshot(runId, snapshot);
+    return snapshot;
+  }
+
+  async #cacheSnapshot(runId: string, snapshot: RunSnapshot): Promise<void> {
+    try {
+      const revision = await this.eventStore.revision(runId);
+      this.snapshotCache.delete(runId);
+      this.snapshotCache.set(runId, { snapshot, revision });
+      while (this.snapshotCache.size > SNAPSHOT_CACHE_LIMIT) {
+        const oldest = this.snapshotCache.keys().next().value as string | undefined;
+        if (oldest === undefined) break;
+        this.snapshotCache.delete(oldest);
+      }
+    } catch {
+      this.snapshotCache.delete(runId);
+    }
   }
 
   async #commitCommands(
@@ -564,6 +738,7 @@ export class ControlStore {
     commands: DomainCommand[],
     authority: ControlAuthority,
     writer: JsonlRunWriter,
+    options: ControlDispatchOptions = {},
   ): Promise<{ after: RunSnapshot; events: HarnessEvent[] }> {
     if (authority !== "public" && before.authorityHash !== this.#authorityHash) {
       throw new Error("Trusted control authority does not match the immutable Run anchor");
@@ -594,7 +769,7 @@ export class ControlStore {
       events.push(event);
     }
     await writer.append(events, this.#authoritySecret);
-    await writer.saveProjection(after, this.#authoritySecret);
+    if (options.persistProjection !== false) await writer.saveProjection(after, this.#authoritySecret);
     return { after, events };
   }
 
@@ -697,6 +872,22 @@ export class ControlStore {
       })),
     });
   }
+}
+
+function sameRevision(left: JsonlRunRevision, right: JsonlRunRevision): boolean {
+  return left.size === right.size
+    && left.mtimeMs === right.mtimeMs
+    && left.taskSize === right.taskSize
+    && left.taskMtimeMs === right.taskMtimeMs;
+}
+
+/** Fold only the suffix that is newer than the supplied snapshot. */
+function applyTail(base: RunSnapshot, events: HarnessEvent[]): RunSnapshot {
+  let next = base;
+  for (const event of events) {
+    if (event.seq > base.lastSeq) next = reduce(next, event);
+  }
+  return next;
 }
 
 function eventType(command: DomainCommand): HarnessEvent["type"] {

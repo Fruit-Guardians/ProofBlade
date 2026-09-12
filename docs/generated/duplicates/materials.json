@@ -210,64 +210,6 @@
       "status": "candidate",
       "symbols": [
         {
-          "id": "@proofblade/materials::method::ControlStore.dispatchBindingTransaction",
-          "package": "@proofblade/materials",
-          "name": "ControlStore.dispatchBindingTransaction",
-          "kind": "method",
-          "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
-          "module": "src/control/control-store.ts",
-          "line": 488,
-          "summary": "Commit the final Control Store fence for a broker-owned session binding."
-        },
-        {
-          "id": "@proofblade/materials::method::ControlStore.dispatchTransaction",
-          "package": "@proofblade/materials",
-          "name": "ControlStore.dispatchTransaction",
-          "kind": "method",
-          "signature": "<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>",
-          "module": "src/control/control-store.ts",
-          "line": 471,
-          "summary": "Inferred summary: dispatch transaction operation used to perform a durable write."
-        }
-      ],
-      "signals": [
-        "same-structure-hash"
-      ],
-      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
-    },
-    {
-      "status": "candidate",
-      "symbols": [
-        {
-          "id": "@proofblade/materials::method::ControlStore.replay",
-          "package": "@proofblade/materials",
-          "name": "ControlStore.replay",
-          "kind": "method",
-          "signature": "(runId: string): Promise<RunSnapshot>",
-          "module": "src/control/control-store.ts",
-          "line": 274,
-          "summary": "Inferred summary: replay operation used to read or inspect state."
-        },
-        {
-          "id": "@proofblade/materials::method::ControlStore.snapshot",
-          "package": "@proofblade/materials",
-          "name": "ControlStore.snapshot",
-          "kind": "method",
-          "signature": "(runId: string): Promise<RunSnapshot>",
-          "module": "src/control/control-store.ts",
-          "line": 269,
-          "summary": "Inferred summary: snapshot operation used to read or inspect state."
-        }
-      ],
-      "signals": [
-        "same-structure-hash"
-      ],
-      "recommendation": "Compare behavior, invariants, errors, and layer ownership before adding another implementation."
-    },
-    {
-      "status": "candidate",
-      "symbols": [
-        {
           "id": "@proofblade/materials::method::DisabledMultiAgentControlPort.cancel",
           "package": "@proofblade/materials",
           "name": "DisabledMultiAgentControlPort.cancel",
@@ -449,7 +391,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 862,
+          "line": 927,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         },
         {
@@ -459,7 +401,7 @@
           "kind": "method",
           "signature": "(_reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 139,
+          "line": 160,
           "summary": "Inferred summary: abort operation used to provide a reusable operation."
         }
       ],
@@ -478,7 +420,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/coding-lane.ts",
-          "line": 866,
+          "line": 931,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         },
         {
@@ -488,7 +430,7 @@
           "kind": "method",
           "signature": "(reason: string): Promise<void>",
           "module": "src/runtime/pi-adapter.ts",
-          "line": 143,
+          "line": 164,
           "summary": "Inferred summary: compact operation used to provide a reusable operation."
         }
       ],
@@ -626,6 +568,6 @@
   ],
   "counts": {
     "exact": 0,
-    "candidates": 19
+    "candidates": 17
   }
 }

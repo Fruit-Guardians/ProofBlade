@@ -13,6 +13,45 @@ export interface ObservationQueueProjection extends ObservationQueueSummary {
   items: ObservationQueueItem[];
 }
 
+/**
+ * Process-local cache for the model-facing observation projection.
+ *
+ * The durable event stream remains the source of truth. This cache only
+ * avoids rebuilding the same projection twice during one provider request
+ * (the context hook and observability hook both ask for it). A changed
+ * projection hash, sequence, or generation invalidates the entry.
+ */
+export class ObservationQueueCache {
+  private entry: {
+    sequence: number;
+    generation: number;
+    projectionHash?: string;
+    projection: ObservationQueueProjection;
+  } | undefined;
+
+  public get(snapshot: Pick<RunSnapshot, "lastSeq" | "generation" | "projectionHash">): ObservationQueueProjection | undefined {
+    const entry = this.entry;
+    if (!entry
+      || entry.sequence !== snapshot.lastSeq
+      || entry.generation !== snapshot.generation
+      || entry.projectionHash !== snapshot.projectionHash) return undefined;
+    return entry.projection;
+  }
+
+  public set(snapshot: Pick<RunSnapshot, "lastSeq" | "generation" | "projectionHash">, projection: ObservationQueueProjection): void {
+    this.entry = {
+      sequence: snapshot.lastSeq,
+      generation: snapshot.generation,
+      projectionHash: snapshot.projectionHash,
+      projection,
+    };
+  }
+
+  public clear(): void {
+    this.entry = undefined;
+  }
+}
+
 export interface ObservationQueueOptions {
   /** Maximum number of coalesced observations retained in the projection. */
   limit?: number;

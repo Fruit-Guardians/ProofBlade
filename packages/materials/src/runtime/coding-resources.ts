@@ -1654,7 +1654,10 @@ function createGlobTool(): AgentHarnessTool<CodingResourceContext> {
     label: "glob",
     description: "Find workspace files with a deterministic glob pattern. Results are sorted, bounded, and exclude control/runtime directories.",
     parameters: Type.Object({ pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })) }, { additionalProperties: false }),
-    executionMode: "sequential",
+    // Workspace enumeration is read-only; its archival write is already
+    // serialized by ControlStore, so it must not force unrelated tool calls
+    // in the same Pi batch onto the sequential path.
+    executionMode: "parallel",
     async execute(_toolCallId, params, _signal, _onUpdate, context) {
       const result = await globWorkspace({ cwd: context.env.cwd, ...(params as { pattern?: string; maxResults?: number }) });
       return searchToolResult(context, result);
@@ -1668,7 +1671,9 @@ function createGrepTool(): AgentHarnessTool<CodingResourceContext> {
     label: "grep",
     description: "Search text in workspace files with deterministic path/line matches, bounded file reads, binary skipping, and a result Artifact.",
     parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 1_000 }), pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })), caseSensitive: Type.Optional(Type.Boolean()), maxResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 2_000 })), maxFileBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: 16 * 1024 * 1024 })) }, { additionalProperties: false }),
-    executionMode: "sequential",
+    // Searching is read-only; the resulting Artifact is independently
+    // journaled and does not depend on another tool's ordering.
+    executionMode: "parallel",
     async execute(_toolCallId, params, _signal, _onUpdate, context) {
       const result = await grepWorkspace({ cwd: context.env.cwd, ...(params as { query: string; pattern?: string; caseSensitive?: boolean; maxResults?: number; maxFileBytes?: number }) });
       return searchToolResult(context, result);
@@ -1679,7 +1684,7 @@ function createGrepTool(): AgentHarnessTool<CodingResourceContext> {
 async function searchToolResult(context: CodingResourceContext, result: Awaited<ReturnType<typeof globWorkspace>> | Awaited<ReturnType<typeof grepWorkspace>>): Promise<ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never> {
   const modelResult = limitWorkspaceSearchResult(result);
   const hash = workspaceSearchHash(result);
-  const artifact = await context.artifactStore.putText(context.runtime.runId, JSON.stringify(result), { filename: `${result.kind}-${hash.slice(0, 12)}.json`, mime: "application/json", sensitivity: "public" });
+  const artifact = await context.artifactStore.putText(context.runtime.runId, JSON.stringify(result), { filename: `${result.kind}-${hash.slice(0, 12)}.json`, mime: "application/json", sensitivity: "public", persistProjection: false });
   const presentation = workspaceSearchText(result);
   const details = { ...modelResult, artifactId: artifact.id, artifactHash: artifact.sha256, resultHash: hash, presentation };
   return toolResult(details, false, WORKSPACE_SEARCH_MODEL_MAX_CHARS);
@@ -1770,6 +1775,7 @@ function createCodingReadTool(): AgentHarnessTool<CodingResourceContext> {
           relatedIds: [],
           annotatedBy: "harness",
         },
+        persistProjection: false,
       });
       const observation = await observeCodingArtifact(context, artifact.id, artifact.sha256, "read", 0, `文件读取 · ${pathTitle(input.path)}`, `自动归档的读取结果：${input.path}${readRange(input)}。`, "intermediate", ["read", "file-content"]);
       // The archived text IS the visible text, so there is nothing to point the
@@ -2109,22 +2115,21 @@ async function observeCodingArtifact(
       details.repetitionCount = next.count;
     }
   }
-  try {
-    const review = await context.evidenceGraph.annotateArtifact({ artifactId, name, summary, role, tags: [...tags, "auto-reviewed"] });
-    // Automatic artifact annotation is bookkeeping, not a solver milestone.
-    // `annotateArtifact` reports a newly seen artifact as progress for explicit
-    // evidence workflows, but read/bash output is produced on every probe.
-    // Propagating that flag here reset the no-progress and experiment breakers
-    // after every successful command, allowing an unbounded investigation loop.
-    details.durableProgress = false;
-    details.progressKey = review.progressKey;
-  } catch {
-    // Artifact annotation is an observer side effect. A transient control-store
-    // failure must not turn a completed bash/read call into a failed solve.
-  }
   if (context.runtime && typeof context.runtime.observeArtifact === "function") {
     try {
-      const observed = await context.runtime.observeArtifact({ operation, artifactId, exitCode });
+      // The runtime combines the review annotation with the observation and
+      // derived Evidence in one ControlStore transaction. This removes two
+      // extra lock/fsync round trips from every read/bash result while keeping
+      // curation semantics unchanged.
+      const observed = await context.runtime.observeArtifact({
+        operation,
+        artifactId,
+        exitCode,
+        persistProjection: false,
+        annotation: { name, summary, role, tags: [...tags, "auto-reviewed"] },
+      });
+      // Automatic observations are bookkeeping, not solver milestones.
+      details.durableProgress = false;
       details.observationId = observed.observationId;
       details.evidenceId = observed.evidenceId;
       details.candidateKinds = observed.candidateKinds;
@@ -2132,6 +2137,17 @@ async function observeCodingArtifact(
     } catch {
       // Automatic observation is best-effort; the raw Artifact remains the
       // durable source if the control store is temporarily unavailable.
+    }
+  } else {
+    try {
+      // Keep lightweight test/offline contexts compatible with the original
+      // seam when no full runtime is attached.
+      const review = await context.evidenceGraph.annotateArtifact({ artifactId, name, summary, role, tags: [...tags, "auto-reviewed"] });
+      details.durableProgress = false;
+      details.progressKey = review.progressKey;
+    } catch {
+      // Artifact annotation is an observer side effect. A transient control-store
+      // failure must not turn a completed bash/read call into a failed solve.
     }
   }
   return details;
@@ -2173,6 +2189,7 @@ async function finalizeAndArchive(
       relatedIds: [],
       annotatedBy: "harness",
     },
+    persistProjection: false,
   });
   const savedBytes = Math.max(0, finalized.rawBytes - finalized.visibleBytes);
   return {
@@ -2230,7 +2247,9 @@ const loadSkillTool: AgentHarnessTool<CodingResourceContext> = {
     name: Type.String({ minLength: 1, description: "Enabled Skill name." }),
     maxChars: Type.Optional(Type.Number({ minimum: 256, maximum: 12_000 })),
   }),
-  executionMode: "sequential",
+  // Loading is an in-memory/read-only operation; it may overlap with another
+  // inspection call. Writes and stateful proxies remain sequential barriers.
+  executionMode: "parallel",
   async execute(_toolCallId, params, _signal, _onUpdate, context) {
     const input = params as { name: string; maxChars?: number };
     if (!context.enabledSkills.has(input.name)) throw new Error(`Skill is not enabled for this conversation: ${input.name}`);

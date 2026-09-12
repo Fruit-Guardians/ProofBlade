@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,6 +10,15 @@ import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { claimCompetitionWorkItem } from "../src/competition/loop.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
+
+class CountingJsonlControlStore extends JsonlControlStore {
+  public replayCount = 0;
+
+  public override async replay(...args: Parameters<JsonlControlStore["replay"]>): Promise<Awaited<ReturnType<JsonlControlStore["replay"]>>> {
+    this.replayCount += 1;
+    return await super.replay(...args);
+  }
+}
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -58,6 +67,44 @@ test("control store replay is deterministic and verifier gated", async () => {
     assert.equal(replayed.finalResult?.evidenceIds.length, 2);
     assert.equal(replayed.finalResult?.candidateHash, replayed.completions["C-001"]?.candidateHash);
     assert.equal(projectionHash(replayed), projectionHash(persisted!));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ControlStore folds from the durable projection and only replays a telemetry tail", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-control-cache-"));
+  try {
+    const runId = "CONTROL-CACHE-001";
+    const secret = "control-cache-secret-0123456789abcdef";
+    const creator = new ControlStore(new JsonlControlStore(join(root, "runs")), undefined, secret);
+    await creator.createRun(runId, demoTask(runId, root, config));
+
+    const reopenedStore = new CountingJsonlControlStore(join(root, "runs"));
+    const reopened = new ControlStore(reopenedStore, undefined, secret);
+    const initial = await reopened.snapshot(runId);
+    assert.equal(initial.lastSeq, 1);
+    assert.equal(reopenedStore.replayCount, 0, "a valid projection should seed the first cold read");
+
+    await reopened.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: "cache-telemetry",
+      actor: "model",
+      type: "model_usage",
+      payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    const after = await reopened.snapshot(runId);
+    assert.equal(after.lastSeq, 2);
+    assert.equal(reopenedStore.replayCount, 0, "the live cache must fold the appended tail without a full replay");
+
+    const persisted = await reopenedStore.loadProjection(runId);
+    assert.equal(persisted?.lastSeq, 1, "telemetry append must not rewrite the full projection synchronously");
+
+    const coldStore = new CountingJsonlControlStore(join(root, "runs"));
+    const cold = new ControlStore(coldStore, undefined, secret);
+    assert.equal((await cold.snapshot(runId)).lastSeq, 2);
+    assert.equal(coldStore.replayCount, 0, "a cold reader should fold the short tail after projection.json");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -421,6 +468,66 @@ test("dispatchBatch validates every command before persisting any event", async 
     assert.equal(after.artifacts["A-BATCH"], undefined);
     assert.equal(after.lastSeq, before.lastSeq);
     assert.equal((await control.events(runId)).length, eventCount);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("append repairs a torn JSONL tail before committing the next telemetry batch", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-jsonl-tail-repair-"));
+  const secret = "jsonl-tail-repair-secret-01234567890123456789";
+  try {
+    const events = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(events, undefined, secret);
+    const runId = "JSONL-TAIL-REPAIR-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const path = join(root, "runs", runId, "events.jsonl");
+    const before = await control.events(runId);
+    await appendFile(path, "{\"schemaVersion\":1,\"torn\":", "utf8");
+
+    const reopened = new JsonlControlStore(join(root, "runs"));
+    assert.equal((await reopened.events(runId)).length, before.length, "readers discard only the incomplete final record");
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: `${runId}:tail-repair`,
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "tail-repair", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+
+    const after = await control.events(runId);
+    assert.equal(after.length, before.length + 1);
+    assert.equal(after.at(-1)?.type, "model_usage");
+    const raw = await readFile(path, "utf8");
+    assert.equal(raw.includes('"torn"'), false);
+    assert.ok(raw.endsWith("\n"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("deferred projection writes are coalesced until an explicit flush barrier", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-projection-barrier-"));
+  try {
+    const eventStore = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(eventStore);
+    const runId = "PROJECTION-BARRIER-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const before = await eventStore.loadProjection(runId);
+    assert.ok(before);
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "main",
+      correlationId: `${runId}:barrier`,
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "barrier", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    assert.equal((await eventStore.loadProjection(runId))?.lastSeq, before.lastSeq, "hot append must not rewrite projection.json");
+    await control.flushProjection(runId);
+    assert.equal((await eventStore.loadProjection(runId))?.lastSeq, before.lastSeq + 1);
+    await control.flushProjection(runId);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

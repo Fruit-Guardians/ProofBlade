@@ -58,7 +58,8 @@ import type { ApprovalPolicy } from "../security/approval-policy.js";
 import { assertToolPreparationPublished, ToolPreflightService, preflightFromRunToolPreparation, runToolPreparationFromPreflight, securityProfileForTask, withFirstClassMcpToolExposure, type SecurityToolProfile, type SecurityToolPreflight } from "./security-tool-profile.js";
 import { RunCoordinator } from "../orchestration/run-coordinator.js";
 import { RunEventIngress } from "../orchestration/event-ingress.js";
-import { acknowledgeObservationItems, projectObservationQueue } from "../orchestration/observation-queue.js";
+import { scheduleAgentTools } from "./tool-scheduler.js";
+import { acknowledgeObservationItems, ObservationQueueCache, projectObservationQueue } from "../orchestration/observation-queue.js";
 import type { ExternalResourceRegistry } from "../recovery/external-resource-registry.js";
 import type { SessionRuntimeHandoff } from "../recovery/session-resource-adapter.js";
 import type { SessionRuntimeCreateBroker } from "../recovery/session-resource-adapter.js";
@@ -106,6 +107,8 @@ export class PiCodingLane implements AgentLanePort {
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
     /** Teardown hook for durable shell jobs owned by this lane. */
     private readonly closeShellJobs: () => Promise<void>,
+    /** Explicit session/flush equivalent for queued Pi telemetry. */
+    private readonly flushObservability: () => Promise<void>,
     /** Present only for a Docker pwn lane; its live tube sessions are torn down on close. */
     private readonly pwnRegistry?: SessionRegistry,
     /** Separate owner-scoped registry for trusted clean-process Pwn reproduction. */
@@ -497,6 +500,11 @@ export class PiCodingLane implements AgentLanePort {
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
     const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...activeMcpTools];
+    // Pi 0.83 treats a batch containing one sequential tool as entirely
+    // sequential. Keep the declared contracts for observability/catalogs, but
+    // execute the provider-facing copy through the lane-local rolling barrier
+    // scheduler so independent read-only calls can overlap.
+    const scheduledTools = scheduleAgentTools(tools);
     const activeToolNames = [
       ...codingActiveToolNames({
         tools: enabledTools,
@@ -608,7 +616,7 @@ export class PiCodingLane implements AgentLanePort {
       session,
       models,
       model,
-      tools,
+      tools: scheduledTools,
       activeToolNames,
       resources: { skills: resources },
       toolContext,
@@ -639,29 +647,61 @@ export class PiCodingLane implements AgentLanePort {
     let lastOmittedItems: ModelContextItem[] = [];
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
+    let compiledContextCache: {
+      snapshotSeq: number;
+      generation: number;
+      queueHash: string;
+      guidance: string;
+      output: ContextBuildOutput;
+    } | undefined;
+    const observationQueueCache = new ObservationQueueCache();
+    const currentObservationQueue = async (current: RunSnapshot) => {
+      const cached = observationQueueCache.get(current);
+      if (cached) return cached;
+      const projection = projectObservationQueue(await options.controlStore.events(options.runId), current);
+      observationQueueCache.set(current, projection);
+      return projection;
+    };
     let persistedContextForTurn = false;
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
-      const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
+      const queue = await currentObservationQueue(current);
       if (queue.total > 0) {
         const injectedById = new Map(maintenance.injectedObservationItems.map((item) => [item.id, item]));
         for (const item of queue.items.slice(0, 8)) injectedById.set(item.id, item);
         maintenance.injectedObservationItems = [...injectedById.values()];
       }
-      const compiled = contextCompiler.build({
-        runId: options.runId,
-        lane: "main",
-        phase: current.phase,
-        task: current.task,
-        snapshot: current,
-        contextWindow: profile.contextWindow,
-        outputBudget: profile.maxTokens,
-        safetyMargin: providerSafetyTokens,
-        resources: contextResources,
-        observationQueue: queue.items,
-        previousBlocks: previousContextBlocks,
-      });
-      previousContextBlocks = compiled.manifest.blocks;
+      const queueHash = sha256(canonicalJson(queue.items));
+      const cached = compiledContextCache;
+      const compiled = cached
+        && cached.snapshotSeq === current.lastSeq
+        && cached.generation === current.generation
+        && cached.queueHash === queueHash
+        && cached.guidance === turnContext.guidance
+        ? cached.output
+        : contextCompiler.build({
+          runId: options.runId,
+          lane: "main",
+          phase: current.phase,
+          task: current.task,
+          snapshot: current,
+          contextWindow: profile.contextWindow,
+          outputBudget: profile.maxTokens,
+          safetyMargin: providerSafetyTokens,
+          resources: contextResources,
+          observationQueue: queue.items,
+          previousBlocks: previousContextBlocks,
+        });
+      if (compiled !== cached?.output) {
+        previousContextBlocks = compiled.manifest.blocks;
+        compiledContextCache = {
+          snapshotSeq: current.lastSeq,
+          generation: current.generation,
+          queueHash,
+          guidance: turnContext.guidance,
+          output: compiled,
+        };
+      }
       const dynamicProjection = contextProjectionMessage(compiled, turnContext.guidance);
       const contextPrefix = forestContext.value
         ? [createCustomMessage(
@@ -695,7 +735,11 @@ export class PiCodingLane implements AgentLanePort {
         // so persist the bounded ledger checkpoint directly before Pi compacts.
         // The append-only transcript remains the source of truth if this
         // observer-side write is temporarily unavailable.
-        await checkpointService.create(options.runId, "context-prune").catch(() => undefined);
+        // The event is durable immediately, but defer the materialized
+        // projection until the existing turn-end flush barrier. Checkpoint
+        // creation sits on the provider hot path and should not add a second
+        // projection rewrite before the next request.
+        await checkpointService.create(options.runId, "context-prune", undefined, { persistProjection: false }).catch(() => undefined);
       }
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: injectContextForRequest ? [...prepared.messages, ...contextPrefix] : prepared.messages };
@@ -719,21 +763,38 @@ export class PiCodingLane implements AgentLanePort {
       estimateContextTokens: async () => currentContextTokens,
       getContextSnapshot: async () => {
         const current = await options.controlStore.snapshot(options.runId);
-        const observationQueue = projectObservationQueue(await options.controlStore.events(options.runId), current);
-        const compiled = contextCompiler.build({
-          runId: options.runId,
-          lane: "main",
-          phase: current.phase,
-          task: current.task,
-          snapshot: current,
-          contextWindow: profile.contextWindow,
-          outputBudget: profile.maxTokens,
-          safetyMargin: providerSafetyTokens,
-          resources: contextResources,
-          observationQueue: observationQueue.items,
-          previousBlocks: previousContextBlocks,
-        });
-        previousContextBlocks = compiled.manifest.blocks;
+        const observationQueue = await currentObservationQueue(current);
+        const queueHash = sha256(canonicalJson(observationQueue.items));
+        const cached = compiledContextCache;
+        const compiled = cached
+          && cached.snapshotSeq === current.lastSeq
+          && cached.generation === current.generation
+          && cached.queueHash === queueHash
+          && cached.guidance === turnContext.guidance
+          ? cached.output
+          : contextCompiler.build({
+            runId: options.runId,
+            lane: "main",
+            phase: current.phase,
+            task: current.task,
+            snapshot: current,
+            contextWindow: profile.contextWindow,
+            outputBudget: profile.maxTokens,
+            safetyMargin: providerSafetyTokens,
+            resources: contextResources,
+            observationQueue: observationQueue.items,
+            previousBlocks: previousContextBlocks,
+          });
+        if (compiled !== cached?.output) {
+          previousContextBlocks = compiled.manifest.blocks;
+          compiledContextCache = {
+            snapshotSeq: current.lastSeq,
+            generation: current.generation,
+            queueHash,
+            guidance: turnContext.guidance,
+            output: compiled,
+          };
+        }
         const summary = contextSnapshot(compiled.manifest);
         return {
           ...summary,
@@ -777,6 +838,10 @@ export class PiCodingLane implements AgentLanePort {
         return undefined;
       },
       async () => await stopAllShellJobs(toolContext),
+      async () => {
+        await scheduling.flush();
+        await options.controlStore.flushProjection(options.runId).catch(() => undefined);
+      },
       pwnRegistry,
       pwnVerifierRegistry,
       webSession,
@@ -875,6 +940,7 @@ export class PiCodingLane implements AgentLanePort {
     try {
       await this.harness.waitForIdle();
     } finally {
+      await this.flushObservability().catch(() => undefined);
       try {
         await this.closeShellJobs().catch(() => undefined);
         // Tear down live pwn tube sessions first: their docker-exec children are

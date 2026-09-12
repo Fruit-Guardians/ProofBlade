@@ -69,6 +69,12 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
 });
 
+test("read-only workspace scans do not serialize unrelated Pi tool calls", () => {
+  const tools = createCodingTools();
+  assert.equal(tools.find((tool) => tool.name === "glob")?.executionMode, "parallel");
+  assert.equal(tools.find((tool) => tool.name === "grep")?.executionMode, "parallel");
+});
+
 test("ordinary read follows bounded continuation pages into one complete model result", async () => {
   const dir = await mkdtemp(join(tmpdir(), "proofblade-complete-read-"));
   const env = new NodeExecutionEnv({ cwd: dir });

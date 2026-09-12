@@ -2,7 +2,7 @@ import type { AgentHarness, AgentHarnessEvent } from "@earendil-works/pi-agent-c
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { captureProviderPrefixShape, type ProviderPrefixShape } from "@proofblade/molecules";
 import type { ControlStore } from "../control/control-store.js";
-import type { ContextManifest, Lane } from "../domain/types.js";
+import type { ContextManifest, HarnessEvent, Lane } from "../domain/types.js";
 import { buildModelContextFrame, type ModelContextFrame, type ModelContextItem } from "../context/model-context-frame.js";
 import { canonicalJson, id, sha256 } from "../domain/utils.js";
 import { solverToolContractSnapshot } from "../runtime/solver-tools.js";
@@ -38,6 +38,80 @@ export interface PiObservabilityOptions {
     parentEpochId?: string;
   };
   scheduling?: ProviderSchedulingTelemetry;
+  /** Internal write-behind coordinator shared with provider scheduling hooks. */
+  telemetry?: ControlEventBatcher;
+}
+
+type TelemetryEvent = Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">;
+const telemetryByOptions = new WeakMap<object, ControlEventBatcher>();
+
+/**
+ * Bounded write-behind for low-value observability events.
+ *
+ * Pi hooks are on the provider/tool critical path.  A synchronous JSONL
+ * append for every hook forces a lock, fsync and projection read/write before
+ * the model can continue.  This queue keeps the event order in memory and
+ * flushes a bounded batch in the background; turn_end/agent_end call flush()
+ * as a quiescence barrier.  Control-plane commands never use this class.
+ */
+export class ControlEventBatcher {
+  private readonly queue: TelemetryEvent[] = [];
+  private flushPromise: Promise<void> | undefined;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  public constructor(
+    private readonly controlStore: ControlStore,
+    private readonly runId: string,
+    private readonly lane: Lane,
+  ) {}
+
+  public append(type: TelemetryEvent["type"], actor: TelemetryEvent["actor"], payload: Record<string, unknown>): void {
+    this.queue.push({
+      schemaVersion: 1,
+      lane: this.lane,
+      correlationId: `${this.runId}:${this.lane}:telemetry`,
+      actor,
+      type,
+      payload,
+    });
+    this.schedule();
+  }
+
+  /** Wait until all currently queued telemetry has reached the event log. */
+  public async flush(): Promise<void> {
+    if (!this.flushPromise) this.flushPromise = this.flushQueued();
+    await this.flushPromise;
+  }
+
+  private schedule(delayMs = 10): void {
+    if (this.timer || this.queue.length === 0) return;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.flush();
+    }, delayMs);
+    (this.timer as unknown as { unref?: () => void }).unref?.();
+  }
+
+  private async flushQueued(): Promise<void> {
+    try {
+      while (this.queue.length > 0) {
+        const batch = this.queue.splice(0, 128);
+        try {
+          await this.controlStore.append(this.runId, batch, { persistProjection: false });
+        } catch {
+          // Telemetry is fail-soft. Keep the batch for the next turn-end or
+          // timer retry instead of turning an observability outage into a
+          // failed model/tool request.
+          this.queue.unshift(...batch);
+          this.schedule(1_000);
+          return;
+        }
+      }
+    } finally {
+      this.flushPromise = undefined;
+      if (this.queue.length > 0 && !this.timer) this.schedule();
+    }
+  }
 }
 
 /** Safe ContextManifest projection persisted beside the RequestEpoch. */
@@ -81,8 +155,13 @@ export class ProviderSchedulingTelemetry {
   private readonly waiting = new Map<string, PendingProvider[]>();
   private readonly requests = new Map<string, PendingProvider>();
   private readonly cancelled = new Set<string>();
+  public readonly batcher: ControlEventBatcher;
+  private readonly options: Pick<PiObservabilityOptions, "runId" | "lane" | "controlStore"> & { telemetry: ControlEventBatcher };
 
-  public constructor(private readonly options: Pick<PiObservabilityOptions, "runId" | "lane" | "controlStore">) {}
+  public constructor(options: Pick<PiObservabilityOptions, "runId" | "lane" | "controlStore">) {
+    this.batcher = new ControlEventBatcher(options.controlStore, options.runId, options.lane);
+    this.options = { ...options, telemetry: this.batcher };
+  }
 
   public readonly observer: ProviderRequestSchedulingObserver = {
     queued: async (info) => await this.queued(info),
@@ -108,6 +187,11 @@ export class ProviderSchedulingTelemetry {
 
   public isCancelled(requestId: string | undefined): boolean {
     return requestId !== undefined && this.cancelled.has(requestId);
+  }
+
+  /** Quiescence barrier used by tests, turn-end, and orderly lane shutdown. */
+  public async flush(): Promise<void> {
+    await this.batcher.flush();
   }
 
   private async queued(info: ProviderRequestQueueInfo): Promise<string> {
@@ -280,6 +364,8 @@ interface PendingTool {
 const toolPolicies = new Map(solverToolContractSnapshot().map((contract) => [String(contract.name), contract]));
 
 export function attachPiObservability<TContext extends object | undefined>(harness: AgentHarness<TContext>, options: PiObservabilityOptions): () => void {
+  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? new ControlEventBatcher(options.controlStore, options.runId, options.lane);
+  telemetryByOptions.set(options, telemetry);
   const providers: PendingProvider[] = [];
   const tools = new Map<string, PendingTool>();
   const unsubscribeBefore = harness.on("before_provider_request", async (event) => {
@@ -387,6 +473,11 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     return undefined;
   });
   const unsubscribeEvents = harness.subscribe(async (event) => {
+    if (event.type === "turn_end" || event.type === "agent_end") {
+      await telemetry.flush();
+      await options.controlStore.flushProjection(options.runId).catch(() => undefined);
+      return;
+    }
     if (!options.scheduling && event.type === "message_end" && isAssistantMessage(event.message)) {
       const pending = providers.shift();
       const message = event.message;
@@ -458,6 +549,8 @@ export function attachPiObservability<TContext extends object | undefined>(harne
     }
   });
   return () => {
+    telemetryByOptions.delete(options);
+    void telemetry.flush();
     unsubscribeEvents();
     unsubscribePayload?.();
     unsubscribeAfter?.();
@@ -466,7 +559,16 @@ export function attachPiObservability<TContext extends object | undefined>(harne
 }
 
 function append(options: PiObservabilityOptions, type: "request_epoch_started" | "request_epoch_context" | "model_context_frame_recorded" | "provider_request_started" | "provider_request_queued" | "provider_request_slot_acquired" | "provider_request_queue_cancelled" | "provider_request_retried" | "provider_request_first_event" | "provider_request_first_token" | "provider_request_inter_event_idle" | "provider_request_stalled" | "provider_recovery_required" | "provider_response_received" | "tool_call_recorded" | "tool_result_recorded" | "compaction_recorded" | "model_usage", actor: "model" | "tool" | "orchestrator", payload: Record<string, unknown>): Promise<void> {
-  return options.controlStore.append(options.runId, [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }]).then(() => undefined);
+  const telemetry = options.telemetry ?? options.scheduling?.batcher ?? telemetryByOptions.get(options);
+  if (telemetry) {
+    telemetry.append(type, actor, payload);
+    return Promise.resolve();
+  }
+  return options.controlStore.append(
+    options.runId,
+    [{ schemaVersion: 1, lane: options.lane, correlationId: `${options.runId}:${options.lane}:telemetry`, actor, type, payload }],
+    { persistProjection: false },
+  ).then(() => undefined);
 }
 
 function providerKey(provider: string, model: string): string {
