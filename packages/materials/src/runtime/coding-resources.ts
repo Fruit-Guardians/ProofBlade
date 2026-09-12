@@ -41,6 +41,10 @@ export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_s
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 /** Maximum size of an implicit complete read returned in one model turn. */
 const MAX_COMPLETE_READ_BYTES = 256 * 1024;
+const KNOWN_TOOL_EXECUTABLES = new Set([
+  "bash", "sh", "zsh", "fish", "python", "python2", "python3", "py", "node", "nodejs",
+  "npm", "npx", "pnpm", "yarn", "tshark", "convert", "magick", "java", "ruby", "perl", "php", "curl", "wget",
+]);
 
 /** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
 export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
@@ -1845,10 +1849,7 @@ function shellSourceScope(command: string, cwd: string): {
   const roots = new Set([normalizedCwd, "/workspace"]);
   const windowsRoot = /^([a-z]):\/(.*)$/i.exec(normalizedCwd);
   if (windowsRoot) roots.add(`/mnt/${windowsRoot[1]!.toLowerCase()}/${windowsRoot[2]}`.replace(/\/$/, ""));
-  const candidates = [
-    ...[...command.matchAll(/(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)/g)].map((match) => match[1] ?? ""),
-    ...[...command.matchAll(/(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi)].map((match) => match[1] ?? ""),
-  ].map((value) => value.replace(/[,:]+$/, "")).filter((value) => value.length > 1 && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value));
+  const candidates = shellPathCandidates(command).filter((candidate) => !isCommandExecutablePath(command, candidate));
   const outsidePaths = [...new Set(candidates.filter((candidate) => {
     if (candidate.startsWith("../")) return true;
     const normalized = candidate.replaceAll("\\", "/").replace(/\/$/, "");
@@ -1861,6 +1862,59 @@ function shellSourceScope(command: string, cwd: string): {
   return outsidePaths.length > 0
     ? { status: "outside_workspace", authoritativeForTaskResult: false, outsidePaths }
     : { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] };
+}
+
+/**
+ * Extract path-shaped arguments without treating the shell's command itself
+ * as task data. Quoted paths are scanned first so `C:/Program Files/...` is
+ * kept intact; the unquoted pass covers ordinary Unix and drive-letter paths.
+ */
+function shellPathCandidates(command: string): string[] {
+  const quotedRanges: Array<[number, number]> = [];
+  const candidates: string[] = [];
+  for (const match of command.matchAll(/(["'])(.*?)\1/g)) {
+    const value = match[2] ?? "";
+    const start = match.index ?? 0;
+    quotedRanges.push([start, start + match[0].length]);
+    if (isPathCandidate(value)) candidates.push(value.replace(/[,:]+$/, ""));
+  }
+  const unquoted = /(?:^|[\s"'=:(])((?:\/(?!\/)|\.\.\/)[^\s"'`;|&<>()[\]{}]*)|(?:^|[\s"'=:(])([a-z]:[\\/][^\s"'`;|&<>()[\]{}]*)/gi;
+  for (const match of command.matchAll(unquoted)) {
+    const start = match.index ?? 0;
+    if (quotedRanges.some(([from, to]) => start >= from && start < to)) continue;
+    const value = (match[1] ?? match[2] ?? "").replace(/[,:]+$/, "");
+    if (isPathCandidate(value)) candidates.push(value);
+  }
+  return [...new Set(candidates)];
+}
+
+function isPathCandidate(value: string): boolean {
+  return value.length > 1
+    && /^(?:\/|\.\.\/|[a-z]:[\\/])/i.test(value)
+    && !/^\/dev\/(?:null|stdin|stdout|stderr)$/.test(value);
+}
+
+/**
+ * An absolute path used as the first word of a shell command is a runtime
+ * executable, not task evidence. Do not downgrade a workspace result merely
+ * because Python/tshark/node lives in a host installation directory. A path
+ * supplied after that executable (for example an external solve.py) remains
+ * a real source and is therefore checked normally.
+ */
+function isCommandExecutablePath(command: string, candidate: string): boolean {
+  const index = command.indexOf(candidate);
+  if (index < 0) return false;
+  const before = command.slice(0, index);
+  const segment = before
+    .slice(Math.max(before.lastIndexOf(";"), before.lastIndexOf("|"), before.lastIndexOf("&"), before.lastIndexOf("\n")) + 1)
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  if (segment.length > 0 && !/^(?:env|sudo|command|exec|nohup|timeout)(?:\s|$)/i.test(segment)) return false;
+  const normalized = candidate.replaceAll("\\", "/");
+  const name = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
+  return /\.(?:exe|cmd|bat|com)$/.test(name)
+    || KNOWN_TOOL_EXECUTABLES.has(name);
 }
 
 function renderShellSourceScope(scope: ReturnType<typeof shellSourceScope>): string | undefined {
