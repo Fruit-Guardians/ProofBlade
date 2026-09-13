@@ -33,7 +33,7 @@ import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
 /** Provider-facing proxy tools for generic security tasks. */
-export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -189,6 +189,7 @@ export function createCodingTools(options: CodingToolOptions = {}): AgentHarness
     ...builtinTools(),
     verifyResultTool,
     evidenceTool,
+    evidenceRecordTool,
     loadSkillTool,
     capabilityTool,
     mcpCallTool,
@@ -424,6 +425,7 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   edit: WORKSPACE_EFFECT,
   write: WORKSPACE_EFFECT,
   verify_result: WORKSPACE_EFFECT,
+  evidence_record: WORKSPACE_EFFECT,
   load_skill: READ_ONLY_EFFECT,
   // Starting and killing processes is a process side effect; polling a log is not,
   // so shell_job's policy is resolved per-operation below.
@@ -588,10 +590,58 @@ const verifyResultTool: AgentHarnessTool<CodingResourceContext> = {
   },
 };
 
+const EVIDENCE_RECORD_ALLOWED_FIELDS = ["artifactIds", "summary", "name", "tags", "claim", "dependsOn"] as const;
+const EVIDENCE_LEGACY_FIELDS = new Set([
+  "operation", "treeId", "query", "artifactId", "artifactIds", "name", "summary", "tags", "role", "relatedIds", "dependsOn", "claim",
+  "maxChars", "uri", "level", "maxResults", "includeStale", "policy", "maxArtifacts", "from", "to", "relation", "explanation", "confidence", "purpose", "rootNodeId", "nodeIds", "relatedTreeIds", "status",
+]);
+
+interface EvidenceRecordInput {
+  artifactIds: string[];
+  summary: string;
+  name: string;
+  tags?: string[];
+  claim?: string;
+  dependsOn?: string[];
+}
+
+interface EvidenceRecordNormalization {
+  ignoredFields?: string[];
+  derivedName?: boolean;
+}
+
+/**
+ * Provider-facing Evidence write contract. The old `evidence` proxy remains
+ * available for graph reads and legacy sessions, but recording gets one small
+ * exact schema so a model cannot accidentally mix read/tree arguments into a
+ * durable write.
+ */
+const evidenceRecordTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "evidence_record",
+  label: "evidence_record",
+  description: "Promote one or more existing Artifact ids into durable Evidence. Required: artifactIds (A-* ids) and summary. Optional: name, tags, claim, dependsOn. If name is omitted, ProofBlade derives a deterministic short name from the first summary line. Use this only for a durable conclusion; ordinary Tool output is already archived as an Artifact/Observation.",
+  parameters: Type.Object({
+    artifactIds: Type.Array(Type.String({ minLength: 1, description: "Stable A-* ids returned by read/bash or evidence search; file paths are not artifact ids." }), { minItems: 1, maxItems: 16 }),
+    summary: Type.String({ minLength: 1, maxLength: 1_000, description: "Concise durable observation grounded in the referenced Artifacts." }),
+    name: Type.Optional(Type.String({ minLength: 1, maxLength: 160, description: "Short display name. Omit to derive it deterministically from summary." })),
+    tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 16 })),
+    claim: Type.Optional(Type.String({ minLength: 1, maxLength: 1_000, description: "Optional testable claim supported by this Evidence." })),
+    dependsOn: Type.Optional(Type.Array(Type.String({ minLength: 1, description: "Existing current-generation Evidence id." }), { maxItems: 16 })),
+  }, { additionalProperties: false }),
+  // Pi validates tool arguments before entering execute(). Convert schema
+  // failures into a valid internal envelope so the same structured Evidence
+  // error path is used by both direct calls and real AgentHarness turns.
+  prepareArguments: prepareEvidenceRecordArguments,
+  executionMode: "sequential",
+  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+    return await executeEvidenceRecord(params as Record<string, unknown>, context, "evidence_record");
+  },
+};
+
 const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
   name: "evidence",
   label: "evidence",
-  description: "Evidence and knowledge proxy for durable observations, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Record accepts artifactIds (plural), name, and summary and promotes artifacts into auditable Evidence. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
+  description: "Evidence and knowledge proxy for reads, typed graph edges, reasoning trees, pb:// L0/L1/L2 projections, and curation status. Use evidence_record for new durable conclusions; it accepts only artifactIds (plural), summary, and optional name/tags/claim/dependsOn. This legacy proxy keeps operation=record for older sessions and normalizes known mixed fields once. Use curation_status for exact pending Artifact ids and viewed/reviewed/promoted counts. Annotate accepts artifactId (singular), name, summary, and optional role, but only marks model output viewed and never clears the curation gate. Trees are views over shared DAG nodes, so reuse node ids instead of copying evidence.",
   parameters: Type.Object({
     operation: Type.String({
       enum: ["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"],
@@ -662,7 +712,8 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       relatedTreeIds?: string[];
       status?: "ACTIVE" | "SUPPORTED" | "CONTESTED" | "ARCHIVED";
     };
-    if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
+    try {
+      if (!("operation" in input) || !["curation_status", "inspect_forest", "inspect_tree", "search", "read", "inspect_uri", "search_uri", "consolidate", "annotate", "record", "link", "create_tree", "update_tree"].includes(input.operation)) throw new Error(`Unsupported evidence operation: ${String(input.operation)}`);
     if (input.operation === "curation_status") {
       assertOnly(input, ["operation"], "evidence curation_status");
       return toolResult({ curation: await context.evidenceCurationGate?.inspect({ includeReviewEvents: true }) ?? { stage: "clear", pendingCount: 0, pendingArtifacts: [] } });
@@ -706,10 +757,7 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
       return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
     }
     if (input.operation === "record") {
-      assertOnly(input, ["operation", "artifactIds", "name", "summary", "tags", "dependsOn", "claim"], "evidence record");
-      if (!input.artifactIds || !input.name || !input.summary) throw new Error("evidence record requires artifactIds, name, and summary");
-      const result = await context.evidenceGraph.recordEvidence({ name: input.name, summary: input.summary, artifactIds: input.artifactIds, tags: input.tags, claim: input.claim, dependsOn: input.dependsOn });
-      return toolResult({ ...result, curation: await context.evidenceCurationGate?.inspect() });
+      return await executeEvidenceRecord(input, context, "evidence");
     }
     if (input.operation === "link") {
       assertOnly(input, ["operation", "from", "to", "relation", "explanation", "confidence"], "evidence link");
@@ -723,9 +771,309 @@ const evidenceTool: AgentHarnessTool<CodingResourceContext> = {
     }
     assertOnly(input, ["operation", "treeId", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"], "evidence update_tree");
     if (!input.treeId) throw new Error("evidence update_tree requires treeId");
-    return toolResult(await context.evidenceGraph.updateTree({ treeId: input.treeId, name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
+      return toolResult(await context.evidenceGraph.updateTree({ treeId: input.treeId, name: input.name, summary: input.summary, purpose: input.purpose, explanation: input.explanation, rootNodeId: input.rootNodeId, nodeIds: input.nodeIds, tags: input.tags, relatedTreeIds: input.relatedTreeIds, status: input.status }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith("[ProofBlade evidence error]")) throw error;
+      throwLegacyEvidenceError(input, message);
+    }
   },
 };
+
+type CodingToolResult = ReturnType<AgentHarnessTool<CodingResourceContext>["execute"]> extends Promise<infer TResult> ? TResult : never;
+
+const EVIDENCE_OPERATION_ALLOWED_FIELDS: Readonly<Record<string, string[]>> = {
+  curation_status: ["operation"],
+  inspect_forest: ["operation", "maxChars"],
+  inspect_tree: ["operation", "treeId"],
+  search: ["operation", "query", "tags"],
+  read: ["operation", "artifactId", "maxChars"],
+  inspect_uri: ["operation", "uri", "level", "maxChars"],
+  search_uri: ["operation", "query", "maxResults", "maxChars", "includeStale"],
+  consolidate: ["operation", "artifactIds", "policy", "maxArtifacts"],
+  annotate: ["operation", "artifactId", "name", "summary", "tags", "role", "relatedIds"],
+  record: ["operation", ...EVIDENCE_RECORD_ALLOWED_FIELDS],
+  link: ["operation", "from", "to", "relation", "explanation", "confidence"],
+  create_tree: ["operation", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
+  update_tree: ["operation", "treeId", "name", "summary", "purpose", "explanation", "rootNodeId", "nodeIds", "tags", "relatedTreeIds", "status"],
+};
+
+function throwLegacyEvidenceError(input: Record<string, unknown>, message: string): never {
+  const operation = typeof input.operation === "string" ? input.operation : "unknown";
+  const receivedFields = Object.keys(input).filter((key) => input[key] !== undefined);
+  const unexpected = /^evidence [^ ]+ does not accept: (.+)$/.exec(message)?.[1]?.split(", ").filter(Boolean) ?? [];
+  const missing = /requires (.+)$/.exec(message)?.[1]?.split(/, and |, | and /).map((field) => field.trim()).filter(Boolean) ?? [];
+  const artifactFailure = /Unknown artifacts?|current-generation artifacts/i.test(message);
+  const dependencyFailure = /Unknown evidence|dependencies must be from the current generation/i.test(message);
+  const code = unexpected.length > 0
+    ? "unknown_field"
+    : missing.length > 0
+      ? "missing_required_field"
+      : artifactFailure
+        ? "invalid_artifact_reference"
+        : dependencyFailure
+          ? "invalid_evidence_dependency"
+          : operation === "unknown"
+            ? "unsupported_operation"
+            : "operation_failed";
+  const invalidFields = unexpected.length > 0
+    ? unexpected
+    : artifactFailure
+      ? ["artifactId", "artifactIds"].filter((field) => receivedFields.includes(field))
+      : dependencyFailure
+        ? ["dependsOn"]
+        : [];
+  const allowedFields = EVIDENCE_OPERATION_ALLOWED_FIELDS[operation] ?? ["operation", ...EVIDENCE_RECORD_ALLOWED_FIELDS];
+  evidenceContractError({
+    tool: "evidence",
+    operation,
+    code,
+    retryable: code !== "unsupported_operation",
+    receivedFields,
+    invalidFields,
+    missingFields: missing,
+    allowedFields,
+    suggestedArguments: operation === "record"
+      ? { artifactIds: ["A-*"], summary: "短小、可审计的结论" }
+      : { operation, ...(operation === "read" ? { artifactId: "A-*" } : {}) },
+    nextAction: unexpected.length > 0
+      ? `${message}. Remove cross-operation fields and retry with only the allowed arguments.`
+      : message,
+  });
+}
+
+function evidenceContractError(details: {
+  tool: "evidence" | "evidence_record";
+  operation: string;
+  code: string;
+  retryable: boolean;
+  receivedFields: string[];
+  invalidFields?: string[];
+  missingFields?: string[];
+  allowedFields: string[];
+  suggestedArguments: Record<string, unknown>;
+  nextAction: string;
+}): never {
+  const payload = {
+    schemaVersion: 1,
+    ...details,
+    invalidFields: details.invalidFields ?? [],
+    missingFields: details.missingFields ?? [],
+  };
+  throw new Error(`[ProofBlade evidence error] ${JSON.stringify(payload)}`);
+}
+
+function normalizeEvidenceRecordInput(
+  raw: Record<string, unknown>,
+  source: "evidence" | "evidence_record",
+): { input: EvidenceRecordInput; normalization: EvidenceRecordNormalization } {
+  const receivedFields = Object.keys(raw).filter((key) => raw[key] !== undefined);
+  const exactAllowed = new Set<string>(EVIDENCE_RECORD_ALLOWED_FIELDS);
+  const allowedFields = source === "evidence" ? ["operation", ...EVIDENCE_RECORD_ALLOWED_FIELDS] : [...EVIDENCE_RECORD_ALLOWED_FIELDS];
+  const unknownFields = receivedFields.filter((key) => !exactAllowed.has(key) && !(source === "evidence" && key === "operation") && !(source === "evidence" && EVIDENCE_LEGACY_FIELDS.has(key)));
+  if (unknownFields.length > 0) {
+    evidenceContractError({
+      tool: source,
+      operation: source === "evidence" ? "record" : "record",
+      code: "unknown_field",
+      retryable: false,
+      receivedFields,
+      invalidFields: unknownFields,
+      allowedFields,
+      suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+      nextAction: `Remove unsupported fields (${unknownFields.join(", ")}) and retry with only the Evidence record fields.`,
+    });
+  }
+  const ignoredFields = source === "evidence"
+    ? receivedFields.filter((key) => !exactAllowed.has(key) && key !== "operation")
+    : [];
+  const missingFields = ["artifactIds", "summary"].filter((key) => raw[key] === undefined);
+  if (missingFields.length > 0) {
+    evidenceContractError({
+      tool: source,
+      operation: "record",
+      code: "missing_required_field",
+      retryable: true,
+      receivedFields,
+      missingFields,
+      allowedFields,
+      suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+      nextAction: `Provide the required field(s): ${missingFields.join(", ")}.`,
+    });
+  }
+  const invalidFields: string[] = [];
+  const artifactIds = raw.artifactIds;
+  if (!Array.isArray(artifactIds) || artifactIds.length < 1 || artifactIds.length > 16 || artifactIds.some((value) => typeof value !== "string" || value.trim().length === 0)) invalidFields.push("artifactIds");
+  const summary = raw.summary;
+  if (typeof summary !== "string" || summary.trim().length === 0 || summary.trim().length > 1_000) invalidFields.push("summary");
+  if (raw.name !== undefined && (typeof raw.name !== "string" || raw.name.trim().length === 0 || raw.name.trim().length > 160)) invalidFields.push("name");
+  if (raw.tags !== undefined && (!Array.isArray(raw.tags) || raw.tags.length > 16 || raw.tags.some((value) => typeof value !== "string" || value.trim().length === 0 || value.trim().length > 40))) invalidFields.push("tags");
+  if (raw.claim !== undefined && (typeof raw.claim !== "string" || raw.claim.trim().length === 0 || raw.claim.trim().length > 1_000)) invalidFields.push("claim");
+  if (raw.dependsOn !== undefined && (!Array.isArray(raw.dependsOn) || raw.dependsOn.length > 16 || raw.dependsOn.some((value) => typeof value !== "string" || value.trim().length === 0))) invalidFields.push("dependsOn");
+  if (invalidFields.length > 0) {
+    evidenceContractError({
+      tool: source,
+      operation: "record",
+      code: "invalid_field_type_or_bounds",
+      retryable: true,
+      receivedFields,
+      invalidFields: [...new Set(invalidFields)],
+      allowedFields,
+      suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+      nextAction: `Correct the type or bounds of: ${[...new Set(invalidFields)].join(", ")}.`,
+    });
+  }
+  const normalizedSummary = (summary as string).trim();
+  const explicitName = typeof raw.name === "string" ? raw.name.trim() : undefined;
+  const name = explicitName ?? deterministicEvidenceName(normalizedSummary);
+  return {
+    input: {
+      artifactIds: (artifactIds as string[]).map((value) => value.trim()),
+      summary: normalizedSummary,
+      name,
+      tags: (raw.tags as string[] | undefined)?.map((value) => value.trim()),
+      claim: typeof raw.claim === "string" ? raw.claim.trim() : undefined,
+      dependsOn: (raw.dependsOn as string[] | undefined)?.map((value) => value.trim()),
+    },
+    normalization: {
+      ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
+      ...(explicitName === undefined ? { derivedName: true } : {}),
+    },
+  };
+}
+
+function deterministicEvidenceName(summary: string): string {
+  const firstLine = summary.split(/\r?\n/, 1)[0]!.replace(/\s+/g, " ").trim() || summary;
+  const codePoints = Array.from(firstLine);
+  return codePoints.slice(0, 80).join("");
+}
+
+const EVIDENCE_VALIDATION_MARKER = "__proofblade_evidence_validation__:";
+
+function prepareEvidenceRecordArguments(raw: unknown): Record<string, unknown> {
+  if (isRecord(raw)) {
+    try {
+      normalizeEvidenceRecordInput(raw, "evidence_record");
+      return raw;
+    } catch (error) {
+      const details = parseEvidenceContractError(error) ?? {
+        schemaVersion: 1,
+        tool: "evidence_record",
+        operation: "record",
+        code: "invalid_arguments",
+        retryable: true,
+        receivedFields: Object.keys(raw),
+        invalidFields: ["root"],
+        missingFields: [],
+        allowedFields: [...EVIDENCE_RECORD_ALLOWED_FIELDS],
+        suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+        nextAction: "Provide an object matching the evidence_record contract.",
+      };
+      return evidenceValidationEnvelope(details);
+    }
+  }
+  return evidenceValidationEnvelope({
+    schemaVersion: 1,
+    tool: "evidence_record",
+    operation: "record",
+    code: "invalid_arguments",
+    retryable: true,
+    receivedFields: [],
+    invalidFields: ["root"],
+    missingFields: ["artifactIds", "summary"],
+    allowedFields: [...EVIDENCE_RECORD_ALLOWED_FIELDS],
+    suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+    nextAction: "Provide an object with artifactIds and summary.",
+  });
+}
+
+function evidenceValidationEnvelope(details: Record<string, unknown>): Record<string, unknown> {
+  const bounded = {
+    ...details,
+    receivedFields: boundValidationFields(details.receivedFields),
+    invalidFields: boundValidationFields(details.invalidFields),
+    missingFields: boundValidationFields(details.missingFields),
+    allowedFields: [...EVIDENCE_RECORD_ALLOWED_FIELDS],
+  };
+  const encoded = JSON.stringify(bounded);
+  const safeEncoded = encoded.length <= 900
+    ? encoded
+    : JSON.stringify({
+      ...bounded,
+      receivedFields: boundValidationFields(bounded.receivedFields).slice(0, 8),
+      invalidFields: boundValidationFields(bounded.invalidFields).slice(0, 8),
+      nextAction: "Correct the Evidence record arguments and retry.",
+    });
+  return {
+    artifactIds: ["A-PROOFBLADE-INVALID"],
+    summary: `${EVIDENCE_VALIDATION_MARKER}${safeEncoded}`,
+  };
+}
+
+function boundValidationFields(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((field): field is string => typeof field === "string").slice(0, 32).map((field) => field.slice(0, 120))
+    : [];
+}
+
+function parseEvidenceContractError(error: unknown): Record<string, unknown> | undefined {
+  const message = error instanceof Error ? error.message : String(error);
+  const prefix = "[ProofBlade evidence error] ";
+  if (!message.startsWith(prefix)) return undefined;
+  try {
+    const details = JSON.parse(message.slice(prefix.length)) as unknown;
+    return isRecord(details) && details.schemaVersion === 1 && details.tool === "evidence_record" ? details : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function preparedEvidenceValidationError(raw: Record<string, unknown>): string | undefined {
+  if (!Array.isArray(raw.artifactIds) || raw.artifactIds[0] !== "A-PROOFBLADE-INVALID" || typeof raw.summary !== "string" || !raw.summary.startsWith(EVIDENCE_VALIDATION_MARKER)) return undefined;
+  const encoded = raw.summary.slice(EVIDENCE_VALIDATION_MARKER.length);
+  try {
+    const details = JSON.parse(encoded) as unknown;
+    return isRecord(details) && details.schemaVersion === 1 && details.tool === "evidence_record"
+      ? `[ProofBlade evidence error] ${JSON.stringify(details)}`
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function executeEvidenceRecord(raw: Record<string, unknown>, context: CodingResourceContext, source: "evidence" | "evidence_record"): Promise<CodingToolResult> {
+  const preparedError = preparedEvidenceValidationError(raw);
+  if (preparedError) throw new Error(preparedError);
+  const normalized = normalizeEvidenceRecordInput(raw, source);
+  let result;
+  try {
+    result = await context.evidenceGraph.recordEvidence(normalized.input);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const artifactFailure = /Unknown artifacts?|current-generation artifacts/i.test(reason);
+    const dependencyFailure = /Unknown evidence|dependencies must be from the current generation/i.test(reason);
+    evidenceContractError({
+      tool: source,
+      operation: "record",
+      code: artifactFailure ? "invalid_artifact_reference" : dependencyFailure ? "invalid_evidence_dependency" : "record_failed",
+      retryable: artifactFailure || dependencyFailure,
+      receivedFields: Object.keys(raw).filter((key) => raw[key] !== undefined),
+      invalidFields: artifactFailure ? ["artifactIds"] : dependencyFailure ? ["dependsOn"] : [],
+      allowedFields: source === "evidence" ? ["operation", ...EVIDENCE_RECORD_ALLOWED_FIELDS] : [...EVIDENCE_RECORD_ALLOWED_FIELDS],
+      suggestedArguments: { artifactIds: ["A-*"], summary: "短小、可审计的结论" },
+      nextAction: artifactFailure
+        ? "Use Artifact ids returned by read/bash or evidence search from the current run; do not use file paths."
+        : dependencyFailure
+          ? "Use existing current-generation Evidence ids in dependsOn, or omit dependsOn."
+          : "Inspect the referenced Artifact/Evidence and retry only after correcting the record.",
+    });
+  }
+  return toolResult({
+    ...result,
+    ...(normalized.normalization.ignoredFields || normalized.normalization.derivedName ? { normalization: normalized.normalization } : {}),
+    curation: await context.evidenceCurationGate?.inspect(),
+  });
+}
 
 /**
  * Submit a model-derived result to a configured external destination.
