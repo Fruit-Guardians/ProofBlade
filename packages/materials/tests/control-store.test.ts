@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ControlStore } from "../src/control/control-store.js";
 import { projectionHash } from "../src/control/reducer.js";
 import { demoTask, runDemo } from "../src/app/demo.js";
-import { JsonlControlStore } from "../src/storage/jsonl-store.js";
+import { JsonlControlStore, makeEvent } from "../src/storage/jsonl-store.js";
 import { claimCompetitionWorkItem } from "../src/competition/loop.js";
 import type { ProofBladeConfig } from "../src/config.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
@@ -105,6 +105,34 @@ test("ControlStore folds from the durable projection and only replays a telemetr
     const cold = new ControlStore(coldStore, undefined, secret);
     assert.equal((await cold.snapshot(runId)).lastSeq, 2);
     assert.equal(coldStore.replayCount, 0, "a cold reader should fold the short tail after projection.json");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("ControlStore rejects a self-hashed projection that is not sealed to the event prefix", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-projection-seal-"));
+  try {
+    const runId = "PROJECTION-SEAL-001";
+    const secret = "projection-seal-secret-0123456789abcdef";
+    const runsRoot = join(root, "runs");
+    const creator = new ControlStore(new JsonlControlStore(runsRoot), undefined, secret);
+    await creator.createRun(runId, demoTask(runId, root, config));
+
+    const path = join(runsRoot, runId, "projection.json");
+    const forged = JSON.parse(await readFile(path, "utf8"));
+    const originalSeal = forged.proofbladeProjectionSeal;
+    delete forged.proofbladeProjectionSeal;
+    forged.status = "FAILED";
+    forged.projectionHash = projectionHash(forged);
+    forged.proofbladeProjectionSeal = originalSeal;
+    await writeFile(path, `${canonicalJson(forged)}\n`, "utf8");
+
+    const coldStore = new CountingJsonlControlStore(runsRoot);
+    const cold = new ControlStore(coldStore, undefined, secret);
+    const snapshot = await cold.snapshot(runId);
+    assert.equal(snapshot.status, "READY");
+    assert.equal(coldStore.replayCount, 1, "an invalid projection seal must force full event replay");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -502,6 +530,38 @@ test("append repairs a torn JSONL tail before committing the next telemetry batc
     const raw = await readFile(path, "utf8");
     assert.equal(raw.includes('"torn"'), false);
     assert.ok(raw.endsWith("\n"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("append discards a parseable JSONL tail without a commit newline before reusing its sequence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-jsonl-valid-tail-repair-"));
+  const secret = "jsonl-valid-tail-repair-secret-0123456789012345";
+  try {
+    const events = new JsonlControlStore(join(root, "runs"));
+    const control = new ControlStore(events, undefined, secret);
+    const runId = "JSONL-VALID-TAIL-REPAIR-001";
+    await control.createRun(runId, demoTask(runId, root, config));
+    const path = join(root, "runs", runId, "events.jsonl");
+    const uncommitted = makeEvent(runId, 2, "model_usage", "model", "executor", { requestId: "uncommitted" });
+    await appendFile(path, canonicalJson(uncommitted), "utf8");
+
+    const reopened = new JsonlControlStore(join(root, "runs"));
+    assert.deepEqual((await reopened.events(runId)).map((event) => event.seq), [1]);
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: `${runId}:tail-repair`,
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "committed", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+
+    const committed = await control.replay(runId);
+    assert.equal(committed.lastSeq, 2);
+    assert.deepEqual((await events.events(runId)).map((event) => event.seq), [1, 2]);
+    assert.equal((await readFile(path, "utf8")).includes("uncommitted"), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -695,7 +695,10 @@ export class ControlStore {
     const durableStateChanged = cached !== undefined;
     if (durableStateChanged) this.snapshotCache.delete(runId);
     if (!durableStateChanged && snapshot === undefined) {
-      const persisted = await this.eventStore.loadProjection(runId).catch(() => undefined);
+      const persisted = await this.eventStore.loadProjection(runId, {
+        events,
+        authoritySecret: this.#authoritySecret,
+      }).catch(() => undefined);
       if (persisted
         && persisted.runId === runId
         && persisted.lastSeq <= streamLastSeq

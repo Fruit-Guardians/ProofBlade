@@ -852,7 +852,7 @@
 ### JsonlControlStore
 - Kind: `class`
 - Signature: `JsonlControlStore`
-- Source: [src/storage/jsonl-store.ts:38](../../../packages/materials/src/storage/jsonl-store.ts:38)
+- Source: [src/storage/jsonl-store.ts:49](../../../packages/materials/src/storage/jsonl-store.ts:49)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: jsonl control store class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1910,7 +1910,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2312](../../../packages/materials/src/control/control-store.ts:2312)
+- Source: [src/control/control-store.ts:2315](../../../packages/materials/src/control/control-store.ts:2315)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -3524,11 +3524,11 @@
 ### makeEvent
 - Kind: `function`
 - Signature: `(runId: string, seq: number, type: HarnessEvent["type"], actor: HarnessEvent["actor"], lane: HarnessEvent["lane"], payload?: Record<string, unknown>, correlationId?: string, envelopeInput?: Partial<RunEventEnvelope>): HarnessEvent`
-- Source: [src/storage/jsonl-store.ts:477](../../../packages/materials/src/storage/jsonl-store.ts:477)
+- Source: [src/storage/jsonl-store.ts:535](../../../packages/materials/src/storage/jsonl-store.ts:535)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: make event operation used to perform a durable write.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`
+- Tests: `packages/materials/tests/control-authority-migration.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`
 
 ### bootstrapToolCatalog
 - Kind: `function`
@@ -7714,7 +7714,7 @@
 ### JsonlRunRevision
 - Kind: `interface`
 - Signature: `JsonlRunRevision`
-- Source: [src/storage/jsonl-store.ts:22](../../../packages/materials/src/storage/jsonl-store.ts:22)
+- Source: [src/storage/jsonl-store.ts:23](../../../packages/materials/src/storage/jsonl-store.ts:23)
 - Export: `@proofblade/materials`
 - Summary: Cheap identity for the append-only event stream.  Consumers use this to
 - Summary source: `tsdoc`
@@ -7722,7 +7722,7 @@
 ### JsonlRunWriter
 - Kind: `interface`
 - Signature: `JsonlRunWriter`
-- Source: [src/storage/jsonl-store.ts:12](../../../packages/materials/src/storage/jsonl-store.ts:12)
+- Source: [src/storage/jsonl-store.ts:13](../../../packages/materials/src/storage/jsonl-store.ts:13)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: jsonl run writer type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10037,7 +10037,7 @@
 ### ControlStore.#cacheSnapshot
 - Kind: `method`
 - Signature: `(runId: string, snapshot: RunSnapshot): Promise<void>`
-- Source: [src/control/control-store.ts:720](../../../packages/materials/src/control/control-store.ts:720)
+- Source: [src/control/control-store.ts:723](../../../packages/materials/src/control/control-store.ts:723)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #cache snapshot operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10045,7 +10045,7 @@
 ### ControlStore.#commitCommands
 - Kind: `method`
 - Signature: `(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter, options?: ControlDispatchOptions): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>`
-- Source: [src/control/control-store.ts:735](../../../packages/materials/src/control/control-store.ts:735)
+- Source: [src/control/control-store.ts:738](../../../packages/materials/src/control/control-store.ts:738)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #commit commands operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10053,7 +10053,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:831](../../../packages/materials/src/control/control-store.ts:831)
+- Source: [src/control/control-store.ts:834](../../../packages/materials/src/control/control-store.ts:834)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10061,7 +10061,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:865](../../../packages/materials/src/control/control-store.ts:865)
+- Source: [src/control/control-store.ts:868](../../../packages/materials/src/control/control-store.ts:868)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10069,7 +10069,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:846](../../../packages/materials/src/control/control-store.ts:846)
+- Source: [src/control/control-store.ts:849](../../../packages/materials/src/control/control-store.ts:849)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10077,7 +10077,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:808](../../../packages/materials/src/control/control-store.ts:808)
+- Source: [src/control/control-store.ts:811](../../../packages/materials/src/control/control-store.ts:811)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10085,7 +10085,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:776](../../../packages/materials/src/control/control-store.ts:776)
+- Source: [src/control/control-store.ts:779](../../../packages/materials/src/control/control-store.ts:779)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12896,7 +12896,7 @@
 ### JsonlControlStore.#appendAuthorizedUnlocked
 - Kind: `method`
 - Signature: `(events: HarnessEvent[], authoritySecret: string): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:349](../../../packages/materials/src/storage/jsonl-store.ts:349)
+- Source: [src/storage/jsonl-store.ts:394](../../../packages/materials/src/storage/jsonl-store.ts:394)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #append authorized unlocked operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12904,7 +12904,7 @@
 ### JsonlControlStore.#appendUnchecked
 - Kind: `method`
 - Signature: `(events: HarnessEvent[]): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:362](../../../packages/materials/src/storage/jsonl-store.ts:362)
+- Source: [src/storage/jsonl-store.ts:407](../../../packages/materials/src/storage/jsonl-store.ts:407)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #append unchecked operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12912,7 +12912,7 @@
 ### JsonlControlStore.#authorityHashFor
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/storage/jsonl-store.ts:391](../../../packages/materials/src/storage/jsonl-store.ts:391)
+- Source: [src/storage/jsonl-store.ts:436](../../../packages/materials/src/storage/jsonl-store.ts:436)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #authority hash for operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12920,7 +12920,7 @@
 ### JsonlControlStore.#loadEvents
 - Kind: `method`
 - Signature: `(runId: string, initialRevision: JsonlRunRevision): Promise<HarnessEvent[]>`
-- Source: [src/storage/jsonl-store.ts:143](../../../packages/materials/src/storage/jsonl-store.ts:143)
+- Source: [src/storage/jsonl-store.ts:154](../../../packages/materials/src/storage/jsonl-store.ts:154)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #load events operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12928,7 +12928,7 @@
 ### JsonlControlStore.#persistTask
 - Kind: `method`
 - Signature: `(runId: string, task: RunSnapshot["task"]): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:307](../../../packages/materials/src/storage/jsonl-store.ts:307)
+- Source: [src/storage/jsonl-store.ts:320](../../../packages/materials/src/storage/jsonl-store.ts:320)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #persist task operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12936,7 +12936,7 @@
 ### JsonlControlStore.#saveProjectionUnlocked
 - Kind: `method`
 - Signature: `(snapshot: RunSnapshot, authoritySecret: string): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:326](../../../packages/materials/src/storage/jsonl-store.ts:326)
+- Source: [src/storage/jsonl-store.ts:339](../../../packages/materials/src/storage/jsonl-store.ts:339)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #save projection unlocked operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12944,7 +12944,7 @@
 ### JsonlControlStore.append
 - Kind: `method`
 - Signature: `(events: HarnessEvent[], authoritySecret: string): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:224](../../../packages/materials/src/storage/jsonl-store.ts:224)
+- Source: [src/storage/jsonl-store.ts:237](../../../packages/materials/src/storage/jsonl-store.ts:237)
 - Export: `@proofblade/materials`
 - Summary: Control-plane write primitive. The raw store is exported for read-only
 - Summary source: `tsdoc`
@@ -12953,7 +12953,7 @@
 ### JsonlControlStore.create
 - Kind: `method`
 - Signature: `(runId: string, task: RunSnapshot["task"], versionSnapshot: RunVersionSnapshot | undefined, authorityHash: string, authoritySecret?: string): Promise<RunSnapshot>`
-- Source: [src/storage/jsonl-store.ts:79](../../../packages/materials/src/storage/jsonl-store.ts:79)
+- Source: [src/storage/jsonl-store.ts:90](../../../packages/materials/src/storage/jsonl-store.ts:90)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12962,7 +12962,7 @@
 ### JsonlControlStore.events
 - Kind: `method`
 - Signature: `(runId: string): Promise<HarnessEvent[]>`
-- Source: [src/storage/jsonl-store.ts:124](../../../packages/materials/src/storage/jsonl-store.ts:124)
+- Source: [src/storage/jsonl-store.ts:135](../../../packages/materials/src/storage/jsonl-store.ts:135)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: events operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12970,17 +12970,17 @@
 
 ### JsonlControlStore.loadProjection
 - Kind: `method`
-- Signature: `(runId: string): Promise<RunSnapshot | undefined>`
-- Source: [src/storage/jsonl-store.ts:336](../../../packages/materials/src/storage/jsonl-store.ts:336)
+- Signature: `(runId: string, verification?: { events: HarnessEvent[]; authoritySecret: string; }): Promise<RunSnapshot | undefined>`
+- Source: [src/storage/jsonl-store.ts:361](../../../packages/materials/src/storage/jsonl-store.ts:361)
 - Export: `@proofblade/materials`
-- Summary: Inferred summary: load projection operation used to read or inspect state.
+- Summary: Inferred summary: load projection operation used to perform a durable write.
 - Summary source: `inferred`
 - Tests: `packages/materials/tests/control-store.test.ts`
 
 ### JsonlControlStore.loadTask
 - Kind: `method`
 - Signature: `(runId: string): Promise<RunSnapshot["task"] | undefined>`
-- Source: [src/storage/jsonl-store.ts:313](../../../packages/materials/src/storage/jsonl-store.ts:313)
+- Source: [src/storage/jsonl-store.ts:326](../../../packages/materials/src/storage/jsonl-store.ts:326)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: load task operation used to read or inspect state.
 - Summary source: `inferred`
@@ -12988,7 +12988,7 @@
 ### JsonlControlStore.migrateLegacyRun
 - Kind: `method`
 - Signature: `(runId: string, authorityHash: string): Promise<"anchored" | "migrated" | "read_only">`
-- Source: [src/storage/jsonl-store.ts:260](../../../packages/materials/src/storage/jsonl-store.ts:260)
+- Source: [src/storage/jsonl-store.ts:273](../../../packages/materials/src/storage/jsonl-store.ts:273)
 - Export: `@proofblade/materials`
 - Summary: Upgrade a pre-authority event stream without rewriting its history. The
 - Summary source: `tsdoc`
@@ -12996,7 +12996,7 @@
 ### JsonlControlStore.projectionDigest
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/storage/jsonl-store.ts:345](../../../packages/materials/src/storage/jsonl-store.ts:345)
+- Source: [src/storage/jsonl-store.ts:390](../../../packages/materials/src/storage/jsonl-store.ts:390)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: projection digest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13004,7 +13004,7 @@
 ### JsonlControlStore.replay
 - Kind: `method`
 - Signature: `(runId: string, task?: RunSnapshot["task"]): Promise<RunSnapshot>`
-- Source: [src/storage/jsonl-store.ts:246](../../../packages/materials/src/storage/jsonl-store.ts:246)
+- Source: [src/storage/jsonl-store.ts:259](../../../packages/materials/src/storage/jsonl-store.ts:259)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: replay operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13013,7 +13013,7 @@
 ### JsonlControlStore.revision
 - Kind: `method`
 - Signature: `(runId: string): Promise<JsonlRunRevision>`
-- Source: [src/storage/jsonl-store.ts:58](../../../packages/materials/src/storage/jsonl-store.ts:58)
+- Source: [src/storage/jsonl-store.ts:69](../../../packages/materials/src/storage/jsonl-store.ts:69)
 - Export: `@proofblade/materials`
 - Summary: Return the current event-stream revision without reading or parsing it.
 - Summary source: `tsdoc`
@@ -13021,7 +13021,7 @@
 ### JsonlControlStore.runPath
 - Kind: `method`
 - Signature: `(runId: string): string`
-- Source: [src/storage/jsonl-store.ts:53](../../../packages/materials/src/storage/jsonl-store.ts:53)
+- Source: [src/storage/jsonl-store.ts:64](../../../packages/materials/src/storage/jsonl-store.ts:64)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run path operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -13029,7 +13029,7 @@
 ### JsonlControlStore.saveProjection
 - Kind: `method`
 - Signature: `(snapshot: RunSnapshot, authoritySecret: string): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:322](../../../packages/materials/src/storage/jsonl-store.ts:322)
+- Source: [src/storage/jsonl-store.ts:335](../../../packages/materials/src/storage/jsonl-store.ts:335)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: save projection operation used to perform a durable write.
 - Summary source: `inferred`
@@ -13038,7 +13038,7 @@
 ### JsonlControlStore.snapshot
 - Kind: `method`
 - Signature: `(runId: string): Promise<RunSnapshot | undefined>`
-- Source: [src/storage/jsonl-store.ts:233](../../../packages/materials/src/storage/jsonl-store.ts:233)
+- Source: [src/storage/jsonl-store.ts:246](../../../packages/materials/src/storage/jsonl-store.ts:246)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: snapshot operation used to read or inspect state.
 - Summary source: `inferred`
@@ -13047,7 +13047,7 @@
 ### JsonlControlStore.waitForEvents
 - Kind: `method`
 - Signature: `(runId: string, afterSeq: number, timeoutMs?: number): Promise<HarnessEvent[]>`
-- Source: [src/storage/jsonl-store.ts:182](../../../packages/materials/src/storage/jsonl-store.ts:182)
+- Source: [src/storage/jsonl-store.ts:195](../../../packages/materials/src/storage/jsonl-store.ts:195)
 - Export: `@proofblade/materials`
 - Summary: Wait for a newer durable event without repeatedly replaying a large Run.
 - Summary source: `tsdoc`
@@ -13055,7 +13055,7 @@
 ### JsonlControlStore.withRunLock
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: (writer: JsonlRunWriter) => Promise<T>): Promise<T>`
-- Source: [src/storage/jsonl-store.ts:107](../../../packages/materials/src/storage/jsonl-store.ts:107)
+- Source: [src/storage/jsonl-store.ts:118](../../../packages/materials/src/storage/jsonl-store.ts:118)
 - Export: `@proofblade/materials`
 - Summary: Execute a complete read/validate/append/projection transaction while
 - Summary source: `tsdoc`
@@ -13064,7 +13064,7 @@
 ### JsonlControlStore.withRunMaintenanceLock
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: () => Promise<T>): Promise<T>`
-- Source: [src/storage/jsonl-store.ts:119](../../../packages/materials/src/storage/jsonl-store.ts:119)
+- Source: [src/storage/jsonl-store.ts:130](../../../packages/materials/src/storage/jsonl-store.ts:130)
 - Export: `@proofblade/materials`
 - Summary: Serialize slow, durable Run maintenance without holding the Control lock.
 - Summary source: `tsdoc`

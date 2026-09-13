@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { watch } from "node:fs";
 import type { Stats } from "node:fs";
 import { mkdir, open, readFile, stat } from "node:fs/promises";
@@ -32,6 +33,16 @@ interface EventCacheEntry {
   readonly revision: JsonlRunRevision;
   readonly events: HarnessEvent[];
 }
+
+interface ProjectionSeal {
+  schemaVersion: 1;
+  eventPrefixHash: string;
+  authorityProof: string;
+}
+
+type StoredProjection = RunSnapshot & {
+  proofbladeProjectionSeal?: ProjectionSeal;
+};
 
 const EVENT_CACHE_LIMIT = 64;
 
@@ -146,6 +157,10 @@ export class JsonlControlStore {
       const lines = content.split(/\r?\n/);
       const events: HarnessEvent[] = [];
       for (let index = 0; index < lines.length; index += 1) {
+        // A JSONL record is committed only once its terminating newline is
+        // durable. Ignore an unterminated tail even when it happens to be
+        // valid JSON, because the next append will repair that same tail.
+        if (index === lines.length - 1 && !content.endsWith("\n")) continue;
         const line = lines[index];
         if (!line) continue;
         try {
@@ -156,8 +171,6 @@ export class JsonlControlStore {
           // storage. The event stream is append-only, so the incomplete
           // tail is safe to discard; malformed records in the middle remain
           // a hard corruption signal.
-          const isTrailingFragment = index === lines.length - 1 && !content.endsWith("\n");
-          if (isTrailingFragment) continue;
           throw new Error(`Invalid event at ${runId}:${index + 1}: ${String(error)}`);
         }
       }
@@ -329,13 +342,45 @@ export class JsonlControlStore {
       throw new Error("Projection write authority does not match the immutable Run anchor");
     }
     const path = join(this.runsRoot, snapshot.runId, "projection.json");
-    const content = { ...snapshot, projectionHash: projectionHash(snapshot) };
+    const events = await this.events(snapshot.runId);
+    const snapshotHash = projectionHash(snapshot);
+    const eventPrefixHash = hashEventPrefix(events, snapshot.runId, snapshot.lastSeq);
+    const sealPayload = projectionSealPayload(snapshot.runId, snapshot.lastSeq, snapshotHash, eventPrefixHash);
+    const content: StoredProjection = {
+      ...snapshot,
+      projectionHash: snapshotHash,
+      proofbladeProjectionSeal: {
+        schemaVersion: 1,
+        eventPrefixHash,
+        authorityProof: createHmac("sha256", authoritySecret).update(sealPayload).digest("hex"),
+      },
+    };
     await atomicWriteFile(path, `${canonicalJson(content)}\n`);
   }
 
-  public async loadProjection(runId: string): Promise<RunSnapshot | undefined> {
+  public async loadProjection(
+    runId: string,
+    verification?: { events: HarnessEvent[]; authoritySecret: string },
+  ): Promise<RunSnapshot | undefined> {
     try {
-      return JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as RunSnapshot;
+      const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
+      const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
+      const snapshot = snapshotFields as RunSnapshot;
+      if (verification === undefined) return snapshot;
+      if (snapshot.runId !== runId || snapshot.projectionHash !== projectionHash(snapshot) || seal?.schemaVersion !== 1) {
+        return undefined;
+      }
+      let eventPrefixHash: string;
+      try {
+        eventPrefixHash = hashEventPrefix(verification.events, runId, snapshot.lastSeq);
+      } catch {
+        return undefined;
+      }
+      if (seal.eventPrefixHash !== eventPrefixHash || !/^[a-f0-9]{64}$/i.test(seal.authorityProof)) return undefined;
+      const expected = createHmac("sha256", verification.authoritySecret)
+        .update(projectionSealPayload(runId, snapshot.lastSeq, snapshot.projectionHash, eventPrefixHash))
+        .digest();
+      return timingSafeEqual(expected, Buffer.from(seal.authorityProof, "hex")) ? snapshot : undefined;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
       throw error;
@@ -420,6 +465,19 @@ function authorityAnchor(events: HarnessEvent[]): string | undefined {
   if (anchors.length === 0) return undefined;
   if (new Set(anchors).size !== 1) throw new Error("Run contains conflicting authority anchors");
   return anchors[0];
+}
+
+function hashEventPrefix(events: HarnessEvent[], runId: string, lastSeq: number): string {
+  if (!Number.isInteger(lastSeq) || lastSeq < 1) throw new Error("Projection lastSeq must identify a committed event prefix");
+  const prefix = events.filter((event) => event.seq <= lastSeq);
+  if (prefix.length !== lastSeq || prefix.some((event, index) => event.runId !== runId || event.streamId !== runId || event.seq !== index + 1)) {
+    throw new Error("Projection does not identify a contiguous event prefix");
+  }
+  return sha256(canonicalJson(prefix));
+}
+
+function projectionSealPayload(runId: string, lastSeq: number, snapshotHash: string, eventPrefixHash: string): string {
+  return canonicalJson({ schemaVersion: 1, runId, lastSeq, snapshotHash, eventPrefixHash });
 }
 
 async function writeExclusive(path: string, content: string): Promise<void> {
