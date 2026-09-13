@@ -8,7 +8,6 @@ import {
   CheckpointService,
   createServices,
   demoTask,
-  JsonlControlStore,
   loadConfig,
   listFixtureProfiles,
   PiCodingLane,
@@ -530,7 +529,7 @@ async function main(): Promise<void> {
       }
       if (action !== "projection") throw new Error("replay action must be projection, protocol, tools, stats, shadow, or compare");
       const replayed = await services.control.replay(runId);
-      const persisted = await new JsonlControlStore(services.runsRoot).loadProjection(runId);
+      const persisted = await services.control.loadProjection(runId);
       const replayHash = projectionHash(replayed);
       const persistedHash = persisted ? projectionHash(persisted) : undefined;
       print({ runId, eventCount: replayed.lastSeq, replayHash, persistedHash, match: replayHash === persistedHash });

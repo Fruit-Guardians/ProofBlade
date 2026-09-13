@@ -365,11 +365,14 @@ export class JsonlControlStore {
     runId: string,
     verification?: { events: HarnessEvent[]; authoritySecret: string },
   ): Promise<RunSnapshot | undefined> {
+    // A projection hash only detects accidental corruption. Without the
+    // event-prefix seal and authority proof, callers must not treat the file
+    // as a trusted snapshot (GUI and evaluation paths are untrusted readers).
+    if (verification === undefined) return undefined;
     try {
       const stored = JSON.parse(await readFile(join(this.runsRoot, runId, "projection.json"), "utf8")) as StoredProjection;
       const { proofbladeProjectionSeal: seal, ...snapshotFields } = stored;
       const snapshot = snapshotFields as RunSnapshot;
-      if (verification === undefined) return snapshot;
       if (snapshot.runId !== runId || snapshot.projectionHash !== projectionHash(snapshot) || seal?.schemaVersion !== 1) {
         return undefined;
       }

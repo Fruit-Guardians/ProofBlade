@@ -306,6 +306,15 @@ export class ControlStore {
     return await this.#readSnapshot(runId, { forceReplay: true });
   }
 
+  /** Read a materialized projection only after verifying its event-prefix seal. */
+  public async loadProjection(runId: string): Promise<RunSnapshot | undefined> {
+    const events = await this.eventStore.events(runId);
+    return await this.eventStore.loadProjection(runId, {
+      events,
+      authoritySecret: this.#authoritySecret,
+    });
+  }
+
   /** Drop process-local read shortcuts without changing durable Run state. */
   public clearReadCaches(): void {
     this.snapshotCache.clear();
@@ -598,7 +607,7 @@ export class ControlStore {
         if (replayed.authorityHash === "LEGACY-UNTRUSTED") return { repaired: false, replayHash };
         let persisted: RunSnapshot | undefined;
         try {
-          persisted = await this.eventStore.loadProjection(runId);
+          persisted = await this.loadProjection(runId);
         } catch {
           // A malformed projection is disposable because the event stream has
           // already replayed successfully and remains the source of truth.
@@ -624,7 +633,7 @@ export class ControlStore {
       await this.#migrateLegacyRunBestEffort(runId);
       await this.eventStore.withRunLock(runId, async (writer) => {
         const snapshot = await this.#readSnapshot(runId, { skipMigration: true });
-        const persisted = await this.eventStore.loadProjection(runId).catch(() => undefined);
+        const persisted = await this.loadProjection(runId).catch(() => undefined);
         if (persisted && persisted.lastSeq === snapshot.lastSeq && projectionHash(persisted) === projectionHash(snapshot)) {
           this.deferredProjectionRuns.delete(runId);
           return;

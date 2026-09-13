@@ -237,7 +237,7 @@ export class DebugDataService {
   private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
     try {
       const [snapshot, projectionStat] = await Promise.all([
-        this.materializedRuns.loadProjection(runId),
+        this.services.control.loadProjection(runId),
         stat(join(this.services.runsRoot, runId, "projection.json")),
       ]);
       if (snapshot

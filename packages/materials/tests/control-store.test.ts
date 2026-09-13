@@ -61,7 +61,7 @@ test("control store replay is deterministic and verifier gated", async () => {
     const runId = "TEST-001";
     await runDemo(root, runId, config);
     const replayed = await control.replay(runId);
-    const persisted = await events.loadProjection(runId);
+    const persisted = await control.loadProjection(runId);
     assert.equal(replayed.status, "SUCCEEDED");
     assert.equal(replayed.finalResult?.completionId, "C-001");
     assert.equal(replayed.finalResult?.evidenceIds.length, 2);
@@ -98,7 +98,7 @@ test("ControlStore folds from the durable projection and only replays a telemetr
     assert.equal(after.lastSeq, 2);
     assert.equal(reopenedStore.replayCount, 0, "the live cache must fold the appended tail without a full replay");
 
-    const persisted = await reopenedStore.loadProjection(runId);
+    const persisted = await reopened.loadProjection(runId);
     assert.equal(persisted?.lastSeq, 1, "telemetry append must not rewrite the full projection synchronously");
 
     const coldStore = new CountingJsonlControlStore(join(root, "runs"));
@@ -128,11 +128,52 @@ test("ControlStore rejects a self-hashed projection that is not sealed to the ev
     forged.proofbladeProjectionSeal = originalSeal;
     await writeFile(path, `${canonicalJson(forged)}\n`, "utf8");
 
+    assert.equal(await new JsonlControlStore(runsRoot).loadProjection(runId), undefined, "raw projection reads must require a verified seal");
+
     const coldStore = new CountingJsonlControlStore(runsRoot);
     const cold = new ControlStore(coldStore, undefined, secret);
     const snapshot = await cold.snapshot(runId);
     assert.equal(snapshot.status, "READY");
     assert.equal(coldStore.replayCount, 1, "an invalid projection seal must force full event replay");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("reconcile and flush repair projections whose content is self-hashed but unsealed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-projection-repair-seal-"));
+  try {
+    const runId = "PROJECTION-REPAIR-SEAL-001";
+    const secret = "projection-repair-seal-secret-0123456789abcdef";
+    const runsRoot = join(root, "runs");
+    const control = new ControlStore(new JsonlControlStore(runsRoot), undefined, secret);
+    await control.createRun(runId, demoTask(runId, root, config));
+    const path = join(runsRoot, runId, "projection.json");
+
+    const forged = JSON.parse(await readFile(path, "utf8"));
+    forged.status = "FAILED";
+    delete forged.proofbladeProjectionSeal;
+    forged.projectionHash = projectionHash(forged);
+    await writeFile(path, `${canonicalJson(forged)}\n`, "utf8");
+    assert.equal((await control.reconcileProjection(runId)).repaired, true);
+    assert.equal((await control.loadProjection(runId))?.status, "READY");
+
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "main",
+      correlationId: `${runId}:deferred`,
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "deferred", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    const current = await control.snapshot(runId);
+    const forgedCurrent = { ...current } as Record<string, unknown>;
+    delete forgedCurrent.proofbladeProjectionSeal;
+    forgedCurrent.projectionHash = projectionHash(forgedCurrent as typeof current);
+    await writeFile(path, `${canonicalJson(forgedCurrent)}\n`, "utf8");
+    await control.flushProjection(runId);
+    assert.equal((await control.loadProjection(runId))?.lastSeq, current.lastSeq);
+    assert.ok(JSON.parse(await readFile(path, "utf8")).proofbladeProjectionSeal);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -257,7 +298,7 @@ test("tool preparation is a bounded durable Run projection and replays exactly",
     const replayed = await control.replay(runId);
     assert.deepEqual(replayed.toolPreparation, preparation);
     assert.equal((await control.events(runId)).at(-1)?.type, "tool_preparation_recorded");
-    assert.equal(projectionHash(replayed), projectionHash((await events.loadProjection(runId))!));
+    assert.equal(projectionHash(replayed), projectionHash((await control.loadProjection(runId))!));
     await assert.rejects(
       control.dispatch(runId, { type: "record_tool_preparation", preparation: { ...preparation, generation: 1 }, lane: "executor" }),
       /generation must equal current generation/,
@@ -318,7 +359,7 @@ test("work graph lifecycle is durable, lease-gated, and replayable", async () =>
     assert.equal(snapshot.workItems["WI-ROOT"]?.status, "BLOCKED");
     assert.equal(snapshot.workItems["WI-REPLAN"]?.status, "SUCCEEDED");
     assert.equal(snapshot.workItems["WI-REPLAN"]?.attempt, 1);
-    assert.equal(projectionHash(snapshot), projectionHash((await events.loadProjection(runId))!));
+    assert.equal(projectionHash(snapshot), projectionHash((await control.loadProjection(runId))!));
     assert.ok((await control.events(runId)).some((event) => event.type === "work_item_blocked"));
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -466,7 +507,7 @@ test("request epochs bind provider events and replay their context hashes", asyn
     assert.equal(epoch.stablePrefixHash, "prefix-v1");
     assert.ok(epoch.createdSeq > 0);
     assert.ok(epoch.updatedSeq > epoch.createdSeq);
-    assert.equal(projectionHash(snapshot), projectionHash((await events.loadProjection(runId))!));
+    assert.equal(projectionHash(snapshot), projectionHash((await control.loadProjection(runId))!));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -574,7 +615,7 @@ test("deferred projection writes are coalesced until an explicit flush barrier",
     const control = new ControlStore(eventStore);
     const runId = "PROJECTION-BARRIER-001";
     await control.createRun(runId, demoTask(runId, root, config));
-    const before = await eventStore.loadProjection(runId);
+    const before = await control.loadProjection(runId);
     assert.ok(before);
     await control.append(runId, [{
       schemaVersion: 1,
@@ -584,9 +625,9 @@ test("deferred projection writes are coalesced until an explicit flush barrier",
       type: "model_usage",
       payload: { requestId: "barrier", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
     }], { persistProjection: false });
-    assert.equal((await eventStore.loadProjection(runId))?.lastSeq, before.lastSeq, "hot append must not rewrite projection.json");
+    assert.equal((await control.loadProjection(runId))?.lastSeq, before!.lastSeq, "hot append must not rewrite projection.json");
     await control.flushProjection(runId);
-    assert.equal((await eventStore.loadProjection(runId))?.lastSeq, before.lastSeq + 1);
+    assert.equal((await control.loadProjection(runId))?.lastSeq, before!.lastSeq + 1);
     await control.flushProjection(runId);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -624,7 +665,7 @@ test("recovery repairs a stale projection after a durable event batch survives a
       ]),
       /simulated process exit after event commit/,
     );
-    const staleProjection = await eventStore.loadProjection(runId);
+    const staleProjection = await control.loadProjection(runId);
     assert.equal(staleProjection?.lastSeq, before.lastSeq, "projection must remain at the pre-crash checkpoint");
 
     // A fresh process sees the complete committed batch in the event stream,
@@ -637,7 +678,7 @@ test("recovery repairs a stale projection after a durable event batch survives a
     const repaired = await reopened.reconcileProjection(runId);
     assert.equal(repaired.repaired, true);
     assert.equal(repaired.replayHash, projectionHash(replayed));
-    const persisted = await reopenedStore.loadProjection(runId);
+    const persisted = await reopened.loadProjection(runId);
     assert.ok(persisted);
     assert.equal(projectionHash(persisted), projectionHash(replayed));
 

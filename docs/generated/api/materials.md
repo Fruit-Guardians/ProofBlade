@@ -4,7 +4,7 @@
 
 - Package: `@proofblade/materials`
 - Module hashes: 169
-- Symbols: 1839
+- Symbols: 1840
 
 ## Public Symbols
 
@@ -365,7 +365,7 @@
 ### FixtureEvaluationRunner
 - Kind: `class`
 - Signature: `FixtureEvaluationRunner`
-- Source: [src/evaluation/fixture-evaluator.ts:115](../../../packages/materials/src/evaluation/fixture-evaluator.ts:115)
+- Source: [src/evaluation/fixture-evaluator.ts:114](../../../packages/materials/src/evaluation/fixture-evaluator.ts:114)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture evaluation runner class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -383,7 +383,7 @@
 ### RealModelEvaluationRunner
 - Kind: `class`
 - Signature: `RealModelEvaluationRunner`
-- Source: [src/evaluation/real-model-evaluator.ts:280](../../../packages/materials/src/evaluation/real-model-evaluator.ts:280)
+- Source: [src/evaluation/real-model-evaluator.ts:279](../../../packages/materials/src/evaluation/real-model-evaluator.ts:279)
 - Export: `@proofblade/materials`
 - Summary: Runs real provider-backed Coding lanes only after an explicit caller opt-in.
 - Summary source: `tsdoc`
@@ -392,7 +392,7 @@
 ### RuntimeScenarioEvaluator
 - Kind: `class`
 - Signature: `RuntimeScenarioEvaluator`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:186](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:186)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:185](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:185)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario evaluator class used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1203,7 +1203,7 @@
 ### BASELINE_PROTOCOL_VERSION
 - Kind: `constant`
 - Signature: `"baseline-v4"`
-- Source: [src/evaluation/fixture-evaluator.ts:19](../../../packages/materials/src/evaluation/fixture-evaluator.ts:19)
+- Source: [src/evaluation/fixture-evaluator.ts:18](../../../packages/materials/src/evaluation/fixture-evaluator.ts:18)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: baseline protocol version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1212,7 +1212,7 @@
 ### BASELINE_REQUIRED_ATTEMPTS
 - Kind: `constant`
 - Signature: `3`
-- Source: [src/evaluation/fixture-evaluator.ts:20](../../../packages/materials/src/evaluation/fixture-evaluator.ts:20)
+- Source: [src/evaluation/fixture-evaluator.ts:19](../../../packages/materials/src/evaluation/fixture-evaluator.ts:19)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: baseline required attempts constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1220,7 +1220,7 @@
 ### BASELINE_REQUIRED_SCENARIOS
 - Kind: `constant`
 - Signature: `number`
-- Source: [src/evaluation/fixture-evaluator.ts:21](../../../packages/materials/src/evaluation/fixture-evaluator.ts:21)
+- Source: [src/evaluation/fixture-evaluator.ts:20](../../../packages/materials/src/evaluation/fixture-evaluator.ts:20)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: baseline required scenarios constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1228,7 +1228,7 @@
 ### BASELINE_REQUIRED_TOTAL_CASES
 - Kind: `constant`
 - Signature: `37`
-- Source: [src/evaluation/fixture-evaluator.ts:22](../../../packages/materials/src/evaluation/fixture-evaluator.ts:22)
+- Source: [src/evaluation/fixture-evaluator.ts:21](../../../packages/materials/src/evaluation/fixture-evaluator.ts:21)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: baseline required total cases constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1244,7 +1244,7 @@
 ### REAL_MODEL_EVALUATION_PROTOCOL_VERSION
 - Kind: `constant`
 - Signature: `"real-model-eval-v2"`
-- Source: [src/evaluation/real-model-evaluator.ts:15](../../../packages/materials/src/evaluation/real-model-evaluator.ts:15)
+- Source: [src/evaluation/real-model-evaluator.ts:14](../../../packages/materials/src/evaluation/real-model-evaluator.ts:14)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation protocol version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1252,7 +1252,7 @@
 ### DEFAULT_RUNTIME_SCENARIOS
 - Kind: `constant`
 - Signature: `readonly RuntimeScenarioDefinition[]`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:69](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:69)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:68](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:68)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: default runtime scenarios constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1261,7 +1261,7 @@
 ### RUNTIME_SCENARIO_PROTOCOL_VERSION
 - Kind: `constant`
 - Signature: `"runtime-scenarios-v1"`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:32](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:32)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:31](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:31)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario protocol version constant used to provide a reusable operation.
 - Summary source: `inferred`
@@ -1910,7 +1910,7 @@
 ### createEffectInput
 - Kind: `function`
 - Signature: `(runId: string, operation: string, args: Record<string, unknown>, replayPolicy: ReplayPolicy, generation: number): { effectId: string; idempotencyKey: string; }`
-- Source: [src/control/control-store.ts:2315](../../../packages/materials/src/control/control-store.ts:2315)
+- Source: [src/control/control-store.ts:2324](../../../packages/materials/src/control/control-store.ts:2324)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create effect input operation used to read or inspect state.
 - Summary source: `inferred`
@@ -2350,7 +2350,7 @@
 ### deriveProviderDiagnostics
 - Kind: `function`
 - Signature: `(events: readonly HarnessEvent[], deadlineExceeded: boolean, completed: boolean): RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:732](../../../packages/materials/src/evaluation/real-model-evaluator.ts:732)
+- Source: [src/evaluation/real-model-evaluator.ts:731](../../../packages/materials/src/evaluation/real-model-evaluator.ts:731)
 - Export: `@proofblade/materials`
 - Summary: Projects provider traffic onto durable executor turns without relying on
 - Summary source: `tsdoc`
@@ -2359,7 +2359,7 @@
 ### preflightRealModelEvaluation
 - Kind: `function`
 - Signature: `(options: RealModelEvaluationPreflightOptions): Promise<RealModelEvaluationPreflightSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:109](../../../packages/materials/src/evaluation/real-model-evaluator.ts:109)
+- Source: [src/evaluation/real-model-evaluator.ts:108](../../../packages/materials/src/evaluation/real-model-evaluator.ts:108)
 - Export: `@proofblade/materials`
 - Summary: Validate a live evaluation setup without creating a Run or contacting a
 - Summary source: `tsdoc`
@@ -3524,7 +3524,7 @@
 ### makeEvent
 - Kind: `function`
 - Signature: `(runId: string, seq: number, type: HarnessEvent["type"], actor: HarnessEvent["actor"], lane: HarnessEvent["lane"], payload?: Record<string, unknown>, correlationId?: string, envelopeInput?: Partial<RunEventEnvelope>): HarnessEvent`
-- Source: [src/storage/jsonl-store.ts:538](../../../packages/materials/src/storage/jsonl-store.ts:538)
+- Source: [src/storage/jsonl-store.ts:541](../../../packages/materials/src/storage/jsonl-store.ts:541)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: make event operation used to perform a durable write.
 - Summary source: `inferred`
@@ -5816,7 +5816,7 @@
 ### FixtureCatalogSnapshot
 - Kind: `interface`
 - Signature: `FixtureCatalogSnapshot`
-- Source: [src/evaluation/fixture-evaluator.ts:26](../../../packages/materials/src/evaluation/fixture-evaluator.ts:26)
+- Source: [src/evaluation/fixture-evaluator.ts:25](../../../packages/materials/src/evaluation/fixture-evaluator.ts:25)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture catalog snapshot type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5824,7 +5824,7 @@
 ### FixtureEvaluationCase
 - Kind: `interface`
 - Signature: `FixtureEvaluationCase`
-- Source: [src/evaluation/fixture-evaluator.ts:44](../../../packages/materials/src/evaluation/fixture-evaluator.ts:44)
+- Source: [src/evaluation/fixture-evaluator.ts:43](../../../packages/materials/src/evaluation/fixture-evaluator.ts:43)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture evaluation case type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5832,7 +5832,7 @@
 ### FixtureEvaluationOptions
 - Kind: `interface`
 - Signature: `FixtureEvaluationOptions`
-- Source: [src/evaluation/fixture-evaluator.ts:37](../../../packages/materials/src/evaluation/fixture-evaluator.ts:37)
+- Source: [src/evaluation/fixture-evaluator.ts:36](../../../packages/materials/src/evaluation/fixture-evaluator.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture evaluation options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -5840,7 +5840,7 @@
 ### FixtureEvaluationSummary
 - Kind: `interface`
 - Signature: `FixtureEvaluationSummary`
-- Source: [src/evaluation/fixture-evaluator.ts:71](../../../packages/materials/src/evaluation/fixture-evaluator.ts:71)
+- Source: [src/evaluation/fixture-evaluator.ts:70](../../../packages/materials/src/evaluation/fixture-evaluator.ts:70)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: fixture evaluation summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6018,7 +6018,7 @@
 ### RealEvaluationVariant
 - Kind: `interface`
 - Signature: `RealEvaluationVariant`
-- Source: [src/evaluation/real-model-evaluator.ts:19](../../../packages/materials/src/evaluation/real-model-evaluator.ts:19)
+- Source: [src/evaluation/real-model-evaluator.ts:18](../../../packages/materials/src/evaluation/real-model-evaluator.ts:18)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real evaluation variant type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6026,7 +6026,7 @@
 ### RealModelCategorySummary
 - Kind: `interface`
 - Signature: `RealModelCategorySummary`
-- Source: [src/evaluation/real-model-evaluator.ts:213](../../../packages/materials/src/evaluation/real-model-evaluator.ts:213)
+- Source: [src/evaluation/real-model-evaluator.ts:212](../../../packages/materials/src/evaluation/real-model-evaluator.ts:212)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model category summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6034,7 +6034,7 @@
 ### RealModelEvaluationCase
 - Kind: `interface`
 - Signature: `RealModelEvaluationCase`
-- Source: [src/evaluation/real-model-evaluator.ts:159](../../../packages/materials/src/evaluation/real-model-evaluator.ts:159)
+- Source: [src/evaluation/real-model-evaluator.ts:158](../../../packages/materials/src/evaluation/real-model-evaluator.ts:158)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation case type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6042,7 +6042,7 @@
 ### RealModelEvaluationGatePolicy
 - Kind: `interface`
 - Signature: `RealModelEvaluationGatePolicy`
-- Source: [src/evaluation/real-model-evaluator.ts:58](../../../packages/materials/src/evaluation/real-model-evaluator.ts:58)
+- Source: [src/evaluation/real-model-evaluator.ts:57](../../../packages/materials/src/evaluation/real-model-evaluator.ts:57)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation gate policy type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6050,7 +6050,7 @@
 ### RealModelEvaluationOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:26](../../../packages/materials/src/evaluation/real-model-evaluator.ts:26)
+- Source: [src/evaluation/real-model-evaluator.ts:25](../../../packages/materials/src/evaluation/real-model-evaluator.ts:25)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6058,7 +6058,7 @@
 ### RealModelEvaluationPreflightOptions
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightOptions`
-- Source: [src/evaluation/real-model-evaluator.ts:67](../../../packages/materials/src/evaluation/real-model-evaluator.ts:67)
+- Source: [src/evaluation/real-model-evaluator.ts:66](../../../packages/materials/src/evaluation/real-model-evaluator.ts:66)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6066,7 +6066,7 @@
 ### RealModelEvaluationPreflightSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationPreflightSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:81](../../../packages/materials/src/evaluation/real-model-evaluator.ts:81)
+- Source: [src/evaluation/real-model-evaluator.ts:80](../../../packages/materials/src/evaluation/real-model-evaluator.ts:80)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation preflight summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6074,7 +6074,7 @@
 ### RealModelEvaluationSummary
 - Kind: `interface`
 - Signature: `RealModelEvaluationSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:260](../../../packages/materials/src/evaluation/real-model-evaluator.ts:260)
+- Source: [src/evaluation/real-model-evaluator.ts:259](../../../packages/materials/src/evaluation/real-model-evaluator.ts:259)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model evaluation summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6082,7 +6082,7 @@
 ### RealModelProviderDiagnostics
 - Kind: `interface`
 - Signature: `RealModelProviderDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:205](../../../packages/materials/src/evaluation/real-model-evaluator.ts:205)
+- Source: [src/evaluation/real-model-evaluator.ts:204](../../../packages/materials/src/evaluation/real-model-evaluator.ts:204)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model provider diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6090,7 +6090,7 @@
 ### RealModelTurnDiagnostics
 - Kind: `interface`
 - Signature: `RealModelTurnDiagnostics`
-- Source: [src/evaluation/real-model-evaluator.ts:196](../../../packages/materials/src/evaluation/real-model-evaluator.ts:196)
+- Source: [src/evaluation/real-model-evaluator.ts:195](../../../packages/materials/src/evaluation/real-model-evaluator.ts:195)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model turn diagnostics type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6098,7 +6098,7 @@
 ### RealModelVariantSummary
 - Kind: `interface`
 - Signature: `RealModelVariantSummary`
-- Source: [src/evaluation/real-model-evaluator.ts:227](../../../packages/materials/src/evaluation/real-model-evaluator.ts:227)
+- Source: [src/evaluation/real-model-evaluator.ts:226](../../../packages/materials/src/evaluation/real-model-evaluator.ts:226)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real model variant summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6147,7 +6147,7 @@
 ### RuntimeScenarioCase
 - Kind: `interface`
 - Signature: `RuntimeScenarioCase`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:49](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:49)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:48](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:48)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario case type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6155,7 +6155,7 @@
 ### RuntimeScenarioContext
 - Kind: `interface`
 - Signature: `RuntimeScenarioContext`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:36](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:36)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:35](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:35)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario context type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6163,7 +6163,7 @@
 ### RuntimeScenarioDefinition
 - Kind: `interface`
 - Signature: `RuntimeScenarioDefinition`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:42](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:42)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:41](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:41)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario definition type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -6172,7 +6172,7 @@
 ### RuntimeScenarioSummary
 - Kind: `interface`
 - Signature: `RuntimeScenarioSummary`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:58](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:58)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:57](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:57)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario summary type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10037,7 +10037,7 @@
 ### ControlStore.#cacheSnapshot
 - Kind: `method`
 - Signature: `(runId: string, snapshot: RunSnapshot): Promise<void>`
-- Source: [src/control/control-store.ts:723](../../../packages/materials/src/control/control-store.ts:723)
+- Source: [src/control/control-store.ts:732](../../../packages/materials/src/control/control-store.ts:732)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #cache snapshot operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10045,7 +10045,7 @@
 ### ControlStore.#commitCommands
 - Kind: `method`
 - Signature: `(runId: string, before: RunSnapshot, commands: DomainCommand[], authority: ControlAuthority, writer: JsonlRunWriter, options?: ControlDispatchOptions): Promise<{ after: RunSnapshot; events: HarnessEvent[]; }>`
-- Source: [src/control/control-store.ts:738](../../../packages/materials/src/control/control-store.ts:738)
+- Source: [src/control/control-store.ts:747](../../../packages/materials/src/control/control-store.ts:747)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #commit commands operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10053,7 +10053,7 @@
 ### ControlStore.#createFixtureControlPort
 - Kind: `method`
 - Signature: `(): FixtureControlPort`
-- Source: [src/control/control-store.ts:834](../../../packages/materials/src/control/control-store.ts:834)
+- Source: [src/control/control-store.ts:843](../../../packages/materials/src/control/control-store.ts:843)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create fixture control port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10061,7 +10061,7 @@
 ### ControlStore.#createUpdateEvaluationPort
 - Kind: `method`
 - Signature: `(): UpdateEvaluationControlPort`
-- Source: [src/control/control-store.ts:868](../../../packages/materials/src/control/control-store.ts:868)
+- Source: [src/control/control-store.ts:877](../../../packages/materials/src/control/control-store.ts:877)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create update evaluation port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10069,7 +10069,7 @@
 ### ControlStore.#createVerificationRecoveryPort
 - Kind: `method`
 - Signature: `(): VerificationRecoveryControlPort`
-- Source: [src/control/control-store.ts:849](../../../packages/materials/src/control/control-store.ts:849)
+- Source: [src/control/control-store.ts:858](../../../packages/materials/src/control/control-store.ts:858)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verification recovery port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10077,7 +10077,7 @@
 ### ControlStore.#createVerifierEffectPort
 - Kind: `method`
 - Signature: `(): VerifierEffectControlPort`
-- Source: [src/control/control-store.ts:811](../../../packages/materials/src/control/control-store.ts:811)
+- Source: [src/control/control-store.ts:820](../../../packages/materials/src/control/control-store.ts:820)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier effect port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10085,7 +10085,7 @@
 ### ControlStore.#createVerifierPort
 - Kind: `method`
 - Signature: `(): VerifierControlPort`
-- Source: [src/control/control-store.ts:779](../../../packages/materials/src/control/control-store.ts:779)
+- Source: [src/control/control-store.ts:788](../../../packages/materials/src/control/control-store.ts:788)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #create verifier port operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10093,7 +10093,7 @@
 ### ControlStore.#migrateLegacyRunBestEffort
 - Kind: `method`
 - Signature: `(runId: string): Promise<void>`
-- Source: [src/control/control-store.ts:315](../../../packages/materials/src/control/control-store.ts:315)
+- Source: [src/control/control-store.ts:324](../../../packages/materials/src/control/control-store.ts:324)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #migrate legacy run best effort operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10101,7 +10101,7 @@
 ### ControlStore.#readSnapshot
 - Kind: `method`
 - Signature: `(runId: string, options?: { forceReplay?: boolean; skipMigration?: boolean; }): Promise<RunSnapshot>`
-- Source: [src/control/control-store.ts:673](../../../packages/materials/src/control/control-store.ts:673)
+- Source: [src/control/control-store.ts:682](../../../packages/materials/src/control/control-store.ts:682)
 - Export: `@proofblade/materials`
 - Summary: Read a Run using the in-memory fold, a durable projection, or full replay.
 - Summary source: `tsdoc`
@@ -10109,7 +10109,7 @@
 ### ControlStore.#recordProjectionMode
 - Kind: `method`
 - Signature: `(runId: string, persistProjection: boolean | undefined): void`
-- Source: [src/control/control-store.ts:638](../../../packages/materials/src/control/control-store.ts:638)
+- Source: [src/control/control-store.ts:647](../../../packages/materials/src/control/control-store.ts:647)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #record projection mode operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10117,7 +10117,7 @@
 ### ControlStore.#withWrite
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: (before: RunSnapshot, writer: JsonlRunWriter) => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:643](../../../packages/materials/src/control/control-store.ts:643)
+- Source: [src/control/control-store.ts:652](../../../packages/materials/src/control/control-store.ts:652)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #with write operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10125,7 +10125,7 @@
 ### ControlStore.acknowledgeObservations
 - Kind: `method`
 - Signature: `(runId: string, observationIds: readonly string[], lane?: Lane): Promise<string[]>`
-- Source: [src/control/control-store.ts:456](../../../packages/materials/src/control/control-store.ts:456)
+- Source: [src/control/control-store.ts:465](../../../packages/materials/src/control/control-store.ts:465)
 - Export: `@proofblade/materials`
 - Summary: Atomically acknowledge model-visible observations. Queue state is derived
 - Summary source: `tsdoc`
@@ -10133,7 +10133,7 @@
 ### ControlStore.append
 - Kind: `method`
 - Signature: `(runId: string, events: Array<Omit<HarnessEvent, "seq" | "id" | "streamId" | "runId" | "ts">>, options?: ControlAppendOptions): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:549](../../../packages/materials/src/control/control-store.ts:549)
+- Source: [src/control/control-store.ts:558](../../../packages/materials/src/control/control-store.ts:558)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: append operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10142,7 +10142,7 @@
 ### ControlStore.appendIngressReceived
 - Kind: `method`
 - Signature: `(runId: string, input: { envelope: RunEventEnvelope; payload?: Record<string, unknown>; }): Promise<RunEventEnvelope>`
-- Source: [src/control/control-store.ts:419](../../../packages/materials/src/control/control-store.ts:419)
+- Source: [src/control/control-store.ts:428](../../../packages/materials/src/control/control-store.ts:428)
 - Export: `@proofblade/materials`
 - Summary: Append one received ingress event with idempotency checked inside the Run
 - Summary source: `tsdoc`
@@ -10150,7 +10150,7 @@
 ### ControlStore.claimIngress
 - Kind: `method`
 - Signature: `(runId: string, claims: readonly IngressClaim[]): Promise<IngressClaim[]>`
-- Source: [src/control/control-store.ts:332](../../../packages/materials/src/control/control-store.ts:332)
+- Source: [src/control/control-store.ts:341](../../../packages/materials/src/control/control-store.ts:341)
 - Export: `@proofblade/materials`
 - Summary: Atomically claim ingress events under the same Run lock used by writes.
 - Summary source: `tsdoc`
@@ -10158,7 +10158,7 @@
 ### ControlStore.clearReadCaches
 - Kind: `method`
 - Signature: `(): void`
-- Source: [src/control/control-store.ts:310](../../../packages/materials/src/control/control-store.ts:310)
+- Source: [src/control/control-store.ts:319](../../../packages/materials/src/control/control-store.ts:319)
 - Export: `@proofblade/materials`
 - Summary: Drop process-local read shortcuts without changing durable Run state.
 - Summary source: `tsdoc`
@@ -10166,7 +10166,7 @@
 ### ControlStore.completeIngress
 - Kind: `method`
 - Signature: `(runId: string, input: { ingressId: string; claimToken: string; status: Extract<RunEventStatus, "applied" | "coalesced" | "failed">; safePoint?: string; reason?: string; }): Promise<void>`
-- Source: [src/control/control-store.ts:375](../../../packages/materials/src/control/control-store.ts:375)
+- Source: [src/control/control-store.ts:384](../../../packages/materials/src/control/control-store.ts:384)
 - Export: `@proofblade/materials`
 - Summary: Complete a previously claimed ingress action after its side effect ran.
 - Summary source: `tsdoc`
@@ -10192,7 +10192,7 @@
 ### ControlStore.dispatch
 - Kind: `method`
 - Signature: `(runId: string, command: DomainCommand, options?: ControlDispatchOptions): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:497](../../../packages/materials/src/control/control-store.ts:497)
+- Source: [src/control/control-store.ts:506](../../../packages/materials/src/control/control-store.ts:506)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10201,7 +10201,7 @@
 ### ControlStore.dispatchBatch
 - Kind: `method`
 - Signature: `(runId: string, commands: DomainCommand[], options?: ControlDispatchOptions): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:501](../../../packages/materials/src/control/control-store.ts:501)
+- Source: [src/control/control-store.ts:510](../../../packages/materials/src/control/control-store.ts:510)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch batch operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10210,7 +10210,7 @@
 ### ControlStore.dispatchBindingTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }): Promise<TResult>`
-- Source: [src/control/control-store.ts:537](../../../packages/materials/src/control/control-store.ts:537)
+- Source: [src/control/control-store.ts:546](../../../packages/materials/src/control/control-store.ts:546)
 - Export: `@proofblade/materials`
 - Summary: Commit the final Control Store fence for a broker-owned session binding.
 - Summary source: `tsdoc`
@@ -10219,7 +10219,7 @@
 ### ControlStore.dispatchTransaction
 - Kind: `method`
 - Signature: `<TResult>(runId: string, prepare: (snapshot: RunSnapshot) => { commands: DomainCommand[]; project: (after: RunSnapshot) => TResult; }, options?: ControlDispatchOptions): Promise<TResult>`
-- Source: [src/control/control-store.ts:513](../../../packages/materials/src/control/control-store.ts:513)
+- Source: [src/control/control-store.ts:522](../../../packages/materials/src/control/control-store.ts:522)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: dispatch transaction operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10228,7 +10228,7 @@
 ### ControlStore.events
 - Kind: `method`
 - Signature: `(runId: string): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:327](../../../packages/materials/src/control/control-store.ts:327)
+- Source: [src/control/control-store.ts:336](../../../packages/materials/src/control/control-store.ts:336)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: events operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -10237,16 +10237,25 @@
 ### ControlStore.flushProjection
 - Kind: `method`
 - Signature: `(runId: string): Promise<void>`
-- Source: [src/control/control-store.ts:619](../../../packages/materials/src/control/control-store.ts:619)
+- Source: [src/control/control-store.ts:628](../../../packages/materials/src/control/control-store.ts:628)
 - Export: `@proofblade/materials`
 - Summary: Persist the current in-memory fold at a turn/lane quiescence barrier.
+- Summary source: `tsdoc`
+- Tests: `packages/materials/tests/control-store.test.ts`
+
+### ControlStore.loadProjection
+- Kind: `method`
+- Signature: `(runId: string): Promise<RunSnapshot | undefined>`
+- Source: [src/control/control-store.ts:310](../../../packages/materials/src/control/control-store.ts:310)
+- Export: `@proofblade/materials`
+- Summary: Read a materialized projection only after verifying its event-prefix seal.
 - Summary source: `tsdoc`
 - Tests: `packages/materials/tests/control-store.test.ts`
 
 ### ControlStore.reconcileProjection
 - Kind: `method`
 - Signature: `(runId: string): Promise<{ repaired: boolean; replayHash: string; }>`
-- Source: [src/control/control-store.ts:592](../../../packages/materials/src/control/control-store.ts:592)
+- Source: [src/control/control-store.ts:601](../../../packages/materials/src/control/control-store.ts:601)
 - Export: `@proofblade/materials`
 - Summary: Rebuild the materialized projection after a process interruption. The
 - Summary source: `tsdoc`
@@ -10264,7 +10273,7 @@
 ### ControlStore.runHash
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/control/control-store.ts:581](../../../packages/materials/src/control/control-store.ts:581)
+- Source: [src/control/control-store.ts:590](../../../packages/materials/src/control/control-store.ts:590)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run hash operation used to read or inspect state.
 - Summary source: `inferred`
@@ -10282,7 +10291,7 @@
 ### ControlStore.waitForEvents
 - Kind: `method`
 - Signature: `(runId: string, afterSeq: number, timeoutMs?: number): Promise<HarnessEvent[]>`
-- Source: [src/control/control-store.ts:447](../../../packages/materials/src/control/control-store.ts:447)
+- Source: [src/control/control-store.ts:456](../../../packages/materials/src/control/control-store.ts:456)
 - Export: `@proofblade/materials`
 - Summary: Wait for a durable event so long-running tools do not replay the full Run in a polling loop.
 - Summary source: `tsdoc`
@@ -10290,7 +10299,7 @@
 ### ControlStore.withConsolidationLock
 - Kind: `method`
 - Signature: `<T>(runId: string, operation: () => Promise<T>): Promise<T>`
-- Source: [src/control/control-store.ts:493](../../../packages/materials/src/control/control-store.ts:493)
+- Source: [src/control/control-store.ts:502](../../../packages/materials/src/control/control-store.ts:502)
 - Export: `@proofblade/materials`
 - Summary: Serialize slow, replay-safe maintenance operations for one Run.
 - Summary source: `tsdoc`
@@ -10632,7 +10641,7 @@
 ### FixtureEvaluationRunner.run
 - Kind: `method`
 - Signature: `(options?: FixtureEvaluationOptions): Promise<FixtureEvaluationSummary>`
-- Source: [src/evaluation/fixture-evaluator.ts:122](../../../packages/materials/src/evaluation/fixture-evaluator.ts:122)
+- Source: [src/evaluation/fixture-evaluator.ts:121](../../../packages/materials/src/evaluation/fixture-evaluator.ts:121)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10650,7 +10659,7 @@
 ### RealModelEvaluationRunner.run
 - Kind: `method`
 - Signature: `(options: RealModelEvaluationOptions): Promise<RealModelEvaluationSummary>`
-- Source: [src/evaluation/real-model-evaluator.ts:283](../../../packages/materials/src/evaluation/real-model-evaluator.ts:283)
+- Source: [src/evaluation/real-model-evaluator.ts:282](../../../packages/materials/src/evaluation/real-model-evaluator.ts:282)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to perform a durable write.
 - Summary source: `inferred`
@@ -10659,7 +10668,7 @@
 ### RuntimeScenarioEvaluator.run
 - Kind: `method`
 - Signature: `(runPrefix: string): Promise<RuntimeScenarioSummary>`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:193](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:193)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:192](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:192)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: run operation used to validate input or state.
 - Summary source: `inferred`
@@ -12896,7 +12905,7 @@
 ### JsonlControlStore.#appendAuthorizedUnlocked
 - Kind: `method`
 - Signature: `(events: HarnessEvent[], authoritySecret: string): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:397](../../../packages/materials/src/storage/jsonl-store.ts:397)
+- Source: [src/storage/jsonl-store.ts:400](../../../packages/materials/src/storage/jsonl-store.ts:400)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #append authorized unlocked operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12904,7 +12913,7 @@
 ### JsonlControlStore.#appendUnchecked
 - Kind: `method`
 - Signature: `(events: HarnessEvent[]): Promise<void>`
-- Source: [src/storage/jsonl-store.ts:410](../../../packages/materials/src/storage/jsonl-store.ts:410)
+- Source: [src/storage/jsonl-store.ts:413](../../../packages/materials/src/storage/jsonl-store.ts:413)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #append unchecked operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12912,7 +12921,7 @@
 ### JsonlControlStore.#authorityHashFor
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/storage/jsonl-store.ts:439](../../../packages/materials/src/storage/jsonl-store.ts:439)
+- Source: [src/storage/jsonl-store.ts:442](../../../packages/materials/src/storage/jsonl-store.ts:442)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: #authority hash for operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12996,7 +13005,7 @@
 ### JsonlControlStore.projectionDigest
 - Kind: `method`
 - Signature: `(runId: string): Promise<string>`
-- Source: [src/storage/jsonl-store.ts:393](../../../packages/materials/src/storage/jsonl-store.ts:393)
+- Source: [src/storage/jsonl-store.ts:396](../../../packages/materials/src/storage/jsonl-store.ts:396)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: projection digest operation used to read or inspect state.
 - Summary source: `inferred`
@@ -15071,7 +15080,7 @@
 ### EvaluationFailureCategory
 - Kind: `type`
 - Signature: `EvaluationFailureCategory`
-- Source: [src/evaluation/fixture-evaluator.ts:24](../../../packages/materials/src/evaluation/fixture-evaluator.ts:24)
+- Source: [src/evaluation/fixture-evaluator.ts:23](../../../packages/materials/src/evaluation/fixture-evaluator.ts:23)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: evaluation failure category type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -15103,7 +15112,7 @@
 ### RealEvaluationFailureCategory
 - Kind: `type`
 - Signature: `RealEvaluationFailureCategory`
-- Source: [src/evaluation/real-model-evaluator.ts:17](../../../packages/materials/src/evaluation/real-model-evaluator.ts:17)
+- Source: [src/evaluation/real-model-evaluator.ts:16](../../../packages/materials/src/evaluation/real-model-evaluator.ts:16)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: real evaluation failure category type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -15111,7 +15120,7 @@
 ### RuntimeScenarioCategory
 - Kind: `type`
 - Signature: `RuntimeScenarioCategory`
-- Source: [src/evaluation/runtime-scenario-evaluator.ts:34](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:34)
+- Source: [src/evaluation/runtime-scenario-evaluator.ts:33](../../../packages/materials/src/evaluation/runtime-scenario-evaluator.ts:33)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: runtime scenario category type contract used to provide a reusable operation.
 - Summary source: `inferred`
