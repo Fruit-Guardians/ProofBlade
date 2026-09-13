@@ -41,11 +41,6 @@ export const CODING_PWN_TOOL_NAMES = ["pwn_open", "pwn_send", "pwn_recv", "pwn_s
 const MODEL_TOOL_RESULT_MAX_TOKENS = 4_096;
 /** Maximum size of an implicit complete read returned in one model turn. */
 const MAX_COMPLETE_READ_BYTES = 256 * 1024;
-const KNOWN_TOOL_EXECUTABLES = new Set([
-  "bash", "sh", "zsh", "fish", "python", "python2", "python3", "py", "node", "nodejs",
-  "npm", "npx", "pnpm", "yarn", "tshark", "convert", "magick", "java", "ruby", "perl", "php", "curl", "wget",
-]);
-
 /** Provider-facing bounds for untrusted MCP `tools/list` metadata. */
 export const MAX_MCP_FIRST_CLASS_TOOLS = 24;
 export const MAX_MCP_FIRST_CLASS_TOOLS_PER_SERVER = 16;
@@ -1898,10 +1893,11 @@ function isPathCandidate(value: string): boolean {
 
 /**
  * An absolute path used as the first word of a shell command is a runtime
- * executable, not task evidence. Do not downgrade a workspace result merely
- * because Python/tshark/node lives in a host installation directory. A path
- * supplied after that executable (for example an external solve.py) remains
- * a real source and is therefore checked normally.
+ * executable, not task evidence, only when its exact path appears in the
+ * harness-owned Tool catalog. Basenames are not identities: an arbitrary
+ * `C:/tmp/python.exe` must not inherit trust merely by imitating Python. A
+ * path supplied after a catalog executable remains task source and is checked
+ * normally.
  */
 function isCommandExecutablePath(command: string, candidate: string, trustedToolPaths: ReadonlySet<string>): boolean {
   const index = command.indexOf(candidate);
@@ -1914,9 +1910,6 @@ function isCommandExecutablePath(command: string, candidate: string, trustedTool
     .trim();
   if (segment.length > 0 && !/^(?:env|sudo|command|exec|nohup|timeout)(?:\s|$)/i.test(segment)) return false;
   const normalized = candidate.replaceAll("\\", "/");
-  const name = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
-  const portableName = name.replace(/\.(?:exe|cmd|bat|com)$/i, "");
-  if (KNOWN_TOOL_EXECUTABLES.has(name) || KNOWN_TOOL_EXECUTABLES.has(portableName)) return true;
   const comparable = /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
   return [...trustedToolPaths].some((path) => {
     const declared = path.replaceAll("\\", "/").replace(/\/$/, "");

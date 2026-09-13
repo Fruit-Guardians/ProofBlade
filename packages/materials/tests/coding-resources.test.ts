@@ -1644,7 +1644,7 @@ test("failed bash returns structured error feedback and records the real experim
   assert.equal(experiments[1]?.summary, "Foreground bash exited with code 17.");
 });
 
-test("source scope trusts only known or catalog-declared external executables", async () => {
+test("source scope trusts only catalog-declared external executable paths", async () => {
   const env = {
     cwd: "/workspace",
     async exec(_command: string, options: { onStderr?: (text: string) => void }) {
@@ -1671,11 +1671,23 @@ test("source scope trusts only known or catalog-declared external executables", 
     enabledMcpServers: new Set<string>(),
   } as unknown as CodingResourceContext;
 
-  const toolOnly = await executeTool("bash", {
+  const undeclaredPython = await executeTool("bash", {
     command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" -c "from PIL import Image; Image.open(\'input.png\').save(\'decoded.png\')"',
   }, context);
-  assert.deepEqual((toolOnly.details as { sourceScope: unknown }).sourceScope, { status: "workspace", authoritativeForTaskResult: true, outsidePaths: [] });
-  assert.doesNotMatch(toolOnly.content.map((part) => part.text ?? "").join("\n"), /source scope/);
+  assert.deepEqual((undeclaredPython.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe"],
+  });
+
+  const disguisedNode = await executeTool("bash", {
+    command: "C:/tmp/node.exe input.png",
+  }, context);
+  assert.deepEqual((disguisedNode.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/node.exe"],
+  });
 
   const toolAndExternalScript = await executeTool("bash", {
     command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" "C:/tmp/solve.py" input.png',
@@ -1683,7 +1695,7 @@ test("source scope trusts only known or catalog-declared external executables", 
   assert.deepEqual((toolAndExternalScript.details as { sourceScope: unknown }).sourceScope, {
     status: "outside_workspace",
     authoritativeForTaskResult: false,
-    outsidePaths: ["C:/tmp/solve.py"],
+    outsidePaths: ["C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe", "C:/tmp/solve.py"],
   });
 
   const arbitraryExecutable = await executeTool("bash", {
@@ -1695,7 +1707,7 @@ test("source scope trusts only known or catalog-declared external executables", 
     outsidePaths: ["C:/tmp/solve.exe"],
   });
 
-  context.trustedToolPaths = new Set(["C:/tools/reviewed-solver.exe"]);
+  context.trustedToolPaths = new Set(["C:/tools/reviewed-solver.exe", "C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe"]);
   const declaredExecutable = await executeTool("bash", {
     command: "C:/tools/reviewed-solver.exe input.png",
   }, context);
@@ -1703,6 +1715,23 @@ test("source scope trusts only known or catalog-declared external executables", 
     status: "workspace",
     authoritativeForTaskResult: true,
     outsidePaths: [],
+  });
+
+  const declaredPython = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" input.png',
+  }, context);
+  assert.deepEqual((declaredPython.details as { sourceScope: unknown }).sourceScope, {
+    status: "workspace",
+    authoritativeForTaskResult: true,
+    outsidePaths: [],
+  });
+  const declaredPythonWithExternalScript = await executeTool("bash", {
+    command: '"C:/Users/35159/AppData/Local/Programs/Python/Python314/python.exe" "C:/tmp/solve.py" input.png',
+  }, context);
+  assert.deepEqual((declaredPythonWithExternalScript.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/solve.py"],
   });
 });
 
