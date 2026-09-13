@@ -80,16 +80,19 @@ test("update_phase changes the durable phase before later investigation actions"
   const runId = "LIVE-PHASE";
   await services.control.createRun(runId, demoTask(runId, root, config));
   const coordinator = new RunCoordinator(services.control);
+  let refreshes = 0;
   const context = {
     setDomainPhase: async (phase: "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE", reason: string) => {
       await coordinator.setDomainPhase(runId, phase, reason);
       const snapshot = await services.control.snapshot(runId);
       return { domainPhase: snapshot.domainPhase, phase: snapshot.phase };
     },
+    onDomainPhaseChanged: async () => { refreshes += 1; },
   } as unknown as CodingResourceContext;
   try {
     const result = await executeTool("update_phase", { phase: "EXPERIMENT", reason: "The packet layout is known; execute the bounded decoder." }, context);
     assert.deepEqual(result.details, { domainPhase: "EXPERIMENT", phase: "experiment", reason: "The packet layout is known; execute the bounded decoder." });
+    assert.equal(refreshes, 1);
     const snapshot = await services.control.snapshot(runId);
     assert.deepEqual({ domainPhase: snapshot.domainPhase, phase: snapshot.phase }, { domainPhase: "EXPERIMENT", phase: "experiment" });
     const compiled = new ContextCompiler().build({ runId, lane: "main", phase: snapshot.phase, task: snapshot.task, snapshot });

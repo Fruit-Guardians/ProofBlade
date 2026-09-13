@@ -631,6 +631,11 @@ export class PiCodingLane implements AgentLanePort {
     const ablationBinding = options.ablationPolicy && ablationRoute
       ? { ...options.ablationPolicy, route: () => ablationRoute }
       : options.ablationPolicy;
+    const refreshAblationRoute = ablationRoute ? async () => {
+      const current = await options.controlStore.snapshot(options.runId);
+      ablationRoute.domainPhase = current.domainPhase;
+      ablationRoute.actionBundles = current.toolPreparation?.actionBundles ?? [];
+    } : async () => undefined;
     attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, ablationBinding, options.deferClaimAcceptance);
     const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
@@ -648,6 +653,13 @@ export class PiCodingLane implements AgentLanePort {
     const contextCompiler = new ContextCompiler();
     let previousContextBlocks: import("../domain/types.js").ContextBlock[] | undefined;
     let persistedContextForTurn = false;
+    toolContext.onDomainPhaseChanged = async () => {
+      // Pi requests context again after the tool result. Append a new dynamic
+      // projection instead of rewriting history so the same tool chain sees
+      // the durable phase immediately.
+      persistedContextForTurn = false;
+      await refreshAblationRoute();
+    };
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
       const queue = projectObservationQueue(await options.controlStore.events(options.runId), current);
@@ -771,11 +783,7 @@ export class PiCodingLane implements AgentLanePort {
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
       () => { persistedContextForTurn = false; },
-      ablationRoute ? async () => {
-        const current = await options.controlStore.snapshot(options.runId);
-        ablationRoute.domainPhase = current.domainPhase;
-        ablationRoute.actionBundles = current.toolPreparation?.actionBundles ?? [];
-      } : async () => undefined,
+      refreshAblationRoute,
       async () => {
         const branch = await session.getBranch();
         for (let index = branch.length - 1; index >= 0; index -= 1) {

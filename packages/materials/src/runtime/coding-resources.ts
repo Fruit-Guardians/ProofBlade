@@ -100,6 +100,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   enabledMcpServers: Set<string>;
   /** Persist a live investigation phase before the lane changes tactics. */
   setDomainPhase?: (phase: InvestigationPhase, reason: string) => Promise<{ domainPhase: DomainPhase; phase: string }>;
+  /** Refresh model-visible context and policy routing after a durable phase change. */
+  onDomainPhaseChanged?: () => Promise<void>;
   /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
   claimVerifier: TaskResultVerifier;
   /**
@@ -512,7 +514,9 @@ const updatePhaseTool: AgentHarnessTool<CodingResourceContext> = {
     if (!phase || !INVESTIGATION_PHASES.includes(phase)) throw new Error(`Unsupported live investigation phase: ${String(input.phase)}`);
     if (!reason) throw new Error("update_phase requires a concrete reason");
     if (!context.setDomainPhase) throw new Error("update_phase is unavailable because this lane has no durable phase controller");
-    return toolResult({ ...(await context.setDomainPhase(phase, reason)), reason });
+    const updated = await context.setDomainPhase(phase, reason);
+    await context.onDomainPhaseChanged?.();
+    return toolResult({ ...updated, reason });
   },
 };
 
