@@ -120,9 +120,9 @@
     "src/recovery/session-runtime-wire.ts": "091fbda05ea82bb5293c8ce3f471d349cb2741c713329972b99e0c5d45e10c3a",
     "src/recovery/verification-recovery.ts": "1aa3852e0bd5486b8eae0797b77c28cedb66299a675dd292dca89682ed7a7ce3",
     "src/runtime/assistant-message.ts": "ec4534e028e4e86658fdba3fe442384482f30c6e8f4014844f6089771c5ad4d2",
-    "src/runtime/coding-lane.ts": "befd17172bab9e6247be2e9265f62b1ac1e6899d4fae8e5253cba6b6e3eb966f",
-    "src/runtime/coding-resources.ts": "90f905b0befca750c53b42b9683d2c8ed75f4494ad47b479a4d3df1b5bb14734",
-    "src/runtime/coding-turn-projection.ts": "bb4d41657a37f9545a328c2b7bfdccd77580abe6114ff1fd374110d6c9c9a7d5",
+    "src/runtime/coding-lane.ts": "82805ad9a98b696e0969f53f31b12e08b25da696b2f8f06f180c9eb87c652b0f",
+    "src/runtime/coding-resources.ts": "d2e08b3c9728cb8fcc1f6a2cf484142b5181dff6f6afa41cb5bbe2620b9e0d0c",
+    "src/runtime/coding-turn-projection.ts": "9634c98b8440e19dc694ed92ed2521b54ba50c1b7974e338416441154586af22",
     "src/runtime/config-reconciliation.ts": "e73457833756da03f3ce34ecfe127a75b551b0c37fde17beb70aa3234ae1591c",
     "src/runtime/context-length-recovery.ts": "99d20d12ce44f31083bc466c48d3bc14354fade15d7d478cc6133885cda22272",
     "src/runtime/lmstudio-provider.ts": "830f2e43bfbf23dd2e13bc0a238e157fbdf042fcf8148e16110810971802b585",
@@ -136,7 +136,7 @@
     "src/runtime/scope.ts": "da8b245ede1e086b979fdd90e7c9bc3050abda0d4af9fa7e4f48dff513af5ca0",
     "src/runtime/security-tool-profile.ts": "7aae142b4b2c7bf4503a9adc8699e3440791bab0ab809b45958012d0316d5071",
     "src/runtime/solver-tools.ts": "7d7cf12d4943e2073178ebb0c7ebcf4504ff786e0b61ebc8d8b919f4c62cfb31",
-    "src/runtime/tool-repeat-breaker.ts": "faa6ee05d92fcbcf911f213c7493bae4de6e18970ca8193bd4274eff137051f9",
+    "src/runtime/tool-repeat-breaker.ts": "603f8f2b608d23a0c9cc632cef47927e57ee06b87603dfa14bb1757ce4d7aae2",
     "src/runtime/version.ts": "a821fa4201ff2e341c55624e0fd4f7953cf5885cfdf41b3a788ca8ebcdedd5d0",
     "src/runtime/web-coding-tools.ts": "0fc62653a9d0d391674bd46dffe25a737e52d5894ca2d0e5939f18ea4f0d94f1",
     "src/runtime/workspace-search.ts": "a86dcc54dbf1d1b1bec79113a498e225745332b5f8eedab1bf2858fbbacde695",
@@ -4125,7 +4125,7 @@
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
       "line": 36,
-      "signature": "readonly [\"verify_result\", \"evidence\", \"load_skill\", \"capability\", \"mcp_call\", \"shell_background\", \"shell_job\"]",
+      "signature": "readonly [\"verify_result\", \"evidence\", \"evidence_record\", \"load_skill\", \"capability\", \"mcp_call\", \"shell_background\", \"shell_job\"]",
       "summary": "Provider-facing proxy tools for generic security tasks.",
       "summarySource": "tsdoc",
       "tags": [],
@@ -4292,7 +4292,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1348,
+      "line": 1696,
       "signature": "2",
       "summary": "How many times identical image CONTENT is re-injected into context before the",
       "summarySource": "tsdoc",
@@ -8865,7 +8865,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1481,
+      "line": 1829,
       "signature": "(command: string): string | undefined",
       "summary": "Bash is intentionally an analysis escape hatch, not a second control-plane",
       "summarySource": "tsdoc",
@@ -8909,7 +8909,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1239,
+      "line": 1587,
       "signature": "(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]",
       "summary": "Inferred summary: coding active tool names operation used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -8955,7 +8955,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1260,
+      "line": 1608,
       "signature": "(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>",
       "summary": "Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -9041,7 +9041,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 436,
+      "line": 438,
       "signature": "(mcp: Pick<McpProjectRegistry, \"summaries\" | \"resolveInvocation\">, runtime?: Pick<ProofBladeToolRuntime, \"resolveCapabilityPolicy\">): ToolEffectPolicyResolver",
       "summary": "Resolves the same read-only and side-effect contract used by the runtime capability boundary.",
       "summarySource": "tsdoc",
@@ -9120,7 +9120,7 @@
       "testRefs": [
         "packages/materials/tests/coding-resources.test.ts"
       ],
-      "structureHash": "bd87c7db66d5ee50611882f102ef5a2138c215e96164bcc0253a9ceb6a768813"
+      "structureHash": "e63005a9036f68c41f04b4a1ddd1c96d2d151101070730aba561922d612abf67"
     },
     {
       "id": "@proofblade/materials::function::createMcpFirstClassTools",
@@ -9129,7 +9129,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 232,
+      "line": 233,
       "signature": "(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>",
       "summary": "Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS",
       "summarySource": "tsdoc",
@@ -9173,7 +9173,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 245,
+      "line": 246,
       "signature": "(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<McpFirstClassToolSelection>",
       "summary": "Promote only bounded MCP metadata into provider-visible tools. The generic",
       "summarySource": "tsdoc",
@@ -9217,7 +9217,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1362,
+      "line": 1710,
       "signature": "(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>[\"execute\"]>>, imagesSeen: Map<string, number> | undefined): typeof result",
       "summary": "Deduplicate repeated image reads within one run, keyed by the image's CONTENT",
       "summarySource": "tsdoc",
@@ -9261,7 +9261,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1465,
+      "line": 1813,
       "signature": "(command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.",
       "summarySource": "tsdoc",
@@ -9305,7 +9305,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1455,
+      "line": 1803,
       "signature": "(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined",
       "summary": "When a bash command TIMED OUT and the command looks like it was holding a",
       "summarySource": "tsdoc",
@@ -9349,7 +9349,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 206,
+      "line": 207,
       "signature": "(server: string, tool: string): string",
       "summary": "First-class tool name for an MCP server tool: mcp__<server>__<tool>.",
       "summarySource": "tsdoc",
@@ -9390,7 +9390,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 406,
+      "line": 407,
       "signature": "<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]",
       "summary": "Select the enabled security MCP tools sent as native provider tools. A",
       "summarySource": "tsdoc",
@@ -9434,7 +9434,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 1121,
+      "line": 1469,
       "signature": "(context: CodingResourceContext): Promise<void>",
       "summary": "Stop every current-generation shell job owned by this lane during teardown.",
       "summarySource": "tsdoc",
@@ -9494,7 +9494,7 @@
       "testRefs": [
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
-      "structureHash": "dd282b49edf4413ced979ed6e51669292e21fd153bb4767b4fa2c1521cf2a989"
+      "structureHash": "4e369ccfdc2e97eba133e0a394825cabcaf183407d44caaae294f1ec7e4495d7"
     },
     {
       "id": "@proofblade/materials::function::attachRepeatedToolFailureBreaker",
@@ -9519,6 +9519,7 @@
         "@earendil-works/pi-ai"
       ],
       "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ],
       "structureHash": "523153d2167a1de5988da4ee5cc16c17116b7d6e5ccf4cce9d550b66982c2e39"
@@ -9530,7 +9531,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-turn-projection.ts",
       "exportPath": "@proofblade/materials",
-      "line": 441,
+      "line": 461,
       "signature": "(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<TaskResultVerifier, \"project\">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>",
       "summary": "Inferred summary: finalize coding turn operation used to perform a durable write.",
       "summarySource": "inferred",
@@ -20951,7 +20952,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 210,
+      "line": 211,
       "signature": "McpFirstClassToolExposure",
       "summary": "Inferred summary: mcp first class tool exposure type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -20992,7 +20993,7 @@
       "visibility": "public",
       "module": "src/runtime/coding-resources.ts",
       "exportPath": "@proofblade/materials",
-      "line": 218,
+      "line": 219,
       "signature": "McpFirstClassToolSelection",
       "summary": "Inferred summary: mcp first class tool selection type contract used to provide a reusable operation.",
       "summarySource": "inferred",
@@ -21099,6 +21100,7 @@
         "@earendil-works/pi-ai"
       ],
       "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/tool-repeat-breaker.test.ts"
       ]
     },
@@ -43440,6 +43442,7 @@
         "../sandbox/fixture.js"
       ],
       "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",
@@ -49556,6 +49559,7 @@
         "./pwn-reproduction-verifier.js"
       ],
       "testRefs": [
+        "packages/materials/tests/coding-resources.test.ts",
         "packages/materials/tests/competition-api.test.ts",
         "packages/materials/tests/context-recovery.test.ts",
         "packages/materials/tests/context.test.ts",

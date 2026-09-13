@@ -1347,7 +1347,7 @@
 
 ### CODING_PROXY_TOOL_NAMES
 - Kind: `constant`
-- Signature: `readonly ["verify_result", "evidence", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]`
+- Signature: `readonly ["verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]`
 - Source: [src/runtime/coding-resources.ts:36](../../../packages/materials/src/runtime/coding-resources.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Provider-facing proxy tools for generic security tasks.
@@ -1382,7 +1382,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1348](../../../packages/materials/src/runtime/coding-resources.ts:1348)
+- Source: [src/runtime/coding-resources.ts:1696](../../../packages/materials/src/runtime/coding-resources.ts:1696)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -2917,7 +2917,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1481](../../../packages/materials/src/runtime/coding-resources.ts:1481)
+- Source: [src/runtime/coding-resources.ts:1829](../../../packages/materials/src/runtime/coding-resources.ts:1829)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2926,7 +2926,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1239](../../../packages/materials/src/runtime/coding-resources.ts:1239)
+- Source: [src/runtime/coding-resources.ts:1587](../../../packages/materials/src/runtime/coding-resources.ts:1587)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2935,7 +2935,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1260](../../../packages/materials/src/runtime/coding-resources.ts:1260)
+- Source: [src/runtime/coding-resources.ts:1608](../../../packages/materials/src/runtime/coding-resources.ts:1608)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2952,7 +2952,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:436](../../../packages/materials/src/runtime/coding-resources.ts:436)
+- Source: [src/runtime/coding-resources.ts:438](../../../packages/materials/src/runtime/coding-resources.ts:438)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2970,7 +2970,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:232](../../../packages/materials/src/runtime/coding-resources.ts:232)
+- Source: [src/runtime/coding-resources.ts:233](../../../packages/materials/src/runtime/coding-resources.ts:233)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2979,7 +2979,7 @@
 ### createMcpFirstClassToolSelection
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<McpFirstClassToolSelection>`
-- Source: [src/runtime/coding-resources.ts:245](../../../packages/materials/src/runtime/coding-resources.ts:245)
+- Source: [src/runtime/coding-resources.ts:246](../../../packages/materials/src/runtime/coding-resources.ts:246)
 - Export: `@proofblade/materials`
 - Summary: Promote only bounded MCP metadata into provider-visible tools. The generic
 - Summary source: `tsdoc`
@@ -2988,7 +2988,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1362](../../../packages/materials/src/runtime/coding-resources.ts:1362)
+- Source: [src/runtime/coding-resources.ts:1710](../../../packages/materials/src/runtime/coding-resources.ts:1710)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2997,7 +2997,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1465](../../../packages/materials/src/runtime/coding-resources.ts:1465)
+- Source: [src/runtime/coding-resources.ts:1813](../../../packages/materials/src/runtime/coding-resources.ts:1813)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -3006,7 +3006,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1455](../../../packages/materials/src/runtime/coding-resources.ts:1455)
+- Source: [src/runtime/coding-resources.ts:1803](../../../packages/materials/src/runtime/coding-resources.ts:1803)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -3015,7 +3015,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:206](../../../packages/materials/src/runtime/coding-resources.ts:206)
+- Source: [src/runtime/coding-resources.ts:207](../../../packages/materials/src/runtime/coding-resources.ts:207)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -3023,7 +3023,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:406](../../../packages/materials/src/runtime/coding-resources.ts:406)
+- Source: [src/runtime/coding-resources.ts:407](../../../packages/materials/src/runtime/coding-resources.ts:407)
 - Export: `@proofblade/materials`
 - Summary: Select the enabled security MCP tools sent as native provider tools. A
 - Summary source: `tsdoc`
@@ -3032,7 +3032,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:1121](../../../packages/materials/src/runtime/coding-resources.ts:1121)
+- Source: [src/runtime/coding-resources.ts:1469](../../../packages/materials/src/runtime/coding-resources.ts:1469)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
@@ -3053,12 +3053,12 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: attach repeated tool failure breaker operation used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### finalizeCodingTurn
 - Kind: `function`
 - Signature: `(options: { runId: string; controlStore: ControlStore; correlationId: string; userPrompt: string; response: AssistantMessage; recoveryCount: number; recoveryExhausted: boolean; termination: CodingTurnTermination; piEntryId?: string; claimVerifier: Pick<TaskResultVerifier, "project">; maintainAfterTurn: () => Promise<void>; }): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-turn-projection.ts:441](../../../packages/materials/src/runtime/coding-turn-projection.ts:441)
+- Source: [src/runtime/coding-turn-projection.ts:461](../../../packages/materials/src/runtime/coding-turn-projection.ts:461)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: finalize coding turn operation used to perform a durable write.
 - Summary source: `inferred`
@@ -7275,7 +7275,7 @@
 ### McpFirstClassToolExposure
 - Kind: `interface`
 - Signature: `McpFirstClassToolExposure`
-- Source: [src/runtime/coding-resources.ts:210](../../../packages/materials/src/runtime/coding-resources.ts:210)
+- Source: [src/runtime/coding-resources.ts:211](../../../packages/materials/src/runtime/coding-resources.ts:211)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool exposure type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7283,7 +7283,7 @@
 ### McpFirstClassToolSelection
 - Kind: `interface`
 - Signature: `McpFirstClassToolSelection`
-- Source: [src/runtime/coding-resources.ts:218](../../../packages/materials/src/runtime/coding-resources.ts:218)
+- Source: [src/runtime/coding-resources.ts:219](../../../packages/materials/src/runtime/coding-resources.ts:219)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool selection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7312,7 +7312,7 @@
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding turn termination type contract used to provide a reusable operation.
 - Summary source: `inferred`
-- Tests: `packages/materials/tests/tool-repeat-breaker.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/tool-repeat-breaker.test.ts`
 
 ### FirstActionBudget
 - Kind: `interface`
@@ -12317,7 +12317,7 @@
 - Export: `@proofblade/materials`
 - Summary: Restrict an adapter to operations it can safely resume/reconcile.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`
 
 ### VerificationRecoveryAdapterRegistry.get
 - Kind: `method`
@@ -13481,7 +13481,7 @@
 - Export: `@proofblade/materials`
 - Summary: Restrict an adapter to operations it can safely resume/reconcile.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`
+- Tests: `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-api.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store-evidence-invariants.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/domain-records.test.ts`, `packages/materials/tests/evidence-bypass-regressions.test.ts`, `packages/materials/tests/knowledge-projection.test.ts`, `packages/materials/tests/knowledge-read-bounds.test.ts`, `packages/materials/tests/model-context-frame.test.ts`, `packages/materials/tests/phase-gate.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/pwn-session-runtime-host.test.ts`, `packages/materials/tests/reasoning-forest.test.ts`, `packages/materials/tests/reverse-core.test.ts`
 
 ### PwnReproducer.reproduce
 - Kind: `method`
