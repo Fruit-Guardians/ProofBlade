@@ -310,8 +310,11 @@ export class JsonlControlStore {
       });
       // Defense-in-depth: reducer validation happens before the durable append.
       reduce(legacy, migration);
-      const current = await readFile(this.runPath(runId), "utf8");
-      await atomicWriteFile(this.runPath(runId), `${current}${canonicalJson(migration)}\n`);
+      // Use the normal append primitive so a crashed legacy writer's
+      // unterminated tail is repaired before the authority event is added.
+      // Concatenating onto the raw file would glue the migration JSON onto
+      // that tail and corrupt the complete Run.
+      await this.#appendUnchecked([migration]);
       this.authorityHashes.set(runId, authorityHash);
       return "migrated";
     });
