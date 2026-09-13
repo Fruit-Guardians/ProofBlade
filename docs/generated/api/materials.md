@@ -205,7 +205,7 @@
 ### CompetitionChallengeSolver
 - Kind: `class`
 - Signature: `CompetitionChallengeSolver`
-- Source: [src/competition/solver.ts:77](../../../packages/materials/src/competition/solver.ts:77)
+- Source: [src/competition/solver.ts:78](../../../packages/materials/src/competition/solver.ts:78)
 - Export: `@proofblade/materials`
 - Summary: The real ChallengeSolver: turns one competition challenge into a full harness
 - Summary source: `tsdoc`
@@ -2917,7 +2917,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1477](../../../packages/materials/src/runtime/coding-resources.ts:1477)
+- Source: [src/runtime/coding-resources.ts:1481](../../../packages/materials/src/runtime/coding-resources.ts:1481)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2997,7 +2997,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1461](../../../packages/materials/src/runtime/coding-resources.ts:1461)
+- Source: [src/runtime/coding-resources.ts:1465](../../../packages/materials/src/runtime/coding-resources.ts:1465)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -3006,7 +3006,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1451](../../../packages/materials/src/runtime/coding-resources.ts:1451)
+- Source: [src/runtime/coding-resources.ts:1455](../../../packages/materials/src/runtime/coding-resources.ts:1455)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -4301,7 +4301,7 @@
 ### CompetitionChallengeSolverInit
 - Kind: `interface`
 - Signature: `CompetitionChallengeSolverInit`
-- Source: [src/competition/solver.ts:35](../../../packages/materials/src/competition/solver.ts:35)
+- Source: [src/competition/solver.ts:36](../../../packages/materials/src/competition/solver.ts:36)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: competition challenge solver init type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -9638,7 +9638,7 @@
 ### CompetitionChallengeSolver.reconcile
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/competition/solver.ts:95](../../../packages/materials/src/competition/solver.ts:95)
+- Source: [src/competition/solver.ts:96](../../../packages/materials/src/competition/solver.ts:96)
 - Export: `@proofblade/materials`
 - Summary: Reconcile expired environments before the Fleet claims new challenges.
 - Summary source: `tsdoc`
@@ -9647,7 +9647,7 @@
 ### CompetitionChallengeSolver.solve
 - Kind: `method`
 - Signature: `(request: ChallengeSolveRequest): Promise<ChallengeSolveResult>`
-- Source: [src/competition/solver.ts:99](../../../packages/materials/src/competition/solver.ts:99)
+- Source: [src/competition/solver.ts:100](../../../packages/materials/src/competition/solver.ts:100)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: solve operation used to perform a durable write.
 - Summary source: `inferred`

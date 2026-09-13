@@ -143,7 +143,7 @@ export class SingleAgentLoop {
     const checkpoints = new CheckpointService(this.services.control, this.services.artifacts);
     const planner = new PlannerCoordinator(this.services.control);
     const refiner = new RefinerCoordinator(this.services.control);
-    const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId));
+    const pendingAtStart = latestPending(await this.services.control.snapshot(options.runId), options.task);
     if (pendingAtStart) {
       throwIfAborted(options.signal);
       let verified: VerificationOutcome;
@@ -274,7 +274,7 @@ export class SingleAgentLoop {
           activeWorkItemId = undefined;
           break;
         }
-        const pending = latestPending(after);
+        const pending = latestPending(after, options.task);
         if (pending) {
           if (mode() === "assist") {
             await coordinator.setDomainPhase(options.runId, "REPRODUCE");
@@ -600,17 +600,28 @@ export async function taskExecutionWorkspace(task: { scope: Pick<TaskContract["s
   return fixturePath;
 }
 
-function latestPending(snapshot: RunSnapshot) {
+function latestPending(snapshot: RunSnapshot, task: Pick<TaskContract, "verification">) {
+  if (!taskRequiresVerification(task)) return undefined;
   return Object.values(snapshot.completions).filter((item) => item.status === "PROPOSED").sort((a, b) => b.createdSeq - a.createdSeq)[0];
 }
 
 function latestAcceptedVerification(snapshot: RunSnapshot, task: TaskContract) {
-  if (task.verification.kind !== "reproduction") return undefined;
+  if (!taskRequiresVerification(task) || task.verification.kind !== "reproduction") return undefined;
   return Object.values(snapshot.completions)
     .filter((item) => item.status === "ACCEPTED"
       && (item.purpose === "claim_reproduction" || item.purpose === "harness_verification")
       && item.generation === snapshot.generation)
     .sort((a, b) => b.createdSeq - a.createdSeq)[0];
+}
+
+/** A generic chat may record an unverified observation without opening a verifier gate. */
+function taskRequiresVerification(task: Pick<TaskContract, "verification">): boolean {
+  const verification = task.verification;
+  return verification.kind !== "reproduction"
+    || verification.required_reproductions > 0
+    || Boolean(verification.command?.trim())
+    || Boolean(verification.pwn)
+    || Boolean(verification.web);
 }
 
 function turnPrompt(snapshot: RunSnapshot, turn: number, intent?: SchedulerIntent, userPrompt?: string): string {
