@@ -102,6 +102,8 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /** Skill bodies already injected into this lane, keyed by stable skill name. */
   loadedSkillContent?: Map<string, { contentHash: string; coverageChars: number }>;
   enabledMcpServers: Set<string>;
+  /** Exact host executable paths admitted by the reviewed tool catalog. */
+  trustedToolPaths?: ReadonlySet<string>;
   /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
   claimVerifier: TaskResultVerifier;
   /**
@@ -1840,7 +1842,7 @@ export function bashEscapeHatchViolation(command: string): string | undefined {
   return undefined;
 }
 
-function shellSourceScope(command: string, cwd: string): {
+function shellSourceScope(command: string, cwd: string, trustedToolPaths: ReadonlySet<string> = new Set()): {
   status: "workspace" | "outside_workspace";
   authoritativeForTaskResult: boolean;
   outsidePaths: string[];
@@ -1849,7 +1851,7 @@ function shellSourceScope(command: string, cwd: string): {
   const roots = new Set([normalizedCwd, "/workspace"]);
   const windowsRoot = /^([a-z]):\/(.*)$/i.exec(normalizedCwd);
   if (windowsRoot) roots.add(`/mnt/${windowsRoot[1]!.toLowerCase()}/${windowsRoot[2]}`.replace(/\/$/, ""));
-  const candidates = shellPathCandidates(command).filter((candidate) => !isCommandExecutablePath(command, candidate));
+  const candidates = shellPathCandidates(command).filter((candidate) => !isCommandExecutablePath(command, candidate, trustedToolPaths));
   const outsidePaths = [...new Set(candidates.filter((candidate) => {
     if (candidate.startsWith("../")) return true;
     const normalized = candidate.replaceAll("\\", "/").replace(/\/$/, "");
@@ -1901,7 +1903,7 @@ function isPathCandidate(value: string): boolean {
  * supplied after that executable (for example an external solve.py) remains
  * a real source and is therefore checked normally.
  */
-function isCommandExecutablePath(command: string, candidate: string): boolean {
+function isCommandExecutablePath(command: string, candidate: string, trustedToolPaths: ReadonlySet<string>): boolean {
   const index = command.indexOf(candidate);
   if (index < 0) return false;
   const before = command.slice(0, index);
@@ -1913,8 +1915,13 @@ function isCommandExecutablePath(command: string, candidate: string): boolean {
   if (segment.length > 0 && !/^(?:env|sudo|command|exec|nohup|timeout)(?:\s|$)/i.test(segment)) return false;
   const normalized = candidate.replaceAll("\\", "/");
   const name = normalized.slice(normalized.lastIndexOf("/") + 1).toLowerCase();
-  return /\.(?:exe|cmd|bat|com)$/.test(name)
-    || KNOWN_TOOL_EXECUTABLES.has(name);
+  const portableName = name.replace(/\.(?:exe|cmd|bat|com)$/i, "");
+  if (KNOWN_TOOL_EXECUTABLES.has(name) || KNOWN_TOOL_EXECUTABLES.has(portableName)) return true;
+  const comparable = /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
+  return [...trustedToolPaths].some((path) => {
+    const declared = path.replaceAll("\\", "/").replace(/\/$/, "");
+    return comparable === (/^[a-z]:\//i.test(declared) ? declared.toLowerCase() : declared);
+  });
 }
 
 function renderShellSourceScope(scope: ReturnType<typeof shellSourceScope>): string | undefined {
@@ -1942,7 +1949,7 @@ function createCodingBashTool(): AgentHarnessTool<CodingResourceContext> {
       const input = ceiling === undefined
         ? raw
         : { ...raw, timeout: Math.min(raw.timeout ?? ceiling, ceiling) };
-      const sourceScope = shellSourceScope(input.command, context.env.cwd);
+      const sourceScope = shellSourceScope(input.command, context.env.cwd, context.trustedToolPaths);
       const sourceScopeNotice = renderShellSourceScope(sourceScope);
       const escapeHatchViolation = bashEscapeHatchViolation(input.command);
       if (escapeHatchViolation) throw new Error(escapeHatchViolation);

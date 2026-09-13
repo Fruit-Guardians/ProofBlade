@@ -1382,7 +1382,7 @@
 ### IMAGE_REINJECT_BUDGET
 - Kind: `constant`
 - Signature: `2`
-- Source: [src/runtime/coding-resources.ts:1352](../../../packages/materials/src/runtime/coding-resources.ts:1352)
+- Source: [src/runtime/coding-resources.ts:1354](../../../packages/materials/src/runtime/coding-resources.ts:1354)
 - Export: `@proofblade/materials`
 - Summary: How many times identical image CONTENT is re-injected into context before the
 - Summary source: `tsdoc`
@@ -2872,7 +2872,7 @@
 ### codingHostGuidance
 - Kind: `function`
 - Signature: `(platform?: NodeJS.Platform): string`
-- Source: [src/runtime/coding-lane.ts:1171](../../../packages/materials/src/runtime/coding-lane.ts:1171)
+- Source: [src/runtime/coding-lane.ts:1172](../../../packages/materials/src/runtime/coding-lane.ts:1172)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding host guidance operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2881,7 +2881,7 @@
 ### createDeclaredExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { targets: readonly string[]; submit: (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:1022](../../../packages/materials/src/runtime/coding-lane.ts:1022)
+- Source: [src/runtime/coding-lane.ts:1023](../../../packages/materials/src/runtime/coding-lane.ts:1023)
 - Export: `@proofblade/materials`
 - Summary: Bind a host-owned submission adapter to the immutable logical destinations
 - Summary source: `tsdoc`
@@ -2890,7 +2890,7 @@
 ### createPlatformExternalSubmitter
 - Kind: `function`
 - Signature: `(deps: { runId: string; runtime: ProofBladeToolRuntime; fixture: FixtureRef; controlStore: ControlStore; verifier: Pick<IndependentVerifier, "verify">; artifactStore: ArtifactStore; mode?: () => "auto" | "assist"; approvalPolicy?: ApprovalPolicy; onApprovalRequired?: (approvalId: string) => void; }): (request: ExternalSubmissionRequest, signal?: AbortSignal) => Promise<ExternalSubmissionResult>`
-- Source: [src/runtime/coding-lane.ts:933](../../../packages/materials/src/runtime/coding-lane.ts:933)
+- Source: [src/runtime/coding-lane.ts:934](../../../packages/materials/src/runtime/coding-lane.ts:934)
 - Export: `@proofblade/materials`
 - Summary: Build the generic external submission path for a task with a trusted
 - Summary source: `tsdoc`
@@ -2899,7 +2899,7 @@
 ### injectReasoningForestContext
 - Kind: `function`
 - Signature: `(messages: AgentMessage[], forestContext: string): AgentMessage[]`
-- Source: [src/runtime/coding-lane.ts:1075](../../../packages/materials/src/runtime/coding-lane.ts:1075)
+- Source: [src/runtime/coding-lane.ts:1076](../../../packages/materials/src/runtime/coding-lane.ts:1076)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: inject reasoning forest context operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2908,7 +2908,7 @@
 ### taskDeclaresRemotePwnTarget
 - Kind: `function`
 - Signature: `(task: Pick<TaskContract, "target">): boolean`
-- Source: [src/runtime/coding-lane.ts:1210](../../../packages/materials/src/runtime/coding-lane.ts:1210)
+- Source: [src/runtime/coding-lane.ts:1211](../../../packages/materials/src/runtime/coding-lane.ts:1211)
 - Export: `@proofblade/materials`
 - Summary: Competition tasks can be labelled misc/crypto/reverse while still exposing
 - Summary source: `tsdoc`
@@ -2917,7 +2917,7 @@
 ### bashEscapeHatchViolation
 - Kind: `function`
 - Signature: `(command: string): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1485](../../../packages/materials/src/runtime/coding-resources.ts:1485)
+- Source: [src/runtime/coding-resources.ts:1487](../../../packages/materials/src/runtime/coding-resources.ts:1487)
 - Export: `@proofblade/materials`
 - Summary: Bash is intentionally an analysis escape hatch, not a second control-plane
 - Summary source: `tsdoc`
@@ -2926,7 +2926,7 @@
 ### codingActiveToolNames
 - Kind: `function`
 - Signature: `(input: { tools: string[]; skills: string[]; mcpServers: string[]; platformJudged?: boolean; externalSubmissionEnabled?: boolean; pwnEnabled?: boolean; pwnReproductionEnabled?: boolean; webReproductionEnabled?: boolean; webSessionEnabled?: boolean; }): string[]`
-- Source: [src/runtime/coding-resources.ts:1243](../../../packages/materials/src/runtime/coding-resources.ts:1243)
+- Source: [src/runtime/coding-resources.ts:1245](../../../packages/materials/src/runtime/coding-resources.ts:1245)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding active tool names operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2935,7 +2935,7 @@
 ### codingProviderToolContractSnapshot
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): Array<{ name: string; description: string; parameters: unknown; }>`
-- Source: [src/runtime/coding-resources.ts:1264](../../../packages/materials/src/runtime/coding-resources.ts:1264)
+- Source: [src/runtime/coding-resources.ts:1266](../../../packages/materials/src/runtime/coding-resources.ts:1266)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding provider tool contract snapshot operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2944,7 +2944,7 @@
 ### codingToolCatalog
 - Kind: `function`
 - Signature: `(): CodingToolCatalogEntry[]`
-- Source: [src/runtime/coding-resources.ts:176](../../../packages/materials/src/runtime/coding-resources.ts:176)
+- Source: [src/runtime/coding-resources.ts:178](../../../packages/materials/src/runtime/coding-resources.ts:178)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -2952,7 +2952,7 @@
 ### createCodingToolEffectPolicyResolver
 - Kind: `function`
 - Signature: `(mcp: Pick<McpProjectRegistry, "summaries" | "resolveInvocation">, runtime?: Pick<ProofBladeToolRuntime, "resolveCapabilityPolicy">): ToolEffectPolicyResolver`
-- Source: [src/runtime/coding-resources.ts:440](../../../packages/materials/src/runtime/coding-resources.ts:440)
+- Source: [src/runtime/coding-resources.ts:442](../../../packages/materials/src/runtime/coding-resources.ts:442)
 - Export: `@proofblade/materials`
 - Summary: Resolves the same read-only and side-effect contract used by the runtime capability boundary.
 - Summary source: `tsdoc`
@@ -2961,7 +2961,7 @@
 ### createCodingTools
 - Kind: `function`
 - Signature: `(options?: CodingToolOptions): AgentHarnessTool<CodingResourceContext>[]`
-- Source: [src/runtime/coding-resources.ts:191](../../../packages/materials/src/runtime/coding-resources.ts:191)
+- Source: [src/runtime/coding-resources.ts:193](../../../packages/materials/src/runtime/coding-resources.ts:193)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: create coding tools operation used to perform a durable write.
 - Summary source: `inferred`
@@ -2970,7 +2970,7 @@
 ### createMcpFirstClassTools
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<AgentHarnessTool<CodingResourceContext>[]>`
-- Source: [src/runtime/coding-resources.ts:236](../../../packages/materials/src/runtime/coding-resources.ts:236)
+- Source: [src/runtime/coding-resources.ts:238](../../../packages/materials/src/runtime/coding-resources.ts:238)
 - Export: `@proofblade/materials`
 - Summary: Enumerate each enabled MCP server's tools and expose them as FIRST-CLASS
 - Summary source: `tsdoc`
@@ -2979,7 +2979,7 @@
 ### createMcpFirstClassToolSelection
 - Kind: `function`
 - Signature: `(mcp: McpProjectRegistry, enabledServers: Iterable<string>, signal?: AbortSignal): Promise<McpFirstClassToolSelection>`
-- Source: [src/runtime/coding-resources.ts:249](../../../packages/materials/src/runtime/coding-resources.ts:249)
+- Source: [src/runtime/coding-resources.ts:251](../../../packages/materials/src/runtime/coding-resources.ts:251)
 - Export: `@proofblade/materials`
 - Summary: Promote only bounded MCP metadata into provider-visible tools. The generic
 - Summary source: `tsdoc`
@@ -2988,7 +2988,7 @@
 ### dedupeImageRead
 - Kind: `function`
 - Signature: `(path: string, result: Awaited<ReturnType<ReturnType<typeof createReadTool<CodingResourceContext>>["execute"]>>, imagesSeen: Map<string, number> | undefined): typeof result`
-- Source: [src/runtime/coding-resources.ts:1366](../../../packages/materials/src/runtime/coding-resources.ts:1366)
+- Source: [src/runtime/coding-resources.ts:1368](../../../packages/materials/src/runtime/coding-resources.ts:1368)
 - Export: `@proofblade/materials`
 - Summary: Deduplicate repeated image reads within one run, keyed by the image's CONTENT
 - Summary source: `tsdoc`
@@ -2997,7 +2997,7 @@
 ### interactiveCommandHint
 - Kind: `function`
 - Signature: `(command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1469](../../../packages/materials/src/runtime/coding-resources.ts:1469)
+- Source: [src/runtime/coding-resources.ts:1471](../../../packages/materials/src/runtime/coding-resources.ts:1471)
 - Export: `@proofblade/materials`
 - Summary: Preflight guard that catches a foreground interactive exploit before it can consume the timeout budget.
 - Summary source: `tsdoc`
@@ -3006,7 +3006,7 @@
 ### interactiveTimeoutHint
 - Kind: `function`
 - Signature: `(errorMessage: string, command: string, pwnToolsAvailable: boolean): string | undefined`
-- Source: [src/runtime/coding-resources.ts:1459](../../../packages/materials/src/runtime/coding-resources.ts:1459)
+- Source: [src/runtime/coding-resources.ts:1461](../../../packages/materials/src/runtime/coding-resources.ts:1461)
 - Export: `@proofblade/materials`
 - Summary: When a bash command TIMED OUT and the command looks like it was holding a
 - Summary source: `tsdoc`
@@ -3015,7 +3015,7 @@
 ### mcpToolName
 - Kind: `function`
 - Signature: `(server: string, tool: string): string`
-- Source: [src/runtime/coding-resources.ts:210](../../../packages/materials/src/runtime/coding-resources.ts:210)
+- Source: [src/runtime/coding-resources.ts:212](../../../packages/materials/src/runtime/coding-resources.ts:212)
 - Export: `@proofblade/materials`
 - Summary: First-class tool name for an MCP server tool: mcp__<server>__<tool>.
 - Summary source: `tsdoc`
@@ -3023,7 +3023,7 @@
 ### selectFirstClassMcpTools
 - Kind: `function`
 - Signature: `<T extends { name: string; }>(tools: T[], targetKind: TargetKind, target?: string, profileId?: string): T[]`
-- Source: [src/runtime/coding-resources.ts:410](../../../packages/materials/src/runtime/coding-resources.ts:410)
+- Source: [src/runtime/coding-resources.ts:412](../../../packages/materials/src/runtime/coding-resources.ts:412)
 - Export: `@proofblade/materials`
 - Summary: Select the enabled security MCP tools sent as native provider tools. A
 - Summary source: `tsdoc`
@@ -3032,7 +3032,7 @@
 ### stopAllShellJobs
 - Kind: `function`
 - Signature: `(context: CodingResourceContext): Promise<void>`
-- Source: [src/runtime/coding-resources.ts:1125](../../../packages/materials/src/runtime/coding-resources.ts:1125)
+- Source: [src/runtime/coding-resources.ts:1127](../../../packages/materials/src/runtime/coding-resources.ts:1127)
 - Export: `@proofblade/materials`
 - Summary: Stop every current-generation shell job owned by this lane during teardown.
 - Summary source: `tsdoc`
@@ -7243,7 +7243,7 @@
 ### CodingToolCatalogEntry
 - Kind: `interface`
 - Signature: `CodingToolCatalogEntry`
-- Source: [src/runtime/coding-resources.ts:170](../../../packages/materials/src/runtime/coding-resources.ts:170)
+- Source: [src/runtime/coding-resources.ts:172](../../../packages/materials/src/runtime/coding-resources.ts:172)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool catalog entry type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7251,7 +7251,7 @@
 ### CodingToolOptions
 - Kind: `interface`
 - Signature: `CodingToolOptions`
-- Source: [src/runtime/coding-resources.ts:184](../../../packages/materials/src/runtime/coding-resources.ts:184)
+- Source: [src/runtime/coding-resources.ts:186](../../../packages/materials/src/runtime/coding-resources.ts:186)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: coding tool options type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7275,7 +7275,7 @@
 ### McpFirstClassToolExposure
 - Kind: `interface`
 - Signature: `McpFirstClassToolExposure`
-- Source: [src/runtime/coding-resources.ts:214](../../../packages/materials/src/runtime/coding-resources.ts:214)
+- Source: [src/runtime/coding-resources.ts:216](../../../packages/materials/src/runtime/coding-resources.ts:216)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool exposure type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -7283,7 +7283,7 @@
 ### McpFirstClassToolSelection
 - Kind: `interface`
 - Signature: `McpFirstClassToolSelection`
-- Source: [src/runtime/coding-resources.ts:222](../../../packages/materials/src/runtime/coding-resources.ts:222)
+- Source: [src/runtime/coding-resources.ts:224](../../../packages/materials/src/runtime/coding-resources.ts:224)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: mcp first class tool selection type contract used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12367,7 +12367,7 @@
 ### PiCodingLane.abort
 - Kind: `method`
 - Signature: `(_reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:862](../../../packages/materials/src/runtime/coding-lane.ts:862)
+- Source: [src/runtime/coding-lane.ts:863](../../../packages/materials/src/runtime/coding-lane.ts:863)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: abort operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12376,7 +12376,7 @@
 ### PiCodingLane.close
 - Kind: `method`
 - Signature: `(): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:874](../../../packages/materials/src/runtime/coding-lane.ts:874)
+- Source: [src/runtime/coding-lane.ts:875](../../../packages/materials/src/runtime/coding-lane.ts:875)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: close operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12385,7 +12385,7 @@
 ### PiCodingLane.compact
 - Kind: `method`
 - Signature: `(reason: string): Promise<void>`
-- Source: [src/runtime/coding-lane.ts:866](../../../packages/materials/src/runtime/coding-lane.ts:866)
+- Source: [src/runtime/coding-lane.ts:867](../../../packages/materials/src/runtime/coding-lane.ts:867)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: compact operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12403,7 +12403,7 @@
 ### PiCodingLane.isIdle
 - Kind: `method`
 - Signature: `(): Promise<boolean>`
-- Source: [src/runtime/coding-lane.ts:870](../../../packages/materials/src/runtime/coding-lane.ts:870)
+- Source: [src/runtime/coding-lane.ts:871](../../../packages/materials/src/runtime/coding-lane.ts:871)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: is idle operation used to provide a reusable operation.
 - Summary source: `inferred`
@@ -12412,7 +12412,7 @@
 ### PiCodingLane.prompt
 - Kind: `method`
 - Signature: `(text: string): Promise<AgentOutcome>`
-- Source: [src/runtime/coding-lane.ts:786](../../../packages/materials/src/runtime/coding-lane.ts:786)
+- Source: [src/runtime/coding-lane.ts:787](../../../packages/materials/src/runtime/coding-lane.ts:787)
 - Export: `@proofblade/materials`
 - Summary: Inferred summary: prompt operation used to perform a durable write.
 - Summary source: `inferred`
@@ -12657,7 +12657,7 @@
 - Export: `@proofblade/materials`
 - Summary: Check an effect and create a pending approval when it has not been granted.
 - Summary source: `tsdoc`
-- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/coding-resources.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/update-evaluation-gates.test.ts`, `packages/materials/tests/web-tools.test.ts`
+- Tests: `packages/materials/tests/ablation.test.ts`, `packages/materials/tests/approval-policy.test.ts`, `packages/materials/tests/binary-core.test.ts`, `packages/materials/tests/competition-solver.test.ts`, `packages/materials/tests/context-recovery.test.ts`, `packages/materials/tests/context.test.ts`, `packages/materials/tests/control-store.test.ts`, `packages/materials/tests/dasctf-api.test.ts`, `packages/materials/tests/evaluation.test.ts`, `packages/materials/tests/evidence-curation-gate.test.ts`, `packages/materials/tests/intent-filter.test.ts`, `packages/materials/tests/interruption-recovery.test.ts`, `packages/materials/tests/local-holdout.test.ts`, `packages/materials/tests/provider-api.test.ts`, `packages/materials/tests/pwn-coding-tools.test.ts`, `packages/materials/tests/real-model-evaluator.test.ts`, `packages/materials/tests/run-work-scheduler.test.ts`, `packages/materials/tests/runtime-contracts.test.ts`, `packages/materials/tests/security-tool-profile.test.ts`, `packages/materials/tests/update-evaluation-gates.test.ts`, `packages/materials/tests/web-tools.test.ts`
 
 ### ApprovalPolicy.consume
 - Kind: `method`

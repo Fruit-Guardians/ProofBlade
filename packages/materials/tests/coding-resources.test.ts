@@ -1644,7 +1644,7 @@ test("failed bash returns structured error feedback and records the real experim
   assert.equal(experiments[1]?.summary, "Foreground bash exited with code 17.");
 });
 
-test("source scope ignores external tool executables but checks external data paths", async () => {
+test("source scope trusts only known or catalog-declared external executables", async () => {
   const env = {
     cwd: "/workspace",
     async exec(_command: string, options: { onStderr?: (text: string) => void }) {
@@ -1684,6 +1684,25 @@ test("source scope ignores external tool executables but checks external data pa
     status: "outside_workspace",
     authoritativeForTaskResult: false,
     outsidePaths: ["C:/tmp/solve.py"],
+  });
+
+  const arbitraryExecutable = await executeTool("bash", {
+    command: "C:/tmp/solve.exe input.png",
+  }, context);
+  assert.deepEqual((arbitraryExecutable.details as { sourceScope: unknown }).sourceScope, {
+    status: "outside_workspace",
+    authoritativeForTaskResult: false,
+    outsidePaths: ["C:/tmp/solve.exe"],
+  });
+
+  context.trustedToolPaths = new Set(["C:/tools/reviewed-solver.exe"]);
+  const declaredExecutable = await executeTool("bash", {
+    command: "C:/tools/reviewed-solver.exe input.png",
+  }, context);
+  assert.deepEqual((declaredExecutable.details as { sourceScope: unknown }).sourceScope, {
+    status: "workspace",
+    authoritativeForTaskResult: true,
+    outsidePaths: [],
   });
 });
 
