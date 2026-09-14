@@ -520,6 +520,7 @@ export class PiCodingLane implements AgentLanePort {
       mcp,
       enabledSkills,
       enabledMcpServers,
+      trustedToolPaths: new Set(toolCatalog.list().map((entry) => entry.path)),
       claimVerifier,
       ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
       continuousRecovery: true,
