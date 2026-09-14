@@ -236,6 +236,45 @@ test("bootstrap resolves a reviewed executable list once and refuses accidental 
   }
 });
 
+test("bootstrap and stale-path probes reject executables with the wrong identity", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-identity-"));
+  try {
+    const matching = { id: "node", name: "node", kind: "tool" as const, description: "Node runtime", candidates: [process.execPath], profiles: ["multi"], identity: { args: ["--version"], outputPattern: "^v\\d+" } };
+    const mismatched = { ...matching, id: "not-node", name: "not-node", identity: { args: ["--version"], outputPattern: "ImageMagick" } };
+    const bootstrapped = await bootstrapToolCatalog(root, [matching, mismatched]);
+    assert.deepEqual(bootstrapped.entries.map((entry) => entry.id), ["node"]);
+    assert.deepEqual(bootstrapped.missing, ["not-node"]);
+
+    const registry = await ProofBladeToolCatalogRegistry.load(root);
+    const diagnostics = await registry.probeEntries(registry.list(), { node: mismatched.identity });
+    assert.deepEqual(diagnostics.map((diagnostic) => diagnostic.code), ["identity_mismatch"]);
+    assert.doesNotMatch(registry.promptBlock(undefined, [], ["node"]), /Node runtime/);
+    assert.deepEqual(registry.contextSnapshot({ excludeIds: ["node"] }).toolCatalog, []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Windows system convert.exe is never registered as ImageMagick", { skip: process.platform !== "win32" }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-system-convert-"));
+  try {
+    const systemConvert = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "convert.exe");
+    const result = await bootstrapToolCatalog(root, [{
+      id: "imagemagick",
+      name: "ImageMagick",
+      kind: "tool",
+      description: "Image conversion",
+      candidates: [systemConvert],
+      profiles: ["misc"],
+      identity: { args: ["-version"], outputPattern: "ImageMagick" },
+    }]);
+    assert.deepEqual(result.entries, []);
+    assert.deepEqual(result.missing, ["imagemagick"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("selectForProfile keeps only prepared direction entries and common tools", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-toolcat-profile-"));
   try {

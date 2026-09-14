@@ -404,7 +404,13 @@ const TOOL_BOOTSTRAP_DEFINITIONS: Record<string, Omit<ToolCatalogBootstrapSpec, 
   z3: { name: "z3", kind: "tool", description: "SMT solver CLI.", candidates: ["z3"] },
   jq: { name: "jq", kind: "tool", description: "JSON filtering and normalization.", candidates: ["jq"] },
   xxd: { name: "xxd", kind: "tool", description: "Hex dump and byte inspection.", candidates: ["xxd"] },
-  imagemagick: { name: "ImageMagick", kind: "tool", description: "Image conversion and steganography helpers.", candidates: ["magick", "convert"] },
+  imagemagick: {
+    name: "ImageMagick",
+    kind: "tool",
+    description: "Image conversion and steganography helpers.",
+    candidates: ["magick", "convert"],
+    identity: { args: ["-version"], outputPattern: "ImageMagick" },
+  },
   apktool: { name: "apktool", kind: "tool", description: "Android APK resource and smali decoding.", candidates: ["apktool", "apktool.bat"] },
   adb: { name: "adb", kind: "tool", description: "Android device/emulator bridge.", candidates: ["adb"] },
   aapt: { name: "aapt", kind: "tool", description: "Android package metadata inspection.", candidates: ["aapt"] },
@@ -547,6 +553,9 @@ export class ToolPreflightService {
 
   public async prepare(profile: SecurityToolProfile, catalog: ProofBladeToolCatalogRegistry, mcp: Pick<McpProjectRegistry, "catalogHash" | "summaries">): Promise<SecurityToolPreflight> {
     const selected = catalog.selectForProfile(profile.id, profile.hostToolIds);
+    const identityById = Object.fromEntries(securityToolCatalogSpecs()
+      .filter((spec) => selected.some((entry) => entry.id === spec.id) && spec.identity)
+      .map((spec) => [spec.id, spec.identity!]));
     const cacheKey = sha256(canonicalJson({
       profile: {
         id: profile.id,
@@ -563,13 +572,14 @@ export class ToolPreflightService {
       runtime: "host",
       runtimeKey: "host",
       tools: selected.map((entry) => entry.id),
+      identities: identityById,
     }));
     const cached = await this.readCached(cacheKey);
     if (cached) return { ...cached, firstActionPlan: copyFirstActionPlan(cached.firstActionPlan ?? profile.firstActionPlan), actionBundles: copyActionBundles(cached.actionBundles ?? profile.actionBundles), runtime: "host", runtimeKey: "host", toolCatalogHash: catalog.catalogHash(), mcpCatalogHash: mcp.catalogHash(), cacheHit: true };
     const checkedAt = Date.now();
-    const diagnostics = await catalog.probeEntries(selected);
-    const missingPaths = new Set(diagnostics.filter((item) => item.code === "path_missing").map((item) => item.id));
-    const tools = selected.map((entry) => ({ id: entry.id, name: entry.name, path: entry.path, status: missingPaths.has(entry.id) ? "missing" as const : "ready" as const }));
+    const diagnostics = await catalog.probeEntries(selected, identityById);
+    const unavailableIds = new Set(diagnostics.filter((item) => item.code === "path_missing" || item.code === "identity_mismatch").map((item) => item.id));
+    const tools = selected.map((entry) => ({ id: entry.id, name: entry.name, path: entry.path, status: unavailableIds.has(entry.id) ? "missing" as const : "ready" as const }));
     const configured = new Set(selected.map((entry) => entry.id));
     const missingRequiredTools = profile.requiredToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
     const missingOptionalTools = profile.optionalToolIds.filter((id) => !configured.has(id) || tools.find((tool) => tool.id === id)?.status === "missing");
@@ -592,7 +602,7 @@ export class ToolPreflightService {
     options: { runtimeKey: string; force?: boolean } = { runtimeKey: "container" },
   ): Promise<SecurityToolPreflight> {
     const specs = securityToolCatalogSpecs().filter((spec) => profile.hostToolIds.includes(spec.id));
-    const toolCatalogHash = sha256(canonicalJson(specs.map(({ id, name, kind, candidates }) => ({ id, name, kind, candidates }))));
+    const toolCatalogHash = sha256(canonicalJson(specs.map(({ id, name, kind, candidates, identity }) => ({ id, name, kind, candidates, ...(identity ? { identity } : {}) }))));
     const runtimeKey = options.runtimeKey.trim() || "container";
     const cacheKey = sha256(canonicalJson({ profile: profile.id, targetKind: profile.targetKind, firstActionPlan: profile.firstActionPlan, actionBundles: profile.actionBundles, runtime: "container", runtimeKey, catalog: toolCatalogHash, mcp: mcp.catalogHash(), tools: specs.map((entry) => entry.id) }));
     const cached = options.force ? undefined : await this.readCached(cacheKey);
@@ -600,7 +610,7 @@ export class ToolPreflightService {
     const checkedAt = Date.now();
     const tools: ToolHealthRecord[] = [];
     for (const spec of specs) {
-      const ready = await probeExecutionTool(env, spec.id, spec.candidates);
+      const ready = await probeExecutionTool(env, spec.id, spec.candidates, spec.identity);
       tools.push({ id: spec.id, name: spec.name, path: `container:${spec.candidates[0] ?? spec.id}`, status: ready ? "ready" : "missing" });
     }
     const configured = new Set(specs.map((spec) => spec.id));
@@ -766,8 +776,12 @@ const PYTHON_MODULES: Record<string, string> = {
   oletools: "oletools",
 };
 
-async function probeExecutionTool(env: ExecutionEnv, id: string, candidates: readonly string[]): Promise<boolean> {
-  const commandChecks = candidates.map((candidate) => `command -v ${shellQuote(candidate)} >/dev/null 2>&1`).join(" || ");
+async function probeExecutionTool(env: ExecutionEnv, id: string, candidates: readonly string[], identity?: ToolCatalogBootstrapSpec["identity"]): Promise<boolean> {
+  const commandChecks = candidates.map((candidate) => {
+    const exists = `command -v ${shellQuote(candidate)} >/dev/null 2>&1`;
+    if (!identity) return exists;
+    return `( ${exists} && ${shellQuote(candidate)} ${identity.args.map(shellQuote).join(" ")} 2>&1 | grep -Eiq ${shellQuote(identity.outputPattern)} )`;
+  }).join(" || ");
   const module = PYTHON_MODULES[id];
   const moduleCheck = module === undefined ? "" : `for py in python3 python py; do if command -v \"$py\" >/dev/null 2>&1 && \"$py\" -c ${shellQuote(`import ${module}`)} >/dev/null 2>&1; then exit 0; fi; done;`;
   const command = `${moduleCheck} if ${commandChecks || "false"}; then exit 0; fi; exit 1`;

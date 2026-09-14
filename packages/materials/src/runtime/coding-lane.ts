@@ -268,7 +268,8 @@ export class PiCodingLane implements AgentLanePort {
     const resources = skills.piSkills().filter((skill) => enabledSkills.has(skill.name));
     const skillResourceSnapshot = skills.contextSnapshot();
     const activeSkillResources = skillResourceSnapshot.skills.filter((skill) => enabledSkills.has(skill.name));
-    const toolResourceSnapshot = toolCatalog.contextSnapshot();
+    const unavailableToolIds = preflight?.tools.filter((tool) => tool.status === "missing").map((tool) => tool.id) ?? [];
+    const toolResourceSnapshot = toolCatalog.contextSnapshot({ excludeIds: unavailableToolIds });
     const contextResources: RuntimeResourceSnapshot = {
       ...skillResourceSnapshot,
       skillCatalogHash: sha256(canonicalJson(activeSkillResources)),
@@ -574,7 +575,7 @@ export class PiCodingLane implements AgentLanePort {
       resources,
       mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled),
       options.workspaceRootForPrompt ?? options.projectRoot,
-      toolCatalog.promptBlock(),
+      toolCatalog.promptBlock(undefined, [], unavailableToolIds),
       {
         ...(options.executionPlatform ? { executionPlatform: options.executionPlatform } : {}),
         ...(options.hostWorkspaceRootForMcp ? { hostWorkspaceRootForMcp: options.hostWorkspaceRootForMcp } : {}),

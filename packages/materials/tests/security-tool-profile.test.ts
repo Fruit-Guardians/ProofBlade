@@ -76,6 +76,29 @@ test("every profile tool id has a reviewed bootstrap definition", () => {
   }
 });
 
+test("ImageMagick readiness rejects an unrelated same-name executable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-imagemagick-identity-"));
+  try {
+    await writeFile(join(root, TOOL_CATALOG_MANIFEST), JSON.stringify({ schemaVersion: 1, tools: [{
+      id: "imagemagick",
+      name: "ImageMagick",
+      kind: "tool",
+      path: process.execPath,
+      description: "wrong executable",
+      profiles: ["misc"],
+    }] }), "utf8");
+    const catalog = await ProofBladeToolCatalogRegistry.load(root);
+    const profile = { ...securityToolProfile("misc"), hostToolIds: ["imagemagick"], requiredToolIds: [], optionalToolIds: ["imagemagick"] };
+    const preflight = await new ToolPreflightService(root).prepare(profile, catalog, { catalogHash: () => "mcp", summaries: () => [] } as never);
+    assert.deepEqual(preflight.tools.map(({ id, status }) => ({ id, status })), [{ id: "imagemagick", status: "missing" }]);
+    assert.deepEqual(preflight.missingOptionalTools, ["imagemagick"]);
+    const spec = securityToolCatalogSpecs().find((candidate) => candidate.id === "imagemagick");
+    assert.deepEqual(spec?.identity, { args: ["-version"], outputPattern: "ImageMagick" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("preflight probes only the selected profile and reuses its cache", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-preflight-"));
   try {

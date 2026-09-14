@@ -38,7 +38,8 @@ export type ToolCatalogDiagnosticCode =
   | "invalid_entry"
   | "duplicate_id"
   | "relative_path"
-  | "path_missing";
+  | "path_missing"
+  | "identity_mismatch";
 
 export interface ToolCatalogDiagnostic {
   type: "warning";
@@ -234,8 +235,9 @@ export class ProofBladeToolCatalogRegistry {
   }
 
   /** The stable `<tool-catalog>` block injected into the coding system prompt. */
-  public promptBlock(profileId?: string, toolIds: readonly string[] = []): string {
-    const entries = profileId === undefined ? this.entries : this.selectForProfile(profileId, toolIds);
+  public promptBlock(profileId?: string, toolIds: readonly string[] = [], excludedToolIds: readonly string[] = []): string {
+    const excluded = new Set(excludedToolIds);
+    const entries = (profileId === undefined ? this.entries : this.selectForProfile(profileId, toolIds)).filter((entry) => !excluded.has(entry.id));
     if (this.disabled || entries.length === 0) return "";
     const sections = new Map<string, ToolCatalogEntry[]>();
     for (const entry of entries) {
@@ -262,11 +264,13 @@ export class ProofBladeToolCatalogRegistry {
   }
 
   /** The tool fields merged into a RuntimeResourceSnapshot (ContextManifest resources). */
-  public contextSnapshot(): Pick<RuntimeResourceSnapshot, "toolCatalogHash" | "toolCatalog"> {
+  public contextSnapshot(options: { excludeIds?: readonly string[] } = {}): Pick<RuntimeResourceSnapshot, "toolCatalogHash" | "toolCatalog"> {
     if (this.disabled) return { toolCatalogHash: sha256(canonicalJson([])), toolCatalog: [] };
+    const excluded = new Set(options.excludeIds ?? []);
+    const entries = this.entries.filter((entry) => !excluded.has(entry.id));
     return {
-      toolCatalogHash: this.catalogHash(),
-      toolCatalog: this.entries.map(({ id, name, kind, path, description }) => ({ id, name, kind, path, description })),
+      toolCatalogHash: catalogHashForEntries(entries),
+      toolCatalog: entries.map(({ id, name, kind, path, description }) => ({ id, name, kind, path, description })),
     };
   }
 
@@ -282,12 +286,16 @@ export class ProofBladeToolCatalogRegistry {
   }
 
   /** Probe a preselected bounded set without rediscovering the whole catalog. */
-  public async probeEntries(entries: readonly ToolCatalogEntry[]): Promise<ToolCatalogDiagnostic[]> {
+  public async probeEntries(entries: readonly ToolCatalogEntry[], identityById: Readonly<Record<string, ToolCatalogIdentityProbe>> = {}): Promise<ToolCatalogDiagnostic[]> {
     if (this.disabled) return [];
     const missing: ToolCatalogDiagnostic[] = [];
     for (const entry of entries) {
       try {
         await stat(entry.path);
+        const identity = identityById[entry.id];
+        if (identity && !(await matchesExecutableIdentity(entry.path, identity))) {
+          missing.push({ type: "warning", code: "identity_mismatch", message: `Tool "${entry.id}" path "${entry.path}" did not match its executable identity probe.`, path: entry.path, id: entry.id });
+        }
       } catch {
         missing.push({ type: "warning", code: "path_missing", message: `Tool "${entry.id}" path "${entry.path}" does not exist on this host.`, path: entry.path, id: entry.id });
       }
@@ -350,6 +358,13 @@ export interface ToolCatalogBootstrapSpec {
   description: string;
   candidates: string[];
   profiles: string[];
+  /** Optional bounded version probe used to reject same-name system tools. */
+  identity?: ToolCatalogIdentityProbe;
+}
+
+export interface ToolCatalogIdentityProbe {
+  args: string[];
+  outputPattern: string;
 }
 
 export interface ToolCatalogBootstrapResult {
@@ -361,8 +376,9 @@ export interface ToolCatalogBootstrapResult {
 
 /**
  * One-time machine setup for the host catalog. It only resolves a fixed,
- * reviewed list of executable names; it never installs packages or executes a
- * tool. The generated manifest is ignored by Git and reused by later lanes.
+ * reviewed list of executable names; it never installs packages. Definitions
+ * may opt into a bounded version probe to reject an unrelated same-name system
+ * executable. The generated manifest is ignored by Git and reused by later lanes.
  */
 export async function bootstrapToolCatalog(root: string, specs: readonly ToolCatalogBootstrapSpec[], options: { force?: boolean } = {}): Promise<ToolCatalogBootstrapResult> {
   const manifestPath = join(root, TOOL_CATALOG_MANIFEST);
@@ -377,7 +393,7 @@ export async function bootstrapToolCatalog(root: string, specs: readonly ToolCat
   const entries: Array<Omit<ToolCatalogEntry, "contentHash">> = [];
   const missing: string[] = [];
   for (const spec of specs) {
-    const path = await resolveExecutable(spec.candidates);
+    const path = await resolveExecutable(spec.candidates, spec.identity);
     if (!path) {
       missing.push(spec.id);
       continue;
@@ -408,12 +424,13 @@ function asStringArray(value: unknown): string[] | undefined {
   return values.length > 0 ? [...new Set(values)] : undefined;
 }
 
-async function resolveExecutable(candidates: readonly string[]): Promise<string | undefined> {
+async function resolveExecutable(candidates: readonly string[], identity?: ToolCatalogIdentityProbe): Promise<string | undefined> {
   for (const candidate of candidates) {
     if (isAbsolutePath(candidate)) {
       try {
         await stat(candidate);
-        return normalizePath(candidate);
+        const path = normalizePath(candidate);
+        if (!identity || await matchesExecutableIdentity(path, identity)) return path;
       } catch {
         continue;
       }
@@ -422,10 +439,22 @@ async function resolveExecutable(candidates: readonly string[]): Promise<string 
       const resolver = process.platform === "win32" ? "where.exe" : "which";
       const result = await execFile(resolver, [candidate], { windowsHide: true, maxBuffer: 16 * 1024 });
       const path = result.stdout.split(/\r?\n/).map((line) => line.trim()).find((line) => line.length > 0 && isAbsolutePath(line));
-      if (path) return normalizePath(path);
+      if (path) {
+        const normalized = normalizePath(path);
+        if (!identity || await matchesExecutableIdentity(normalized, identity)) return normalized;
+      }
     } catch {
       // Try the next reviewed alias.
     }
   }
   return undefined;
+}
+
+async function matchesExecutableIdentity(path: string, identity: ToolCatalogIdentityProbe): Promise<boolean> {
+  try {
+    const result = await execFile(path, identity.args, { windowsHide: true, timeout: 5_000, maxBuffer: 16 * 1024 });
+    return new RegExp(identity.outputPattern, "i").test(`${result.stdout}\n${result.stderr}`);
+  } catch {
+    return false;
+  }
 }
