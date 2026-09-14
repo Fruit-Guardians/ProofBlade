@@ -29,6 +29,8 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification, TaskResultVerifier } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { EvidenceCurationGate } from "../src/knowledge/evidence-curation-gate.js";
+import { RunCoordinator } from "../src/orchestration/run-coordinator.js";
+import { ContextCompiler } from "../src/context/compiler.js";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,7 +41,7 @@ import { join, resolve } from "node:path";
  * ONLY together with a deliberate tool-contract change — the provider prompt
  * cache prefix depends on this shape.
  */
-const CODING_TOOL_CONTRACT_HASH = "643acf05ac25a760eb5fb8e35b57e89fe45dd001167803bcf2e9da2569738f79";
+const CODING_TOOL_CONTRACT_HASH = "daa68256d0cbdb25d9bf99f26162e9ef6da23198df8b19a7672819baca309eb2";
 
 test("TaskResultVerifier is the canonical verifier and keeps the legacy class as a compatibility alias", () => {
   assert.equal(Object.getPrototypeOf(CodingClaimVerifier.prototype), TaskResultVerifier.prototype);
@@ -47,7 +49,7 @@ test("TaskResultVerifier is the canonical verifier and keeps the legacy class as
 
 test("coding provider tools keep stable Skill, Capability, and MCP proxy contracts", () => {
   const snapshot = codingProviderToolContractSnapshot();
-  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
+  assert.deepEqual(snapshot.map((tool) => tool.name), ["read", "bash", "edit", "write", "glob", "grep", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job", "pwn_open", "pwn_send", "pwn_recv", "pwn_signal", "pwn_close", "pwn_list", "pwn_record_primitive", "pwn_reproduce"]);
   assert.equal(sha256(canonicalJson(snapshot)), CODING_TOOL_CONTRACT_HASH);
   assert.equal(snapshot.some((tool) => tool.name === "verify_claim"), false);
   assert.equal(createCodingTools({ externalSubmissionEnabled: true }).some((tool) => tool.name === "submit_flag"), false);
@@ -55,7 +57,7 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
 
   const withoutResources = codingActiveToolNames({ tools: ["read", "bash"], skills: [], mcpServers: [] });
   const withResources = codingActiveToolNames({ tools: ["read", "bash"], skills: ["triage"], mcpServers: ["echo", "browser"] });
-  assert.deepEqual(withoutResources, ["read", "bash", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
+  assert.deepEqual(withoutResources, ["read", "bash", "update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"]);
   assert.deepEqual(withResources, withoutResources);
   // External submission is gated on a trusted destination, not on tool selection.
   assert.equal(withoutResources.includes("submit_flag"), false);
@@ -67,6 +69,43 @@ test("coding provider tools keep stable Skill, Capability, and MCP proxy contrac
   assert.equal(platformTools.includes("submit_flag"), false);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webReproductionEnabled: true }).slice(-1), ["web_reproduce"]);
   assert.deepEqual(codingActiveToolNames({ tools: ["bash"], skills: [], mcpServers: [], webSessionEnabled: true }).slice(-5), ["web_open", "web_request", "web_replay", "web_close", "web_list"]);
+});
+
+test("update_phase changes the durable phase before later investigation actions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-live-phase-"));
+  const config = {
+    schemaVersion: 1,
+    runtime: { piVersion: "0.83.0" },
+    storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+    modelProfiles: { executor: { thinkingLevel: "off" } },
+  } as unknown as ProofBladeConfig;
+  const services = createServices(root, config);
+  const runId = "LIVE-PHASE";
+  await services.control.createRun(runId, demoTask(runId, root, config));
+  const coordinator = new RunCoordinator(services.control);
+  let refreshes = 0;
+  const context = {
+    setDomainPhase: async (phase: "RECON" | "TARGET_MODEL" | "HYPOTHESIS" | "EXPERIMENT" | "REPRODUCE", reason: string) => {
+      await coordinator.setDomainPhase(runId, phase, reason);
+      const snapshot = await services.control.snapshot(runId);
+      return { domainPhase: snapshot.domainPhase, phase: snapshot.phase };
+    },
+    onDomainPhaseChanged: async () => { refreshes += 1; },
+  } as unknown as CodingResourceContext;
+  try {
+    const result = await executeTool("update_phase", { phase: "EXPERIMENT", reason: "The packet layout is known; execute the bounded decoder." }, context);
+    assert.deepEqual(result.details, { domainPhase: "EXPERIMENT", phase: "experiment", reason: "The packet layout is known; execute the bounded decoder." });
+    assert.equal(refreshes, 1);
+    const snapshot = await services.control.snapshot(runId);
+    assert.deepEqual({ domainPhase: snapshot.domainPhase, phase: snapshot.phase }, { domainPhase: "EXPERIMENT", phase: "experiment" });
+    const compiled = new ContextCompiler().build({ runId, lane: "main", phase: snapshot.phase, task: snapshot.task, snapshot });
+    assert.match(compiled.messages.map((message) => message.content).join("\n"), /"domain_phase":"EXPERIMENT"/);
+    const phaseEvent = (await services.control.events(runId)).findLast((event) => event.type === "domain_phase_changed");
+    assert.deepEqual(phaseEvent?.payload, { domainPhase: "EXPERIMENT", reason: "The packet layout is known; execute the bounded decoder." });
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("read-only workspace scans do not serialize unrelated Pi tool calls", () => {

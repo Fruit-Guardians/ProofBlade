@@ -21,7 +21,7 @@ import type { EvidenceCurationGate } from "../knowledge/evidence-curation-gate.j
 import type { TaskResultVerifier } from "../verification/claim-verification.js";
 import type { ToolEffectPolicy, ToolEffectPolicyResolver } from "./tool-repeat-breaker.js";
 import type { ProofBladeToolRuntime } from "../tools/runtime.js";
-import type { Lane, RawEffectResult, TargetKind } from "../domain/types.js";
+import type { DomainPhase, Lane, RawEffectResult, TargetKind } from "../domain/types.js";
 import type { PwnToolHandler } from "../pwn/pwn-tools.js";
 import { createPwnCodingTools } from "./pwn-coding-tools.js";
 import type { ExperimentGate } from "../competition/experiment-gate.js";
@@ -33,7 +33,7 @@ import { RunEventIngress } from "../orchestration/event-ingress.js";
 
 export const CODING_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "glob", "grep"] as const;
 /** Provider-facing proxy tools for generic security tasks. */
-export const CODING_PROXY_TOOL_NAMES = ["verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
+export const CODING_PROXY_TOOL_NAMES = ["update_phase", "verify_result", "evidence", "evidence_record", "load_skill", "capability", "mcp_call", "shell_background", "shell_job"] as const;
 export const CODING_WEB_TOOL_NAMES = ["web_reproduce"] as const;
 /** Interactive HTTP session tools (exploration counterpart to web_reproduce). */
 export const CODING_WEB_SESSION_TOOL_NAMES = ["web_open", "web_request", "web_replay", "web_close", "web_list"] as const;
@@ -97,6 +97,10 @@ export interface CodingResourceContext extends ExecutionToolContext {
   /** Skill bodies already injected into this lane, keyed by stable skill name. */
   loadedSkillContent?: Map<string, { contentHash: string; coverageChars: number }>;
   enabledMcpServers: Set<string>;
+  /** Persist a live investigation phase before the lane changes tactics. */
+  setDomainPhase?: (phase: InvestigationPhase, reason: string) => Promise<{ domainPhase: DomainPhase; phase: string }>;
+  /** Refresh model-visible context and policy routing after a durable phase change. */
+  onDomainPhaseChanged?: () => Promise<void>;
   /** Exact host executable paths admitted by the reviewed tool catalog. */
   trustedToolPaths?: ReadonlySet<string>;
   /** Durable verifier used for generic task results (legacy field name kept for wire compatibility). */
@@ -188,6 +192,7 @@ export interface CodingToolOptions {
 export function createCodingTools(options: CodingToolOptions = {}): AgentHarnessTool<CodingResourceContext>[] {
   return [
     ...builtinTools(),
+    updatePhaseTool,
     verifyResultTool,
     evidenceTool,
     evidenceRecordTool,
@@ -425,6 +430,7 @@ const CODING_TOOL_EFFECT_POLICIES: Readonly<Record<string, ToolEffectPolicy>> = 
   bash: PROCESS_EFFECT,
   edit: WORKSPACE_EFFECT,
   write: WORKSPACE_EFFECT,
+  update_phase: WORKSPACE_EFFECT,
   verify_result: WORKSPACE_EFFECT,
   evidence_record: WORKSPACE_EFFECT,
   load_skill: READ_ONLY_EFFECT,
@@ -486,6 +492,36 @@ export function createCodingToolEffectPolicyResolver(
     }
   };
 }
+
+const INVESTIGATION_PHASES = ["RECON", "TARGET_MODEL", "HYPOTHESIS", "EXPERIMENT", "REPRODUCE"] as const;
+type InvestigationPhase = (typeof INVESTIGATION_PHASES)[number];
+
+/**
+ * Move the durable phase before the model changes investigation tactics.
+ * This is observability and context control, not a capability gate: every
+ * prepared tool remains available in every phase.
+ */
+const updatePhaseTool: AgentHarnessTool<CodingResourceContext> = {
+  name: "update_phase",
+  label: "update_phase",
+  description: "Update the live durable phase before changing investigation tactics. Use RECON while identifying inputs, TARGET_MODEL when forming the mechanism, HYPOTHESIS when choosing a falsifiable test, EXPERIMENT before executing that test, and REPRODUCE before a clean verification. This updates context and budgets but never hides or blocks tools. REPORT and SUBMIT are verifier-owned.",
+  parameters: Type.Object({
+    phase: Type.String({ enum: [...INVESTIGATION_PHASES] }),
+    reason: Type.String({ minLength: 1, maxLength: 500, description: "Concrete reason this phase now matches the next action." }),
+  }, { additionalProperties: false }),
+  executionMode: "sequential",
+  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+    const input = params as { phase?: string; reason?: string };
+    const phase = input.phase?.trim() as InvestigationPhase | undefined;
+    const reason = input.reason?.trim() ?? "";
+    if (!phase || !INVESTIGATION_PHASES.includes(phase)) throw new Error(`Unsupported live investigation phase: ${String(input.phase)}`);
+    if (!reason) throw new Error("update_phase requires a concrete reason");
+    if (!context.setDomainPhase) throw new Error("update_phase is unavailable because this lane has no durable phase controller");
+    const updated = await context.setDomainPhase(phase, reason);
+    await context.onDomainPhaseChanged?.();
+    return toolResult({ ...updated, reason });
+  },
+};
 
 /**
  * Domain-neutral verification entry point. The provider-facing contract uses

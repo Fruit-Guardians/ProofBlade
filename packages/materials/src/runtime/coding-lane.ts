@@ -81,6 +81,8 @@ Anything that will take more than about a minute — a brute force, a wide sweep
 
 If the same tool call keeps looking wrong or incomplete, do not re-issue it a third time. Either the output is telling you something you have not accepted yet, or the approach is wrong: change the question, change the tool, or move on with what you already have.
 
+For a multi-step security investigation, keep the displayed phase live: call \`update_phase\` before the first investigative tool to enter reconnaissance, then before a real change to target modeling, hypothesis selection, experiment, or clean reproduction. Skip phases that do not fit the task instead of calling it mechanically. Phase tracking guides context and budgets but never restricts which prepared tool you may use. Do not call it for ordinary conversation or merely to narrate work after it happened.
+
 Use the capability proxy as an optional analysis instrument, not a mandatory workflow. Search it when stable binary or firmware structure would help, describe only the chosen operation to load its schema, and invoke it with workspace-relative paths. Keep planning autonomous; do not call capabilities mechanically when read or bash is more appropriate.`;
 
 export class PiCodingLane implements AgentLanePort {
@@ -502,6 +504,7 @@ export class PiCodingLane implements AgentLanePort {
       ? createDeclaredExternalSubmitter({ targets: externalSubmissionTargets, submit: configuredExternalSubmit })
       : undefined;
     const externalSubmissionEnabled = Boolean(externalSubmit);
+    const phaseCoordinator = new RunCoordinator(options.controlStore);
     const tools = [...createCodingTools({ platformJudged, externalSubmissionEnabled, webReproductionEnabled: Boolean(webReproducer || browserReproducer), webSessionEnabled: Boolean(webSession) }), ...activeMcpTools];
     // Pi 0.83 treats a batch containing one sequential tool as entirely
     // sequential. Keep the declared contracts for observability/catalogs, but
@@ -531,6 +534,11 @@ export class PiCodingLane implements AgentLanePort {
       mcp,
       enabledSkills,
       enabledMcpServers,
+      setDomainPhase: async (phase, reason) => {
+        await phaseCoordinator.setDomainPhase(options.runId, phase, reason);
+        const current = await options.controlStore.snapshot(options.runId);
+        return { domainPhase: current.domainPhase, phase: current.phase };
+      },
       trustedToolPaths: new Set(toolCatalog.list().map((entry) => entry.path)),
       claimVerifier,
       ...(options.deferClaimAcceptance ? { deferClaimAcceptance: true } : {}),
@@ -635,6 +643,11 @@ export class PiCodingLane implements AgentLanePort {
     const ablationBinding = options.ablationPolicy && ablationRoute
       ? { ...options.ablationPolicy, route: () => ablationRoute }
       : options.ablationPolicy;
+    const refreshAblationRoute = ablationRoute ? async () => {
+      const current = await options.controlStore.snapshot(options.runId);
+      ablationRoute.domainPhase = current.domainPhase;
+      ablationRoute.actionBundles = current.toolPreparation?.actionBundles ?? [];
+    } : async () => undefined;
     attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination, createCodingToolEffectPolicyResolver(mcp, runtime), failureStormBreaker, experimentBudgetBreaker, toolBudget, firstActionBudget, ablationBinding, options.deferClaimAcceptance);
     const maintenance = { compactRequested: false, injectedObservationItems: [] as import("../domain/types.js").ObservationQueueItem[] };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
@@ -667,6 +680,13 @@ export class PiCodingLane implements AgentLanePort {
       return projection;
     };
     let persistedContextForTurn = false;
+    toolContext.onDomainPhaseChanged = async () => {
+      // Pi requests context again after the tool result. Append a new dynamic
+      // projection instead of rewriting history so the same tool chain sees
+      // the durable phase immediately.
+      persistedContextForTurn = false;
+      await refreshAblationRoute();
+    };
     harness.on("context", async ({ messages }) => {
       const current = await options.controlStore.snapshot(options.runId);
       const queue = await currentObservationQueue(current);
@@ -837,11 +857,7 @@ export class PiCodingLane implements AgentLanePort {
       termination,
       async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
       () => { persistedContextForTurn = false; },
-      ablationRoute ? async () => {
-        const current = await options.controlStore.snapshot(options.runId);
-        ablationRoute.domainPhase = current.domainPhase;
-        ablationRoute.actionBundles = current.toolPreparation?.actionBundles ?? [];
-      } : async () => undefined,
+      refreshAblationRoute,
       async () => {
         const branch = await session.getBranch();
         for (let index = branch.length - 1; index >= 0; index -= 1) {

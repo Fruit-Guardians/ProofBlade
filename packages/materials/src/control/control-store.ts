@@ -144,7 +144,7 @@ const FAILURE_CATEGORIES = new Set<PrimaryFailureCategory>([
 export type DomainCommand =
   | { type: "start_phase"; phase: Phase; lane?: Lane }
   | { type: "finish_phase"; phase: Phase; lane?: Lane }
-  | { type: "set_domain_phase"; domainPhase: DomainPhase; lane?: Lane }
+  | { type: "set_domain_phase"; domainPhase: DomainPhase; lane?: Lane; reason?: string }
   | { type: "record_tool_preparation"; preparation: RunToolPreparation; lane?: Lane }
   | { type: "fixture_reset"; generation: number; lane?: Lane }
   | { type: "pause"; reason: string; lane?: Lane }
@@ -1001,7 +1001,7 @@ function payloadFor(command: DomainCommand, seq: number, snapshot: RunSnapshot, 
   switch (command.type) {
     case "start_phase": return { phase: command.phase };
     case "finish_phase": return { phase: command.phase };
-    case "set_domain_phase": return { domainPhase: command.domainPhase };
+    case "set_domain_phase": return { domainPhase: command.domainPhase, ...(command.reason ? { reason: command.reason } : {}) };
     case "record_tool_preparation": return { preparation: command.preparation };
     case "fixture_reset": return { generation: command.generation };
     case "pause": return { reason: command.reason };
@@ -1414,7 +1414,10 @@ function validateCommand(snapshot: RunSnapshot, command: DomainCommand, referenc
     if (command.type === "handoff_superseded" && handoff.status === "REJECTED") throw new Error("A rejected handoff cannot be superseded");
   }
   if (command.type === "start_phase") assertPhaseTransition(snapshot, command.phase);
-  if (command.type === "set_domain_phase") validateDomainPhaseTransition(snapshot, command.domainPhase);
+  if (command.type === "set_domain_phase") {
+    if (command.reason !== undefined && (command.reason.trim().length === 0 || command.reason.length > 500)) throw new Error("Domain phase reason must contain 1-500 characters");
+    validateDomainPhaseTransition(snapshot, command.domainPhase);
+  }
   if (command.type === "record_tool_preparation") validateToolPreparation(snapshot, command.preparation);
   if (command.type === "experiment") validateExperimentCommand(snapshot, command);
   if (command.type === "replan_requested") validateReplanCommand(snapshot, command);
