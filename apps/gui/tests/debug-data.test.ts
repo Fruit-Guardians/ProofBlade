@@ -274,6 +274,37 @@ test("replays Runs when a self-hashed projection is missing its durable seal", a
   }
 });
 
+test("folds a sealed projection tail without reconciling during GUI polling", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-run-list-tail-"));
+  const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+  try {
+    const runId = "CHAT-PROJECTION-TAIL-001";
+    await data.createConversation({ runId, title: "projection tail", workspacePath: root });
+    const control = (data as unknown as {
+      services: {
+        control: {
+          append: (requestedRunId: string, events: unknown[], options: { persistProjection: boolean }) => Promise<unknown>;
+          reconcileProjection: (requestedRunId: string) => Promise<unknown>;
+        };
+      };
+    }).services.control;
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "executor",
+      correlationId: `${runId}:telemetry`,
+      actor: "model",
+      type: "model_usage",
+      payload: { provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+    control.reconcileProjection = async () => { throw new Error("GUI polling must not reconcile a sealed tail"); };
+    const runs = await data.listRuns();
+    assert.ok(runs.some((item) => item.runId === runId));
+  } finally {
+    await data.close().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("RunDetail exposes the durable observation queue projection for the GUI", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-observation-queue-"));
   try {
