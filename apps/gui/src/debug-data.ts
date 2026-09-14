@@ -232,6 +232,7 @@ export class DebugDataService {
   }
 
   private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
+    let verified: RunSnapshot | undefined;
     try {
       const [snapshot, projectionStat] = await Promise.all([
         this.services.control.loadProjection(runId),
@@ -241,20 +242,27 @@ export class DebugDataService {
         && snapshot.runId === runId
         && snapshot.projectionHash === projectionHash(snapshot)
         && projectionStat.mtimeMs >= eventsStat.mtimeMs) return snapshot;
+      // A sealed projection that is only behind the stream is already proven
+      // to match its committed event prefix. Fold the tail below instead of
+      // replaying and rewriting it on every list refresh, because hot lanes
+      // defer projection writes until their next fence by design.
+      verified = snapshot;
     } catch {
       // Missing, malformed, or stale projections are disposable. The event
       // stream remains authoritative and is repaired below.
     }
-    try {
-      // Historical Runs predate projection seals. Reconcile once on first
-      // access so the event stream is replayed under the ControlStore lock,
-      // then persist a sealed projection for subsequent GUI startups.
-      await this.services.control.reconcileProjection(runId);
-      const repaired = await this.services.control.loadProjection(runId);
-      if (repaired && repaired.runId === runId && repaired.projectionHash === projectionHash(repaired)) return repaired;
-    } catch {
-      // A legacy or otherwise unrecoverable Run remains readable through the
-      // normal authoritative replay path.
+    if (verified === undefined) {
+      try {
+        // Historical Runs predate projection seals. Reconcile once on first
+        // access so the event stream is replayed under the ControlStore lock,
+        // then persist a sealed projection for subsequent GUI startups.
+        await this.services.control.reconcileProjection(runId);
+        const repaired = await this.services.control.loadProjection(runId);
+        if (repaired && repaired.runId === runId && repaired.projectionHash === projectionHash(repaired)) return repaired;
+      } catch {
+        // A legacy or otherwise unrecoverable Run remains readable through the
+        // normal authoritative replay path.
+      }
     }
     return await this.services.control.snapshot(runId);
   }

@@ -56,7 +56,7 @@
 - Run 切换、定时器、手动操作和对话完成后的列表/详情刷新必须共用组件生命周期内唯一的单飞协调器；后台 tick 忙时立即返回且不得积压等待 Promise，交互刷新忙时只合并一次最新请求，旧 Run 的迟到响应不得覆盖当前详情。后台刷新不得清除可见错误；Run 切换、手动刷新和对话完成等交互刷新成功后必须清除已恢复的请求错误。
 - Run 详情缓存必须同时观察 durable `events.jsonl` 的 `mtimeMs`/文件大小和递归排序后的 Pi Session 文件状态；Session 加载期间发生变化时重读一次，仍不稳定则不得缓存。完整详情采用容量 32、单项 8 MiB、总量 64 MiB 的加权 LRU，超限详情只返回不缓存；同一 Run 的并发 miss 必须 single-flight，命中缓存时仍要刷新进程内 `active` 状态，服务关闭时必须与列表缓存一并清空。
 - 首屏只等待轻量 bootstrap 与 Provider 设置即可解除全局 loading；Workspace Skill/MCP 能力扫描和 Run 列表必须后台加载，不能阻止用户打开“新建对话”。静态 Skill/MCP 目录在进程内 single-flight 缓存，Provider Native 状态继续按当前配置动态生成。
-- Run 列表优先读取并校验 `projection.json`，不为侧栏统计 Tool 次数而回放完整事件流；projection 缺失、损坏或真正落后时才在持锁回放后回填带封印的 projection。历史 Run 只在首次冷读时回放一次，后续 GUI 启动复用已校验的封印投影；列表 Tool 数是可选投影，缺失时不显示。
+- Run 列表优先读取并校验 `projection.json`，不为侧栏统计 Tool 次数而回放完整事件流；projection 缺失或损坏（含无封印的历史 Run）时才在持锁回放后回填带封印的 projection，仅落后但已校验的 projection 走尾部折叠，不得因列表刷新而重放或重写 projection。历史 Run 只在首次冷读时回放一次，后续 GUI 启动复用已校验的封印投影；列表 Tool 数是可选投影，缺失时不显示。
 
 ## 验证
 

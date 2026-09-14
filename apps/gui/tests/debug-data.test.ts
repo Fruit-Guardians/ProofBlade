@@ -274,6 +274,41 @@ test("replays Runs when a self-hashed projection is missing its durable seal", a
   }
 });
 
+test("Run listing folds a stale sealed projection without rewriting it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-stale-projection-"));
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    const runId = "CHAT-STALE-PROJECTION-001";
+    await data.createConversation({ runId, title: "stale projection", workspacePath: root });
+    const control = (data as unknown as {
+      services: { control: { append: (target: string, events: unknown[], options: { persistProjection: boolean }) => Promise<unknown> } };
+    }).services.control;
+    const projectionPath = join(root, "runs", runId, "projection.json");
+    const before = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq: number };
+    // Hot tool/telemetry writes intentionally leave the stream ahead of
+    // projection.json until the lane reaches its next fence.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await control.append(runId, [{
+      schemaVersion: 1,
+      lane: "main",
+      correlationId: `${runId}:deferred`,
+      actor: "model",
+      type: "model_usage",
+      payload: { requestId: "deferred", provider: "test", model: "test-model", usage: { input: 1, output: 1, totalTokens: 2 } },
+    }], { persistProjection: false });
+
+    const runs = await data.listRuns();
+    const run = runs.find((item) => item.runId === runId);
+    assert.ok(run);
+    assert.equal(run.lastSeq, before.lastSeq + 1, "listing must expose the committed event tail");
+    const after = JSON.parse(await readFile(projectionPath, "utf8")) as { lastSeq: number };
+    assert.equal(after.lastSeq, before.lastSeq, "a stale but sealed projection must not be rewritten by a read");
+    await data.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("RunDetail exposes the durable observation queue projection for the GUI", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-observation-queue-"));
   try {
