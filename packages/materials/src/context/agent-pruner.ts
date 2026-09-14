@@ -25,6 +25,12 @@ export interface ToolPairViolation {
 }
 
 export function repairAgentMessages(messages: AgentMessage[]): AgentContextPruneResult {
+  // Valid transcripts are read-only. Avoid cloning the entire append-only
+  // session on every provider request; only the repair path needs an owned
+  // copy before it mutates tool exchanges.
+  if (toolPairViolations(messages).length === 0) {
+    return { messages, estimatedTokens: messageTokens(messages), dropped: [] };
+  }
   const output = structuredClone(messages);
   const dropped: AgentContextPruneResult["dropped"] = [];
   repairToolPairs(output, dropped);

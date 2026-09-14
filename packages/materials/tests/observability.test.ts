@@ -7,10 +7,20 @@ import { captureProviderPrefixShape } from "@proofblade/molecules";
 import type { ProofBladeConfig } from "../src/config.js";
 import { createServices, demoTask } from "../src/app/demo.js";
 import { RunTelemetry } from "../src/observability/run-telemetry.js";
-import { createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
+import { ControlEventBatcher, createProviderSchedulingTelemetry } from "../src/observability/pi-events.js";
 import { canonicalJson, sha256 } from "../src/domain/utils.js";
-import { createEffectInput } from "../src/control/control-store.js";
+import { ControlStore, createEffectInput } from "../src/control/control-store.js";
+import { JsonlControlStore } from "../src/storage/jsonl-store.js";
 import { DeterministicObserver } from "../src/knowledge/observer.js";
+
+class CountingControlStore extends ControlStore {
+  public appendCount = 0;
+
+  public override async append(...args: Parameters<ControlStore["append"]>): Promise<Awaited<ReturnType<ControlStore["append"]>>> {
+    this.appendCount += 1;
+    return await super.append(...args);
+  }
+}
 
 const config: ProofBladeConfig = {
   schemaVersion: 1,
@@ -32,6 +42,25 @@ const config: ProofBladeConfig = {
     },
   },
 };
+
+test("observability write-behind batches hook events into one append", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-observe-batch-"));
+  try {
+    const store = new CountingControlStore(new JsonlControlStore(join(root, "runs")));
+    const runId = "OBSERVE-BATCH-001";
+    await store.createRun(runId, demoTask(runId, root, config));
+    const batcher = new ControlEventBatcher(store, runId, "executor");
+    batcher.append("provider_request_started", "model", { requestId: "PR-BATCH" });
+    batcher.append("tool_call_recorded", "model", { toolCallId: "TC-BATCH", toolName: "read" });
+    batcher.append("tool_result_recorded", "tool", { toolCallId: "TC-BATCH", toolName: "read", isError: false });
+    assert.equal(store.appendCount, 0, "hook append should not wait on the JSONL lock");
+    await batcher.flush();
+    assert.equal(store.appendCount, 1, "one turn batch should use one control append");
+    assert.deepEqual((await store.events(runId)).map((event) => event.type), ["run_started", "provider_request_started", "tool_call_recorded", "tool_result_recorded"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("run telemetry aggregates provider, tool, effect, version, and failure data", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-observe-"));
@@ -192,6 +221,7 @@ test("provider scheduling telemetry preserves request correlation when responses
     await scheduling.observer.completed(second, assistantMessage("fixture-model", "second"));
     await scheduling.observer.response(first, { status: 201, headers: { "x-first": "yes" } });
     await scheduling.observer.completed(first, assistantMessage("fixture-model", "first"));
+    await scheduling.flush();
     const events = await services.control.events(runId);
     const usage = events
       .filter((event) => event.type === "model_usage")

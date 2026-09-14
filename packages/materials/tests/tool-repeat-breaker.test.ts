@@ -103,6 +103,17 @@ test("successful or different tool calls reset the repeated failure sequence", (
   assert.equal(breaker.observe(failed({ operation: "inspect_forest" })).count, 1);
 });
 
+test("evidence contract failures keep one repeat identity when argument placeholders change", () => {
+  const breaker = new RepeatedToolFailureBreaker(3);
+  const failure = (artifactId: string) => failed(
+    { operation: "read", artifactId },
+    `[ProofBlade evidence error] ${JSON.stringify({ schemaVersion: 1, tool: "evidence", operation: "read", code: "unknown_field", retryable: true, receivedFields: ["operation", "artifactId", "artifactIds"], invalidFields: ["artifactIds"], missingFields: [], allowedFields: ["operation", "artifactId", "maxChars"], suggestedArguments: { artifactId: "A-*" }, nextAction: "Remove cross-operation fields." })}`,
+  );
+  assert.equal(breaker.observe(failure("A-1")).count, 1);
+  assert.equal(breaker.observe(failure("A-2")).count, 2);
+  assert.equal(breaker.observe(failure("A-3")).terminate, true);
+});
+
 test("[contract:no-progress-breaker] repeated successful observations stop without constraining productive mutations", () => {
   const breaker = new NoProgressToolBreaker(3);
   const repeatedRead = {
@@ -385,7 +396,7 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
         maxChars: Type.Number(),
       }),
       async execute() {
-        throw new Error("fixture evidence failure");
+        throw new Error(`[ProofBlade evidence error] ${JSON.stringify({ schemaVersion: 1, tool: "evidence", operation: "inspect_forest", code: "unknown_field", retryable: true, receivedFields: ["operation", "maxChars", "query"], invalidFields: ["query"], missingFields: [], allowedFields: ["operation", "maxChars"], suggestedArguments: { operation: "inspect_forest" }, nextAction: "Remove cross-operation fields." })}`);
       },
     };
     const harness = new AgentHarness({
@@ -420,6 +431,8 @@ test("[contract:repeated-tool-failure-visible] real Harness termination produces
 
     assert.equal(response.stopReason, "toolUse");
     assert.deepEqual(response.content.map((item) => item.type), ["toolCall"]);
+    const toolResultEntries = (await session.getBranch()).filter((entry) => entry.type === "message" && entry.message.role === "toolResult");
+    assert.ok(toolResultEntries.some((entry) => (entry.message.details as { code?: string } | undefined)?.code === "unknown_field"));
     assert.match(outcome.text, /current agent turn was stopped/i);
     const assistantEvent = (await controlStore.events(runId)).findLast((event) => event.type === "assistant_message");
     assert.equal(assistantEvent?.payload?.text, outcome.text);

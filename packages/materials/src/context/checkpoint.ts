@@ -13,7 +13,7 @@ export interface CreatedCheckpoint {
 export class CheckpointService {
   public constructor(private readonly controlStore: ControlStore, private readonly artifactStore: ArtifactStore) {}
 
-  public async create(runId: string, reason: string, manifest?: ContextManifest): Promise<CreatedCheckpoint> {
+  public async create(runId: string, reason: string, manifest?: ContextManifest, options: { persistProjection?: boolean } = {}): Promise<CreatedCheckpoint> {
     const snapshot = await this.controlStore.snapshot(runId);
     const existing = Object.values(snapshot.checkpoints).find((item) =>
       item.reason === reason
@@ -26,12 +26,16 @@ export class CheckpointService {
     }
     const checkpointId = id("CP");
     const content = checkpointText(snapshot, checkpointId, reason, manifest);
-    const artifact = await this.artifactStore.putText(runId, content, { filename: `checkpoint-${checkpointId}.md`, mime: "text/markdown" });
+    const artifact = await this.artifactStore.putText(runId, content, {
+      filename: `checkpoint-${checkpointId}.md`,
+      mime: "text/markdown",
+      persistProjection: options.persistProjection,
+    });
     await this.controlStore.dispatch(runId, {
       type: "checkpoint",
       checkpoint: { id: checkpointId, artifactId: artifact.id, snapshotSeq: snapshot.lastSeq, reason, contextManifestHash: manifest?.hash },
       lane: "main",
-    });
+    }, options);
     return { checkpointId, artifactId: artifact.id, content };
   }
 }
