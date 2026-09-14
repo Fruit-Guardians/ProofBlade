@@ -289,6 +289,69 @@ test("assist mode pauses before verification and resumes from the durable propos
   }
 });
 
+test("an unverified chat observation does not block the Run on a missing verifier", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-unverified-chat-loop-"));
+  const services = createServices(root, config);
+  try {
+    const runId = "UNVERIFIED-CHAT-LOOP-001";
+    const task = demoTask(runId, root, config);
+    task.verification.required_reproductions = 0;
+    delete task.verification.command;
+    const candidate = "PB{unverified_chat_observation}";
+    const command = process.platform === "win32" ? "type challenge.txt" : "cat challenge.txt";
+    let prompts = 0;
+    const lane: AgentLaneFactory = async ({ claimVerifier, fixture }) => ({
+      async prompt() {
+        prompts += 1;
+        if (prompts === 1) {
+          await claimVerifier.record({
+            candidate,
+            command,
+            cwd: fixture.path,
+            toolCallId: `${runId}-verify`,
+            execute: async () => ({ stdout: candidate, stderr: "", exitCode: 0, durationMs: 1 }),
+          });
+        }
+        return { text: prompts === 1 ? `候选结果：${candidate}` : "继续分析。", stopReason: "stop", usage: zeroUsage() };
+      },
+      async compact() {},
+      async abort() {},
+      async isIdle() { return true; },
+      async close() {},
+    });
+
+    const first = await new SingleAgentLoop(root, config, services, lane).run({
+      runId,
+      task,
+      mode: "assist",
+      maxTurns: 1,
+      userPrompt: "完成分析并给出当前结论",
+    });
+    const firstSnapshot = await services.control.snapshot(runId);
+    assert.equal(first.status, "PAUSED");
+    assert.equal(firstSnapshot.workItems[Object.keys(firstSnapshot.workItems)[0]!]?.status, "SUCCEEDED");
+    assert.equal(Object.values(firstSnapshot.completions)[0]?.status, "PROPOSED");
+    assert.equal((await services.control.events(runId)).some((event) => event.type === "work_item_blocked"), false);
+
+    const second = await new SingleAgentLoop(root, config, services, lane).run({
+      runId,
+      task,
+      mode: "assist",
+      maxTurns: 1,
+      userPrompt: "继续分析",
+    });
+    const secondSnapshot = await services.control.snapshot(runId);
+    const secondEvents = await services.control.events(runId);
+    assert.equal(second.status, "PAUSED");
+    assert.equal(prompts, 2);
+    assert.equal(secondEvents.some((event) => event.type === "work_item_blocked"), false);
+    assert.equal(Object.values(secondSnapshot.effects).some((effect) => effect.operation === "fixture_score"), false);
+  } finally {
+    await services.sandbox.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("auto mode preserves a pause raised during a turn instead of exhausting the run", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-pause-during-turn-"));
   try {

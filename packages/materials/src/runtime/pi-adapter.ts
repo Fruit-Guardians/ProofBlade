@@ -43,6 +43,7 @@ export class PiAgentLane implements AgentLanePort {
     private readonly lane: Lane,
     private readonly controlStore: ControlStore,
     private readonly harness: AgentHarness<ExecutionToolContext>,
+    private readonly flushObservability: () => Promise<void>,
   ) {}
 
   public static async create(options: {
@@ -65,7 +66,8 @@ export class PiAgentLane implements AgentLanePort {
     const scheduling = createProviderSchedulingTelemetry({ runId: options.runId, lane, controlStore: options.controlStore });
     const { models, model } = createConfiguredModels(profile, undefined, { observer: scheduling.observer });
     const snapshot = await options.controlStore.snapshot(options.runId);
-    const compiled = new ContextCompiler().build({
+    const contextCompiler = new ContextCompiler();
+    const compiled = contextCompiler.build({
       runId: options.runId,
       lane,
       phase: snapshot.phase,
@@ -73,6 +75,18 @@ export class PiAgentLane implements AgentLanePort {
       snapshot,
       contextWindow: profile.contextWindow,
     });
+    let compiledContextCache: { snapshotSeq: number; generation: number; output: typeof compiled } = {
+      snapshotSeq: snapshot.lastSeq,
+      generation: snapshot.generation,
+      output: compiled,
+    };
+    const compileCurrentContext = async (): Promise<typeof compiled> => {
+      const current = await options.controlStore.snapshot(options.runId);
+      if (compiledContextCache.snapshotSeq === current.lastSeq && compiledContextCache.generation === current.generation) return compiledContextCache.output;
+      const output = contextCompiler.build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow });
+      compiledContextCache = { snapshotSeq: current.lastSeq, generation: current.generation, output };
+      return output;
+    };
     const readTool = createReadTool<ExecutionToolContext>();
     const harness = new AgentHarness<ExecutionToolContext>({
       session,
@@ -90,17 +104,24 @@ export class PiAgentLane implements AgentLanePort {
       lane,
       controlStore: options.controlStore,
       estimateContextTokens: async () => {
-        const current = await options.controlStore.snapshot(options.runId);
-        return new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow }).estimatedTokens;
+        return (await compileCurrentContext()).estimatedTokens;
       },
       getContextSnapshot: async () => {
-        const current = await options.controlStore.snapshot(options.runId);
-        const currentContext = new ContextCompiler().build({ runId: options.runId, lane, phase: current.phase, task: current.task, snapshot: current, contextWindow: profile.contextWindow });
+        const currentContext = await compileCurrentContext();
         return contextSnapshot(currentContext.manifest);
       },
       scheduling,
     });
-    return new PiAgentLane(options.runId, lane, options.controlStore, harness);
+    return new PiAgentLane(
+      options.runId,
+      lane,
+      options.controlStore,
+      harness,
+      async () => {
+        await scheduling.flush();
+        await options.controlStore.flushProjection(options.runId).catch(() => undefined);
+      },
+    );
   }
 
   public async prompt(text: string): Promise<AgentOutcome> {
@@ -149,7 +170,13 @@ export class PiAgentLane implements AgentLanePort {
   }
 
   public async close(): Promise<void> {
-    await this.harness.waitForIdle();
+    try {
+      await this.harness.waitForIdle();
+    } finally {
+      // Match Pi's explicit session/flush barrier: queued observability must
+      // reach durable storage before a lane becomes disposable.
+      await this.flushObservability().catch(() => undefined);
+    }
   }
 }
 

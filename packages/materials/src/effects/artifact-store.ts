@@ -10,6 +10,8 @@ export interface ArtifactMeta {
   sourceEffectId?: string;
   filename?: string;
   truncated?: boolean;
+  /** Skip projection.json for hot-path artifacts; the event log remains authoritative. */
+  persistProjection?: boolean;
   semantic?: Omit<ArtifactSemanticMetadata, "updatedSeq">;
 }
 
@@ -26,7 +28,7 @@ export class ArtifactStore {
 
   public async putText(runId: string, content: string, meta: ArtifactMeta = {}): Promise<ArtifactRef> {
     const artifact = await this.stageText(runId, content, meta);
-    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" });
+    await this.controlStore.dispatch(runId, { type: "artifact", generation: artifact.generation, artifact, lane: "executor" }, { persistProjection: meta.persistProjection });
     return (await this.controlStore.snapshot(runId)).artifacts[artifact.id] ?? artifact;
   }
 

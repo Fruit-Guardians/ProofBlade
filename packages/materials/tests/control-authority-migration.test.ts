@@ -92,6 +92,37 @@ test("legacy run_started is replayed, backed up, append-only migrated, and recov
   }
 });
 
+test("legacy migration repairs an unterminated event tail before appending its authority anchor", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-authority-torn-tail-"));
+  const state = join(root, "host-private-state");
+  try {
+    const runId = "LEGACY-TORN-TAIL-UPGRADE";
+    const task = demoTask(runId, root, config);
+    const runDir = join(root, "runs", runId);
+    await mkdir(runDir, { recursive: true });
+    await writeFile(join(runDir, "task.json"), `${canonicalJson(task)}\n`, "utf8");
+    const legacyStart = makeEvent(runId, 1, "run_started", "orchestrator", "main", { generation: 0, versionSnapshot: undefined });
+    const uncommittedTail = makeEvent(runId, 2, "model_usage", "model", "executor", { requestId: "uncommitted-legacy-tail" });
+    await writeFile(join(runDir, "events.jsonl"), `${canonicalJson(legacyStart)}\n${canonicalJson(uncommittedTail)}`, "utf8");
+
+    const upgraded = createServices(root, config, { authorityStateDirectory: state });
+    const snapshot = await upgraded.control.snapshot(runId);
+    assert.notEqual(snapshot.authorityHash, "LEGACY-UNTRUSTED");
+    const events = await upgraded.control.events(runId);
+    assert.deepEqual(events.map((event) => ({ seq: event.seq, type: event.type })), [
+      { seq: 1, type: "run_started" },
+      { seq: 2, type: "run_authority_migrated" },
+    ]);
+    const migrated = await readFile(join(runDir, "events.jsonl"), "utf8");
+    assert.equal(migrated.includes("uncommitted-legacy-tail"), false);
+    assert.ok(migrated.endsWith("\n"));
+    const backup = await readFile(join(runDir, "events.pre-authority-migration.jsonl"), "utf8");
+    assert.ok(backup.endsWith(canonicalJson(uncommittedTail)), "the forensic backup keeps the pre-repair tail");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("failed legacy migration remains replayable but read-only", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-authority-readonly-"));
   const state = join(root, "host-private-state");

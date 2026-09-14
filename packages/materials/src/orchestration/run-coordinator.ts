@@ -95,13 +95,13 @@ export class RunCoordinator {
     await this.ingress.complete(runId, action, status, reason);
   }
 
-  /** Move the durable competition projection, tolerating an idempotent race. */
-  public async setDomainPhase(runId: string, domainPhase: DomainPhase): Promise<void> {
+  /** Move the live durable phase projection, tolerating an idempotent race. */
+  public async setDomainPhase(runId: string, domainPhase: DomainPhase, reason?: string): Promise<void> {
     const genericPhase = genericPhaseForDomain(domainPhase);
     try {
       await this.control.dispatchTransaction(runId, (snapshot) => {
         const commands = [
-          ...(snapshot.domainPhase === domainPhase ? [] : [{ type: "set_domain_phase" as const, domainPhase, lane: "executor" as const }]),
+          ...(snapshot.domainPhase === domainPhase ? [] : [{ type: "set_domain_phase" as const, domainPhase, lane: "executor" as const, ...(reason ? { reason } : {}) }]),
           ...pathToPhase(snapshot.phase, genericPhase).map((phase) => ({ type: "start_phase" as const, phase, lane: "executor" as const })),
         ];
         return { commands, project: () => undefined };

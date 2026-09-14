@@ -27,7 +27,6 @@ import {
   type ToolFailureObservation,
 } from "../runtime/tool-repeat-breaker.js";
 import { SpillStore, type SpillArtifactWriter } from "../storage/spill-store.js";
-import { JsonlControlStore } from "../storage/jsonl-store.js";
 
 export const RUNTIME_SCENARIO_PROTOCOL_VERSION = "runtime-scenarios-v1";
 
@@ -421,7 +420,7 @@ async function evaluatePauseResumeReplay(context: RuntimeScenarioContext): Promi
   requireCondition((await services.control.snapshot(runId)).status === "PAUSED", "phase transition implicitly resumed a paused run");
   await services.control.dispatch(runId, { type: "resume" });
   const replayed = await services.control.replay(runId);
-  const persisted = await new JsonlControlStore(services.runsRoot).loadProjection(runId);
+  const persisted = await services.control.loadProjection(runId);
   requireCondition(replayed.status === "RUNNING", "explicit resume did not restore RUNNING status");
   requireCondition(Boolean(persisted) && projectionHash(replayed) === projectionHash(persisted!), "pause/resume replay projection diverged");
   return { status: replayed.status, phase: replayed.phase, replayParity: true };

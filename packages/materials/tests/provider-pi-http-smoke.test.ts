@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -18,6 +18,8 @@ import { CodingClaimVerifier } from "../src/verification/claim-verification.js";
 import { MAX_PROJECT_PROMPT_TOKENS, PiCodingLane } from "../src/runtime/coding-lane.js";
 import { createConfiguredModels, type ResolvedModelProfile } from "../src/runtime/lmstudio-provider.js";
 import type { SessionRuntimeCreateBroker } from "../src/recovery/session-resource-adapter.js";
+import { AblationPolicyController } from "../src/evaluation/ablation-policy.js";
+import { DEFAULT_HARNESS_POLICY } from "../src/evaluation/ablation.js";
 
 const apiKeyEnv = "PROOFBLADE_MOCK_PROVIDER_KEY";
 
@@ -82,6 +84,90 @@ test("Responses tool continuation preserves the complete previous input prefix",
     assert.match(JSON.stringify(firstInput[2]), /<proofblade-context/);
     assert.deepEqual(secondInput.slice(0, firstInput.length), firstInput, "the next tool continuation must append after the complete prior Provider input");
     assert.equal(requestBodies[0]?.prompt_cache_key, requestBodies[1]?.prompt_cache_key);
+  } finally {
+    await lane?.close();
+    delete process.env[apiKeyEnv];
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 50 });
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("update_phase refreshes dynamic context and strict routing within the same tool chain", async () => {
+  const requestBodies: Array<{ input?: unknown[] }> = [];
+  let requestCount = 0;
+  const server = createServer(async (request, response) => {
+    const chunks: string[] = [];
+    request.setEncoding("utf8");
+    for await (const chunk of request) chunks.push(String(chunk));
+    requestBodies.push(JSON.parse(chunks.join("")) as { input?: unknown[] });
+    requestCount += 1;
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    if (requestCount <= 2) {
+      const item = requestCount === 1
+        ? { type: "function_call", id: "fc-phase", call_id: "call-phase", name: "update_phase", arguments: JSON.stringify({ phase: "HYPOTHESIS", reason: "Move to a bounded falsifiable test." }), status: "completed" }
+        : { type: "function_call", id: "fc-route", call_id: "call-route", name: "mcp_call", arguments: JSON.stringify({ operation: "list" }), status: "completed" };
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item })}\n\n`);
+      response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+      response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: `resp-phase-${requestCount}`, status: "completed", output: [item], usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 } } })}\n\n`);
+      return;
+    }
+    const item = { type: "message", id: "msg-phase-done", role: "assistant", status: "completed", content: [{ type: "output_text", text: "phase route refreshed", annotations: [] }] };
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.added", output_index: 0, item: { ...item, content: [] } })}\n\n`);
+    response.write(`data: ${JSON.stringify({ type: "response.output_item.done", output_index: 0, item })}\n\n`);
+    response.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp-phase-done", status: "completed", output: [item], usage: { input_tokens: 120, output_tokens: 5, total_tokens: 125 } } })}\n\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const root = await mkdtemp(join(tmpdir(), "proofblade-live-phase-context-"));
+  let lane: PiCodingLane | undefined;
+  try {
+    process.env[apiKeyEnv] = "mock-key";
+    const config: ProofBladeConfig = {
+      schemaVersion: 1,
+      runtime: { piVersion: "0.83.0" },
+      storage: { runsDir: "runs", fixturesDir: "fixtures/runtime" },
+      modelProfiles: { executor: { provider: "mock-responses", api: "openai-responses", baseUrl: `http://127.0.0.1:${address.port}/v1`, model: "mock-model", modelDiscoveryPath: "/models", apiKeyEnv, contextWindow: 32_000, maxTokens: 256, requestTimeoutMs: 5_000, maxRetries: 0, input: ["text"] } },
+    };
+    const services = createServices(root, config);
+    const runId = "LIVE-PHASE-CONTEXT";
+    const task = demoTask(runId, root, config);
+    task.mode = "coding_assistant";
+    task.scope.allowed_workspace = root;
+    task.verification.required_reproductions = 0;
+    delete task.verification.command;
+    await services.control.createRun(runId, task);
+    const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts, services.journal, services.verifierJournal, services.verifier);
+    const decisions: string[] = [];
+    lane = await PiCodingLane.create({
+      runId,
+      projectRoot: root,
+      installRoot: root,
+      runDir: join(services.runsRoot, runId),
+      controlStore: services.control,
+      artifactStore: services.artifacts,
+      journal: services.journal,
+      claimVerifier: verifier,
+      config,
+      ablationPolicy: {
+        controller: new AblationPolicyController({ ...DEFAULT_HARNESS_POLICY, firstAction: "off", phaseRoute: "hard_gate", actionBundle: "off" }),
+        experimentId: "AB-LIVE-PHASE",
+        variantId: "strict",
+        caseId: "same-chain",
+        attempt: 1,
+        runId,
+        onDecision: (event) => { decisions.push(`${event.requestedTool}:${event.policyName}:${event.decision}`); },
+      },
+    });
+
+    const outcome = await lane.prompt("Advance the investigation and test the selected hypothesis.");
+    assert.equal(outcome.text, "phase route refreshed");
+    assert.equal(requestBodies.length, 3);
+    const secondInput = requestBodies[1]?.input ?? [];
+    const projections = secondInput.filter((item) => JSON.stringify(item).includes("<proofblade-context"));
+    assert.ok(projections.length >= 2, "the phase change must append a fresh dynamic projection in the same turn");
+    assert.match(JSON.stringify(projections.at(-1)), /domain_phase[^A-Z]+HYPOTHESIS/);
+    assert.ok(decisions.includes("mcp_call:phase_route:block"), "strict routing must read the updated durable phase before the next tool call");
   } finally {
     await lane?.close();
     delete process.env[apiKeyEnv];
@@ -439,6 +525,8 @@ test("PiCodingLane persists tool preparation before the first Provider request a
   } satisfies SessionRuntimeCreateBroker;
   try {
     services = createServices(root, config);
+    await mkdir(join(root, "skills", "ctf-web"), { recursive: true });
+    await writeFile(join(root, "skills", "ctf-web", "SKILL.md"), "---\nname: ctf-web\ndescription: Minimal web specialist fixture for routing coverage.\nmetadata:\n  user-invocable: \"false\"\n---\nUse the prepared HTTP evidence and keep conclusions tied to verifier rules.\n", "utf8");
     const runId = "PI-HTTP-PREFLIGHT";
     const task = fixtureTask(runId, "web-source-1", root, config);
     task.target = `REMOTE:http://127.0.0.1:${address.port}`;
@@ -507,6 +595,7 @@ test("PiCodingLane persists tool preparation before the first Provider request a
     assert.ok(!(firstRequest.messages ?? []).some((message) => messageText(message).includes(firstPrompt) && messageText(message).includes("[ProofBlade prepared CTF path]")));
     assert.doesNotMatch(messageText((firstRequest.messages ?? []).at(-1) ?? {}), /<proofblade-turn-guidance>[\s\S]*\[ProofBlade prepared CTF path\]/);
     const projectionText = messageText((firstRequest.messages ?? []).at(-1) ?? {});
+    assert.match(projectionText, /## Automatically routed specialist guidance[\s\S]*<skill name="ctf-web"/, "the lane must inject the selected specialist Skill without requiring a model load_skill call");
     const projectionMatch = projectionText.match(/<proofblade-context[^>]*dynamic-hash="([a-f0-9]{64})">\n([\s\S]*)\n<\/proofblade-context>/);
     assert.ok(projectionMatch, "the serialized context projection must expose its visible suffix hash");
     assert.equal(projectionMatch?.[1], sha256(projectionMatch?.[2] ?? ""), "dynamicSuffixHash must hash the bounded text sent to the Provider");
