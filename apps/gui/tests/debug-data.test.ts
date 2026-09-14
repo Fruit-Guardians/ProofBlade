@@ -288,6 +288,10 @@ test("folds a sealed projection tail without reconciling during GUI polling", as
         };
       };
     }).services.control;
+    const projectionPath = join(root, "runs", runId, "projection.json");
+    const projectionBefore = await readFile(projectionPath, "utf8");
+    const lastProjectedSeq = (JSON.parse(projectionBefore) as { lastSeq: number }).lastSeq;
+    await new Promise((resolve) => setTimeout(resolve, 20));
     await control.append(runId, [{
       schemaVersion: 1,
       lane: "executor",
@@ -298,7 +302,10 @@ test("folds a sealed projection tail without reconciling during GUI polling", as
     }], { persistProjection: false });
     control.reconcileProjection = async () => { throw new Error("GUI polling must not reconcile a sealed tail"); };
     const runs = await data.listRuns();
-    assert.ok(runs.some((item) => item.runId === runId));
+    const run = runs.find((item) => item.runId === runId);
+    assert.ok(run);
+    assert.equal(run.lastSeq, lastProjectedSeq + 1, "the list must expose the committed telemetry tail");
+    assert.equal(await readFile(projectionPath, "utf8"), projectionBefore, "GUI polling must not rewrite a stale sealed projection");
   } finally {
     await data.close().catch(() => undefined);
     await rm(root, { recursive: true, force: true });

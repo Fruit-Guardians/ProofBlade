@@ -232,24 +232,23 @@ export class DebugDataService {
   }
 
   private async runListSnapshot(runId: string, eventsStat: Stats): Promise<RunSnapshot> {
-    const projectionPath = join(this.services.runsRoot, runId, "projection.json");
-    let projectionHasSeal = false;
+    let verified: RunSnapshot | undefined;
     try {
       const [snapshot, projectionStat] = await Promise.all([
         this.services.control.loadProjection(runId),
-        stat(projectionPath),
+        stat(join(this.services.runsRoot, runId, "projection.json")),
       ]);
       if (snapshot
         && snapshot.runId === runId
         && snapshot.projectionHash === projectionHash(snapshot)
         && projectionStat.mtimeMs >= eventsStat.mtimeMs) return snapshot;
-      projectionHasSeal = await hasProjectionSeal(projectionPath);
+      verified = snapshot;
     } catch {
       // Missing, malformed, or stale projections are disposable. The event
       // stream remains authoritative and is repaired below.
     }
-    if (projectionHasSeal) {
-      // A valid sealed projection can be behind an append-only telemetry tail.
+    if (verified) {
+      // A verified projection can be behind an append-only telemetry tail.
       // Let ControlStore fold that tail in memory; the GUI list must not turn
       // its polling loop into a full replay-and-write maintenance job.
       return await this.services.control.snapshot(runId);
@@ -660,18 +659,6 @@ export class DebugDataService {
       if (attempt === 1) return { sessions, version, stable: false };
     }
     throw new Error("Unreachable session load state");
-  }
-}
-
-async function hasProjectionSeal(path: string): Promise<boolean> {
-  try {
-    const stored = JSON.parse(await readFile(path, "utf8")) as { proofbladeProjectionSeal?: Record<string, unknown> };
-    const seal = stored.proofbladeProjectionSeal;
-    return seal?.schemaVersion === 1
-      && typeof seal.eventPrefixHash === "string"
-      && typeof seal.authorityProof === "string";
-  } catch {
-    return false;
   }
 }
 
