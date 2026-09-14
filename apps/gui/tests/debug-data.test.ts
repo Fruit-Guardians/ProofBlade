@@ -238,7 +238,7 @@ test("Artifact previews are range-bounded and can be continued without reading t
   }
 });
 
-test("lists migration-tailed Runs from valid projections without replaying full event streams", async () => {
+test("replays Runs when a self-hashed projection is missing its durable seal", async () => {
   const root = await mkdtemp(join(tmpdir(), "proofblade-gui-run-list-projection-"));
   try {
     const data = new DebugDataService(root, config, join(root, "proofblade.config.json"));
@@ -249,19 +249,6 @@ test("lists migration-tailed Runs from valid projections without replaying full 
     delete legacyProjection.taskHash;
     legacyProjection.projectionHash = projectionHash(legacyProjection);
     await writeFile(join(root, "runs", runId, "projection.json"), `${JSON.stringify(legacyProjection)}\n`);
-    await appendFile(join(root, "runs", runId, "events.jsonl"), `${JSON.stringify({
-      schemaVersion: 1,
-      runId,
-      streamId: runId,
-      seq: legacyProjection.lastSeq + 1,
-      type: "run_authority_migrated",
-      payload: { taskHash: projection.taskHash, authorityHash: "a".repeat(64), migratedFrom: "legacy-v1" },
-    })}\n`);
-    const control = (data as unknown as {
-      services: { control: { snapshot: (requestedRunId: string) => Promise<RunSnapshot> } };
-    }).services.control;
-    control.snapshot = async () => { throw new Error("listRuns must not replay a current projection"); };
-
     const runs = await data.listRuns();
     const run = runs.find((item) => item.runId === runId);
     assert.ok(run);
