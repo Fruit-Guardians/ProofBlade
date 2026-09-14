@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ARTIFACT_PREVIEW_MAX_BYTES, DebugDataService, assistantTurnsFromEntries, assertRunId, boundedJsonByteSize, codingConversationTask, codingWorkspace, conversationMessagesFromEntries, correlateToolCalls, runKind } from "../src/debug-data.js";
@@ -255,6 +255,20 @@ test("replays Runs when a self-hashed projection is missing its durable seal", a
     assert.equal(run.kind, "chat");
     assert.equal(run.counts.tools, undefined);
     await data.close();
+    const sealed = JSON.parse(await readFile(join(root, "runs", runId, "projection.json"))) as { proofbladeProjectionSeal?: unknown };
+    assert.ok(sealed.proofbladeProjectionSeal, "the first cold read should backfill a durable projection seal");
+
+    const reopened = new DebugDataService(root, config, join(root, "proofblade.config.json"));
+    try {
+      const control = (reopened as unknown as {
+        services: { control: { snapshot: () => Promise<RunSnapshot> } };
+      }).services.control;
+      control.snapshot = async () => { throw new Error("sealed projection should avoid a second full replay"); };
+      const reopenedRuns = await reopened.listRuns();
+      assert.ok(reopenedRuns.some((item) => item.runId === runId));
+    } finally {
+      await reopened.close();
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }
